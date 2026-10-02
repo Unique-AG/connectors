@@ -48,7 +48,8 @@ _NOT_A_CALENDAR_HANDLE = (
     "outlook_list_calendar_shares takes a calendar handle in `calendar_ref`: "
     + "outlook:///calendars/{id}, exactly as outlook_list_calendars reported it in `uri`. "
     + "A calendar name is not a handle. An event handle is not a calendar handle. This tool read "
-    + "nothing. If you call this tool again with this value, the call will fail the same way."
+    + "nothing. If you call this tool again with the same arguments, the call will fail the same "
+    + "way."
 )
 
 

@@ -45,8 +45,8 @@ GRAPH_NOT_FOUND = (
     + "signed-in user cannot see it' with one 404. Report that this tool failed to read the "
     + "series. Do not report that the series ended. To find the series again, call "
     + "outlook_list_events for a window that holds one date of the series. Then pass the "
-    + "`series_master_uri` of that row to this tool. Retrying the same handle will fail "
-    + "identically."
+    + "`series_master_uri` of that row to this tool. If you call this tool again with the same "
+    + "arguments, the call will fail the same way."
 )
 
 DEFAULT_TIME_ZONE = "UTC"
@@ -74,7 +74,8 @@ _NOT_AN_EVENT_HANDLE = (
     + "  outlook:///events/{calendar_id}/{event_id}\n"
     + "Both ids are percent-encoded. Copy the `series_master_uri` of an outlook_list_events row, "
     + "and do not assemble one. A calendar handle, a mail handle, a subject line, and a bare "
-    + "event id are not event handles. Retrying this value will fail identically."
+    + "event id are not event handles. If you call this tool again with the same arguments, the "
+    + "call will fail the same way."
 )
 
 _NOT_A_ZONE = (
@@ -82,21 +83,23 @@ _NOT_A_ZONE = (
     + "argument takes an IANA zone name, such as `Europe/Zurich`, `America/New_York`, or `UTC`. "
     + "A Windows zone name, a city, a numeric offset, and an abbreviation such as `CEST` are not "
     + "IANA names. `Etc/GMT+2` does resolve, but it is two hours BEHIND UTC. `UTC` is the "
-    + "default. If the question is not about a time of day, omit the argument. Retrying this "
-    + "value will fail identically."
+    + "default. If the question is not about a time of day, omit the argument. If you call this "
+    + "tool again with the same arguments, the call will fail the same way."
 )
 
 _ENDS_BEFORE_STARTS = (
     "outlook_list_event_instances read nothing, because `ends_on` falls before `starts_on`. A "
     + "window cannot run backwards. Both arguments include what they name, so one date in both "
     + "bounds lists that one day. Put the earlier bound in `starts_on` and the later bound in "
-    + "`ends_on`. Retrying these values will fail identically."
+    + "`ends_on`. If you call this tool again with the same arguments, the call will fail the "
+    + "same way."
 )
 
 _DOES_NOT_REPEAT = (
     "outlook_list_event_instances read nothing, because this event is not part of a recurring "
     + "series. Only a series has instances. To read this event, call outlook_read_event with "
-    + "the same `uri`. Retrying this value will fail identically."
+    + "the same `uri`. If you call this tool again with the same arguments, the call will fail "
+    + "the same way."
 )
 
 _IS_ONE_DATE_OF_A_SERIES = (
@@ -226,7 +229,10 @@ def _not_a_series_master(event: Event, *, calendar_id: str) -> str:
     if event.series_master_id is None:
         return _DOES_NOT_REPEAT
     master = EventHandle(calendar_id, event.series_master_id)
-    return f"{_IS_ONE_DATE_OF_A_SERIES}{master.uri}\nRetrying this value will fail identically."
+    return (
+        f"{_IS_ONE_DATE_OF_A_SERIES}{master.uri}\n"
+        + "If you call this tool again with the same arguments, the call will fail the same way."
+    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

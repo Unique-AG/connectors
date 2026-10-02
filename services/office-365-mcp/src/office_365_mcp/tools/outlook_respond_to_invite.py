@@ -100,14 +100,16 @@ _PROPOSAL_ON_AN_ACCEPT = (
     "outlook_respond_to_invite was given `proposed_new_time` with the response `accept`. "
     + "Microsoft takes a new time only with a decline or a tentative response. NO RESPONSE WAS "
     + "SENT. To propose a new time, use `decline` or `tentative`. To accept the time of the "
-    + "organizer, remove `proposed_new_time`. Retrying these values will fail identically."
+    + "organizer, remove `proposed_new_time`. If you call this tool again with the same "
+    + "arguments, the call will fail the same way."
 )
 
 _PROPOSAL_WITH_NO_RESPONSE = (
     "outlook_respond_to_invite was given `proposed_new_time` with `send_response` false. "
     + "Microsoft sends a new time to the organizer only in a response, so a proposal needs "
     + "`send_response` true. NO RESPONSE WAS SENT. To propose a new time, set `send_response` to "
-    + "true. Retrying these values will fail identically."
+    + "true. If you call this tool again with the same arguments, the call will fail the same "
+    + "way."
 )
 
 _BACKWARD_PROPOSAL = (
@@ -122,8 +124,8 @@ def _bad_moment(argument: str, value: str) -> str:
         f"outlook_respond_to_invite was given {value!r} in `proposed_new_time.{argument}`, which "
         + "is not a local wall-clock time. Write it as `YYYY-MM-DDTHH:MM` or "
         + "`YYYY-MM-DDTHH:MM:SS`, with no offset and no `Z`. The zone goes in "
-        + "`proposed_new_time.time_zone` alone. NO RESPONSE WAS SENT. Retrying this value will "
-        + "fail identically."
+        + "`proposed_new_time.time_zone` alone. NO RESPONSE WAS SENT. If you call this tool again "
+        + "with the same arguments, the call will fail the same way."
     )
 
 
@@ -133,7 +135,8 @@ def _proposals_off(event: Event) -> str:
     return (
         f"{who} does not allow new time proposals for {_name(event)!r}, so Microsoft refuses "
         + "a proposal for it. NO RESPONSE WAS SENT. To respond with no new time, remove "
-        + "`proposed_new_time`. Retrying with `proposed_new_time` will fail identically."
+        + "`proposed_new_time`. If you call this tool again with the same arguments, the call "
+        + "will fail the same way."
     )
 
 

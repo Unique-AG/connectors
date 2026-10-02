@@ -50,7 +50,7 @@ _BAD_HANDLE = (
     + "outlook:///events/AAMkSYNTHETIC-cal-0001%3D/AAMkAGI2SYNTHETIC-immutable-0001%3D. "
     + "A subject line, a calendar handle, a message handle, and an Outlook web link are not "
     + "event handles. An attachment handle belongs to outlook_read_event_attachment. If you "
-    + "call this tool again with this value, the call will fail the same way."
+    + "call this tool again with the same arguments, the call will fail the same way."
 )
 
 GRAPH_NOT_FOUND = (
@@ -60,7 +60,7 @@ GRAPH_NOT_FOUND = (
     + "tool cannot tell which one it is. Report that this tool failed to list the attachments. "
     + "Do not report that the meeting was canceled. Find the event again with "
     + "outlook_list_events. Then list its attachments again with the new `uri`. If you call "
-    + "this tool again with this handle, the call will fail the same way."
+    + "this tool again with the same arguments, the call will fail the same way."
 )
 
 

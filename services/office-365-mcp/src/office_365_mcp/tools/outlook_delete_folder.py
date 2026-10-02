@@ -95,14 +95,15 @@ _DELETED_ITEMS_ITSELF = (
     "That handle addresses Deleted Items itself. outlook_delete_folder moves a folder to Deleted "
     + "Items, so it cannot delete Deleted Items. Nothing was deleted. This connector cannot erase "
     + "mail or folders. If the user wants to erase what Deleted Items holds, tell them to do that "
-    + "in Outlook. If you call this tool again with this handle, the call will fail the same way."
+    + "in Outlook. If you call this tool again with the same arguments, the call will fail the "
+    + "same way."
 )
 
 _ALREADY_IN_DELETED_ITEMS = (
     "That folder is already in Deleted Items, so outlook_delete_folder did not move it. Nothing "
     + "was deleted. This connector cannot erase mail or folders. If the user wants to erase the "
-    + "folder, tell them to do that in Outlook. If you call this tool again with this handle, the "
-    + "call will fail the same way."
+    + "folder, tell them to do that in Outlook. If you call this tool again with the same "
+    + "arguments, the call will fail the same way."
 )
 
 

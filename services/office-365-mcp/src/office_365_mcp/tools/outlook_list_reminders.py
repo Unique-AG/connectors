@@ -44,15 +44,16 @@ calendar holds a reminder.
 _ENDS_BEFORE_STARTS = (
     "outlook_list_reminders read nothing, because `ends_on` falls before `starts_on` and no "
     + "calendar holds a window that runs backwards. Put the earlier bound in `starts_on` and the "
-    + "later bound in `ends_on`. Then call again. Retrying with the same two will fail "
-    + "identically."
+    + "later bound in `ends_on`. Then call again. If you call this tool again with the same "
+    + "arguments, the call will fail the same way."
 )
 
 _NOT_A_ZONE = (
     "outlook_list_reminders read nothing, because it cannot resolve the name in `time_zone`. "
     + "This argument takes an IANA zone name, such as `Europe/Zurich`, `America/New_York`, or "
     + "`UTC`. A Windows zone name, a city, a numeric offset, and an abbreviation such as `CEST` "
-    + "do not work. Retrying with the same name will fail identically."
+    + "do not work. If you call this tool again with the same arguments, the call will fail the "
+    + "same way."
 )
 
 

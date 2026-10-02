@@ -76,14 +76,14 @@ _NOT_A_SHARE_HANDLE = (
     + "outlook:///calendarpermissions/{calendar_id}/{id}, exactly as "
     + "outlook_list_calendar_shares reported it in `uri`. A calendar handle is not a share "
     + "handle. An email address is not a share handle. Nothing was removed. If you call this tool "
-    + "again with this value, the call will fail the same way."
+    + "again with the same arguments, the call will fail the same way."
 )
 
 _NOT_REMOVABLE = (
     "Microsoft 365 marks this share as not removable, so outlook_unshare_calendar did not remove "
     + "it. The `My Organization` row is always like this, because it sets what the whole "
-    + "organization can see. Nothing was removed. If you call this tool again with this handle, "
-    + "the call will fail the same way."
+    + "organization can see. Nothing was removed. If you call this tool again with the same "
+    + "arguments, the call will fail the same way."
 )
 
 

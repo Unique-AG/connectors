@@ -76,26 +76,27 @@ _NOT_A_CALENDAR_HANDLE = (
     "outlook_delete_calendar takes a calendar handle in `calendar_ref`: "
     + "outlook:///calendars/{id}, exactly as outlook_list_calendars reported it in `uri`. "
     + "A calendar name is not a handle. An event handle is not a calendar handle. Nothing was "
-    + "deleted. If you call this tool again with this value, the call will fail the same way."
+    + "deleted. If you call this tool again with the same arguments, the call will fail the same "
+    + "way."
 )
 
 _THE_DEFAULT_CALENDAR = (
     "That handle names the default calendar of the mailbox. Microsoft Graph deletes only a "
     + "calendar other than the default calendar. Nothing was deleted. If you call this tool "
-    + "again with this handle, the call will fail the same way."
+    + "again with the same arguments, the call will fail the same way."
 )
 
 _NOT_REMOVABLE = (
     "Microsoft 365 marks this calendar as not removable from the mailbox, so "
     + "outlook_delete_calendar did not delete it. Nothing was deleted. If you call this tool "
-    + "again with this handle, the call will fail the same way."
+    + "again with the same arguments, the call will fail the same way."
 )
 
 _NOT_THE_OWNER = (
     "Microsoft 365 does not report the signed-in user as the owner of this calendar. Another "
     + "person owns it and shares it with the user, or this connector cannot tell who owns it. "
     + "This tool deletes only a calendar that the signed-in user owns. Nothing was deleted. If "
-    + "you call this tool again with this handle, the call will fail the same way."
+    + "you call this tool again with the same arguments, the call will fail the same way."
 )
 
 _HOLDS_AN_EVENT = (

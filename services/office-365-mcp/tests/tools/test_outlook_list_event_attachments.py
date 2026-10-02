@@ -226,7 +226,9 @@ class TestWhatItRefuses:
         assert graph.calls.call_count == 0
         assert "outlook_list_events" in str(refused.value)
         assert "outlook_read_event_attachment" in str(refused.value)
-        assert "again with this value, the call will fail the same way" in str(refused.value)
+        assert "again with the same arguments, the call will fail the same way" in str(
+            refused.value
+        )
 
     async def test_the_refusal_shows_a_handle_that_this_tool_accepts(
         self, client: GraphServiceClient
@@ -281,7 +283,10 @@ class TestHowItDeclaresItself:
         assert "outlook_list_events" in lister.GRAPH_NOT_FOUND
         assert "list its attachments again" in lister.GRAPH_NOT_FOUND.lower()
         assert "Do not report that the meeting was canceled" in lister.GRAPH_NOT_FOUND
-        assert "again with this handle, the call will fail the same way" in lister.GRAPH_NOT_FOUND
+        assert (
+            "again with the same arguments, the call will fail the same way"
+            in lister.GRAPH_NOT_FOUND
+        )
 
     async def test_it_announces_itself_as_reading_and_changing_nothing(
         self, transport: httpx.AsyncClient

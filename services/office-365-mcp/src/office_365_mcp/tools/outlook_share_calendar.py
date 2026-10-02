@@ -98,7 +98,8 @@ _NOT_A_CALENDAR_HANDLE = (
     "outlook_share_calendar takes a calendar handle in `calendar_ref`: "
     + "outlook:///calendars/{id}, exactly as outlook_list_calendars reported it in `uri`. "
     + "A calendar name is not a handle. An event handle is not a calendar handle. Nothing was "
-    + "shared. If you call this tool again with this value, the call will fail the same way."
+    + "shared. If you call this tool again with the same arguments, the call will fail the same "
+    + "way."
 )
 
 _NOT_ONE_ADDRESS = (
@@ -111,7 +112,7 @@ _NOT_ONE_ADDRESS = (
 _CANNOT_SHARE = (
     "Microsoft 365 reports that the signed-in user cannot share this calendar. Only the person "
     + "who created a calendar can share it. Nothing was shared. If you call this tool again with "
-    + "this handle, the call will fail the same way."
+    + "the same arguments, the call will fail the same way."
 )
 
 
