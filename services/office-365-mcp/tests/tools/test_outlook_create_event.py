@@ -3,6 +3,7 @@ and no address in it resolves anywhere."""
 
 import json
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Annotated, TypedDict, Unpack, cast
 from urllib.parse import quote
 
@@ -42,6 +43,7 @@ from office_365_mcp.shared.calendar import (
     STEP_CALENDAR,
     EventImportance,
     EventSensitivity,
+    RecurrenceRule,
     ShowAs,
 )
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
@@ -207,6 +209,7 @@ class _Options(TypedDict, total=False):
     hide_attendees: bool
     response_requested: bool
     allow_new_time_proposals: bool
+    recurrence: RecurrenceRule
 
 
 async def _create(
@@ -449,15 +452,14 @@ class TestWhatItSendsToGraph:
 
         assert _sent_at(create, 0)["transactionId"] != _sent_at(create, 1)["transactionId"]
 
-    @pytest.mark.parametrize("absent", ["recurrence", "attachments"])
-    async def test_nothing_it_sends_carries_a_property_no_argument_offers(
-        self, client: GraphServiceClient, graph: respx.MockRouter, absent: str
+    async def test_nothing_it_sends_carries_an_attachment_because_no_argument_offers_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         create = _ready(graph)
 
         _ = await _create(client, attendees=[_ADA], location="Room 3", body_html="<p>Agenda</p>")
 
-        assert absent not in _sent(create)
+        assert "attachments" not in _sent(create)
 
     @pytest.mark.parametrize(
         "absent",
@@ -471,6 +473,7 @@ class TestWhatItSendsToGraph:
             "hideAttendees",
             "responseRequested",
             "allowNewTimeProposals",
+            "recurrence",
         ],
     )
     async def test_an_option_the_call_leaves_out_never_reaches_graph(
@@ -1522,6 +1525,137 @@ class TestWhatItRefuses:
             _ = await _create(client, subject="")
 
 
+_TEN_MONDAYS = RecurrenceRule(
+    pattern_type="weekly", days_of_week=("monday",), range_type="numbered", number_of_occurrences=10
+)
+
+
+class TestASeries:
+    async def test_a_rule_reaches_graph_as_the_recurrence_of_the_one_event_it_creates(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA], recurrence=_TEN_MONDAYS)
+
+        assert create.call_count == 1
+        assert _sent(create)["recurrence"] == {
+            "pattern": {"type": "weekly", "interval": 1, "daysOfWeek": ["monday"]},
+            "range": {"type": "numbered", "startDate": "2026-03-02", "numberOfOccurrences": 10},
+        }
+
+    async def test_the_question_names_the_rule_before_anybody_is_invited(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[_ADA], recurrence=_TEN_MONDAYS, confirm=capturing)
+
+        assert asked[0].startswith(
+            f"Create 'Pricing review' from {_STARTS} to {_ENDS} UTC, repeating every week on "
+            + "Monday, 10 times and invite 1 person:"
+        )
+
+    async def test_a_rule_asks_under_another_transaction_id_than_the_same_event_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+        _ = await _create(client, attendees=[_ADA], recurrence=_TEN_MONDAYS)
+
+        assert _sent_at(create, 0)["transactionId"] != _sent_at(create, 1)["transactionId"]
+
+    async def test_a_series_nobody_is_told_about_asks_nobody(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, recurrence=_TEN_MONDAYS, confirm=counting)
+
+        assert asked == []
+        assert create.call_count == 1
+
+    @pytest.mark.parametrize(
+        ("rule", "said"),
+        [
+            (
+                RecurrenceRule(pattern_type="weekly", range_type="noEnd"),
+                "Add `days_of_week` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="noEnd", number_of_occurrences=10),
+                "Remove `number_of_occurrences` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="endDate", end_date=date(2026, 3, 1)
+                ),
+                "Give an `end_date` on or after 2026-03-02.",
+            ),
+        ],
+        ids=["weekly-without-days", "no-end-with-count", "ends-before-it-starts"],
+    )
+    async def test_a_rule_it_cannot_send_never_reaches_graph_and_says_what_to_change(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        rule: RecurrenceRule,
+        said: str,
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _create(client, attendees=[_ADA], recurrence=rule)
+
+        refusal = str(raised.value)
+        assert refusal.startswith("outlook_create_event cannot send this `recurrence`.")
+        assert said in refusal
+        assert refusal.endswith("NO EVENT WAS CREATED and nobody was invited.")
+        assert len(graph.calls) == 0
+
+    async def test_the_schema_root_stays_one_object_and_the_rule_is_a_nested_object(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert parameters["type"] == "object"
+        assert not {"anyOf", "oneOf", "allOf", "not"} & set(parameters)
+        published = _object(_object(parameters["properties"])["recurrence"])
+        assert published["anyOf"] == [{"$ref": "#/$defs/RecurrenceRule"}, {"type": "null"}]
+        assert published["default"] is None
+        rule = _object(_object(parameters["$defs"])["RecurrenceRule"])
+        assert rule["type"] == "object"
+        assert rule["required"] == ["pattern_type", "range_type"]
+
+    async def test_a_rule_outside_its_bounds_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run(
+                {
+                    **creator.GRAPH_CALL_EXAMPLE,
+                    "recurrence": {"pattern_type": "daily", "interval": 0, "range_type": "noEnd"},
+                }
+            )
+
+        assert len(graph.calls) == 0
+
+
 class TestTheTeamsMeetingACalendarDoesNotTake:
     async def test_a_teams_meeting_on_a_calendar_that_lists_other_providers_is_never_posted(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -2041,6 +2175,7 @@ class TestTheSchemaItPublishes:
             "hide_attendees",
             "response_requested",
             "allow_new_time_proposals",
+            "recurrence",
         }
 
     @pytest.mark.parametrize(
@@ -2108,9 +2243,7 @@ class TestTheSchemaItPublishes:
         properties = _object(parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
 
-    @pytest.mark.parametrize(
-        "word", ["recur", "repeat", "attach", "file", "upload", "calendar", "user"]
-    )
+    @pytest.mark.parametrize("word", ["repeat", "attach", "file", "upload", "calendar", "user"])
     async def test_no_argument_offers_something_this_tool_cannot_do(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
@@ -2246,7 +2379,7 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         lowered = description.casefold()
-        assert "no way to make it repeat" in lowered
+        assert "to make the event repeat, set `recurrence`" in lowered
         assert "no way to hide" not in lowered, "the description says the list cannot be hidden"
         assert "default calendar" in lowered
         assert (

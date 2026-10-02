@@ -43,7 +43,7 @@ from msgraph.generated.models.user import User
 from msgraph.generated.models.week_index import WeekIndex
 from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
@@ -56,6 +56,7 @@ from office_365_mcp.shared.calendar import (
     EventSummary,
     RecurrencePatternSummary,
     RecurrenceRangeSummary,
+    RecurrenceRule,
     RecurrenceSummary,
     ShowAs,
     WorkingHoursSummary,
@@ -67,7 +68,9 @@ from office_365_mcp.shared.calendar import (
     event_time,
     is_midnight,
     providers_without_teams,
+    recurrence_refusal,
     repeated_address,
+    series_reach,
     transaction_id_for,
     wall_clock,
     window_bounds,
@@ -93,6 +96,12 @@ _SIGNED_IN = User(
     id="00000000-0000-4000-8000-000000000001", mail=_MINE, user_principal_name=_MY_UPN
 )
 
+_TEN_MONDAYS = RecurrenceRule(
+    pattern_type="weekly", days_of_week=("monday",), range_type="numbered", number_of_occurrences=10
+)
+
+_FIRST_DAY = date(2026, 3, 2)
+
 
 def _draft(
     *,
@@ -116,6 +125,7 @@ def _draft(
     hide_attendees: bool | None = None,
     response_requested: bool | None = None,
     allow_new_time_proposals: bool | None = None,
+    recurrence: RecurrenceRule | None = None,
 ) -> EventDraft:
     return EventDraft(
         subject=subject,
@@ -138,6 +148,7 @@ def _draft(
         hide_attendees=hide_attendees,
         response_requested=response_requested,
         allow_new_time_proposals=allow_new_time_proposals,
+        recurrence=recurrence,
     )
 
 
@@ -962,8 +973,7 @@ class TestTheCreateBody:
         assert "location" not in body
         assert "attendees" not in body
 
-    @pytest.mark.parametrize("property_name", ["recurrence", "attachments"])
-    def test_it_never_names_a_property_no_tool_here_offers(self, property_name: str) -> None:
+    def test_it_never_names_an_attachment_because_no_tool_here_offers_one(self) -> None:
         draft = _draft(
             attendees=(_SOMEBODY_ELSE,),
             body_html="<p>Agenda attached.</p>",
@@ -973,7 +983,7 @@ class TestTheCreateBody:
 
         body = _payload(event_body(draft, transaction_id="synthetic-transaction"))
 
-        assert property_name not in body
+        assert "attachments" not in body
 
     @pytest.mark.parametrize(
         "property_name",
@@ -987,6 +997,7 @@ class TestTheCreateBody:
             "hideAttendees",
             "responseRequested",
             "allowNewTimeProposals",
+            "recurrence",
         ],
     )
     def test_it_never_names_an_option_the_draft_left_unset(self, property_name: str) -> None:
@@ -1517,6 +1528,574 @@ class TestTheTransactionId:
         composed = transaction_id_for("me", _draft())
 
         assert str(uuid.UUID(composed)) == composed
+
+    def test_a_rule_composes_another_id_than_the_same_event_with_none(self) -> None:
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) != transaction_id_for(
+            "me", _draft()
+        )
+
+    def test_the_same_rule_twice_composes_the_same_id(self) -> None:
+        again = RecurrenceRule(
+            pattern_type="weekly",
+            days_of_week=("monday",),
+            range_type="numbered",
+            number_of_occurrences=10,
+        )
+
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) == transaction_id_for(
+            "me", _draft(recurrence=again)
+        )
+
+    def test_the_same_days_in_another_order_compose_the_same_id(self) -> None:
+        one = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("monday", "friday"), range_type="noEnd"
+        )
+        other = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("friday", "monday"), range_type="noEnd"
+        )
+
+        assert transaction_id_for("me", _draft(recurrence=one)) == transaction_id_for(
+            "me", _draft(recurrence=other)
+        )
+
+    @pytest.mark.parametrize(
+        "other",
+        [
+            RecurrenceRule(
+                pattern_type="weekly",
+                interval=2,
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday", "tuesday"),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                first_day_of_week="monday",
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=11,
+            ),
+            RecurrenceRule(pattern_type="weekly", days_of_week=("monday",), range_type="noEnd"),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                range_type="endDate",
+                end_date=date(2026, 6, 30),
+            ),
+            RecurrenceRule(
+                pattern_type="relativeMonthly",
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+        ],
+        ids=["interval", "days", "first-day", "count", "no-end", "end-date", "pattern"],
+    )
+    def test_each_part_of_the_rule_is_in_the_id(self, other: RecurrenceRule) -> None:
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) != transaction_id_for(
+            "me", _draft(recurrence=other)
+        )
+
+
+class TestTheRuleItTakes:
+    def test_the_days_come_back_in_week_order_and_once_each(self) -> None:
+        rule = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("friday", "monday", "friday"), range_type="noEnd"
+        )
+
+        assert rule.days_of_week == ("monday", "friday")
+
+    def test_the_interval_is_one_when_the_call_names_none(self) -> None:
+        assert RecurrenceRule(pattern_type="daily", range_type="noEnd").interval == 1
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"interval": 0},
+            {"day_of_month": 0},
+            {"day_of_month": 32},
+            {"month": 0},
+            {"month": 13},
+            {"number_of_occurrences": 0},
+            {"pattern_type": "monthly"},
+            {"range_type": "forever"},
+            {"days_of_week": ["Mon"]},
+            {"index": "fifth"},
+        ],
+        ids=[
+            "interval",
+            "day-0",
+            "day-32",
+            "month-0",
+            "month-13",
+            "count",
+            "pattern",
+            "range",
+            "day-name",
+            "index",
+        ],
+    )
+    def test_a_value_outside_its_vocabulary_or_bounds_never_becomes_a_rule(
+        self, fields: dict[str, object]
+    ) -> None:
+        with pytest.raises(ValidationError):
+            _ = RecurrenceRule.model_validate(
+                {"pattern_type": "daily", "range_type": "noEnd", **fields}
+            )
+
+    def test_a_rule_cannot_change_once_it_is_made(self) -> None:
+        with pytest.raises(ValidationError):
+            _TEN_MONDAYS.interval = 2
+
+    def test_the_type_of_the_pattern_and_of_the_range_are_the_two_it_requires(self) -> None:
+        assert RecurrenceRule.model_json_schema()["required"] == ["pattern_type", "range_type"]
+
+    @pytest.mark.parametrize("name", list(RecurrenceRule.model_fields))
+    def test_every_field_says_what_it_is_in_15_to_60_words(self, name: str) -> None:
+        description = RecurrenceRule.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+
+class TestWhatARuleSays:
+    @pytest.mark.parametrize(
+        ("rule", "said"),
+        [
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    interval=2,
+                    days_of_week=("wednesday", "monday"),
+                    range_type="numbered",
+                    number_of_occurrences=10,
+                ),
+                "repeating every 2 weeks on Monday and Wednesday, 10 times",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="endDate", end_date=date(2026, 6, 30)
+                ),
+                "repeating every day until 2026-06-30",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", interval=3, range_type="noEnd"),
+                "repeating every 3 days with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("friday", "monday", "wednesday"),
+                    first_day_of_week="monday",
+                    range_type="numbered",
+                    number_of_occurrences=1,
+                ),
+                "repeating every week on Monday, Wednesday, and Friday (weeks start on Monday), "
+                + "1 time",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", interval=3, day_of_month=15, range_type="noEnd"
+                ),
+                "repeating every 3 months on day 15 with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("thursday", "friday"),
+                    range_type="noEnd",
+                ),
+                "repeating every month on the first Thursday or Friday with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("tuesday",),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                "repeating every month on the second Tuesday with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteYearly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                "repeating every year on March 15 with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeYearly",
+                    interval=2,
+                    days_of_week=("wednesday",),
+                    index="last",
+                    month=11,
+                    range_type="endDate",
+                    end_date=date(2030, 12, 31),
+                ),
+                "repeating every 2 years on the last Wednesday of November until 2030-12-31",
+            ),
+        ],
+        ids=[
+            "weekly-numbered",
+            "daily-until",
+            "daily-no-end",
+            "three-days-one-time",
+            "absolute-monthly",
+            "relative-monthly-default-index",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_each_rule_is_named_in_words(self, rule: RecurrenceRule, said: str) -> None:
+        assert draft_details(_draft(recurrence=rule)) == said
+
+    def test_the_rule_sits_after_the_whole_days_and_before_the_place(self) -> None:
+        details = draft_details(
+            _draft(
+                all_day=True,
+                starts_at="2026-03-02T00:00",
+                ends_at="2026-03-03T00:00",
+                recurrence=_TEN_MONDAYS,
+                location="Room 3",
+            )
+        )
+
+        assert details == (
+            "as an all-day event on 2026-03-02, repeating every week on Monday, 10 times, "
+            + "at 'Room 3'"
+        )
+
+
+class TestTheCreateBodyOfASeries:
+    @pytest.mark.parametrize(
+        ("rule", "pattern"),
+        [
+            (
+                RecurrenceRule(pattern_type="daily", interval=3, range_type="noEnd"),
+                {"type": "daily", "interval": 3},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    interval=2,
+                    days_of_week=("wednesday", "monday"),
+                    first_day_of_week="monday",
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "weekly",
+                    "interval": 2,
+                    "daysOfWeek": ["monday", "wednesday"],
+                    "firstDayOfWeek": "monday",
+                },
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", interval=3, day_of_month=15, range_type="noEnd"
+                ),
+                {"type": "absoluteMonthly", "interval": 3, "dayOfMonth": 15},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("thursday", "friday"),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "relativeMonthly",
+                    "interval": 1,
+                    "daysOfWeek": ["thursday", "friday"],
+                    "index": "second",
+                },
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteYearly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                {"type": "absoluteYearly", "interval": 1, "dayOfMonth": 15, "month": 3},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeYearly",
+                    days_of_week=("wednesday",),
+                    index="last",
+                    month=11,
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "relativeYearly",
+                    "interval": 1,
+                    "daysOfWeek": ["wednesday"],
+                    "index": "last",
+                    "month": 11,
+                },
+            ),
+        ],
+        ids=[
+            "daily",
+            "weekly",
+            "absolute-monthly",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_each_pattern_reaches_graph_with_the_fields_it_takes_and_no_others(
+        self, rule: RecurrenceRule, pattern: dict[str, object]
+    ) -> None:
+        body = _payload(event_body(_draft(recurrence=rule), transaction_id="synthetic"))
+
+        assert cast("dict[str, object]", body["recurrence"])["pattern"] == pattern
+
+    @pytest.mark.parametrize(
+        ("rule", "dates"),
+        [
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="endDate", end_date=date(2026, 6, 30)
+                ),
+                {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-30"},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="numbered", number_of_occurrences=10
+                ),
+                {"type": "numbered", "startDate": "2026-03-02", "numberOfOccurrences": 10},
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="noEnd"),
+                {"type": "noEnd", "startDate": "2026-03-02"},
+            ),
+        ],
+        ids=["end-date", "numbered", "no-end"],
+    )
+    def test_each_range_starts_on_the_date_of_the_start_and_names_no_zone_of_its_own(
+        self, rule: RecurrenceRule, dates: dict[str, object]
+    ) -> None:
+        body = _payload(event_body(_draft(recurrence=rule), transaction_id="synthetic"))
+
+        assert cast("dict[str, object]", body["recurrence"])["range"] == dates
+
+    def test_an_all_day_series_starts_on_the_date_of_its_first_midnight(self) -> None:
+        draft = _draft(
+            all_day=True,
+            starts_at="2026-03-09T00:00",
+            ends_at="2026-03-10T00:00",
+            recurrence=_TEN_MONDAYS,
+        )
+
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert cast("dict[str, dict[str, object]]", body["recurrence"])["range"]["startDate"] == (
+            "2026-03-09"
+        )
+
+
+_REFUSED = "outlook_create_event cannot send this `recurrence`."
+_NOTHING_HAPPENED = "NO EVENT WAS CREATED and nobody was invited."
+
+
+class TestWhatARuleIsRefusedFor:
+    @pytest.mark.parametrize(
+        ("rule", "said"),
+        [
+            (
+                RecurrenceRule(pattern_type="weekly", range_type="noEnd"),
+                "The `weekly` pattern needs `days_of_week`. Add `days_of_week` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteMonthly", range_type="noEnd"),
+                "The `absoluteMonthly` pattern needs `day_of_month`. Add `day_of_month` to "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="relativeMonthly", range_type="noEnd"),
+                "The `relativeMonthly` pattern needs `days_of_week`. Add `days_of_week` to "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteYearly", range_type="noEnd"),
+                "The `absoluteYearly` pattern needs `day_of_month` and `month`. Add "
+                + "`day_of_month` and `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteYearly", day_of_month=15, range_type="noEnd"),
+                "The `absoluteYearly` pattern needs `month`. Add `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="relativeYearly", range_type="noEnd"),
+                "The `relativeYearly` pattern needs `days_of_week` and `month`. Add "
+                + "`days_of_week` and `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="endDate"),
+                "The `endDate` range needs `end_date`. Add `end_date` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="numbered"),
+                "The `numbered` range needs `number_of_occurrences`. Add "
+                + "`number_of_occurrences` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="noEnd", end_date=date(2026, 6, 30)
+                ),
+                "The `noEnd` range takes no `end_date`. Remove `end_date` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="noEnd", number_of_occurrences=10),
+                "The `noEnd` range takes no `number_of_occurrences`. Remove "
+                + "`number_of_occurrences` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily",
+                    range_type="endDate",
+                    end_date=date(2026, 6, 30),
+                    number_of_occurrences=10,
+                ),
+                "The `endDate` range takes no `number_of_occurrences`. Remove "
+                + "`number_of_occurrences` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", days_of_week=("monday",), range_type="noEnd"),
+                "The `daily` pattern takes no `days_of_week`. Remove `days_of_week` from "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("monday",),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                "The `weekly` pattern takes no `index`. Remove `index` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                "The `absoluteMonthly` pattern takes no `month`. Remove `month` from "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("monday",),
+                    first_day_of_week="monday",
+                    range_type="noEnd",
+                ),
+                "The `relativeMonthly` pattern takes no `first_day_of_week`. Remove "
+                + "`first_day_of_week` from `recurrence`.",
+            ),
+        ],
+        ids=[
+            "weekly-without-days",
+            "absolute-monthly-without-day",
+            "relative-monthly-without-days",
+            "absolute-yearly-without-either",
+            "absolute-yearly-without-month",
+            "relative-yearly-without-either",
+            "end-date-without-date",
+            "numbered-without-count",
+            "no-end-with-date",
+            "no-end-with-count",
+            "end-date-with-count",
+            "daily-with-days",
+            "weekly-with-index",
+            "absolute-monthly-with-month",
+            "relative-monthly-with-first-day",
+        ],
+    )
+    def test_each_refusal_says_what_to_add_or_remove(self, rule: RecurrenceRule, said: str) -> None:
+        refusal = recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY)
+
+        assert refusal == f"{_REFUSED} {said} {_NOTHING_HAPPENED}"
+
+    def test_an_end_date_before_the_first_day_names_both_dates(self) -> None:
+        rule = RecurrenceRule(pattern_type="daily", range_type="endDate", end_date=date(2026, 3, 1))
+
+        refusal = recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY)
+
+        assert refusal == (
+            f"{_REFUSED} The `end_date` 2026-03-01 is before 2026-03-02, the date of `starts_at`. "
+            + f"Give an `end_date` on or after 2026-03-02. {_NOTHING_HAPPENED}"
+        )
+
+    @pytest.mark.parametrize(
+        "rule",
+        [
+            RecurrenceRule(pattern_type="daily", range_type="endDate", end_date=_FIRST_DAY),
+            _TEN_MONDAYS,
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                first_day_of_week="monday",
+                range_type="noEnd",
+            ),
+            RecurrenceRule(pattern_type="absoluteMonthly", day_of_month=2, range_type="noEnd"),
+            RecurrenceRule(
+                pattern_type="relativeMonthly",
+                days_of_week=("monday",),
+                index="first",
+                range_type="noEnd",
+            ),
+            RecurrenceRule(
+                pattern_type="absoluteYearly", day_of_month=2, month=3, range_type="noEnd"
+            ),
+            RecurrenceRule(
+                pattern_type="relativeYearly",
+                days_of_week=("monday",),
+                month=3,
+                range_type="noEnd",
+            ),
+        ],
+        ids=[
+            "ends-on-the-first-day",
+            "weekly-numbered",
+            "weekly-with-first-day",
+            "absolute-monthly",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_a_rule_with_what_its_types_need_is_not_refused(self, rule: RecurrenceRule) -> None:
+        assert recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY) is None
+
+    def test_no_rule_is_nothing_to_refuse(self) -> None:
+        assert recurrence_refusal("outlook_create_event", None, starts_on=_FIRST_DAY) is None
+
+
+class TestTheSeriesAChangeReaches:
+    def test_a_series_master_reaches_every_occurrence(self) -> None:
+        assert series_reach(Event(type=EventType.SeriesMaster)) == (
+            "The change applies to every occurrence of the series."
+        )
+
+    @pytest.mark.parametrize("kind", [EventType.Occurrence, EventType.Exception])
+    def test_one_date_of_a_series_reaches_only_that_date(self, kind: EventType) -> None:
+        assert series_reach(Event(type=kind)) == (
+            "The change applies only to this one date. The other occurrences of the series stay "
+            + "as they are."
+        )
+
+    @pytest.mark.parametrize("kind", [EventType.SingleInstance, None])
+    def test_an_event_in_no_series_says_nothing_about_one(self, kind: EventType | None) -> None:
+        assert series_reach(Event(type=kind)) == ""
 
 
 class TestTheCreateResponse:

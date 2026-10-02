@@ -16,7 +16,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import EventAttendee, confirmation_id_for, event_of
+from office_365_mcp.shared.calendar import (
+    EventAttendee,
+    confirmation_id_for,
+    event_of,
+    series_reach,
+)
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
@@ -136,9 +141,15 @@ def _question(event: Event, comment: str | None) -> str:
     invited = [_named(attendee) for attendee in event.attendees or []]
     name = event.subject or "this event"
     said = f" ({comment!r})" if comment else ""
-    return (
-        f"Cancel {name!r}? Microsoft mails a cancellation{said} to {', '.join(invited)}, and this "
-        + "connector cannot recall it."
+    return " ".join(
+        part
+        for part in (
+            f"Cancel {name!r}?",
+            series_reach(event),
+            f"Microsoft mails a cancellation{said} to {', '.join(invited)}, and this connector "
+            + "cannot recall it.",
+        )
+        if part
     )
 
 

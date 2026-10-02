@@ -35,6 +35,7 @@ from office_365_mcp.shared.calendar import (
     IMPORTANCE_FIELD,
     IS_REMINDER_ON_FIELD,
     NOBODY_INVITED_BUT_A_PLACE,
+    RECURRENCE_FIELD,
     REMINDER_MINUTES_FIELD,
     RESPONSE_REQUESTED_FIELD,
     ROOM_ADDRESSES_FIELD,
@@ -56,6 +57,7 @@ from office_365_mcp.shared.calendar import (
     EventImportance,
     EventSensitivity,
     EventTime,
+    RecurrenceRule,
     ShowAs,
     calendar_of,
     counted_people,
@@ -65,6 +67,7 @@ from office_365_mcp.shared.calendar import (
     event_time,
     is_midnight,
     providers_without_teams,
+    recurrence_refusal,
     repeated_address,
     spelled,
     transaction_id_for,
@@ -120,7 +123,8 @@ a real invitation.
 or a location. This tool creates nothing unless the user agrees. This tool creates an event \
 without that agreement only when there is no attendee, no room, and no location. Microsoft has \
 no draft state to hold that event for review first.
-- This tool creates a single occurrence, with no way to make it repeat.
+- To make the event repeat, set `recurrence`. This tool then creates the whole series in one \
+call.
 - If a call times out, do not call this tool again first. An invitation can already be out. \
 Before you create the event again, make sure that outlook_list_events does not already show it.
 """
@@ -372,6 +376,7 @@ async def create_event(
     hide_attendees: bool | None = None,
     response_requested: bool | None = None,
     allow_new_time_proposals: bool | None = None,
+    recurrence: RecurrenceRule | None = None,
     confirm: Confirm,
 ) -> CreatedEvent | InputRequiredResult:
     """Read the calendar, ask a person when the event names anybody or any place, then create it.
@@ -401,6 +406,7 @@ async def create_event(
         hide_attendees=hide_attendees,
         response_requested=response_requested,
         allow_new_time_proposals=allow_new_time_proposals,
+        recurrence=recurrence,
     )
 
     created: Event | None = None
@@ -460,6 +466,7 @@ def _drafted(
     hide_attendees: bool | None,
     response_requested: bool | None,
     allow_new_time_proposals: bool | None,
+    recurrence: RecurrenceRule | None,
 ) -> EventDraft:
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
@@ -467,6 +474,9 @@ def _drafted(
         raise ToolError(_ENDS_BEFORE_IT_STARTS)
     if all_day and not (is_midnight(opens) and is_midnight(closes)):
         raise ToolError(_not_midnight(starts_at, ends_at))
+    refusal = recurrence_refusal(TOOL_NAME, recurrence, starts_on=opens.date())
+    if refusal is not None:
+        raise ToolError(refusal)
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
     rooms = _addresses(room_addresses, argument="room_addresses")
@@ -495,6 +505,7 @@ def _drafted(
         hide_attendees=hide_attendees,
         response_requested=response_requested,
         allow_new_time_proposals=allow_new_time_proposals,
+        recurrence=recurrence,
     )
 
 
@@ -766,6 +777,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         allow_new_time_proposals: Annotated[
             bool | None, Field(description=ALLOW_NEW_TIME_PROPOSALS_FIELD)
         ] = None,
+        recurrence: Annotated[RecurrenceRule | None, Field(description=RECURRENCE_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> CreatedEvent | InputRequiredResult:
         return await create_event(
@@ -790,5 +802,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             hide_attendees=hide_attendees,
             response_requested=response_requested,
             allow_new_time_proposals=allow_new_time_proposals,
+            recurrence=recurrence,
             confirm=a_person_agrees(ctx),
         )

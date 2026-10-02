@@ -27,6 +27,7 @@ from office_365_mcp.shared.calendar import (
     invited_attendee,
     repeated_address,
     resource_addresses,
+    series_reach,
     wall_clock,
     zone_named,
 )
@@ -347,9 +348,15 @@ def _question(before: Event, patch: EventPatch) -> str:
         )
     name = before.subject or "this event"
     said = "; ".join(changes)
-    return (
-        f"Update {name!r}: change {said}? Microsoft mails every current attendee about this "
-        + "change, and this connector cannot recall it."
+    return " ".join(
+        part
+        for part in (
+            f"Update {name!r}: change {said}?",
+            series_reach(before),
+            "Microsoft mails every current attendee about this change, and this connector cannot "
+            + "recall it.",
+        )
+        if part
     )
 
 

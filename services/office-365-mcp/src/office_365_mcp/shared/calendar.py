@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -39,7 +39,7 @@ from msgraph.generated.users.item.calendars.item.events.item.event_item_request_
     EventItemRequestBuilder,
 )
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
@@ -148,6 +148,13 @@ ALLOW_NEW_TIME_PROPOSALS_FIELD = (
     + "Null sends nothing, and Microsoft then uses true, so attendees can propose a new time."
 )
 
+RECURRENCE_FIELD = (
+    "Set this parameter to make the event repeat as a series. Null creates one event that does "
+    + "not repeat. The series starts on the date of `starts_at` and uses `time_zone`. Give a "
+    + "`starts_at` on a date that fits the pattern. Otherwise the first occurrence comes on a "
+    + "later date."
+)
+
 STORED_SHOW_AS_FIELD = (
     "The free-busy status as Microsoft stored it, read from the response and not from the "
     + "arguments. Microsoft can also report `unknown`. This field is null when Graph did not say."
@@ -224,6 +231,65 @@ type ShowAs = Literal["free", "tentative", "busy", "oof", "workingElsewhere"]
 type EventImportance = Literal["low", "normal", "high"]
 
 type EventSensitivity = Literal["normal", "personal", "private", "confidential"]
+
+_WEEK: tuple[DayName, ...] = (
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+)
+
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+_PATTERN_NEEDS: Mapping[PatternType, tuple[str, ...]] = {
+    "daily": (),
+    "weekly": ("days_of_week",),
+    "absoluteMonthly": ("day_of_month",),
+    "relativeMonthly": ("days_of_week",),
+    "absoluteYearly": ("day_of_month", "month"),
+    "relativeYearly": ("days_of_week", "month"),
+}
+
+_UNITS: Mapping[PatternType, str] = {
+    "daily": "day",
+    "weekly": "week",
+    "absoluteMonthly": "month",
+    "relativeMonthly": "month",
+    "absoluteYearly": "year",
+    "relativeYearly": "year",
+}
+
+_PATTERN_ALSO_TAKES: Mapping[PatternType, tuple[str, ...]] = {
+    "weekly": ("first_day_of_week",),
+    "relativeMonthly": ("index",),
+    "relativeYearly": ("index",),
+}
+
+_PATTERN_PARTS = ("days_of_week", "day_of_month", "month", "index", "first_day_of_week")
+
+_RANGE_NEEDS: Mapping[RangeType, tuple[str, ...]] = {
+    "endDate": ("end_date",),
+    "numbered": ("number_of_occurrences",),
+    "noEnd": (),
+}
+
+_RANGE_PARTS = ("end_date", "number_of_occurrences")
 
 _SHOWN_AS: Mapping[ShowAs, str] = {
     "free": "free",
@@ -370,6 +436,100 @@ class RecurrenceSummary(BaseModel):
             pattern=None if pattern is None else RecurrencePatternSummary.from_pattern(pattern),
             range=None if dates is None else RecurrenceRangeSummary.from_range(dates),
         )
+
+
+class RecurrenceRule(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    pattern_type: PatternType = Field(
+        description=(
+            "How the series repeats: `daily`, `weekly`, `absoluteMonthly`, `relativeMonthly`, "
+            + "`absoluteYearly`, or `relativeYearly`. An absolute pattern names a day of the "
+            + "month, for example the 15th. A relative pattern names a weekday and its position "
+            + "in the month, for example the second Tuesday."
+        )
+    )
+    interval: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "The number of units between two occurrences, 1 or more. The unit is days for "
+            + "`daily`, weeks for `weekly`, months for a monthly pattern, and years for a yearly "
+            + "pattern. For example, 2 on a `weekly` pattern means every other week."
+        ),
+    )
+    days_of_week: tuple[DayName, ...] = Field(
+        default=(),
+        description=(
+            "The weekdays on which the series occurs, in lowercase English, for example "
+            + "`monday`. A `weekly`, `relativeMonthly`, or `relativeYearly` pattern needs one or "
+            + "more days, and the other patterns take none. A relative pattern with two or more "
+            + "days falls on the first day that fits."
+        ),
+    )
+    day_of_month: int | None = Field(
+        default=None,
+        ge=1,
+        le=31,
+        description=(
+            "The day of the month on which the series occurs, from 1 to 31. An "
+            + "`absoluteMonthly` or an `absoluteYearly` pattern needs this value, and the other "
+            + "patterns take none."
+        ),
+    )
+    month: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description=(
+            "The month in which the series occurs, as a number from 1 to 12. An "
+            + "`absoluteYearly` or a `relativeYearly` pattern needs this value, and the other "
+            + "patterns take none."
+        ),
+    )
+    index: WeekIndexName | None = Field(
+        default=None,
+        description=(
+            "The position in the month of the weekday that the series occurs on: `first`, "
+            + "`second`, `third`, `fourth`, or `last`. Only a relative pattern takes this value. "
+            + "Null sends nothing, and Microsoft then uses `first`."
+        ),
+    )
+    first_day_of_week: DayName | None = Field(
+        default=None,
+        description=(
+            "The day that Microsoft counts as the start of the week, in lowercase English. Only a "
+            + "`weekly` pattern takes this value. Null sends nothing, and Microsoft then uses "
+            + "`sunday`."
+        ),
+    )
+    range_type: RangeType = Field(
+        description=(
+            "How the series ends: `endDate` on the date in `end_date`, `numbered` after the "
+            + "count in `number_of_occurrences`, or `noEnd` with no end."
+        )
+    )
+    end_date: date | None = Field(
+        default=None,
+        description=(
+            "The last date on which the series can occur, as `YYYY-MM-DD`, on or after the date "
+            + "of `starts_at`. An `endDate` range needs this value, and the other ranges take "
+            + "none. The last occurrence can fall before this date."
+        ),
+    )
+    number_of_occurrences: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "How many times the series occurs, 1 or more. A `numbered` range needs this value, "
+            + "and the other ranges take none."
+        ),
+    )
+
+    @field_validator("days_of_week")
+    @classmethod
+    def _in_week_order(cls, days: tuple[DayName, ...]) -> tuple[DayName, ...]:
+        return tuple(day for day in _WEEK if day in days)
 
 
 class EventTime(BaseModel):
@@ -748,6 +908,49 @@ class EventDraft:
     hide_attendees: bool | None = None
     response_requested: bool | None = None
     allow_new_time_proposals: bool | None = None
+    recurrence: RecurrenceRule | None = None
+
+
+def recurrence_refusal(tool: str, rule: RecurrenceRule | None, *, starts_on: date) -> str | None:
+    problem = None if rule is None else _rule_problem(rule, starts_on=starts_on)
+    if problem is None:
+        return None
+    return (
+        f"{tool} cannot send this `recurrence`. {problem} NO EVENT WAS CREATED and nobody was "
+        + "invited."
+    )
+
+
+def _rule_problem(rule: RecurrenceRule, *, starts_on: date) -> str | None:
+    dumped = cast("Mapping[str, object]", rule.model_dump(exclude_none=True))
+    given = {name for name, value in dumped.items() if value != ()}
+    needs = _PATTERN_NEEDS[rule.pattern_type]
+    ends_with = _RANGE_NEEDS[rule.range_type]
+    for owner, wanted, taken, parts in (
+        (
+            f"The `{rule.pattern_type}` pattern",
+            needs,
+            (*needs, *_PATTERN_ALSO_TAKES.get(rule.pattern_type, ())),
+            _PATTERN_PARTS,
+        ),
+        (f"The `{rule.range_type}` range", ends_with, ends_with, _RANGE_PARTS),
+    ):
+        missing = [name for name in wanted if name not in given]
+        if missing:
+            return f"{owner} needs {_named(missing)}. Add {_named(missing)} to `recurrence`."
+        extra = [name for name in parts if name in given and name not in taken]
+        if extra:
+            return f"{owner} takes no {_named(extra)}. Remove {_named(extra)} from `recurrence`."
+    if rule.end_date is not None and rule.end_date < starts_on:
+        return (
+            f"The `end_date` {rule.end_date} is before {starts_on}, the date of `starts_at`. Give "
+            + f"an `end_date` on or after {starts_on}."
+        )
+    return None
+
+
+def _named(names: Sequence[str]) -> str:
+    return " and ".join(f"`{name}`" for name in names)
 
 
 def draft_details(draft: EventDraft) -> str:
@@ -755,6 +958,7 @@ def draft_details(draft: EventDraft) -> str:
         detail
         for detail in (
             _whole_days(draft) if draft.all_day else "",
+            "" if draft.recurrence is None else _repeats(draft.recurrence),
             f"at {cut_for_a_question(draft.location)!r}" if draft.location else "",
             _rooms_booked(draft.room_addresses),
             "as a Teams meeting" if draft.online_meeting else "",
@@ -823,6 +1027,87 @@ def _whole_days(draft: EventDraft) -> str:
     return f"as an all-day event from {first} to {last}"
 
 
+def _repeats(rule: RecurrenceRule) -> str:
+    return f"repeating {_how_often(rule)}{_until(rule)}"
+
+
+def _how_often(rule: RecurrenceRule) -> str:
+    unit = _UNITS[rule.pattern_type]
+    every = f"every {unit}" if rule.interval == 1 else f"every {rule.interval} {unit}s"
+    relative = f"the {rule.index or 'first'} {_days(rule.days_of_week, 'or')}"
+    match rule.pattern_type:
+        case "daily":
+            return every
+        case "weekly":
+            week = (
+                ""
+                if rule.first_day_of_week is None
+                else f" (weeks start on {rule.first_day_of_week.title()})"
+            )
+            return f"{every} on {_days(rule.days_of_week, 'and')}{week}"
+        case "absoluteMonthly":
+            return f"{every} on day {rule.day_of_month}"
+        case "relativeMonthly":
+            return f"{every} on {relative}"
+        case "absoluteYearly":
+            return f"{every} on {_month(rule.month)} {rule.day_of_month}"
+        case "relativeYearly":
+            return f"{every} on {relative} of {_month(rule.month)}"
+
+
+def _until(rule: RecurrenceRule) -> str:
+    match rule.range_type:
+        case "numbered":
+            count = rule.number_of_occurrences
+            return f", {count} {'time' if count == 1 else 'times'}"
+        case "endDate":
+            return f" until {rule.end_date}"
+        case "noEnd":
+            return " with no end"
+
+
+def _days(days: Sequence[DayName], joiner: str) -> str:
+    named = [day.title() for day in days]
+    if len(named) <= 2:
+        return f" {joiner} ".join(named)
+    return f"{', '.join(named[:-1])}, {joiner} {named[-1]}"
+
+
+def _month(month: int | None) -> str:
+    assert month is not None, "a yearly rule names its month before a draft holds it"
+    return _MONTHS[month - 1]
+
+
+def _first_day(draft: EventDraft) -> date:
+    opens = wall_clock(draft.starts_at)
+    assert opens is not None, (
+        "a draft holds a start that the create already read as a wall-clock time"
+    )
+    return opens.date()
+
+
+def _patterned(rule: RecurrenceRule, *, starts_on: date) -> PatternedRecurrence:
+    return PatternedRecurrence(
+        pattern=RecurrencePattern(
+            type=RecurrencePatternType(rule.pattern_type),
+            interval=rule.interval,
+            days_of_week=[DayOfWeek(day) for day in rule.days_of_week] or None,
+            day_of_month=rule.day_of_month,
+            month=rule.month,
+            index=None if rule.index is None else WeekIndex(rule.index),
+            first_day_of_week=(
+                None if rule.first_day_of_week is None else DayOfWeek(rule.first_day_of_week)
+            ),
+        ),
+        range=RecurrenceRange(
+            type=RecurrenceRangeType(rule.range_type),
+            start_date=starts_on,
+            end_date=rule.end_date,
+            number_of_occurrences=rule.number_of_occurrences,
+        ),
+    )
+
+
 def _body_described(body_html: str) -> str:
     preview = body_opening(body_html)
     counted = f"with a body of {len(body_html)} characters"
@@ -859,6 +1144,11 @@ def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
         hide_attendees=draft.hide_attendees,
         response_requested=draft.response_requested,
         allow_new_time_proposals=draft.allow_new_time_proposals,
+        recurrence=(
+            None
+            if draft.recurrence is None
+            else _patterned(draft.recurrence, starts_on=_first_day(draft))
+        ),
         transaction_id=transaction_id,
     )
 
@@ -918,6 +1208,7 @@ def transaction_id_for(target: str, draft: EventDraft) -> str:
         draft.body_html or "",
         "online" if draft.online_meeting else "offline",
         *_options(draft),
+        *_rule_spelled(draft.recurrence),
     )
 
 
@@ -939,6 +1230,21 @@ def _options(draft: EventDraft) -> list[str]:
         *_listed(draft.categories),
         *_listed(draft.room_addresses),
     ]
+
+
+def _rule_spelled(rule: RecurrenceRule | None) -> list[str]:
+    return [] if rule is None else [rule.model_dump_json()]
+
+
+def series_reach(event: Event) -> str:
+    if event.type == EventType.SeriesMaster:
+        return "The change applies to every occurrence of the series."
+    if event.type in (EventType.Occurrence, EventType.Exception):
+        return (
+            "The change applies only to this one date. The other occurrences of the series stay "
+            + "as they are."
+        )
+    return ""
 
 
 def _canonical(*fields: str) -> str:

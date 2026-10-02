@@ -3,6 +3,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, cast
 
 import httpx
@@ -35,6 +36,7 @@ from office_365_mcp.shared.calendar import (
     EventDraft,
     EventImportance,
     EventSensitivity,
+    RecurrenceRule,
     ShowAs,
     transaction_id_for,
 )
@@ -325,6 +327,7 @@ async def _called(
         hide_attendees=cast("bool | None", arguments.get("hide_attendees")),
         response_requested=cast("bool | None", arguments.get("response_requested")),
         allow_new_time_proposals=cast("bool | None", arguments.get("allow_new_time_proposals")),
+        recurrence=cast("RecurrenceRule | None", arguments.get("recurrence")),
         confirm=cast("Confirm", arguments["confirm"]),
     )
 
@@ -499,15 +502,14 @@ class TestWhatItSendsToGraph:
 
         assert "attendees" not in _sent(create)
 
-    @pytest.mark.parametrize("absent", ["recurrence", "attachments"])
-    async def test_nothing_it_sends_carries_a_property_no_argument_offers(
-        self, client: GraphServiceClient, graph: respx.MockRouter, absent: str
+    async def test_nothing_it_sends_carries_an_attachment_because_no_argument_offers_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         create = _ready(graph)
 
         _ = await _create(client, attendees=[_ADA])
 
-        assert absent not in _sent(create)
+        assert "attachments" not in _sent(create)
 
     @pytest.mark.parametrize(
         "absent",
@@ -521,6 +523,7 @@ class TestWhatItSendsToGraph:
             "hideAttendees",
             "responseRequested",
             "allowNewTimeProposals",
+            "recurrence",
         ],
     )
     async def test_an_option_the_call_leaves_out_never_reaches_graph(
@@ -1431,6 +1434,96 @@ class TestWhatItRefuses:
             _ = await _create(client, subject="")
 
 
+_EVERY_OTHER_TUESDAY = RecurrenceRule(
+    pattern_type="weekly",
+    interval=2,
+    days_of_week=("tuesday",),
+    range_type="endDate",
+    end_date=date(2026, 6, 30),
+)
+
+
+class TestASeries:
+    async def test_a_rule_reaches_the_shared_calendar_as_the_recurrence_of_the_event(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA], recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert _sent(create)["recurrence"] == {
+            "pattern": {"type": "weekly", "interval": 2, "daysOfWeek": ["tuesday"]},
+            "range": {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-30"},
+        }
+
+    async def test_the_question_names_the_rule_under_the_owners_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, attendees=[_ADA], recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert question.startswith(
+            f"Create {_SUBJECT!r} on the calendar of {_OWNER_NAME!r}, as {_OWNER_NAME!r}, from "
+            + f"{_STARTS_AT} to {_ENDS_AT} UTC, repeating every 2 weeks on Tuesday until "
+            + "2026-06-30?"
+        )
+
+    async def test_the_answer_is_bound_to_an_id_that_carries_the_rule(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+        series = EventDraft(
+            subject=_SUBJECT,
+            starts_at=_STARTS_AT,
+            ends_at=_ENDS_AT,
+            time_zone="UTC",
+            attendees=(),
+            optional_attendees=(),
+            body_html=None,
+            location=None,
+            all_day=False,
+            online_meeting=False,
+            recurrence=_EVERY_OTHER_TUESDAY,
+        )
+
+        _ = await _create(client, recurrence=_EVERY_OTHER_TUESDAY)
+
+        assert _sent(create)["transactionId"] == transaction_id_for(_CALENDAR_ID, series)
+        assert _sent(create)["transactionId"] != _TRANSACTION
+
+    async def test_a_rule_it_cannot_send_never_reaches_graph_and_says_what_to_add(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _create(
+                client,
+                recurrence=RecurrenceRule(pattern_type="relativeYearly", range_type="noEnd"),
+            )
+
+        assert str(raised.value) == (
+            "outlook_create_event_on_behalf cannot send this `recurrence`. The `relativeYearly` "
+            + "pattern needs `days_of_week` and `month`. Add `days_of_week` and `month` to "
+            + "`recurrence`. NO EVENT WAS CREATED and nobody was invited."
+        )
+        assert len(graph.calls) == 0
+
+    async def test_the_schema_root_stays_one_object_and_the_rule_is_a_nested_object(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        assert parameters["type"] == "object"
+        assert not {"anyOf", "oneOf", "allOf", "not"} & set(parameters)
+        properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
+        assert properties["recurrence"]["anyOf"] == [
+            {"$ref": "#/$defs/RecurrenceRule"},
+            {"type": "null"},
+        ]
+
+
 class TestTheRetryItRefuses:
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_create_graph_answers_503_is_never_posted_a_second_time(
@@ -1796,12 +1889,11 @@ class TestTheSchemaItPublishes:
             "hide_attendees",
             "response_requested",
             "allow_new_time_proposals",
+            "recurrence",
         }
 
-    @pytest.mark.parametrize(
-        "word", ["recur", "repeat", "attach", "series", "cancel", "user", "mailbox"]
-    )
-    async def test_no_argument_offers_a_series_an_attachment_or_another_mailbox(
+    @pytest.mark.parametrize("word", ["repeat", "attach", "series", "cancel", "user", "mailbox"])
+    async def test_no_argument_offers_an_attachment_a_cancel_or_another_mailbox(
         self, transport: httpx.AsyncClient, word: str
     ) -> None:
         parameters, _tool = await _registered(transport)

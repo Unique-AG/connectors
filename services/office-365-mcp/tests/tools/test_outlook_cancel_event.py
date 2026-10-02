@@ -40,6 +40,7 @@ def _event(
     attendees: Sequence[Mapping[str, object]] = (),
     is_organizer: bool | None = True,
     organizer: Mapping[str, object] | None = None,
+    kind: str = "singleInstance",
 ) -> dict[str, object]:
     return {
         "id": _EVENT_ID,
@@ -49,7 +50,7 @@ def _event(
         "end": {"dateTime": "2026-03-02T15:00:00.0000000", "timeZone": "UTC"},
         "isAllDay": False,
         "isCancelled": False,
-        "type": "singleInstance",
+        "type": kind,
         "seriesMasterId": None,
         "sensitivity": "normal",
         "showAs": "busy",
@@ -214,6 +215,60 @@ class TestThePersonBetweenTheRequestAndTheCancellationMail:
         question = asked[0]
         assert "Weekly sync" in question
         assert "No longer needed" in question
+
+    @pytest.mark.parametrize(
+        ("kind", "said"),
+        [
+            ("seriesMaster", "The change applies to every occurrence of the series."),
+            (
+                "occurrence",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+            (
+                "exception",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+        ],
+    )
+    async def test_the_question_says_how_much_of_a_series_the_cancel_reaches(
+        self, client: GraphServiceClient, graph: respx.MockRouter, kind: str, said: str
+    ) -> None:
+        _ = _reads(graph, _event(subject="Weekly sync", attendees=[_attendee(_ADA)], kind=kind))
+        _ = _cancels(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _cancel(client, confirm=capturing)
+
+        assert asked == [
+            f"Cancel 'Weekly sync'? {said} Microsoft mails a cancellation to {_ADA}, and this "
+            + "connector cannot recall it."
+        ]
+
+    async def test_the_question_about_a_single_event_names_no_series(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(subject="Weekly sync", attendees=[_attendee(_ADA)]))
+        _ = _cancels(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _cancel(client, confirm=capturing)
+
+        assert asked == [
+            f"Cancel 'Weekly sync'? Microsoft mails a cancellation to {_ADA}, and this connector "
+            + "cannot recall it."
+        ]
 
 
 class TestWhatItRefuses:

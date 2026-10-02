@@ -51,6 +51,7 @@ def _event(
     attendees: Sequence[Mapping[str, object]] = (),
     is_organizer: bool | None = True,
     organizer: Mapping[str, object] | None = None,
+    kind: str = "singleInstance",
 ) -> dict[str, object]:
     return {
         "id": _EVENT_ID,
@@ -60,7 +61,7 @@ def _event(
         "end": dict(end) if end is not None else _moment("2026-03-02T15:00:00.0000000"),
         "isAllDay": False,
         "isCancelled": False,
-        "type": "singleInstance",
+        "type": kind,
         "seriesMasterId": None,
         "sensitivity": "normal",
         "showAs": "busy",
@@ -401,6 +402,60 @@ class TestThePersonBetweenTheRequestAndTheChange:
         assert "Room 9" in question
         assert f"the attendee list to 1 person: {_GRACE}" in question
         assert "cannot recall" in question
+
+    @pytest.mark.parametrize(
+        ("kind", "said"),
+        [
+            ("seriesMaster", "The change applies to every occurrence of the series."),
+            (
+                "occurrence",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+            (
+                "exception",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+        ],
+    )
+    async def test_the_question_says_how_much_of_a_series_the_change_reaches(
+        self, client: GraphServiceClient, graph: respx.MockRouter, kind: str, said: str
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)], kind=kind))
+        _ = _updates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _update(client, subject="Renamed", confirm=capturing)
+
+        assert asked == [
+            f"Update 'Pricing review': change the subject to 'Renamed'? {said} Microsoft mails "
+            + "every current attendee about this change, and this connector cannot recall it."
+        ]
+
+    async def test_the_question_about_a_single_event_names_no_series(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _update(client, subject="Renamed", confirm=capturing)
+
+        assert asked == [
+            "Update 'Pricing review': change the subject to 'Renamed'? Microsoft mails every "
+            + "current attendee about this change, and this connector cannot recall it."
+        ]
 
 
 class TestTheEraWithNoBackChannel:

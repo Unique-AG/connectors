@@ -241,6 +241,16 @@ _BOOKING: Mapping[str, object] = {
     "hide_attendees": True,
 }
 
+_REPEATING: Mapping[str, object] = {
+    **_INVITING,
+    "recurrence": {
+        "pattern_type": "weekly",
+        "days_of_week": ["monday"],
+        "range_type": "endDate",
+        "end_date": "2026-06-29",
+    },
+}
+
 _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_check_availability",
@@ -248,6 +258,7 @@ _NEWER_CALENDAR_TOOLS: frozenset[str] = frozenset(
         "outlook_update_event",
         "outlook_cancel_event",
         "outlook_respond_to_invite",
+        "outlook_list_time_zones",
     }
 )
 
@@ -343,6 +354,33 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
         ]
         assert (sent["showAs"], sent["categories"]) == ("oof", ["Budget"])
         assert (sent["reminderMinutesBeforeStart"], sent["hideAttendees"]) == (15, True)
+
+    async def test_an_agreed_series_posts_its_rule_once_from_the_published_shape(
+        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        result = await every_calendar_tool.call_tool(
+            outlook_create_event.TOOL_NAME, dict(_REPEATING)
+        )
+
+        assert result.structured_content is not None, "the confirmed series answered nothing"
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+
+        assert [call.request.url.path for call in posted] == ["/v1.0/me/events"]
+        assert sent["recurrence"] == {
+            "pattern": {"type": "weekly", "interval": 1, "daysOfWeek": ["monday"]},
+            "range": {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-29"},
+        }
+
+    async def test_a_series_the_person_declined_posts_nothing(
+        self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError):
+            _ = await a_declining_client.call_tool(outlook_create_event.TOOL_NAME, dict(_REPEATING))
+
+        posted = [call.request.url.path for call in _made(graph) if call.request.method == "POST"]
+
+        assert posted == [], f"a declined series posted {posted}"
 
     async def test_a_room_booking_the_person_declined_posts_nothing(
         self, a_declining_client: Client[FastMCPTransport], graph: respx.MockRouter
