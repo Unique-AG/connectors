@@ -747,7 +747,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (
         ToolsPreset.OUTLOOK_RULES,
-        ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite"),
+        ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite", "Mail.ReadBasic"),
         0,
         10,
     ),

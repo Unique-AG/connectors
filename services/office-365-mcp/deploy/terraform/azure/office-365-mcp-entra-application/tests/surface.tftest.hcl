@@ -298,7 +298,7 @@ run "preset_outlook_rules" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,MailboxSettings.Read,MailboxSettings.ReadWrite,Mail.ReadBasic"
     error_message = "outlook-rules composed ${join(",", local.permissions)}"
   }
 

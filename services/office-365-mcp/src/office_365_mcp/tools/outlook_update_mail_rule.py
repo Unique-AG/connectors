@@ -46,7 +46,7 @@ TOOL_NAME = "outlook_update_mail_rule"
 
 STEP_UPDATE = "update_mail_rule"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite", "Mail.ReadBasic")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "rule_ref": "outlook:///rules/AQAAAJSYNTHETIC-rule-one",

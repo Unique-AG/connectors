@@ -40,7 +40,7 @@ TOOL_NAME = "outlook_create_mail_rule"
 
 STEP_CREATE = "create_mail_rule"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite", "Mail.ReadBasic")
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_get_mailbox_settings",)
 

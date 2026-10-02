@@ -921,8 +921,8 @@ class TestWhatItAnswers:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permission_is_the_one_the_write_needs(self) -> None:
-        assert updater.GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite",)
+    def test_the_permissions_cover_the_write_and_the_folder_read(self) -> None:
+        assert updater.GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite", "Mail.ReadBasic")
 
     def test_a_repeat_cannot_write_twice_so_no_tool_is_named_to_look_first(self) -> None:
         assert not hasattr(updater, "CHANGE_SHOWN_BY")

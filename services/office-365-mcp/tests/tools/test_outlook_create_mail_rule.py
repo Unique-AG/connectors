@@ -710,8 +710,8 @@ class TestWhatItAnswers:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permission_is_the_one_the_write_needs(self) -> None:
-        assert creator.GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite",)
+    def test_the_permissions_cover_the_write_and_the_folder_read(self) -> None:
+        assert creator.GRAPH_PERMISSIONS == ("MailboxSettings.ReadWrite", "Mail.ReadBasic")
 
     def test_the_mailbox_settings_show_the_change(self) -> None:
         assert creator.CHANGE_SHOWN_BY == ("outlook_get_mailbox_settings",)

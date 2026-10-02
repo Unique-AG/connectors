@@ -255,13 +255,15 @@
         {
           "name": "outlook_create_mail_rule",
           "permissions": [
-            "MailboxSettings.ReadWrite"
+            "MailboxSettings.ReadWrite",
+            "Mail.ReadBasic"
           ]
         },
         {
           "name": "outlook_update_mail_rule",
           "permissions": [
-            "MailboxSettings.ReadWrite"
+            "MailboxSettings.ReadWrite",
+            "Mail.ReadBasic"
           ]
         },
         {
