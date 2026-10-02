@@ -9,7 +9,6 @@ from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.drive_item import DriveItem
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -19,6 +18,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
     request_with_query,
+    send_parsed,
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -80,9 +80,9 @@ _NOTHING_CREATED = "No file was created."
 _EVERY_TEXT_EXTENSION = ", ".join(f"`.{extension}`" for extension in TEXT_EXTENSIONS)
 
 _DESCRIPTION = """\
-This tool creates one new text file in a OneDrive or SharePoint folder that the signed-in user \
-can write to. It cannot replace a file or upload a binary file. sharepoint_browse_folder finds the \
-folder, and sharepoint_read_file reads the new file back. OneDrive and SharePoint can show the \
+This tool creates one new text file in a OneDrive or SharePoint folder where the signed-in user \
+has write access. It cannot replace a file or upload a binary file. sharepoint_browse_folder finds \
+the folder, and sharepoint_read_file reads the new file. OneDrive and SharePoint can show the \
 change to everyone who can open the folder.
 
 Notes:
@@ -121,10 +121,10 @@ _WRITTEN_BUT_UNREAD = (
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this folder, and this call created nothing. The handle is well "
-    + "formed, so the folder was most likely deleted. It can also have moved to another drive, "
-    + "which gives it a new handle. Find the folder again with sharepoint_search_files or "
-    + "sharepoint_browse_folder, and take the `uri` from that result. This same handle fails the "
-    + "same way, so do not retry it."
+    + "formed, so the folder was most probably deleted, or somebody moved it to another drive. A "
+    + "move to another drive gives a folder a new handle. Find the folder again with "
+    + "sharepoint_search_files or sharepoint_browse_folder. Then take the `uri` from that new "
+    + "result. The same handle fails the same way, so do not retry it."
 )
 
 GRAPH_FORBIDDEN = item_access_refused(_NOTHING_CREATED)
@@ -178,9 +178,7 @@ async def create_text_file(
         if refused is None and asked is None:
             request = _put_request(client, handle.drive_id, found.id, name=name, content=content)
             with graph_step(STEP_CREATE_FILE):
-                written = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-                    request, DriveItem, {"XXX": ODataError}
-                )
+                written = await send_parsed(client, request, DriveItem)
             created = await summary_after_write(
                 client,
                 handle.drive_id,

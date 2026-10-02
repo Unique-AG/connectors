@@ -8,7 +8,6 @@ from kiota_abstractions.method import Method
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.folder import Folder
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -17,7 +16,8 @@ from office_365_mcp.graph_client import (
     graph_step,
     no_retry,
     not_graph,
-    request_with_query,
+    request_with_json_body,
+    send_parsed,
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -87,10 +87,10 @@ _NOT_A_FOLDER = (
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find the folder in `parent`, and this call created nothing. The handle "
-    + "is well formed, so the folder is most likely deleted, or it moved to another drive. A move "
-    + "to another drive gives a folder a new handle. Find the folder again with "
-    + "sharepoint_search_files or sharepoint_browse_folder, and take the `uri` from that result. "
-    + "This same handle fails the same way, so do not retry it."
+    + "is well formed, so the folder was most probably deleted, or somebody moved it to another "
+    + "drive. A move to another drive gives a folder a new handle. Find the folder again with "
+    + "sharepoint_search_files or sharepoint_browse_folder. Then take the `uri` from that new "
+    + "result. The same handle fails the same way, so do not retry it."
 )
 
 GRAPH_FORBIDDEN = item_access_refused(_NOTHING_CREATED)
@@ -160,19 +160,17 @@ async def _post_folder(
     client: GraphServiceClient, drive_id: str, parent_id: str, *, name: str
 ) -> DriveItem | None:
     children = client.drives.by_drive_id(drive_id).items.by_drive_item_id(parent_id).children
-    request = request_with_query(
-        Method.POST, children.url_template, children.path_parameters, query=FAIL_ON_CONFLICT
+    request = request_with_json_body(
+        client,
+        Method.POST,
+        children.url_template,
+        children.path_parameters,
+        query=FAIL_ON_CONFLICT,
+        body=DriveItem(name=name, folder=Folder()),
     )
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
-        "application/json",
-        DriveItem(name=name, folder=Folder()),
-    )
     request.add_request_options(no_retry())
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, DriveItem, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, DriveItem)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

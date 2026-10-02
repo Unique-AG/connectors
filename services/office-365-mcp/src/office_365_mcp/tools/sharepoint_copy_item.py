@@ -12,7 +12,6 @@ from msgraph.generated.drives.item.items.item.copy.copy_post_request_body import
 )
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.item_reference import ItemReference
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -21,7 +20,8 @@ from office_365_mcp.graph_client import (
     graph_step,
     no_retry,
     not_graph,
-    request_with_query,
+    request_with_json_body,
+    send_no_response_content,
 )
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -68,7 +68,7 @@ _NOTHING_COPIED = "Nothing was copied."
 _DESCRIPTION = """\
 Starts a copy of one file or folder in OneDrive or SharePoint, for the signed-in user. The copy \
 goes into a folder in the same drive or in another drive. The copy of a folder includes everything \
-inside it. Microsoft makes the copy after this call returns, so the copy can take some time to \
+inside it. Microsoft runs the copy after this call returns, so the copy can take some time to \
 show. To move an item instead, use sharepoint_move_item. OneDrive and SharePoint can show the \
 change to everyone who can open the folder.
 
@@ -76,8 +76,8 @@ Notes:
 - This tool asks the user to agree before it creates anything, every time.
 - The copy gets the permissions of the destination folder, not the permissions of the original. \
 It has only the latest version of a file, and Microsoft does not copy the metadata of the original.
-- If the destination already holds an item with the same name, the copy fails. This failure can \
-come after this call returns, and then this tool cannot show it. To copy an item into its own \
+- If the destination already holds an item with the same name, the copy fails. This error can \
+occur after this call returns, and then this tool cannot show it. To copy an item into its own \
 folder, give the copy a new `name`.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 sharepoint_browse_folder does not show the copy in the destination.
@@ -109,7 +109,7 @@ _TOP_FOLDER_CANNOT_BE_COPIED = (
 
 _DESTINATION_IS_NOT_A_FOLDER = (
     "Nothing was copied. Microsoft 365 reports that the item in `to_folder` is not a folder, so "
-    + "it cannot hold a copy. Use sharepoint_browse_folder to find a folder, and pass the `uri` "
+    + "it cannot hold a copy. Use sharepoint_browse_folder to find a folder. Then pass the `uri` "
     + "of that folder. This same value fails again, so do not retry it."
 )
 
@@ -117,7 +117,7 @@ GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find the item or the destination folder, and nothing was copied. Both "
     + "handles are well formed, so the arguments are not the problem. Somebody probably deleted "
     + "one of the two, or moved it to another drive. A move to another drive gives an item a new "
-    + "handle. Find both again with sharepoint_search_files or sharepoint_browse_folder, and take "
+    + "handle. Find both again with sharepoint_search_files or sharepoint_browse_folder. Then take "
     + "the `uri` values from those new results. The same handles fail the same way, so do not "
     + "retry them."
 )
@@ -137,8 +137,8 @@ class CopyStarted(BaseModel):
     destination_uri: str = Field(
         description=(
             "The handle of the folder that gets the copy, in the shape "
-            + "sharepoint:///folders/{drive_id}/{item_id}. Pass it to sharepoint_browse_folder "
-            + "to see the copy after Microsoft finishes it."
+            + "sharepoint:///folders/{drive_id}/{item_id}. After Microsoft finishes the copy, pass "
+            + "it to sharepoint_browse_folder to see the copy."
         )
     )
     name: str | None = Field(
@@ -233,19 +233,17 @@ async def _start_copy(
     name: str | None,
 ) -> None:
     copy = client.drives.by_drive_id(source.drive_id).items.by_drive_item_id(source.item_id).copy
-    request = request_with_query(
-        Method.POST, copy.url_template, copy.path_parameters, query=FAIL_ON_CONFLICT
+    request = request_with_json_body(
+        client,
+        Method.POST,
+        copy.url_template,
+        copy.path_parameters,
+        query=FAIL_ON_CONFLICT,
+        body=_DestinationAndNameOnly(parent_reference=parent, name=name),
     )
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
-        "application/json",
-        _DestinationAndNameOnly(parent_reference=parent, name=name),
-    )
     request.add_request_options(no_retry())
-    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
-        request, {"XXX": ODataError}
-    )
+    await send_no_response_content(client, request)
 
 
 class _DestinationAndNameOnly(CopyPostRequestBody):

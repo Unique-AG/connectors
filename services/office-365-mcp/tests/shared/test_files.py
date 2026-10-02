@@ -11,11 +11,10 @@ from msgraph.generated.models.folder import Folder
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.item_reference import ItemReference
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.root import Root
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphNotFound, request_with_query
+from office_365_mcp.graph_client import GraphNotFound, request_with_query, send_parsed
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     FOLDER_HANDLE_SOURCES,
@@ -318,9 +317,7 @@ class TestFailOnConflict:
         request.headers.try_add("Accept", "application/json")
         request.set_stream_content(b'{"name": "Q3", "folder": {}}', "application/json")
 
-        created = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-            request, DriveItem, {"XXX": ODataError}
-        )
+        created = await send_parsed(client, request, DriveItem)
 
         assert isinstance(created, DriveItem)
         assert created.id == "01SYNTHETICNEW0001"

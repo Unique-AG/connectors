@@ -4,13 +4,17 @@ from typing import Annotated, Self
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.method import Method
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.site import Site
 from msgraph.generated.models.site_collection_response import SiteCollectionResponse
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, request_with_query
+from office_365_mcp.graph_client import (
+    collect_pages,
+    graph_errors,
+    request_with_query,
+    send_parsed,
+)
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_search_sites"
@@ -28,8 +32,7 @@ sharepoint_search_files to search only this site. This tool finds sites. It does
 or folders.
 
 Notes:
-- Microsoft Graph matches `query` against several properties of a site, not only its title. \
-This tool keeps the order that Graph gives and does not sort the rows.
+- This tool does not sort the rows.
 """
 
 
@@ -70,8 +73,8 @@ class SiteList(BaseModel):
     sites: list[SiteSummary] = Field(
         description=(
             "The sites that matched, in the order Microsoft returned them. An empty list means "
-            + "that no site matched. This tool leaves out a site that Graph reports with no web "
-            + "address, because a row without one cannot be passed as `path`."
+            + "that no site matched. This tool does not list a site that Graph reports with no "
+            + "web address. Such a row has no value to pass as `path`."
         )
     )
     capped: bool = Field(
@@ -105,9 +108,7 @@ async def _first_page(client: GraphServiceClient, query: str) -> SiteCollectionR
         query={"search": query},
     )
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SiteCollectionResponse, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, SiteCollectionResponse)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -125,7 +126,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Free text to look for. Microsoft Graph matches it against several "
+                    "The free text for the search. Microsoft Graph matches it against several "
                     + "properties of a site, not only the title. Use a word from the name that "
                     + "the user gave."
                 ),
