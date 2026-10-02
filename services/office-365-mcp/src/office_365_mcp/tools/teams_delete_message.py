@@ -1,4 +1,3 @@
-import hashlib
 from collections.abc import Mapping
 from typing import Annotated, Literal
 
@@ -13,7 +12,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.handles import MessageHandle, message_handle
+from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import MessageHandle, message_handle, not_a_message_handle
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
     Confirm,
@@ -36,7 +36,12 @@ _CHANNEL_PERMISSIONS: tuple[str, ...] = (_CHANNEL_WRITE,)
 
 GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
-CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_read_message",)
+CHANGE_SHOWN_BY: tuple[str, ...] = (
+    "teams_read_message",
+    "teams_list_chat_messages",
+    "teams_browse_channel",
+    "teams_list_message_replies",
+)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
@@ -50,8 +55,8 @@ _EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 _DESCRIPTION = """\
 Deletes one Teams message as the signed-in user. The message can be a chat message, a channel \
 post, or a reply to a channel post. This is a soft delete: Teams shows the message as deleted. \
-Everyone in the conversation can see the change. teams_read_message shows when a message was \
-deleted, and teams_edit_message replaces the text of a message instead.
+Everyone in the conversation can see the change. teams_edit_message replaces the text of a \
+message instead.
 
 Notes:
 - This tool asks the user to agree before it deletes a message, every time. This tool deletes \
@@ -59,19 +64,8 @@ nothing unless the user agrees.
 - Microsoft Graph has an operation that undoes a soft delete (undoSoftDelete). This connector \
 does not offer that operation.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
-teams_read_message does not already show the change.
+the conversation does not already show the change.
 """
-
-_BAD_HANDLE = """\
-teams_delete_message takes the `uri` handle of a Teams message from another Teams tool, and this \
-value is not one. A message handle has one of exactly three shapes:
-  teams:///chats/{chat_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
-The ids are percent-encoded, for example \
-teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
-word for word. No message was deleted. If you call this tool again with this value, the call \
-will fail the same way."""
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no message was deleted. The handle is well "
@@ -86,8 +80,9 @@ GRAPH_NOT_FOUND = (
 class DeletedMessage(BaseModel):
     uri: str = Field(
         description=(
-            "The handle of the message that this call deleted. Pass this handle to "
-            + "teams_read_message to see when the message was deleted."
+            "The handle of the message that this call deleted, exactly as the call received it. "
+            + "After the delete, a list of messages shows this message with a `deleted_at` time, "
+            + "or does not show it."
         )
     )
     deleted: Literal[True] = Field(
@@ -121,7 +116,7 @@ def _question(handle: MessageHandle) -> str:
 
 
 def _about(handle: MessageHandle) -> str:
-    return hashlib.sha256(handle.uri.encode()).hexdigest()
+    return confirmation_id_for(handle.uri)
 
 
 def _permissions(handle: MessageHandle) -> tuple[str, ...]:
@@ -187,6 +182,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> DeletedMessage | InputRequiredResult:
         handle = message_handle(uri)
         if handle is None:
-            raise ToolError(_BAD_HANDLE)
+            raise ToolError(not_a_message_handle(TOOL_NAME, _NOTHING_DELETED))
         await narrowed_to(ctx, *_permissions(handle))
         return await delete_message(client, handle=handle, confirm=a_person_agrees(ctx))

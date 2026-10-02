@@ -22,6 +22,7 @@ from respx.models import Call
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MessageHandle, message_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirmed
+from office_365_mcp.tools import PRESETS, TOOL_NAMES, graph_advice, resolve
 from office_365_mcp.tools import teams_delete_message as deleter
 from office_365_mcp.tools.teams_delete_message import (
     DeletedMessage,
@@ -531,8 +532,23 @@ class TestHowItDeclaresItself:
         assert handle.chat_id is not None
         assert deleter.GRAPH_CALL_NARROWS_TO == ("Chat.ReadWrite", "User.Read")
 
-    def test_teams_read_message_shows_the_change(self) -> None:
-        assert deleter.CHANGE_SHOWN_BY == ("teams_read_message",)
+    def test_the_read_tools_whose_rows_carry_deleted_at_show_the_change(self) -> None:
+        assert deleter.CHANGE_SHOWN_BY == (
+            "teams_read_message",
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+        )
+
+    @pytest.mark.parametrize(
+        "preset", [preset for preset, tools in PRESETS.items() if deleter.TOOL_NAME in tools]
+    )
+    def test_every_preset_that_holds_it_also_holds_a_tool_that_shows_the_change(
+        self, preset: str
+    ) -> None:
+        advice = graph_advice(resolve(preset=preset, enabled=None))
+
+        assert advice[deleter.TOOL_NAME].shown_by, preset
 
     async def test_it_announces_itself_as_a_destructive_write_that_is_not_idempotent(
         self, transport: httpx.AsyncClient
@@ -556,13 +572,33 @@ class TestHowItDeclaresItself:
             "Microsoft Graph has an operation that undoes a soft delete (undoSoftDelete). This "
             + "connector does not offer that operation.",
             "If a call times out, do not call this tool again first. Before you call again, make "
-            + "sure that teams_read_message does not already show the change.",
+            + "sure that the conversation does not already show the change.",
+            "teams_edit_message replaces the text of a message instead.",
         ],
     )
     async def test_the_description_says(self, transport: httpx.AsyncClient, sentence: str) -> None:
         tool = await _registered(transport)
 
         assert sentence in " ".join((tool.description or "").split())
+
+    async def test_the_retry_note_names_no_tool(self, transport: httpx.AsyncClient) -> None:
+        tool = await _registered(transport)
+
+        lines = (tool.description or "").splitlines()
+        retry = [line for line in lines if line.startswith("- If a call times out")]
+        assert len(retry) == 1, lines
+        assert not [name for name in TOOL_NAMES if name in retry[0]], retry[0]
+
+    async def test_no_text_sends_the_model_to_teams_read_message_to_see_the_delete(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        schema = cast("Mapping[str, object]", tool.output_schema)
+        properties = cast("Mapping[str, Mapping[str, str]]", schema["properties"])
+        assert "teams_read_message" not in (tool.description or "")
+        assert "teams_read_message" not in properties["uri"]["description"]
+        assert "`deleted_at`" in properties["uri"]["description"]
 
     async def test_the_only_argument_is_uri(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)

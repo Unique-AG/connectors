@@ -1,6 +1,4 @@
 import dataclasses
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from typing import Annotated
 
@@ -13,8 +11,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, not_graph
-from office_365_mcp.shared.handles import MessageHandle, message_handle
-from office_365_mcp.shared.messages import Mention, outgoing_message
+from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import MessageHandle, message_handle, not_a_message_handle
+from office_365_mcp.shared.messages import Mention, mention_fields, outgoing_message
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -58,17 +57,6 @@ nothing unless the user agrees.
 gives it again. This tool sends no file and no card, so the change can remove a file or a card \
 from the message.
 """
-
-_BAD_HANDLE = """\
-teams_edit_message takes the `uri` handle of a Teams message from another Teams tool, and this \
-value is not one. A message handle has one of exactly three shapes:
-  teams:///chats/{chat_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
-  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
-The ids are percent-encoded, for example \
-teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
-word for word. No message was changed. If you call this tool again with this value, the call \
-will fail the same way."""
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no message was changed. The handle is well "
@@ -138,8 +126,7 @@ def _question(handle: MessageHandle, message: str, mentions: Sequence[Mention]) 
 
 
 def _about(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
-    mentioned = [[mention.user_id, mention.name] for mention in mentions]
-    return hashlib.sha256(json.dumps([handle.uri, message, mentioned]).encode()).hexdigest()
+    return confirmation_id_for(handle.uri, message, *mention_fields(mentions))
 
 
 def _permission(handle: MessageHandle) -> str:
@@ -228,7 +215,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> EditedMessage | InputRequiredResult:
         handle = message_handle(uri)
         if handle is None:
-            raise ToolError(_BAD_HANDLE)
+            raise ToolError(not_a_message_handle(TOOL_NAME, _NOTHING_CHANGED))
         await narrowed_to(ctx, _permission(handle))
         return await edit_message(
             client,
