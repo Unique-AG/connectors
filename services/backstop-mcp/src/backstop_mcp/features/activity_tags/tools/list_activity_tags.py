@@ -40,8 +40,10 @@ async def list_activity_tags(
     """List the standard Backstop activity-tag catalog.
 
     Tag names carry prefixes (e.g. 'XY: Follow-up'). Search by the core term and pass
-    every matching id — do not require an exact name. Use when you need tag ids, names, how
-    many activities currently carry each tag, and whether a tag is shown in the Backstop UI.
+    every matching id to search_activities `activity_tag_ids` — do not require an exact
+    name. A strategy mentioned in activities is this search with that term. Use when you
+    need tag ids, names, how many activities currently carry each tag, and whether a tag is
+    shown in the Backstop UI.
     Instance tag names come back as data. Pass `search` to keep tags whose name contains
     that substring. Pass refresh=true only when the user reports a missing tag.
 

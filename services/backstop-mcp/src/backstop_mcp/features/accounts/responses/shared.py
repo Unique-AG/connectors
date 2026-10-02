@@ -28,6 +28,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     InvestorTypeDto,
     ResolvedProductDto,
 )
+from backstop_mcp.features.custom_fields import StoredCustomFieldValueResponse
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
     Candidate,
@@ -105,13 +106,27 @@ class InvestorTypeResponse(OmitNoneModel):
     """The account's investor type, identity only."""
 
     id: str = Field(description="Backstop investor-type id.")
-    name: str | None = Field(default=None, description="Investor-type name, e.g. 'Fund of Funds'.")
+    name: str | None = Field(
+        default=None,
+        description="Investor-type name, e.g. 'Fund of Funds'. Blank on some tenants.",
+    )
+    classification_type: str | None = Field(
+        default=None,
+        description=(
+            "Backstop's classification of the investor type, e.g. 'Endowment/Foundation'. "
+            "Group an investor-type breakdown on this when `name` is blank."
+        ),
+    )
 
     @classmethod
     def from_investor_type(cls, investor_type: InvestorTypeDto | None) -> Self | None:
         if investor_type is None:
             return None
-        return cls(id=investor_type.id, name=investor_type.name)
+        return cls(
+            id=investor_type.id,
+            name=investor_type.name,
+            classification_type=investor_type.classification_type,
+        )
 
     @classmethod
     def from_included(
@@ -119,7 +134,11 @@ class InvestorTypeResponse(OmitNoneModel):
     ) -> Self | None:
         if investor_type is None:
             return None
-        return cls(id=investor_type.id, name=investor_type.attributes.name)
+        return cls(
+            id=investor_type.id,
+            name=investor_type.attributes.name,
+            classification_type=investor_type.attributes.classification_type,
+        )
 
 
 class InvestorQualificationResponse(OmitNoneModel):
@@ -278,7 +297,11 @@ class AccountRowResponse(OmitNoneModel):
     )
     us_domiciled: bool | None = Field(
         default=None,
-        description="True when Backstop marks the account as domiciled in the United States.",
+        description=(
+            "US/non-US flag. True when Backstop marks the account as domiciled in the United "
+            "States. It is not a geographical breakdown: that is the tenant's location "
+            "custom field in `custom_field_values`, weighted by latest value."
+        ),
     )
     is_open: bool = Field(
         description="True when `closedDate` was absent on the account. A present null is closed."
@@ -287,7 +310,18 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Only present when `include_latest_value=true` was passed on "
-            "`get_product_investors`. For any other date, use `get_time_series`."
+            "`get_product_investors`. For any other date, use `get_time_series`. A "
+            "geographical breakdown weights each account by this amount."
+        ),
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every account custom field with a value. Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this account — "
+            "group it as blank. Field names differ by tenant: for a geographical breakdown "
+            "pick the location or region field by its `name`, and ask the user when it is "
+            "unclear."
         ),
     )
 
@@ -319,6 +353,7 @@ class AccountRowResponse(OmitNoneModel):
         resource: AccountApiResource,
         *,
         included: Included,
+        custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = None,
     ) -> Self:
         attributes = resource.attributes
         return cls(
@@ -345,6 +380,7 @@ class AccountRowResponse(OmitNoneModel):
             new_issue_eligible=attributes.new_issue_eligible,
             us_domiciled=attributes.us_domiciled,
             is_open="closed_date" not in attributes.model_fields_set,
+            custom_field_values=custom_field_values,
         )
 
 

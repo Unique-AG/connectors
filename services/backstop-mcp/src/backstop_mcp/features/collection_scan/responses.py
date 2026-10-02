@@ -35,8 +35,8 @@ class ScanCoverageResponse(OmitNoneModel):
     )
     truncated: bool = Field(
         description=(
-            "True when this payload is not the full visible set: the row cap fired, the "
-            "ceiling was hit, or a later page failed."
+            "True when this payload is not the full visible set: the ceiling was hit or a "
+            "later page failed."
         )
     )
     ceiling_hit: bool = Field(

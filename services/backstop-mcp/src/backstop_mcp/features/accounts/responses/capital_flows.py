@@ -100,9 +100,9 @@ class CapitalFlowsResolvedResponse(OmitNoneModel):
         )
     )
     flows: tuple[CapitalFlowRowResponse, ...] = Field(
-        description="Actuals newest-first by transaction_date. Capped at max_rows."
+        description="Every matching actual, newest-first by transaction_date."
     )
-    total: int = Field(description="Actuals in the window before the row cap.")
+    total: int = Field(description="Matching actuals in the window; the length of `flows`.")
     subscription_count: int = Field(description="How many of `total` are subscriptions.")
     redemption_count: int = Field(description="How many of `total` are redemptions.")
     unattributed_count: int = Field(
@@ -116,12 +116,6 @@ class CapitalFlowsResolvedResponse(OmitNoneModel):
             "Rows in the window that were not actuals (status != COMPLETED) and are therefore "
             "absent from `flows` and from every count here. A window with pending "
             "subscriptions is not a window with none."
-        )
-    )
-    truncated: bool = Field(
-        description=(
-            "True when matching actuals exceeded `max_rows`. Counts are over the matching "
-            "set, not the truncated `flows` list."
         )
     )
     scan_truncated: bool = Field(

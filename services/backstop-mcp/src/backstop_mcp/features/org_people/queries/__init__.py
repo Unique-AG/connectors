@@ -6,7 +6,6 @@ from backstop_mcp.features.org_people.queries.get_people_for_organization_query 
 from backstop_mcp.features.org_people.queries.get_person_query import GetPersonQuery
 from backstop_mcp.features.org_people.queries.search_organizations_query import (
     MAX_ORGANIZATION_SCAN_RECORDS,
-    OrganizationCustomFieldMatch,
     SearchOrganizationsQuery,
 )
 
@@ -16,6 +15,5 @@ __all__ = [
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
-    "OrganizationCustomFieldMatch",
     "SearchOrganizationsQuery",
 ]

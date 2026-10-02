@@ -333,6 +333,28 @@ class TestListActivityTagsTool:
         assert [tag.id for tag in first.tags] == [_LIVE_TAG_ID]
         assert [tag.id for tag in cached.tags] == ["88"]
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_core_term_keeps_the_prefixed_tag(self) -> None:
+        base_url = tenant("at-prefix")
+        respx.get(f"{base_url}/activity-tags").mock(
+            return_value=_collection_page(
+                _tag("1", name="AT: Tail Hedging", quantityTagged=40, viewable=True),
+                _tag("2", name="Tail Hedging", quantityTagged=3, viewable=True),
+                _tag("3", name="AT: Long Vol", quantityTagged=9, viewable=True),
+            )
+        )
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await list_activity_tags(
+                    search="Tail Hedging",
+                    activity_tags=activity_tags_service(client),
+                ),
+                ListActivityTagsResponse,
+            )
+
+        assert sorted(tag.id for tag in result.tags) == ["1", "2"]
+
 
 class TestListActivityTagsInput:
     def test_accepts_search(self) -> None:

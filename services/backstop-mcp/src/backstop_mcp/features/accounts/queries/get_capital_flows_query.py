@@ -64,7 +64,6 @@ class GetCapitalFlowsQuery:
         *,
         start_date: date,
         end_date: date,
-        max_rows: int,
         owner_id: str | None = None,
         account_ids: Sequence[str] | None = None,
     ) -> CapitalFlowsResolvedResponse:
@@ -95,13 +94,12 @@ class GetCapitalFlowsQuery:
         )
         return CapitalFlowsResolvedResponse(
             request_count=subscriptions.request_count + redemptions.request_count,
-            flows=matched[:max_rows],
+            flows=matched,
             total=len(matched),
             subscription_count=sum(1 for row in matched if row.kind == "subscription"),
             redemption_count=sum(1 for row in matched if row.kind == "redemption"),
             unattributed_count=sum(1 for row in matched if row.unattributed),
             non_actual_count=subscriptions.non_actuals_dropped + redemptions.non_actuals_dropped,
-            truncated=len(matched) > max_rows,
             scan_truncated=subscriptions.scan_truncated or redemptions.scan_truncated,
         )
 
@@ -211,7 +209,7 @@ class GetCapitalFlowsQuery:
 
         Sorting on `(date is None, date)` descending puts the undated group *first* — `True` sorts
         above `False` and `reverse=True` inverts the guard along with the date — so undated rows
-        crowd real ones out at the row cap. Sorting undated rows as `date.min` descending lands
+        would lead the list. Sorting undated rows as `date.min` descending lands
         them where they belong: after every dated row.
         """
         return tuple(

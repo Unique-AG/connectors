@@ -67,7 +67,8 @@ async def get_activity_detail(
 
     When the answer depends on what was sent or attached, list the attachments returned
     here. Do not infer attachment contents from titles, later packs, or note text; say
-    'not attached' when the list is empty.
+    'not attached' when the list is empty or the promised names are not in it. A later
+    email is not evidence the earlier ask was inside it.
 
     Documented fallback, with `get_activity_history`, when `search_activities` is unavailable.
     While the primary is up, prefer `search_activities` with `include_description` for note
