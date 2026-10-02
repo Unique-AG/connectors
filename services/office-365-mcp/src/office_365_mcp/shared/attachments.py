@@ -1,10 +1,37 @@
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Literal, Self
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.attachment import Attachment
 from msgraph.generated.models.file_attachment import FileAttachment
 from msgraph.generated.models.item_attachment import ItemAttachment
 from msgraph.generated.models.reference_attachment import ReferenceAttachment
+from msgraph.generated.users.item.messages.item.attachments.attachments_request_builder import (
+    AttachmentsRequestBuilder,
+)
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
+
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    CollectedItems,
+    collect_pages,
+    graph_step,
+)
+from office_365_mcp.shared.handles import MailAttachmentHandle, MailMessageHandle
+from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.seam import FileFromGraph, graph_mailbox
+
+STEP_MESSAGE_ATTACHMENTS = "message_attachments"
+
+MAX_BYTES = 10 * 1024 * 1024
+
+MEGABYTE = 1024 * 1024
+
+_DEFAULT_MEDIA_TYPE = "application/octet-stream"
+
+_AttachmentsQuery = AttachmentsRequestBuilder.AttachmentsRequestBuilderGetQueryParameters
 
 ATTACHMENT_FIELDS: tuple[str, ...] = (
     "id",
@@ -92,3 +119,88 @@ def _kind(attachment: Attachment) -> AttachmentKind:
     if isinstance(attachment, ReferenceAttachment):
         return "reference"
     return "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class AttachmentRefusals:
+    an_item: str
+    a_link: str
+    no_size: str
+    nothing_came_back: str
+    too_large: Callable[[int], str]
+
+
+async def message_attachments(
+    client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
+) -> CollectedItems[AttachmentSummary]:
+    headers = immutable_id_headers()
+    with graph_step(STEP_MESSAGE_ATTACHMENTS):
+        first_page = await (
+            graph_mailbox(client, mailbox)
+            .messages.by_message_id(handle.message_id)
+            .attachments.get(
+                request_configuration=RequestConfiguration[_AttachmentsQuery](
+                    query_parameters=_AttachmentsQuery(select=list(ATTACHMENT_FIELDS)),
+                    headers=headers,
+                )
+            )
+        )
+        assert first_page is not None, "Graph answered an attachment listing with no collection"
+        collected = await collect_pages(
+            first_page, client, limit=MAX_SCANNED_ITEMS, headers=headers
+        )
+
+    return CollectedItems(
+        items=[_row(attachment, handle) for attachment in collected.items],
+        capped=collected.capped,
+    )
+
+
+def _row(attachment: Attachment, handle: MailMessageHandle) -> AttachmentSummary:
+    assert attachment.id is not None, "Graph answered an attachment with no id"
+    return AttachmentSummary.from_attachment(
+        attachment, uri=MailAttachmentHandle(handle.message_id, attachment.id).uri
+    )
+
+
+def refusal_before_download(summary: AttachmentSummary, refusals: AttachmentRefusals) -> str | None:
+    if summary.kind == "item":
+        return refusals.an_item
+    if summary.kind == "reference":
+        return refusals.a_link
+    if summary.size is None:
+        return refusals.no_size
+    if summary.size > MAX_BYTES:
+        return refusals.too_large(summary.size)
+    return None
+
+
+def file_or_refusal(
+    summary: AttachmentSummary, downloaded: Attachment | None, refusals: AttachmentRefusals
+) -> FileFromGraph | str:
+    assert summary.size is not None, "the size refusal comes before any download"
+    content = downloaded.content_bytes if isinstance(downloaded, FileAttachment) else None
+    if not content and summary.size > 0:
+        return refusals.nothing_came_back
+    body = content or b""
+    return FileFromGraph(body, name=summary.name, mime_type=media_type(summary.content_type, body))
+
+
+def media_type(content_type: str | None, body: bytes) -> str:
+    if content_type is None:
+        return _DEFAULT_MEDIA_TYPE
+    reported = content_type.split(";", 1)[0].strip().lower()
+    top, _, sub = reported.partition("/")
+    if not top or not sub:
+        return _DEFAULT_MEDIA_TYPE
+    if top == "text" and not _is_utf8(body):
+        return _DEFAULT_MEDIA_TYPE
+    return reported
+
+
+def _is_utf8(body: bytes) -> bool:
+    try:
+        _ = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True

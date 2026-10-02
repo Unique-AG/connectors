@@ -30,6 +30,8 @@ _PATH = (
     + "/attachments/AAMkAGI2SYNTHETIC-attachment-0001%3D"
 )
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 _URI = MailAttachmentHandle(_MESSAGE_ID, _ATTACHMENT_ID).uri
 
 _NAME = "Invoice-4471.pdf"
@@ -221,7 +223,7 @@ class TestWhatItRefuses:
         assert graph.calls.call_count == 0
         assert _URI in str(refused.value), "the refusal shows a handle that this tool accepts"
         assert "outlook_list_attachments" in str(refused.value)
-        assert "again with this value, the call will fail the same way" in str(refused.value)
+        assert _RETRY in str(refused.value)
 
     async def test_an_attached_outlook_item_is_refused_after_one_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -237,7 +239,7 @@ class TestWhatItRefuses:
 
         assert route.call_count == 1
         assert "open the attached item in Outlook" in str(refused.value)
-        assert "again with this handle, the call will fail the same way" in str(refused.value)
+        assert _RETRY in str(refused.value)
 
     async def test_a_link_to_a_file_in_cloud_storage_is_refused_after_one_request(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -253,7 +255,7 @@ class TestWhatItRefuses:
 
         assert route.call_count == 1
         assert "open the link from the message in Outlook" in str(refused.value)
-        assert "again with this handle, the call will fail the same way" in str(refused.value)
+        assert _RETRY in str(refused.value)
 
     @pytest.mark.parametrize(
         ("kind", "size", "said"),
@@ -295,7 +297,7 @@ class TestWhatItRefuses:
         assert "10.0 MB or less" in refusal
         assert "hold the whole file in memory and send it to you in one message" in refusal
         assert "never sends part of a file" in refusal
-        assert "again with this handle, the call will fail the same way" in refusal
+        assert _RETRY in refusal
 
     async def test_an_attachment_of_exactly_ten_megabytes_is_read(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -409,9 +411,6 @@ class TestHowItDeclaresItself:
         example = cast("str", reader.GRAPH_CALL_EXAMPLE["uri"])
         assert mail_attachment_handle(example) is not None
 
-    def test_the_cap_is_ten_binary_megabytes(self) -> None:
-        assert reader.MAX_BYTES == 10 * 1024 * 1024
-
     def test_each_graph_call_has_a_step_of_its_own(self) -> None:
         assert (reader.STEP_ATTACHMENT, reader.STEP_CONTENT) == (
             "message_attachment",
@@ -423,7 +422,7 @@ class TestHowItDeclaresItself:
     ) -> None:
         assert "The handle is well formed" in reader.GRAPH_NOT_FOUND
         assert "List the attachments again with outlook_list_attachments" in reader.GRAPH_NOT_FOUND
-        assert "again with this handle, the call will fail the same way" in reader.GRAPH_NOT_FOUND
+        assert _RETRY in reader.GRAPH_NOT_FOUND
 
     async def test_it_announces_itself_as_reading_and_changing_nothing(
         self, transport: httpx.AsyncClient

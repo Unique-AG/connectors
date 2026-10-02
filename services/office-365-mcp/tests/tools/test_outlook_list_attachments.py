@@ -10,6 +10,7 @@ from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared import attachments as shared_attachments
 from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS
 from office_365_mcp.shared.handles import (
     EventAttachmentHandle,
@@ -26,6 +27,8 @@ _ITEM_ID = "AAMkAGI2SYNTHETIC-attachment-0002="
 _LINK_ID = "AAMkAGI2SYNTHETIC-attachment-0003="
 
 _PATH = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/attachments"
+
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
 
 _MESSAGE_URI = "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
 
@@ -183,7 +186,7 @@ class TestWhatItAnswers:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 2)
+        monkeypatch.setattr(shared_attachments, "MAX_SCANNED_ITEMS", 2)
         more = f"https://graph.microsoft.com/v1.0{_PATH}?%24skip=3"
         _ = graph.get(_PATH).mock(
             return_value=httpx.Response(
@@ -244,7 +247,7 @@ class TestWhatItRefuses:
 
         assert graph.calls.call_count == 0
         assert "outlook_read_attachment" in str(refused.value)
-        assert "again with this value, the call will fail the same way" in str(refused.value)
+        assert _RETRY in str(refused.value)
 
     async def test_a_message_graph_will_not_return_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -286,7 +289,7 @@ class TestHowItDeclaresItself:
         assert "The handle is well formed" in lister.GRAPH_NOT_FOUND
         assert "outlook_search_mail" in lister.GRAPH_NOT_FOUND
         assert "list its attachments again" in lister.GRAPH_NOT_FOUND.lower()
-        assert "again with this handle, the call will fail the same way" in lister.GRAPH_NOT_FOUND
+        assert _RETRY in lister.GRAPH_NOT_FOUND
 
     async def test_it_announces_itself_as_reading_and_changing_nothing(
         self, transport: httpx.AsyncClient
