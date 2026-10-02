@@ -485,7 +485,7 @@ class TestThePersonBeforeTheChange:
         assert "'Pricing review (moved)'" in question
         assert "2026-03-02T15:00:00+01:00 until 2026-03-02T16:00:00+01:00" in question
         assert "the attendee list to 1 person: 'Grace Hopper'?" in question
-        assert question.endswith(" It removes 'Bob Kelso'.")
+        assert question.endswith(" The change removes 'Bob Kelso'.")
         assert _GRACE_ID not in question
         assert OTHER_USER_ID not in question
 
@@ -502,7 +502,7 @@ class TestThePersonBeforeTheChange:
         _ = await _update(client, attendees=[], confirm=capturing)
 
         assert "the attendee list to nobody" in asked[0]
-        assert asked[0].endswith(" It removes 'Bob Kelso'.")
+        assert asked[0].endswith(" The change removes 'Bob Kelso'.")
 
     async def test_the_question_names_who_the_change_removes(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -518,7 +518,7 @@ class TestThePersonBeforeTheChange:
 
         assert asked == [
             "Change the Teams meeting 'Pricing review': the attendee list to 2 people: "
-            + "'Bob Kelso', 'Grace Hopper'? It removes 'carol@fabrikam.com'."
+            + "'Bob Kelso', 'Grace Hopper'? The change removes 'carol@fabrikam.com'."
         ]
 
     @pytest.mark.parametrize(
@@ -546,7 +546,7 @@ class TestThePersonBeforeTheChange:
 
         _ = await _update(client, attendees=[_GRACE], confirm=capturing)
 
-        assert asked[0].endswith(f"? It removes {named}.")
+        assert asked[0].endswith(f"? The change removes {named}.")
 
     @pytest.mark.parametrize(
         "attendees",

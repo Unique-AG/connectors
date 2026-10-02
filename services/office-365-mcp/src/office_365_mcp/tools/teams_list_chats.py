@@ -156,7 +156,7 @@ class ChatSummary(BaseModel):
         description=(
             "Who is in the chat, returned only for unnamed chats. Named chats show `topic` "
             + "instead, and this field is null there. Match a member by `user_id` against the "
-            + "`user_id` from get_me, or by `display_name`. If `include_member_emails` is set, "
+            + "`user_id` from get_me, or by `display_name`. If `include_member_emails` is true, "
             + "you can also match by `email`."
         )
     )

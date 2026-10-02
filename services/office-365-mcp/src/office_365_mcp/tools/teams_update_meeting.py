@@ -107,8 +107,8 @@ GRAPH_NOT_FOUND = (
 class UpdatedMeeting(BaseModel):
     meeting_uri: str = Field(
         description=(
-            "The handle of the meeting that this call changed, echoed back from `meeting_uri`. "
-            + "Pass it to teams_read_meeting to see the meeting as it is now."
+            "The handle of the meeting that this call changed, exactly as the call received it "
+            + "in `meeting_uri`. Pass it to teams_read_meeting to see the meeting as it is now."
         )
     )
     subject: str | None = Field(
@@ -253,7 +253,7 @@ def _question(meeting: OnlineMeeting, change: _Change) -> str:
         )
     name = repr(cut_for_a_question(meeting.subject)) if meeting.subject else "that has no subject"
     removed = [] if change.attendees is None else _removed(meeting, change.attendees)
-    removes = f" It removes {', '.join(removed)}." if removed else ""
+    removes = f" The change removes {', '.join(removed)}." if removed else ""
     return f"Change the Teams meeting {name}: {' and '.join(changes)}?{removes}"
 
 
@@ -321,8 +321,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The meeting to change, as the `meeting_uri` handle from teams_list_chats or "
-                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it word for "
-                    + "word. A `teams:///transcripts/...` handle is not valid here."
+                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it verbatim. "
+                    + "A `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],

@@ -273,7 +273,7 @@ class TestTheHandlesItRefuses:
         assert "teams_browse_channel" in advice
         assert "teams_search_messages" in advice
         assert (
-            "If you call this tool again with this value, the call will fail the same way."
+            "If you call this tool again with the same arguments, the call will fail the same way."
             in advice
         )
 
@@ -361,7 +361,7 @@ class TestHowItDeclaresItself:
             "One call is one request, because a given channel allows this whole connector about "
             "one request a second, across the whole tenant."
         ) in described
-        assert "never follows Microsoft's cursor" in described
+        assert "never uses the cursor from Microsoft" in described
         assert "the list is not the whole thread" in described
         assert "oldest first" in described
 

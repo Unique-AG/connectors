@@ -85,7 +85,7 @@ _DESCRIPTION = """\
 Replaces the text of one Teams message, as the signed-in user. The message can be a chat \
 message, a channel post, or a reply to a channel post. The message must be one that the \
 signed-in user sent. Everyone in the conversation can see the change. teams_send_chat_message \
-and teams_send_channel_message send a new message, and teams_delete_message removes one.
+and teams_send_channel_message send a new message, and teams_delete_message deletes one.
 
 Notes:
 - This tool asks the user to agree before it changes a message, every time. This tool changes \

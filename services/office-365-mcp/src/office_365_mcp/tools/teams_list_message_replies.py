@@ -46,8 +46,9 @@ the sibling tool that reads a page of posts with their replies.
 Notes:
 - One call is one request, because a given channel allows this whole connector about one request a \
 second, across the whole tenant.
-- This tool never follows Microsoft's cursor and reads at most 50 replies. If `more_replies` is \
-true, the list is not the whole thread. Microsoft does not say which replies are not in the list.\
+- This tool never uses the cursor from Microsoft, and it reads at most 50 replies. If \
+`more_replies` is true, the list is not the whole thread. Microsoft does not say which replies \
+are not in the list.\
 """
 
 _NOT_A_POST_HANDLE = """\
@@ -57,7 +58,7 @@ A post handle has exactly this shape:
 The ids are percent-encoded. teams_browse_channel and teams_search_messages give the handle of a \
 post. A chat handle is not a post handle. A reply handle ends in `/replies/{reply_id}` and is not \
 a post handle either. Copy the `uri` of a post word for word. If you call this tool again with \
-this value, the call will fail the same way."""
+the same arguments, the call will fail the same way."""
 
 
 class ThreadReplies(BaseModel):
@@ -70,8 +71,8 @@ class ThreadReplies(BaseModel):
     more_replies: bool = Field(
         description=(
             "True when Microsoft reported more replies than this call returned. False means that "
-            + "this list holds every reply. This tool makes one request and never follows "
-            + f"Microsoft's cursor, so it cannot read more than {MAX_REPLIES} replies."
+            + "this list holds every reply. This tool makes one request and never uses the "
+            + f"cursor from Microsoft, so it cannot read more than {MAX_REPLIES} replies."
         )
     )
 

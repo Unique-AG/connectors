@@ -96,8 +96,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _NOTHING_CHANGED = "No reaction was changed."
 
 _ALREADY_DELETED = (
-    f"This message is already deleted. {_NOTHING_CHANGED} If you call this tool again with this "
-    + "handle, the call will fail the same way."
+    f"This message is already deleted. {_NOTHING_CHANGED} If you call this tool again with the "
+    + "same arguments, the call will fail the same way."
 )
 
 _DESCRIPTION = """\
@@ -116,11 +116,11 @@ the conversation does not already show the change.
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no reaction was changed. The handle is well "
-    + "formed, so the argument is not the problem. Graph answers a deleted message and a message "
-    + "that the signed-in user cannot see with the same 404. A search hit that is a channel reply "
+    + "formed, so the argument is not the problem. Graph gives the same 404 for a deleted message "
+    + "and for a message that the signed-in user cannot see. A search hit that is a channel reply "
     + "can carry a handle that does not address the reply. teams_browse_channel and "
     + "teams_list_message_replies give the handle of a reply. If you call this tool again with "
-    + "this handle, the call will fail the same way."
+    + "the same arguments, the call will fail the same way."
 )
 
 type _ChannelQuery = ChannelRequestBuilder.ChannelItemRequestBuilderGetQueryParameters
@@ -318,8 +318,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The reaction, as one emoji, for example \U0001f44d. Microsoft 365 takes the "
-                    + "reaction as unicode text. To remove a reaction, give the same emoji that "
-                    + "was added."
+                    + "reaction as unicode text. To remove a reaction, give the emoji of the "
+                    + "reaction that the signed-in user added."
                 ),
             ),
         ],

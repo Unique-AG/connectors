@@ -484,7 +484,7 @@ class TestThePersonBeforeTheChange:
 
         assert str(refused.value) == (
             "This message is already deleted. No reaction was changed. If you call this tool "
-            + "again with this handle, the call will fail the same way."
+            + "again with the same arguments, the call will fail the same way."
         )
         assert session.asked == []
         assert all(route.call_count == 0 for route in routes.values())

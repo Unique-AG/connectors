@@ -59,12 +59,14 @@ Notes:
 - Microsoft Graph gives attendance reports to the meeting organizer only. For any other user, \
 this tool returns the meeting details with the status `not_organizer`.
 - Read `status` before you decide: `not_ready` means wait, not "nobody attended".
-- This tool reads one page of records, of the newest report only. Calling it again returns the \
-same records.\
+- This tool reads one page of records, of the newest report only. If you call this tool again, \
+it returns the same records.\
 """
 
 _NOT_A_MEETING_HANDLE = not_a_meeting_handle(
-    TOOL_NAME, tail="If you call this tool again with this value, the call will fail the same way."
+    TOOL_NAME,
+    tail="If you call this tool again with the same arguments, "
+    + "the call will fail the same way.",
 )
 
 
@@ -90,8 +92,8 @@ class MeetingInvitee(BaseModel):
 class MeetingDetails(BaseModel):
     meeting_uri: str = Field(
         description=(
-            "The meeting handle that this tool read. Copy it word for word when another Teams "
-            + "meeting tool asks for a `meeting_uri`."
+            "The meeting handle that this tool read. When another Teams meeting tool asks for a "
+            + "`meeting_uri`, copy this handle word for word."
         )
     )
     join_web_url: str | None = Field(

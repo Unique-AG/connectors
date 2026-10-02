@@ -568,7 +568,8 @@ class TestHowItDeclaresItself:
         message = str(refused.value)
         assert message == meetings.not_a_meeting_handle(
             reader.TOOL_NAME,
-            tail="If you call this tool again with this value, the call will fail the same way.",
+            tail="If you call this tool again with the same arguments, "
+            + "the call will fail the same way.",
         )
         assert (
             "teams_read_meeting takes the `meeting_uri` handle from teams_list_chats or "
@@ -603,15 +604,15 @@ class TestHowItDeclaresItself:
             + "`not_organizer`."
         ) in description
         assert "`not_ready` means wait" in description
-        assert "Calling it again returns the same records." in description
+        assert "If you call this tool again, it returns the same records." in description
         assert 45 <= len(description.split()) <= 210
 
     def test_the_answer_hands_on_the_handle_without_naming_a_tool(self) -> None:
         meeting_uri = str(reader.MeetingDetails.model_fields["meeting_uri"].description)
 
         assert meeting_uri == (
-            "The meeting handle that this tool read. Copy it word for word when another Teams "
-            + "meeting tool asks for a `meeting_uri`."
+            "The meeting handle that this tool read. When another Teams meeting tool asks for a "
+            + "`meeting_uri`, copy this handle word for word."
         )
         assert "teams_list_meeting_transcripts" not in meeting_uri
         assert "teams_list_meeting_recordings" not in meeting_uri

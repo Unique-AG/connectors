@@ -99,9 +99,9 @@ the conversation does not already show the change.
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no message was deleted. The handle is well "
-    + "formed, so the argument is not the problem. Graph gives the same 404 for a message that is "
-    + "gone and for a message that the signed-in user cannot see. A search hit that is a channel "
-    + "reply can carry a handle that does not address the reply. teams_browse_channel and "
+    + "formed, so the argument is not the problem. Graph gives the same 404 for a deleted message "
+    + "and for a message that the signed-in user cannot see. A search hit that is a channel reply "
+    + "can carry a handle that does not address the reply. teams_browse_channel and "
     + "teams_list_message_replies give the handle of a reply. If you call this tool again with "
     + "the same arguments, the call will fail the same way."
 )

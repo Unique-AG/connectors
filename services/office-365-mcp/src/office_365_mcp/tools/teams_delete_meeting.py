@@ -75,7 +75,7 @@ _NO_SUCH_MEETING = (
 _NOT_THE_ORGANIZER = not_the_organizer("deletes", tail=_REFUSED)
 
 GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not find this meeting when this tool sent the delete. "
+    "Microsoft 365 did not find this meeting when this tool tried to delete it. "
     + f"{_NOTHING_DELETED} The meeting was there a moment before, so a person or an earlier call "
     + "probably deleted it. Call teams_read_meeting to see if the meeting is still there."
 )
@@ -84,20 +84,20 @@ GRAPH_NOT_FOUND = (
 class DeletedMeeting(BaseModel):
     meeting_uri: str = Field(
         description=(
-            "The handle that this call was given, echoed back from `meeting_uri`. It names the "
-            + "meeting that this call deleted."
+            "The handle of the meeting that this call deleted, exactly as the call received it "
+            + "in `meeting_uri`."
         )
     )
     subject: str | None = Field(
         description=(
-            "The subject that the meeting had immediately before the delete, as Microsoft 365 "
-            + "held it. Null when the meeting had no subject."
+            "The subject that the meeting had immediately before this call deleted it, as "
+            + "Microsoft 365 held it. Null when the meeting had no subject."
         )
     )
     start: datetime | None = Field(
         description=(
             "When the meeting was due to start, in UTC, as Microsoft 365 held it immediately "
-            + "before the delete. Null when Microsoft 365 gave no start."
+            + "before this call deleted it. Null when Microsoft 365 gave no start."
         )
     )
 
@@ -168,8 +168,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The meeting to delete, as the `meeting_uri` handle from teams_list_chats or "
-                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it word for "
-                    + "word. A `teams:///transcripts/...` handle is not valid here."
+                    + "teams_create_meeting: `teams:///meetings/{join_web_url}`. Copy it verbatim. "
+                    + "A `teams:///transcripts/...` handle is not valid here."
                 ),
             ),
         ],
