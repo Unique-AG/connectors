@@ -374,7 +374,12 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
 
         assert [call.request.url.path for call in posted] == ["/v1.0/me/events"]
         assert sent["recurrence"] == {
-            "pattern": {"type": "weekly", "interval": 1, "daysOfWeek": ["monday"]},
+            "pattern": {
+                "type": "weekly",
+                "interval": 1,
+                "daysOfWeek": ["monday"],
+                "firstDayOfWeek": "sunday",
+            },
             "range": {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-29"},
         }
 

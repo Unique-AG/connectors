@@ -1904,6 +1904,17 @@ class TestTheRuleItTakes:
                 {"pattern_type": "daily", "range_type": "noEnd", **fields}
             )
 
+    @pytest.mark.parametrize("key", ["week_index", "firstDayOfWeek"])
+    def test_a_key_the_rule_does_not_name_never_becomes_a_rule(self, key: str) -> None:
+        with pytest.raises(ValidationError) as raised:
+            _ = RecurrenceRule.model_validate(
+                {"pattern_type": "weekly", "range_type": "noEnd", key: "monday"}
+            )
+
+        assert [(error["type"], error["loc"]) for error in raised.value.errors()] == [
+            ("extra_forbidden", (key,))
+        ]
+
     def test_a_rule_cannot_change_once_it_is_made(self) -> None:
         with pytest.raises(ValidationError):
             _TEN_MONDAYS.interval = 2
@@ -2052,6 +2063,19 @@ class TestTheCreateBodyOfASeries:
             ),
             (
                 RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("wednesday", "monday"),
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "weekly",
+                    "interval": 1,
+                    "daysOfWeek": ["monday", "wednesday"],
+                    "firstDayOfWeek": "sunday",
+                },
+            ),
+            (
+                RecurrenceRule(
                     pattern_type="absoluteMonthly", interval=3, day_of_month=15, range_type="noEnd"
                 ),
                 {"type": "absoluteMonthly", "interval": 3, "dayOfMonth": 15},
@@ -2096,6 +2120,7 @@ class TestTheCreateBodyOfASeries:
         ids=[
             "daily",
             "weekly",
+            "weekly-without-first-day",
             "absolute-monthly",
             "relative-monthly",
             "absolute-yearly",

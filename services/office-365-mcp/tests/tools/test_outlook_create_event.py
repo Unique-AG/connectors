@@ -1628,7 +1628,12 @@ class TestASeries:
 
         assert create.call_count == 1
         assert _sent(create)["recurrence"] == {
-            "pattern": {"type": "weekly", "interval": 1, "daysOfWeek": ["monday"]},
+            "pattern": {
+                "type": "weekly",
+                "interval": 1,
+                "daysOfWeek": ["monday"],
+                "firstDayOfWeek": "sunday",
+            },
             "range": {"type": "numbered", "startDate": "2026-03-02", "numberOfOccurrences": 10},
         }
 
@@ -1739,6 +1744,29 @@ class TestASeries:
                 {
                     **creator.GRAPH_CALL_EXAMPLE,
                     "recurrence": {"pattern_type": "daily", "interval": 0, "range_type": "noEnd"},
+                }
+            )
+
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        ("key", "value"), [("week_index", "second"), ("firstDayOfWeek", "monday")]
+    )
+    async def test_a_misspelled_key_in_the_rule_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter, key: str, value: str
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run(
+                {
+                    **creator.GRAPH_CALL_EXAMPLE,
+                    "recurrence": {
+                        "pattern_type": "relativeMonthly",
+                        "days_of_week": ["monday"],
+                        key: value,
+                        "range_type": "noEnd",
+                    },
                 }
             )
 
@@ -2340,6 +2368,14 @@ class TestTheSchemaItPublishes:
 
         properties = _object(parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_one_argument_that_makes_the_event_repeat_is_the_recurrence(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        properties = _object(parameters["properties"])
+        assert [name for name in properties if "recur" in name.casefold()] == ["recurrence"]
 
     async def test_the_one_argument_that_hides_anything_hides_the_attendee_list(
         self, transport: httpx.AsyncClient

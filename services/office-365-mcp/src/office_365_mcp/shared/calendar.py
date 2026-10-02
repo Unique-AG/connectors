@@ -486,7 +486,7 @@ class RecurrenceSummary(BaseModel):
 
 
 class RecurrenceRule(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     pattern_type: PatternType = Field(
         description=(
@@ -546,8 +546,8 @@ class RecurrenceRule(BaseModel):
         default=None,
         description=(
             "The day that Microsoft counts as the start of the week, in lowercase English. Only a "
-            + "`weekly` pattern takes this value. Null sends nothing, and Microsoft then uses "
-            + "`sunday`."
+            + "`weekly` pattern takes this value. Null sends `sunday`, the default that Microsoft "
+            + "documents."
         ),
     )
     range_type: RangeType = Field(
@@ -1135,7 +1135,9 @@ def _patterned(rule: RecurrenceRule, *, starts_on: date) -> PatternedRecurrence:
             month=rule.month,
             index=None if rule.index is None else WeekIndex(rule.index),
             first_day_of_week=(
-                None if rule.first_day_of_week is None else DayOfWeek(rule.first_day_of_week)
+                DayOfWeek(rule.first_day_of_week or "sunday")
+                if rule.pattern_type == "weekly"
+                else None
             ),
         ),
         range=RecurrenceRange(
