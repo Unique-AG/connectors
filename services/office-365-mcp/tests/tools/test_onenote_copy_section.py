@@ -1516,6 +1516,13 @@ class TestHowItDeclaresItself:
 
         assert "can each be in a notebook of a Microsoft 365 group" in (tool.description or "")
 
+    async def test_the_description_says_neither_side_can_be_in_a_site(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "Neither one can be in a notebook of a SharePoint site." in (tool.description or "")
+
     @pytest.mark.parametrize("argument", ["section", "to_notebook", "to_section_group"])
     async def test_each_handle_argument_names_the_group_and_site_shapes(
         self, transport: httpx.AsyncClient, argument: str
@@ -1525,10 +1532,37 @@ class TestHowItDeclaresItself:
         field = cast("Mapping[str, object]", properties[argument])
 
         assert (
-            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
-            + "or onenote:///sites/{site}/ instead."
+            "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This "
+            + "tool refuses a handle from a site notebook, which starts with "
+            + "onenote:///sites/{site}/."
             in cast("str", field["description"])
         )
+
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group"),
+        [
+            ("onenote:///groups/", _NOTEBOOK_URI, None),
+            (_SECTION_URI, "onenote:///groups/", None),
+            (_SECTION_URI, None, "onenote:///groups/"),
+        ],
+        ids=["section", "to_notebook", "to_section_group"],
+    )
+    async def test_each_refusal_names_the_group_and_site_shapes(
+        self,
+        client: GraphServiceClient,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _copy(
+                client, section=section, to_notebook=to_notebook, to_section_group=to_section_group
+            )
+
+        message = str(refused.value)
+        assert "onenote:///groups/{group}/" in message
+        assert "onenote:///sites/{site}/" in message
+        assert "This tool refuses a handle from a site notebook" in message
 
 
 class TestNotebooksOfASharePointSite:

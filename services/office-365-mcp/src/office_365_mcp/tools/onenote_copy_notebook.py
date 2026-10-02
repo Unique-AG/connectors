@@ -59,14 +59,19 @@ _NOTHING_COPIED = "Nothing was copied."
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _OWN_ONEDRIVE = "your own OneDrive"
 
+_HANDLE_OWNERS = (
+    "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This tool "
+    + "refuses a handle from a site notebook, which starts with onenote:///sites/{site}/."
+)
+
 _NOT_A_NOTEBOOK_HANDLE = (
     "onenote_copy_notebook takes a notebook handle in `notebook`. It looks like "
     + "onenote:///notebooks/{id}, and it comes from the `uri` of a onenote_list_notebooks or "
-    + "onenote_find_notebook_from_url result. A handle from a group or site notebook starts with "
-    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section handle "
-    + "(onenote:///sections/{id}) and a section group handle (onenote:///sectiongroups/{id}) are "
-    + "neither one a notebook handle. Copy it word for word. This same value fails again, so do "
-    + "not retry it."
+    + "onenote_find_notebook_from_url result. "
+    + _HANDLE_OWNERS
+    + " A section handle (onenote:///sections/{id}) and a section group handle "
+    + "(onenote:///sectiongroups/{id}) are neither one a notebook handle. Copy it word for word. "
+    + "This same value fails again, so do not retry it."
 )
 
 _NO_OPERATION_NAMED = (
@@ -102,9 +107,9 @@ _OWNER_REFUSED = (
 
 _DESCRIPTION = """\
 Starts a copy of a whole notebook into the signed-in user's own OneDrive, or into a Microsoft 365 \
-group with `to_group`. This call does not copy the notebook itself: Microsoft runs the copy, and \
-the answer is the operation that tracks it. Pass the answer's `uri` to onenote_get_operation until \
-`status` reads Completed or Failed.
+group with `to_group`. This tool cannot copy a notebook of a SharePoint site. This call does not \
+copy the notebook itself: Microsoft runs the copy, and the answer is the operation that tracks it. \
+Pass the answer's `uri` to onenote_get_operation until `status` reads Completed or Failed.
 
 Notes:
 - This tool asks the user to agree before it writes into a Microsoft 365 group. A copy into the \
@@ -206,9 +211,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The notebook to copy: the `uri` of a onenote_list_notebooks or "
                     + "onenote_find_notebook_from_url result, or a onenote_create_notebook answer, "
-                    + "copied word for word. The shape is onenote:///notebooks/{id}. A handle from "
-                    + "a group or site notebook starts with onenote:///groups/{group}/ or "
-                    + "onenote:///sites/{site}/ instead."
+                    + "copied word for word. The shape is onenote:///notebooks/{id}. "
+                    + _HANDLE_OWNERS
                 ),
             ),
         ],

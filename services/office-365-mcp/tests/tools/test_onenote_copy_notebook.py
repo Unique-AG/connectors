@@ -251,6 +251,7 @@ class TestWhatItRefuses:
         message = str(refused.value)
         assert "onenote:///groups/{group}/" in message
         assert "onenote:///sites/{site}/" in message
+        assert "This tool refuses a handle from a site notebook" in message
 
 
 class TestWhatItAnswers:
@@ -686,6 +687,13 @@ class TestHowItDeclaresItself:
             in description
         )
 
+    async def test_the_description_says_a_site_notebook_cannot_be_copied(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "This tool cannot copy a notebook of a SharePoint site." in (tool.description or "")
+
     async def test_the_to_group_description_names_where_the_id_comes_from(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -704,8 +712,14 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
         properties = cast("Mapping[str, object]", tool.parameters["properties"])
         notebook = cast("Mapping[str, object]", properties["notebook"])
+        description = cast("str", notebook["description"])
 
-        assert "onenote:///groups/{group}/" in cast("str", notebook["description"])
+        assert "onenote:///groups/{group}/" in description
+        assert (
+            "This tool refuses a handle from a site notebook, which starts with "
+            + "onenote:///sites/{site}/."
+            in description
+        )
 
     async def test_the_new_name_description_lists_the_forbidden_characters(
         self, transport: httpx.AsyncClient

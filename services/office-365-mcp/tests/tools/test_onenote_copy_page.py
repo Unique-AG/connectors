@@ -1312,6 +1312,13 @@ class TestHowItDeclaresItself:
 
         assert "notebook of a Microsoft 365 group" in (tool.description or "")
 
+    async def test_the_description_says_neither_side_can_be_in_a_site(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "Neither one can be in a notebook of a SharePoint site." in (tool.description or "")
+
     @pytest.mark.parametrize("argument", ["page", "to_section"])
     async def test_each_handle_argument_names_the_group_and_site_shapes(
         self, transport: httpx.AsyncClient, argument: str
@@ -1321,8 +1328,9 @@ class TestHowItDeclaresItself:
         field = cast("Mapping[str, object]", properties[argument])
 
         assert (
-            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
-            + "or onenote:///sites/{site}/ instead."
+            "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This "
+            + "tool refuses a handle from a site notebook, which starts with "
+            + "onenote:///sites/{site}/."
             in cast("str", field["description"])
         )
 
@@ -1335,7 +1343,9 @@ class TestHowItDeclaresItself:
         self, client: GraphServiceClient, page: str, to_section: str
     ) -> None:
         with pytest.raises(
-            ToolError, match=r"onenote:///groups/\{group\}/ or onenote:///sites/\{site\}/ instead"
+            ToolError,
+            match=r"onenote:///groups/\{group\}/ instead\. This tool refuses a handle from a site "
+            + r"notebook, which starts with onenote:///sites/\{site\}/\.",
         ):
             _ = await _copy(client, page=page, to_section=to_section)
 
