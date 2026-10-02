@@ -28,7 +28,7 @@ from office_365_mcp.shared.notes import (
     owner_named,
 )
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "onenote_list_pages"
@@ -46,8 +46,19 @@ GRAPH_NOT_FOUND = (
     + "the section from there, because this same handle fails again. If this call named a "
     + "`group`, the id most likely names no group that the signed-in user can reach. Take the "
     + "id from teams_list_my_teams, or ask the user for it. This same id fails again, so do not "
-    + "retry it. If it named neither, Microsoft found no OneNote for this account to list pages "
-    + "from at all, and no other argument here fixes that."
+    + "retry it. If this call named a `site`, the id most likely names no site that the "
+    + "signed-in user can reach. Ask the user for the correct id. This same id fails again, so "
+    + "do not retry it. If it named none of these, Microsoft found no OneNote for this account "
+    + "to list pages from at all, and no other argument here fixes that."
+)
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
+    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
+    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. This same call fails again, so do not retry it."
 )
 
 MAX_PAGES = 100
@@ -78,9 +89,10 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
 
 _DESCRIPTION = """\
 Finds pages across every notebook the signed-in user can reach, inside one section, or inside the \
-notebooks of one group. `title_contains` matches the title only: Microsoft Graph has no full-text \
-search over a page's words for a work or school account. The page index can hold an empty title \
-for days after a create, so find a new page by `created_at` or by its section instead.
+notebooks of one group or one SharePoint site. `title_contains` matches the title only: Microsoft \
+Graph has no full-text search over a page's words for a work or school account. The page index can \
+hold an empty title for days after a create, so find a new page by `created_at` or by its section \
+instead.
 
 Notes:
 - The four date windows are inclusive at both ends and combine with AND. The default order is \
@@ -107,9 +119,14 @@ _PAGELEVEL_NEEDS_A_SECTION = (
 )
 
 _GROUP_WITH_A_SECTION = (
-    "onenote_list_pages takes `group` only when `section` is omitted. A section handle from a "
-    + "group notebook already carries its group. The same combination fails again, so do not "
-    + "retry it as it is."
+    "onenote_list_pages takes `group` or `site` only when `section` is omitted. A section handle "
+    + "from a group or site notebook already carries its owner. The same combination fails "
+    + "again, so do not retry it as it is."
+)
+
+_GROUP_WITH_A_SITE = (
+    "onenote_list_pages takes at most one of `group` and `site`. A notebook belongs to one group "
+    + "or one site, never to both. The same combination fails again, so do not retry it as it is."
 )
 
 _MODIFIED_WINDOW_RUNS_BACKWARDS = (
@@ -151,6 +168,7 @@ async def list_pages(
     *,
     section: str | None = None,
     group: str | None = None,
+    site: str | None = None,
     title_contains: str | None = None,
     created_by_app_id: str | None = None,
     order_by: OrderBy | None = None,
@@ -164,10 +182,12 @@ async def list_pages(
 ) -> PageList:
     assert 1 <= limit <= MAX_PAGES, f"limit must be within 1..{MAX_PAGES}, got {limit}"
     assert skip >= 0, f"skip must not be negative, got {skip}"
-    if section is not None and group is not None:
+    if group is not None and site is not None:
+        raise ToolError(_GROUP_WITH_A_SITE)
+    if section is not None and (group is not None or site is not None):
         raise ToolError(_GROUP_WITH_A_SECTION)
     handle = _section_to_search(section)
-    owner = owner_named(group=group, site=None) if handle is None else handle.owner
+    owner = owner_named(group=group, site=site) if handle is None else handle.owner
     if include_level_and_order and handle is None:
         raise ToolError(_PAGELEVEL_NEEDS_A_SECTION)
     _refuse_backwards_windows(modified_after, modified_before, created_after, created_before)
@@ -181,7 +201,11 @@ async def list_pages(
     )
     order_clause = _ORDER_BY_CLAUSES[order_by] if order_by is not None else None
 
-    with graph_errors(TOOL_NAME), graph_step(STEP_PAGES):
+    with (
+        owner_refused(group is not None or site is not None, _OWNER_REFUSED),
+        graph_errors(TOOL_NAME),
+        graph_step(STEP_PAGES),
+    ):
         first_page = await _first_page(
             client,
             handle,
@@ -345,6 +369,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        site: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The SharePoint site whose pages this call searches, as its Graph site id. "
+                    + "It is a host name and two ids, joined by commas, and it is not "
+                    + "percent-encoded. Ask the user for it. Pass it only without `section`. "
+                    + "Pass at most one of `group` and `site`."
+                ),
+            ),
+        ] = None,
         title_contains: Annotated[
             str | None,
             Field(
@@ -465,6 +501,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             section=section,
             group=group,
+            site=site,
             title_contains=title_contains,
             created_by_app_id=created_by_app_id,
             order_by=order_by,

@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
 from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS
+from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_pages as lister
 
 from .conftest import GRAPH_V1
@@ -31,10 +32,27 @@ _GROUP_SECTION_PAGES_PATH = (
     f"/groups/{_GROUP_ID}/onenote/sections/0-SYNTHETICSECTION0001%210001/pages"
 )
 
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE_PAGES_PATH = f"/sites/{_SITE_ID}/onenote/pages"
+_SITE_SECTION_PAGES_PATH = f"/sites/{_SITE_ID}/onenote/sections/0-SYNTHETICSECTION0001%210001/pages"
+
 _SECTION = OnenoteSectionHandle(_SECTION_ID).uri
 _GROUP_SECTION = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+_SITE_SECTION = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("sites", _SITE_ID)).uri
 
 _APP_ID = "WLID-000000004C12821A"
+
+_OWNER_REFUSED = (
+    "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
+    + "Most likely, the signed-in user is not a member of that group or site, or the id is "
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
+    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
+    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. This same call fails again, so do not retry it."
+)
 
 
 def _page_payload(
@@ -92,6 +110,16 @@ def group_pages(graph: respx.MockRouter) -> respx.Route:
 @pytest.fixture
 def group_section_pages(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_GROUP_SECTION_PAGES_PATH)
+
+
+@pytest.fixture
+def site_pages(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_PAGES_PATH)
+
+
+@pytest.fixture
+def site_section_pages(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(_SITE_SECTION_PAGES_PATH)
 
 
 class TestWhatItAsks:
@@ -435,15 +463,15 @@ class TestTheGroupRoute:
     async def test_a_group_together_with_a_section_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, section: str
     ) -> None:
-        with pytest.raises(ToolError, match="`group` only when `section` is omitted"):
+        with pytest.raises(ToolError, match="`group` or `site` only when `section` is omitted"):
             _ = await lister.list_pages(client, section=section, group=_GROUP_ID, limit=25)
 
         assert len(graph.calls) == 0
 
-    async def test_the_refusal_of_both_says_a_section_handle_carries_its_group(
+    async def test_the_refusal_of_both_says_a_section_handle_carries_its_owner(
         self, client: GraphServiceClient
     ) -> None:
-        with pytest.raises(ToolError, match="already carries its group") as excinfo:
+        with pytest.raises(ToolError, match="already carries its owner") as excinfo:
             _ = await lister.list_pages(client, section=_SECTION, group=_GROUP_ID, limit=25)
 
         assert "fails again" in str(excinfo.value)
@@ -473,6 +501,126 @@ class TestTheGroupRoute:
     def test_the_not_found_advice_covers_a_group_id(self) -> None:
         assert "`group`" in lister.GRAPH_NOT_FOUND
         assert "teams_list_my_teams" in lister.GRAPH_NOT_FOUND
+
+
+class TestTheSiteRoute:
+    async def test_a_site_asks_that_sites_pages_and_nothing_else(
+        self,
+        client: GraphServiceClient,
+        site_pages: respx.Route,
+        pages: respx.Route,
+        section_pages: respx.Route,
+        group_pages: respx.Route,
+        site_section_pages: respx.Route,
+    ) -> None:
+        site_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        _ = await lister.list_pages(client, site=_SITE_ID, limit=25)
+
+        assert site_pages.call_count == 1
+        assert pages.call_count == 0
+        assert section_pages.call_count == 0
+        assert group_pages.call_count == 0
+        assert site_section_pages.call_count == 0
+
+    async def test_the_site_route_sends_the_query_strings_of_the_user_route(
+        self, client: GraphServiceClient, site_pages: respx.Route, pages: respx.Route
+    ) -> None:
+        site_pages.mock(return_value=_page())
+        pages.mock(return_value=_page())
+
+        for site in (None, _SITE_ID):
+            _ = await lister.list_pages(
+                client,
+                site=site,
+                title_contains="Roadmap",
+                created_by_app_id=_APP_ID,
+                order_by="title_asc",
+                modified_after=date(2026, 3, 4),
+                created_before=date(2026, 4, 1),
+                skip=10,
+                limit=7,
+            )
+
+        assert site_pages.calls.last.request.url.params == pages.calls.last.request.url.params
+        assert site_pages.calls.last.request.url.params["$top"] == "7"
+
+    async def test_a_site_row_carries_the_site_in_both_of_its_handles(
+        self, client: GraphServiceClient, site_pages: respx.Route
+    ) -> None:
+        site_pages.mock(return_value=_page(_page_payload(_PAGE_ID, section_id=_SECTION_ID)))
+
+        answer = await lister.list_pages(client, site=_SITE_ID, limit=25)
+
+        row = answer.pages[0]
+        owner = OnenoteOwner("sites", _SITE_ID)
+        assert row.uri == OnenotePageHandle(_PAGE_ID, owner=owner).uri
+        assert row.section_uri == OnenoteSectionHandle(_SECTION_ID, owner=owner).uri
+        assert row.uri.startswith("onenote:///sites/")
+
+    async def test_a_section_handle_of_a_site_asks_that_sites_section_route(
+        self,
+        client: GraphServiceClient,
+        site_section_pages: respx.Route,
+        site_pages: respx.Route,
+        section_pages: respx.Route,
+        pages: respx.Route,
+    ) -> None:
+        site_section_pages.mock(return_value=_page(_page_payload(_PAGE_ID)))
+
+        answer = await lister.list_pages(client, section=_SITE_SECTION, limit=25)
+
+        assert site_section_pages.call_count == 1
+        assert site_pages.call_count == 0
+        assert section_pages.call_count == 0
+        assert pages.call_count == 0
+        assert answer.pages[0].uri.startswith("onenote:///sites/")
+
+    @pytest.mark.parametrize("section", [_SECTION, _SITE_SECTION])
+    async def test_a_site_together_with_a_section_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, section: str
+    ) -> None:
+        with pytest.raises(ToolError, match="`group` or `site` only when `section` is omitted"):
+            _ = await lister.list_pages(client, section=section, site=_SITE_ID, limit=25)
+
+        assert len(graph.calls) == 0
+
+    async def test_a_group_together_with_a_site_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="at most one of `group` and `site`") as excinfo:
+            _ = await lister.list_pages(client, group=_GROUP_ID, site=_SITE_ID, limit=25)
+
+        assert "never to both" in str(excinfo.value)
+        assert "do not retry it as it is" in str(excinfo.value)
+        assert len(graph.calls) == 0
+
+    async def test_a_site_with_level_and_order_but_no_section_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="section"):
+            _ = await lister.list_pages(
+                client, site=_SITE_ID, include_level_and_order=True, limit=25
+            )
+
+        assert len(graph.calls) == 0
+
+    async def test_a_404_on_the_site_route_is_a_not_found(
+        self, client: GraphServiceClient, site_pages: respx.Route
+    ) -> None:
+        site_pages.mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await lister.list_pages(client, site=_SITE_ID, limit=25)
+
+    def test_the_not_found_advice_covers_a_site_id(self) -> None:
+        assert "If this call named a `site`" in lister.GRAPH_NOT_FOUND
+        assert "names no site that the signed-in user can reach" in lister.GRAPH_NOT_FOUND
+        assert "This same id fails again, so do not retry it." in lister.GRAPH_NOT_FOUND
 
 
 class TestWhatItAnswers:
@@ -648,6 +796,47 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await lister.list_pages(client, limit=25)
+
+    @pytest.mark.parametrize(
+        ("group", "site", "route"),
+        [(_GROUP_ID, None, _GROUP_PAGES_PATH), (None, _SITE_ID, _SITE_PAGES_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_refusal_for_a_named_owner_arrives_as_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        group: str | None,
+        site: str | None,
+        route: str,
+    ) -> None:
+        graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await lister.list_pages(client, group=group, site=site, limit=25)
+
+        assert str(refused.value) == (
+            _OWNER_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_refusal_for_a_section_handle_with_no_group_or_site_stays_a_forbidden(
+        self, client: GraphServiceClient, group_section_pages: respx.Route
+    ) -> None:
+        group_section_pages.mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await lister.list_pages(client, section=_GROUP_SECTION, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("Notes.Read",)
@@ -991,5 +1180,30 @@ class TestItsArguments:
             in described
         )
 
-    def test_the_description_names_the_group_search(self) -> None:
-        assert "notebooks of one group" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+    async def test_it_takes_an_optional_site_beside_the_group(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        assert {"section", "group", "site"} <= set(properties)
+        assert properties["site"]["default"] is None
+        assert {"minLength": 1, "type": "string"} in cast(
+            "list[object]", properties["site"]["anyOf"]
+        )
+
+    async def test_the_site_argument_says_whose_pages_it_searches_and_how_to_write_the_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        properties = await self._properties(transport)
+
+        described = cast("str", properties["site"]["description"])
+        assert described.startswith("The SharePoint site whose pages this call searches")
+        assert "a host name and two ids, joined by commas" in described
+        assert "not percent-encoded" in described
+        assert "Ask the user for it." in described
+        assert "only without `section`" in described
+        assert "at most one of `group` and `site`" in described
+        assert 15 <= len(described.split()) <= 60
+
+    def test_the_description_names_the_group_and_site_search(self) -> None:
+        assert "notebooks of one group or one SharePoint site" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
