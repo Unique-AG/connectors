@@ -71,11 +71,13 @@ _AGREE = "edit"
 _DECLINE = "do not edit"
 _NOTHING_CHANGED = "No message was changed."
 _REFUSED = (
-    f"{_NOTHING_CHANGED} If you call this tool again with this handle, the call will fail the same "
-    + "way."
+    f"{_NOTHING_CHANGED} If you call this tool again with the same arguments, the call will fail "
+    + "the same way."
 )
 
-_ALREADY_DELETED = f"This message is deleted, and a deleted message cannot be changed. {_REFUSED}"
+_ALREADY_DELETED = (
+    f"This message is deleted, and this tool cannot change a deleted message. {_REFUSED}"
+)
 
 _NOT_THE_SENDER = not_the_sender("changes", tail=_REFUSED)
 
@@ -95,11 +97,11 @@ from the message.
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not find this message, and no message was changed. The handle is well "
-    + "formed, so the argument is not the problem. Graph answers a deleted message and a message "
-    + "that the signed-in user cannot see with the same 404. A search hit that is a channel reply "
+    + "formed, so the argument is not the problem. Graph gives the same 404 for a deleted message "
+    + "and for a message that the signed-in user cannot see. A search hit that is a channel reply "
     + "can carry a handle that does not address the reply. teams_browse_channel and "
     + "teams_list_message_replies give the handle of a reply. If you call this tool again with "
-    + "this handle, the call will fail the same way."
+    + "the same arguments, the call will fail the same way."
 )
 
 
@@ -121,8 +123,8 @@ class EditedMessage(BaseModel):
     )
     mentions: list[Mention] = Field(
         description=(
-            "The people that this call mentioned in the new text, in the order given. An empty "
-            + "list means that this call sent no mention."
+            "The people that this call mentioned in the new text, in the order of the request. An "
+            + "empty list means that this call sent no mention."
         )
     )
 
@@ -253,9 +255,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 default=[],
                 description=(
                     "The people to @mention in the new text, one entry for each person. This tool "
-                    + "writes the mention markup itself, so `message` stays plain text. The "
-                    + "mentions come first, in the order given. An empty list sends the new text "
-                    + "with no mention."
+                    + "writes the mention markup itself, so `message` stays plain text. This tool "
+                    + "puts the mentions first, in the order of this list. An empty list sends the "
+                    + "new text with no mention."
                 ),
             ),
         ],

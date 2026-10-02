@@ -167,7 +167,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The membership to remove, as the `membership_id` of a teams_list_chat_members "
-                    + "row for this chat. Copy it word for word. It is not the member's `user_id`."
+                    + "row for this chat. Copy it word for word. It is not the `user_id` of the "
+                    + "member."
                 ),
             ),
         ],

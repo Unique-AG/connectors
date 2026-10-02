@@ -60,8 +60,8 @@ class RenamedChat(BaseModel):
     )
     topic: str | None = Field(
         description=(
-            "The topic of the chat, as Microsoft 365 reported it after the change. Null when "
-            + "Microsoft 365 reported no topic."
+            "The topic of the chat, as Microsoft 365 reported it after the change. The value is "
+            + "null when Microsoft 365 reported no topic."
         )
     )
 
@@ -130,7 +130,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The new topic of the chat, as the user writes it. The topic can have at most "
                     + f"{CHAT_TOPIC_MAX_CHARACTERS} characters, and it must not contain a colon "
-                    + "(:). The answer's `topic` is what Microsoft stored. Read it from the "
+                    + "(:). The `topic` of the answer is what Microsoft stored. Read it from the "
                     + "answer, not from this argument."
                 ),
             ),

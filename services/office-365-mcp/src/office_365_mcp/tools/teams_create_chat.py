@@ -51,7 +51,7 @@ _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No chat was created."
 
 _FAILS_THE_SAME_WAY = (
-    "If you call this tool again with these values, the call will fail the same way."
+    "If you call this tool again with the same arguments, the call will fail the same way."
 )
 
 _DESCRIPTION = """\
@@ -71,7 +71,7 @@ teams_list_chats does not already show the chat.
 
 def _not_one_other(count: int) -> str:
     return (
-        f"teams_create_chat was given {count} people for a one-to-one chat. A one-to-one chat "
+        f"teams_create_chat received {count} people for a one-to-one chat. A one-to-one chat "
         + "has exactly one other person. Do not include the signed-in user, because this tool "
         + "adds that user itself. For more people, set `chat_type` to `group`. "
         + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
@@ -79,14 +79,14 @@ def _not_one_other(count: int) -> str:
 
 
 _A_TOPIC_ON_ONE_TO_ONE = (
-    "teams_create_chat was given a `topic` for a one-to-one chat. Microsoft allows a topic only on "
-    + "a group chat. Call again without `topic`, or set `chat_type` to `group`. "
-    + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
+    "teams_create_chat received a `topic` for a one-to-one chat. Microsoft allows a topic only on "
+    + "a group chat. To keep a one-to-one chat, call again without `topic`. To use a topic, set "
+    + f"`chat_type` to `group`. {_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 )
 
 _NOBODY_ELSE = (
-    "teams_create_chat was given only the signed-in user in `members`. A chat needs at least one "
-    + "other person, and this tool adds the signed-in user itself. "
+    "teams_create_chat received only the signed-in user in `members`. A chat needs at least one "
+    + "other person. This tool adds the signed-in user itself. "
     + f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 )
 
@@ -94,29 +94,29 @@ _NOBODY_ELSE = (
 class CreatedChat(BaseModel):
     chat_id: str = Field(
         description=(
-            "Graph's id for the chat, for example `19:...@thread.v2`. Pass this id as `chat_id` "
-            + "to a tool that sends chat messages, or to teams_list_chat_members to see who is in "
-            + "the chat."
+            "The id that Graph gives to the chat, for example `19:...@thread.v2`. Pass this id as "
+            + "`chat_id` to a tool that sends chat messages. Pass this id also to "
+            + "teams_list_chat_members to see who is in the chat."
         )
     )
     chat_type: str = Field(
         description=(
-            "The kind of chat that Microsoft stored, `oneOnOne` or `group`, read from the response "
-            + "and not from the arguments. This value is `unknown` for a type that Graph added "
-            + "after this connector."
+            "The kind of chat that Microsoft stored, `oneOnOne` or `group`. This value comes from "
+            + "the response, not from the arguments. If Graph gives a chat type that this "
+            + "connector does not know, the value is `unknown`."
         )
     )
     topic: str | None = Field(
         description=(
-            "The name of the chat as Microsoft stored it, read from the response. This value is "
-            + "null for a one-to-one chat and for a group chat with no name."
+            "The topic of the chat, as Microsoft stored it. This value comes from the response. "
+            + "The value is null for a one-to-one chat and for a group chat with no topic."
         )
     )
     created_at: datetime | None = Field(
         description=(
-            "When Microsoft created the chat. For a one-to-one chat, a time before this call means "
-            + "that the chat existed already, and that this call created nothing new. Null when "
-            + "Graph gave no time."
+            "When Microsoft created the chat. If the chat is one-to-one and this time is before "
+            + "this call, the chat existed already. Then this call created nothing new. The value "
+            + "is null when Graph gives no time."
         )
     )
 
@@ -254,10 +254,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 max_length=CHAT_TOPIC_MAX_CHARACTERS,
                 pattern=CHAT_TOPIC_PATTERN,
                 description=(
-                    "The name of a group chat, at most "
-                    + f"{CHAT_TOPIC_MAX_CHARACTERS} characters, with no `:` character. Microsoft "
-                    + "allows a topic only on a group chat, so leave this null for `oneOnOne`. "
-                    + "Null creates a group chat with no name."
+                    "The topic of a group chat. The topic can have at most "
+                    + f"{CHAT_TOPIC_MAX_CHARACTERS} characters, and it must not contain a colon "
+                    + "(:). Microsoft allows a topic only on a group chat, so leave this null for "
+                    + "`oneOnOne`. With `group`, a null topic creates a group chat with no topic."
                 ),
             ),
         ] = None,

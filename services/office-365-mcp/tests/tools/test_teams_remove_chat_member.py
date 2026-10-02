@@ -41,9 +41,11 @@ _MEMBERSHIP_ID = cast("str", remover.GRAPH_CALL_EXAMPLE["membership_id"])
 _OTHER_MEMBERSHIP_ID = "MCMjU1lOVEhFVElDMSMj"
 
 _CHAT_PATH = "/chats/19%3Arelease%40thread.v2"
+_OTHER_CHAT_PATH = "/chats/19%3Apricing%40thread.v2"
 _MEMBERS_PATH = f"{_CHAT_PATH}/members"
 _MEMBER_PATH = f"{_MEMBERS_PATH}/{_MEMBERSHIP_ID.replace('=', '%3D')}"
 _OTHER_MEMBER_PATH = f"{_MEMBERS_PATH}/{_OTHER_MEMBERSHIP_ID}"
+_MEMBER_PATH_IN_OTHER_CHAT = f"{_OTHER_CHAT_PATH}/members/{_MEMBERSHIP_ID.replace('=', '%3D')}"
 
 _TOPIC = "Release planning"
 
@@ -422,13 +424,36 @@ class TestThePersonBeforeTheChange:
         assert route.call_count == 0
         assert _deletes(graph) == []
 
-    def test_the_binding_differs_for_another_membership_and_another_chat(self) -> None:
-        about = remover._about  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_for_another_membership_and_another_chat(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _removes(graph)
+        _ = _reads(graph, _JANE, _OTHER_MEMBER_PATH)
+        _ = _reads(graph, _ADA, _MEMBER_PATH_IN_OTHER_CHAT)
+        _ = graph.get(_OTHER_CHAT_PATH).mock(
+            return_value=httpx.Response(
+                200, json={"id": _OTHER_CHAT_ID, "topic": _TOPIC, "chatType": "group"}
+            )
+        )
 
-        bound = about(_CHAT_ID, _MEMBERSHIP_ID)
+        async def binding(chat_id: str, membership_id: str) -> str:
+            seen: list[str] = []
 
-        assert bound != about(_CHAT_ID, _OTHER_MEMBERSHIP_ID)
-        assert bound != about(_OTHER_CHAT_ID, _MEMBERSHIP_ID)
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return _NOTHING_REMOVED
+
+            with pytest.raises(ToolError, match=_NOTHING_REMOVED):
+                _ = await remove_chat_member(
+                    client, chat_id=chat_id, membership_id=membership_id, confirm=capturing
+                )
+            return seen[0]
+
+        bound = await binding(_CHAT_ID, _MEMBERSHIP_ID)
+
+        assert bound != await binding(_CHAT_ID, _OTHER_MEMBERSHIP_ID)
+        assert bound != await binding(_OTHER_CHAT_ID, _MEMBERSHIP_ID)
 
 
 class TestTheEraWithNoBackChannel:
@@ -681,4 +706,4 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
         described = cast("str", properties["membership_id"]["description"])
         assert "teams_list_chat_members" in described
-        assert "It is not the member's `user_id`." in described
+        assert "It is not the `user_id` of the member." in described

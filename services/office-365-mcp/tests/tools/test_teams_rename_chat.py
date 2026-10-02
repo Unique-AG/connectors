@@ -282,14 +282,26 @@ class TestThePersonBeforeTheChange:
 
         assert route.call_count == 0
 
-    def test_the_binding_differs_for_another_topic_and_another_chat(self) -> None:
-        about = renamer._about  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_for_another_topic_and_another_chat(
+        self, client: GraphServiceClient
+    ) -> None:
+        async def binding(chat_id: str, topic: str) -> str:
+            seen: list[str] = []
 
-        bound = about(_CHAT_ID, _TOPIC)
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return _NOTHING_RENAMED
 
-        assert bound == about(_CHAT_ID, _TOPIC)
-        assert bound != about(_CHAT_ID, _OTHER_TOPIC)
-        assert bound != about(_OTHER_CHAT_ID, _TOPIC)
+            with pytest.raises(ToolError, match=_NOTHING_RENAMED):
+                _ = await rename_chat(client, chat_id=chat_id, topic=topic, confirm=capturing)
+            return seen[0]
+
+        bound = await binding(_CHAT_ID, _TOPIC)
+
+        assert bound == await binding(_CHAT_ID, _TOPIC)
+        assert bound != await binding(_CHAT_ID, _OTHER_TOPIC)
+        assert bound != await binding(_OTHER_CHAT_ID, _TOPIC)
 
 
 class TestTheEraWithNoBackChannel:

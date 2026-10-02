@@ -72,6 +72,25 @@ def _chat_payload(
     }
 
 
+async def _binding(
+    client: GraphServiceClient,
+    chat_type: NewChatKind,
+    members: Sequence[Person],
+    topic: str | None = None,
+) -> str:
+    seen: list[str] = []
+
+    async def capturing(question: str, about: str) -> Confirmed:
+        assert question
+        seen.append(about)
+        return None
+
+    _ = await create_chat(
+        client, chat_type=chat_type, members=members, topic=topic, confirm=capturing
+    )
+    return seen[0]
+
+
 def _signed_in(graph: respx.MockRouter) -> respx.Route:
     return graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
@@ -422,33 +441,45 @@ class TestThePersonBeforeTheCreate:
         assert calls_when_asked == [1], "asked after the create already went out"
         assert post.call_count == 1
 
-    def test_the_binding_differs_when_only_the_chat_type_differs(self) -> None:
-        first = creator._about("oneOnOne", [OTHER_USER_ID], None)  # pyright: ignore[reportPrivateUsage]
-        second = creator._about("group", [OTHER_USER_ID], None)  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_when_only_the_chat_type_differs(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        first = await _binding(client, "oneOnOne", [_GRACE])
+        second = await _binding(client, "group", [_GRACE])
 
         assert first != second
 
-    def test_the_binding_differs_when_only_the_members_differ(self) -> None:
-        first = creator._about("group", [OTHER_USER_ID], None)  # pyright: ignore[reportPrivateUsage]
-        second = creator._about("group", [_THIRD_USER_ID], None)  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_when_only_the_members_differ(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        first = await _binding(client, "group", [_GRACE])
+        second = await _binding(client, "group", [_BOB])
 
         assert first != second
 
-    def test_the_binding_differs_when_only_the_topic_differs(self) -> None:
+    async def test_the_binding_differs_when_only_the_topic_differs(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
         bindings = {
-            creator._about("group", [OTHER_USER_ID], topic)  # pyright: ignore[reportPrivateUsage]
+            await _binding(client, "group", [_GRACE], topic)
             for topic in (None, "Release", "Release plan")
         }
 
         assert len(bindings) == 3
 
-    def test_the_binding_ignores_the_order_of_the_members(self) -> None:
-        first = creator._about(  # pyright: ignore[reportPrivateUsage]
-            "group", [OTHER_USER_ID, _THIRD_USER_ID], None
-        )
-        second = creator._about(  # pyright: ignore[reportPrivateUsage]
-            "group", [_THIRD_USER_ID, OTHER_USER_ID], None
-        )
+    async def test_the_binding_ignores_the_order_of_the_members(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        first = await _binding(client, "group", [_GRACE, _BOB])
+        second = await _binding(client, "group", [_BOB, _GRACE])
 
         assert first == second
 

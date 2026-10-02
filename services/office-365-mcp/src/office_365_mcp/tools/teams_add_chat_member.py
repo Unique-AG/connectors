@@ -76,8 +76,9 @@ class AddedChatMember(BaseModel):
     )
     shared_history: bool = Field(
         description=(
-            "True when this call let the new member see all earlier messages of the chat. False "
-            + "when the new member sees only the messages that come after the addition."
+            "The value is true when this call let the new member see all earlier messages of the "
+            + "chat. The value is false when the new member sees only the messages after the "
+            + "addition."
         )
     )
 
@@ -171,7 +172,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Set this parameter to true to let the new member see all earlier messages "
                     + "of the chat. The default, false, lets the new member see only the messages "
-                    + "that come after the addition."
+                    + "after the addition."
                 ),
             ),
         ] = False,

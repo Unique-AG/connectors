@@ -74,8 +74,8 @@ _AGREE = "delete"
 _DECLINE = "do not delete"
 _NOTHING_DELETED = "No message was deleted."
 _REFUSED = (
-    f"{_NOTHING_DELETED} If you call this tool again with this handle, the call will fail the same "
-    + "way."
+    f"{_NOTHING_DELETED} If you call this tool again with the same arguments, the call will fail "
+    + "the same way."
 )
 
 _ALREADY_DELETED = f"This message is already deleted. {_REFUSED}"
@@ -85,7 +85,7 @@ _NOT_THE_SENDER = not_the_sender("deletes", tail=_REFUSED)
 _DESCRIPTION = """\
 Deletes one Teams message as the signed-in user. The message can be a chat message, a channel \
 post, or a reply to a channel post. The message must be one that the signed-in user sent. This \
-is a soft delete: Teams shows the message as deleted. Everyone in the conversation can see the \
+is a soft delete. Teams shows the message as deleted. Everyone in the conversation can see the \
 change. teams_edit_message replaces the text of a message instead.
 
 Notes:
@@ -103,7 +103,7 @@ GRAPH_NOT_FOUND = (
     + "gone and for a message that the signed-in user cannot see. A search hit that is a channel "
     + "reply can carry a handle that does not address the reply. teams_browse_channel and "
     + "teams_list_message_replies give the handle of a reply. If you call this tool again with "
-    + "this handle, the call will fail the same way."
+    + "the same arguments, the call will fail the same way."
 )
 
 
@@ -111,14 +111,15 @@ class DeletedMessage(BaseModel):
     uri: str = Field(
         description=(
             "The handle of the message that this call deleted, exactly as the call received it. "
-            + "After the delete, a list of messages shows this message with a `deleted_at` time, "
+            + "After this call, a list of messages shows this message with a `deleted_at` time, "
             + "or does not show it."
         )
     )
     deleted: Literal[True] = Field(
         description=(
-            "Always true, because this tool answers only after Microsoft 365 accepts the delete. "
-            + "Microsoft 365 answers a delete with no content, so this answer repeats the request."
+            "Always true, because this tool answers only after Microsoft 365 accepts the deletion. "
+            + "Microsoft 365 answers a deletion with no content, so this answer repeats the "
+            + "request."
         )
     )
 

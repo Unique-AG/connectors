@@ -75,7 +75,7 @@ _LETTERED_ID = "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f"
 _NOT_THE_SENDER = (
     "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
     + "deletes only a message that the signed-in user sent. No message was deleted. If you "
-    + "call this tool again with this handle, the call will fail the same way."
+    + "call this tool again with the same arguments, the call will fail the same way."
 )
 
 
@@ -410,7 +410,7 @@ class TestThePersonBeforeTheChange:
 
         assert str(refused.value) == (
             "This message is already deleted. No message was deleted. If you call this tool "
-            + "again with this handle, the call will fail the same way."
+            + "again with the same arguments, the call will fail the same way."
         )
         assert session.asked == []
         assert me.call_count == 0
@@ -462,14 +462,28 @@ class TestThePersonBeforeTheChange:
 
         assert routes[_CHANNEL_DELETE].call_count == 1
 
-    def test_the_binding_differs_for_another_message(self) -> None:
-        about = deleter._about  # pyright: ignore[reportPrivateUsage]
+    async def test_the_binding_differs_for_another_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _me(graph)
+        _ = _every_endpoint(graph)
 
-        bound = about(_CHAT_HANDLE)
+        async def binding(handle: MessageHandle) -> str:
+            seen: list[str] = []
 
-        assert bound == about(MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID))
-        assert bound != about(_CHANNEL_HANDLE)
-        assert about(_CHANNEL_HANDLE) != about(_REPLY_HANDLE)
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return None
+
+            _ = await delete_message(client, handle=handle, confirm=capturing)
+            return seen[0]
+
+        bound = await binding(_CHAT_HANDLE)
+
+        assert bound == await binding(MessageHandle(message_id=_MESSAGE_ID, chat_id=_CHAT_ID))
+        assert bound != await binding(_CHANNEL_HANDLE)
+        assert await binding(_CHANNEL_HANDLE) != await binding(_REPLY_HANDLE)
 
 
 class TestTheEraWithNoBackChannel:
@@ -801,7 +815,7 @@ class TestHowItDeclaresItself:
         "sentence",
         [
             "The message must be one that the signed-in user sent.",
-            "This is a soft delete: Teams shows the message as deleted.",
+            "This is a soft delete. Teams shows the message as deleted.",
             "Everyone in the conversation can see the change.",
             "This tool asks the user to agree before it deletes a message, every time. This tool "
             + "deletes nothing unless the user agrees.",

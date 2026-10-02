@@ -70,7 +70,7 @@ _LETTERED_ID = "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f"
 _NOT_THE_SENDER = (
     "Microsoft 365 does not name the signed-in user as the sender of this message. This tool "
     + "changes only a message that the signed-in user sent. No message was changed. If you "
-    + "call this tool again with this handle, the call will fail the same way."
+    + "call this tool again with the same arguments, the call will fail the same way."
 )
 
 
@@ -504,9 +504,9 @@ class TestThePersonBeforeTheChange:
             )
 
         assert str(refused.value) == (
-            "This message is deleted, and a deleted message cannot be changed. No message was "
-            + "changed. If you call this tool again with this handle, the call will fail the same "
-            + "way."
+            "This message is deleted, and this tool cannot change a deleted message. No message "
+            + "was changed. If you call this tool again with the same arguments, the call will "
+            + "fail the same way."
         )
         assert session.asked == []
         assert all(route.call_count == 0 for route in routes.values())
@@ -555,20 +555,33 @@ class TestThePersonBeforeTheChange:
 
         assert route.call_count == 1
 
-    def test_the_binding_differs_for_another_text_another_mention_and_another_message(
-        self,
+    async def test_the_binding_differs_for_another_text_another_mention_and_another_message(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        about = editor._about  # pyright: ignore[reportPrivateUsage]
+        _ = _every_endpoint(graph)
 
-        bound = about(_CHAT_HANDLE, _TEXT, (_JANE, _ADA))
+        async def binding(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
+            seen: list[str] = []
 
-        assert bound != about(_CHAT_HANDLE, _OTHER_TEXT, (_JANE, _ADA))
-        assert bound != about(_CHAT_HANDLE, _TEXT, (_JANE,))
-        assert bound != about(_CHAT_HANDLE, _TEXT, (_ADA, _JANE))
-        assert bound != about(
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return None
+
+            _ = await edit_message(
+                client, handle=handle, message=message, confirm=capturing, mentions=mentions
+            )
+            return seen[0]
+
+        bound = await binding(_CHAT_HANDLE, _TEXT, (_JANE, _ADA))
+
+        assert bound != await binding(_CHAT_HANDLE, _OTHER_TEXT, (_JANE, _ADA))
+        assert bound != await binding(_CHAT_HANDLE, _TEXT, (_JANE,))
+        assert bound != await binding(_CHAT_HANDLE, _TEXT, (_ADA, _JANE))
+        assert bound != await binding(
             _CHAT_HANDLE, _TEXT, (Mention(user_id=_JANE.user_id, name="Jane S"), _ADA)
         )
-        assert bound != about(_CHANNEL_HANDLE, _TEXT, (_JANE, _ADA))
+        assert bound != await binding(_CHANNEL_HANDLE, _TEXT, (_JANE, _ADA))
 
 
 class TestTheEraWithNoBackChannel:

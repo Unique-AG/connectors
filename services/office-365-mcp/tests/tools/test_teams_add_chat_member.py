@@ -41,6 +41,7 @@ from .conftest import OTHER_USER_ID, SIGNED_IN_USER_ID
 _CHAT_ID = "19:release@thread.v2"
 _OTHER_CHAT_ID = "19:pricing@thread.v2"
 _CHAT_PATH = "/chats/19%3Arelease%40thread.v2"
+_OTHER_CHAT_PATH = "/chats/19%3Apricing%40thread.v2"
 _MEMBERS_PATH = f"{_CHAT_PATH}/members"
 _LOCATION = f"/chats/{_CHAT_ID}/members/MCMjU1lOVEhFVElDMCMj"
 
@@ -411,16 +412,39 @@ class TestThePersonBeforeTheChange:
         assert asked == []
         assert route.call_count == 0
 
-    def test_the_binding_differs_for_another_user_another_chat_and_another_history(
-        self,
+    async def test_the_binding_differs_for_another_user_another_chat_and_another_history(
+        self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        about = adder._about  # pyright: ignore[reportPrivateUsage]
+        _ = _names_the_chat(graph)
+        _ = graph.get(_OTHER_CHAT_PATH).mock(
+            return_value=httpx.Response(
+                200, json={"id": _OTHER_CHAT_ID, "topic": _TOPIC, "chatType": "group"}
+            )
+        )
 
-        bound = about(_CHAT_ID, _GRACE_ID, share_history=False)
+        async def binding(chat_id: str, member: Person, *, share_history: bool) -> str:
+            seen: list[str] = []
 
-        assert bound != about(_CHAT_ID, _JANE_ID, share_history=False)
-        assert bound != about(_OTHER_CHAT_ID, _GRACE_ID, share_history=False)
-        assert bound != about(_CHAT_ID, _GRACE_ID, share_history=True)
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return _NOTHING_ADDED
+
+            with pytest.raises(ToolError, match=_NOTHING_ADDED):
+                _ = await add_chat_member(
+                    client,
+                    chat_id=chat_id,
+                    member=member,
+                    share_history=share_history,
+                    confirm=capturing,
+                )
+            return seen[0]
+
+        bound = await binding(_CHAT_ID, _GRACE, share_history=False)
+
+        assert bound != await binding(_CHAT_ID, _JANE, share_history=False)
+        assert bound != await binding(_OTHER_CHAT_ID, _GRACE, share_history=False)
+        assert bound != await binding(_CHAT_ID, _GRACE, share_history=True)
 
 
 class TestTheEraWithNoBackChannel:
