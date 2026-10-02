@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Mapping
 from typing import cast
@@ -6,9 +7,11 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_list_focused_overrides as lister
 
 from .conftest import GRAPH_V1
@@ -51,6 +54,25 @@ def _undescribed(schema: Mapping[str, object]) -> list[str]:
         ).items()
         if not field.get("description")
     )
+
+
+def _unguarded(tool: Tool) -> list[str]:
+    schemas = json.dumps([tool.parameters, tool.output_schema], ensure_ascii=False)
+    prose = [tool.description or "", *re.findall(r'"description": "((?:[^"\\]|\\.)*)"', schemas)]
+    held = frozenset(TOOL_NAMES).intersection(
+        *(names for names in PRESETS.values() if tool.name in names)
+    )
+    mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
+    offenders: list[str] = []
+    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+        outside = set(mention.findall(sentence)) - held
+        guard = sentence.split(",", 1)[0]
+        if outside and not (
+            guard.startswith("If this deployment exposes ")
+            and outside <= set(mention.findall(guard))
+        ):
+            offenders.append(sentence)
+    return offenders
 
 
 @pytest.fixture
@@ -227,7 +249,10 @@ class TestTheSchemaItPublishes:
 
         assert tool is not None, "register left the tool off the server"
         assert tool.description is not None
-        assert "outlook_set_focused_override adds a sender or changes a row" in tool.description
+        assert (
+            "If this deployment exposes outlook_set_focused_override, that tool adds a sender or "
+            "changes a row"
+        ) in tool.description
         assert "every future message from a listed sender" in tool.description
 
     async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
@@ -264,7 +289,21 @@ class TestTheSchemaItPublishes:
         described = answer["$defs"]["FocusedOverride"]["properties"]["sender_address"][
             "description"
         ]
-        assert "Use this value as `sender` in outlook_set_focused_override" in described
+        assert (
+            "If this deployment exposes outlook_set_focused_override, use this value as `sender` "
+            "in that tool"
+        ) in described
+
+    async def test_every_other_tool_it_names_comes_after_a_guard_that_names_it(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        assert _unguarded(tool) == []
 
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient

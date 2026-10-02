@@ -19,8 +19,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
 _DESCRIPTION = """\
 Lists the senders for which the signed-in user chose a fixed inbox tab in Outlook, Focused or \
-Other. Each row gives one sender address and the tab for that sender. \
-outlook_set_focused_override adds a sender or changes a row.
+Other. Each row gives one sender address and the tab for that sender. If this deployment \
+exposes outlook_set_focused_override, that tool adds a sender or changes a row.
 
 Notes:
 - Outlook puts every future message from a listed sender in the tab of `classify_as`. A sender \

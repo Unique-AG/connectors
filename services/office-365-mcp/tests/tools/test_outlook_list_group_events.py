@@ -1,3 +1,5 @@
+import json
+import re
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from typing import cast
@@ -12,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.seam import READ_ONLY, REQUESTABLE_PERMISSIONS
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_list_group_events as lister
 
 from .conftest import GRAPH_V1
@@ -122,6 +125,25 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
 
 def _properties(tool: Tool) -> Mapping[str, Mapping[str, object]]:
     return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+
+def _unguarded(tool: Tool) -> list[str]:
+    schemas = json.dumps([tool.parameters, tool.output_schema], ensure_ascii=False)
+    prose = [tool.description or "", *re.findall(r'"description": "((?:[^"\\]|\\.)*)"', schemas)]
+    held = frozenset(TOOL_NAMES).intersection(
+        *(names for names in PRESETS.values() if tool.name in names)
+    )
+    mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
+    offenders: list[str] = []
+    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+        outside = set(mention.findall(sentence)) - held
+        guard = sentence.split(",", 1)[0]
+        if outside and not (
+            guard.startswith("If this deployment exposes ")
+            and outside <= set(mention.findall(guard))
+        ):
+            offenders.append(sentence)
+    return offenders
 
 
 class TestTheRequestItSends:
@@ -554,9 +576,27 @@ class TestTheSchemaItPublishes:
 
         described = str(tool.description)
         assert "A row has no `uri`." in described
-        assert "outlook_read_event" in described
+        assert "No other tool of this connector can open a group event." in described
+        assert "outlook_read_event" not in described
         assert "teams_list_my_teams" in described
         assert "does not sort the rows" in described
+
+    async def test_the_description_names_the_tool_for_a_person_only_after_a_guard(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert (
+            "If this deployment exposes outlook_list_events, use that tool for the calendars of "
+            "a person."
+        ) in str(tool.description)
+
+    async def test_every_other_tool_it_names_comes_after_a_guard_that_names_it(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert _unguarded(tool) == []
 
     async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)

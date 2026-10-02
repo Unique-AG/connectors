@@ -64,13 +64,13 @@ _EventsQuery = CalendarViewRequestBuilder.CalendarViewRequestBuilderGetQueryPara
 _DESCRIPTION = """\
 Lists the events on the calendar of ONE Microsoft 365 group within a date window. Each \
 recurring series becomes one row for each occurrence. Every team is a group, so this lists the \
-events of a team. For the calendars of a person, use outlook_list_events.
+events of a team. If this deployment exposes outlook_list_events, use that tool for the \
+calendars of a person.
 
 Notes:
 - `group_id` is the `team_id` of a team, from teams_list_my_teams. A team and its group have the \
 same id.
-- A row has no `uri`. outlook_read_event reads only the calendars of the signed-in user, so it \
-cannot open a group event.
+- A row has no `uri`. No other tool of this connector can open a group event.
 - This tool does not sort the rows. It keeps them in the order that Microsoft 365 returns them.
 """
 

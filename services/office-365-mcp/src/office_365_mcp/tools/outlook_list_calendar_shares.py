@@ -32,8 +32,9 @@ GRAPH_NOT_FOUND = (
 
 _DESCRIPTION = """\
 Lists the people who can see one calendar of the signed-in user, and the role of each person. \
-outlook_list_calendars lists the calendars and their handles. outlook_share_calendar shares a \
-calendar with a person, and outlook_unshare_calendar stops a share.
+outlook_list_calendars lists the calendars and their handles. If this deployment exposes \
+outlook_share_calendar, that tool shares a calendar with a person. If this deployment exposes \
+outlook_unshare_calendar, that tool stops a share.
 
 Notes:
 - Microsoft lists the shares only for a calendar that the signed-in user owns. For a calendar \
@@ -56,8 +57,9 @@ _NOT_A_CALENDAR_HANDLE = (
 class CalendarShare(BaseModel):
     uri: str = Field(
         description=(
-            "The handle of this share. Pass it as `share_ref` to outlook_unshare_calendar to stop "
-            + "the share. The shape is outlook:///calendarpermissions/{calendar_id}/{id}."
+            "The handle of this share. If this deployment exposes outlook_unshare_calendar, pass "
+            + "it as `share_ref` to that tool to stop the share. The shape is "
+            + "outlook:///calendarpermissions/{calendar_id}/{id}."
         )
     )
     name: str | None = Field(
@@ -95,8 +97,10 @@ class CalendarShare(BaseModel):
     )
     is_removable: bool | None = Field(
         description=(
-            "True when outlook_unshare_calendar can stop this share. False when Microsoft does "
-            + "not let anybody remove this row. Null when Microsoft does not say."
+            "True when Microsoft lets anybody remove this share. False when Microsoft does not "
+            + "let anybody remove this row. Null when Microsoft does not say. If this deployment "
+            + "exposes outlook_unshare_calendar, that tool refuses a share that has the value "
+            + "false."
         )
     )
 

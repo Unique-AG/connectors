@@ -36,9 +36,11 @@ as IANA names. Each row has a zone name and a display label. This tool only read
 nothing.
 
 Notes:
-- If this deployment exposes outlook_create_event or outlook_update_event, each tool takes \
-either spelling in `time_zone`. If this deployment exposes outlook_list_events, it takes only \
-IANA names.
+- A tool that lists or reads events, event occurrences, or reminders takes only IANA names in \
+`time_zone`. This tool lists Windows names by default. For a tool that takes only IANA names, \
+set `standard` to `iana`.
+- Every other tool that takes a zone name sends it to Microsoft as written. Microsoft accepts \
+either spelling.
 - Find the row that matches the place that the user named. Do not guess a zone name. An \
 `Etc/GMT+N` name is N hours behind UTC, not ahead of it.
 """

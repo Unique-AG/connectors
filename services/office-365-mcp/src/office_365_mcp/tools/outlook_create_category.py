@@ -56,7 +56,7 @@ _DESCRIPTION = """\
 Creates one new category, with a name and a color, in the signed-in user's own list of \
 categories. There is no draft and no review step. The list belongs to the user's own mailbox \
 alone, so this tool never asks anybody to agree. A new category is on no message at first. \
-outlook_mark_mail puts a category on a message.
+If this deployment exposes outlook_mark_mail, that tool puts a category on a message.
 
 Notes:
 - Microsoft refuses a duplicate name, and the same name fails again.

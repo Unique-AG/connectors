@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Mapping
 from datetime import datetime, timedelta
@@ -7,10 +8,12 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.calendar import ZONE_NAME, zone_named
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_list_time_zones as lister
 
 from .conftest import GRAPH_V1
@@ -37,6 +40,25 @@ def _page(*zones: dict[str, object], next_link: str | None = None) -> httpx.Resp
 @pytest.fixture
 def zones(graph: respx.MockRouter) -> respx.Route:
     return graph.get(url__startswith=f"{GRAPH_V1}/me/outlook/supportedTimeZones")
+
+
+def _unguarded(tool: Tool) -> list[str]:
+    schemas = json.dumps([tool.parameters, tool.output_schema], ensure_ascii=False)
+    prose = [tool.description or "", *re.findall(r'"description": "((?:[^"\\]|\\.)*)"', schemas)]
+    held = frozenset(TOOL_NAMES).intersection(
+        *(names for names in PRESETS.values() if tool.name in names)
+    )
+    mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
+    offenders: list[str] = []
+    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+        outside = set(mention.findall(sentence)) - held
+        guard = sentence.split(",", 1)[0]
+        if outside and not (
+            guard.startswith("If this deployment exposes ")
+            and outside <= set(mention.findall(guard))
+        ):
+            offenders.append(sentence)
+    return offenders
 
 
 class TestTheRequestItSends:
@@ -223,7 +245,7 @@ class TestTheSchemaItPublishes:
         )
         assert undescribed == [], "a model is handed these values with nothing to say what they are"
 
-    async def test_the_sibling_tools_are_named_as_tools_this_deployment_might_not_run(
+    async def test_every_other_tool_it_names_comes_after_a_guard_that_names_it(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -232,13 +254,9 @@ class TestTheSchemaItPublishes:
         tool = await mcp.get_tool(lister.TOOL_NAME)
 
         assert tool is not None, "register left the tool off the server"
-        sentences = re.split(r"(?<=[.!?])\s+|\n\s*-\s+", tool.description or "")
-        naming = [sentence for sentence in sentences if re.search(r"\boutlook_\w+", sentence)]
-        assert naming, "the description names no tool to pass a zone name to"
-        for sentence in naming:
-            assert sentence.startswith("If this deployment exposes "), sentence
+        assert _unguarded(tool) == []
 
-    async def test_the_description_says_which_tools_take_which_spelling(
+    async def test_the_description_says_which_tools_take_only_iana_names(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -249,11 +267,25 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         description = " ".join((tool.description or "").split())
         assert (
-            "If this deployment exposes outlook_create_event or outlook_update_event, each tool "
-            "takes either spelling in `time_zone`."
+            "A tool that lists or reads events, event occurrences, or reminders takes only IANA "
+            "names in `time_zone`."
         ) in description
+        assert "This tool lists Windows names by default." in description
+        assert "For a tool that takes only IANA names, set `standard` to `iana`." in description
+
+    async def test_the_description_says_every_other_tool_sends_the_name_as_written(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        lister.register(mcp, transport)
+
+        tool = await mcp.get_tool(lister.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        description = " ".join((tool.description or "").split())
         assert (
-            "If this deployment exposes outlook_list_events, it takes only IANA names."
+            "Every other tool that takes a zone name sends it to Microsoft as written. "
+            "Microsoft accepts either spelling."
         ) in description
 
     def test_the_call_that_proves_the_permissions_takes_no_arguments(self) -> None:

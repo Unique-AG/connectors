@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Mapping
 from typing import cast
@@ -20,6 +21,7 @@ from office_365_mcp.shared.handles import (
     calendar_permission_handle,
 )
 from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_list_calendar_shares as lister
 
 from .conftest import GRAPH_V1
@@ -89,6 +91,25 @@ def _undescribed(schema: Mapping[str, object]) -> list[str]:
         ).items()
         if not field.get("description")
     )
+
+
+def _unguarded(tool: Tool) -> list[str]:
+    schemas = json.dumps([tool.parameters, tool.output_schema], ensure_ascii=False)
+    prose = [tool.description or "", *re.findall(r'"description": "((?:[^"\\]|\\.)*)"', schemas)]
+    held = frozenset(TOOL_NAMES).intersection(
+        *(names for names in PRESETS.values() if tool.name in names)
+    )
+    mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
+    offenders: list[str] = []
+    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+        outside = set(mention.findall(sentence)) - held
+        guard = sentence.split(",", 1)[0]
+        if outside and not (
+            guard.startswith("If this deployment exposes ")
+            and outside <= set(mention.findall(guard))
+        ):
+            offenders.append(sentence)
+    return offenders
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
@@ -371,8 +392,13 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert "outlook_list_calendars lists the calendars and their handles" in description
-        assert "outlook_share_calendar" in description
-        assert "outlook_unshare_calendar" in description
+        assert (
+            "If this deployment exposes outlook_share_calendar, that tool shares a calendar with "
+            "a person."
+        ) in description
+        assert (
+            "If this deployment exposes outlook_unshare_calendar, that tool stops a share."
+        ) in description
         assert "Microsoft lists the shares only for a calendar that the signed-in user owns" in (
             description
         )
@@ -389,7 +415,34 @@ class TestHowItDeclaresItself:
             tool.output_schema,
         )
         described = answer["$defs"]["CalendarShare"]["properties"]["uri"]["description"]
-        assert "Pass it as `share_ref` to outlook_unshare_calendar" in described
+        assert (
+            "If this deployment exposes outlook_unshare_calendar, pass it as `share_ref` to that "
+            "tool to stop the share."
+        ) in described
+
+    async def test_a_row_says_what_a_false_removable_flag_means_for_the_unshare_tool(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        answer = cast(
+            "Mapping[str, Mapping[str, Mapping[str, Mapping[str, Mapping[str, str]]]]]",
+            tool.output_schema,
+        )
+        described = answer["$defs"]["CalendarShare"]["properties"]["is_removable"]["description"]
+        assert "True when Microsoft lets anybody remove this share." in described
+        assert "False when Microsoft does not let anybody remove this row." in described
+        assert (
+            "If this deployment exposes outlook_unshare_calendar, that tool refuses a share that "
+            "has the value false."
+        ) in described
+
+    async def test_every_other_tool_it_names_comes_after_a_guard_that_names_it(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert _unguarded(tool) == []
 
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient

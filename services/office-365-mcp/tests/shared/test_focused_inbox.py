@@ -42,6 +42,15 @@ def test_a_row_carries_the_address_the_name_and_the_tab_that_graph_reported() ->
     )
 
 
+def test_the_sender_address_names_the_tool_that_takes_it_only_after_a_guard() -> None:
+    described = FocusedOverride.model_fields["sender_address"].description or ""
+
+    assert (
+        "If this deployment exposes outlook_set_focused_override, use this value as `sender` "
+        "in that tool."
+    ) in described
+
+
 @pytest.mark.parametrize("tab", ["focused", "other"])
 def test_each_tab_reads_as_its_wire_value(tab: str) -> None:
     row = FocusedOverride.from_override(_parsed(_payload(classify_as=tab)))

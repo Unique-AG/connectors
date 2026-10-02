@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Mapping
 from typing import cast
 
@@ -12,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden
 from office_365_mcp.shared.seam import WRITE_ADDITIVE
+from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_create_category as creator
 
 _CATEGORIES_PATH = "/me/outlook/masterCategories"
@@ -45,6 +47,25 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 def _property(parameters: Mapping[str, object], name: str) -> Mapping[str, object]:
     properties = cast("Mapping[str, object]", parameters["properties"])
     return cast("Mapping[str, object]", properties[name])
+
+
+def _unguarded(tool: Tool) -> list[str]:
+    schemas = json.dumps([tool.parameters, tool.output_schema], ensure_ascii=False)
+    prose = [tool.description or "", *re.findall(r'"description": "((?:[^"\\]|\\.)*)"', schemas)]
+    held = frozenset(TOOL_NAMES).intersection(
+        *(names for names in PRESETS.values() if tool.name in names)
+    )
+    mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
+    offenders: list[str] = []
+    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+        outside = set(mention.findall(sentence)) - held
+        guard = sentence.split(",", 1)[0]
+        if outside and not (
+            guard.startswith("If this deployment exposes ")
+            and outside <= set(mention.findall(guard))
+        ):
+            offenders.append(sentence)
+    return offenders
 
 
 class TestWhatItSendsToGraph:
@@ -272,11 +293,21 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = tool.description or ""
-        assert "outlook_mark_mail puts a category on a message" in description
+        assert (
+            "If this deployment exposes outlook_mark_mail, that tool puts a category on a message"
+            in description
+        )
         assert (
             "make sure that outlook_list_categories does not show a category named `name`"
             in description
         )
+
+    async def test_every_other_tool_it_names_comes_after_a_guard_that_names_it(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert _unguarded(tool) == []
 
     async def test_the_description_states_the_duplicate_name_failure_as_a_fact(
         self, transport: httpx.AsyncClient

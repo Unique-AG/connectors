@@ -12,8 +12,9 @@ type ClassifyAs = Literal["focused", "other"]
 class FocusedOverride(BaseModel):
     sender_address: str = Field(
         description=(
-            "The SMTP address of the sender. Each address has at most one row. Use this value "
-            "as `sender` in outlook_set_focused_override."
+            "The SMTP address of the sender. Each address has at most one row. If this "
+            "deployment exposes outlook_set_focused_override, use this value as `sender` in that "
+            "tool."
         )
     )
     sender_name: str | None = Field(
