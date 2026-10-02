@@ -45,12 +45,13 @@ _RuleQuery = MessageRuleItemRequestBuilder.MessageRuleItemRequestBuilderGetQuery
 
 _DESCRIPTION = """\
 Turns one existing inbox rule off in the signed-in user's own mailbox. The rule stays in the \
-mailbox and stops acting on incoming mail. outlook_get_mailbox_settings lists the rules and gives \
-the handle of each rule in `uri`. If this deployment exposes outlook_update_mail_rule, that tool \
-can turn a rule on again. If this deployment exposes outlook_create_mail_rule, that tool creates \
-a rule.
+mailbox and stops acting on incoming mail. This tool cannot enable a rule or create one. \
+outlook_get_mailbox_settings lists the rules and gives the handle of each rule in `uri`.
 
 Notes:
+- To turn the rule on again, the user clicks once in Outlook. If this deployment exposes \
+outlook_update_mail_rule, that tool can turn a rule on again. If this deployment exposes \
+outlook_create_mail_rule, that tool creates a rule.
 - This tool refuses a read-only rule.
 - This call is safe to repeat after a timeout.
 """

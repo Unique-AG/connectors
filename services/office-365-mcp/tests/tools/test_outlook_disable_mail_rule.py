@@ -354,8 +354,16 @@ class TestHowItDeclaresItself:
         assert (
             "If this deployment exposes outlook_create_mail_rule, that tool creates a rule."
         ) in description
-        assert "clicks once in Outlook" not in description
         assert "\N{EM DASH}" not in description
+
+    async def test_it_says_it_cannot_enable_a_rule_and_that_the_user_clicks_in_outlook(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        described = tool.description or ""
+        assert "cannot enable a rule" in described
+        assert "clicks once in Outlook" in described
 
     async def test_it_says_it_refuses_a_read_only_rule_and_is_safe_to_repeat(
         self, transport: httpx.AsyncClient
