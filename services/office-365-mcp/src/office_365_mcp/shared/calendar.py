@@ -26,7 +26,6 @@ from msgraph.generated.models.recurrence_pattern import RecurrencePattern
 from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
 from msgraph.generated.models.recurrence_range import RecurrenceRange
 from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
-from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
 from msgraph.generated.models.user import User
 from msgraph.generated.models.week_index import WeekIndex
@@ -45,6 +44,7 @@ from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import body_opening as body_opening
 from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
 from office_365_mcp.shared.window import closes_at, opens_at
@@ -395,13 +395,13 @@ class RecurrencePatternSummary(BaseModel):
         days: Sequence[DayOfWeek | None] = pattern.days_of_week or []
         first = pattern.first_day_of_week
         return cls(
-            kind=None if pattern.type is None else spelled(pattern.type),
+            kind=spelled(pattern.type),
             interval=pattern.interval,
             days_of_week=[spelled(day) for day in days if day is not None],
             day_of_month=pattern.day_of_month,
             month=pattern.month,
-            index=None if pattern.index is None else spelled(pattern.index),
-            first_day_of_week=None if first is None else spelled(first),
+            index=spelled(pattern.index),
+            first_day_of_week=spelled(first),
         )
 
 
@@ -441,7 +441,7 @@ class RecurrenceRangeSummary(BaseModel):
     @classmethod
     def from_range(cls, dates: RecurrenceRange) -> Self:
         return cls(
-            kind=None if dates.type is None else spelled(dates.type),
+            kind=spelled(dates.type),
             start_date=None if dates.start_date is None else dates.start_date.isoformat(),
             end_date=None if dates.end_date is None else dates.end_date.isoformat(),
             number_of_occurrences=dates.number_of_occurrences,
@@ -676,11 +676,7 @@ class CalendarSummary(BaseModel):
             online_meeting_providers=[
                 spelled(provider) for provider in providers if provider is not None
             ],
-            default_online_meeting_provider=(
-                None
-                if calendar.default_online_meeting_provider is None
-                else spelled(calendar.default_online_meeting_provider)
-            ),
+            default_online_meeting_provider=spelled(calendar.default_online_meeting_provider),
         )
 
 
@@ -701,10 +697,8 @@ class EventAttendee(BaseModel):
         return cls(
             name=_name_of(attendee),
             address=_address_of(attendee),
-            kind=None if attendee.type is None else spelled(attendee.type),
-            response=(
-                None if status is None or status.response is None else spelled(status.response)
-            ),
+            kind=spelled(attendee.type),
+            response=spelled(None if status is None else status.response),
             responded_at=None if status is None else _answered_at(status.time),
         )
 
@@ -776,21 +770,19 @@ class EventSummary(BaseModel):
             end=event_time(event.end, zone=zone),
             all_day=event.is_all_day,
             cancelled=event.is_cancelled,
-            kind=None if event.type is None else spelled(event.type),
+            kind=spelled(event.type),
             in_series=master is not None,
             series_master_uri=None if master is None else EventHandle(calendar_id, master).uri,
-            sensitivity=None if event.sensitivity is None else spelled(event.sensitivity),
-            show_as=None if event.show_as is None else spelled(event.show_as),
+            sensitivity=spelled(event.sensitivity),
+            show_as=spelled(event.show_as),
             categories=list(event.categories or []),
-            importance=None if event.importance is None else spelled(event.importance),
+            importance=spelled(event.importance),
             location=None if event.location is None else event.location.display_name,
             is_online_meeting=event.is_online_meeting,
             join_url=None if online is None else online.join_url,
             organizer=MailAddress.from_recipient(event.organizer),
             owner_is_organizer=event.is_organizer,
-            owner_response=(
-                None if status is None or status.response is None else spelled(status.response)
-            ),
+            owner_response=spelled(None if status is None else status.response),
             attendee_count=len(event.attendees or []),
             web_link=event.web_link,
         )
@@ -836,22 +828,6 @@ class WorkingHoursSummary(BaseModel):
             ends_at=None if hours.end_time is None else hours.end_time.isoformat(),
             time_zone=None if zone is None else zone.name,
         )
-
-
-def spelled(
-    value: AttendeeType
-    | DayOfWeek
-    | ResponseType
-    | EventType
-    | FreeBusyStatus
-    | Sensitivity
-    | Importance
-    | OnlineMeetingProviderType
-    | RecurrencePatternType
-    | RecurrenceRangeType
-    | WeekIndex,
-) -> str:
-    return str.__str__(value)
 
 
 _TEAMS_FOR_BUSINESS = spelled(OnlineMeetingProviderType.TeamsForBusiness)

@@ -29,11 +29,11 @@ from office_365_mcp.shared.calendar import (
     EventTime,
     event_time,
     repeated_address,
-    spelled,
     wall_clock,
     zone_named,
 )
 from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_suggest_meeting_times"
@@ -187,9 +187,7 @@ class SuggestedAttendee(BaseModel):
         )
         return cls(
             address=address,
-            availability=(
-                None if availability.availability is None else spelled(availability.availability)
-            ),
+            availability=(spelled(availability.availability)),
         )
 
 
@@ -227,7 +225,7 @@ class MeetingSuggestion(BaseModel):
             end=None if slot is None else event_time(slot.end, zone=zone),
             confidence=suggestion.confidence,
             order=suggestion.order,
-            organizer_availability=None if organizer is None else spelled(organizer),
+            organizer_availability=spelled(organizer),
             attendees=[
                 SuggestedAttendee.from_attendee_availability(one)
                 for one in suggestion.attendee_availability or []

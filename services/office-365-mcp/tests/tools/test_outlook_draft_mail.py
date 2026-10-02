@@ -15,9 +15,10 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_mail as drafter
-from office_365_mcp.tools.outlook_draft_mail import MailDraft, MailImportance
+from office_365_mcp.tools.outlook_draft_mail import MailDraft
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 

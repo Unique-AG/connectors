@@ -70,7 +70,6 @@ from office_365_mcp.shared.calendar import (
     providers_without_teams,
     recurrence_refusal,
     repeated_address,
-    spelled,
     transaction_id_for,
     wall_clock,
     zone_named,
@@ -78,6 +77,7 @@ from office_365_mcp.shared.calendar import (
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -639,10 +639,10 @@ def _answer(created: Event, *, calendar: Calendar, draft: EventDraft) -> Created
         is_online_meeting=created.is_online_meeting,
         join_url=None if online is None else online.join_url,
         location=None if created.location is None else created.location.display_name,
-        show_as=None if created.show_as is None else spelled(created.show_as),
+        show_as=spelled(created.show_as),
         categories=list(created.categories or []),
-        importance=None if created.importance is None else spelled(created.importance),
-        sensitivity=None if created.sensitivity is None else spelled(created.sensitivity),
+        importance=spelled(created.importance),
+        sensitivity=spelled(created.sensitivity),
         is_reminder_on=created.is_reminder_on,
         reminder_minutes_before_start=created.reminder_minutes_before_start,
         hide_attendees=created.hide_attendees,

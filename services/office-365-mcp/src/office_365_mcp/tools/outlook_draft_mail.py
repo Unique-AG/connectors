@@ -1,7 +1,7 @@
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -21,7 +21,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailDraftHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance, copied_and_marked
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -47,8 +48,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 MAX_SUBJECT_CHARACTERS = 255
-
-type MailImportance = Literal["low", "normal", "high"]
 
 _AGREE = "create the draft"
 _DECLINE = "do not create the draft"
@@ -210,19 +209,9 @@ def _question(
         + "That mailbox is not the signed-in user's own. "
         + f"The draft has the subject {cut_for_a_question(subject)!r}. "
         + f"It is addressed to {', '.join(to)}."
-        + _copied_and_marked(cc, importance=importance, categories=categories)
+        + copied_and_marked(cc, importance=importance, categories=categories)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
-    )
-
-
-def _copied_and_marked(
-    cc: Sequence[str], *, importance: MailImportance | None, categories: Sequence[str]
-) -> str:
-    return (
-        (f" It is copied to {', '.join(cc)}." if cc else "")
-        + ("" if importance is None else f" It has {importance} importance.")
-        + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )
 
 
@@ -249,7 +238,7 @@ def _answer(draft: Message) -> MailDraft:
         cc=MailAddress.each_of(draft.cc_recipients),
         subject=draft.subject,
         body=None if draft.body is None else draft.body.content,
-        importance=None if draft.importance is None else str.__str__(draft.importance),
+        importance=spelled(draft.importance),
         categories=list(draft.categories or []),
     )
 

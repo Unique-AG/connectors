@@ -21,11 +21,11 @@ from office_365_mcp.shared.calendar import (
     WorkingHoursSummary,
     event_time,
     repeated_address,
-    spelled,
     wall_clock,
     zone_named,
 )
 from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_check_availability"
@@ -113,7 +113,7 @@ class FreeBusySlot(BaseModel):
     @classmethod
     def from_item(cls, item: ScheduleItem, *, zone: ZoneInfo) -> FreeBusySlot:
         return cls(
-            status=None if item.status is None else spelled(item.status),
+            status=spelled(item.status),
             start=event_time(item.start, zone=zone),
             end=event_time(item.end, zone=zone),
             subject=item.subject,

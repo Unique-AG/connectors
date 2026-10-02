@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import MailRuleHandle, mail_folder_handle
 from office_365_mcp.shared.mail import ONE_ADDRESS, WellKnownFolder
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 
 STEP_READ_RULE = "read_mail_rule"
@@ -365,8 +366,8 @@ class RuleConditions(BaseModel):
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must be in the To recipients or in the Cc recipients of "
-            + "an incoming message for the condition or the exception to apply."
+            "True when the mailbox owner must be a To or Cc recipient of an incoming message for "
+            + "the condition or the exception to apply."
         ),
     )
     subject_contains: list[str] | None = Field(
@@ -397,7 +398,7 @@ def conditions_of(predicates: MessageRulePredicates | None) -> RuleConditions | 
         from_addresses=_addresses(predicates.from_addresses) or None,
         has_attachments=predicates.has_attachments,
         header_contains=predicates.header_contains or None,
-        importance=_spelled(predicates.importance),
+        importance=spelled(predicates.importance),
         is_approval_request=predicates.is_approval_request,
         is_automatic_forward=predicates.is_automatic_forward,
         is_automatic_reply=predicates.is_automatic_reply,
@@ -409,11 +410,11 @@ def conditions_of(predicates: MessageRulePredicates | None) -> RuleConditions | 
         is_read_receipt=predicates.is_read_receipt,
         is_signed=predicates.is_signed,
         is_voicemail=predicates.is_voicemail,
-        message_action_flag=_spelled(predicates.message_action_flag),
+        message_action_flag=spelled(predicates.message_action_flag),
         not_sent_to_me=predicates.not_sent_to_me,
         recipient_contains=predicates.recipient_contains or None,
         sender_contains=predicates.sender_contains or None,
-        sensitivity=_spelled(predicates.sensitivity),
+        sensitivity=spelled(predicates.sensitivity),
         sent_cc_me=predicates.sent_cc_me,
         sent_only_to_me=predicates.sent_only_to_me,
         sent_to_addresses=_addresses(predicates.sent_to_addresses) or None,
@@ -641,7 +642,7 @@ def actions_of(actions: MessageRuleActions | None) -> RuleActions | None:
         forward_as_attachment_to=_addresses(actions.forward_as_attachment_to) or None,
         forward_to=_addresses(actions.forward_to) or None,
         mark_as_read=actions.mark_as_read,
-        mark_importance=_spelled(actions.mark_importance),
+        mark_importance=spelled(actions.mark_importance),
         move_to_folder=actions.move_to_folder or None,
         permanent_delete=actions.permanent_delete,
         redirect_to=_addresses(actions.redirect_to) or None,
@@ -834,8 +835,8 @@ class RuleConditionsInput(BaseModel):
         default=None,
         min_length=1,
         description=(
-            "The strings that must appear in the To recipients or in the Cc recipients of an "
-            + "incoming message for the condition or the exception to apply."
+            "The strings that must appear in the To or Cc recipients of an incoming message for "
+            + "the condition or the exception to apply."
         ),
     )
     sender_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
@@ -886,8 +887,8 @@ class RuleConditionsInput(BaseModel):
     sent_to_or_cc_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must be in the To recipients or in the Cc recipients "
-            + "of an incoming message for the condition or the exception to apply."
+            "Set true when the mailbox owner must be a To or Cc recipient of an incoming message "
+            + "for the condition or the exception to apply."
         ),
     )
     subject_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
@@ -1221,7 +1222,3 @@ def _deletes(actions: MessageRuleActions | None) -> bool | None:
         return None
     said = [flag for flag in (actions.delete, actions.permanent_delete) if flag is not None]
     return any(said) if said else None
-
-
-def _spelled(value: Importance | MessageActionFlag | Sensitivity | None) -> str | None:
-    return None if value is None else str.__str__(value)

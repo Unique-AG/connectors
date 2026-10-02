@@ -15,8 +15,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors
-from office_365_mcp.shared.calendar import EventTime, event_time, spelled, window_bounds, zone_named
+from office_365_mcp.shared.calendar import EventTime, event_time, window_bounds, zone_named
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 
@@ -146,7 +147,7 @@ class GroupEventSummary(BaseModel):
             end=event_time(event.end, zone=zone),
             all_day=event.is_all_day,
             cancelled=event.is_cancelled,
-            kind=None if event.type is None else spelled(event.type),
+            kind=spelled(event.type),
             in_series=event.series_master_id is not None,
             location=None if event.location is None else event.location.display_name,
             join_url=None if online is None else online.join_url,

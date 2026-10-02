@@ -13,12 +13,11 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailFlag
+from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailFlag, MailImportance
 from office_365_mcp.tools import outlook_search_mail as searcher
 from office_365_mcp.tools.outlook_search_mail import (
     CRITERIA,
     MAX_RESULTS,
-    MailImportance,
     SearchCriteria,
     search_mail,
 )
@@ -1067,6 +1066,18 @@ class TestWhatItTellsAModel:
             described = properties[name]["description"]
             assert "applies this filter to the page that Graph returns" in described
             assert "fewer than `limit` messages" in described
+
+    async def test_flagged_says_that_a_message_with_no_flag_matches_neither_value(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _ = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        described = properties["flagged"]["description"]
+        assert (
+            "A message for which Microsoft 365 reports no flag matches neither value." in described
+        )
+        assert 15 <= len(described.split()) <= 60
 
     async def test_more_may_exist_says_when_it_is_computed(
         self, transport: httpx.AsyncClient

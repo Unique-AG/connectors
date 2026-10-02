@@ -2,7 +2,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -35,7 +35,8 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -72,8 +73,6 @@ GRAPH_NOT_FOUND = (
     + "message is not in this mailbox now. If you call this tool again with the same "
     + "arguments, the call will fail the same way."
 )
-
-type MailImportance = Literal["low", "normal", "high"]
 
 _ORIGINAL_FIELDS: tuple[str, ...] = ("subject", "from", "replyTo", "toRecipients", "ccRecipients")
 
@@ -402,7 +401,7 @@ def _answer(*, created: Message, fill: _Fill) -> MailReplyAllDraft:
         recipient_count=len(to) + len(cc),
         subject=stored.subject,
         body=body,
-        importance=None if stored.importance is None else str.__str__(stored.importance),
+        importance=spelled(stored.importance),
         categories=list(stored.categories or []),
         body_written=fill.message is not None,
         failure=None if fill.failure is None else str(fill.failure),

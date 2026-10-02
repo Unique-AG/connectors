@@ -1,12 +1,12 @@
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta
-from typing import Annotated, Literal
+from functools import partial
+from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_builder import (
@@ -24,8 +24,11 @@ from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     ONE_ADDRESS,
     SUMMARY_FIELDS,
+    MailImportance,
     MailSummary,
     WellKnownFolder,
+    carries_category,
+    has_flag_state,
 )
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import (
@@ -58,8 +61,6 @@ GRAPH_NOT_FOUND = (
 MAX_RESULTS = 1000
 
 DEFAULT_FOLDER: WellKnownFolder = "inbox"
-
-type MailImportance = Literal["low", "normal", "high"]
 
 _FOLDER_FIELDS: tuple[str, ...] = ("displayName", "totalItemCount", "unreadItemCount")
 
@@ -285,11 +286,11 @@ def _keeps(
     if importance is not None:
         checks.append(_has_importance(importance))
     if flagged is not None:
-        checks.append(_has_flag_state(flagged))
+        checks.append(partial(has_flag_state, flagged=flagged))
     if has_attachments is not None:
         checks.append(_has_attachment_state(has_attachments))
     if category is not None:
-        checks.append(_carries_category(category))
+        checks.append(partial(carries_category, category=category))
     if not checks:
         return None
     return lambda message: all(check(message) for check in checks)
@@ -314,20 +315,8 @@ def _has_importance(importance: MailImportance) -> Callable[[Message], bool]:
     return lambda message: message.importance is wanted
 
 
-def _has_flag_state(flagged: bool) -> Callable[[Message], bool]:
-    return lambda message: (
-        message.flag is not None
-        and (message.flag.flag_status is FollowupFlagStatus.Flagged) is flagged
-    )
-
-
 def _has_attachment_state(has_attachments: bool) -> Callable[[Message], bool]:
     return lambda message: message.has_attachments is has_attachments
-
-
-def _carries_category(category: str) -> Callable[[Message], bool]:
-    wanted = category.casefold()
-    return lambda message: any(name.casefold() == wanted for name in message.categories or [])
 
 
 def _one_address(from_address: str | None) -> str | None:
@@ -414,7 +403,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Set to true for only the messages flagged for follow-up. Set to false for "
                     "only the messages that are not flagged. A completed follow-up counts as not "
-                    "flagged. The tool applies this filter to the messages it reads."
+                    "flagged. A message for which Microsoft 365 reports no flag matches neither "
+                    "value. The tool applies this filter to the messages it reads."
                 )
             ),
         ] = None,

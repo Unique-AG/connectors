@@ -2,7 +2,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -25,7 +25,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -43,16 +44,12 @@ STEP_UPDATE_DRAFT = "update_draft"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
-CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
-
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D",
     "subject": "Invoice 4471 (final)",
 }
 
 MAX_SUBJECT_CHARACTERS = 255
-
-type MailImportance = Literal["low", "normal", "high"]
 
 _DRAFT_FIELDS: tuple[str, ...] = ("isDraft", "subject", "toRecipients", "ccRecipients")
 
@@ -93,7 +90,7 @@ _NOT_A_DRAFT_HANDLE = (
     + "percent-encoded. A subject line, an email address, a message id and an Outlook web link "
     + "are not handles. A folder or rule handle is not a draft handle either. Nothing was "
     + "changed. Copy the `uri` of the drafting tool result exactly. If you call this tool again "
-    + "with this value, the call will fail the same way."
+    + "with the same arguments, the call will fail the same way."
 )
 
 _A_MESSAGE_IS_NOT_A_DRAFT = (
@@ -374,7 +371,7 @@ def _answer(updated: Message, *, handle: MailDraftHandle) -> UpdatedDraft:
         cc=MailAddress.each_of(updated.cc_recipients),
         subject=updated.subject,
         body=None if updated.body is None else updated.body.content,
-        importance=None if updated.importance is None else str.__str__(updated.importance),
+        importance=spelled(updated.importance),
         categories=list(updated.categories or []),
     )
 

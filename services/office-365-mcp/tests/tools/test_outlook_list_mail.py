@@ -12,9 +12,14 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, FlagMoment, MailFlag, WellKnownFolder
+from office_365_mcp.shared.mail import (
+    SUMMARY_FIELDS,
+    FlagMoment,
+    MailFlag,
+    MailImportance,
+    WellKnownFolder,
+)
 from office_365_mcp.tools import outlook_list_mail as lister
-from office_365_mcp.tools.outlook_list_mail import MailImportance
 
 from .conftest import GRAPH_V1
 
@@ -1188,6 +1193,18 @@ class TestWhatItTellsAModel:
         properties = cast("Mapping[str, Mapping[str, str]]", tool.parameters["properties"])
         for name in ("importance", "flagged", "has_attachments", "category"):
             assert "applies this filter to the messages it reads" in properties[name]["description"]
+
+    async def test_flagged_says_that_a_message_with_no_flag_matches_neither_value(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", tool.parameters["properties"])
+        described = properties["flagged"]["description"]
+        assert (
+            "A message for which Microsoft 365 reports no flag matches neither value." in described
+        )
+        assert 15 <= len(described.split()) <= 60
 
     async def test_importance_admits_the_three_values_graph_reports_and_nothing_else(
         self, transport: httpx.AsyncClient

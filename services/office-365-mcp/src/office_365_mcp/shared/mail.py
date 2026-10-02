@@ -1,16 +1,18 @@
 import re
+from collections.abc import Sequence
 from typing import Literal, Self
 
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
-from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.prose import cut_for_a_question
 
 SUMMARY_FIELDS: tuple[str, ...] = (
     "id",
@@ -46,6 +48,8 @@ type WellKnownFolder = Literal[
     "clutter",
 ]
 
+type MailImportance = Literal["low", "normal", "high"]
+
 
 class MailAddress(BaseModel):
     name: str | None = Field(description="The display name on the message, or null if none.")
@@ -70,10 +74,6 @@ class MailAddress(BaseModel):
             for address in (cls.from_recipient(recipient) for recipient in recipients or [])
             if address is not None
         ]
-
-
-def _spelled(value: FollowupFlagStatus | Importance | None) -> str | None:
-    return None if value is None else str.__str__(value)
 
 
 class FlagMoment(BaseModel):
@@ -128,7 +128,7 @@ class MailFlag(BaseModel):
         if flag is None:
             return None
         return cls(
-            status=_spelled(flag.flag_status),
+            status=spelled(flag.flag_status),
             start=FlagMoment.from_moment(flag.start_date_time),
             due=FlagMoment.from_moment(flag.due_date_time),
             completed=FlagMoment.from_moment(flag.completed_date_time),
@@ -206,10 +206,32 @@ class MailSummary(BaseModel):
             ),
             is_read=message.is_read,
             has_attachments=message.has_attachments,
-            importance=_spelled(message.importance),
+            importance=spelled(message.importance),
             flag=MailFlag.from_flag(message.flag),
             categories=message.categories or [],
             is_draft=message.is_draft,
             folder_id=message.parent_folder_id,
             web_link=message.web_link,
         )
+
+
+def has_flag_state(message: Message, flagged: bool) -> bool:
+    return (
+        message.flag is not None
+        and (message.flag.flag_status is FollowupFlagStatus.Flagged) is flagged
+    )
+
+
+def carries_category(message: Message, category: str) -> bool:
+    wanted = category.casefold()
+    return any(name.casefold() == wanted for name in message.categories or [])
+
+
+def copied_and_marked(
+    cc: Sequence[str], *, importance: MailImportance | None, categories: Sequence[str]
+) -> str:
+    return (
+        (f" It is copied to {', '.join(cc)}." if cc else "")
+        + ("" if importance is None else f" It has {importance} importance.")
+        + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
+    )

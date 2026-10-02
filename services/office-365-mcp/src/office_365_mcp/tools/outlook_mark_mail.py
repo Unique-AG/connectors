@@ -26,7 +26,8 @@ from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, 
 from office_365_mcp.shared.calendar import ZONE_NAME, wall_clock
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import FlagMoment
+from office_365_mcp.shared.mail import FlagMoment, MailImportance
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -49,8 +50,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_refs": ["outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"],
     "is_read": True,
 }
-
-type MailImportance = Literal["low", "normal", "high"]
 
 type FlagStatus = Literal["flagged", "complete", "notFlagged"]
 
@@ -91,7 +90,7 @@ other messages, and the row of that message gives the reason.
 the user's own mailbox without a question.
 """
 
-_RETRY = " Retrying these values will fail identically."
+_RETRY = " If you call this tool again with the same arguments, the call will fail the same way."
 
 _NOTHING_TO_CHANGE = (
     "outlook_mark_mail needs at least one of `is_read`, `flagged`, `flag_status`, "
@@ -141,7 +140,7 @@ def _not_a_time(argument: str, value: str) -> str:
         f"outlook_mark_mail cannot read {value!r} in `{argument}` as a time. Write "
         + "`YYYY-MM-DDTHH:MM` or `YYYY-MM-DDTHH:MM:SS`, for example `2026-03-02T14:00`. Do not "
         + "add an offset or a `Z`. Put the zone in `flag_time_zone`. "
-        + f"{_NOTHING_CHANGED} Retrying this value will fail identically."
+        + f"{_NOTHING_CHANGED}{_RETRY}"
     )
 
 
@@ -511,15 +510,11 @@ def _request() -> RequestConfiguration[QueryParameters]:
 
 def _flag_status_of(message: Message | None) -> str | None:
     flag = None if message is None else message.flag
-    return None if flag is None else _reported(flag.flag_status)
+    return spelled(None if flag is None else flag.flag_status)
 
 
 def _importance_of(message: Message | None) -> str | None:
-    return None if message is None else _reported(message.importance)
-
-
-def _reported(value: FollowupFlagStatus | Importance | None) -> str | None:
-    return None if value is None else str.__str__(value)
+    return spelled(None if message is None else message.importance)
 
 
 def _why(failure: GraphFailure) -> str:

@@ -466,8 +466,8 @@ class TestOneCalendarRow:
         assert row.default_online_meeting_provider == "teamsForBusiness"
 
     def test_a_provider_this_sdk_cannot_name_is_left_out_of_the_row(self) -> None:
-        """kiota puts None in the list for a provider it has no member for, and `spelled` raises
-        on None, so the row reports the providers it can name and drops the rest."""
+        """kiota puts None in the list for a provider it has no member for, so the row reports the
+        providers it can name and drops the rest."""
         calendar = Calendar(
             id=_CALENDAR_ID,
             allowed_online_meeting_providers=cast(

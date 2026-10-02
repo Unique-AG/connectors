@@ -15,6 +15,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools import outlook_update_draft as updater
 from office_365_mcp.tools.outlook_update_draft import DraftChange, UpdatedDraft
@@ -41,6 +42,10 @@ _BODY = "<p>Sending this over for review.</p>"
 _REFUSED: dict[str, object] = {"error": {"code": "ErrorAccessDenied", "message": "denied"}}
 
 _NOT_CHANGED = "The draft was not changed."
+
+_RETRY_SENTENCE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 async def _refuses(question: str, about: str) -> Confirmed:
@@ -120,7 +125,7 @@ async def _update(client: GraphServiceClient, **overrides: object) -> UpdatedDra
         body_html=cast("str | None", overrides.get("body_html")),
         to=cast("Sequence[str] | None", overrides.get("to")),
         cc=cast("Sequence[str] | None", overrides.get("cc")),
-        importance=cast("updater.MailImportance | None", overrides.get("importance")),
+        importance=cast("MailImportance | None", overrides.get("importance")),
         categories=cast("Sequence[str] | None", overrides.get("categories")),
     )
     answer = await updater.update_draft(
@@ -314,6 +319,14 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_a_value_that_is_not_a_draft_handle_ends_with_the_one_retry_sentence(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, draft_ref=_SUBJECT, subject="Invoice 4471 (final)")
+
+        assert str(refused.value).endswith(_RETRY_SENTENCE)
+
     @pytest.mark.parametrize("is_draft", [False, None])
     async def test_a_message_that_is_not_a_draft_now_is_never_changed(
         self, client: GraphServiceClient, graph: respx.MockRouter, is_draft: bool | None
@@ -399,7 +412,9 @@ class TestTheSchemaItPublishes:
 class TestHowItDeclaresItself:
     def test_the_permission_is_the_one_microsoft_documents_for_the_update(self) -> None:
         assert updater.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
-        assert updater.CHANGE_SHOWN_BY == ("outlook_list_mail",)
+        assert not hasattr(updater, "CHANGE_SHOWN_BY"), (
+            "a write that is safe to repeat gets the retry advice, which names no tool"
+        )
 
     def test_its_two_steps_are_the_two_calls_it_makes(self) -> None:
         assert updater.STEP_READ_DRAFT == "read_draft"

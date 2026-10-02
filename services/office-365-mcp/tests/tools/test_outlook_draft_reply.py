@@ -16,13 +16,10 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_reply as replier
-from office_365_mcp.tools.outlook_draft_reply import (
-    MailImportance,
-    MailReplyDraft,
-    MailReplyMode,
-)
+from office_365_mcp.tools.outlook_draft_reply import MailReplyDraft, MailReplyMode
 
 _MESSAGE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 

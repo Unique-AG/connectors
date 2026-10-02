@@ -1,14 +1,13 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.exchange_id_format import ExchangeIdFormat
-from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.messages_request_builder import MessagesRequestBuilder
 from msgraph.generated.users.item.translate_exchange_ids.translate_exchange_ids_post_request_body import (  # noqa: E501
@@ -20,7 +19,13 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import kql
-from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailSummary
+from office_365_mcp.shared.mail import (
+    SUMMARY_FIELDS,
+    MailImportance,
+    MailSummary,
+    carries_category,
+    has_flag_state,
+)
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -39,8 +44,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read", "Mail.Read.Share
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 
 MAX_RESULTS = 1000
-
-type MailImportance = Literal["low", "normal", "high"]
 
 _KQL_IMPORTANCE: Mapping[MailImportance, str] = {"low": "low", "normal": "medium", "high": "high"}
 
@@ -213,24 +216,12 @@ def _property_terms(importance: MailImportance | None, has_attachments: bool | N
 
 
 def _narrowed(found: list[Message], *, flagged: bool | None, category: str | None) -> list[Message]:
-    wanted = None if category is None else category.casefold()
     return [
         message
         for message in found
-        if (flagged is None or _has_flag_state(message, flagged))
-        and (wanted is None or _carries_category(message, wanted))
+        if (flagged is None or has_flag_state(message, flagged))
+        and (category is None or carries_category(message, category))
     ]
-
-
-def _has_flag_state(message: Message, flagged: bool) -> bool:
-    return (
-        message.flag is not None
-        and (message.flag.flag_status is FollowupFlagStatus.Flagged) is flagged
-    )
-
-
-def _carries_category(message: Message, wanted: str) -> bool:
-    return any(name.casefold() == wanted for name in message.categories or [])
 
 
 def _opening_term(received_after: date | datetime) -> str:
@@ -315,6 +306,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "Set to true for only the mail flagged for follow-up. Set to false for only "
                     "the mail that is not flagged. A completed follow-up counts as not flagged. "
+                    "A message for which Microsoft 365 reports no flag matches neither value. "
                     "The tool applies this filter to the page that Graph returns, so the result "
                     "can hold fewer than `limit` messages."
                 )

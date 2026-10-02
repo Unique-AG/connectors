@@ -39,7 +39,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance, copied_and_marked
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -79,8 +80,6 @@ GRAPH_NOT_FOUND = (
 )
 
 type MailReplyMode = Literal["reply", "forward"]
-
-type MailImportance = Literal["low", "normal", "high"]
 
 MODES: tuple[str, ...] = ("reply", "forward")
 
@@ -386,19 +385,9 @@ def _question(
         + f"The {mode} is {preposition} the message {named}. "
         + "That mailbox is not the signed-in user's own. "
         + f"The draft is addressed to {', '.join(addressed) or _CHOSEN_BY_MICROSOFT}."
-        + _copied_and_marked(cc, importance=importance, categories=categories)
+        + copied_and_marked(cc, importance=importance, categories=categories)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
-    )
-
-
-def _copied_and_marked(
-    cc: Sequence[str], *, importance: MailImportance | None, categories: Sequence[str]
-) -> str:
-    return (
-        (f" It is copied to {', '.join(cc)}." if cc else "")
-        + ("" if importance is None else f" It has {importance} importance.")
-        + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )
 
 
@@ -481,7 +470,7 @@ def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyD
         cc=MailAddress.each_of(stored.cc_recipients),
         subject=stored.subject,
         body=body,
-        importance=None if stored.importance is None else str.__str__(stored.importance),
+        importance=spelled(stored.importance),
         categories=list(stored.categories or []),
         body_written=fill.message is not None,
         failure=None if fill.failure is None else str(fill.failure),

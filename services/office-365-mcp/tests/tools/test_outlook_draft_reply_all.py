@@ -14,6 +14,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_reply_all as replier
 from office_365_mcp.tools.outlook_draft_reply_all import MailReplyAllDraft
@@ -161,7 +162,7 @@ async def _reply_all(client: GraphServiceClient, **overrides: object) -> MailRep
         body_html=cast("str", overrides.get("body_html", _BODY)),
         confirm=cast("Confirm", overrides.get("confirm", _never_asked)),
         cc=cast("Sequence[str]", overrides.get("cc", ())),
-        importance=cast("replier.MailImportance | None", overrides.get("importance")),
+        importance=cast("MailImportance | None", overrides.get("importance")),
         categories=cast("Sequence[str]", overrides.get("categories", ())),
         mailbox=cast("str | None", overrides.get("mailbox")),
     )

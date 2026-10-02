@@ -28,13 +28,12 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import ZONE_NAME
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.mail import FlagMoment
+from office_365_mcp.shared.mail import FlagMoment, MailImportance
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools.outlook_mark_mail import (
     GRAPH_PERMISSIONS,
     TOOL_NAME,
     FlagStatus,
-    MailImportance,
     MarkChange,
     MarkedMail,
     mark_mail,
@@ -73,6 +72,10 @@ _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _MAILBOX = "alex@example.invalid"
 
 _NOT_CHANGED = "No message was changed."
+
+_RETRY_SENTENCE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 _START = "2026-03-02T09:00"
 _DUE = "2026-03-06T17:00"
@@ -1030,6 +1033,29 @@ class TestWhatItRefusesBeforeWritingAnything:
         assert route.call_count == 0
         assert named in str(refused.value)
         assert _NOT_CHANGED in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            pytest.param(MarkChange(flagged=True, flag_status="complete"), id="two-forms"),
+            pytest.param(
+                MarkChange(flag_starts_at="tomorrow at 9", flag_time_zone=_ZONE),
+                id="start-not-a-time",
+            ),
+            pytest.param(
+                MarkChange(add_categories=("Red",), remove_categories=("RED",)),
+                id="category-in-both-lists",
+            ),
+        ],
+    )
+    async def test_a_value_refusal_ends_with_the_one_sentence_for_a_repeat_that_fails_again(
+        self, client: GraphServiceClient, change: MarkChange
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await mark_mail(client, message_refs=_REFS[:1], change=change, confirm=_never_asked)
+
+        assert str(refused.value).endswith(_RETRY_SENTENCE)
+        assert "identically" not in str(refused.value)
 
     async def test_a_due_date_equal_to_the_start_date_is_accepted(
         self, client: GraphServiceClient, graph: respx.MockRouter
