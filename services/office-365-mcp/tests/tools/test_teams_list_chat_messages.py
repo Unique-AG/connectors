@@ -142,7 +142,7 @@ class TestOneCallIsOneRequest:
 
         listed = await lister.list_chat_messages(client, chat_id=_CHAT_ID, limit=20)
 
-        assert len(graph.calls) == 1, "one call is one request against the chat"
+        assert len(graph.calls) == 1
         assert not second_page.called
         assert listed.more_messages is True
 

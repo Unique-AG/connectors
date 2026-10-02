@@ -66,7 +66,7 @@ class TestTheRequestItSends:
         assert route.call_count == 1
         params = route.calls.last.request.url.params
         assert params["$top"] == "7"
-        assert set(params) == {"$top"}, "Microsoft supports no other option on this collection"
+        assert set(params) == {"$top"}
 
     async def test_it_asks_for_the_message_type_graph_hides_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -106,7 +106,7 @@ class TestReadingTheRepliesOfOnePost:
         resolved = message_handle(reply.uri)
         assert resolved is not None
         assert (resolved.message_id, resolved.reply_to_id) == ("1770000000001", _POST_ID)
-        assert resolved.channel_id == _CHANNEL_ID, "the handle round-trips its decoded ids"
+        assert resolved.channel_id == _CHANNEL_ID
 
     async def test_a_reply_graph_named_no_parent_for_is_still_placed_under_its_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -228,8 +228,8 @@ class TestOneCallIsOneRequest:
 
         assert listed.more_replies is True
         assert [message.message_id for message in listed.messages] == ["1770000000001"]
-        assert len(graph.calls) == 1, "one call is one request against the channel"
-        assert not second_page.called, "the cursor is read, not followed"
+        assert len(graph.calls) == 1
+        assert not second_page.called
 
     async def test_an_answer_without_a_cursor_says_that_was_the_whole_thread(
         self, client: GraphServiceClient, graph: respx.MockRouter

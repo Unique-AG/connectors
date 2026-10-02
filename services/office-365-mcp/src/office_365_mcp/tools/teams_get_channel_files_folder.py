@@ -71,8 +71,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The team that owns the channel, exactly as teams_list_my_teams reported it. "
-                    + "This id is opaque. Copy it and never build one from a name. A team name "
-                    + "is not an id."
+                    + "This id is opaque. Copy it. Never build one from a name. A team name is "
+                    + "not an id."
                 ),
             ),
         ],
@@ -82,7 +82,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The channel to look up, exactly as teams_list_channels reported it. This id "
-                    + "is opaque. Copy it and never build one from a name. Pass it with the "
+                    + "is opaque. Copy it. Never build one from a name. Pass it with the "
                     + "`team_id` of the same team."
                 ),
             ),

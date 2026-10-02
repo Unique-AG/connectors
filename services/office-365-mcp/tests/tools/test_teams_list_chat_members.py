@@ -78,7 +78,7 @@ class TestTheRequestItSends:
 
         _ = await lister.teams_list_chat_members(client, chat_id=_CHAT_ID)
 
-        assert len(graph.calls) == 1, "one call is one request against the chat"
+        assert len(graph.calls) == 1
         request = route.calls.last.request
         assert request.method == "GET"
         assert str(request.url) == f"{GRAPH_V1}{_MEMBERS_PATH}"
@@ -96,7 +96,7 @@ class TestOneCallIsOneRequest:
 
         listed = await lister.teams_list_chat_members(client, chat_id=_CHAT_ID)
 
-        assert len(graph.calls) == 1, "one call is one request against the chat"
+        assert len(graph.calls) == 1
         assert not second_page.called
         assert listed.more_members is True
         assert len(listed.members) == 1
@@ -317,7 +317,7 @@ class TestHowItDeclaresItself:
         assert "That tool shows members only for unnamed chats." in description
         assert "This tool reads one page of members." in description
         assert "If `more_members` is true" in description
-        assert "Calling it again returns the same members." in description
+        assert "If you call this tool again, it returns the same members." in description
 
     async def test_the_description_says_a_member_without_an_entra_account_has_no_id_or_email(
         self, transport: httpx.AsyncClient

@@ -37,8 +37,8 @@ accepts. teams_browse_channel is the sibling tool for a channel, and teams_searc
 message by its text.
 
 Notes:
-- To read further back, pass the oldest `created_at` as `sent_before`. Messages from that same \
-second come back again at the top of the list.
+- To read further back, pass the oldest `created_at` as `sent_before`. The messages from that same \
+second appear again at the top of the list.
 - One call is one request, because a given chat allows this whole connector about one request a \
 second, across the whole tenant.\
 """
@@ -138,10 +138,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             date | datetime | None,
             Field(
                 description=(
-                    "Only messages sent at or before this point, inclusive. A date, "
-                    + "`2026-03-04`, covers that whole UTC day. A moment, "
-                    + "`2026-03-04T09:00:00Z`, covers the whole second it names, and a moment "
-                    + "with no zone is read as UTC."
+                    "Only messages sent at or before this point. A date, `2026-03-04`, covers "
+                    + "that whole UTC day. A moment, `2026-03-04T09:00:00Z`, covers the whole "
+                    + "second it names. This tool reads a moment with no zone as UTC."
                 )
             ),
         ] = None,

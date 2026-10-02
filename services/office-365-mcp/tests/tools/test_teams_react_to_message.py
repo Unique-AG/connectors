@@ -162,7 +162,7 @@ class _Session:
 
 
 def _the_question(answer: object) -> tuple[str, str, str, str]:
-    assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
+    assert isinstance(answer, InputRequiredResult)
     requests = answer.input_requests or {}
     assert len(requests) == 1, f"one question per call, and this one asked {sorted(requests)}"
     key = next(iter(requests))
@@ -215,7 +215,7 @@ class TestTheRequestItMakes:
         assert {path: route.call_count for path, route in routes.items()} == {
             path: 1 if path == endpoint else 0 for path in _EVERY_ENDPOINT
         }
-        assert _methods(graph).count("POST") == 1, "one reaction change costs one write"
+        assert _methods(graph).count("POST") == 1
         body = cast("Mapping[str, object]", json.loads(routes[endpoint].calls.last.request.content))
         assert body == {"reactionType": _THUMBS_UP}
 
@@ -246,9 +246,7 @@ class TestTheRequestItMakes:
         assert {path: route.call_count for path, route in reads.items()} == {
             path: 1 if path in read else 0 for path in reads
         }
-        assert posts_read.call_count == replies_read.call_count == 0, (
-            "a channel post needs ChannelMessage.Read.All, which no preset with this tool asks for"
-        )
+        assert posts_read.call_count == replies_read.call_count == 0
         assert _methods(graph) == ["GET"] * len(read)
 
     @pytest.mark.parametrize("path", [_CHANNEL_ONLY_PATH, _TEAM_PATH])
@@ -363,7 +361,7 @@ class TestThePersonBeforeTheChange:
             client, handle=handle, reaction=_THUMBS_UP, remove=False, confirm=watching
         )
 
-        assert calls_when_asked == [reads], "asked before the read, or after the change"
+        assert calls_when_asked == [reads]
         assert _methods(graph) == [*reads, "POST"]
 
     @pytest.mark.parametrize(("remove", "verb"), [(False, "Add"), (True, "Remove")])
@@ -380,7 +378,7 @@ class TestThePersonBeforeTheChange:
         assert len(asked) == 1
         assert asked[0].startswith(f"{verb} the reaction {_THUMBS_UP!r}")
         assert "Everyone in the conversation can see this change." in asked[0]
-        assert "teams:///" not in asked[0], "a handle means nothing to the person who agrees"
+        assert "teams:///" not in asked[0]
 
     async def test_the_question_names_the_sender_and_the_text_of_a_chat_message(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -535,9 +533,7 @@ class TestTheEraWithNoBackChannel:
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "add"
         assert _THUMBS_UP in question
-        assert all(route.call_count == 0 for route in routes.values()), (
-            "an unanswered question changed the reaction anyway"
-        )
+        assert all(route.call_count == 0 for route in routes.values())
 
     @pytest.mark.parametrize(
         ("remove", "endpoint"),
@@ -574,7 +570,7 @@ class TestTheEraWithNoBackChannel:
             ),
         )
 
-        assert routes[endpoint].call_count == 1, "the agreed change did not happen exactly once"
+        assert routes[endpoint].call_count == 1
         assert _methods(graph).count("POST") == 1
         assert answer == ChangedReaction(uri=_CHAT_HANDLE.uri, reaction=_THUMBS_UP, removed=remove)
 
@@ -609,9 +605,7 @@ class TestTheEraWithNoBackChannel:
                 ),
             )
 
-        assert all(route.call_count == 0 for route in routes.values()), (
-            "a reaction changed under an answer nobody gave for it"
-        )
+        assert all(route.call_count == 0 for route in routes.values())
 
 
 class TestTheRetryItRefuses:
@@ -780,7 +774,7 @@ class TestHowItDeclaresItself:
         example = cast("Mapping[str, str]", reactor.GRAPH_CALL_EXAMPLE)
         handle = message_handle(example["uri"])
 
-        assert handle is not None, "GRAPH_CALL_EXAMPLE's own uri is not a message handle"
+        assert handle is not None
         assert handle.chat_id is not None
         assert reactor.GRAPH_CALL_NARROWS_TO == _CHAT_PERMISSIONS
 
@@ -819,19 +813,17 @@ class TestHowItDeclaresItself:
     ) -> None:
         tool = await _registered(transport)
 
-        description = tool.description or ""
+        description = " ".join((tool.description or "").split())
         assert (
             "This tool asks the user to agree before it changes a reaction, every time. This tool "
             + "changes nothing unless the user agrees."
-        ) in " ".join(description.split())
+        ) in description
         assert (
             "If a call times out, do not call this tool again first. Before you call again, make "
             + "sure that the conversation does not already show the change."
-        ) in " ".join(description.split())
-        assert "Everyone in the conversation can see the change." in " ".join(description.split())
-        assert ("teams_list_chat_messages shows the reactions of a chat message.") in " ".join(
-            description.split()
-        )
+        ) in description
+        assert "Everyone in the conversation can see the change." in description
+        assert "teams_list_chat_messages shows the reactions of a chat message." in description
 
     async def test_the_description_says_what_the_question_names_on_each_surface(
         self, transport: httpx.AsyncClient
@@ -863,7 +855,7 @@ class TestHowItDeclaresItself:
 
         assert "teams_list_chat_messages" in uri
         assert "the `uri` of a message from another Teams tool" in uri
-        assert "question" not in uri, "the question is described once, in the description"
+        assert "question" not in uri
 
     async def test_the_retry_note_names_no_tool(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)

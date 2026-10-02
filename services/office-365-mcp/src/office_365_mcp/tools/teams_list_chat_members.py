@@ -28,7 +28,7 @@ unnamed chats.
 
 Notes:
 - This tool reads one page of members. If `more_members` is true, the chat has members that this \
-list does not show. Calling it again returns the same members.
+list does not show. If you call this tool again, it returns the same members.
 - A member without a Microsoft Entra account, such as an anonymous guest, has a null `user_id` and \
 a null `email`.\
 """
@@ -37,8 +37,8 @@ a null `email`.\
 class ChatMembership(BaseModel):
     membership_id: str = Field(
         description=(
-            "The id that Microsoft uses for this membership in this chat. This id is opaque, so "
-            + "copy it as it is and never parse it. It is not the member's `user_id`."
+            "The id that Microsoft uses for this membership in this chat. This id is opaque. "
+            + "Copy it as it is. Never parse it. It is not the member's `user_id`."
         )
     )
     user_id: str | None = Field(

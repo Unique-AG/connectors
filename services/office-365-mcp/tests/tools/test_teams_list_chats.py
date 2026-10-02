@@ -120,10 +120,7 @@ class TestTheQueryItSends:
         assert params["$expand"] == "members,lastMessagePreview"
         assert params["$top"] == "7"
         assert "$select" not in params, "$select is rejected on this collection"
-        assert set(params) == {"$orderby", "$expand", "$top"}, (
-            "the preview, sender and read state come from the default projection and the "
-            + "existing expansions, so they add no parameter"
-        )
+        assert set(params) == {"$orderby", "$expand", "$top"}
 
     async def test_a_limit_above_graphs_ceiling_is_a_programming_error(
         self, client: GraphServiceClient
@@ -396,36 +393,29 @@ class TestWhoIsInTheChat:
     async def test_an_entra_member_reports_its_user_id_and_another_kind_reports_none(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        graph.get("/me/chats").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        chat_payload(
-                            "19:unnamed@unq.gbl.spaces",
-                            topic=None,
-                            members=[
-                                aad_member("Ada Lovelace", user_id=ADA_USER_ID),
-                                {
-                                    "@odata.type": _GUEST_MEMBER,
-                                    "id": "member-room",
-                                    "displayName": "Room 3",
-                                },
-                            ],
-                        )
-                    ]
-                },
-            )
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:unnamed@unq.gbl.spaces",
+                topic=None,
+                members=[
+                    aad_member("Ada Lovelace", user_id=ADA_USER_ID),
+                    {
+                        "@odata.type": _GUEST_MEMBER,
+                        "id": "member-room",
+                        "displayName": "Room 3",
+                    },
+                ],
+            ),
         )
-
-        listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
 
         members = listed.chats[0].members
         assert members is not None
         assert [(m.display_name, m.user_id) for m in members] == [
             ("Ada Lovelace", ADA_USER_ID),
             ("Room 3", None),
-        ], "the id does not wait for `include_member_emails`"
+        ]
 
     def test_the_members_field_offers_user_id_as_a_way_to_match(self) -> None:
         description = chats.ChatSummary.model_fields["members"].description
@@ -675,11 +665,11 @@ class TestWhetherTheUserReadIt:
 
         assert [chat.unread for chat in listed.chats] == [None, None, None]
 
-    def test_the_unread_field_says_what_it_compares(self) -> None:
+    def test_the_unread_field_says_when_it_is_true(self) -> None:
         description = chats.ChatSummary.model_fields["unread"].description
 
         assert description is not None
-        assert "compares the last message time with the time the user last read" in description
+        assert "True when the last message is newer than the time the user last read" in description
 
     async def test_the_tool_description_names_the_last_message_and_the_read_state(
         self, transport: httpx.AsyncClient

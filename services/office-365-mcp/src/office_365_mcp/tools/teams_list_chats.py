@@ -132,8 +132,8 @@ class ChatSummary(BaseModel):
     )
     last_message_preview: str | None = Field(
         description=(
-            f"The opening of the last message as plain text, cut to {PREVIEW_CHARACTERS} "
-            + "characters with an ellipsis. Null when no one posted yet, the message was "
+            f"The first {PREVIEW_CHARACTERS} characters of the last message as plain text. A "
+            + "longer text ends with an ellipsis. Null when no one posted yet, the message was "
             + "deleted, or it has no text, as with a system event."
         )
     )
@@ -145,9 +145,8 @@ class ChatSummary(BaseModel):
     )
     unread: bool | None = Field(
         description=(
-            "This field compares the last message time with the time the user last read the "
-            + "chat. True means the last message is newer. False means it is not. Null when "
-            + "either time is missing."
+            "True when the last message is newer than the time the user last read the chat. "
+            + "False when it is not. Null when either time is missing."
         )
     )
     created_at: datetime | None = Field(
@@ -158,7 +157,7 @@ class ChatSummary(BaseModel):
             "Who is in the chat, returned only for unnamed chats. Named chats show `topic` "
             + "instead, and this field is null there. Match a member by `user_id` against the "
             + "`user_id` from get_me, or by `display_name`. If `include_member_emails` is set, "
-            + "match by `email` also."
+            + "you can also match by `email`."
         )
     )
     members_may_be_incomplete: bool = Field(

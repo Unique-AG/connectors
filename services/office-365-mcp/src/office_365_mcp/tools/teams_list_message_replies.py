@@ -8,8 +8,8 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.chat_message import ChatMessage
-from msgraph.generated.teams.item.channels.item.messages.item.replies.replies_request_builder import (  # noqa: E501
-    RepliesRequestBuilder,
+from msgraph.generated.teams.item.channels.item.messages.item.replies import (
+    replies_request_builder,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -34,7 +34,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_REPLIES = 50
 
-type _RepliesQuery = RepliesRequestBuilder.RepliesRequestBuilderGetQueryParameters
+_RepliesQuery = (
+    replies_request_builder.RepliesRequestBuilder.RepliesRequestBuilderGetQueryParameters
+)
 
 _DESCRIPTION = """\
 Lists the replies to one Teams channel post, oldest first, as the signed-in user, by the `uri` of \
@@ -45,7 +47,7 @@ Notes:
 - One call is one request, because a given channel allows this whole connector about one request a \
 second, across the whole tenant.
 - This tool never follows Microsoft's cursor and reads at most 50 replies. If `more_replies` is \
-true, the list is not the whole thread. Microsoft does not say which replies the list leaves out.\
+true, the list is not the whole thread. Microsoft does not say which replies are not in the list.\
 """
 
 _NOT_A_POST_HANDLE = """\
@@ -69,7 +71,7 @@ class ThreadReplies(BaseModel):
         description=(
             "True when Microsoft reported more replies than this call returned. False means that "
             + "this list holds every reply. This tool makes one request and never follows "
-            + f"Microsoft's cursor, so it cannot read past {MAX_REPLIES} replies."
+            + f"Microsoft's cursor, so it cannot read more than {MAX_REPLIES} replies."
         )
     )
 
@@ -87,7 +89,7 @@ async def teams_list_message_replies(
 
     configuration = RequestConfiguration[_RepliesQuery](
         headers=unknown_enum_headers(),
-        query_parameters=RepliesRequestBuilder.RepliesRequestBuilderGetQueryParameters(top=limit),
+        query_parameters=_RepliesQuery(top=limit),
     )
     with graph_errors(TOOL_NAME, step=STEP):
         page = await (
@@ -144,7 +146,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 le=MAX_REPLIES,
                 description=(
                     f"How many replies to request from Microsoft, at most {MAX_REPLIES}. This "
-                    + "tool drops system events after the request, so the list can be shorter."
+                    + "tool removes system events after the request, so the list can be shorter."
                 ),
             ),
         ] = 20,
