@@ -601,6 +601,24 @@ class TestOneEventRow:
 
         assert row.series_master_uri is None
 
+    def test_a_series_master_belongs_to_its_own_series_and_names_no_master_handle(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.SeriesMaster, series_master_id=None)
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.kind, row.in_series, row.series_master_uri) == ("seriesMaster", True, None)
+
+    def test_the_kind_names_all_four_values_that_graph_documents(self) -> None:
+        description = EventSummary.model_fields["kind"].description or ""
+
+        for value in ("`singleInstance`", "`occurrence`", "`exception`", "`seriesMaster`"):
+            assert value in description
+
+    def test_the_series_master_uri_is_null_on_the_master_itself(self) -> None:
+        description = EventSummary.model_fields["series_master_uri"].description or ""
+
+        assert "series master itself" in description
+
     def test_it_reports_the_categories_and_the_importance_in_microsofts_spelling(self) -> None:
         event = Event(
             id=_EVENT_ID, categories=["Budget", "Blue category"], importance=Importance.High
@@ -615,7 +633,9 @@ class TestOneEventRow:
 
         assert (row.categories, row.importance) == ([], None)
 
-    @pytest.mark.parametrize("name", ["series_master_uri", "categories", "importance"])
+    @pytest.mark.parametrize(
+        "name", ["kind", "in_series", "series_master_uri", "categories", "importance"]
+    )
     def test_the_series_and_tag_fields_say_what_they_are_in_15_to_60_words(self, name: str) -> None:
         description = EventSummary.model_fields[name].description or ""
 

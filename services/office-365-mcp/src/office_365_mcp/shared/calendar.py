@@ -720,15 +720,25 @@ class EventSummary(BaseModel):
     all_day: bool | None = Field(description="Whether this is an all-day event.")
     cancelled: bool | None = Field(description="Whether the organizer cancelled the event.")
     kind: str | None = Field(
-        description="The row kind: `singleInstance`, `occurrence`, or `exception`; null if unknown."
+        description=(
+            "The row kind, as Microsoft spells it: `singleInstance`, `occurrence`, "
+            + "`exception`, or `seriesMaster`. outlook_read_event returns `seriesMaster` when it "
+            + "reads the series master that a `series_master_uri` names. This field is null if "
+            + "unknown."
+        )
     )
-    in_series: bool = Field(description="Whether this row belongs to a recurring series.")
+    in_series: bool = Field(
+        description=(
+            "Whether this row belongs to a recurring series. This is true for an occurrence, an "
+            + "exception, and the series master. It is false for a single event."
+        )
+    )
     series_master_uri: str | None = Field(
         description=(
             "A handle for the series master of the recurring series of this row, in the same "
             + "shape as `uri`. outlook_read_event reads the master from this handle "
             + "and returns the recurrence rule. This field is null when Graph names no series "
-            + "master, as on a single event."
+            + "master, as on a single event and on the series master itself."
         )
     )
     sensitivity: str | None = Field(
@@ -773,7 +783,7 @@ class EventSummary(BaseModel):
             all_day=event.is_all_day,
             cancelled=event.is_cancelled,
             kind=spelled(event.type),
-            in_series=master is not None,
+            in_series=master is not None or event.type == EventType.SeriesMaster,
             series_master_uri=None if master is None else EventHandle(calendar_id, master).uri,
             sensitivity=spelled(event.sensitivity),
             show_as=spelled(event.show_as),

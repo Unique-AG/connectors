@@ -594,6 +594,8 @@ class TestWhatItAnswers:
 
         assert master.call_count == 1
         assert answer.kind == "seriesMaster"
+        assert answer.in_series is True
+        assert answer.series_master_uri is None
         assert answer.recurrence is not None
         assert "recurrence" in master.calls.last.request.url.params["$select"].split(",")
 
