@@ -641,6 +641,10 @@ class TestHowItDeclaresItself:
         assert "does not document whether a deleted event can be restored" in description
         assert "outlook_cancel_event" in description
         assert "Deleted Items" in description
+        assert "Microsoft documents that a cancel moves the event to Deleted Items." in description
+        assert (
+            "but it can add a comment, and it moves the event to Deleted Items" not in description
+        )
         assert "outlook_respond_to_invite declines" in description
         assert "\n\nNotes:\n" in description
 

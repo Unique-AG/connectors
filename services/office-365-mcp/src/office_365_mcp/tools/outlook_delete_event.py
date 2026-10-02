@@ -60,8 +60,9 @@ _UTC = ZoneInfo("UTC")
 _DESCRIPTION = """\
 Deletes one event that the signed-in user organizes, from the calendar that holds it. If the \
 event has attendees, Microsoft sends each attendee a cancellation. outlook_cancel_event also \
-sends a cancellation, but it can add a comment, and it moves the event to Deleted Items. \
-outlook_respond_to_invite declines an event that somebody else organizes.
+sends a cancellation, and it can add a comment. Microsoft documents that a cancel moves the \
+event to Deleted Items. outlook_respond_to_invite declines an event that somebody else \
+organizes.
 
 Notes:
 - This tool always asks the user to agree, because Microsoft does not document whether a deleted \
