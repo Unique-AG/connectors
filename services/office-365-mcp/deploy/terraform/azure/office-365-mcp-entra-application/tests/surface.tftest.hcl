@@ -375,7 +375,7 @@ run "preset_sharepoint_write" {
 
   assert {
     condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
-    error_message = "Files.ReadWrite.All needs an administrator, as Files.Read.All does. This composed ${join(",", local.admin_consent)}"
+    error_message = "Files.ReadWrite.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 
@@ -391,7 +391,7 @@ run "preset_sharepoint_share" {
 
   assert {
     condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
-    error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This composed ${join(",", local.admin_consent)}"
+    error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 
@@ -407,7 +407,7 @@ run "preset_sharepoint_sites" {
 
   assert {
     condition     = local.admin_consent == ["Files.Read.All", "Sites.Read.All"]
-    error_message = "Sites.Read.All is marked as needing an administrator, as Files.Read.All is. This composed ${join(",", local.admin_consent)}"
+    error_message = "Sites.Read.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 
