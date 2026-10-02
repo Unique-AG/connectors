@@ -257,9 +257,10 @@ class TestWhatItRefuses:
             locations=[RoomRequest(display_name="Conf room Hood", address=address)]
         )
 
-        with pytest.raises(ToolError, match="not one"):
+        with pytest.raises(ToolError, match="not one") as raised:
             _ = await _suggest(client, location_constraint=constraint)
 
+        assert "`location_constraint.locations[].address`" in str(raised.value)
         assert len(graph.calls) == 0
 
     async def test_a_time_it_cannot_read_never_reaches_graph(

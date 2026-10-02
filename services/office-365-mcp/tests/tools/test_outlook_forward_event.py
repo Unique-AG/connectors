@@ -48,6 +48,9 @@ _DANA = "dana@example.invalid"
 _ERIN = "erin@example.invalid"
 
 _NOTHING_FORWARDED = "This tool forwarded nothing."
+_SAME_FAILURE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 def _event(
@@ -520,6 +523,14 @@ class TestWhatItRefuses:
 
         assert _NOTHING_FORWARDED in str(raised.value)
         assert len(graph.calls) == 0
+
+    async def test_the_refusal_of_a_bad_address_ends_with_the_canonical_retry_sentence(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as raised:
+            _ = await _forward(client, to=["Dana Swope"])
+
+        assert str(raised.value).endswith(_SAME_FAILURE)
 
     async def test_an_address_given_twice_in_another_case_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter

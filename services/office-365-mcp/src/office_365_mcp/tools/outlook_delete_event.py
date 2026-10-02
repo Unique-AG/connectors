@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -13,7 +14,7 @@ from msgraph.generated.models.event_type import EventType
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
@@ -66,6 +67,9 @@ outlook_respond_to_invite declines an event that somebody else organizes.
 Notes:
 - This tool always asks the user to agree, because Microsoft does not document whether a deleted \
 event can be restored. The question names the subject, the start, and each attendee.
+- The `uri` of a series master deletes every occurrence of the series. The `uri` of one \
+occurrence deletes only that date. The answer has `series_master` true when the delete reached \
+the whole series.
 - This tool refuses an event that the signed-in user does not organize. Microsoft does not \
 document what a delete of the copy of an attendee does for the organizer.
 - This call is safe to repeat after a timeout. A second call finds no event and reports that.
@@ -136,7 +140,7 @@ async def delete_event(
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            with graph_step(STEP_DELETE):
+            with suppress(GraphNotFound), graph_step(STEP_DELETE):
                 await (
                     client.me.calendars.by_calendar_id(handle.calendar_id)
                     .events.by_event_id(handle.event_id)

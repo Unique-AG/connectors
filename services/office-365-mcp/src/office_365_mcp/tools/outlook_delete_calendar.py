@@ -102,8 +102,8 @@ _NOT_THE_OWNER = (
 _HOLDS_AN_EVENT = (
     "This calendar holds at least one event, so outlook_delete_calendar did not delete it. This "
     + "tool deletes only an empty calendar, so that no event is lost. Nothing was deleted. Tell "
-    + "the user to move or cancel the events of this calendar first, for example in Outlook. "
-    + "Then the user can ask again."
+    + "the user to move or cancel the events of this calendar first, for example in Outlook. If "
+    + "you call this tool again with the same arguments, the call will fail the same way."
 )
 
 

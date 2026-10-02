@@ -54,6 +54,10 @@ _GRACE = "grace@example.invalid"
 
 _NOT_FOUND = {"error": {"code": "ErrorItemNotFound", "message": "not found"}}
 
+_SAME_FAILURE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
+
 
 def _calendar(
     *,
@@ -278,6 +282,7 @@ class TestWhatItRefuses:
         assert "holds at least one event" in message
         assert "move or cancel the events" in message
         assert "Nothing was deleted." in message
+        assert message.endswith(_SAME_FAILURE)
         assert delete_route.call_count == 0
 
     async def test_an_empty_page_that_names_a_next_page_is_refused_too(

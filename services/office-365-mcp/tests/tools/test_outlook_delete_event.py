@@ -360,14 +360,18 @@ class TestGraphErrors:
 
         assert delete_route.call_count == 0
 
-    async def test_a_404_on_the_delete_propagates_as_graph_not_found(
+    async def test_a_404_on_the_delete_after_the_read_found_the_event_answers_deleted_once(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _reads(graph)
-        _ = _deletes(graph, status=404)
+        read = _reads(graph, _event(subject="Weekly sync", attendees=[_attendee(_ADA)]))
+        delete_route = _deletes(graph, status=404)
 
-        with pytest.raises(GraphNotFound):
-            _ = await _delete(client)
+        answer = await _delete(client)
+
+        assert read.call_count == 1
+        assert delete_route.call_count == 1
+        assert answer.uri == _URI
+        assert answer.subject == "Weekly sync"
 
 
 class TestWhatItAnswers:
@@ -609,6 +613,16 @@ class TestHowItDeclaresItself:
         assert "Deleted Items" in description
         assert "outlook_respond_to_invite declines" in description
         assert "\n\nNotes:\n" in description
+
+    async def test_the_description_says_what_the_uri_of_a_series_master_and_of_one_date_deletes(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "The `uri` of a series master deletes every occurrence of the series." in description
+        assert "The `uri` of one occurrence deletes only that date." in description
+        assert "`series_master` true when the delete reached the whole series" in description
 
     def test_not_found_advice_points_at_the_lister(self) -> None:
         assert "outlook_list_events" in deleter.GRAPH_NOT_FOUND

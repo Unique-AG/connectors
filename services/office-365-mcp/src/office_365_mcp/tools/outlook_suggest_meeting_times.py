@@ -363,7 +363,7 @@ def _room_address(address: str | None) -> str | None:
         return None
     trimmed = address.strip()
     if ONE_ADDRESS.match(trimmed) is None:
-        raise ToolError(_bad_address("location_constraint", trimmed))
+        raise ToolError(_bad_address("location_constraint.locations[].address", trimmed))
     return trimmed
 
 
