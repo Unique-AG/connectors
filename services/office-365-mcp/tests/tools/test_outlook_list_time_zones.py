@@ -50,7 +50,7 @@ def _unguarded(tool: Tool) -> list[str]:
     )
     mention = re.compile(rf"\b(?:{'|'.join(TOOL_NAMES)})\b")
     offenders: list[str] = []
-    for sentence in (s for text in prose for s in re.split(r"(?<=[.!?])\s+|\n\s*-\s+", text)):
+    for sentence in (s for text in prose for s in re.split(r"\n\s*-\s+|(?<=[.!?])\s+", text)):
         outside = set(mention.findall(sentence)) - held
         guard = sentence.split(",", 1)[0]
         if outside and not (
@@ -273,7 +273,7 @@ class TestTheSchemaItPublishes:
         assert "This tool lists Windows names by default." in description
         assert "For a tool that takes only IANA names, set `standard` to `iana`." in description
 
-    async def test_the_description_says_every_other_tool_sends_the_name_as_written(
+    async def test_the_description_says_a_writing_tool_sends_the_name_as_written_and_can_be_refused(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -284,9 +284,15 @@ class TestTheSchemaItPublishes:
         assert tool is not None, "register left the tool off the server"
         description = " ".join((tool.description or "").split())
         assert (
-            "Every other tool that takes a zone name sends it to Microsoft as written. "
-            "Microsoft accepts either spelling."
+            "If this deployment exposes outlook_check_availability, that tool also takes only "
+            "IANA names."
         ) in description
+        assert (
+            "A tool that creates or changes an event sends the zone name to Microsoft as written."
+        ) in description
+        assert "Microsoft documents that it can refuse some zone names there." in description
+        assert "Microsoft accepts either spelling" not in description
+        assert "Every other tool that takes a zone name" not in description
 
     def test_the_call_that_proves_the_permissions_takes_no_arguments(self) -> None:
         assert lister.GRAPH_CALL_EXAMPLE == {}
