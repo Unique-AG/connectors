@@ -252,6 +252,32 @@ class TestWhatItSendsToGraph:
         assert _addressed(_sent(fill), "ccRecipients") == [_BOB, _CAROL, _PAM]
         assert "toRecipients" not in _sent(fill)
 
+    async def test_an_added_cc_that_is_already_on_the_draft_reaches_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(
+            graph,
+            _draft(to=[_recipient("Ada Lovelace", _ADA)], cc=[_recipient("Grace", _GRACE)]),
+        )
+        fill = _fills(graph)
+
+        _ = await _reply_all(client, cc=[_GRACE.upper(), _PAM])
+
+        assert _addressed(_sent(fill), "ccRecipients") == [_GRACE, _PAM]
+
+    async def test_an_added_cc_that_is_already_in_to_leaves_the_cc_untouched(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(
+            graph,
+            _draft(to=[_recipient("Ada Lovelace", _ADA)], cc=[_recipient("Grace", _GRACE)]),
+        )
+        fill = _fills(graph)
+
+        _ = await _reply_all(client, cc=[_ADA.upper()])
+
+        assert set(_sent(fill)) == {"@odata.type", "body"}
+
     async def test_the_importance_and_the_categories_reach_the_fill(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -460,6 +486,15 @@ class TestTheSchemaItPublishes:
         assert cc["default"] == []
         assert "maxItems" not in cc
 
+    async def test_cc_says_an_address_already_on_the_draft_is_not_added_again(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+
+        described = cast("str", _properties(parameters)["cc"]["description"])
+        assert "An address that is already on the draft is not added again." in described
+        assert 15 <= len(described.split()) <= 60
+
     async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
 
@@ -665,6 +700,40 @@ class TestThePersonBeforeTheDraftIsCreated:
         assert "The draft appears in that mailbox, and anyone with access to it can see it." in (
             question
         )
+
+    async def test_a_cc_that_is_already_on_the_original_cc_is_listed_and_counted_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _original(to=[_PAM], cc=[_GRACE]))
+        _ = _shared_writes(graph)
+        asked: list[str] = []
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            bound.append(about)
+            return None
+
+        for cc in ([_GRACE.upper()], []):
+            _ = await _reply_all(client, cc=cc, mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert asked[0].count(_GRACE) == 1
+        assert f"It is copied to {_GRACE}." in asked[0]
+        assert "That is 3 addresses in all." in asked[0]
+        assert asked[0] == asked[1]
+        assert bound[0] == bound[1]
+
+    async def test_a_cc_that_is_already_addressed_is_left_out_of_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply_all(client, cc=[_PAM.upper()], mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert f"It is copied to {_BOB}." in asked[0]
+        assert "That is 4 addresses in all." in asked[0]
 
     async def test_the_question_names_the_reply_to_address_over_the_sender(
         self, client: GraphServiceClient, graph: respx.MockRouter

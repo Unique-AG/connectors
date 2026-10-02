@@ -239,7 +239,8 @@ async def draft_reply_all(
         if mailbox is not None:
             original = await _read_original(reached, handle)
             addressed = _addressed(original)
-            copied = [*_spelled(original.cc_recipients), *added]
+            original_cc = _spelled(original.cc_recipients)
+            copied = [*original_cc, *_not_yet_on(added, [*addressed, *original_cc])]
             with not_graph():
                 answer = await confirm(
                     _question(
@@ -315,6 +316,11 @@ def _spelled(recipients: list[Recipient] | None) -> list[str]:
     return [one.address or one.name or _UNNAMED_ADDRESS for one in MailAddress.each_of(recipients)]
 
 
+def _not_yet_on(added: Sequence[str], present: Sequence[str]) -> list[str]:
+    seen = {address.casefold() for address in present}
+    return [address for address in added if address.casefold() not in seen]
+
+
 def _question(
     mailbox: str,
     *,
@@ -372,9 +378,17 @@ def _fill_body(
     importance: MailImportance | None,
     categories: Sequence[str],
 ) -> Message:
+    on_the_draft = [
+        one.address
+        for one in MailAddress.each_of(
+            [*(created.to_recipients or []), *(created.cc_recipients or [])]
+        )
+        if one.address
+    ]
+    new = _not_yet_on(added, on_the_draft)
     return Message(
         body=ItemBody(content_type=BodyType.Html, content=body_html),
-        cc_recipients=[*(created.cc_recipients or []), *_recipients(added)] if added else None,
+        cc_recipients=[*(created.cc_recipients or []), *_recipients(new)] if new else None,
         importance=None if importance is None else Importance(importance),
         categories=list(categories) or None,
     )
@@ -457,7 +471,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "More Cc recipients to add to the draft, one SMTP address for each entry, "
                     + "from the user or outlook_find_recipient. The Cc recipients of the original "
-                    + "message stay on the draft."
+                    + "message stay on the draft. An address that is already on the draft is not "
+                    + "added again."
                 ),
             ),
         ],
