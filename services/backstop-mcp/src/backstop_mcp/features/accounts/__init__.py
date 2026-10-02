@@ -12,6 +12,7 @@ from backstop_mcp.features.accounts.dependencies import (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
+    get_latest_account_values_query_factory,
     get_product_query_factory,
     get_time_series_query_factory,
 )
@@ -37,13 +38,18 @@ from backstop_mcp.features.accounts.queries import (
     GetAccountsForProductQuery,
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
+    GetLatestAccountValuesQuery,
     GetProductQuery,
     GetTimeSeriesQuery,
     HoldingsTableShapeError,
     TimeSeriesEntityType,
     TimeSeriesName,
 )
-from backstop_mcp.features.accounts.resolve_product import resolve_product, resolve_product_query
+from backstop_mcp.features.accounts.resolve_product import (
+    resolve_product,
+    resolve_product_family,
+    resolve_product_query,
+)
 from backstop_mcp.features.accounts.responses import (
     MAX_CAPITAL_FLOW_SCAN_RECORDS,
     MAX_PRODUCT_SCAN_RECORDS,
@@ -78,6 +84,7 @@ __all__ = [
     "GetAccountsForProductQuery",
     "GetCapitalFlowsQuery",
     "GetHoldingsQuery",
+    "GetLatestAccountValuesQuery",
     "GetProductQuery",
     "GetTimeSeriesQuery",
     "HoldingFigureErrorDto",
@@ -109,9 +116,11 @@ __all__ = [
     "get_accounts_for_product_query_factory",
     "get_capital_flows_query_factory",
     "get_holdings_query_factory",
+    "get_latest_account_values_query_factory",
     "get_product_query_factory",
     "get_time_series_query_factory",
     "raise_if_invalid_series",
     "resolve_product",
+    "resolve_product_family",
     "resolve_product_query",
 ]

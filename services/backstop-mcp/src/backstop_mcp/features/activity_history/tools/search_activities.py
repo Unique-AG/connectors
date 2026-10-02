@@ -1,8 +1,9 @@
 """`search_activities`: firm-wide or party activity search over `POST /entity-activities`.
 
-Primary path for meetings, calls, notes, emails, and documents. Undocumented UI search;
-`get_activity_history` is the documented fallback when this endpoint is missing. Tag filters
-here are OR; REST activity-tag filters are AND.
+Primary path for meetings, calls, notes, emails, and documents. The swagger entry calls
+that POST a create; it is a search. `get_activity_history` is the party-scoped fallback
+when this endpoint does not answer. Tag filters here are OR; REST activity-tag filters
+are AND.
 """
 
 import logging
@@ -44,6 +45,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +69,10 @@ _DEFAULT_FIELDS: frozenset[str] = frozenset(
     }
 )
 _FALLBACK_MESSAGE = (
-    "POST /entity-activities is undocumented and did not answer. Call get_activity_history "
-    "with a resolved party instead. That fallback is party-scoped only — there is no "
-    "documented firm-wide activity collection, so a firm-wide question must be narrowed "
-    "to a party rather than treated as 'no activity exists'."
+    "POST /entity-activities did not answer. Call get_activity_history with a resolved "
+    "party instead. That fallback is party-scoped only — the REST activity streams have "
+    "no firm-wide collection, so a firm-wide question must be narrowed to a party rather "
+    "than treated as 'no activity exists'."
 )
 
 SearchMode = Literal["rows", "aggregate"]
@@ -107,13 +109,6 @@ def _is_wide_sweep(
     return party_id is None and not activity_tags and not authors
 
 
-def _add_years(day: date, years: int) -> date:
-    try:
-        return day.replace(year=day.year + years)
-    except ValueError:
-        return day.replace(year=day.year + years, day=28)
-
-
 def _row_urls(
     rows: Sequence[EntityActivityDto], build_entity_link_util: BuildEntityLinkUtil
 ) -> dict[str, str | None]:
@@ -128,16 +123,6 @@ def _row_urls(
             continue
         urls[row.id] = build_entity_link_util.canonical_url(target=target)
     return urls
-
-
-def _date_window(
-    start_date: date | None, end_date: date | None, *, today: date
-) -> tuple[date, date]:
-    until = end_date if end_date is not None else today
-    since = start_date if start_date is not None else _add_years(until, -1)
-    if since > until:
-        raise ValueError("start_date must not be after end_date")
-    return since, until
 
 
 @tool(
@@ -189,8 +174,8 @@ async def search_activities(
             default=None,
             description=(
                 "The argument is `party_id`. Trusted Backstop Party ID from a prior "
-                "resolve echo. Sent as `associatedWiths: PartyBean_{id}`. Always pass "
-                "together with `search_type` — `party_id` alone is rejected. Never invent "
+                "resolve echo. Sent as entityId with resourceType from `search_type`. Always "
+                "pass together with `search_type` — `party_id` alone is rejected. Never invent "
                 "one. Exactly one of `party_id` or `search` when scoping to a party."
             ),
         ),
@@ -223,9 +208,9 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Tag ids from list_activity_tags. This endpoint treats the list as OR "
-                "(union). REST get_activity_history `activity_tag_ids` is AND. Do not assume "
-                "they match."
+                "Pass every id `list_activity_tags` returned for the term; the list is OR. "
+                "Tag names carry prefixes (for example 'AT: Tail Hedging'), so requiring an "
+                "exact name misses the tag. REST get_activity_history `activity_tag_ids` is AND."
             ),
         ),
     ] = None,
@@ -313,12 +298,12 @@ async def search_activities(
     "party_id": "<id from prior resolve echo>",
     "types": ["meeting_call", "meeting", "note"]}
 
-    This is the primary activity tool; `get_activity_history` is fallback only. It is an
-    undocumented UI search (`POST /entity-activities`) and may 404 or refuse the credential
-    (a 401 that still authenticates on documented endpoints) on another tenant — that is not
-    "no activity exists" and not a reason to retry this tool. The failure payload names
-    `get_activity_history`, which is party-scoped only. `results: []` with status resolved is
-    genuinely none in that window.
+    This is the primary activity tool; `get_activity_history` is fallback only. It reads
+    `POST /entity-activities` (a search; the swagger summary calls it a create) and may 404
+    or refuse the credential (a 401 that still authenticates on other endpoints) on another
+    tenant — that is not "no activity exists" and not a reason to retry this tool. The
+    failure payload names `get_activity_history`, which is party-scoped only. `results: []`
+    with status resolved is genuinely none in that window.
 
     Counts are visible to you, not firm-wide. `totalCount` saturates at 10000; this tool clamps
     `pageNum × pageSize` before requesting so it never provokes that 500, and returns the
@@ -326,12 +311,16 @@ async def search_activities(
 
     `mode=aggregate` with `group_by` answers a counting question without row bodies. Aggregate
     and `include_description` are refused on a wide sweep (no party, no tags, no authors) —
-    that walk hits the 10000 ceiling. `include_description` is opt-in, capped, and refused in
-    aggregate mode. `attachments_count` is a count only — pass the row `activity_id` (or `id`)
-    to `get_activity_detail` for the file list. Meeting, call, note, and document rows from
-    `get_activity_history` use the same argument; history email ids do not.
+    that walk hits the 10000 ceiling. A party missing from a firm-wide row sample is not
+    inactive; for "who has had no activity since X" use get_last_activity_for_parties.
+    `include_description` is opt-in, capped, and refused in aggregate mode.
+    `attachments_count` is a count only — pass the row `activity_id` (or `id`) to
+    `get_activity_detail` for the names. Do not assume what the files are. Meeting, call,
+    note, and document rows from `get_activity_history` use the
+    same argument; history email ids do not. Attendee columns use the structured
+    `attendees` names on these rows, not names read out of the title or body.
     """
-    start_date, end_date = _date_window(start_date, end_date, today=date.today())
+    start_date, end_date = date_window(start_date, end_date, today=date.today())
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
     if mode == "rows" and group_by is not None:
@@ -401,6 +390,7 @@ async def search_activities(
             end_date=end_date,
             types=selected_types,
             party_id=scoped_party_id,
+            resource_type=None if resolved_party is None else resolved_party.search_type,
             activity_tags=tag_ids,
             authors=author_emails,
             include_description=include_description,
@@ -414,7 +404,7 @@ async def search_activities(
     except Exception as exc:
         # Broad on purpose, matching `GetHoldingsQuery`: HTTP status, transport timeout,
         # schema-validation failure, and a 401 that re-verified (`BackstopTransientAuthError`)
-        # all mean the same thing here — the undocumented endpoint did not answer usably. A
+        # all mean the same thing here — the search did not answer usably. A
         # `httpx.TimeoutException` reaches this frame raw (the client lets transport errors
         # out), and letting it propagate is the one path where the "name the fallback" contract
         # silently would not fire, on the failure an unbounded-payload UI endpoint is likeliest

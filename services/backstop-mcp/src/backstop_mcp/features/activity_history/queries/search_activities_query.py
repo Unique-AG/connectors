@@ -1,48 +1,9 @@
-"""Firm-wide (or party) activity search via `POST /entity-activities`.
-
-UNDOCUMENTED ENDPOINT — deliberately. Read this before changing anything here.
-
-**Where it came from.** It is not in the Backstop swagger. It was found by navigating the
-Backstop web app's Activity Explorer with the browser network tab open: the screen a Backstop
-user actually uses to answer "what happened with this client", and this is the single call it
-makes. Nothing about it is inferred from the published API docs, which do not mention it; every
-behaviour recorded below was measured against a live instance. That is also the only way to
-verify a change to this module — the swagger cannot confirm or deny any of it.
-
-**Why we use it anyway.** It is dramatically faster than the documented route, and it answers
-questions the documented route cannot answer at all:
-
-- One POST returns meetings, calls, notes, emails and documents together, already filtered by
-  date window, type, party, tag and author, and already sorted by `effectiveDate`. The
-  documented equivalent (`get_activity_history`) is four separate per-party REST streams, each
-  paged on its own, then merged and sorted here — many requests per answer instead of one.
-- It searches **firm-wide**. The REST streams hang off one party (`/{segment}/{id}/activities`),
-  so without this endpoint "what did the firm do last quarter", "what did this colleague log",
-  and any question spanning more than one client are simply unanswerable.
-- Those are the questions clients want Backstop to answer. This endpoint, and the account table
-  in `accounts/queries/get_holdings_query.py`, are the two undocumented calls the product leans on
-  hardest; treat both as load-bearing rather than as shortcuts to clean up later.
-
-**What we owe for that.** An undocumented endpoint can change or be absent without notice, so
-callers must never treat its failure as "no activity exists": `search_activities` catches a 404,
-a schema drift, or a 401 that re-verified (`BackstopTransientAuthError`) and names
-`get_activity_history` — the documented, party-scoped fallback — in the failure payload. Keep
-that fallback working. Keep this module's schemas lenient, and keep `api_responses.py`
-degrading unreadable fields to `None` rather than raising.
-
-**Measured behaviour.** The swagger name would call it a create; it is a search. Pagination is
-`pageNum` (1-based) × `pageSize` in the JSON body — not `paginate` / `links.next`.
-`pageNum × pageSize > 10000` is HTTP 500, so this module clamps **before** the request and
-returns whatever was already fetched.
-
-`activityTags` on this body is OR (union). REST `filter[activityTagIds]` is AND. Counts are
-permission-filtered: `totalCount` is visible-to-this-credential, not a firm-wide fact, and it
-saturates at 10000.
-"""
+"""Firm-wide or party activity search via `POST /entity-activities` (a search, not a create)."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
+from typing import Literal
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -62,18 +23,37 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
 )
+from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVABLE = 10_000
+# Org search returns activity inherited through people; those rows name the person only.
+_INHERITED_PARTY_KINDS: frozenset[str] = frozenset({"people", "contacts", "employees"})
+
+_TYPE_LABELS: dict[EntityActivityType, str] = {
+    "meeting": "meeting",
+    "meeting_call": "call",
+    "document": "document",
+    "email": "email",
+    "email_blast": "email blast",
+    "note": "note",
+}
+# Wire values for `newFilters.types`. `meeting_call` is the tool token; Backstop's filter
+# value is `call`. Sending `meeting_call` returned the unfiltered totalCount.
+_TYPE_FILTER_VALUES: dict[EntityActivityType, str] = {
+    "meeting": "meeting",
+    "meeting_call": "call",
+    "document": "document",
+    "email": "email",
+    "email_blast": "email_blast",
+    "note": "note",
+}
 
 
 class SearchActivitiesQuery:
-    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall.
-
-    The endpoint is an undocumented UI search — read the module docstring before changing this,
-    including for what "verified" has to mean here.
-    """
+    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall."""
 
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
@@ -85,6 +65,7 @@ class SearchActivitiesQuery:
         end_date: date,
         types: Sequence[EntityActivityType] = ENTITY_ACTIVITY_TYPES,
         party_id: str | None = None,
+        resource_type: SearchType | None = None,
         activity_tags: Sequence[str] = (),
         authors: Sequence[str] = (),
         include_description: bool = False,
@@ -102,6 +83,13 @@ class SearchActivitiesQuery:
         partial_due_to_error = False
         total_count: int | None = None
         page_num = 1
+        ignored_filters: list[str] = []
+        scoped = (
+            party_id is not None
+            or bool(activity_tags)
+            or bool(authors)
+            or (bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES))
+        )
 
         while True:
             if page_num * effective_page_size > max_retrievable:
@@ -120,6 +108,7 @@ class SearchActivitiesQuery:
                         end_date=end_date,
                         types=types,
                         party_id=party_id,
+                        resource_type=resource_type,
                         activity_tags=activity_tags,
                         authors=authors,
                         include_description=include_description,
@@ -141,10 +130,30 @@ class SearchActivitiesQuery:
             page = document.data.attributes
             if total_count is None:
                 total_count = page.total_count
-            rows, page_dropped = self._project_rows(page.results)
+            rows, page_dropped, violating = self._project_rows(
+                page.results,
+                start_date=start_date,
+                end_date=end_date,
+                types=types,
+                party_id=party_id,
+                resource_type=resource_type,
+                activity_tags=activity_tags,
+                total_count=total_count,
+                scoped=scoped,
+            )
+            self._record_ignored_filters(
+                violating,
+                total_count=total_count,
+                party_id=party_id,
+                resource_type=resource_type,
+                already_logged=ignored_filters,
+            )
+            ignored_filters.extend(name for name in violating if name not in ignored_filters)
             dropped += page_dropped
             rows_received += len(page.results)
             collected.extend(rows)
+            if any(name != "total_count" for name in violating):
+                break
             if len(page.results) < effective_page_size:
                 exhausted = True
                 break
@@ -182,6 +191,7 @@ class SearchActivitiesQuery:
             ceiling_clamped=ceiling_clamped,
             truncated_by_row_cap=truncated_by_row_cap,
             partial_due_to_error=partial_due_to_error,
+            server_filter_ignored=tuple(ignored_filters),
         )
 
     def _request_body(
@@ -193,57 +203,194 @@ class SearchActivitiesQuery:
         end_date: date,
         types: Sequence[EntityActivityType],
         party_id: str | None,
+        resource_type: SearchType | None,
         activity_tags: Sequence[str],
         authors: Sequence[str],
         include_description: bool,
     ) -> dict[str, object]:
-        """JSON:API search body. Built here, never passed through from a caller."""
-        filters: dict[str, object] = {
+        """JSON:API search body. Built here, never passed through from a caller.
+
+        Date, types, tags, and authors go under `newFilters`. `filters` is ignored by
+        Backstop. A party is `entityId` + `resourceType`, not `associatedWiths`.
+        `meeting_call` is sent as the search value `call`.
+        """
+        new_filters: dict[str, object] = {
             "effectiveDate": {
                 "startTimestamp": f"{start_date.isoformat()}T00:00:00",
                 "endTimestamp": f"{end_date.isoformat()}T23:59:59",
             }
         }
         if types:
-            filters["types"] = list(types)
-        if party_id is not None:
-            filters["associatedWiths"] = [self._party_bean(party_id)]
+            new_filters["types"] = [
+                {
+                    "searchValues": [
+                        {"value": _TYPE_FILTER_VALUES[activity_type]} for activity_type in types
+                    ]
+                }
+            ]
         if activity_tags:
-            filters["activityTags"] = list(activity_tags)
+            new_filters["activityTags"] = [
+                {"searchValues": [{"value": tag_id} for tag_id in activity_tags]}
+            ]
         if authors:
-            filters["authors"] = [{"searchValue": email, "isEmail": True} for email in authors]
-        include_fields = ["associatedWith"]
+            new_filters["authors"] = [
+                {"searchValues": [{"value": email, "isEmail": True} for email in authors]}
+            ]
+        include_fields = ["associatedWith", "inheritedFrom", "primaryEntity"]
         if include_description:
             include_fields = [*include_fields, "description"]
         attributes: dict[str, object] = {
             "pageSize": page_size,
             "pageNum": page_num,
             "sorts": [{"columnName": "effectiveDate", "ascending": False}],
-            "filters": filters,
+            "newFilters": new_filters,
             "includeFields": include_fields,
         }
+        if party_id is not None:
+            assert resource_type is not None, "resource_type is required when party_id is set"
+            attributes["entityId"] = int(party_id)
+            attributes["resourceType"] = resource_type
         if include_description:
             attributes["shouldIncludeDescription"] = True
         return {"data": {"type": "entity-activities", "attributes": attributes}}
 
-    def _party_bean(self, party_id: str) -> str:
-        return f"PartyBean_{party_id}"
-
     def _project_rows(
         self,
         results: Sequence[dict[str, object]],
-    ) -> tuple[tuple[EntityActivityDto, ...], int]:
+        *,
+        start_date: date,
+        end_date: date,
+        types: Sequence[EntityActivityType],
+        party_id: str | None,
+        resource_type: SearchType | None,
+        activity_tags: Sequence[str],
+        total_count: int | None,
+        scoped: bool,
+    ) -> tuple[tuple[EntityActivityDto, ...], int, dict[str, int]]:
+        """Drop rows that show an ignored filter. Person-only rows on a party search are kept.
+
+        A non-party search whose totalCount is 10000 is reported as `total_count`.
+        """
+        check_types = bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES)
+        allowed_types = {_TYPE_LABELS[token] for token in types if token in _TYPE_LABELS}
+        requested_tags = {tag for tag in activity_tags if tag}
+        date_violations = 0
+        type_violations = 0
+        tag_violations = 0
+        readable = 0
+        party_hits = 0
+        party_contradictions = 0
+        unreadable = 0
+        unprojectable = 0
         projected: list[EntityActivityDto] = []
-        dropped = 0
         for raw in results:
             attributes = EntityActivityAttributes.safe_model_validate(raw)
             if attributes is None:
                 logger.warning("activity_history.entity_activities.row_unreadable")
-                dropped += 1
+                unreadable += 1
+                continue
+            readable += 1
+            row_violation = False
+            if attributes.effective_date is not None and (
+                attributes.effective_date < start_date or attributes.effective_date > end_date
+            ):
+                date_violations += 1
+                row_violation = True
+            if check_types and (attributes.type or "").casefold() not in allowed_types:
+                type_violations += 1
+                row_violation = True
+            if requested_tags:
+                row_tags = {tag.id for tag in attributes.activity_tags if tag.id}
+                if row_tags.isdisjoint(requested_tags):
+                    tag_violations += 1
+                    row_violation = True
+            if party_id is not None:
+                relation = self._party_relation(attributes, party_id, resource_type)
+                if relation == "hit":
+                    party_hits += 1
+                elif relation == "contradict":
+                    party_contradictions += 1
+            if row_violation:
                 continue
             row = EntityActivityDto.from_attributes(attributes)
             if row is None:
-                dropped += 1
+                unprojectable += 1
                 continue
             projected.append(row)
-        return tuple(projected), dropped
+
+        party_violation = (
+            party_id is not None and readable > 0 and party_hits == 0 and party_contradictions > 0
+        )
+        if party_violation:
+            projected = []
+            unprojectable = 0
+
+        violating: dict[str, int] = {}
+        if date_violations:
+            violating["effective_date"] = date_violations
+        if type_violations:
+            violating["types"] = type_violations
+        if tag_violations:
+            violating["activity_tags"] = tag_violations
+        if party_violation:
+            violating["party"] = readable
+        if party_id is None and scoped and total_count == MAX_RETRIEVABLE:
+            violating["total_count"] = 0
+        return tuple(projected), unreadable + unprojectable, violating
+
+    def _party_relation(
+        self,
+        attributes: EntityActivityAttributes,
+        party_id: str,
+        resource_type: SearchType | None,
+    ) -> Literal["hit", "contradict", "neutral"]:
+        """`hit` names the id; `contradict` names another party of the same kind; else `neutral`."""
+        refs = (
+            *attributes.associated_with,
+            *attributes.inherited_from,
+            *(() if attributes.primary_entity is None else (attributes.primary_entity,)),
+        )
+        named = False
+        other_party = False
+        for ref in refs:
+            if ref.resource_id is None:
+                continue
+            if ref.resource_id == party_id:
+                named = True
+                continue
+            if resource_type == "organizations" and ref.resource_type in _INHERITED_PARTY_KINDS:
+                continue
+            other_party = True
+        if named:
+            return "hit"
+        if other_party:
+            return "contradict"
+        return "neutral"
+
+    def _record_ignored_filters(
+        self,
+        violating: Mapping[str, int],
+        *,
+        total_count: int | None,
+        party_id: str | None,
+        resource_type: SearchType | None,
+        already_logged: Sequence[str],
+    ) -> None:
+        """Warn and count each newly ignored filter, once per name per walk."""
+        body_shape = "newFilters+entityId" if party_id is not None else "newFilters"
+        for name, rows_violating in violating.items():
+            if name in already_logged:
+                continue
+            logger.warning(
+                "activity_history.entity_activities.filter_ignored",
+                extra={
+                    "filter": name,
+                    "rows_violating": rows_violating,
+                    "total_count": total_count,
+                    "body_shape": body_shape,
+                    "party_id": party_id,
+                    "resource_type": resource_type,
+                    "endpoint": "entity-activities",
+                },
+            )
+            BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})

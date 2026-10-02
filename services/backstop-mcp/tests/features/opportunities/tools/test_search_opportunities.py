@@ -102,13 +102,19 @@ def _included() -> list[dict[str, object]]:
         resource(
             "c1",
             "contacts",
-            name="Koch",
+            name="Contoso",
             country="United States of America",
             state="KS",
             city="Wichita",
             contactDescription="x" * 200,
+            specificResource={
+                "resourceType": "organizations",
+                "resourceId": "c1",
+                "resourceLink": "https://example.test/organizations/c1",
+                "restricted": False,
+            },
         ),
-        resource("p1", "products", name="CATS Select"),
+        resource("p1", "products", name="Harbor Select"),
     ]
 
 
@@ -135,7 +141,7 @@ class TestSearchOpportunities:
         base_url = tenant("so-filter")
         opportunities = respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                _deal("1", name="Contoso - Harbor Select", stage_id="42482"),
                 included=_included(),
                 total=1,
             )
@@ -155,7 +161,7 @@ class TestSearchOpportunities:
         params = recorded_requests(opportunities.calls)[0].url.params
         assert params["filter[representative.name][eq]"] == "blazarus"
         assert params["include"] == "investor,product,stage"
-        assert params["fields[contacts]"] == "name,country,state,city"
+        assert params["fields[contacts]"] == "name,country,state,city,specificResource"
         assert "weightedValue" in params["fields[opportunities]"]
         assert "weightedAllocatedValue" in params["fields[opportunities]"]
         assert params["page[limit]"] == "500"
@@ -168,11 +174,13 @@ class TestSearchOpportunities:
         assert rows[0]["id"] == "1"
         assert rows[0]["stage"] == "IDD"
         investor = object_dict(rows[0]["investor"])
-        assert investor["name"] == "Koch"
+        assert investor["name"] == "Contoso"
         assert investor["country"] == "United States of America"
+        assert investor["search_type"] == "organizations"
         assert "contactDescription" not in investor
+        assert "specificResource" not in investor
         product = object_dict(rows[0]["product"])
-        assert product["name"] == "CATS Select"
+        assert product["name"] == "Harbor Select"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -303,7 +311,7 @@ class TestSearchOpportunities:
         base_url = tenant("so-id")
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                _deal("1", name="Contoso - Harbor Select", stage_id="42482"),
                 _deal("2", name="Other", stage_id="42482"),
                 included=_included(),
                 total=2,
@@ -322,7 +330,7 @@ class TestSearchOpportunities:
 
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
         assert [item["id"] for item in rows] == ["1", "2"]
-        assert [item["name"] for item in rows] == ["Koch - CATS Select", "Other"]
+        assert [item["name"] for item in rows] == ["Contoso - Harbor Select", "Other"]
         assert set(rows[0]) == {"id", "name"}
 
     @pytest.mark.asyncio
@@ -331,7 +339,7 @@ class TestSearchOpportunities:
         base_url = tenant("so-url")
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                _deal("1", name="Contoso - Harbor Select", stage_id="42482"),
                 included=_included(),
                 total=1,
             )
@@ -366,7 +374,7 @@ class TestSearchOpportunities:
         base_url = tenant("so-catalog-down")
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Koch - CATS Select", stage_id="42482"),
+                _deal("1", name="Contoso - Harbor Select", stage_id="42482"),
                 included=_included(),
                 total=1,
             )
@@ -389,7 +397,95 @@ class TestSearchOpportunities:
         assert result.custom_fields_unavailable is True
 
 
+def _product_page() -> httpx.Response:
+    return _page(
+        _deal("on", name="onshore deal", stage_id="42482", product_id="p-on"),
+        _deal("off", name="offshore deal", stage_id="42482", product_id="p-off"),
+        _deal("none", name="no product", stage_id="42482", product_id=None),
+        included=[
+            resource("42482", "opportunity-stages", name="IDD"),
+            resource("c1", "contacts", name="Contoso"),
+            resource(
+                "p-on",
+                "products",
+                name="Northwind Dispersion Fund (Onshore)",
+                configuration={"productShortName": "NWON"},
+            ),
+            resource(
+                "p-off",
+                "products",
+                name="Northwind Dispersion Fund (Offshore)",
+                configuration={"productShortName": "NWOF"},
+            ),
+        ],
+        total=3,
+    )
+
+
+class TestSearchOpportunitiesProductFilter:
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("product", "expected_ids"),
+        [
+            pytest.param(["NWON"], ["on"], id="short-name-exact"),
+            pytest.param([" nwon "], ["on"], id="short-name-case-and-space-insensitive"),
+            pytest.param(["NWO"], [], id="short-name-is-not-a-prefix-match"),
+            pytest.param(["dispersion"], ["on", "off"], id="display-name-substring"),
+            pytest.param(["offshore"], ["off"], id="display-name-substring-narrows"),
+            pytest.param(["NWON", "NWOF"], ["on", "off"], id="several-products-are-or"),
+            pytest.param(["unrelated"], [], id="no-match"),
+        ],
+    )
+    async def test_matches_short_name_exactly_or_display_name_substring(
+        self, product: list[str], expected_ids: list[str]
+    ) -> None:
+        base_url = tenant("so-product")
+        route = respx.get(f"{base_url}/opportunities").mock(return_value=_product_page())
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    product=product,
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert params["fields[products]"] == "name,configuration"
+        assert "filter[product.name]" not in params
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [item["id"] for item in rows] == expected_ids
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_short_name_is_read_from_configuration(self) -> None:
+        base_url = tenant("so-product-short")
+        respx.get(f"{base_url}/opportunities").mock(return_value=_product_page())
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    product=["NWON"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        product = object_dict(rows[0]["product"])
+        assert product["id"] == "p-on"
+        assert product["short_name"] == "NWON"
+
+
 class TestSearchOpportunitiesInput:
+    def test_product_must_be_a_list(self) -> None:
+        with pytest.raises(ValidationError):
+            _INPUT.validate_python({"product": "NWON"})
+
     def test_rejects_unknown_mode(self) -> None:
         with pytest.raises(ValidationError):
             _INPUT.validate_python({"mode": "nope"})

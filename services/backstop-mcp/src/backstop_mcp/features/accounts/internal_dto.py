@@ -475,6 +475,19 @@ class SeriesFigureDto(BaseModel):
     valued: SeriesPointDto | None = None
 
 
+class AccountLatestValueDto(BaseModel):
+    """One account's latest `values` figure, or why it could not be read.
+
+    `figure` is `None` with no `error` when Backstop publishes no dated point for the account.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    account_id: str
+    figure: SeriesFigureDto | None = None
+    error: str | None = None
+
+
 class ProductCatalogFetchDto(BaseModel):
     """The product catalog walk, and whether it read all of it.
 

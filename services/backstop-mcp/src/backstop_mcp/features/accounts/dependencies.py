@@ -8,6 +8,7 @@ from backstop_mcp.features.accounts.queries import (
     GetAccountsForProductQuery,
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
+    GetLatestAccountValuesQuery,
     GetProductQuery,
     GetTimeSeriesQuery,
 )
@@ -46,3 +47,10 @@ def get_time_series_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> GetTimeSeriesQuery:
     return GetTimeSeriesQuery(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_latest_account_values_query_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> GetLatestAccountValuesQuery:
+    return GetLatestAccountValuesQuery(client=client)

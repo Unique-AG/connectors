@@ -39,6 +39,7 @@ from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkT
 
 logger = logging.getLogger(__name__)
 
+
 # Scan ceiling. `GET /opportunities` has no wall of its own, and `parallel=True` builds one
 # coroutine per page from `meta.totalResourceCount` and accumulates every row — so an unbounded
 # walk is bounded only by the tenant. 1,206 rows measured here, so this is ~16x headroom on this
@@ -73,7 +74,7 @@ class SearchOpportunitiesQuery:
         representative: str | None = None,
         is_open: bool | None = None,
         stage: str | None = None,
-        product: str | None = None,
+        products: Sequence[str] = (),
         mode: SearchMode = "rows",
         group_by: OpportunityGroupBy | None = None,
         max_rows: int,
@@ -142,10 +143,13 @@ class SearchOpportunitiesQuery:
                     exc_info=exc,
                 )
 
+        product_needles = tuple(item.strip().casefold() for item in products if item.strip())
         selected = tuple(
             opportunity
             for opportunity in opportunities_mapped
-            if self._matches_filters(opportunity, is_open=is_open, stage=stage, product=product)
+            if self._matches_filters(
+                opportunity, is_open=is_open, stage=stage, product_needles=product_needles
+            )
         )
         return self._to_response(
             selected,
@@ -163,8 +167,8 @@ class SearchOpportunitiesQuery:
     def _query_params(self, *, representative: str | None) -> dict[str, object]:
         params: dict[str, object] = {
             "include": "investor,product,stage",
-            "fields[contacts]": "name,country,state,city",
-            "fields[products]": "name",
+            "fields[contacts]": "name,country,state,city,specificResource",
+            "fields[products]": "name,configuration",
             "fields[opportunity-stages]": "name",
             "fields[opportunities]": (
                 "name,isOpen,probability,requestedAmount,allocatedAmount,weightedValue,"
@@ -183,7 +187,7 @@ class SearchOpportunitiesQuery:
         *,
         is_open: bool | None,
         stage: str | None,
-        product: str | None,
+        product_needles: Sequence[str],
     ) -> bool:
         if is_open is not None and opportunity.is_open is not is_open:
             return False
@@ -191,11 +195,20 @@ class SearchOpportunitiesQuery:
             name = (opportunity.stage or "").casefold()
             if name != stage.strip().casefold():
                 return False
-        if product is not None:
-            name = (opportunity.product.name if opportunity.product is not None else "") or ""
-            if name.casefold() != product.strip().casefold():
-                return False
-        return True
+        return not product_needles or self._matches_product(opportunity.product, product_needles)
+
+    def _matches_product(
+        self, product: ProductFromOpportunityResponse | None, needles: Sequence[str]
+    ) -> bool:
+        """Short name exact, or display name substring. Several needles are OR.
+
+        `needles` arrive already stripped and casefolded.
+        """
+        if product is None:
+            return False
+        short = (product.short_name or "").casefold()
+        name = (product.name or "").casefold()
+        return any(short == needle or needle in name for needle in needles)
 
     def _to_response(
         self,

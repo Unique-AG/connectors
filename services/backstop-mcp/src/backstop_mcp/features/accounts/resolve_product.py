@@ -31,10 +31,12 @@ case warns rather than passing silently.
 import logging
 from collections.abc import Sequence
 from http import HTTPStatus
+from typing import ClassVar, Literal
 from urllib.parse import quote
 
 from fastmcp import Context
 from mcp.types import InputRequiredResult
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -45,10 +47,14 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ProductResolution, ResolvedProductDto
 from backstop_mcp.features.resolution import (
+    Ambiguous,
     Candidate,
     NotFound,
+    Resolved,
+    Unresolved,
     elicit_if_ambiguous,
     from_candidates,
+    input_required,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +66,8 @@ _PRODUCT_INDEX_PAGE_SIZE = 200
 # Two full pages. This instance returns 72, so anything past this is a different kind of tenant
 # and the "re-read the catalog every call" trade stops paying for itself.
 _LARGE_CATALOG = 400
+
+_FAMILY_CAP = 6
 
 _SCOPE = "products"
 
@@ -89,7 +97,14 @@ def _resolution(hits: Sequence[ResolvedProductDto], *, query: str) -> ProductRes
     )
 
 
-def _match_product(products: Sequence[ResolvedProductDto], query: str) -> ProductResolution:
+class _ProductMatch(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    resolution: ProductResolution
+    field: Literal["id", "short_name", "exact_name", "substring", "none"]
+
+
+def _match_product(products: Sequence[ResolvedProductDto], query: str) -> _ProductMatch:
     """Match `query` against a parsed product index.
 
     Order: exact id, exact short name, exact name, name substring. A caller can type an id into
@@ -97,11 +112,11 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
     """
     query = query.strip()
     if not query:
-        return NotFound(query=query, scope=_SCOPE)
+        return _ProductMatch(resolution=NotFound(query=query, scope=_SCOPE), field="none")
 
     id_hits = tuple(product for product in products if product.id == query)
     if id_hits:
-        return _resolution(id_hits, query=query)
+        return _ProductMatch(resolution=_resolution(id_hits, query=query), field="id")
 
     needle = query.casefold()
     short_hits = tuple(
@@ -110,7 +125,7 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
         if product.short_name is not None and product.short_name.casefold() == needle
     )
     if short_hits:
-        return _resolution(short_hits, query=query)
+        return _ProductMatch(resolution=_resolution(short_hits, query=query), field="short_name")
 
     exact_name_hits = tuple(
         product
@@ -118,14 +133,32 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
         if product.name is not None and product.name.casefold() == needle
     )
     if exact_name_hits:
-        return _resolution(exact_name_hits, query=query)
+        return _ProductMatch(
+            resolution=_resolution(exact_name_hits, query=query), field="exact_name"
+        )
 
     substring_hits = tuple(
         product
         for product in products
         if product.name is not None and needle in product.name.casefold()
     )
-    return _resolution(substring_hits, query=query)
+    return _ProductMatch(resolution=_resolution(substring_hits, query=query), field="substring")
+
+
+def _select_product_family(
+    products: Sequence[ResolvedProductDto], query: str
+) -> ProductResolution | tuple[ResolvedProductDto, ...]:
+    """Substring hits up to `_FAMILY_CAP` come back together. Anything else is today's match.
+
+    A duplicate short name or exact name stays ambiguous. More substring hits than the cap
+    falls back to that same elicitation.
+    """
+    match = _match_product(products, query)
+    if match.field == "substring" and isinstance(match.resolution, Ambiguous):
+        hits = tuple(candidate.value for candidate in match.resolution.candidates)
+        if len(hits) <= _FAMILY_CAP:
+            return hits
+    return match.resolution
 
 
 async def _fetch_product(client: BackstopClient, product_id: str) -> ProductResolution:
@@ -207,10 +240,42 @@ async def resolve_product(
     assert product is not None
     if not product.strip():
         return NotFound(query=product.strip(), scope=_SCOPE)
-    outcome = _match_product(await _index_products(client, name_like=product), product)
+    outcome = _match_product(await _index_products(client, name_like=product), product).resolution
     if isinstance(outcome, NotFound):
-        outcome = _match_product(await _index_products(client), product)
+        outcome = _match_product(await _index_products(client), product).resolution
     return await elicit_if_ambiguous(ctx, outcome)
+
+
+async def resolve_product_family(
+    ctx: Context,
+    client: BackstopClient,
+    *,
+    product: str,
+) -> tuple[ResolvedProductDto, ...] | Unresolved[ResolvedProductDto] | InputRequiredResult:
+    """Like `resolve_product`, except a name-substring match returns every vehicle up to the cap.
+
+    Digits are tried as a by-id GET first, the same way `resolve_product_query` does, so an
+    echoed id stays one request. A duplicate short name or exact name still elicits. More
+    substring hits than `_FAMILY_CAP` elicits too.
+    """
+    product = product.strip()
+    if not product:
+        return NotFound(query=product, scope=_SCOPE)
+    if product.isdigit():
+        by_id = await _fetch_product(client, product)
+        if isinstance(by_id, Resolved):
+            return (by_id.value,)
+    selected = _select_product_family(await _index_products(client, name_like=product), product)
+    if isinstance(selected, tuple):
+        return selected
+    if isinstance(selected, NotFound):
+        selected = _select_product_family(await _index_products(client), product)
+        if isinstance(selected, tuple):
+            return selected
+    outcome = await elicit_if_ambiguous(ctx, selected)
+    if input_required(outcome) or not isinstance(outcome, Resolved):
+        return outcome
+    return (outcome.value,)
 
 
 async def resolve_product_query(

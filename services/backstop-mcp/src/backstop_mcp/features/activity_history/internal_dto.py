@@ -20,6 +20,7 @@ __all__ = [
     "EntityActivitiesFetchDto",
     "EntityActivityDto",
     "MeetingSpecificsDto",
+    "PartyLastActivityDto",
 ]
 
 
@@ -124,7 +125,10 @@ class MeetingSpecificsDto(BaseModel):
 class AttendeeDto(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+    id: str | None = None
     name: str | None = None
+    company_name: str | None = None
+    job_title: str | None = None
 
 
 class EntityActivityDto(BaseModel):
@@ -214,3 +218,15 @@ class EntityActivitiesFetchDto(BaseModel):
     ceiling_clamped: bool
     truncated_by_row_cap: bool
     partial_due_to_error: bool = False
+    server_filter_ignored: tuple[str, ...] = ()
+
+
+class PartyLastActivityDto(BaseModel):
+    """One party's newest-activity search: the one-row fetch, or why it failed."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    party_id: str
+    search_type: SearchType
+    fetch: EntityActivitiesFetchDto | None = None
+    error: str | None = None

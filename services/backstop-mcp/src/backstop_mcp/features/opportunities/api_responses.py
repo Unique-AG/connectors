@@ -29,7 +29,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt, LenientStr
@@ -42,6 +42,7 @@ __all__ = [
     "OpportunityStageHistoryAttributes",
     "SearchContactAttributes",
     "SearchProductAttributes",
+    "SearchProductConfigurationAttributes",
 ]
 
 
@@ -115,22 +116,39 @@ class OpportunityStageAttributes(BaseModel):
 
 
 class SearchContactAttributes(BaseModel):
-    """Sparse `contacts` attributes from the investor include on `GET /opportunities`."""
+    """Sparse `contacts` attributes from the investor include on `GET /opportunities`.
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+    `specificResource` names the concrete collection (`organizations` / `people`) under the
+    same id; `fields[contacts]` accepts it.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
     country: str | None = None
     state: str | None = None
     city: str | None = None
+    specific_resource: ResourceRef | None = Field(default=None, alias="specificResource")
+
+
+class SearchProductConfigurationAttributes(BaseModel):
+    """`attributes.configuration` on the product include; the short name lives only here.
+
+    `fields[products]=productShortName` is `400`, so there is no top-level short name to read.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    product_short_name: str | None = Field(default=None, validation_alias="productShortName")
 
 
 class SearchProductAttributes(BaseModel):
-    """Sparse `products` attributes from the product include on `GET /opportunities`."""
+    """Sparse `products` attributes (`name,configuration`) from the opportunity product include."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
+    configuration: SearchProductConfigurationAttributes | None = None
 
 
 class OpportunityStageHistoryAttributes(BaseModel):

@@ -20,6 +20,7 @@ from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityRecordResponse,
     GetActivityHistoryQuery,
+    GetMeetingAttendeesQuery,
 )
 from backstop_mcp.features.activity_writes import (
     AuthorDto,
@@ -445,7 +446,9 @@ class TestLogActivityCommandDispatch:
             activity=_meeting(), party_id=_ORG_ID, author=_AUTHOR
         )
         history = await GetActivityHistoryQuery(
-            client=client, build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None)
+            client=client,
+            build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+            get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
         ).run(
             segment="organizations",
             entity_id=_ORG_ID,

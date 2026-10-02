@@ -66,6 +66,10 @@ async def get_activity_detail(
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, attendees, and attachment list.
 
+    When the answer depends on what was sent or attached, list the attachments returned
+    here. Do not infer attachment contents from titles, later packs, or note text; say
+    'not attached' when the list is empty.
+
     Documented fallback, with `get_activity_history`, when `search_activities` is unavailable.
     While the primary is up, prefer `search_activities` with `include_description` for note
     text. When it 404s, `get_activity_history` yields a truncated gist and this tool is how

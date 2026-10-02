@@ -198,7 +198,9 @@ class TestProjection:
         """With an empty vocabulary, so only `included` can be answering."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
-                _opportunity("5072909", stage_id="42482", name="Koch - CATS Select", isOpen=True),
+                _opportunity(
+                    "5072909", stage_id="42482", name="Contoso - Harbor Select", isOpen=True
+                ),
                 included=[_side_loaded_stage("42482")],
             )
         )
@@ -357,7 +359,7 @@ class TestProjection:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=False,
                     probability=1.0,
                     requestedAmount=100000000.0,
@@ -376,7 +378,7 @@ class TestProjection:
         result = await _run(client)
 
         deal = result.opportunities[0]
-        assert deal.name == "Koch - CATS Select"
+        assert deal.name == "Contoso - Harbor Select"
         assert deal.is_open is False
         assert deal.probability == 1.0
         assert deal.requested_amount == 100000000.0
@@ -400,7 +402,7 @@ class TestProjection:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     waitlistId=2,
                     isErisa=False,
                     weightedValue=100000000.0,
@@ -740,7 +742,9 @@ class TestMalformedRecords:
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity("malformed", stage_id="42482", probability=["not-a-number"]),
-                _opportunity("intact", stage_id="42482", name="Koch - CATS Select", isOpen=True),
+                _opportunity(
+                    "intact", stage_id="42482", name="Contoso - Harbor Select", isOpen=True
+                ),
                 included=[_side_loaded_stage("42482")],
             )
         )
@@ -750,7 +754,7 @@ class TestMalformedRecords:
         by_id = {deal.id: deal for deal in result.opportunities}
         assert set(by_id) == {"malformed", "intact"}
         assert by_id["malformed"].probability is None
-        assert by_id["intact"].name == "Koch - CATS Select"
+        assert by_id["intact"].name == "Contoso - Harbor Select"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -766,7 +770,7 @@ class TestMalformedRecords:
                 _opportunity(
                     "kept",
                     stage_id="42482",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=True,
                     regularCustomFieldValues=stored,
                 ),

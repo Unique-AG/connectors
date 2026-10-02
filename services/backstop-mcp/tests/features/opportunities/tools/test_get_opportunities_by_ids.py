@@ -121,7 +121,7 @@ def _open_deal() -> dict[str, object]:
         "5755031",
         stage_id="42482",
         history=["4908995"],
-        name="Koch - CATS Select",
+        name="Contoso - Harbor Select",
         isOpen=True,
         previousStage="Client Approval",
         dateEnteredCurrentStage="2026-03-01T00:00:00.000-0500",
@@ -135,7 +135,7 @@ def _two_field_deal() -> dict[str, object]:
     return _opportunity(
         "5755031",
         stage_id="42482",
-        name="Koch - CATS Select",
+        name="Contoso - Harbor Select",
         isOpen=True,
         regularCustomFieldValues=[
             {"definitionId": "8648265", "value": 0.3},
@@ -209,7 +209,7 @@ class TestGetOpportunitiesByIds:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - Invested",
+                    name="Contoso - Invested",
                     isOpen=False,
                 ),
                 included=[_side_loaded_stage("96016")],
@@ -398,7 +398,7 @@ class TestGetOpportunitiesByIds:
         )
         respx.get(f"{BASE_URL}/opportunities/5072909").mock(
             return_value=_document(
-                _opportunity("5072909", stage_id="96016", name="Koch - Invested", isOpen=False),
+                _opportunity("5072909", stage_id="96016", name="Contoso - Invested", isOpen=False),
                 included=[_side_loaded_stage("96016")],
             )
         )
