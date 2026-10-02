@@ -38,7 +38,6 @@ from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
-    ONE_ADDRESS,
     AddressFault,
     MailAddress,
     MailImportance,
@@ -164,10 +163,10 @@ def _bad_address(argument: str, value: str) -> str:
     )
 
 
-def _copied_twice(address: str) -> str:
+def _repeated(argument: str, address: str) -> str:
     return (
-        f"outlook_draft_reply was given {address!r} twice in `cc`, and this tool copies each "
-        + "address once. A change of case does not make a second address. No draft was "
+        f"outlook_draft_reply was given {address!r} twice in `{argument}`, and this tool lists "
+        + "each address once. A change of case does not make a second address. No draft was "
         + "created. Remove the repeat and call again. If you call this tool again with the same "
         + "arguments, the call will fail the same way."
     )
@@ -335,24 +334,29 @@ async def draft_reply(
 
 
 def _forward_addresses(mode: MailReplyMode, to: Sequence[str]) -> list[str]:
-    trimmed = [address.strip() for address in to]
     if mode == "reply":
-        if trimmed:
+        if to:
             raise ToolError(_TO_ON_A_REPLY)
         return []
-    if not trimmed:
+    if not to:
         raise ToolError(_NO_FORWARD_RECIPIENT)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address("to", address))
-    return trimmed
+    checked = one_address_each(to)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated("to", checked.entry)
+            if checked.repeated
+            else _bad_address("to", checked.entry)
+        )
+    return list(checked)
 
 
 def _copied_addresses(cc: Sequence[str], *, forwarded_to: Sequence[str]) -> list[str]:
     checked = one_address_each(cc)
     if isinstance(checked, AddressFault):
         raise ToolError(
-            _copied_twice(checked.entry) if checked.repeated else _bad_address("cc", checked.entry)
+            _repeated("cc", checked.entry)
+            if checked.repeated
+            else _bad_address("cc", checked.entry)
         )
     addressed = {address.casefold() for address in forwarded_to}
     for address in checked:

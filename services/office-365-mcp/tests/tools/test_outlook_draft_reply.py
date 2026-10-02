@@ -438,6 +438,16 @@ class TestTheModesAndAddressesItRefuses:
 
         assert len(graph.calls) == 0, "a refused argument creates nothing in the mailbox"
 
+    async def test_to_on_a_reply_is_refused_before_its_entries_are_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        with pytest.raises(ToolError, match="takes no `to` on a reply"):
+            _ = await _reply(client, to=[_ADA, _ADA.upper(), "Grace Hopper"])
+
+        assert len(graph.calls) == 0
+
     async def test_a_forward_with_nobody_to_forward_to_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -470,6 +480,18 @@ class TestTheModesAndAddressesItRefuses:
         with pytest.raises(ToolError):
             _ = await _reply(client, mode="forward", to=[address])
 
+        assert len(graph.calls) == 0
+
+    async def test_a_forward_entry_that_is_not_one_address_is_named_before_a_repeat(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph, _CREATE_FORWARD)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _reply(client, mode="forward", to=[_ADA, _ADA.upper(), "Grace Hopper"])
+
+        assert "'Grace Hopper' in `to`, which is not one email address" in str(raised.value)
+        assert "twice" not in str(raised.value)
         assert len(graph.calls) == 0
 
     async def test_the_refusal_says_where_an_address_may_come_from(
@@ -539,7 +561,37 @@ class TestTheModesAndAddressesItRefuses:
         with pytest.raises(ToolError, match="outlook_find_recipient"):
             _ = await _reply(client, cc=["Pam Beesly"])
 
-    async def test_an_address_repeated_in_cc_is_refused_whatever_its_case(
+    @pytest.mark.parametrize(
+        ("argument", "entries", "reported"),
+        [
+            ("to", [_ADA, _ADA.upper()], _ADA.upper()),
+            ("to", [_ADA, _GRACE, f" {_ADA.upper()} "], _ADA.upper()),
+            ("cc", [_PAM, _PAM.upper()], _PAM.upper()),
+            ("cc", [_GRACE, _PAM, f" {_GRACE.upper()} "], _GRACE.upper()),
+        ],
+    )
+    async def test_an_address_repeated_in_one_list_is_refused_whatever_its_case(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        argument: str,
+        entries: list[str],
+        reported: str,
+    ) -> None:
+        _ = _creates(graph, _CREATE_FORWARD)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _reply(client, mode="forward", **{"to": [_ADA], argument: entries})
+
+        assert str(raised.value) == (
+            f"outlook_draft_reply was given {reported!r} twice in `{argument}`, and this tool "
+            + "lists each address once. A change of case does not make a second address. No "
+            + "draft was created. Remove the repeat and call again. If you call this tool "
+            + "again with the same arguments, the call will fail the same way."
+        )
+        assert len(graph.calls) == 0
+
+    async def test_a_repeat_in_cc_is_refused_on_a_reply_too(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph)
