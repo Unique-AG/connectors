@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Mapping, Sequence
 
@@ -6,6 +7,8 @@ import pytest
 import respx
 from fastmcp import FastMCP
 from fastmcp.tools import Tool
+from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
+from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
@@ -324,6 +327,29 @@ class TestWhatItAnswers:
         assert answer.is_read is False
         assert answer.folder_id == "AQMkADAwSYNTHETIC-folder"
         assert answer.web_link == "https://outlook.office365.invalid/owa/?ItemID=synthetic"
+
+    async def test_it_answers_every_summary_field_as_the_shared_summary_does(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        payload = _payload(body=_body("hello")) | {
+            "sender": {"emailAddress": {"name": "Sam Assistant", "address": "sam@vance.invalid"}},
+            "replyTo": [{"emailAddress": {"name": "Billing", "address": "billing@vance.invalid"}}],
+            "importance": "high",
+            "flag": {
+                "flagStatus": "flagged",
+                "dueDateTime": {"dateTime": "2026-03-06T16:00:00.0000000", "timeZone": "UTC"},
+            },
+            "categories": ["Red category"],
+            "isDraft": True,
+        }
+        _ = _reads(graph, payload)
+
+        answer = await read_mail(client, handle=_HANDLE)
+
+        summary = MailSummary.from_message(_parsed(payload), message_id=_IMMUTABLE_ID)
+        assert {name: getattr(answer, name) for name in MailSummary.model_fields} == {
+            name: getattr(summary, name) for name in MailSummary.model_fields
+        }
 
 
 class TestTheAttachmentsItReports:
@@ -917,6 +943,15 @@ class TestTheRoundTripFromASearchResult:
         assert answer.body == "Paid it this morning.", (
             "the point of the round trip: a hit has a preview, and this is where the text is"
         )
+
+
+def _parsed(payload: dict[str, object]) -> Message:
+    node = JsonParseNodeFactory().get_root_parse_node(
+        "application/json", json.dumps(payload).encode()
+    )
+    message = node.get_object_value(Message)
+    assert message is not None
+    return message
 
 
 async def _registered(transport: httpx.AsyncClient) -> Tool:

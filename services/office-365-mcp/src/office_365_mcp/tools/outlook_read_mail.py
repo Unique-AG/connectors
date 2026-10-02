@@ -193,34 +193,23 @@ def _answer(
 ) -> MailMessage:
     summary = MailSummary.from_message(message, message_id=handle.message_id)
     body = _body_of(message)
-    return MailMessage(
-        uri=summary.uri,
-        subject=summary.subject,
-        preview=summary.preview,
-        sender=summary.sender,
-        sent_by=summary.sent_by,
-        to=summary.to,
-        reply_to=summary.reply_to,
-        received_at=summary.received_at,
-        is_read=summary.is_read,
-        has_attachments=summary.has_attachments,
-        importance=summary.importance,
-        flag=summary.flag,
-        categories=summary.categories,
-        is_draft=summary.is_draft,
-        folder_id=summary.folder_id,
-        web_link=summary.web_link,
-        cc=MailAddress.each_of(message.cc_recipients),
-        sent_at=(None if message.sent_date_time is None else message.sent_date_time.isoformat()),
-        body=body.text,
-        body_is_the_new_part=body.is_the_new_part,
-        body_is_plain_text=body.is_plain_text,
-        internet_message_headers=[
-            MessageHeader(name=header.name, value=header.value)
-            for header in message.internet_message_headers or []
-        ],
-        attachments=attachments.items,
-        attachments_capped=attachments.capped,
+    return MailMessage.model_validate(
+        {
+            **dict(summary),
+            "cc": MailAddress.each_of(message.cc_recipients),
+            "sent_at": (
+                None if message.sent_date_time is None else message.sent_date_time.isoformat()
+            ),
+            "body": body.text,
+            "body_is_the_new_part": body.is_the_new_part,
+            "body_is_plain_text": body.is_plain_text,
+            "internet_message_headers": [
+                MessageHeader(name=header.name, value=header.value)
+                for header in message.internet_message_headers or []
+            ],
+            "attachments": attachments.items,
+            "attachments_capped": attachments.capped,
+        }
     )
 
 
