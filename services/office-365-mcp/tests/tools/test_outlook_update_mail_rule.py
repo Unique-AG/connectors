@@ -41,6 +41,7 @@ _ARCHIVE_PATH = "/me/mailFolders/archive"
 _ADA = "ada@example.invalid"
 _DANA = "dana@example.invalid"
 _ERIN = "erin@example.invalid"
+_STRANGER = "stranger@evil.invalid"
 
 _NOTHING_CHANGED = "The rule was not changed."
 
@@ -211,6 +212,12 @@ def _modern_context(
     return cast("Context", cast("object", _Client()))
 
 
+def _agreeing(key: str, agree: str, state: str) -> Context:
+    return _modern_context(
+        answers={key: ElicitResult(action="accept", content={"value": agree})}, state=state
+    )
+
+
 def _the_question(answer: MailRule | InputRequiredResult) -> tuple[str, str, str, str]:
     assert isinstance(answer, InputRequiredResult), "the question was never put to anybody"
     requests = answer.input_requests or {}
@@ -253,7 +260,7 @@ class TestWhatItSendsToGraph:
     ) -> None:
         _ = _ready(graph)
 
-        _ = await _update(client, display_name="Renamed")
+        _ = await _update(client, display_name="Renamed", confirm=_agrees)
 
         made = cast("Sequence[Call]", graph.calls)
         path = "/v1.0/me/mailFolders/inbox/messageRules/AQAAAJ5dZqSYNTHETIC%3D"
@@ -267,7 +274,7 @@ class TestWhatItSendsToGraph:
     ) -> None:
         patch = _ready(graph)
 
-        _ = await _update(client, display_name="Renamed")
+        _ = await _update(client, display_name="Renamed", confirm=_agrees)
 
         assert _sent(patch) == {"displayName": "Renamed"}
 
@@ -323,7 +330,7 @@ class TestWhatItSendsToGraph:
         reads = _reads(graph)
         _ = graph.patch(_RULE_PATH).mock(return_value=httpx.Response(204))
 
-        answer = await _update(client, display_name="Renamed")
+        answer = await _update(client, display_name="Renamed", confirm=_agrees)
 
         assert reads.call_count == 2
         assert answer.uri == _RULE_REF
@@ -453,7 +460,9 @@ class TestWhatItKeeps:
     ) -> None:
         patch = _ready(graph)
 
-        _ = await _update(client, display_name="Renamed", actions=RuleActionsInput())
+        _ = await _update(
+            client, display_name="Renamed", actions=RuleActionsInput(), confirm=_agrees
+        )
 
         assert _sent(patch) == {"displayName": "Renamed"}
 
@@ -467,7 +476,7 @@ class TestTheRetryItRefuses:
         patch = graph.patch(_RULE_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphFailure):
-            _ = await _update(client, display_name="Renamed")
+            _ = await _update(client, display_name="Renamed", confirm=_agrees)
 
         assert patch.call_count == 1
         assert GraphSettings().max_retries > 0, "no retries are configured, so this proves nothing"
@@ -727,13 +736,38 @@ class TestWhenItAsksThePerson:
         assert len(asked) == 1
         assert "match its conditions" in asked[0]
 
+    async def test_renaming_a_rule_that_forwards_asks_and_names_the_kept_forward(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+        asked, _bound, capture = _capturing()
+
+        _ = await _update(client, display_name="Renamed", confirm=capture)
+
+        assert len(asked) == 1
+        assert asked[0].startswith("Change the inbox rule 'Renamed'?")
+        assert f"a copy of each matching message to {_DANA}" in asked[0]
+        assert patch.call_count == 1
+
+    async def test_moving_a_rule_that_forwards_in_the_order_asks_and_names_the_kept_forward(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+        asked, _bound, capture = _capturing()
+
+        _ = await _update(client, sequence=1, confirm=capture)
+
+        assert len(asked) == 1
+        assert f"a copy of each matching message to {_DANA}" in asked[0]
+        assert patch.call_count == 1
+
     @pytest.mark.parametrize(
         ("current", "change"),
         [
-            (_rule(), {"display_name": "Renamed"}),
-            (_rule(), {"sequence": 1}),
             (_rule(), {"is_enabled": False}),
+            (_rule(is_enabled=False), {"display_name": "Renamed"}),
             (_rule(is_enabled=False), {"conditions": RuleConditionsInput(sent_to_me=True)}),
+            (_rule(actions={"markAsRead": True}), {"sequence": 1}),
             (
                 _rule(actions={"forwardTo": [_recipient(_DANA)], "markAsRead": True}),
                 {"remove_actions": ["forward_to"]},
@@ -741,10 +775,10 @@ class TestWhenItAsksThePerson:
             (_rule(actions={"markAsRead": True}, is_enabled=False), {"is_enabled": True}),
         ],
         ids=[
-            "rename",
-            "reorder",
             "turn-off",
+            "rename-while-off",
             "stays-off",
+            "reorder-without-forward",
             "stops-forwarding",
             "sends-nothing-on",
         ],
@@ -806,6 +840,22 @@ class TestWhenItAsksThePerson:
 
         assert bound[0] == bound[1]
         assert len(set(bound[1:])) == 4
+
+    async def test_the_agreement_is_bound_to_the_rule_as_it_was_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reads = _reads(graph)
+        _ = _patches(graph)
+        asked, bound, capture = _capturing()
+
+        _ = await _update(client, display_name="Renamed", confirm=capture)
+        _ = reads.mock(
+            return_value=httpx.Response(200, json=_rule(conditions={"senderContains": ["anyone"]}))
+        )
+        _ = await _update(client, display_name="Renamed", confirm=capture)
+
+        assert asked[0] == asked[1]
+        assert bound[0] != bound[1]
 
     async def test_the_agreement_is_bound_to_the_actions_that_the_call_removes(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -876,6 +926,52 @@ class TestTheEraWithNoBackChannel:
         assert isinstance(answer, MailRule)
         assert patch.call_count == 1
 
+    async def test_an_answer_to_a_rule_that_forwards_elsewhere_by_then_changes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reads = _reads(graph)
+        patch = _patches(graph)
+        conditions = RuleConditionsInput(subject_contains=["invoice"])
+        key, state, agree, message = _the_question(
+            await _round(client, conditions=conditions, confirm=a_person_agrees(_modern_context()))
+        )
+        assert _DANA in message
+        _ = reads.mock(
+            return_value=httpx.Response(
+                200, json=_rule(actions={"forwardTo": [_recipient(_STRANGER)]})
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _round(
+                client,
+                conditions=conditions,
+                confirm=a_person_agrees(_agreeing(key, agree, state)),
+            )
+
+        assert patch.call_count == 0
+
+    async def test_an_answer_to_a_rule_whose_conditions_changed_by_then_changes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reads = _reads(graph)
+        patch = _patches(graph)
+        key, state, agree, _message = _the_question(
+            await _round(client, display_name="Renamed", confirm=a_person_agrees(_modern_context()))
+        )
+        _ = reads.mock(
+            return_value=httpx.Response(200, json=_rule(conditions={"senderContains": ["anyone"]}))
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _round(
+                client,
+                display_name="Renamed",
+                confirm=a_person_agrees(_agreeing(key, agree, state)),
+            )
+
+        assert patch.call_count == 0
+
     async def test_an_answer_bound_to_another_change_changes_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -910,7 +1006,7 @@ class TestWhatItAnswers:
             _rule(display_name="Renamed", actions={"moveToFolder": _ARCHIVE_ID}),
         )
 
-        answer = await _update(client, display_name="Renamed")
+        answer = await _update(client, display_name="Renamed", confirm=_agrees)
 
         assert answer.uri == _RULE_REF
         assert answer.display_name == "Renamed"
@@ -1011,9 +1107,13 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert "This tool changes only the parts that the call gives" in description
-        assert "asks the user to agree when the rule runs and forwards or redirects mail" in (
-            description
-        )
+        assert (
+            "This tool asks the user to agree before it changes a rule that runs and forwards "
+            + "or redirects mail after the change. The question names every address, also an "
+            + "address that the rule keeps. This tool changes nothing unless the user agrees. "
+            + "This tool changes a rule without that agreement only when the rule is off, or "
+            + "does not forward or redirect mail, after the change."
+        ) in description
         assert "Every address must come from the user." in description
         assert "This tool refuses a read-only rule." in description
         assert "refuses `actions` and `remove_actions` for a rule that erases mail" in description
