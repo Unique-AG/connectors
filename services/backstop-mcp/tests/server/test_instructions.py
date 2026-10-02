@@ -3,9 +3,9 @@
 from fastmcp import FastMCP
 
 from backstop_mcp.config import TenantGuidance, ToolGuidance
-from backstop_mcp.features.opportunities.tools.search_opportunities import search_opportunities
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.tenant_guidance import compose_instructions, with_tool_guidance
+from backstop_mcp.server.tools import TOOLS
 
 
 class TestInstructions:
@@ -122,6 +122,7 @@ class TestInstructions:
         assert "colleague updates" in instructions
         assert "Investor Status" in instructions
         assert "Tag names carry prefixes" in instructions
+        search_opportunities = next(fn for fn in TOOLS if fn.__name__ == "search_opportunities")
         tool = FastMCP("overlay-routes").add_tool(search_opportunities)
         updated = with_tool_guidance(tool, guidance.tools["search_opportunities"])
         assert updated.description is not None
