@@ -7,7 +7,7 @@ import dataclasses
 import hashlib
 import json
 from collections.abc import Mapping
-from typing import cast
+from typing import cast, get_args
 
 import pytest
 from msgraph.generated.models.email_address import EmailAddress
@@ -24,8 +24,13 @@ from pydantic import BaseModel
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle, MailRuleHandle
 from office_365_mcp.shared.rules import (
+    HIDDEN_RULE_FOLDER,
+    NO_RULE_ACTION,
+    NOT_A_RULE_FOLDER,
+    READ_ONLY_RULE,
     InboxRule,
     MailRule,
+    RuleActionName,
     RuleActions,
     RuleActionsInput,
     RuleConditions,
@@ -36,6 +41,8 @@ from office_365_mcp.shared.rules import (
     actions_of,
     conditions_of,
     forwarding_question,
+    merged_actions,
+    not_one_address,
     predicates_for,
     rule_confirmation_id,
     unusable_addresses,
@@ -43,6 +50,14 @@ from office_365_mcp.shared.rules import (
 )
 
 _RULE_ID = "AQAAAJSYNTHETIC-rule-one"
+
+_ADA = "ada@example.invalid"
+_DANA = "dana@example.invalid"
+_ERIN = "erin@example.invalid"
+_TEAM = "team@example.invalid"
+
+_MOVED_INTO = "AQMkADAwSYNTHETIC-moved"
+_COPIED_INTO = "AQMkADAwSYNTHETIC-copied"
 
 _STRING_LISTS = (
     "body_contains",
@@ -77,6 +92,8 @@ _BOOLEANS = (
 _ADDRESS_LISTS = ("from_addresses", "sent_to_addresses")
 
 _SDK_ONLY = frozenset({"backing_store", "additional_data", "odata_type"})
+
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
 
 
 def _recipient(address: str | None, *, name: str | None = None) -> Recipient:
@@ -355,6 +372,66 @@ class TestAnInboxRule:
         with pytest.raises(AssertionError, match="no id"):
             _ = InboxRule.from_rule(MessageRule())
 
+    def test_every_action_the_rule_has_is_reported_in_its_own_field(self) -> None:
+        rule = InboxRule.from_rule(
+            MessageRule(
+                id=_RULE_ID,
+                actions=MessageRuleActions(
+                    assign_categories=["Partner", "Urgent"],
+                    copy_to_folder=_COPIED_INTO,
+                    delete=True,
+                    forward_as_attachment_to=[_recipient(_ADA)],
+                    forward_to=[_recipient(_DANA)],
+                    mark_as_read=True,
+                    mark_importance=Importance.High,
+                    move_to_folder=_MOVED_INTO,
+                    permanent_delete=True,
+                    redirect_to=[_recipient(_ERIN)],
+                    stop_processing_rules=True,
+                ),
+            )
+        )
+
+        assert rule.assigns_categories == ["Partner", "Urgent"]
+        assert rule.copies_to_folder == _COPIED_INTO
+        assert rule.deletes is True
+        assert rule.forward_as_attachment_to == [_ADA]
+        assert rule.forwards_to == [_DANA]
+        assert rule.marks_as_read is True
+        assert rule.marks_importance == "high"
+        assert rule.moves_to_folder == _MOVED_INTO
+        assert rule.permanently_deletes is True
+        assert rule.redirects_to == [_ERIN]
+        assert rule.stops_processing_more_rules is True
+
+    def test_a_delete_to_deleted_items_is_not_a_permanent_erase(self) -> None:
+        rule = InboxRule.from_rule(
+            MessageRule(
+                id=_RULE_ID, actions=MessageRuleActions(delete=True, permanent_delete=False)
+            )
+        )
+
+        assert rule.deletes is True
+        assert rule.permanently_deletes is False
+
+    def test_a_rule_with_no_actions_reports_every_action_as_unset(self) -> None:
+        rule = InboxRule.from_rule(MessageRule(id=_RULE_ID))
+
+        assert rule.assigns_categories == []
+        assert rule.copies_to_folder is None
+        assert rule.marks_importance is None
+        assert rule.permanently_deletes is None
+
+    def test_a_rule_whose_actions_set_nothing_reports_every_action_as_unset(self) -> None:
+        rule = InboxRule.from_rule(
+            MessageRule(id=_RULE_ID, actions=MessageRuleActions(assign_categories=[]))
+        )
+
+        assert rule.assigns_categories == []
+        assert rule.copies_to_folder is None
+        assert rule.marks_importance is None
+        assert rule.permanently_deletes is None
+
     def test_a_rule_handle_names_the_tools_that_change_delete_and_turn_off_the_rule(self) -> None:
         described = InboxRule.model_fields["uri"].description
 
@@ -365,11 +442,6 @@ class TestAnInboxRule:
         assert "no tool here can change" not in described
         assert "Pass it as `rule_ref`" in described
 
-
-_ADA = "ada@example.invalid"
-_DANA = "dana@example.invalid"
-_ERIN = "erin@example.invalid"
-_TEAM = "team@example.invalid"
 
 _EVERY_CONDITION = RuleConditionsInput.model_validate(
     {
@@ -383,9 +455,6 @@ _EVERY_CONDITION = RuleConditionsInput.model_validate(
         "within_size_range": {"minimum_kb": 1, "maximum_kb": 2048},
     }
 )
-
-_MOVED_INTO = "AQMkADAwSYNTHETIC-moved"
-_COPIED_INTO = "AQMkADAwSYNTHETIC-copied"
 
 _EVERY_ACTION = RuleActionsInput(
     assign_categories=["Newsletters"],
@@ -426,6 +495,11 @@ class TestTheInputSpellsWhatTheAnswerReports:
         assert set(RuleActionsInput.model_fields) == set(RuleActions.model_fields) - {
             "permanent_delete"
         }
+
+    def test_the_actions_a_call_can_remove_are_exactly_the_actions_it_can_give(self) -> None:
+        assert set(get_args(cast("object", RuleActionName.__value__))) == set(
+            RuleActionsInput.model_fields
+        )
 
     def test_no_input_schema_has_a_property_that_erases_permanently(self) -> None:
         for model in (RuleActionsInput, RuleConditionsInput):
@@ -488,6 +562,117 @@ class TestTheActionsThatReachGraph:
     def test_an_actions_object_that_sets_something_says_so(self) -> None:
         assert RuleActionsInput().sets_nothing
         assert not RuleActionsInput(stop_processing_rules=True).sets_nothing
+
+    def test_an_actions_object_names_the_actions_it_sets(self) -> None:
+        given = RuleActionsInput(mark_as_read=True, forward_to=[_DANA])
+
+        assert given.names == {"mark_as_read", "forward_to"}
+        assert RuleActionsInput().names == frozenset()
+
+
+_EVERY_KEPT_ACTION = MessageRuleActions(
+    assign_categories=["Partner"],
+    copy_to_folder=_COPIED_INTO,
+    delete=True,
+    forward_as_attachment_to=[_recipient(_ADA)],
+    forward_to=[_recipient(_DANA, name="Dana")],
+    mark_as_read=True,
+    mark_importance=Importance.High,
+    move_to_folder=_MOVED_INTO,
+    redirect_to=[_recipient(_ERIN)],
+    stop_processing_rules=True,
+)
+
+
+class TestMergingActions:
+    def test_no_given_action_and_no_removal_keep_every_current_action(self) -> None:
+        merged = merged_actions(_EVERY_KEPT_ACTION, MessageRuleActions(), [])
+
+        assert actions_of(merged) == actions_of(_EVERY_KEPT_ACTION)
+
+    def test_a_kept_recipient_goes_back_with_the_name_that_graph_gave_it(self) -> None:
+        merged = merged_actions(_EVERY_KEPT_ACTION, MessageRuleActions(), [])
+
+        assert merged.forward_to is not None
+        email = merged.forward_to[0].email_address
+        assert email is not None
+        assert (email.address, email.name) == (_DANA, "Dana")
+
+    def test_a_given_action_replaces_the_same_action_and_keeps_the_others(self) -> None:
+        given = actions_for(RuleActionsInput(mark_importance="low", forward_to=[_TEAM]), _FOLDERS)
+
+        reported = actions_of(merged_actions(_EVERY_KEPT_ACTION, given, []))
+
+        assert reported is not None
+        assert reported.mark_importance == "low"
+        assert reported.forward_to == [_TEAM]
+        assert reported.assign_categories == ["Partner"]
+        assert reported.redirect_to == [_ERIN]
+        assert reported.move_to_folder == _MOVED_INTO
+
+    def test_a_given_folder_id_replaces_the_kept_one_and_a_kept_one_is_not_read(self) -> None:
+        given = MessageRuleActions(move_to_folder="AQMkADAwSYNTHETIC-new")
+
+        merged = merged_actions(_EVERY_KEPT_ACTION, given, [])
+
+        assert merged.move_to_folder == "AQMkADAwSYNTHETIC-new"
+        assert merged.copy_to_folder == _COPIED_INTO
+
+    @pytest.mark.parametrize("name", sorted(RuleActionsInput.model_fields))
+    def test_each_action_can_be_removed_by_its_own_name(self, name: str) -> None:
+        merged = merged_actions(
+            _EVERY_KEPT_ACTION, MessageRuleActions(), [cast("RuleActionName", name)]
+        )
+
+        reported = actions_of(merged)
+        assert reported is not None
+        assert name not in reported.model_dump()
+        assert len(reported.model_dump()) == len(RuleActionsInput.model_fields) - 1
+
+    def test_removed_names_leave_the_other_actions_in_place(self) -> None:
+        merged = merged_actions(
+            MessageRuleActions(forward_to=[_recipient(_DANA)], mark_as_read=True),
+            MessageRuleActions(),
+            ["forward_to", "delete"],
+        )
+
+        assert actions_of(merged) == RuleActions(mark_as_read=True)
+
+    def test_no_current_actions_give_exactly_the_given_ones(self) -> None:
+        given = MessageRuleActions(mark_as_read=True)
+
+        assert actions_of(merged_actions(None, given, [])) == RuleActions(mark_as_read=True)
+
+    def test_a_flag_set_to_false_and_an_empty_list_are_not_kept(self) -> None:
+        current = MessageRuleActions(
+            delete=False, mark_as_read=False, stop_processing_rules=False, assign_categories=[]
+        )
+
+        merged = merged_actions(current, MessageRuleActions(), [])
+
+        assert merged.delete is None
+        assert merged.mark_as_read is None
+        assert merged.stop_processing_rules is None
+        assert merged.assign_categories is None
+        assert actions_of(merged) is None
+
+    def test_a_permanent_erase_is_never_carried_into_a_merged_set(self) -> None:
+        current = MessageRuleActions(permanent_delete=True, mark_as_read=True)
+
+        merged = merged_actions(current, MessageRuleActions(), [])
+
+        assert merged.permanent_delete is None
+
+    def test_the_arguments_are_left_as_they_were(self) -> None:
+        current = MessageRuleActions(forward_to=[_recipient(_DANA)], mark_as_read=True)
+        given = MessageRuleActions(mark_importance=Importance.Low)
+
+        _ = merged_actions(current, given, ["forward_to"])
+
+        assert current.forward_to is not None
+        assert current.mark_as_read is True
+        assert given.forward_to is None
+        assert given.mark_as_read is None
 
 
 class TestTheActionsThatAreReported:
@@ -613,6 +798,48 @@ class TestTheQuestionAboutMailThatLeaves:
         assert "it acts on every incoming message" in question
 
 
+class TestTheRefusalTexts:
+    @pytest.mark.parametrize(
+        "text",
+        [NOT_A_RULE_FOLDER, HIDDEN_RULE_FOLDER, READ_ONLY_RULE],
+        ids=["folder", "hidden", "ro"],
+    )
+    def test_a_refusal_that_retrying_cannot_fix_ends_with_the_one_retry_sentence(
+        self, text: str
+    ) -> None:
+        assert text.endswith(_RETRY)
+        assert text.count("If you call this tool again") == 1
+
+    @pytest.mark.parametrize(
+        ("text", "tool"),
+        [
+            (NOT_A_RULE_FOLDER, "outlook_browse_folders"),
+            (HIDDEN_RULE_FOLDER, "outlook_browse_folders"),
+            (not_one_address(["Dana Swope"]), "outlook_find_recipient"),
+            (
+                RuleActionsInput.model_fields["move_to_folder"].description or "",
+                "outlook_browse_folders",
+            ),
+        ],
+        ids=["folder", "hidden", "address", "move-field"],
+    )
+    def test_a_tool_the_rule_presets_may_lack_is_named_only_behind_a_deployment_guard(
+        self, text: str, tool: str
+    ) -> None:
+        assert tool in text
+        assert text.count(tool) == text.count(f"If this deployment exposes {tool}")
+
+    def test_the_folder_refusal_still_names_the_well_known_folders_that_work_everywhere(
+        self,
+    ) -> None:
+        for name in ("inbox", "sentitems", "drafts", "archive", "deleteditems", "junkemail"):
+            assert f"`{name}`" in NOT_A_RULE_FOLDER
+
+    def test_a_rule_with_no_action_left_asks_for_an_action_in_actions(self) -> None:
+        assert NO_RULE_ACTION.startswith("This call gives the rule no action.")
+        assert "Give at least one action in `actions`" in NO_RULE_ACTION
+
+
 class TestTheAgreementBinding:
     def test_the_same_parts_give_the_same_id(self) -> None:
         first = rule_confirmation_id("tool", 1, True, _EVERY_ACTION, None)
@@ -630,6 +857,16 @@ class TestTheAgreementBinding:
         }
 
         assert len(bound) == 5
+
+    def test_a_list_of_names_is_one_part_of_the_id(self) -> None:
+        bound = {
+            rule_confirmation_id("tool", []),
+            rule_confirmation_id("tool", ["forward_to"]),
+            rule_confirmation_id("tool", ["forward_to", "delete"]),
+            rule_confirmation_id("tool", ["forward_to"], ["delete"]),
+        }
+
+        assert len(bound) == 4
 
     def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:
         canonical = json.dumps(["tool", {"mark_as_read": True}], sort_keys=True)

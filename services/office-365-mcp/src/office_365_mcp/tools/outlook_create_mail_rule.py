@@ -53,9 +53,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return the folder that `move_to_folder` or `copy_to_folder` names, and "
-    + "no rule was created. A person probably deleted or moved the folder. Call "
-    + "outlook_browse_folders again. Then use the `uri` that it reports now. If you call this tool "
-    + "again with the same arguments, the call will fail the same way."
+    + "no rule was created. A person probably deleted or moved the folder. If this deployment "
+    + "exposes outlook_browse_folders, call it again. Then use the `uri` that it reports now. If "
+    + "you call this tool again with the same arguments, the call will fail the same way."
 )
 
 _AGREE = "create the rule"
@@ -179,8 +179,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "What the rule does to each matching message. Give at least one action. A "
-                    + "rule can move, copy, mark as read, set the importance, categorize, delete "
-                    + "to Deleted Items, forward, or redirect a message."
+                    + "rule can move, copy, mark as read, set the importance, categorize, "
+                    + "forward, or redirect a message. It can also delete a message to Deleted "
+                    + "Items."
                 )
             ),
         ],

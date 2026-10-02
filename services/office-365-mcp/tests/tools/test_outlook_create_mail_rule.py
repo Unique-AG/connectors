@@ -47,6 +47,8 @@ _TEAM = "team@example.invalid"
 
 _NOTHING_CREATED = "No rule was created."
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 _MARK_READ = RuleActionsInput(mark_as_read=True)
 _FORWARDS = RuleActionsInput(forward_to=[_DANA], stop_processing_rules=True)
 _NEWSLETTERS = RuleConditionsInput(sender_contains=["newsletter"])
@@ -384,13 +386,13 @@ class TestWhatItRefuses:
             _ = await _create(client, conditions=conditions, exceptions=exceptions, actions=actions)
 
         assert str(raised.value).startswith(_NOTHING_CREATED)
-        assert "outlook_find_recipient" in str(raised.value)
+        assert "If this deployment exposes outlook_find_recipient, use it" in str(raised.value)
         assert len(graph.calls) == 0
 
     async def test_actions_that_set_nothing_never_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(ToolError, match="`actions` sets no action") as raised:
+        with pytest.raises(ToolError, match="gives the rule no action") as raised:
             _ = await _create(client, actions=RuleActionsInput())
 
         assert str(raised.value).startswith(_NOTHING_CREATED)
@@ -403,10 +405,13 @@ class TestWhatItRefuses:
     async def test_a_folder_that_is_neither_a_handle_nor_a_well_known_name_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, ref: str
     ) -> None:
-        with pytest.raises(ToolError, match="outlook_browse_folders") as raised:
+        with pytest.raises(
+            ToolError, match="If this deployment exposes outlook_browse_folders"
+        ) as raised:
             _ = await _create(client, actions=RuleActionsInput(move_to_folder=ref))
 
         assert str(raised.value).startswith(_NOTHING_CREATED)
+        assert str(raised.value).endswith(_RETRY)
         assert len(graph.calls) == 0
 
     async def test_a_hidden_folder_is_refused_after_its_read_and_before_anybody_is_asked(
@@ -713,7 +718,9 @@ class TestHowItDeclaresItself:
 
     def test_the_not_found_advice_says_no_rule_was_created(self) -> None:
         assert "no rule was created" in creator.GRAPH_NOT_FOUND
-        assert "outlook_browse_folders" in creator.GRAPH_NOT_FOUND
+        assert "If this deployment exposes outlook_browse_folders" in creator.GRAPH_NOT_FOUND
+        assert creator.GRAPH_NOT_FOUND.count("outlook_browse_folders") == 1
+        assert creator.GRAPH_NOT_FOUND.endswith(_RETRY)
 
     async def test_the_call_example_is_accepted_by_the_schema(
         self, transport: httpx.AsyncClient

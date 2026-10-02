@@ -1,6 +1,6 @@
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self, cast, get_args
 
@@ -73,31 +73,46 @@ type RuleActionFlag = Literal[
     "replyToAll",
     "review",
 ]
+type RuleActionName = Literal[
+    "assign_categories",
+    "copy_to_folder",
+    "delete",
+    "forward_as_attachment_to",
+    "forward_to",
+    "mark_as_read",
+    "mark_importance",
+    "move_to_folder",
+    "redirect_to",
+    "stop_processing_rules",
+]
 
 NOT_A_RULE_FOLDER = (
-    "`move_to_folder` and `copy_to_folder` take a folder handle, outlook:///folders/{id}, exactly "
-    + "as outlook_browse_folders reported it in `uri`. They also take a well-known folder name: "
-    + "`inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, or `clutter`. The "
-    + "name of a folder that the user sees is not a handle. If you call this tool again with this "
-    + "value, the call will fail the same way."
+    "`move_to_folder` and `copy_to_folder` take a well-known folder name: `inbox`, `sentitems`, "
+    + "`drafts`, `archive`, `deleteditems`, `junkemail`, or `clutter`. If this deployment exposes "
+    + "outlook_browse_folders, they also take a folder handle, outlook:///folders/{id}, exactly "
+    + "as that tool reported it in `uri`. The name of a folder that the user sees is not a "
+    + "handle. If you call this tool again with the same arguments, the call will fail the same "
+    + "way."
 )
 
 HIDDEN_RULE_FOLDER = (
     "That folder is hidden from the user in Outlook. A rule that moves or copies mail into it "
-    + "hides that mail from the user. Use a folder that the user can see. outlook_browse_folders "
-    + "lists them. If you call this tool again with this folder, the call will fail the same way."
+    + "hides that mail from the user. Use a folder that the user can see. If this deployment "
+    + "exposes outlook_browse_folders, that tool lists them. If you call this tool again with the "
+    + "same arguments, the call will fail the same way."
 )
 
 NO_RULE_ACTION = (
-    "`actions` sets no action. A rule must do at least one thing to each matching message, for "
-    + "example `move_to_folder` or `mark_as_read`. Give at least one action and call again."
+    "This call gives the rule no action. A rule must do at least one thing to each matching "
+    + "message, for example `move_to_folder` or `mark_as_read`. Give at least one action in "
+    + "`actions` and call again."
 )
 
 READ_ONLY_RULE = (
     "Microsoft 365 marks this rule as read-only. The rules API cannot change or delete a "
     + "read-only rule. A read-only rule still runs. Tell the user that this connector cannot "
-    + "change or delete this rule. If you call this tool again with this handle, the call will "
-    + "fail the same way."
+    + "change or delete this rule. If you call this tool again with the same arguments, the call "
+    + "will fail the same way."
 )
 
 
@@ -105,9 +120,9 @@ def not_one_address(entries: Sequence[str]) -> str:
     listed = ", ".join(repr(entry) for entry in entries)
     return (
         "Each address in a rule must be one SMTP address, for example `ada@example.com`, and not "
-        + f"a display name. These entries are not one address: {listed}. Use "
-        + "outlook_find_recipient to find the address for a name that the user gave. Then call "
-        + "again with that address."
+        + f"a display name. These entries are not one address: {listed}. If this deployment "
+        + "exposes outlook_find_recipient, use it to find the address for a name that the user "
+        + "gave. Then call again with that address."
     )
 
 
@@ -155,8 +170,8 @@ class RuleConditions(BaseModel):
         default=None,
         exclude_if=_unset,
         description=(
-            "The strings that the condition or the exception looks for in the body or in the "
-            + "subject of an incoming message."
+            "The strings that the condition or the exception looks for in the body or subject of "
+            + "an incoming message."
         ),
     )
     categories: list[str] | None = Field(
@@ -302,16 +317,16 @@ class RuleConditions(BaseModel):
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must not be a recipient of an incoming message for the "
-            + "condition or the exception to apply."
+            "True when the mailbox owner must not be a recipient of an incoming message. The "
+            + "condition or the exception applies only then."
         ),
     )
     recipient_contains: list[str] | None = Field(
         default=None,
         exclude_if=_unset,
         description=(
-            "The strings that the condition or the exception looks for in the To recipients or "
-            + "in the Cc recipients of an incoming message."
+            "The strings that the condition or the exception looks for in the To or Cc "
+            + "recipients of an incoming message."
         ),
     )
     sender_contains: list[str] | None = Field(
@@ -327,23 +342,24 @@ class RuleConditions(BaseModel):
         exclude_if=_unset,
         description=(
             "The sensitivity that an incoming message must carry for the condition or the "
-            + "exception to apply: `normal`, `personal`, `private`, or `confidential`."
+            + "exception to apply. The values are `normal`, `personal`, `private`, and "
+            + "`confidential`."
         ),
     )
     sent_cc_me: bool | None = Field(
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must be in the Cc recipients of an incoming message for "
-            + "the condition or the exception to apply."
+            "True when the mailbox owner must be in the Cc recipients of an incoming message. "
+            + "The condition or the exception applies only then."
         ),
     )
     sent_only_to_me: bool | None = Field(
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must be the only recipient of an incoming message for "
-            + "the condition or the exception to apply."
+            "True when the mailbox owner must be the only recipient of an incoming message. The "
+            + "condition or the exception applies only then."
         ),
     )
     sent_to_addresses: list[str] | None = Field(
@@ -359,16 +375,16 @@ class RuleConditions(BaseModel):
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must be in the To recipients of an incoming message for "
-            + "the condition or the exception to apply."
+            "True when the mailbox owner must be in the To recipients of an incoming message. "
+            + "The condition or the exception applies only then."
         ),
     )
     sent_to_or_cc_me: bool | None = Field(
         default=None,
         exclude_if=_unset,
         description=(
-            "True when the mailbox owner must be a To or Cc recipient of an incoming message for "
-            + "the condition or the exception to apply."
+            "True when the mailbox owner must be a To or Cc recipient of an incoming message. "
+            + "The condition or the exception applies only then."
         ),
     )
     subject_contains: list[str] | None = Field(
@@ -383,7 +399,7 @@ class RuleConditions(BaseModel):
         default=None,
         exclude_if=_unset,
         description=(
-            "The range of sizes, in kilobytes, that an incoming message must fall in for the "
+            "The size range, in kilobytes, that an incoming message must fall in for the "
             + "condition or the exception to apply."
         ),
     )
@@ -495,10 +511,34 @@ class InboxRule(BaseModel):
             + "when the rule does not move mail."
         )
     )
+    copies_to_folder: str | None = Field(
+        description=(
+            "The Graph id of the folder in which this rule puts a copy of each matching message. "
+            + "Null when the rule copies no mail."
+        )
+    )
     deletes: bool | None = Field(
         description=(
             "True when the rule deletes each matching message, permanently or to Deleted Items. "
             + "Null when Graph reports no delete action."
+        )
+    )
+    permanently_deletes: bool | None = Field(
+        description=(
+            "True when the rule erases each matching message permanently, without Deleted Items. "
+            + "Null when Graph reports no such action."
+        )
+    )
+    assigns_categories: list[str] = Field(
+        description=(
+            "The names of the categories that this rule puts on each matching message. Empty "
+            + "when the rule has no such action."
+        )
+    )
+    marks_importance: str | None = Field(
+        description=(
+            "The importance that this rule sets on each matching message: `low`, `normal`, or "
+            + "`high`. Null when the rule sets no importance."
         )
     )
     marks_as_read: bool | None = Field(
@@ -533,7 +573,11 @@ class InboxRule(BaseModel):
                 None if actions is None else actions.forward_as_attachment_to
             ),
             moves_to_folder=None if actions is None else actions.move_to_folder,
+            copies_to_folder=None if actions is None else actions.copy_to_folder,
             deletes=_deletes(actions),
+            permanently_deletes=None if actions is None else actions.permanent_delete,
+            assigns_categories=[] if actions is None else actions.assign_categories or [],
+            marks_importance=None if actions is None else spelled(actions.mark_importance),
             marks_as_read=None if actions is None else actions.mark_as_read,
             stops_processing_more_rules=(
                 None if actions is None else actions.stop_processing_rules
@@ -697,8 +741,8 @@ class RuleConditionsInput(BaseModel):
         default=None,
         min_length=1,
         description=(
-            "The strings that must appear in the body or in the subject of an incoming message "
-            + "for the condition or the exception to apply. Omit it when neither matters."
+            "The strings that must appear in the body or subject of an incoming message. The "
+            + "condition or the exception applies only then. Omit it when neither matters."
         ),
     )
     categories: list[Annotated[str, Field(min_length=1)]] | None = Field(
@@ -829,24 +873,25 @@ class RuleConditionsInput(BaseModel):
     not_sent_to_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must not be a recipient of an incoming message for "
-            + "the condition or the exception to apply. Omit it otherwise."
+            "Set true when the mailbox owner must not be a recipient of an incoming message. The "
+            + "condition or the exception applies only then. Omit it otherwise."
         ),
     )
     recipient_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
         default=None,
         min_length=1,
         description=(
-            "The strings that must appear in the To or Cc recipients of an incoming message for "
-            + "the condition or the exception to apply."
+            "The strings that must appear in the To or Cc recipients of an incoming message. The "
+            + "condition or the exception applies only then."
         ),
     )
     sender_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
         default=None,
         min_length=1,
         description=(
-            "The strings that must appear in the sender (`from`) of an incoming message for the "
-            + "condition or the exception to apply. Use it for a part of an address or a name."
+            "The strings that must appear in the sender (`from`) of an incoming message. The "
+            + "condition or the exception applies only then. Use it for a part of an address or a "
+            + "name."
         ),
     )
     sensitivity: RuleSensitivity | None = Field(
@@ -859,38 +904,38 @@ class RuleConditionsInput(BaseModel):
     sent_cc_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must be in the Cc recipients of an incoming message "
-            + "for the condition or the exception to apply. Omit it otherwise."
+            "Set true when the mailbox owner must be in the Cc recipients of an incoming message. "
+            + "The condition or the exception applies only then. Omit it otherwise."
         ),
     )
     sent_only_to_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must be the only recipient of an incoming message for "
-            + "the condition or the exception to apply. Omit it otherwise."
+            "Set true when the mailbox owner must be the only recipient of an incoming message. "
+            + "The condition or the exception applies only then. Omit it otherwise."
         ),
     )
     sent_to_addresses: list[str] | None = Field(
         default=None,
         min_length=1,
         description=(
-            "The SMTP addresses to which an incoming message must be sent for the condition or the "
-            + "exception to apply, for example `team@example.com`. Omit it when the recipients do "
-            + "not matter."
+            "The SMTP addresses to which an incoming message must be sent, for example "
+            + "`team@example.com`. The condition or the exception applies only then. Omit it when "
+            + "the recipients do not matter."
         ),
     )
     sent_to_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must be in the To recipients of an incoming message "
-            + "for the condition or the exception to apply. Omit it otherwise."
+            "Set true when the mailbox owner must be in the To recipients of an incoming message. "
+            + "The condition or the exception applies only then. Omit it otherwise."
         ),
     )
     sent_to_or_cc_me: Literal[True] | None = Field(
         default=None,
         description=(
-            "Set true when the mailbox owner must be a To or Cc recipient of an incoming message "
-            + "for the condition or the exception to apply."
+            "Set true when the mailbox owner must be a To or Cc recipient of an incoming message. "
+            + "The condition or the exception applies only then. Omit it otherwise."
         ),
     )
     subject_contains: list[Annotated[str, Field(min_length=1)]] | None = Field(
@@ -904,7 +949,7 @@ class RuleConditionsInput(BaseModel):
     within_size_range: SizeRangeKb | None = Field(
         default=None,
         description=(
-            "The range of sizes, in kilobytes, that an incoming message must fall in for the "
+            "The size range, in kilobytes, that an incoming message must fall in for the "
             + "condition or the exception to apply. Omit it when the size does not matter."
         ),
     )
@@ -925,7 +970,7 @@ class RuleActionsInput(BaseModel):
         min_length=1,
         description=(
             "The folder in which the rule puts a copy of each matching message. It takes the same "
-            + "values as `move_to_folder`: a folder handle, or a well-known folder name."
+            + "values as `move_to_folder`."
         ),
     )
     delete: Literal[True] | None = Field(
@@ -969,9 +1014,10 @@ class RuleActionsInput(BaseModel):
         default=None,
         min_length=1,
         description=(
-            "The folder to which the rule moves each matching message. Give the `uri` of an "
-            + "outlook_browse_folders row, or a well-known folder name: `inbox`, `sentitems`, "
-            + "`drafts`, `archive`, `deleteditems`, `junkemail`, or `clutter`."
+            "The folder to which the rule moves each matching message. Give a well-known folder "
+            + "name: `inbox`, `sentitems`, `drafts`, `archive`, `deleteditems`, `junkemail`, or "
+            + "`clutter`. If this deployment exposes outlook_browse_folders, you can also give "
+            + "the `uri` of a row of that tool."
         ),
     )
     redirect_to: list[str] | None = Field(
@@ -992,8 +1038,12 @@ class RuleActionsInput(BaseModel):
     )
 
     @property
+    def names(self) -> frozenset[str]:
+        return frozenset(self.model_dump(exclude_none=True))
+
+    @property
     def sets_nothing(self) -> bool:
-        return not self.model_dump(exclude_none=True)
+        return not self.names
 
 
 def predicates_for(conditions: RuleConditionsInput | None) -> MessageRulePredicates | None:
@@ -1064,6 +1114,38 @@ def actions_for(actions: RuleActionsInput, folders: RuleFolders) -> MessageRuleA
     )
 
 
+def merged_actions(
+    current: MessageRuleActions | None,
+    given: MessageRuleActions,
+    removed: Collection[RuleActionName],
+) -> MessageRuleActions:
+    kept = MessageRuleActions() if current is None else current
+
+    def pick[T](name: RuleActionName, new: T | None, old: T | None) -> T | None:
+        return None if name in removed else new or old or None
+
+    return MessageRuleActions(
+        assign_categories=pick(
+            "assign_categories", given.assign_categories, kept.assign_categories
+        ),
+        copy_to_folder=pick("copy_to_folder", given.copy_to_folder, kept.copy_to_folder),
+        delete=pick("delete", given.delete, kept.delete),
+        forward_as_attachment_to=pick(
+            "forward_as_attachment_to",
+            given.forward_as_attachment_to,
+            kept.forward_as_attachment_to,
+        ),
+        forward_to=pick("forward_to", given.forward_to, kept.forward_to),
+        mark_as_read=pick("mark_as_read", given.mark_as_read, kept.mark_as_read),
+        mark_importance=pick("mark_importance", given.mark_importance, kept.mark_importance),
+        move_to_folder=pick("move_to_folder", given.move_to_folder, kept.move_to_folder),
+        redirect_to=pick("redirect_to", given.redirect_to, kept.redirect_to),
+        stop_processing_rules=pick(
+            "stop_processing_rules", given.stop_processing_rules, kept.stop_processing_rules
+        ),
+    )
+
+
 def unusable_addresses(
     *parts: RuleConditionsInput | RuleActionsInput | None,
 ) -> list[str]:
@@ -1109,7 +1191,7 @@ def forwarding_question(
     )
 
 
-def rule_confirmation_id(*parts: BaseModel | str | int | bool | None) -> str:
+def rule_confirmation_id(*parts: BaseModel | str | int | bool | list[str] | None) -> str:
     canonical = [
         part.model_dump(mode="json", exclude_none=True) if isinstance(part, BaseModel) else part
         for part in parts

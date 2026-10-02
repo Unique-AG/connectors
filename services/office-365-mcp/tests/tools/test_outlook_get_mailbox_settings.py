@@ -21,6 +21,7 @@ _CATEGORIES = "/me/outlook/masterCategories"
 _RULE_ID = "AQAAAJSYNTHETIC-rule-one"
 _OTHER_RULE_ID = "AQAAAJSYNTHETIC-rule-two"
 _ARCHIVE_FOLDER_ID = "AQMkADAwSYNTHETIC-archive"
+_COPY_FOLDER_ID = "AQMkADAwSYNTHETIC-copy"
 
 _OUTSIDE = "collector@elsewhere.invalid"
 _INSIDE = "deputy@example.invalid"
@@ -372,6 +373,60 @@ class TestWhatARuleSays:
         assert rule[0].marks_as_read is True
         assert rule[0].stops_processing_more_rules is True
 
+    async def test_a_rule_that_categorizes_copies_and_sets_the_importance_reports_each_of_them(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(
+                    actions={
+                        "assignCategories": ["Partner", "Urgent"],
+                        "copyToFolder": _COPY_FOLDER_ID,
+                        "markImportance": "high",
+                        "moveToFolder": _ARCHIVE_FOLDER_ID,
+                    }
+                )
+            )
+        )
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].assigns_categories == ["Partner", "Urgent"]
+        assert rule[0].copies_to_folder == _COPY_FOLDER_ID
+        assert rule[0].marks_importance == "high"
+        assert rule[0].moves_to_folder == _ARCHIVE_FOLDER_ID
+        assert rule[0].permanently_deletes is None
+
+    @pytest.mark.parametrize("importance", ["low", "normal", "high"])
+    async def test_every_importance_a_rule_sets_is_reported_by_its_own_name(
+        self, client: GraphServiceClient, rules: respx.Route, importance: str
+    ) -> None:
+        rules.mock(return_value=_page(_rule_payload(actions={"markImportance": importance})))
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert rule[0].marks_importance == importance
+
+    async def test_a_permanent_erase_is_reported_apart_from_a_delete_to_deleted_items(
+        self, client: GraphServiceClient, rules: respx.Route
+    ) -> None:
+        rules.mock(
+            return_value=_page(
+                _rule_payload(actions={"delete": False, "permanentDelete": True}),
+                _rule_payload(_OTHER_RULE_ID, actions={"delete": True, "permanentDelete": False}),
+            )
+        )
+
+        rule = (await settings_tool.get_mailbox_settings(client, include="rules")).rules
+
+        assert rule is not None
+        assert [(row.deletes, row.permanently_deletes) for row in rule] == [
+            (True, True),
+            (True, False),
+        ]
+
     async def test_a_rule_that_permanently_deletes_is_reported_as_deleting(
         self, client: GraphServiceClient, rules: respx.Route
     ) -> None:
@@ -402,6 +457,9 @@ class TestWhatARuleSays:
         assert rule[0].marks_as_read is False
         assert rule[0].forwards_to == []
         assert rule[0].moves_to_folder is None
+        assert rule[0].assigns_categories == []
+        assert rule[0].copies_to_folder is None
+        assert rule[0].marks_importance is None
 
     async def test_a_rule_graph_reported_no_actions_for_is_still_listed(
         self, client: GraphServiceClient, rules: respx.Route
@@ -417,6 +475,10 @@ class TestWhatARuleSays:
         assert rule[0].stops_processing_more_rules is None
         assert rule[0].moves_to_folder is None
         assert rule[0].forwards_to == []
+        assert rule[0].assigns_categories == []
+        assert rule[0].copies_to_folder is None
+        assert rule[0].marks_importance is None
+        assert rule[0].permanently_deletes is None
 
     @pytest.mark.usefixtures("rules")
     async def test_a_mailbox_with_no_rules_answers_an_empty_list(

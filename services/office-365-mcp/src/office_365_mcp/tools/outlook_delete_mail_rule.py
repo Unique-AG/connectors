@@ -68,7 +68,7 @@ _NOT_A_RULE_HANDLE = (
     "outlook_delete_mail_rule takes a rule handle in `rule_ref`: outlook:///rules/{id}, exactly "
     + "as outlook_get_mailbox_settings reported it in `uri`. The name of a rule is not a handle. "
     + "A message handle and a folder handle are not rule handles. Nothing was deleted. If you "
-    + "call this tool again with this value, the call will fail the same way."
+    + "call this tool again with the same arguments, the call will fail the same way."
 )
 
 
@@ -106,8 +106,7 @@ class DeletedRule(BaseModel):
     deleted: Literal[True] = Field(
         description=(
             "Always true, because this tool answers only when the rule is gone. It is also true "
-            + "when the rule was there at the start of this call, but Graph then found no rule to "
-            + "delete."
+            + "when Graph found no rule to delete after this call read the rule."
         )
     )
 

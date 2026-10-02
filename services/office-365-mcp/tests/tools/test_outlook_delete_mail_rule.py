@@ -45,6 +45,8 @@ _DANA = "dana@example.invalid"
 
 _NOTHING_DELETED = "The rule was not deleted."
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 
 def _rule(
     *, display_name: str | None = "Partner mail", is_read_only: bool | None = False
@@ -213,6 +215,7 @@ class TestWhatItRefuses:
             _ = await _delete(client, rule_ref=not_a_rule, confirm=_never_asked)
 
         assert "Nothing was deleted." in str(raised.value)
+        assert str(raised.value).endswith(_RETRY)
         assert len(graph.calls) == 0
 
     async def test_a_read_only_rule_is_refused_unasked_and_never_deleted(
@@ -224,6 +227,7 @@ class TestWhatItRefuses:
             _ = await _delete(client, confirm=_never_asked)
 
         assert str(raised.value).startswith(_NOTHING_DELETED)
+        assert str(raised.value).endswith(_RETRY)
         assert delete.call_count == 0
 
 
@@ -409,6 +413,7 @@ class TestHowItDeclaresItself:
     def test_the_not_found_advice_says_nothing_was_deleted(self) -> None:
         assert "nothing was deleted" in deleter.GRAPH_NOT_FOUND
         assert "already gone" in deleter.GRAPH_NOT_FOUND
+        assert deleter.GRAPH_NOT_FOUND.endswith(_RETRY)
 
     async def test_it_takes_one_rule_handle(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)
