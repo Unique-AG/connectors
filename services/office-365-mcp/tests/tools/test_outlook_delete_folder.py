@@ -40,6 +40,27 @@ _FOLDER_ID = "AQMkADAwSYNTHETIC-folder-0001"
 _MOVED_ID = "AQMkADAwSYNTHETIC-folder-0001-moved"
 _INBOX_ID = "AQMkADAwSYNTHETIC-inbox"
 _DELETED_ITEMS_ID = "AQMkADAwSYNTHETIC-deleteditems"
+_ROOT_ID = "AQMkADAwSYNTHETIC-msgfolderroot"
+_SYNC_ISSUES_ID = "AQMkADAwSYNTHETIC-syncissues"
+_CONFLICTS_ID = "AQMkADAwSYNTHETIC-conflicts"
+_SENT_ITEMS_ID = "AQMkADAwSYNTHETIC-sentitems"
+
+_OUTLOOK_NAMES = (
+    "archive",
+    "clutter",
+    "conflicts",
+    "conversationhistory",
+    "drafts",
+    "inbox",
+    "junkemail",
+    "localfailures",
+    "outbox",
+    "recoverableitemsdeletions",
+    "scheduled",
+    "searchfolders",
+    "sentitems",
+    "serverfailures",
+)
 
 _FOLDER_REF = MailFolderHandle(_FOLDER_ID).uri
 
@@ -51,6 +72,17 @@ _SHARED = f"/users/{_MAILBOX}/mailFolders"
 _NAME = "Projects"
 
 _NOT_DELETED = "The folder was not deleted."
+
+
+@pytest.fixture(autouse=True)
+def no_well_known_folders(graph: respx.MockRouter) -> None:
+    for under in (_OWN, _SHARED):
+        for name in ("msgfolderroot", "syncissues", *_OUTLOOK_NAMES):
+            _ = graph.get(f"{under}/{name}").mock(
+                return_value=httpx.Response(
+                    404, json={"error": {"code": "ErrorItemNotFound", "message": "not found"}}
+                )
+            )
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -88,16 +120,17 @@ def _ready(
     graph: respx.MockRouter,
     *,
     under: str = _OWN,
+    at: str = _FOLDER_ID,
     folder: dict[str, object] | None = None,
     moved: dict[str, object] | None = None,
 ) -> respx.Route:
-    _ = graph.get(f"{under}/{_FOLDER_ID}").mock(
+    _ = graph.get(f"{under}/{at}").mock(
         return_value=httpx.Response(200, json=folder if folder is not None else _folder())
     )
     _ = graph.get(f"{under}/deleteditems").mock(
         return_value=httpx.Response(200, json={"id": _DELETED_ITEMS_ID})
     )
-    return graph.post(f"{under}/{_FOLDER_ID}/move").mock(
+    return graph.post(f"{under}/{at}/move").mock(
         return_value=httpx.Response(
             200,
             json=moved
@@ -107,12 +140,20 @@ def _ready(
     )
 
 
+def _exists(graph: respx.MockRouter, name: str, folder_id: str, *, under: str = _OWN) -> None:
+    _ = graph.get(f"{under}/{name}").mock(return_value=httpx.Response(200, json={"id": folder_id}))
+
+
 def _methods(graph: respx.MockRouter) -> list[str]:
     return [call.request.method for call in cast("Sequence[Call]", graph.calls)]
 
 
 def _requests(graph: respx.MockRouter) -> list[httpx.Request]:
     return [call.request for call in cast("Sequence[Call]", graph.calls)]
+
+
+def _read_names(graph: respx.MockRouter) -> list[str]:
+    return [request.url.path.rsplit("/", 1)[-1] for request in _requests(graph)]
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -140,14 +181,21 @@ async def _registered(transport: httpx.AsyncClient) -> FunctionTool:
 
 
 class TestWhatItSendsToGraph:
-    async def test_it_reads_the_folder_and_deleted_items_and_then_moves_the_folder(
+    async def test_it_reads_the_folder_deleted_items_and_the_two_parents_and_then_moves_the_folder(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         move = _ready(graph)
 
         _ = await _delete(client)
 
-        assert _methods(graph) == ["GET", "GET", "POST"]
+        assert _methods(graph) == ["GET", "GET", "GET", "GET", "POST"]
+        assert _read_names(graph) == [
+            _FOLDER_ID,
+            "deleteditems",
+            "msgfolderroot",
+            "syncissues",
+            "move",
+        ]
         assert _sent(move) == {"DestinationId": _DELETED_ITEMS_ID}
 
     async def test_the_reads_select_only_what_the_question_and_the_refusals_need(
@@ -157,7 +205,7 @@ class TestWhatItSendsToGraph:
 
         _ = await _delete(client)
 
-        folder, deleted_items, _move = _requests(graph)
+        folder, deleted_items, root, sync_issues, _move = _requests(graph)
         assert set(folder.url.params["$select"].split(",")) == {
             "displayName",
             "totalItemCount",
@@ -166,6 +214,10 @@ class TestWhatItSendsToGraph:
         }
         assert deleted_items.url.path.endswith("/me/mailFolders/deleteditems")
         assert deleted_items.url.params["$select"] == "id"
+        assert root.url.path.endswith("/me/mailFolders/msgfolderroot")
+        assert root.url.params["$select"] == "id"
+        assert sync_issues.url.path.endswith("/me/mailFolders/syncissues")
+        assert sync_issues.url.params["$select"] == "id"
 
     async def test_it_never_erases_the_folder(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -266,6 +318,87 @@ class TestWhatItRefuses:
         assert "Nothing was deleted." in str(raised.value)
         assert move.call_count == 0
 
+    @pytest.mark.parametrize("name", ["inbox", "SentItems", "msgfolderroot", "syncissues"])
+    async def test_a_well_known_name_in_a_handle_is_refused_before_any_call_to_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str
+    ) -> None:
+        with pytest.raises(ToolError, match=f"Outlook creates the folder '{name}'") as raised:
+            _ = await _delete(client, folder_ref=MailFolderHandle(name).uri, confirm=_never_asked)
+
+        assert "Nothing was deleted." in str(raised.value)
+        assert len(graph.calls) == 0
+
+    async def test_the_inbox_at_the_top_level_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        move = _ready(
+            graph, at=_INBOX_ID, folder=_folder(folder_id=_INBOX_ID, name="Inbox", parent=_ROOT_ID)
+        )
+        _exists(graph, "msgfolderroot", _ROOT_ID)
+        _exists(graph, "inbox", _INBOX_ID)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder 'Inbox'") as raised:
+            _ = await _delete(
+                client, folder_ref=MailFolderHandle(_INBOX_ID).uri, confirm=_never_asked
+            )
+
+        assert "This tool does not move it. Nothing was deleted." in str(raised.value)
+        assert str(raised.value).endswith(
+            "If you call this tool again with the same arguments, the call will fail the same way."
+        )
+        assert move.call_count == 0
+        assert _read_names(graph)[-1] == "inbox", "the reads went on after the id matched"
+
+    async def test_a_child_of_sync_issues_with_the_id_of_conflicts_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        move = _ready(
+            graph,
+            folder=_folder(folder_id=_CONFLICTS_ID, name="Conflicts", parent=_SYNC_ISSUES_ID),
+        )
+        _exists(graph, "syncissues", _SYNC_ISSUES_ID)
+        _exists(graph, "conflicts", _CONFLICTS_ID)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder 'Conflicts'"):
+            _ = await _delete(client, confirm=_never_asked)
+
+        assert move.call_count == 0
+
+    async def test_a_well_known_name_that_answers_not_found_is_skipped(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        move = _ready(
+            graph,
+            folder=_folder(folder_id=_SENT_ITEMS_ID, name="Sent Items", parent=_ROOT_ID),
+        )
+        _exists(graph, "msgfolderroot", _ROOT_ID)
+        _exists(graph, "sentitems", _SENT_ITEMS_ID)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder 'Sent Items'"):
+            _ = await _delete(client, confirm=_never_asked)
+
+        assert move.call_count == 0
+        read = _read_names(graph)
+        assert read[-1] == "sentitems"
+        assert "archive" in read, "a name that answered not found ended the reads"
+
+    @pytest.mark.parametrize(
+        ("name", "folder_id"),
+        [("msgfolderroot", _ROOT_ID), ("syncissues", _SYNC_ISSUES_ID)],
+    )
+    async def test_a_parent_folder_is_refused_after_the_two_parent_reads(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str, folder_id: str
+    ) -> None:
+        move = _ready(graph, folder=_folder(folder_id=folder_id, name=name, parent="above"))
+        _exists(graph, "msgfolderroot", _ROOT_ID)
+        _exists(graph, "syncissues", _SYNC_ISSUES_ID)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder"):
+            _ = await _delete(client, confirm=_never_asked)
+
+        assert move.call_count == 0
+        assert _methods(graph) == ["GET", "GET", "GET", "GET"]
+
     async def test_a_folder_deeper_inside_deleted_items_moves_to_its_top(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -274,6 +407,20 @@ class TestWhatItRefuses:
         _ = await _delete(client)
 
         assert move.call_count == 1
+
+    async def test_a_user_folder_called_inbox_at_the_top_level_is_moved_after_the_well_known_reads(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        move = _ready(graph, folder=_folder(name="Inbox", parent=_ROOT_ID))
+        _exists(graph, "msgfolderroot", _ROOT_ID)
+        for name in _OUTLOOK_NAMES:
+            _exists(graph, name, f"AQMkADAwSYNTHETIC-{name}")
+
+        _ = await _delete(client)
+
+        assert move.call_count == 1
+        read = _read_names(graph)[4:-1]
+        assert sorted(read) == sorted(_OUTLOOK_NAMES), "each documented name is read once"
 
 
 class TestWhatItAnswers:
@@ -398,7 +545,7 @@ class TestThePersonBeforeTheFolderMoves:
         question = await _asked(client, graph)
 
         assert question
-        assert _methods(graph) == ["GET", "GET", "POST"]
+        assert _methods(graph) == ["GET", "GET", "GET", "GET", "POST"]
 
     async def test_a_refusal_moves_nothing(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -668,6 +815,10 @@ class TestHowItDeclaresItself:
             description
         )
         assert "This tool refuses Deleted Items itself" in description
+        assert (
+            "It also refuses a folder that Outlook creates for every mailbox, such as Inbox."
+            in description
+        )
         assert "If a call times out, do not call this tool again first." in description
         assert "permanent" not in description.casefold()
 
