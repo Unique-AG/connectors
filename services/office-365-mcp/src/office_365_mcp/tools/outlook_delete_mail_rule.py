@@ -15,6 +15,7 @@ from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.rules import (
     READ_ONLY_RULE,
+    MailRule,
     RuleActions,
     RuleConditions,
     actions_of,
@@ -125,10 +126,10 @@ async def delete_mail_rule(
         if rule.is_read_only:
             refused = f"{_NOTHING_DELETED} {READ_ONLY_RULE}"
         if refused is None:
+            question = _question(handle, rule)
+            about = rule_confirmation_id(TOOL_NAME, handle.uri, question, MailRule.from_rule(rule))
             with not_graph():
-                answer = await confirm(
-                    _question(handle, rule), rule_confirmation_id(TOOL_NAME, handle.uri)
-                )
+                answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:

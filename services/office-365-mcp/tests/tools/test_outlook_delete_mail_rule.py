@@ -26,7 +26,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle
-from office_365_mcp.shared.rules import RULE_FIELDS, rule_confirmation_id
+from office_365_mcp.shared.rules import RULE_FIELDS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_mail_rule as deleter
 from office_365_mcp.tools.outlook_delete_mail_rule import (
@@ -49,7 +49,11 @@ _RETRY = "If you call this tool again with the same arguments, the call will fai
 
 
 def _rule(
-    *, display_name: str | None = "Partner mail", is_read_only: bool | None = False
+    *,
+    display_name: str | None = "Partner mail",
+    is_read_only: bool | None = False,
+    conditions: Mapping[str, object] | None = None,
+    actions: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "id": _RULE_ID,
@@ -58,9 +62,19 @@ def _rule(
         "isEnabled": True,
         "isReadOnly": is_read_only,
         "hasError": False,
-        "conditions": {"senderContains": ["partner"]},
-        "actions": {"forwardTo": [{"emailAddress": {"address": _DANA}}], "permanentDelete": True},
+        "conditions": dict(conditions or {"senderContains": ["partner"]}),
+        "actions": dict(
+            actions
+            or {"forwardTo": [{"emailAddress": {"address": _DANA}}], "permanentDelete": True}
+        ),
     }
+
+
+_CHANGED_BY_THEN = [
+    pytest.param(_rule(conditions={"senderContains": ["anyone"]}), id="other-conditions"),
+    pytest.param(_rule(actions={"markAsRead": True}), id="other-actions"),
+    pytest.param(_rule(display_name="Renamed"), id="other-name"),
+]
 
 
 def _reads(graph: respx.MockRouter, payload: Mapping[str, object] | None = None) -> respx.Route:
@@ -153,6 +167,12 @@ def _modern_context(
             )
 
     return cast("Context", cast("object", _Client()))
+
+
+def _agreeing(key: str, agree: str, state: str) -> Context:
+    return _modern_context(
+        answers={key: ElicitResult(action="accept", content={"value": agree})}, state=state
+    )
 
 
 def _the_question(answer: DeletedRule | InputRequiredResult) -> tuple[str, str, str, str]:
@@ -267,15 +287,31 @@ class TestThePersonBetweenTheRequestAndTheDelete:
         assert reads.call_count == 1
         assert delete.call_count == 0
 
-    async def test_the_agreement_is_bound_to_the_rule(
+    async def test_the_same_rule_read_twice_gives_the_same_agreement(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph)
+        asked, bound, capture = _capturing()
+
+        _ = await _delete(client, confirm=capture)
+        _ = await _delete(client, confirm=capture)
+
+        assert asked[0] == asked[1]
+        assert bound[0] == bound[1]
+
+    @pytest.mark.parametrize("changed", _CHANGED_BY_THEN)
+    async def test_the_agreement_is_bound_to_the_rule_as_it_was_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter, changed: dict[str, object]
+    ) -> None:
+        reads = _reads(graph)
+        _ = _deletes(graph)
         _asked, bound, capture = _capturing()
 
         _ = await _delete(client, confirm=capture)
+        _ = reads.mock(return_value=httpx.Response(200, json=changed))
+        _ = await _delete(client, confirm=capture)
 
-        assert bound == [rule_confirmation_id(deleter.TOOL_NAME, _RULE_REF)]
+        assert bound[0] != bound[1]
 
 
 class TestTheEraWithAHandshake:
@@ -332,18 +368,26 @@ class TestTheEraWithNoBackChannel:
             await _round(client, confirm=a_person_agrees(_modern_context()))
         )
 
-        answer = await _round(
-            client,
-            confirm=a_person_agrees(
-                _modern_context(
-                    answers={key: ElicitResult(action="accept", content={"value": agree})},
-                    state=state,
-                )
-            ),
-        )
+        answer = await _round(client, confirm=a_person_agrees(_agreeing(key, agree, state)))
 
         assert isinstance(answer, DeletedRule)
         assert delete.call_count == 1
+
+    @pytest.mark.parametrize("changed", _CHANGED_BY_THEN)
+    async def test_an_answer_to_a_rule_that_changed_by_then_deletes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, changed: dict[str, object]
+    ) -> None:
+        reads = _reads(graph)
+        delete = _deletes(graph)
+        key, state, agree, _message = _the_question(
+            await _round(client, confirm=a_person_agrees(_modern_context()))
+        )
+        _ = reads.mock(return_value=httpx.Response(200, json=changed))
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _round(client, confirm=a_person_agrees(_agreeing(key, agree, state)))
+
+        assert delete.call_count == 0
 
 
 class TestGraphFailures:
