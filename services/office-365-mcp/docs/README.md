@@ -11,14 +11,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 65 tools in total. A
-deployment turns on a fixed subset of these 65 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 67 tools in total. A
+deployment turns on a fixed subset of these 67 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 65 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 67 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -53,6 +53,8 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
 | `teams_send_chat_message` | Write, adds | `ChatMessage.Send` | No | Posts one message to an existing Teams chat, after the user approves it. The `message` text is plain text. The message can @mention people, can have a subject, and can have an importance of `normal`, `high`, or `urgent`. |
 | `teams_send_channel_message` | Write, adds | `ChannelMessage.Send` | No | Posts one message to an existing Teams channel, after the user approves it. The message can @mention people, can have a subject, and can have an importance of `normal` or `high`. With `reply_to_id`, the tool replies in the thread of an existing post. The tool refuses a `subject` together with `reply_to_id`. |
+| `teams_send_chat_message_with_files` | Write, adds | `ChatMessage.Send`, `Files.Read.All` | No | Posts one message to an existing Teams chat, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_chat_message` posts a message with no file. |
+| `teams_send_channel_message_with_files` | Write, adds | `ChannelMessage.Send`, `Files.Read.All` | No | Posts one message to an existing Teams channel, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_channel_message` posts a message with no file. |
 | `teams_react_to_message` | Write, changes or removes | `ChatMessage.Send`, `ChannelMessage.Send`, `Chat.Read`, `Channel.ReadBasic.All`, `Team.ReadBasic.All` | No | Adds or removes one reaction on one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of a chat message, or the channel and the team of a channel message. |
 
 ### Outlook mail
@@ -127,7 +129,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 22 named bundles in the table below.
+- **A preset.** One of the 23 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -140,7 +142,7 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 22 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 23 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
@@ -153,6 +155,7 @@ description.
 | `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
 | `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
 | `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members` | Finds a chat or a channel, and posts a new message to either. It also adds or removes a reaction, and lists the messages and members of a chat. |
+| `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach. |
 | `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_browse_folder`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
 | `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
@@ -235,7 +238,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 22 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 23 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.

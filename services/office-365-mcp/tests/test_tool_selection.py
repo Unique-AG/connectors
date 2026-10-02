@@ -257,6 +257,8 @@ _MENTION_SOURCES = (
     "teams_browse_channel",
 )
 
+_FILE_SOURCES = ("sharepoint_search_files", "sharepoint_browse_folder")
+
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_list_chat_messages": {"chat_id": ("teams_list_chats",)},
     "teams_list_chat_members": {"chat_id": ("teams_list_chats",)},
@@ -286,6 +288,17 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
         "user_id": _MENTION_SOURCES,
+    },
+    "teams_send_chat_message_with_files": {
+        "chat_id": ("teams_list_chats",),
+        "user_id": _MENTION_SOURCES,
+        "attachments": _FILE_SOURCES,
+    },
+    "teams_send_channel_message_with_files": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+        "user_id": _MENTION_SOURCES,
+        "attachments": _FILE_SOURCES,
     },
     "teams_react_to_message": {"uri": ("teams_list_chat_messages",)},
     "teams_search_messages": {"mentions": ("get_me",)},
@@ -383,6 +396,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "teams_send_chat_message": frozenset({"message", "name"}),
     "teams_send_channel_message": frozenset({"message", "name"}),
+    "teams_send_chat_message_with_files": frozenset({"message", "name"}),
+    "teams_send_channel_message_with_files": frozenset({"message", "name"}),
     "teams_react_to_message": frozenset({"reaction"}),
     "teams_search_messages": frozenset(
         {
@@ -687,6 +702,20 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ),
         0,
         9,
+    ),
+    (
+        ToolsPreset.TEAMS_WRITE_FILES,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Files.Read.All",
+        ),
+        1,
+        13,
     ),
     (
         ToolsPreset.TEAMS_FILES,

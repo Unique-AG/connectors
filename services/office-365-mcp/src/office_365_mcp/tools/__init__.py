@@ -71,7 +71,9 @@ from office_365_mcp.tools import (
     teams_read_transcript,
     teams_search_messages,
     teams_send_channel_message,
+    teams_send_channel_message_with_files,
     teams_send_chat_message,
+    teams_send_chat_message_with_files,
 )
 
 __all__ = [
@@ -132,6 +134,8 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     teams_read_message,
     teams_send_chat_message,
     teams_send_channel_message,
+    teams_send_chat_message_with_files,
+    teams_send_channel_message_with_files,
     teams_react_to_message,
     teams_list_meeting_transcripts,
     teams_read_transcript,
@@ -240,6 +244,20 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_chat_messages",
         "teams_react_to_message",
         "teams_list_chat_members",
+    ),
+    "teams-write-files": (
+        "teams_list_chats",
+        "teams_list_my_teams",
+        "teams_list_channels",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
+        "teams_list_chat_messages",
+        "teams_react_to_message",
+        "teams_list_chat_members",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
     ),
     "teams-files": (
         "teams_list_my_teams",

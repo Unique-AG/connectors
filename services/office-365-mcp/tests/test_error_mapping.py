@@ -88,13 +88,17 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_update_event",
         "teams_react_to_message",
         "teams_send_channel_message",
+        "teams_send_channel_message_with_files",
         "teams_send_chat_message",
+        "teams_send_chat_message_with_files",
     }
 )
 
 _CHANNEL_WRITES_IN_PRESETS_THAT_READ_NO_CHANNEL_ON_PURPOSE: frozenset[tuple[str, str]] = frozenset(
     {
         ("teams-write", "teams_send_channel_message"),
+        ("teams-write-files", "teams_send_channel_message"),
+        ("teams-write-files", "teams_send_channel_message_with_files"),
     }
 )
 

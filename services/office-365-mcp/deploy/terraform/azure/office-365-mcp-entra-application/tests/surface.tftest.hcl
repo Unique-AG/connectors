@@ -202,6 +202,27 @@ run "preset_teams_write" {
   }
 }
 
+run "preset_teams_write_files" {
+  variables {
+    tools_preset = "teams-write-files"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChatMessage.Send,ChannelMessage.Send,Files.Read.All"
+    error_message = "teams-write-files composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "teams-write-files resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "teams-write-files costs an administrator only for Files.Read.All, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_files" {
   variables {
     tools_preset = "teams-files"

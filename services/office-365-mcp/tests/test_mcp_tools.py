@@ -648,6 +648,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "onenote_copy_notebook",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
         "teams_react_to_message",
     }
 )
