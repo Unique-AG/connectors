@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from hashlib import sha256
@@ -9,6 +9,7 @@ from urllib.parse import unquote, urlsplit
 from kiota_abstractions.base_request_builder import BaseRequestBuilder
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.method import Method
+from kiota_abstractions.request_information import RequestInformation
 from kiota_abstractions.serialization.parsable import Parsable
 from kiota_abstractions.serialization.parsable_factory import ParsableFactory
 from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
@@ -19,6 +20,7 @@ from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
+from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.section_group import SectionGroup
@@ -32,6 +34,9 @@ from msgraph.generated.users.item.onenote.notebooks.notebooks_request_builder im
 )
 from msgraph.generated.users.item.onenote.pages.item.onenote_page_item_request_builder import (
     OnenotePageItemRequestBuilder,
+)
+from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
+    onenote_patch_content_post_request_body as _post_request_body,
 )
 from msgraph.generated.users.item.onenote.section_groups.item import (
     section_group_item_request_builder,
@@ -48,6 +53,7 @@ from office_365_mcp.graph_client import (
     TypedQueryParameters,
     collect_pages,
     graph_step,
+    no_retry,
     request_with_query,
 )
 from office_365_mcp.shared.handles import (
@@ -134,6 +140,32 @@ async def get_with_query[M: Parsable](
     request.headers.try_add("Accept", "application/json")
     return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
         request, model, {"XXX": ODataError}
+    )
+
+
+async def patch_page(
+    client: GraphServiceClient,
+    handle: OnenotePageHandle,
+    commands: Sequence[OnenotePatchContentCommand],
+    *,
+    safe_to_repeat: bool,
+) -> None:
+    patch = (
+        onenote_root(client, handle.owner)
+        .pages.by_onenote_page_id(handle.page_id)
+        .onenote_patch_content
+    )
+    request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
+    request.headers.try_add("Accept", "application/json")
+    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        "application/json",
+        _post_request_body.OnenotePatchContentPostRequestBody(commands=list(commands)),
+    )
+    if not safe_to_repeat:
+        request.add_request_options(no_retry())
+    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
+        request, {"XXX": ODataError}
     )
 
 

@@ -1,7 +1,7 @@
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
-from typing import get_args
+from typing import cast, get_args
 from urllib.parse import unquote
 
 import httpx
@@ -14,6 +14,9 @@ from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_operation_error import OnenoteOperationError
 from msgraph.generated.models.onenote_page import OnenotePage
+from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
+from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
+from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.page_links import PageLinks
@@ -25,7 +28,12 @@ from msgraph.generated.users.item.onenote.sections.item import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel
 
-from office_365_mcp.graph_client import FetchedResponse, GraphNotFound
+from office_365_mcp.graph_client import (
+    FetchedResponse,
+    GraphNotFound,
+    GraphUnavailable,
+    graph_step,
+)
 from office_365_mcp.shared import notes
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
@@ -1069,6 +1077,96 @@ class TestGetWithQuery:
         )
 
         assert route.call_count == 1
+
+
+_APPEND_TO_BODY = OnenotePatchContentCommand(
+    target="body",
+    action=OnenotePatchActionType.Append,
+    position=OnenotePatchInsertPosition.After,
+    content="<p>Synthetic.</p>",
+)
+_REPLACE_TITLE = OnenotePatchContentCommand(
+    target="title", action=OnenotePatchActionType.Replace, content="Synthetic title"
+)
+_PATCH_PATH = f"/me/onenote/pages/{_PAGE_ID}/onenotePatchContent"
+
+
+class TestPatchPage:
+    @pytest.mark.parametrize(
+        ("owner", "root"),
+        [(None, "/me"), (_GROUP, f"/groups/{_GROUP_ID}"), (_SITE, f"/sites/{_SITE_ID}")],
+        ids=["me", "group", "site"],
+    )
+    async def test_it_posts_the_commands_once_under_the_owner_of_the_handle(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        owner: OnenoteOwner | None,
+        root: str,
+    ) -> None:
+        route = graph.post(f"{root}/onenote/pages/{_PAGE_ID}/onenotePatchContent").mock(
+            return_value=httpx.Response(204)
+        )
+
+        await notes.patch_page(
+            client, OnenotePageHandle(_PAGE_ID, owner=owner), [_APPEND_TO_BODY], safe_to_repeat=True
+        )
+
+        assert route.call_count == 1
+        request = route.calls.last.request
+        assert request.headers["Accept"] == "application/json"
+        assert json.loads(request.content) == {
+            "commands": [
+                {
+                    "target": "body",
+                    "action": "Append",
+                    "position": "After",
+                    "content": "<p>Synthetic.</p>",
+                }
+            ]
+        }
+
+    async def test_it_sends_a_sequence_of_commands_in_the_order_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(204))
+
+        await notes.patch_page(
+            client,
+            OnenotePageHandle(_PAGE_ID),
+            (_REPLACE_TITLE, _APPEND_TO_BODY),
+            safe_to_repeat=True,
+        )
+
+        sent = cast(
+            "list[dict[str, object]]", json.loads(route.calls.last.request.content)["commands"]
+        )
+        assert [command["target"] for command in sent] == ["title", "body"]
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_patch_that_is_not_safe_to_repeat_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable), graph_step("patch_page"):
+            await notes.patch_page(
+                client, OnenotePageHandle(_PAGE_ID), [_APPEND_TO_BODY], safe_to_repeat=False
+            )
+
+        assert route.call_count == 1
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_patch_that_is_safe_to_repeat_is_sent_again_after_a_503(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(side_effect=[httpx.Response(503), httpx.Response(204)])
+
+        await notes.patch_page(
+            client, OnenotePageHandle(_PAGE_ID), [_REPLACE_TITLE], safe_to_repeat=True
+        )
+
+        assert route.call_count == 2
 
 
 _RESULT_PAGE_ID = "0-55555555-5555-4555-8555-555555555555!101-66666666-6666-4666-8666-666666666666"

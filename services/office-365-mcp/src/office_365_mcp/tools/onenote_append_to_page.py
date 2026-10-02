@@ -4,28 +4,22 @@ from typing import Annotated
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.method import Method
-from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
-from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
-    onenote_patch_content_post_request_body as _post_request_body,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     PageSummary,
-    onenote_root,
     page_for_a_question,
     page_summary,
+    patch_page,
     write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
@@ -167,22 +161,7 @@ async def _append(client: GraphServiceClient, handle: OnenotePageHandle, *, body
         position=OnenotePatchInsertPosition.After,
         content=body_html,
     )
-    patch = (
-        onenote_root(client, handle.owner)
-        .pages.by_onenote_page_id(handle.page_id)
-        .onenote_patch_content
-    )
-    request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
-    request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
-        "application/json",
-        _post_request_body.OnenotePatchContentPostRequestBody(commands=[command]),
-    )
-    request.add_request_options(no_retry())
-    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
-        request, {"XXX": ODataError}
-    )
+    await patch_page(client, handle, [command], safe_to_repeat=False)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

@@ -5,28 +5,22 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.method import Method
-from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
-from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
-    onenote_patch_content_post_request_body as _post_request_body,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     NotebookAudience,
     PageSummary,
-    onenote_root,
     page_for_a_question,
     page_summary,
+    patch_page,
     write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
@@ -254,33 +248,16 @@ def a_person_agrees(ctx: Context) -> Confirm:
 async def _edit(
     client: GraphServiceClient, handle: OnenotePageHandle, commands: list[EditCommand]
 ) -> None:
-    body = _post_request_body.OnenotePatchContentPostRequestBody(
-        commands=[
-            OnenotePatchContentCommand(
-                target=command.target,
-                action=_ACTION_TYPES[command.action],
-                position=None if command.position is None else _POSITIONS[command.position],
-                content=command.content,
-            )
-            for command in commands
-        ]
-    )
-    patch = (
-        onenote_root(client, handle.owner)
-        .pages.by_onenote_page_id(handle.page_id)
-        .onenote_patch_content
-    )
-    request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
-    request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
-        "application/json",
-        body,
-    )
-    request.add_request_options(no_retry())
-    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
-        request, {"XXX": ODataError}
-    )
+    patch_commands = [
+        OnenotePatchContentCommand(
+            target=command.target,
+            action=_ACTION_TYPES[command.action],
+            position=None if command.position is None else _POSITIONS[command.position],
+            content=command.content,
+        )
+        for command in commands
+    ]
+    await patch_page(client, handle, patch_commands, safe_to_repeat=False)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
