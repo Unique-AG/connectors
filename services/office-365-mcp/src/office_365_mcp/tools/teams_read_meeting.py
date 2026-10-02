@@ -42,7 +42,7 @@ who attended the newest session and for how long. teams_list_meeting_transcripts
 tool for the words, and teams_list_meeting_recordings is the sibling tool for the recordings.
 
 Notes:
-- Only the meeting organizer can read attendance reports.
+- Microsoft Graph gives attendance reports to the meeting organizer only.
 - Read `status` before you decide: `not_ready` means wait, not "nobody attended".
 - This tool reads one page of records, of the newest report only. Calling it again returns the \
 same records.\

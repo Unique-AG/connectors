@@ -507,7 +507,9 @@ class TestHowItDeclaresItself:
             description
         )
         assert "\n\nNotes:\n- " in description
-        assert "- Only the meeting organizer can read attendance reports." in description
+        assert "- Microsoft Graph gives attendance reports to the meeting organizer only." in (
+            description
+        )
         assert "`not_ready` means wait" in description
         assert "Calling it again returns the same records." in description
         assert 45 <= len(description.split()) <= 210
