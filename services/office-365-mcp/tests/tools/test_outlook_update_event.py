@@ -1,21 +1,28 @@
 import json
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import TypedDict, Unpack, cast
 from urllib.parse import quote
 
 import httpx
 import pytest
 import respx
-from fastmcp import Context
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ElicitRequest, ElicitRequestFormParams, ElicitResult, InputRequiredResult
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
+from office_365_mcp.shared.calendar import EventImportance, EventSensitivity, ShowAs
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
-from office_365_mcp.tools.outlook_update_event import UpdatedEvent, a_person_agrees, update_event
+from office_365_mcp.tools.outlook_update_event import (
+    TOOL_NAME,
+    UpdatedEvent,
+    a_person_agrees,
+    register,
+    update_event,
+)
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -109,6 +116,19 @@ async def _refuses(question: str, about: str) -> str | None:
     return "Nothing was changed."
 
 
+class _Options(TypedDict, total=False):
+    show_as: ShowAs
+    add_categories: Sequence[str]
+    remove_categories: Sequence[str]
+    importance: EventImportance
+    sensitivity: EventSensitivity
+    is_reminder_on: bool
+    reminder_minutes_before_start: int
+    hide_attendees: bool
+    response_requested: bool
+    allow_new_time_proposals: bool
+
+
 async def _update(
     client: GraphServiceClient,
     *,
@@ -121,6 +141,7 @@ async def _update(
     attendees: Sequence[str] | None = None,
     optional_attendees: Sequence[str] | None = None,
     confirm: Confirm = _agrees,
+    **options: Unpack[_Options],
 ) -> UpdatedEvent:
     answer = await update_event(
         client,
@@ -133,9 +154,25 @@ async def _update(
         attendees=attendees,
         optional_attendees=optional_attendees,
         confirm=confirm,
+        **options,
     )
     assert isinstance(answer, UpdatedEvent), "this call was answered with a question, not an event"
     return answer
+
+
+def _tagged(*categories: str, attendees: Sequence[Mapping[str, object]] = ()) -> dict[str, object]:
+    return _event(attendees=attendees) | {"categories": list(categories)}
+
+
+class _Asked:
+    def __init__(self) -> None:
+        self.questions: list[str] = []
+        self.abouts: list[str] = []
+
+    async def __call__(self, question: str, about: str) -> str | None:
+        self.questions.append(question)
+        self.abouts.append(about)
+        return None
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -722,3 +759,547 @@ class TestWhatItAnswers:
         assert answer.series_master_uri is None
         assert answer.categories == []
         assert answer.importance is None
+
+    async def test_the_answer_reports_the_stored_options_from_the_response(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(
+            graph,
+            _event()
+            | {
+                "showAs": "oof",
+                "sensitivity": "private",
+                "isReminderOn": False,
+                "reminderMinutesBeforeStart": 30,
+                "hideAttendees": True,
+                "responseRequested": False,
+                "allowNewTimeProposals": False,
+            },
+        )
+
+        answer = await _update(client, show_as="free")
+
+        assert (answer.show_as, answer.sensitivity) == ("oof", "private")
+        assert (answer.is_reminder_on, answer.reminder_minutes_before_start) == (False, 30)
+        assert (
+            answer.hide_attendees,
+            answer.response_requested,
+            answer.allow_new_time_proposals,
+        ) == (True, False, False)
+
+    async def test_options_the_response_leaves_out_are_reported_as_unknown(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        answer = await _update(client, subject="Renamed")
+
+        assert answer.is_reminder_on is None
+        assert answer.reminder_minutes_before_start is None
+        assert answer.hide_attendees is None
+        assert answer.response_requested is None
+        assert answer.allow_new_time_proposals is None
+
+
+class TestTheOptionsItSendsToGraph:
+    @pytest.mark.parametrize(
+        ("options", "key", "value"),
+        [
+            pytest.param(_Options(show_as="busy"), "showAs", "busy", id="show-as"),
+            pytest.param(
+                _Options(show_as="workingElsewhere"),
+                "showAs",
+                "workingElsewhere",
+                id="show-as-elsewhere",
+            ),
+            pytest.param(_Options(importance="low"), "importance", "low", id="importance"),
+            pytest.param(
+                _Options(sensitivity="confidential"),
+                "sensitivity",
+                "confidential",
+                id="sensitivity",
+            ),
+            pytest.param(_Options(is_reminder_on=False), "isReminderOn", False, id="reminder-off"),
+            pytest.param(
+                _Options(reminder_minutes_before_start=0),
+                "reminderMinutesBeforeStart",
+                0,
+                id="reminder-minutes",
+            ),
+            pytest.param(_Options(hide_attendees=False), "hideAttendees", False, id="show-list"),
+            pytest.param(
+                _Options(response_requested=True), "responseRequested", True, id="response"
+            ),
+            pytest.param(
+                _Options(allow_new_time_proposals=False),
+                "allowNewTimeProposals",
+                False,
+                id="no-proposals",
+            ),
+        ],
+    )
+    async def test_each_option_alone_is_the_only_change_sent(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        options: _Options,
+        key: str,
+        value: object,
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(client, **options)
+
+        assert _sent(patch) == {key: value, "@odata.type": "#microsoft.graph.event"}
+
+    async def test_the_read_before_the_change_asks_for_the_categories(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _tagged("Budget"))
+        _ = _updates(graph)
+
+        _ = await _update(client, add_categories=["Blue category"])
+
+        assert "categories" in read.calls.last.request.url.params["$select"].split(",")
+
+
+class TestTheCategoriesItMerges:
+    async def test_an_added_category_joins_the_ones_the_event_has(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget"))
+        patch = _updates(graph)
+
+        _ = await _update(client, add_categories=["Blue category"])
+
+        assert _sent(patch)["categories"] == ["Budget", "Blue category"]
+
+    async def test_a_name_the_event_has_in_another_case_is_not_added_twice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget"))
+        patch = _updates(graph)
+
+        _ = await _update(client, add_categories=["BUDGET", "Blue category"])
+
+        assert _sent(patch)["categories"] == ["Budget", "Blue category"]
+
+    async def test_a_removed_category_goes_whatever_its_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", "Blue category"))
+        patch = _updates(graph)
+
+        _ = await _update(client, remove_categories=["budget"])
+
+        assert _sent(patch)["categories"] == ["Blue category"]
+
+    async def test_an_add_and_a_remove_in_one_call_write_one_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", "Blue category"))
+        patch = _updates(graph)
+
+        _ = await _update(client, add_categories=["Red category"], remove_categories=["Budget"])
+
+        assert _sent(patch)["categories"] == ["Blue category", "Red category"]
+
+    async def test_removing_every_category_sends_an_explicit_empty_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget"))
+        patch = _updates(graph)
+
+        _ = await _update(client, remove_categories=["Budget"])
+
+        assert _sent(patch)["categories"] == []
+
+    async def test_a_merge_that_changes_nothing_beside_another_change_sends_no_categories(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget"))
+        patch = _updates(graph)
+
+        _ = await _update(client, subject="Renamed", remove_categories=["Blue category"])
+
+        assert _sent(patch) == {"subject": "Renamed", "@odata.type": "#microsoft.graph.event"}
+
+    async def test_a_category_in_both_lists_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, add_categories=["Budget"], remove_categories=["budget"])
+
+        assert str(refused.value) == (
+            "outlook_update_event was given the category 'Budget' in both `add_categories` and "
+            + "`remove_categories`. NOTHING WAS CHANGED. Put each category name in one list only. "
+            + "A different case is not a different category. Retrying these values will fail "
+            + "identically."
+        )
+        assert len(graph.calls) == 0
+
+    async def test_a_merge_that_changes_nothing_and_no_other_change_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _tagged("Budget", "Blue category", attendees=[_attendee(_ADA)]))
+        patch = _updates(graph)
+        asked = _Asked()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, add_categories=["budget"], confirm=asked)
+
+        assert str(refused.value) == (
+            "The categories of this event already match `add_categories` and `remove_categories`, "
+            + "and this call gives no other change. The event has the categories 'Budget', "
+            + "'Blue category'. NOTHING WAS CHANGED. Retrying these values will fail identically."
+        )
+        assert read.call_count == 1
+        assert patch.call_count == 0
+        assert asked.questions == [], "a call that changes nothing interrupted the user"
+
+    async def test_removing_a_category_from_an_event_with_none_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        patch = _updates(graph)
+
+        with pytest.raises(ToolError, match="The event has no category. NOTHING WAS CHANGED."):
+            _ = await _update(client, remove_categories=["Budget"])
+
+        assert patch.call_count == 0
+
+    async def test_an_attendee_of_the_meeting_hears_it_is_not_the_organizer_first(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget") | {"isOrganizer": False})
+        patch = _updates(graph)
+
+        with pytest.raises(ToolError, match="not its organizer"):
+            _ = await _update(client, add_categories=["Budget"])
+
+        assert patch.call_count == 0
+
+
+class TestWhatTheQuestionSaysAboutTheOptions:
+    @pytest.mark.parametrize(
+        ("options", "said"),
+        [
+            pytest.param(_Options(show_as="busy"), "show it as busy", id="busy"),
+            pytest.param(_Options(show_as="oof"), "show it as out of office", id="oof"),
+            pytest.param(
+                _Options(show_as="workingElsewhere"),
+                "show it as working elsewhere",
+                id="working-elsewhere",
+            ),
+            pytest.param(
+                _Options(add_categories=["Blue category"]),
+                "set the categories to 'Budget, Blue category'",
+                id="categories",
+            ),
+            pytest.param(
+                _Options(remove_categories=["Budget"]), "remove every category", id="no-categories"
+            ),
+            pytest.param(
+                _Options(importance="high"), "set the importance to high", id="importance"
+            ),
+            pytest.param(
+                _Options(sensitivity="private"), "set the sensitivity to private", id="sensitivity"
+            ),
+            pytest.param(_Options(is_reminder_on=True), "set a reminder", id="reminder-on"),
+            pytest.param(_Options(is_reminder_on=False), "remove the reminder", id="reminder-off"),
+            pytest.param(
+                _Options(reminder_minutes_before_start=1),
+                "set the reminder time to 1 minute before the start",
+                id="one-minute",
+            ),
+            pytest.param(
+                _Options(reminder_minutes_before_start=15),
+                "set the reminder time to 15 minutes before the start",
+                id="minutes",
+            ),
+            pytest.param(_Options(hide_attendees=True), "hide the attendee list", id="hide"),
+            pytest.param(
+                _Options(hide_attendees=False),
+                "show the attendee list to every attendee",
+                id="show-list",
+            ),
+            pytest.param(
+                _Options(response_requested=True),
+                "ask the attendees for a response",
+                id="response",
+            ),
+            pytest.param(
+                _Options(response_requested=False),
+                "ask the attendees for no response",
+                id="no-response",
+            ),
+            pytest.param(
+                _Options(allow_new_time_proposals=True),
+                "let the attendees propose a new time",
+                id="proposals",
+            ),
+            pytest.param(
+                _Options(allow_new_time_proposals=False),
+                "let no attendee propose a new time",
+                id="no-proposals",
+            ),
+        ],
+    )
+    async def test_each_option_is_named_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter, options: _Options, said: str
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, confirm=asked, **options)
+
+        assert asked.questions == [
+            f"Update 'Pricing review': {said}? Microsoft mails every current attendee about this "
+            + "change, and this connector cannot recall it."
+        ]
+
+    async def test_several_changes_are_listed_with_the_attendee_list_last(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(
+            client,
+            subject="Renamed",
+            attendees=[_GRACE, _ADA],
+            optional_attendees=[],
+            show_as="tentative",
+            hide_attendees=True,
+            confirm=asked,
+        )
+
+        assert asked.questions == [
+            "Update 'Pricing review': change the subject to 'Renamed', show it as tentative, hide "
+            + f"the attendee list and change the attendee list to 2 people: {_GRACE}, {_ADA}? "
+            + "Microsoft mails every current attendee about this change, and this connector "
+            + "cannot recall it."
+        ]
+
+    async def test_a_category_that_writes_a_question_of_its_own_arrives_as_one_token(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+        category = "Budget? Microsoft mails nobody"
+
+        _ = await _update(client, add_categories=[category], confirm=asked)
+
+        assert f"set the categories to {category!r}?" in asked.questions[0]
+
+    async def test_an_option_on_an_event_with_nobody_on_it_is_never_put_to_a_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[]))
+        patch = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, show_as="oof", add_categories=["Holiday"], confirm=asked)
+
+        assert asked.questions == []
+        assert patch.call_count == 1
+
+
+class TestTheIdAnAnswerIsBoundTo:
+    @pytest.mark.parametrize(
+        "options",
+        [
+            pytest.param(_Options(show_as="busy"), id="show-as"),
+            pytest.param(_Options(add_categories=["Blue category"]), id="add-category"),
+            pytest.param(_Options(remove_categories=["Budget"]), id="remove-category"),
+            pytest.param(_Options(importance="high"), id="importance"),
+            pytest.param(_Options(sensitivity="private"), id="sensitivity"),
+            pytest.param(_Options(is_reminder_on=True), id="reminder-on"),
+            pytest.param(_Options(reminder_minutes_before_start=15), id="reminder-minutes"),
+            pytest.param(_Options(hide_attendees=True), id="hide-attendees"),
+            pytest.param(_Options(response_requested=False), id="response-requested"),
+            pytest.param(_Options(allow_new_time_proposals=False), id="new-time-proposals"),
+        ],
+    )
+    async def test_each_option_binds_the_answer_to_another_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter, options: _Options
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, subject="Renamed", confirm=asked)
+        _ = await _update(client, subject="Renamed", confirm=asked, **options)
+
+        assert asked.abouts[0] != asked.abouts[1]
+
+    @pytest.mark.parametrize(
+        ("one", "other"),
+        [
+            pytest.param(_Options(is_reminder_on=True), _Options(is_reminder_on=False), id="on"),
+            pytest.param(_Options(show_as="busy"), _Options(show_as="free"), id="show-as"),
+        ],
+    )
+    async def test_two_values_of_one_option_bind_two_ids(
+        self, client: GraphServiceClient, graph: respx.MockRouter, one: _Options, other: _Options
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, confirm=asked, **one)
+        _ = await _update(client, confirm=asked, **other)
+
+        assert asked.abouts[0] != asked.abouts[1]
+
+    async def test_the_same_call_on_the_same_event_binds_the_same_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        for _round in range(2):
+            _ = await _update(
+                client, add_categories=["Blue category"], show_as="busy", confirm=asked
+            )
+
+        assert asked.abouts[0] == asked.abouts[1]
+
+    async def test_the_id_follows_the_category_list_the_change_writes(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        """The person agrees to the full list in the question. If the event gains a category
+        between two rounds, the second round writes another list, so it binds another id."""
+        read = _reads(graph, _tagged("Budget", attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(client, add_categories=["Blue category"], confirm=asked)
+        read.return_value = httpx.Response(
+            200, json=_tagged("Budget", "Red category", attendees=[_attendee(_ADA)])
+        )
+        _ = await _update(client, add_categories=["Blue category"], confirm=asked)
+
+        assert asked.abouts[0] != asked.abouts[1]
+
+
+async def _parameters(transport: httpx.AsyncClient) -> Mapping[str, object]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    register(mcp, transport)
+    tool = await mcp.get_tool(TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return cast("Mapping[str, object]", tool.parameters)
+
+
+class TestHowItDeclaresItself:
+    async def test_only_the_handle_is_required(self, transport: httpx.AsyncClient) -> None:
+        assert (await _parameters(transport))["required"] == ["uri"]
+
+    async def test_the_free_busy_choice_leaves_out_the_status_only_microsoft_sets(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        shown_as = _object(_object(parameters["$defs"])["ShowAs"])
+        assert shown_as["enum"] == ["free", "tentative", "busy", "oof", "workingElsewhere"]
+
+    async def test_a_reminder_time_below_zero_never_reaches_the_tool(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        minutes = _object(_object(parameters["properties"])["reminder_minutes_before_start"])
+        assert cast("Sequence[object]", minutes["anyOf"])[0] == {"minimum": 0, "type": "integer"}
+
+    @pytest.mark.parametrize("argument", ["add_categories", "remove_categories"])
+    async def test_each_category_list_defaults_to_empty(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        parameters = await _parameters(transport)
+
+        assert _object(_object(parameters["properties"])[argument])["default"] == []
+
+
+class TestTheNothingToChangeRefusal:
+    @pytest.mark.parametrize(
+        "argument",
+        [
+            "subject",
+            "location",
+            "show_as",
+            "add_categories",
+            "remove_categories",
+            "importance",
+            "sensitivity",
+            "is_reminder_on",
+            "reminder_minutes_before_start",
+            "hide_attendees",
+            "response_requested",
+            "allow_new_time_proposals",
+        ],
+    )
+    async def test_it_names_each_argument_that_changes_the_event(
+        self, client: GraphServiceClient, graph: respx.MockRouter, argument: str
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client)
+
+        assert f"`{argument}`" in str(refused.value)
+        assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert len(graph.calls) == 0
+
+    async def test_empty_category_lists_are_no_change(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="no argument that changes anything"):
+            _ = await _update(client, add_categories=[], remove_categories=[])
+
+        assert len(graph.calls) == 0
+
+
+class TestTheSecondRoundOfACategoryChange:
+    async def test_the_second_round_writes_the_merged_list_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _tagged("Budget", attendees=[_attendee(_ADA)]))
+        patch = _updates(graph)
+
+        first = await update_event(
+            client,
+            uri=_URI,
+            add_categories=["Blue category"],
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        request = requests[key]
+        assert isinstance(request, ElicitRequest)
+        params = request.params
+        assert isinstance(params, ElicitRequestFormParams)
+        assert "set the categories to 'Budget, Blue category'" in params.message
+        schema = cast(
+            "Mapping[str, object]",
+            cast("Mapping[str, object]", params.requested_schema)["properties"],
+        )
+        agree = cast("Sequence[str]", cast("Mapping[str, object]", schema["value"])["enum"])[0]
+
+        second = await update_event(
+            client,
+            uri=_URI,
+            add_categories=["Blue category"],
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agree})},
+                    state=first.request_state,
+                )
+            ),
+        )
+
+        assert isinstance(second, UpdatedEvent)
+        assert patch.call_count == 1
+        assert _sent(patch)["categories"] == ["Budget", "Blue category"]

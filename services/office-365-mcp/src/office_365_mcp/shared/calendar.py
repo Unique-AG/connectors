@@ -94,26 +94,35 @@ NOBODY_INVITED_BUT_A_PLACE = (
     + "or of a bookable room that the location names."
 )
 
-SHOW_AS_FIELD = (
+_DEFAULT_WHEN_NULL = " Null sends nothing, and Microsoft then applies its own default."
+
+_KEPT_WHEN_NULL = " Null sends nothing, and the event keeps the value that it has now."
+
+_SHOW_AS = (
     "How the event shows in the free-busy view of the calendar: `free`, `tentative`, `busy`, "
-    + "`oof` for out of office, or `workingElsewhere`. Null sends nothing, and Microsoft then "
-    + "applies its own default."
+    + "`oof` for out of office, or `workingElsewhere`."
 )
+
+SHOW_AS_FIELD = _SHOW_AS + _DEFAULT_WHEN_NULL
+
+SHOW_AS_CHANGE_FIELD = _SHOW_AS + _KEPT_WHEN_NULL
 
 CATEGORIES_FIELD = (
     "One category name for each entry, exactly as the user names it or as outlook_list_categories "
     + "reports it. An empty list adds no category to the event."
 )
 
-IMPORTANCE_FIELD = (
-    "The importance of the event: `low`, `normal`, or `high`. Null sends nothing, and Microsoft "
-    + "then applies its own default."
-)
+_IMPORTANCE = "The importance of the event: `low`, `normal`, or `high`."
 
-SENSITIVITY_FIELD = (
-    "The sensitivity of the event: `normal`, `personal`, `private`, or `confidential`. Null "
-    + "sends nothing, and Microsoft then applies its own default."
-)
+IMPORTANCE_FIELD = _IMPORTANCE + _DEFAULT_WHEN_NULL
+
+IMPORTANCE_CHANGE_FIELD = _IMPORTANCE + _KEPT_WHEN_NULL
+
+_SENSITIVITY = "The sensitivity of the event: `normal`, `personal`, `private`, or `confidential`."
+
+SENSITIVITY_FIELD = _SENSITIVITY + _DEFAULT_WHEN_NULL
+
+SENSITIVITY_CHANGE_FIELD = _SENSITIVITY + _KEPT_WHEN_NULL
 
 ROOM_ADDRESSES_FIELD = (
     "The rooms to book, one SMTP address of a room mailbox for each entry and nothing else in the "
@@ -122,31 +131,57 @@ ROOM_ADDRESSES_FIELD = (
     + "must not also be in `attendees` or `optional_attendees`."
 )
 
-IS_REMINDER_ON_FIELD = (
+_IS_REMINDER_ON = (
     "Set this parameter to true for a reminder alert before the event starts, or to false for no "
-    + "reminder. Null sends nothing, and Microsoft then applies its own default."
+    + "reminder."
 )
 
-REMINDER_MINUTES_FIELD = (
-    "How many minutes before the start the reminder alert comes, as a whole number of 0 or more. "
-    + "Null sends nothing, and Microsoft then applies its own default."
+IS_REMINDER_ON_FIELD = _IS_REMINDER_ON + _DEFAULT_WHEN_NULL
+
+IS_REMINDER_ON_CHANGE_FIELD = _IS_REMINDER_ON + _KEPT_WHEN_NULL
+
+_REMINDER_MINUTES = (
+    "How many minutes before the start the reminder alert comes, as a whole number of 0 or more."
+)
+
+REMINDER_MINUTES_FIELD = _REMINDER_MINUTES + _DEFAULT_WHEN_NULL
+
+REMINDER_MINUTES_CHANGE_FIELD = _REMINDER_MINUTES + _KEPT_WHEN_NULL
+
+_HIDE_ATTENDEES = (
+    "Set this parameter to true to hide the attendee list. Each attendee then sees only "
+    + "themselves in the meeting request and in the tracking list."
 )
 
 HIDE_ATTENDEES_FIELD = (
-    "Set this parameter to true to hide the attendee list. Each attendee then sees only "
-    + "themselves in the meeting request and in the tracking list. Null sends nothing, and "
-    + "Microsoft then uses false, so every attendee sees the full list."
+    _HIDE_ATTENDEES
+    + " Null sends nothing, and Microsoft then uses false, so every attendee sees the full list."
+)
+
+HIDE_ATTENDEES_CHANGE_FIELD = _HIDE_ATTENDEES + _KEPT_WHEN_NULL
+
+_RESPONSE_REQUESTED = (
+    "Set this parameter to false to ask the attendees for no response to the invitation."
 )
 
 RESPONSE_REQUESTED_FIELD = (
-    "Set this parameter to false to ask the attendees for no response to the invitation. Null "
-    + "sends nothing, and Microsoft then uses true, so each attendee is asked for a response."
+    _RESPONSE_REQUESTED
+    + " Null sends nothing, and Microsoft then uses true, so each attendee is asked for a "
+    + "response."
+)
+
+RESPONSE_REQUESTED_CHANGE_FIELD = _RESPONSE_REQUESTED + _KEPT_WHEN_NULL
+
+_ALLOW_NEW_TIME_PROPOSALS = (
+    "Set this parameter to false so that attendees cannot propose a new time when they respond."
 )
 
 ALLOW_NEW_TIME_PROPOSALS_FIELD = (
-    "Set this parameter to false so that attendees cannot propose a new time when they respond. "
-    + "Null sends nothing, and Microsoft then uses true, so attendees can propose a new time."
+    _ALLOW_NEW_TIME_PROPOSALS
+    + " Null sends nothing, and Microsoft then uses true, so attendees can propose a new time."
 )
+
+ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD = _ALLOW_NEW_TIME_PROPOSALS + _KEPT_WHEN_NULL
 
 RECURRENCE_FIELD = (
     "Set this parameter to make the event repeat as a series. Null creates one event that does "
@@ -1001,10 +1036,14 @@ def _rooms_booked(rooms: tuple[str, ...]) -> str:
 def _reminder(on: bool | None, minutes: int | None) -> str:
     if minutes is None:
         return _either(on, yes="with a reminder", no="with no reminder")
-    before = f"{minutes} {'minute' if minutes == 1 else 'minutes'} before the start"
+    before = _before_the_start(minutes)
     if on is False:
         return f"with no reminder, and a reminder time of {before}"
     return f"with a reminder {before}"
+
+
+def _before_the_start(minutes: int) -> str:
+    return f"{minutes} {'minute' if minutes == 1 else 'minutes'} before the start"
 
 
 def _either(value: bool | None, *, yes: str, no: str) -> str:
@@ -1155,13 +1194,94 @@ def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
 
 @dataclass(frozen=True, slots=True)
 class EventPatch:
-    subject: str | None
-    starts_at: str | None
-    ends_at: str | None
-    time_zone: str | None
-    location: str | None
-    attendees: tuple[str, ...] | None
-    optional_attendees: tuple[str, ...] | None
+    subject: str | None = None
+    starts_at: str | None = None
+    ends_at: str | None = None
+    time_zone: str | None = None
+    location: str | None = None
+    attendees: tuple[str, ...] | None = None
+    optional_attendees: tuple[str, ...] | None = None
+    show_as: ShowAs | None = None
+    categories: tuple[str, ...] | None = None
+    importance: EventImportance | None = None
+    sensitivity: EventSensitivity | None = None
+    is_reminder_on: bool | None = None
+    reminder_minutes_before_start: int | None = None
+    hide_attendees: bool | None = None
+    response_requested: bool | None = None
+    allow_new_time_proposals: bool | None = None
+
+
+def merged_categories(
+    current: Sequence[str], *, add: Sequence[str], remove: Sequence[str]
+) -> list[str]:
+    removed = {name.casefold() for name in remove}
+    merged: dict[str, str] = {}
+    for name in (*current, *add):
+        key = name.casefold()
+        if key not in removed and key not in merged:
+            merged[key] = name
+    return list(merged.values())
+
+
+def patch_changes(patch: EventPatch) -> list[str]:
+    return [
+        change
+        for change in (
+            "" if patch.subject is None else f"change the subject to {patch.subject!r}",
+            (
+                ""
+                if patch.starts_at is None
+                else f"change the time to {patch.starts_at} – {patch.ends_at} {patch.time_zone}"
+            ),
+            "" if patch.location is None else f"change the location to {patch.location!r}",
+            "" if patch.show_as is None else f"show it as {_SHOWN_AS[patch.show_as]}",
+            _categories_set(patch.categories),
+            "" if patch.importance is None else f"set the importance to {patch.importance}",
+            "" if patch.sensitivity is None else f"set the sensitivity to {patch.sensitivity}",
+            _either(patch.is_reminder_on, yes="set a reminder", no="remove the reminder"),
+            (
+                ""
+                if patch.reminder_minutes_before_start is None
+                else "set the reminder time to "
+                + _before_the_start(patch.reminder_minutes_before_start)
+            ),
+            _either(
+                patch.hide_attendees,
+                yes="hide the attendee list",
+                no="show the attendee list to every attendee",
+            ),
+            _either(
+                patch.response_requested,
+                yes="ask the attendees for a response",
+                no="ask the attendees for no response",
+            ),
+            _either(
+                patch.allow_new_time_proposals,
+                yes="let the attendees propose a new time",
+                no="let no attendee propose a new time",
+            ),
+            _attendee_list_set(patch),
+        )
+        if change
+    ]
+
+
+def _categories_set(categories: tuple[str, ...] | None) -> str:
+    if categories is None:
+        return ""
+    if not categories:
+        return "remove every category"
+    return f"set the categories to {cut_for_a_question(', '.join(categories))!r}"
+
+
+def _attendee_list_set(patch: EventPatch) -> str:
+    if patch.attendees is None:
+        return ""
+    invited = [*patch.attendees, *(f"{one} (optional)" for one in patch.optional_attendees or ())]
+    if not invited:
+        return "change the attendee list to nobody"
+    return f"change the attendee list to {counted_people(invited)}: {', '.join(invited)}"
 
 
 def event_patch_body(patch: EventPatch) -> Event:
@@ -1187,6 +1307,15 @@ def event_patch_body(patch: EventPatch) -> Event:
             if patch.attendees is None
             else invited_attendees(patch.attendees, patch.optional_attendees or ())
         ),
+        show_as=None if patch.show_as is None else FreeBusyStatus(patch.show_as),
+        categories=None if patch.categories is None else list(patch.categories),
+        importance=None if patch.importance is None else Importance(patch.importance),
+        sensitivity=None if patch.sensitivity is None else Sensitivity(patch.sensitivity),
+        is_reminder_on=patch.is_reminder_on,
+        reminder_minutes_before_start=patch.reminder_minutes_before_start,
+        hide_attendees=patch.hide_attendees,
+        response_requested=patch.response_requested,
+        allow_new_time_proposals=patch.allow_new_time_proposals,
     )
 
 

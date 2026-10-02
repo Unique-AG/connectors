@@ -52,6 +52,7 @@ from office_365_mcp.shared.calendar import (
     EventAttendee,
     EventDraft,
     EventImportance,
+    EventPatch,
     EventSensitivity,
     EventSummary,
     RecurrencePatternSummary,
@@ -65,8 +66,11 @@ from office_365_mcp.shared.calendar import (
     draft_details,
     event_body,
     event_of,
+    event_patch_body,
     event_time,
     is_midnight,
+    merged_categories,
+    patch_changes,
     providers_without_teams,
     recurrence_refusal,
     repeated_address,
@@ -1133,6 +1137,200 @@ class TestTheCreateBody:
         body = _payload(event_body(_draft(all_day=True), transaction_id="synthetic"))
 
         assert body["isAllDay"] is True
+
+
+class TestThePatchBody:
+    def test_an_empty_patch_names_nothing(self) -> None:
+        assert _payload(event_patch_body(EventPatch())) == {"@odata.type": "#microsoft.graph.event"}
+
+    @pytest.mark.parametrize(
+        ("patch", "property_name", "value"),
+        [
+            (EventPatch(show_as="tentative"), "showAs", "tentative"),
+            (EventPatch(show_as="workingElsewhere"), "showAs", "workingElsewhere"),
+            (
+                EventPatch(categories=("Budget", "Blue category")),
+                "categories",
+                ["Budget", "Blue category"],
+            ),
+            (EventPatch(categories=()), "categories", []),
+            (EventPatch(importance="high"), "importance", "high"),
+            (EventPatch(sensitivity="personal"), "sensitivity", "personal"),
+            (EventPatch(is_reminder_on=False), "isReminderOn", False),
+            (EventPatch(reminder_minutes_before_start=0), "reminderMinutesBeforeStart", 0),
+            (EventPatch(hide_attendees=True), "hideAttendees", True),
+            (EventPatch(response_requested=False), "responseRequested", False),
+            (EventPatch(allow_new_time_proposals=False), "allowNewTimeProposals", False),
+        ],
+        ids=[
+            "show-as",
+            "working-elsewhere",
+            "categories",
+            "no-categories",
+            "importance",
+            "sensitivity",
+            "reminder-off",
+            "reminder-minutes",
+            "hide-attendees",
+            "no-response",
+            "no-proposals",
+        ],
+    )
+    def test_each_option_is_the_only_property_sent_in_microsofts_spelling(
+        self, patch: EventPatch, property_name: str, value: object
+    ) -> None:
+        assert _payload(event_patch_body(patch)) == {
+            property_name: value,
+            "@odata.type": "#microsoft.graph.event",
+        }
+
+
+class TestTheCategoryMerge:
+    def test_a_new_name_comes_after_the_names_the_event_has(self) -> None:
+        assert merged_categories(["Budget"], add=["Blue category"], remove=[]) == [
+            "Budget",
+            "Blue category",
+        ]
+
+    def test_a_name_the_event_has_in_another_case_keeps_its_own_spelling(self) -> None:
+        assert merged_categories(["Budget"], add=["BUDGET"], remove=[]) == ["Budget"]
+
+    def test_a_removed_name_goes_whatever_its_case(self) -> None:
+        assert merged_categories(["Budget", "Blue category"], add=[], remove=["BLUE CATEGORY"]) == [
+            "Budget"
+        ]
+
+    def test_a_name_added_twice_is_added_once(self) -> None:
+        assert merged_categories([], add=["Budget", "budget"], remove=[]) == ["Budget"]
+
+    def test_removing_every_name_leaves_an_empty_list(self) -> None:
+        assert merged_categories(["Budget"], add=[], remove=["Budget"]) == []
+
+    def test_the_current_list_is_left_as_it_was(self) -> None:
+        current = ["Budget"]
+
+        _ = merged_categories(current, add=["Blue category"], remove=["Budget"])
+
+        assert current == ["Budget"]
+
+
+class TestWhatAPatchSays:
+    @pytest.mark.parametrize(
+        ("patch", "said"),
+        [
+            (EventPatch(subject="Renamed"), "change the subject to 'Renamed'"),
+            (
+                EventPatch(
+                    starts_at="2026-03-02T16:00", ends_at="2026-03-02T17:00", time_zone="UTC"
+                ),
+                "change the time to 2026-03-02T16:00 – 2026-03-02T17:00 UTC",
+            ),
+            (EventPatch(location="Room 9"), "change the location to 'Room 9'"),
+            (EventPatch(attendees=(), optional_attendees=()), "change the attendee list to nobody"),
+            (
+                EventPatch(attendees=(_MINE,), optional_attendees=(_SOMEBODY_ELSE,)),
+                f"change the attendee list to 2 people: {_MINE}, {_SOMEBODY_ELSE} (optional)",
+            ),
+            (EventPatch(show_as="free"), "show it as free"),
+            (EventPatch(show_as="oof"), "show it as out of office"),
+            (
+                EventPatch(categories=("Budget", "Blue category")),
+                "set the categories to 'Budget, Blue category'",
+            ),
+            (EventPatch(categories=()), "remove every category"),
+            (EventPatch(importance="low"), "set the importance to low"),
+            (EventPatch(sensitivity="confidential"), "set the sensitivity to confidential"),
+            (EventPatch(is_reminder_on=True), "set a reminder"),
+            (EventPatch(is_reminder_on=False), "remove the reminder"),
+            (
+                EventPatch(reminder_minutes_before_start=1),
+                "set the reminder time to 1 minute before the start",
+            ),
+            (
+                EventPatch(reminder_minutes_before_start=0),
+                "set the reminder time to 0 minutes before the start",
+            ),
+            (EventPatch(hide_attendees=True), "hide the attendee list"),
+            (EventPatch(hide_attendees=False), "show the attendee list to every attendee"),
+            (EventPatch(response_requested=True), "ask the attendees for a response"),
+            (EventPatch(response_requested=False), "ask the attendees for no response"),
+            (EventPatch(allow_new_time_proposals=True), "let the attendees propose a new time"),
+            (EventPatch(allow_new_time_proposals=False), "let no attendee propose a new time"),
+        ],
+        ids=[
+            "subject",
+            "time",
+            "location",
+            "nobody",
+            "attendees",
+            "free",
+            "out-of-office",
+            "categories",
+            "no-categories",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-off",
+            "one-minute",
+            "zero-minutes",
+            "hide-attendees",
+            "show-attendees",
+            "response",
+            "no-response",
+            "proposals",
+            "no-proposals",
+        ],
+    )
+    def test_each_change_on_its_own_is_named(self, patch: EventPatch, said: str) -> None:
+        assert patch_changes(patch) == [said]
+
+    def test_an_empty_patch_names_no_change(self) -> None:
+        assert patch_changes(EventPatch()) == []
+
+    def test_every_change_is_named_in_this_order_with_the_attendee_list_last(self) -> None:
+        patch = EventPatch(
+            subject="Renamed",
+            starts_at="2026-03-02T16:00",
+            ends_at="2026-03-02T17:00",
+            time_zone="UTC",
+            location="Room 9",
+            attendees=(_MINE,),
+            optional_attendees=(),
+            show_as="busy",
+            categories=("Budget",),
+            importance="high",
+            sensitivity="private",
+            is_reminder_on=True,
+            reminder_minutes_before_start=10,
+            hide_attendees=True,
+            response_requested=False,
+            allow_new_time_proposals=False,
+        )
+
+        assert patch_changes(patch) == [
+            "change the subject to 'Renamed'",
+            "change the time to 2026-03-02T16:00 – 2026-03-02T17:00 UTC",
+            "change the location to 'Room 9'",
+            "show it as busy",
+            "set the categories to 'Budget'",
+            "set the importance to high",
+            "set the sensitivity to private",
+            "set a reminder",
+            "set the reminder time to 10 minutes before the start",
+            "hide the attendee list",
+            "ask the attendees for no response",
+            "let no attendee propose a new time",
+            f"change the attendee list to 1 person: {_MINE}",
+        ]
+
+    def test_a_long_category_list_is_cut_and_says_so(self) -> None:
+        categories = tuple(f"Category {index}" for index in range(30))
+
+        [said] = patch_changes(EventPatch(categories=categories))
+
+        shown = cast("str", ast.literal_eval(said.removeprefix("set the categories to ")))
+        assert len(shown) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert shown.endswith("…")
 
 
 class TestWhatADraftSaysBeyondItsFirstClause:

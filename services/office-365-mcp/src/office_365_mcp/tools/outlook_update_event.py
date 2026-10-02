@@ -16,15 +16,32 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
+    ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD,
+    HIDE_ATTENDEES_CHANGE_FIELD,
+    IMPORTANCE_CHANGE_FIELD,
+    IS_REMINDER_ON_CHANGE_FIELD,
+    REMINDER_MINUTES_CHANGE_FIELD,
+    RESPONSE_REQUESTED_CHANGE_FIELD,
+    SENSITIVITY_CHANGE_FIELD,
+    SHOW_AS_CHANGE_FIELD,
+    STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD,
+    STORED_HIDE_ATTENDEES_FIELD,
+    STORED_IS_REMINDER_ON_FIELD,
+    STORED_REMINDER_MINUTES_FIELD,
+    STORED_RESPONSE_REQUESTED_FIELD,
     ZONE_NAME,
     EventAttendee,
+    EventImportance,
     EventPatch,
+    EventSensitivity,
     EventSummary,
+    ShowAs,
     confirmation_id_for,
-    counted_people,
     event_of,
     event_patch_body,
     invited_attendee,
+    merged_categories,
+    patch_changes,
     repeated_address,
     resource_addresses,
     series_reach,
@@ -65,10 +82,24 @@ _AGREE = "update"
 _DECLINE = "do not update"
 _NOTHING_HAPPENED = "Nothing was changed."
 
-_DESCRIPTION = (
-    "Changes the subject, time, location, or attendee list of one existing event the signed-in "
-    "user organizes. A change that reaches an attendee mails them that the meeting changed."
-)
+_DESCRIPTION = """\
+Changes one existing event that the signed-in user organizes. This tool can change the subject, \
+the time, the location, and the attendee lists. It can also change the free-busy status, the \
+categories, the importance, the sensitivity, and the reminder. Other arguments set whether the \
+attendees see the attendee list, send a response, or propose a new time. A change that reaches an \
+attendee mails the attendee a notice that the meeting changed. outlook_cancel_event is the tool \
+that cancels an event that the user organizes.
+
+Notes:
+- Each argument that you give replaces that part of the event. An argument that you omit keeps \
+the value that Microsoft stored. `attendees` and `optional_attendees` replace the whole attendee \
+list. `add_categories` and `remove_categories` change only the names that they give.
+- This tool asks the user to agree before it changes an event that has or gets an attendee, or \
+that gets a new location. This tool changes nothing unless the user agrees.
+- If a call times out, do not call this tool again first. A notice can already be out to the \
+attendees. Before you change the event again, make sure that outlook_read_event does not already \
+show the change.
+"""
 
 _NOT_A_HANDLE = (
     "outlook_update_event takes the `uri` that outlook_list_events or outlook_read_event reported, "
@@ -88,11 +119,16 @@ _NOT_THE_ORGANIZER = (
 )
 
 _NOTHING_TO_CHANGE = (
-    "outlook_update_event was given no argument that changes anything: `subject`, the time "
-    + "arguments, `location`, and the two attendee lists were all left out. NOTHING WAS CHANGED. "
-    + "Pass at least one of them. If you are not sure what the event currently holds, call "
-    + "outlook_read_event first."
+    "outlook_update_event was given no argument that changes anything. NOTHING WAS CHANGED. The "
+    + "arguments that change the event are `subject`, the time arguments, `location`, the two "
+    + "attendee lists, `show_as`, `add_categories`, and `remove_categories`. The other arguments "
+    + "that change it are `importance`, `sensitivity`, `is_reminder_on`, "
+    + "`reminder_minutes_before_start`, `hide_attendees`, `response_requested`, and "
+    + "`allow_new_time_proposals`. Pass at least one of them. If you are not sure what the event "
+    + "currently holds, call outlook_read_event first."
 )
+
+_RETRY = " Retrying these values will fail identically."
 
 _BLANK_LOCATION = (
     "outlook_update_event was given `location` as only whitespace. NOTHING WAS CHANGED. This "
@@ -156,10 +192,33 @@ def _repeated(argument: str, address: str) -> str:
     )
 
 
+def _in_both_lists(name: str) -> str:
+    return (
+        f"outlook_update_event was given the category {name!r} in both `add_categories` and "
+        + "`remove_categories`. NOTHING WAS CHANGED. Put each category name in one list only. A "
+        + f"different case is not a different category.{_RETRY}"
+    )
+
+
+def _categories_unchanged(current: Sequence[str]) -> str:
+    held = (
+        "the categories " + ", ".join(repr(name) for name in current) if current else "no category"
+    )
+    return (
+        "The categories of this event already match `add_categories` and `remove_categories`, and "
+        + f"this call gives no other change. The event has {held}. NOTHING WAS CHANGED.{_RETRY}"
+    )
+
+
 class UpdatedEvent(EventSummary):
     attendees: list[EventAttendee] = Field(
         description="The attendees Microsoft now holds for this event."
     )
+    is_reminder_on: bool | None = Field(description=STORED_IS_REMINDER_ON_FIELD)
+    reminder_minutes_before_start: int | None = Field(description=STORED_REMINDER_MINUTES_FIELD)
+    hide_attendees: bool | None = Field(description=STORED_HIDE_ATTENDEES_FIELD)
+    response_requested: bool | None = Field(description=STORED_RESPONSE_REQUESTED_FIELD)
+    allow_new_time_proposals: bool | None = Field(description=STORED_ALLOW_NEW_TIME_PROPOSALS_FIELD)
 
 
 async def update_event(
@@ -173,23 +232,49 @@ async def update_event(
     location: str | None = None,
     attendees: Sequence[str] | None = None,
     optional_attendees: Sequence[str] | None = None,
+    show_as: ShowAs | None = None,
+    add_categories: Sequence[str] = (),
+    remove_categories: Sequence[str] = (),
+    importance: EventImportance | None = None,
+    sensitivity: EventSensitivity | None = None,
+    is_reminder_on: bool | None = None,
+    reminder_minutes_before_start: int | None = None,
+    hide_attendees: bool | None = None,
+    response_requested: bool | None = None,
+    allow_new_time_proposals: bool | None = None,
     confirm: Confirm,
 ) -> UpdatedEvent | InputRequiredResult:
     handle = event_handle(uri)
     if handle is None:
         raise ToolError(_NOT_A_HANDLE)
     if (
-        subject is None
-        and starts_at is None
-        and ends_at is None
-        and time_zone is None
-        and location is None
-        and attendees is None
-        and optional_attendees is None
+        not add_categories
+        and not remove_categories
+        and all(
+            value is None
+            for value in (
+                subject,
+                starts_at,
+                ends_at,
+                time_zone,
+                location,
+                attendees,
+                optional_attendees,
+                show_as,
+                importance,
+                sensitivity,
+                is_reminder_on,
+                reminder_minutes_before_start,
+                hide_attendees,
+                response_requested,
+                allow_new_time_proposals,
+            )
+        )
     ):
         raise ToolError(_NOTHING_TO_CHANGE)
     _time_trio(starts_at, ends_at, time_zone)
     _attendees_given_together(attendees, optional_attendees)
+    _categories_given_apart(add_categories, remove_categories)
     if starts_at is not None:
         assert ends_at is not None and time_zone is not None, "_time_trio admits no other shape"
         _validated_span(starts_at, ends_at)
@@ -206,19 +291,8 @@ async def update_event(
 
     updated: Event | None = None
     asked: InputRequiredResult | None = None
-    about = confirmation_id_for(
-        handle.uri,
-        repr(subject),
-        repr(starts_at),
-        repr(ends_at),
-        repr(time_zone),
-        repr(place),
-        repr(None if required is None else sorted(a.casefold() for a in required)),
-        repr(None if optional is None else sorted(a.casefold() for a in optional)),
-    )
     with graph_errors(TOOL_NAME):
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
-        refused: str | None = _NOT_THE_ORGANIZER if event.is_organizer is False else None
         patch = EventPatch(
             subject=subject,
             starts_at=starts_at,
@@ -227,11 +301,23 @@ async def update_event(
             location=place,
             attendees=required,
             optional_attendees=optional,
+            show_as=show_as,
+            categories=_categories_after(
+                event.categories or [], add=add_categories, remove=remove_categories
+            ),
+            importance=importance,
+            sensitivity=sensitivity,
+            is_reminder_on=is_reminder_on,
+            reminder_minutes_before_start=reminder_minutes_before_start,
+            hide_attendees=hide_attendees,
+            response_requested=response_requested,
+            allow_new_time_proposals=allow_new_time_proposals,
         )
+        refused = _refusal(event, patch)
         body = _patched(patch, before=event)
         if refused is None and _reaches_an_attendee(body, before=event):
             with not_graph():
-                answer = await confirm(_question(event, patch), about)
+                answer = await confirm(_question(event, patch), _about(handle.uri, patch))
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -266,6 +352,22 @@ def _attendees_given_together(
 ) -> None:
     if (attendees is None) != (optional_attendees is None):
         raise ToolError(_ATTENDEE_LISTS_INCOMPLETE)
+
+
+def _categories_given_apart(add: Sequence[str], remove: Sequence[str]) -> None:
+    removed = {name.casefold() for name in remove}
+    both = next((name for name in add if name.casefold() in removed), None)
+    if both is not None:
+        raise ToolError(_in_both_lists(both))
+
+
+def _categories_after(
+    current: Sequence[str], *, add: Sequence[str], remove: Sequence[str]
+) -> tuple[str, ...] | None:
+    if not add and not remove:
+        return None
+    merged = merged_categories(current, add=add, remove=remove)
+    return None if merged == list(current) else tuple(merged)
 
 
 def _validated_span(starts_at: str, ends_at: str) -> None:
@@ -309,6 +411,14 @@ def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
             raise ToolError(_invited_twice(address))
 
 
+def _refusal(event: Event, patch: EventPatch) -> str | None:
+    if event.is_organizer is False:
+        return _NOT_THE_ORGANIZER
+    if patch == EventPatch():
+        return _categories_unchanged(event.categories or [])
+    return None
+
+
 def _patched(patch: EventPatch, *, before: Event) -> Event:
     body = event_patch_body(patch)
     if patch.attendees is not None:
@@ -330,34 +440,51 @@ def _reaches_an_attendee(body: Event, *, before: Event) -> bool:
 
 
 def _question(before: Event, patch: EventPatch) -> str:
-    changes: list[str] = []
-    if patch.subject is not None:
-        changes.append(f"the subject to {patch.subject!r}")
-    if patch.starts_at is not None:
-        changes.append(f"the time to {patch.starts_at} – {patch.ends_at} {patch.time_zone}")
-    if patch.location is not None:
-        changes.append(f"the location to {patch.location!r}")
-    if patch.attendees is not None:
-        invited = list(patch.attendees) + [
-            f"{one} (optional)" for one in patch.optional_attendees or ()
-        ]
-        changes.append(
-            f"the attendee list to {counted_people(invited)}: {', '.join(invited)}"
-            if invited
-            else "the attendee list to nobody"
-        )
+    changes = patch_changes(patch)
+    assert changes, "a patch that changes nothing is refused before anybody is asked"
+    said = changes[0] if len(changes) == 1 else f"{', '.join(changes[:-1])} and {changes[-1]}"
     name = before.subject or "this event"
-    said = "; ".join(changes)
     return " ".join(
         part
         for part in (
-            f"Update {name!r}: change {said}?",
+            f"Update {name!r}: {said}?",
             series_reach(before),
             "Microsoft mails every current attendee about this change, and this connector cannot "
             + "recall it.",
         )
         if part
     )
+
+
+def _about(uri: str, patch: EventPatch) -> str:
+    return confirmation_id_for(
+        uri,
+        *(
+            repr(value)
+            for value in (
+                patch.subject,
+                patch.starts_at,
+                patch.ends_at,
+                patch.time_zone,
+                patch.location,
+                _folded(patch.attendees),
+                _folded(patch.optional_attendees),
+                patch.show_as,
+                patch.categories,
+                patch.importance,
+                patch.sensitivity,
+                patch.is_reminder_on,
+                patch.reminder_minutes_before_start,
+                patch.hide_attendees,
+                patch.response_requested,
+                patch.allow_new_time_proposals,
+            )
+        ),
+    )
+
+
+def _folded(addresses: tuple[str, ...] | None) -> list[str] | None:
+    return None if addresses is None else sorted(address.casefold() for address in addresses)
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
@@ -394,6 +521,11 @@ def _answer(updated: Event, *, calendar_id: str, time_zone: str | None) -> Updat
         attendee_count=summary.attendee_count,
         web_link=summary.web_link,
         attendees=EventAttendee.each_of(updated.attendees),
+        is_reminder_on=updated.is_reminder_on,
+        reminder_minutes_before_start=updated.reminder_minutes_before_start,
+        hide_attendees=updated.hide_attendees,
+        response_requested=updated.response_requested,
+        allow_new_time_proposals=updated.allow_new_time_proposals,
     )
 
 
@@ -412,6 +544,29 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description="The event to change, from outlook_list_events or outlook_read_event.",
+            ),
+        ],
+        add_categories: Annotated[
+            list[str],
+            Field(
+                default=[],
+                description=(
+                    "The category names to add to the event, exactly as the user names them or "
+                    + "as outlook_list_categories reports them. This tool keeps the other "
+                    + "categories of the event. It does not add a name that the event already "
+                    + "has. This match ignores case."
+                ),
+            ),
+        ],
+        remove_categories: Annotated[
+            list[str],
+            Field(
+                default=[],
+                description=(
+                    "The category names to remove from the event. The match ignores case. A name "
+                    + "that the event does not have changes nothing. A name cannot be in both "
+                    + "this list and `add_categories`."
+                ),
             ),
         ],
         ctx: Context,
@@ -450,6 +605,28 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             list[str] | None,
             Field(description="The full optional-attendee list this event must now have."),
         ] = None,
+        show_as: Annotated[ShowAs | None, Field(description=SHOW_AS_CHANGE_FIELD)] = None,
+        importance: Annotated[
+            EventImportance | None, Field(description=IMPORTANCE_CHANGE_FIELD)
+        ] = None,
+        sensitivity: Annotated[
+            EventSensitivity | None, Field(description=SENSITIVITY_CHANGE_FIELD)
+        ] = None,
+        is_reminder_on: Annotated[
+            bool | None, Field(description=IS_REMINDER_ON_CHANGE_FIELD)
+        ] = None,
+        reminder_minutes_before_start: Annotated[
+            int | None, Field(ge=0, description=REMINDER_MINUTES_CHANGE_FIELD)
+        ] = None,
+        hide_attendees: Annotated[
+            bool | None, Field(description=HIDE_ATTENDEES_CHANGE_FIELD)
+        ] = None,
+        response_requested: Annotated[
+            bool | None, Field(description=RESPONSE_REQUESTED_CHANGE_FIELD)
+        ] = None,
+        allow_new_time_proposals: Annotated[
+            bool | None, Field(description=ALLOW_NEW_TIME_PROPOSALS_CHANGE_FIELD)
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> UpdatedEvent | InputRequiredResult:
         return await update_event(
@@ -462,5 +639,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             location=location,
             attendees=attendees,
             optional_attendees=optional_attendees,
+            show_as=show_as,
+            add_categories=add_categories,
+            remove_categories=remove_categories,
+            importance=importance,
+            sensitivity=sensitivity,
+            is_reminder_on=is_reminder_on,
+            reminder_minutes_before_start=reminder_minutes_before_start,
+            hide_attendees=hide_attendees,
+            response_requested=response_requested,
+            allow_new_time_proposals=allow_new_time_proposals,
             confirm=a_person_agrees(ctx),
         )
