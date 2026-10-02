@@ -542,6 +542,55 @@ class TestTheCalendarHandleGrammar:
         assert handles.drive_file_handle(uri) is None
 
 
+_CONTACT_ID = "AAMkAGI2SYNTHETIC-contact-0009="
+
+
+class TestTheContactHandleGrammar:
+    def test_a_contact_handle_round_trips_its_id(self) -> None:
+        handle = handles.ContactHandle(_CONTACT_ID)
+
+        assert handles.contact_handle(handle.uri) == handle
+
+    def test_the_id_is_percent_encoded_so_a_separator_inside_it_cannot_end_the_segment(
+        self,
+    ) -> None:
+        awkward = "AAMk/with/slashes?and=query#hash"
+
+        uri = handles.ContactHandle(awkward).uri
+
+        assert "/" not in uri.removeprefix("outlook:///contacts/")
+        assert handles.contact_handle(uri) == handles.ContactHandle(awkward)
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            f"outlook:///messages/{_CONTACT_ID}",
+            f"outlook:///folders/{_FOLDER_ID}",
+            f"outlook:///calendars/{_CALENDAR_ID}",
+            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
+            _MAIL_ATTACHMENT_URI,
+            _CHAT_URI,
+            "people:///contacts/AAMkAGI2",
+            "outlook:///contacts/",
+            "outlook:///contacts/%20",
+            "outlook:///contacts/a/b",
+            "outlook:///contacts",
+            "alexw@example.invalid",
+            "",
+        ],
+    )
+    def test_what_is_not_a_contact_handle(self, uri: str) -> None:
+        assert handles.contact_handle(uri) is None
+
+    def test_a_contact_handle_is_not_a_handle_of_another_family(self) -> None:
+        uri = handles.ContactHandle(_CONTACT_ID).uri
+
+        assert handles.mail_message_handle(uri) is None
+        assert handles.mail_folder_handle(uri) is None
+        assert handles.calendar_handle(uri) is None
+        assert handles.message_handle(uri) is None
+
+
 _ONENOTE_SECTION_ID = (
     "1-11111111-1111-4111-8111-111111111111!100-22222222-2222-4222-8222-222222222222"
 )

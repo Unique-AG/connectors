@@ -10,18 +10,18 @@
 ## Overview
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
-clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 89 tools in total. A
-deployment turns on a fixed subset of these 89 tools (never all of them, unless a preset or a
-list names every one). This document explains what each tool does, how a deployment picks its
-tools, and how sign-in and consent work.
+clients through the Microsoft Graph API. It reaches Outlook mail, calendar, and contacts,
+Microsoft Teams, SharePoint and OneDrive, OneNote, and user identity. The server has 91 tools in
+total. A deployment turns on a fixed subset of these 91 tools (never all of them, unless a preset
+or a list names every one). This document explains what each tool does, how a deployment picks
+its tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 89 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
-calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
-configuration. The Kind column is a hint to the calling client about the kind of change a tool
-makes. It does not control access to the tool.
+office-365-mcp has 91 tools, across seven areas: identity, Microsoft Teams, Outlook mail, Outlook
+calendar, Outlook contacts, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always
+on, in every configuration. The Kind column is a hint to the calling client about the kind of
+change a tool makes. It does not control access to the tool.
 
 The same hint also sets the error text that the model gets when Microsoft 365 fails or does not
 answer. For a tool that makes a change that is not safe to repeat, this text tells the model to
@@ -114,6 +114,13 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `outlook_delete_calendar` | Write, changes or removes, safe to repeat | `Calendars.ReadWrite`, `User.Read` | No | Removes one calendar that the signed-in user owns, only when the calendar holds no event. The tool always asks the user to approve this first. It looks for an event again after the user agrees. It refuses the default calendar, and a calendar that another person owns. |
 | `outlook_create_event_on_behalf` | Write, adds | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadWrite.Shared` | No | One event on a calendar delegated by another person, sent under that person's own name. The event can repeat as a series, and it can book rooms as resource attendees. It takes the same other arguments as `outlook_create_event`. |
 
+### Outlook contacts
+
+| Tool | Kind | Permission | Admin consent | What it does |
+| --- | --- | --- | --- | --- |
+| `outlook_list_contacts` | Read | `Contacts.Read` | No | The contacts in the default Contacts folder of the signed-in user. Each contact gives the names, the email addresses, the telephone numbers, the company, and the job title. With one email address, the list holds only the contacts that hold this address. |
+| `outlook_read_contact` | Read | `Contacts.Read` | No | One contact in full, from a handle that `outlook_list_contacts` minted. The answer also gives the department, the postal addresses, the birthday, the categories, and the notes about the person. |
+
 ### SharePoint and OneDrive
 
 | Tool | Kind | Permission | Admin consent | What it does |
@@ -151,7 +158,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 26 named bundles in the table below.
+- **A preset.** One of the 27 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -164,7 +171,7 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 26 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 27 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
@@ -190,6 +197,7 @@ description.
 | `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
 | `outlook-calendar-rooms` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_find_rooms` | Everything in `outlook-calendar-write`, plus finding a meeting room and its address. This preset needs admin consent for `Place.Read.All`. |
 | `outlook-group-calendar` | `teams_list_my_teams`, `outlook_list_group_events` | Finds a team, and lists the events on the calendar of the Microsoft 365 group of that team. |
+| `outlook-contacts` | `outlook_list_contacts`, `outlook_read_contact` | Lists the contacts in the default Contacts folder, and reads one contact in full. |
 | `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder` | Finds a file in OneDrive or on a SharePoint site, and lists one level of a folder. |
 | `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
 | `onenote-read` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | Lists notebooks, sections, and pages, and reads or previews a page. |
@@ -265,7 +273,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 26 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 27 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.

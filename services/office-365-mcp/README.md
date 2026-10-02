@@ -101,7 +101,8 @@ Each `outlook:///` mail family names a single id. An attachment handle is the ex
 every Graph route to an attachment goes through its message or its event. So a mail attachment
 handle names two ids, and an event attachment handle names three. A calendar handle also names a
 single id. Microsoft states that a container type has no immutable id, because its regular ids
-"were already constant".
+"were already constant". A contact handle, `outlook:///contacts/{contact}`, also names a single
+id.
 
 An event handle is `outlook:///events/{calendar}/{event}`, two segments. An event id is meaningful
 only next to the calendar it was read from. Graph answers a different id for the same meeting in a

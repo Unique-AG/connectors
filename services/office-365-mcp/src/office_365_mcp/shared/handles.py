@@ -219,6 +219,15 @@ class CalendarPermissionHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class ContactHandle:
+    contact_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///contacts/{_segment(self.contact_id)}"
+
+
+@dataclass(frozen=True, slots=True)
 class DriveFileHandle:
     drive_id: str
     item_id: str
@@ -300,6 +309,7 @@ _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
 _EVENT_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)/attachments/([^/]+)\Z")
 _CALENDAR_PERMISSION_HANDLE = re.compile(r"\Aoutlook:///calendarpermissions/([^/]+)/([^/]+)\Z")
+_CONTACT_HANDLE = re.compile(r"\Aoutlook:///contacts/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
 _ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
@@ -403,6 +413,11 @@ def event_attachment_handle(uri: str) -> EventAttachmentHandle | None:
 def calendar_permission_handle(uri: str) -> CalendarPermissionHandle | None:
     ids = _two_ids(_CALENDAR_PERMISSION_HANDLE, uri)
     return None if ids is None else CalendarPermissionHandle(*ids)
+
+
+def contact_handle(uri: str) -> ContactHandle | None:
+    contact_id = _single_id(_CONTACT_HANDLE, uri)
+    return None if contact_id is None else ContactHandle(contact_id)
 
 
 def drive_file_handle(uri: str) -> DriveFileHandle | None:

@@ -440,6 +440,18 @@
           ]
         },
         {
+          "name": "outlook_list_contacts",
+          "permissions": [
+            "Contacts.Read"
+          ]
+        },
+        {
+          "name": "outlook_read_contact",
+          "permissions": [
+            "Contacts.Read"
+          ]
+        },
+        {
           "name": "sharepoint_search_files",
           "permissions": [
             "Files.Read.All"
@@ -646,6 +658,8 @@
         "outlook_share_calendar",
         "outlook_unshare_calendar",
         "outlook_delete_calendar",
+        "outlook_list_contacts",
+        "outlook_read_contact",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_read_file",
@@ -919,6 +933,10 @@
           "teams_list_my_teams",
           "outlook_list_group_events"
         ],
+        "outlook-contacts": [
+          "outlook_list_contacts",
+          "outlook_read_contact"
+        ],
         "sharepoint-search": [
           "sharepoint_search_files",
           "sharepoint_browse_folder"
@@ -1009,6 +1027,7 @@
         "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
+        "Contacts.Read",
         "Files.Read.All",
         "Notes.Read",
         "Notes.Create",
@@ -1044,7 +1063,8 @@
         "Notes.Read": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,
-        "Place.Read.All": true
+        "Place.Read.All": true,
+        "Contacts.Read": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",
