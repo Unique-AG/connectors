@@ -1,7 +1,5 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -16,8 +14,23 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.shared.messages import Mention, TeamsMessage, outgoing_message
-from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.messages import (
+    CHANNEL_ID_FIELD,
+    CHANNEL_IMPORTANCE_FIELD,
+    CHANNEL_POST,
+    CHANNEL_SUBJECT_FIELD,
+    MENTIONS_FIELD,
+    MESSAGE_FIELD,
+    REPLY_TO_ID_FIELD,
+    TEAM_ID_FIELD,
+    ChannelImportance,
+    Mention,
+    TeamsMessage,
+    outgoing_message,
+    send_binding,
+    send_question,
+    subject_on_a_reply,
+)
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -40,21 +53,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message": "Ship it.",
 }
 
-type ChannelImportance = Literal["normal", "high"]
-
-_AGREE = "post"
-_DECLINE = "do not post"
-_NOTHING_SENT = "Nothing was posted."
-_CANNOT_BE_RECALLED = "This cannot be recalled once posted."
-
-_SUBJECT_ON_A_REPLY = (
-    "teams_send_channel_message received both `subject` and `reply_to_id`. This tool sets a "
-    + "subject only on a new channel post, never on a reply. To reply in the thread, omit "
-    + "`subject`. To start a new post with a subject, omit `reply_to_id`. "
-    + f"{_NOTHING_SENT} If you call this tool again with the same arguments, the call will fail "
-    + "the same way."
-)
-
 _DESCRIPTION = """\
 Posts one new message as the signed-in user to an existing channel of a Teams team. With \
 `reply_to_id`, this tool replies in the thread of an existing post. The message can @mention \
@@ -66,7 +64,7 @@ Notes:
 - This tool asks the user to agree before it posts anything, every time. This tool posts \
 nothing unless the user agrees.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
-teams_browse_channel does not already show the message.
+the channel does not already show the message.
 """
 
 
@@ -83,24 +81,22 @@ async def send_channel_message(
     reply_to_id: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
     if subject is not None and reply_to_id is not None:
-        raise ToolError(_SUBJECT_ON_A_REPLY)
-    question = _question(
+        raise ToolError(subject_on_a_reply(TOOL_NAME))
+    where = "to" if reply_to_id is None else f"as a reply to post {reply_to_id!r} in"
+    question = send_question(
+        CHANNEL_POST,
         message,
-        team_id,
-        channel_id,
+        f"{where} channel {channel_id!r} in team {team_id!r}",
         mentions,
         subject=subject,
         importance=importance,
-        reply_to_id=reply_to_id,
     )
-    about = _about(
+    about = send_binding(
+        (team_id, channel_id, repr(reply_to_id)),
         message,
-        team_id,
-        channel_id,
         mentions,
         subject=subject,
         importance=importance,
-        reply_to_id=reply_to_id,
     )
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
@@ -122,11 +118,12 @@ async def send_channel_message(
                 subject=subject,
             )
             messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
+            configuration = RequestConfiguration[QueryParameters](options=no_retry())
             sent = await (
-                messages.post(outgoing, request_configuration=_send_request())
+                messages.post(outgoing, request_configuration=configuration)
                 if reply_to_id is None
                 else messages.by_chat_message_id(reply_to_id).replies.post(
-                    outgoing, request_configuration=_send_request()
+                    outgoing, request_configuration=configuration
                 )
             )
 
@@ -144,58 +141,13 @@ async def send_channel_message(
     )
 
 
-def _question(
-    message: str,
-    team_id: str,
-    channel_id: str,
-    mentions: Sequence[Mention],
-    *,
-    subject: str | None,
-    importance: ChannelImportance | None,
-    reply_to_id: str | None,
-) -> str:
-    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
-    mentioned = f" It mentions {named}." if mentions else ""
-    details = [
-        text
-        for text in (
-            None if subject is None else f"the subject {cut_for_a_question(subject)!r}",
-            None if importance is None else f"{importance} importance",
-        )
-        if text is not None
-    ]
-    marked = f" with {' and '.join(details)}" if details else ""
-    where = "to" if reply_to_id is None else f"as a reply to post {reply_to_id!r} in"
-    return (
-        f"Post {cut_for_a_question(message)!r}{marked} {where} channel {channel_id!r} in team "
-        + f"{team_id!r} now?{mentioned} {_CANNOT_BE_RECALLED}"
-    )
-
-
-def _about(
-    message: str,
-    team_id: str,
-    channel_id: str,
-    mentions: Sequence[Mention],
-    *,
-    subject: str | None,
-    importance: ChannelImportance | None,
-    reply_to_id: str | None,
-) -> str:
-    mentioned = [[mention.user_id, mention.name] for mention in mentions]
-    return hashlib.sha256(
-        json.dumps(
-            [team_id, channel_id, reply_to_id, message, mentioned, subject, importance]
-        ).encode()
-    ).hexdigest()
-
-
-def _send_request() -> RequestConfiguration[QueryParameters]:
-    return RequestConfiguration[QueryParameters](options=no_retry())
-
-
 def a_person_agrees(ctx: Context) -> Confirm:
-    return person_confirms(ctx, agree=_AGREE, decline=_DECLINE, nothing_happened=_NOTHING_SENT)
+    return person_confirms(
+        ctx,
+        agree=CHANNEL_POST.agree,
+        decline=CHANNEL_POST.decline,
+        nothing_happened=CHANNEL_POST.nothing_sent,
+    )
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -208,67 +160,19 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=WRITE_ADDITIVE,
     )
     async def teams_send_channel_message(
-        team_id: Annotated[
-            str,
-            Field(
-                min_length=1,
-                description="The team the channel is in, as reported by teams_list_my_teams.",
-            ),
-        ],
-        channel_id: Annotated[
-            str,
-            Field(
-                min_length=1,
-                description="The channel to post to, as reported by teams_list_channels.",
-            ),
-        ],
-        message: Annotated[
-            str,
-            Field(min_length=1, description="The message to send, as plain text."),
-        ],
-        mentions: Annotated[
-            list[Mention],
-            Field(
-                default=[],
-                description=(
-                    "The people to @mention, one entry for each person. This tool writes the "
-                    + "mention markup itself, so `message` stays plain text. An empty list posts "
-                    + "a message with no mention."
-                ),
-            ),
-        ],
+        team_id: Annotated[str, Field(min_length=1, description=TEAM_ID_FIELD)],
+        channel_id: Annotated[str, Field(min_length=1, description=CHANNEL_ID_FIELD)],
+        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
         subject: Annotated[
-            str | None,
-            Field(
-                min_length=1,
-                description=(
-                    "The subject of the new channel post, as plain text. Omit this parameter to "
-                    + "post the message with no subject. This tool refuses a subject together "
-                    + "with `reply_to_id`."
-                ),
-            ),
+            str | None, Field(min_length=1, description=CHANNEL_SUBJECT_FIELD)
         ] = None,
         importance: Annotated[
-            ChannelImportance | None,
-            Field(
-                description=(
-                    "The importance of the new message: `normal` or `high`. Set this parameter "
-                    + "only when the user asks for an importance."
-                ),
-            ),
+            ChannelImportance | None, Field(description=CHANNEL_IMPORTANCE_FIELD)
         ] = None,
         reply_to_id: Annotated[
-            str | None,
-            Field(
-                min_length=1,
-                description=(
-                    "The `message_id` of the channel post to reply to, as teams_browse_channel or "
-                    + "teams_read_message reports it. Give the id of a post, never the id of a "
-                    + "reply. To answer a reply, give the `reply_to_id` of that reply. Omit this "
-                    + "parameter to start a new post."
-                ),
-            ),
+            str | None, Field(min_length=1, description=REPLY_TO_ID_FIELD)
         ] = None,
         client: GraphServiceClient = graph,
     ) -> TeamsMessage | InputRequiredResult:

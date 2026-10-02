@@ -396,6 +396,8 @@ def outgoing_message(
 
 type ChatImportance = Literal["normal", "high", "urgent"]
 
+type ChannelImportance = Literal["normal", "high"]
+
 
 @dataclass(frozen=True, slots=True)
 class SendWords:
@@ -412,6 +414,14 @@ CHAT_SEND = SendWords(
     decline="do not send",
     nothing_sent="Nothing was sent.",
     cannot_be_recalled="This cannot be recalled once sent.",
+)
+
+CHANNEL_POST = SendWords(
+    verb="Post",
+    agree="post",
+    decline="do not post",
+    nothing_sent="Nothing was posted.",
+    cannot_be_recalled="This cannot be recalled once posted.",
 )
 
 CHAT_ID_FIELD: str = (
@@ -438,6 +448,41 @@ CHAT_SUBJECT_FIELD: str = (
     "The subject of the new chat message, as plain text. Omit this parameter to send the message "
     + "with no subject."
 )
+
+TEAM_ID_FIELD: str = (
+    "The team that holds the channel, as the `team_id` that teams_list_my_teams reported. It is "
+    + "a GUID, not a `teams:///` handle."
+)
+
+CHANNEL_ID_FIELD: str = (
+    "The channel to post to, as the `channel_id` that teams_list_channels reported for this team, "
+    + "for example `19:...@thread.tacv2`. It is not a `teams:///` handle."
+)
+
+REPLY_TO_ID_FIELD: str = (
+    "The `message_id` of the channel post to reply to, as teams_browse_channel or "
+    + "teams_read_message reports it. Give the id of a post, never the id of a reply. To answer a "
+    + "reply, give the `reply_to_id` of that reply. Omit this parameter to start a new post."
+)
+
+CHANNEL_SUBJECT_FIELD: str = (
+    "The subject of the new channel post, as plain text. Omit this parameter to post the message "
+    + "with no subject. This tool refuses a subject together with `reply_to_id`."
+)
+
+CHANNEL_IMPORTANCE_FIELD: str = (
+    "The importance of the new message: `normal` or `high`. Set this parameter only when the user "
+    + "asks for an importance."
+)
+
+
+def subject_on_a_reply(tool: str) -> str:
+    return (
+        f"{tool} received both `subject` and `reply_to_id`. This tool sets a subject only on a new "
+        + "channel post, never on a reply. To reply in the thread, omit `subject`. To start a new "
+        + f"post with a subject, omit `reply_to_id`. {CHANNEL_POST.nothing_sent} If you call this "
+        + "tool again with the same arguments, the call will fail the same way."
+    )
 
 
 def send_question(

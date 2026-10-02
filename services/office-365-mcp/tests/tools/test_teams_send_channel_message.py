@@ -21,16 +21,18 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, graph_errors
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+    graph_errors,
+)
 from office_365_mcp.shared.handles import MessageHandle, message_handle
-from office_365_mcp.shared.messages import Mention, TeamsMessage
+from office_365_mcp.shared.messages import ChannelImportance, Mention, TeamsMessage
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_channel_message as sender
-from office_365_mcp.tools.teams_send_channel_message import (
-    ChannelImportance,
-    a_person_agrees,
-    send_channel_message,
-)
+from office_365_mcp.tools.teams_send_channel_message import a_person_agrees, send_channel_message
 
 from .conftest import TEAMS_SENDER, message_payload
 
@@ -260,132 +262,6 @@ class TestThePersonBeforeThePost:
         assert "subject" not in question
         assert "importance" not in question
 
-    def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
-        common_prefix = "x" * 120
-
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " short tail",
-            _TEAM_ID,
-            _CHANNEL_ID,
-            (),
-            subject=None,
-            importance=None,
-            reply_to_id=None,
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " a very different, much longer tail",
-            _TEAM_ID,
-            _CHANNEL_ID,
-            (),
-            subject=None,
-            importance=None,
-            reply_to_id=None,
-        )
-
-        assert first != second
-
-    def test_the_binding_differs_for_the_same_message_to_a_different_channel(self) -> None:
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _TEAM_ID, _CHANNEL_ID, (), subject=None, importance=None, reply_to_id=None
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE,
-            _TEAM_ID,
-            "19:other@thread.tacv2",
-            (),
-            subject=None,
-            importance=None,
-            reply_to_id=None,
-        )
-        assert first != second
-
-    def test_the_binding_differs_when_only_the_importance_differs(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE,
-                _TEAM_ID,
-                _CHANNEL_ID,
-                (),
-                subject=None,
-                importance=importance,
-                reply_to_id=None,
-            )
-            for importance in (None, "normal", "high")
-        }
-
-        assert len(bindings) == 3
-
-    def test_the_binding_differs_when_only_the_subject_differs(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE,
-                _TEAM_ID,
-                _CHANNEL_ID,
-                (),
-                subject=subject,
-                importance=None,
-                reply_to_id=None,
-            )
-            for subject in (None, _SUBJECT, "Release plan, revised")
-        }
-
-        assert len(bindings) == 3
-
-    def test_the_binding_keeps_the_subject_and_the_message_apart(self) -> None:
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            "Ship it",
-            _TEAM_ID,
-            _CHANNEL_ID,
-            (),
-            subject="Friday",
-            importance=None,
-            reply_to_id=None,
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            "Ship it Friday",
-            _TEAM_ID,
-            _CHANNEL_ID,
-            (),
-            subject=None,
-            importance=None,
-            reply_to_id=None,
-        )
-
-        assert first != second
-
-    def test_the_binding_differs_when_only_the_mentions_differ(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE,
-                _TEAM_ID,
-                _CHANNEL_ID,
-                mentions,
-                subject=None,
-                importance=None,
-                reply_to_id=None,
-            )
-            for mentions in (
-                (),
-                (_JANE,),
-                (_ADA,),
-                (_JANE, _ADA),
-                (_ADA, _JANE),
-                (Mention(user_id=_JANE.user_id, name="Ada Lovelace"),),
-            )
-        }
-
-        assert len(bindings) == 6
-
-    def test_the_binding_differs_for_a_new_post_and_for_a_reply_in_each_thread(self) -> None:
-        bindings = {
-            sender._about(  # pyright: ignore[reportPrivateUsage]
-                _MESSAGE, _TEAM_ID, _CHANNEL_ID, (), subject=None, importance=None, reply_to_id=root
-            )
-            for root in (None, _ROOT_ID, "1770000000009")
-        }
-
-        assert len(bindings) == 3
-
     async def test_the_question_for_a_reply_names_the_post_it_answers(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -407,6 +283,35 @@ class TestThePersonBeforeThePost:
             _ = await _send(client, confirm=_refuses, reply_to_id=_ROOT_ID)
 
         assert reply.call_count == 0, "a declined reply still reached the thread"
+
+    async def test_the_binding_differs_for_each_team_each_channel_and_each_thread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return _NOTHING_SENT
+
+        for team_id, channel_id, reply_to_id in (
+            (_TEAM_ID, _CHANNEL_ID, None),
+            ("0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6", _CHANNEL_ID, None),
+            (_TEAM_ID, "19:other@thread.tacv2", None),
+            (_TEAM_ID, _CHANNEL_ID, _ROOT_ID),
+        ):
+            with pytest.raises(ToolError, match=_NOTHING_SENT):
+                _ = await send_channel_message(
+                    client,
+                    team_id=team_id,
+                    channel_id=channel_id,
+                    message=_MESSAGE,
+                    confirm=capturing,
+                    reply_to_id=reply_to_id,
+                )
+
+        assert len(set(bound)) == 4
+        assert len(graph.calls) == 0
 
     async def test_a_subject_on_a_reply_is_refused_before_anybody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -851,7 +756,7 @@ class TestTheRetryItRefuses:
     ) -> None:
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphUnavailable):
             _ = await _send(client, confirm=_agrees)
 
         assert post.call_count == 1
@@ -862,7 +767,7 @@ class TestTheRetryItRefuses:
     ) -> None:
         reply = graph.post(_REPLY_PATH).mock(return_value=httpx.Response(503))
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphUnavailable):
             _ = await _send(client, confirm=_agrees, reply_to_id=_ROOT_ID)
 
         assert reply.call_count == 1
@@ -875,7 +780,7 @@ class TestTheRetryItRefuses:
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
         )
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphThrottled):
             _ = await _send(client, confirm=_agrees)
 
         assert post.call_count == 1
@@ -998,6 +903,23 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         assert "nothing here can recall it" in (tool.description or "")
+
+    async def test_the_retry_note_names_no_tool_and_the_outage_advice_names_the_reader(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        (retry,) = [
+            " ".join(bullet.split())
+            for bullet in (tool.description or "").split("\n- ")
+            if bullet.startswith("If a call times out")
+        ]
+        assert retry == (
+            "If a call times out, do not call this tool again first. Before you call again, make "
+            + "sure that the channel does not already show the message."
+        )
+        assert "teams_browse_channel" not in retry
+        assert sender.CHANGE_SHOWN_BY == ("teams_browse_channel",)
 
     async def test_the_description_says_reply_to_id_replies_in_a_thread(
         self, transport: httpx.AsyncClient

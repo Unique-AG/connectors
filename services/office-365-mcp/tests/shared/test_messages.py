@@ -6,13 +6,16 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from pydantic import ValidationError
 
 from office_365_mcp.shared.messages import (
+    CHANNEL_POST,
     CHAT_SEND,
+    ChannelImportance,
     ChatImportance,
     Mention,
     mention_fields,
     outgoing_message,
     send_binding,
     send_question,
+    subject_on_a_reply,
 )
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
@@ -22,6 +25,11 @@ _CHAT_ID = "19:release@thread.v2"
 _TO_THE_CHAT = f"to chat {_CHAT_ID!r}"
 _MESSAGE = "Ship it Friday."
 _SUBJECT = "Release plan"
+
+_TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_ROOT_ID = "1770000000001"
+_TO_THE_CHANNEL = f"to channel {_CHANNEL_ID!r} in team {_TEAM_ID!r}"
 
 
 class TestOutgoingMessage:
@@ -146,6 +154,18 @@ class TestSendQuestion:
             + "be recalled once sent."
         )
 
+    def test_a_channel_post_names_the_channel_the_team_and_that_it_cannot_be_recalled(
+        self,
+    ) -> None:
+        question = send_question(
+            CHANNEL_POST, _MESSAGE, _TO_THE_CHANNEL, (), subject=None, importance=None
+        )
+
+        assert question == (
+            "Post 'Ship it Friday.' to channel '19:general@thread.tacv2' in team "
+            + "'8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81' now? This cannot be recalled once posted."
+        )
+
 
 def _bound(
     message: str = _MESSAGE,
@@ -196,6 +216,56 @@ class TestSendBinding:
         )
 
         assert len({_bound(mentions=mentions) for mentions in sets}) == 6
+
+
+def _bound_in_channel(
+    *,
+    team_id: str = _TEAM_ID,
+    channel_id: str = _CHANNEL_ID,
+    reply_to_id: str | None = None,
+    mentions: Sequence[Mention] = (),
+    subject: str | None = None,
+    importance: ChannelImportance | None = None,
+) -> str:
+    return send_binding(
+        (team_id, channel_id, repr(reply_to_id)),
+        _MESSAGE,
+        mentions,
+        subject=subject,
+        importance=importance,
+    )
+
+
+class TestSendBindingInAChannel:
+    def test_the_same_message_to_another_team_or_another_channel_is_bound_apart(self) -> None:
+        bindings = {
+            _bound_in_channel(),
+            _bound_in_channel(team_id="0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6"),
+            _bound_in_channel(channel_id="19:other@thread.tacv2"),
+        }
+
+        assert len(bindings) == 3
+
+    def test_a_new_post_and_a_reply_in_each_thread_are_bound_apart(self) -> None:
+        roots = (None, _ROOT_ID, "1770000000009")
+
+        assert len({_bound_in_channel(reply_to_id=root) for root in roots}) == 3
+
+    def test_each_importance_of_a_channel_post_is_bound_apart(self) -> None:
+        importances: tuple[ChannelImportance | None, ...] = (None, "normal", "high")
+
+        assert len({_bound_in_channel(importance=importance) for importance in importances}) == 3
+
+
+class TestSubjectOnAReply:
+    def test_it_names_the_tool_says_nothing_was_posted_and_that_a_retry_fails(self) -> None:
+        assert subject_on_a_reply("teams_send_channel_message") == (
+            "teams_send_channel_message received both `subject` and `reply_to_id`. This tool sets "
+            + "a subject only on a new channel post, never on a reply. To reply in the thread, "
+            + "omit `subject`. To start a new post with a subject, omit `reply_to_id`. Nothing was "
+            + "posted. If you call this tool again with the same arguments, the call will fail the "
+            + "same way."
+        )
 
 
 class TestMentionFields:
