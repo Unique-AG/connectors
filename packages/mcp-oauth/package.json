@@ -19,7 +19,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@nestjs/schedule": "catalog:",
-    "@nestjs/throttler": "6.5.0",
+    "@nestjs/throttler": "6.7.1",
     "bcrypt": "6.0.0",
     "nestjs-zod": "catalog:",
     "reflect-metadata": "catalog:",
