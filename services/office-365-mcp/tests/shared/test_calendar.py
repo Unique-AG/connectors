@@ -2321,22 +2321,50 @@ class TestWhatARuleIsRefusedFor:
         assert recurrence_refusal("outlook_create_event", None, starts_on=_FIRST_DAY) is None
 
 
-class TestTheSeriesAChangeReaches:
-    def test_a_series_master_reaches_every_occurrence(self) -> None:
-        assert series_reach(Event(type=EventType.SeriesMaster)) == (
-            "The change applies to every occurrence of the series."
-        )
+class TestTheSeriesAnActionReaches:
+    @pytest.mark.parametrize(
+        ("what", "said"),
+        [
+            ("change", "The change applies to every occurrence of the series."),
+            ("cancellation", "The cancellation applies to every occurrence of the series."),
+            ("delete", "The delete applies to every occurrence of the series."),
+        ],
+    )
+    def test_a_series_master_reaches_every_occurrence(self, what: str, said: str) -> None:
+        assert series_reach(Event(type=EventType.SeriesMaster), what=what) == said
 
     @pytest.mark.parametrize("kind", [EventType.Occurrence, EventType.Exception])
-    def test_one_date_of_a_series_reaches_only_that_date(self, kind: EventType) -> None:
-        assert series_reach(Event(type=kind)) == (
-            "The change applies only to this one date. The other occurrences of the series stay "
-            + "as they are."
-        )
+    @pytest.mark.parametrize(
+        ("what", "said"),
+        [
+            (
+                "change",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+            (
+                "cancellation",
+                "The cancellation applies only to this one date. The other occurrences of the "
+                + "series stay as they are.",
+            ),
+            (
+                "delete",
+                "The delete applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+        ],
+    )
+    def test_one_date_of_a_series_reaches_only_that_date(
+        self, kind: EventType, what: str, said: str
+    ) -> None:
+        assert series_reach(Event(type=kind), what=what) == said
 
+    @pytest.mark.parametrize("what", ["change", "cancellation", "delete"])
     @pytest.mark.parametrize("kind", [EventType.SingleInstance, None])
-    def test_an_event_in_no_series_says_nothing_about_one(self, kind: EventType | None) -> None:
-        assert series_reach(Event(type=kind)) == ""
+    def test_an_event_in_no_series_says_nothing_about_one(
+        self, kind: EventType | None, what: str
+    ) -> None:
+        assert series_reach(Event(type=kind), what=what) == ""
 
 
 class TestTheCreateResponse:

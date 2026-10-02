@@ -192,6 +192,11 @@ RECURRENCE_FIELD = (
     + "later date."
 )
 
+SERIES_MASTER_FIELD = (
+    "True when the event was the master of a recurring series, and false for a single event, an "
+    + "occurrence, or an exception. Graph reports this in the `type` of the event."
+)
+
 STORED_SHOW_AS_FIELD = (
     "The free-busy status as Microsoft stored it, read from the response and not from the "
     + "arguments. Microsoft can also report `unknown`. This field is null when Graph did not say."
@@ -1365,12 +1370,12 @@ def _rule_spelled(rule: RecurrenceRule | None) -> list[str]:
     return [] if rule is None else [rule.model_dump_json()]
 
 
-def series_reach(event: Event) -> str:
+def series_reach(event: Event, *, what: str) -> str:
     if event.type == EventType.SeriesMaster:
-        return "The change applies to every occurrence of the series."
+        return f"The {what} applies to every occurrence of the series."
     if event.type in (EventType.Occurrence, EventType.Exception):
         return (
-            "The change applies only to this one date. The other occurrences of the series stay "
+            f"The {what} applies only to this one date. The other occurrences of the series stay "
             + "as they are."
         )
     return ""

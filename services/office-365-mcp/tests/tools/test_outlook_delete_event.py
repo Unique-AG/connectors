@@ -27,7 +27,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.calendar import SERIES_MASTER_FIELD, confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_event as deleter
@@ -47,7 +47,14 @@ _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
 
 _NO_RESTORE = "Microsoft does not document whether a deleted event can be restored."
-_EVERY_OCCURRENCE = "every occurrence of the series"
+_EVERY_OCCURRENCE = "The delete applies to every occurrence of the series."
+_ONE_DATE = (
+    "The delete applies only to this one date. The other occurrences of the series stay as they "
+    + "are."
+)
+_SAME_FAILURE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
 
 
 def _attendee(address: str, *, kind: str = "required") -> dict[str, object]:
@@ -232,17 +239,26 @@ class TestThePersonBetweenTheRequestAndTheDelete:
             client, graph, _event(kind="seriesMaster", attendees=[_attendee(_ADA)])
         )
 
-        assert "master of a recurring series" in question
         assert _EVERY_OCCURRENCE in question
+        assert _ONE_DATE not in question
         assert _ADA in question
 
-    @pytest.mark.parametrize("kind", ["singleInstance", "occurrence", "exception"])
-    async def test_the_question_for_an_event_that_is_not_a_master_names_no_series(
+    @pytest.mark.parametrize("kind", ["occurrence", "exception"])
+    async def test_the_question_for_one_date_of_a_series_says_only_that_date_goes(
         self, client: GraphServiceClient, graph: respx.MockRouter, kind: str
     ) -> None:
-        question = await _asked(client, graph, _event(kind=kind))
+        question = await _asked(client, graph, _event(kind=kind, attendees=[_attendee(_ADA)]))
 
+        assert _ONE_DATE in question
         assert _EVERY_OCCURRENCE not in question
+        assert _ADA in question
+
+    async def test_the_question_for_a_single_event_names_no_series(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        question = await _asked(client, graph, _event(kind="singleInstance"))
+
+        assert "series" not in question
 
     async def test_the_question_names_an_event_with_no_subject(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -277,6 +293,14 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    async def test_the_refusal_of_a_bad_handle_ends_with_the_canonical_retry_sentence(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as raised:
+            _ = await _delete(client, uri="outlook:///calendars/x")
+
+        assert str(raised.value).endswith(_SAME_FAILURE)
+
     @pytest.mark.parametrize("is_organizer", [False, None], ids=["attendee", "unknown"])
     async def test_an_event_the_signed_in_user_does_not_organize_is_never_deleted(
         self, client: GraphServiceClient, graph: respx.MockRouter, is_organizer: bool | None
@@ -307,6 +331,7 @@ class TestWhatItRefuses:
         message = str(raised.value)
         assert "outlook_respond_to_invite can decline the invitation" in message
         assert "The event was not deleted." in message
+        assert message.endswith(_SAME_FAILURE)
 
 
 class TestTheRetryItRefuses:
@@ -587,3 +612,9 @@ class TestHowItDeclaresItself:
 
     def test_not_found_advice_points_at_the_lister(self) -> None:
         assert "outlook_list_events" in deleter.GRAPH_NOT_FOUND
+
+    def test_the_series_master_field_has_the_one_description_of_the_series_fact(self) -> None:
+        assert DeletedEvent.model_fields["series_master"].description == SERIES_MASTER_FIELD
+
+    def test_the_not_found_advice_ends_with_the_canonical_retry_sentence(self) -> None:
+        assert deleter.GRAPH_NOT_FOUND.endswith(_SAME_FAILURE)

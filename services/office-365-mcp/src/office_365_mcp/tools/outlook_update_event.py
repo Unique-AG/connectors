@@ -514,7 +514,7 @@ def _question(before: Event, patch: EventPatch) -> str:
         part
         for part in (
             f"Update {name!r}: {said}?",
-            series_reach(before),
+            series_reach(before, what="change"),
             "Microsoft mails every current attendee about this change, and this connector cannot "
             + "recall it.",
         )

@@ -6,12 +6,16 @@ from urllib.parse import quote
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnavailable
+from office_365_mcp.shared.calendar import SERIES_MASTER_FIELD
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.tools import outlook_cancel_event as canceller
 from office_365_mcp.tools.outlook_cancel_event import CancelledEvent, cancel_event
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
@@ -112,6 +116,14 @@ async def _cancel(
 
 def _sent(route: respx.Route) -> dict[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
+
+
+async def _registered(transport: httpx.AsyncClient) -> Tool:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    canceller.register(mcp, transport)
+    tool = await mcp.get_tool(canceller.TOOL_NAME)
+    assert tool is not None, "register left the tool off the server"
+    return tool
 
 
 class TestWhatItSendsToGraph:
@@ -219,16 +231,16 @@ class TestThePersonBetweenTheRequestAndTheCancellationMail:
     @pytest.mark.parametrize(
         ("kind", "said"),
         [
-            ("seriesMaster", "The change applies to every occurrence of the series."),
+            ("seriesMaster", "The cancellation applies to every occurrence of the series."),
             (
                 "occurrence",
-                "The change applies only to this one date. The other occurrences of the series "
-                + "stay as they are.",
+                "The cancellation applies only to this one date. The other occurrences of the "
+                + "series stay as they are.",
             ),
             (
                 "exception",
-                "The change applies only to this one date. The other occurrences of the series "
-                + "stay as they are.",
+                "The cancellation applies only to this one date. The other occurrences of the "
+                + "series stay as they are.",
             ),
         ],
     )
@@ -250,6 +262,25 @@ class TestThePersonBetweenTheRequestAndTheCancellationMail:
             f"Cancel 'Weekly sync'? {said} Microsoft mails a cancellation to {_ADA}, and this "
             + "connector cannot recall it."
         ]
+
+    async def test_a_series_master_with_nobody_on_it_is_cancelled_without_asking_and_says_so(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(kind="seriesMaster", attendees=[]))
+        cancel = _cancels(graph)
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        answer = await _cancel(client, confirm=counting)
+
+        assert asked == [], "cancelling a series with nobody on it interrupted the user"
+        assert cancel.call_count == 1
+        assert answer.series_master is True
+        assert answer.notified is False
 
     async def test_the_question_about_a_single_event_names_no_series(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -353,6 +384,7 @@ class TestWhatItAnswers:
         assert [a.address for a in answer.attendees] == [_ADA]
         assert answer.comment == "No longer needed"
         assert answer.notified is True
+        assert answer.series_master is False
 
     async def test_an_event_with_nobody_on_it_reports_notified_false(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -363,3 +395,93 @@ class TestWhatItAnswers:
 
         assert answer.attendees == []
         assert answer.notified is False
+
+    async def test_a_series_master_with_an_attendee_is_reported_as_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _event(kind="seriesMaster", attendees=[_attendee(_ADA)]))
+
+        answer = await _cancel(client)
+
+        assert answer.series_master is True
+        assert answer.notified is True
+
+    @pytest.mark.parametrize("kind", ["singleInstance", "occurrence", "exception"])
+    async def test_an_event_that_is_not_a_master_is_not_reported_as_a_series(
+        self, client: GraphServiceClient, graph: respx.MockRouter, kind: str
+    ) -> None:
+        _ = _ready(graph, _event(kind=kind))
+
+        answer = await _cancel(client)
+
+        assert answer.series_master is False
+
+
+class TestHowItDescribesItself:
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert lead.strip() != ""
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
+
+    async def test_the_description_says_who_is_mailed_and_names_the_sibling_tools(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "Cancels one event that the signed-in user organizes." in description
+        assert "moves the event to Deleted Items" in description
+        assert "mails each attendee a cancellation with the optional comment" in description
+        assert "Nothing here can recall the cancellation." in description
+        assert "If this deployment exposes outlook_delete_event" in description
+        assert (
+            "outlook_respond_to_invite declines an event that somebody else organizes."
+            in description
+        )
+        assert "This tool refuses an event that the user does not organize." in description
+
+    async def test_the_description_asks_the_user_to_agree_in_the_words_of_the_other_tools(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert (
+            "This tool asks the user to agree before it cancels an event that has an attendee. "
+            + "This tool cancels nothing unless the user agrees. This tool cancels an event "
+            + "without that agreement only when the event has no attendee."
+        ) in (tool.description or "")
+
+    async def test_the_description_says_how_far_a_cancel_of_a_series_reaches(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "The `uri` of a series master cancels every occurrence of the series." in description
+        assert "The `uri` of one occurrence cancels only that date." in description
+        assert "`series_master` true when the cancel reached the whole series" in description
+
+    async def test_the_description_says_what_to_do_after_a_timeout(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert (
+            "If a call times out, do not call this tool again first. A cancellation can already "
+            + "be out."
+        ) in description
+        assert (
+            "Before you call again, make sure that outlook_read_event still shows the event."
+            in description
+        )
+
+    def test_the_series_master_field_has_the_one_description_of_the_series_fact(self) -> None:
+        assert CancelledEvent.model_fields["series_master"].description == SERIES_MASTER_FIELD

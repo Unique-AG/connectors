@@ -15,11 +15,13 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import (
+    SERIES_MASTER_FIELD,
     EventAttendee,
     EventTime,
     confirmation_id_for,
     event_of,
     event_time,
+    series_reach,
 )
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -74,8 +76,8 @@ _NOT_A_HANDLE = (
     + "reported, and this is not one. An event handle has exactly one shape:\n"
     + "  outlook:///events/{calendar_id}/{event_id}\n"
     + "with both ids percent-encoded. The event was not deleted. Copy the `uri` of a tool result, "
-    + "and do not assemble one. If you call this tool again with this value, the call will fail "
-    + "the same way."
+    + "and do not assemble one. If you call this tool again with the same arguments, the call "
+    + "will fail the same way."
 )
 
 _NOT_THE_ORGANIZER = (
@@ -107,13 +109,7 @@ class DeletedEvent(BaseModel):
             + "null when Graph reported no start for the event."
         )
     )
-    series_master: bool = Field(
-        description=(
-            "True when the event was the master of a recurring series, and false for a single "
-            + "event, an occurrence, or an exception. Graph reports this in the `type` of the "
-            + "event."
-        )
-    )
+    series_master: bool = Field(description=SERIES_MASTER_FIELD)
     attendees: list[EventAttendee] = Field(
         description=(
             "Each attendee that the event held just before the delete. Microsoft sent each of "
@@ -162,12 +158,8 @@ def _question(event: Event) -> str:
     named = repr(cut_for_a_question(event.subject)) if event.subject else "with no subject"
     start = event_time(event.start, zone=_UTC)
     starting = "" if start is None else f" that starts {start.iso or start.local}"
-    series = (
-        " This event is the master of a recurring series, so this delete can remove every "
-        + "occurrence of the series."
-        if event.type == EventType.SeriesMaster
-        else ""
-    )
+    reach = series_reach(event, what="delete")
+    series = f" {reach}" if reach else ""
     invited = [
         one.address or one.name or "an attendee" for one in EventAttendee.each_of(event.attendees)
     ]
