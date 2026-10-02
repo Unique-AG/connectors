@@ -132,6 +132,15 @@ async def _walk_chats(client: GraphServiceClient, *, limit: int) -> None:
     _ = await collect_pages(first, client, limit=limit)
 
 
+def _a_draft(draft_id: str) -> Mapping[str, object]:
+    return {
+        "id": draft_id,
+        "isDraft": True,
+        "subject": "Invoice 4471",
+        "changeKey": "CQAAABYAAAC4SYNTHETIC-version-0001",
+    }
+
+
 def _page(chat_ids: Sequence[str], next_link: str | None = None) -> Mapping[str, object]:
     page: dict[str, object] = {"value": [{"id": chat_id} for chat_id in chat_ids]}
     if next_link is not None:
@@ -230,9 +239,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0001%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
@@ -271,9 +278,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0002%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
@@ -295,9 +300,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0003%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         _ = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         waited = 0.5

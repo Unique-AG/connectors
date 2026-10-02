@@ -49,6 +49,7 @@ _PAM = "pam@example.invalid"
 _SUBJECT = "Invoice 4471"
 
 _CHANGE_KEY = "CQAAABYAAAC4SYNTHETIC-version-0001"
+_NEXT_CHANGE_KEY = "CQAAABYAAAC4SYNTHETIC-version-0002"
 
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
 
@@ -110,6 +111,12 @@ async def _refuses(draft: Message, mailbox: str | None) -> Confirmed:
 def _mail_sent(answer: MailSent | InputRequiredResult) -> MailSent:
     assert isinstance(answer, MailSent), "the send was answered with a question rather than made"
     return answer
+
+
+def _reads_in_turn(graph: respx.MockRouter, *payloads: dict[str, object]) -> respx.Route:
+    return graph.get(_DRAFT_PATH).mock(
+        side_effect=[httpx.Response(200, json=payload) for payload in payloads]
+    )
 
 
 def _sends(graph: respx.MockRouter) -> respx.Route:
@@ -475,11 +482,7 @@ class TestTheEraWithNoBackChannel:
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
         )
-        _ = read.mock(
-            return_value=httpx.Response(
-                200, json=_draft(change_key="CQAAABYAAAC4SYNTHETIC-version-0002")
-            )
-        )
+        _ = read.mock(return_value=httpx.Response(200, json=_draft(change_key=_NEXT_CHANGE_KEY)))
 
         with pytest.raises(ToolError, match="given for a different request") as raised:
             _ = await send_draft(
@@ -508,11 +511,7 @@ class TestTheEraWithNoBackChannel:
                 client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
             )
         )
-        _ = read.mock(
-            return_value=httpx.Response(
-                200, json=_draft(change_key="CQAAABYAAAC4SYNTHETIC-version-0002")
-            )
-        )
+        _ = read.mock(return_value=httpx.Response(200, json=_draft(change_key=_NEXT_CHANGE_KEY)))
 
         _key, second_question, second_state, _agrees_with = _the_question(
             await send_draft(
@@ -537,8 +536,62 @@ class TestTheEraWithNoBackChannel:
         assert send.call_count == 0, "an accept bound to the bare question reached the mailbox"
 
 
+class TestTheDraftThatChangesWhileThePersonIsAsked:
+    async def test_a_draft_edited_after_the_question_is_refused_and_never_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads_in_turn(graph, _draft(), _draft(change_key=_NEXT_CHANGE_KEY))
+        send = _sends(graph)
+
+        with pytest.raises(ToolError, match="changed after this tool asked the user") as raised:
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+
+        assert "agreed to the earlier version" in str(raised.value)
+        assert "asks the user about the draft as it is now" in str(raised.value)
+        assert read.call_count == 2
+        assert send.call_count == 0, (
+            "a draft edited after the question went out on the old agreement"
+        )
+
+    async def test_a_draft_with_the_same_change_key_on_both_reads_is_sent_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads_in_turn(graph, _draft(), _draft())
+        send = _sends(graph)
+
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+
+        assert answer.subject == _SUBJECT
+        assert read.call_count == 2
+        assert send.call_count == 1
+
+    async def test_a_draft_that_is_not_a_draft_on_the_second_read_is_refused_as_already_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads_in_turn(graph, _draft(), _draft(is_draft=False))
+        send = _sends(graph)
+
+        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
+            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+
+        assert read.call_count == 2
+        assert send.call_count == 0, "a message that went out while the person was asked went again"
+
+    async def test_a_decline_reads_the_draft_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        send = _sends(graph)
+
+        with pytest.raises(ToolError, match="Nothing was sent"):
+            _ = await send_draft(client, confirm=_refuses, draft_ref=_DRAFT_REF)
+
+        assert read.call_count == 1, "a refusal read the draft again for nothing"
+        assert send.call_count == 0
+
+
 class TestWhatItAsksGraphFor:
-    async def test_it_reads_the_draft_and_then_sends_it_and_makes_no_other_call(
+    async def test_it_reads_the_draft_again_after_the_agreement_and_then_sends_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         read = _reads(graph, _draft())
@@ -546,11 +599,25 @@ class TestWhatItAsksGraphFor:
 
         _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
-        assert read.call_count == 1
+        assert read.call_count == 2
         assert send.call_count == 1
-        assert len(graph.calls) == 2, "a send costs the pre-read and the send, and nothing else"
+        assert len(graph.calls) == 3, "a send costs two reads and the send, and nothing else"
         made = cast("Sequence[Call]", graph.calls)
-        assert [call.request.method for call in made] == ["GET", "POST"]
+        assert [call.request.method for call in made] == ["GET", "GET", "POST"]
+
+    async def test_both_reads_select_the_same_fields(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, _draft())
+        _ = _sends(graph)
+
+        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+
+        made = cast("Sequence[Call]", read.calls)
+        selected = [call.request.url.params["$select"] for call in made]
+        assert len(selected) == 2
+        assert selected[0] == selected[1]
+        assert "changeKey" in selected[1]
 
     async def test_the_pre_read_selects_the_recipients_the_subject_and_whether_it_is_a_draft(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -964,17 +1031,53 @@ class TestHowItDeclaresItself:
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        lowered = (tool.description or "").casefold()
-        assert "cannot be undone" in lowered
+        description = tool.description or ""
+        assert "the signed-in user's own mailbox or, with `mailbox`" in description
+        assert "This connector cannot undo a send or recall the message." in description
 
     async def test_the_description_says_a_person_is_asked_before_anything_is_sent(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        lowered = (tool.description or "").casefold()
-        assert "approve" in lowered
-        assert "outlook_draft_mail" in lowered
+        description = tool.description or ""
+        assert (
+            "This tool asks the user to agree before it sends anything, every time." in description
+        )
+        assert "This tool sends nothing unless the user agrees." in description
+        assert "outlook_draft_mail" in description
+
+    async def test_the_description_says_a_changed_draft_is_not_sent_on_the_old_agreement(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "If the draft changes after this tool asks the user, this tool sends nothing." in (
+            description
+        )
+        assert "A new call asks the user about the draft as it is now." in description
+
+    async def test_the_description_says_a_timeout_is_not_a_reason_to_send_again(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "If a call times out, do not call this tool again first." in description
+        assert all(f"make sure that {shown}" in description for shown in sender.CHANGE_SHOWN_BY)
+
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert lead.strip() != ""
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
 
     @pytest.mark.parametrize("name", _DRAFTING_TOOLS)
     async def test_the_description_and_the_draft_ref_name_every_tool_that_hands_back_a_draft(
