@@ -5,16 +5,19 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from msgraph.generated.models.attachment import Attachment
 from msgraph.generated.users.item.calendars.item.events.item.attachments.attachments_request_builder import (  # noqa: E501
     AttachmentsRequestBuilder,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
-from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS, AttachmentSummary
-from office_365_mcp.shared.handles import EventAttachmentHandle, EventHandle, event_handle
+from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.shared.attachments import (
+    ATTACHMENT_FIELDS,
+    AttachmentSummary,
+    collect_attachments,
+)
+from office_365_mcp.shared.handles import EventAttachmentHandle, event_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -84,35 +87,26 @@ async def list_event_attachments(client: GraphServiceClient, *, uri: str) -> Eve
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    headers = immutable_id_headers()
-    with graph_errors(TOOL_NAME, step=STEP_ATTACHMENTS):
+    with graph_errors(TOOL_NAME), graph_step(STEP_ATTACHMENTS):
         first_page = await (
             client.me.calendars.by_calendar_id(handle.calendar_id)
             .events.by_event_id(handle.event_id)
             .attachments.get(
                 request_configuration=RequestConfiguration[_AttachmentsQuery](
                     query_parameters=_AttachmentsQuery(select=list(ATTACHMENT_FIELDS)),
-                    headers=headers,
+                    headers=immutable_id_headers(),
                 )
             )
         )
-        assert first_page is not None, "Graph answered an attachment listing with no collection"
-        collected = await collect_pages(
-            first_page, client, limit=MAX_SCANNED_ITEMS, headers=headers
+        collected = await collect_attachments(
+            first_page,
+            client,
+            uri_of=lambda attachment_id: (
+                EventAttachmentHandle(handle.calendar_id, handle.event_id, attachment_id).uri
+            ),
         )
 
-    return EventAttachments(
-        attachments=[_row(attachment, handle) for attachment in collected.items],
-        capped=collected.capped,
-    )
-
-
-def _row(attachment: Attachment, handle: EventHandle) -> AttachmentSummary:
-    assert attachment.id is not None, "Graph answered an attachment with no id"
-    return AttachmentSummary.from_attachment(
-        attachment,
-        uri=EventAttachmentHandle(handle.calendar_id, handle.event_id, attachment.id).uri,
-    )
+    return EventAttachments(attachments=collected.items, capped=collected.capped)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

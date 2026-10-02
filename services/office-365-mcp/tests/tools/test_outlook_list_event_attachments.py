@@ -10,6 +10,7 @@ from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared import attachments as shared_attachments
 from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS
 from office_365_mcp.shared.handles import (
     CalendarHandle,
@@ -189,7 +190,7 @@ class TestWhatItAnswers:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(lister, "MAX_SCANNED_ITEMS", 2)
+        monkeypatch.setattr(shared_attachments, "MAX_SCANNED_ITEMS", 2)
         more = f"https://graph.microsoft.com/v1.0{_PATH}?%24skip=3"
         _ = graph.get(_PATH).mock(
             return_value=httpx.Response(

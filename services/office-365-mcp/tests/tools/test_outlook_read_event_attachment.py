@@ -13,7 +13,7 @@ from mcp.types import BlobResourceContents, TextResourceContents
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS
+from office_365_mcp.shared.attachments import ATTACHMENT_FIELDS, MAX_BYTES
 from office_365_mcp.shared.handles import (
     EventAttachmentHandle,
     EventHandle,
@@ -325,6 +325,20 @@ class TestWhatItRefuses:
             _ = await reader.read_event_attachment(client, uri=_URI)
 
         assert route.call_count == 1
+
+    async def test_bytes_above_the_limit_are_refused_even_when_the_reported_size_was_small(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        grown = b"x" * (MAX_BYTES + 1)
+        route = _serves(graph, described=_described(), whole=_with_bytes(_described(), grown))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await reader.read_event_attachment(client, uri=_URI)
+
+        assert route.call_count == 2
+        assert "10.0 MB or less" in str(refused.value)
+        assert "never sends part of a file" in str(refused.value)
+        assert _RETRY in str(refused.value)
 
     async def test_an_attachment_with_no_reported_size_is_refused_before_any_bytes_are_asked_for(
         self, client: GraphServiceClient, graph: respx.MockRouter

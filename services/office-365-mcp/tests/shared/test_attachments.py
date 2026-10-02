@@ -1,13 +1,16 @@
 import base64
 import json
+from dataclasses import dataclass
 
 import httpx
 import pytest
 import respx
 from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
 from msgraph.generated.models.attachment import Attachment
+from msgraph.generated.models.attachment_collection_response import AttachmentCollectionResponse
 from msgraph.generated.models.file_attachment import FileAttachment
 from msgraph.generated.models.item_attachment import ItemAttachment
+from msgraph.generated.models.reference_attachment import ReferenceAttachment
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.shared import attachments
@@ -19,6 +22,8 @@ from office_365_mcp.shared.attachments import (
     AttachmentKind,
     AttachmentRefusals,
     AttachmentSummary,
+    collect_attachments,
+    fetch_file_or_refusal,
     file_or_refusal,
     media_type,
     message_attachments,
@@ -236,6 +241,49 @@ class TestTheMessageListing:
         assert STEP_MESSAGE_ATTACHMENTS == "message_attachments"
 
 
+class TestTheSharedListing:
+    async def test_each_row_carries_the_uri_that_the_given_function_makes_from_its_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_MESSAGES_PATH).mock(
+            return_value=httpx.Response(
+                200, json={"value": [_row("first-id="), _row("second-id=", name="Logo.png")]}
+            )
+        )
+
+        found = await collect_attachments(
+            await _first_page(client), client, uri_of=lambda attachment_id: f"made:{attachment_id}"
+        )
+
+        assert [row.uri for row in found.items] == ["made:first-id=", "made:second-id="]
+        assert [row.name for row in found.items] == ["Invoice.pdf", "Logo.png"]
+        assert found.capped is False
+
+    async def test_it_follows_the_next_link_with_the_immutable_id_header(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        more = f"{GRAPH_V1}{_MESSAGES_PATH}?$skiptoken=second"
+        route = graph.get(_MESSAGES_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json={"value": [_row("first-id=")], "@odata.nextLink": more}),
+                httpx.Response(200, json={"value": [_row("second-id=")]}),
+            ]
+        )
+
+        found = await collect_attachments(
+            await _first_page(client), client, uri_of=lambda attachment_id: attachment_id
+        )
+
+        assert [row.uri for row in found.items] == ["first-id=", "second-id="]
+        assert found.capped is False
+        assert route.call_count == 2
+        assert 'IdType="ImmutableId"' in route.calls.last.request.headers["prefer"]
+
+
+async def _first_page(client: GraphServiceClient) -> AttachmentCollectionResponse | None:
+    return await client.me.messages.by_message_id(_MESSAGE_ID).attachments.get()
+
+
 _REFUSALS = AttachmentRefusals(
     an_item="an item",
     a_link="a link",
@@ -330,6 +378,20 @@ class TestWhatTheDownloadBecomes:
 
         assert refused == "nothing came back"
 
+    def test_bytes_above_the_cap_are_refused_whatever_size_graph_reported(self) -> None:
+        grown = b"x" * (MAX_BYTES + 1)
+
+        refused = file_or_refusal(_summary(size=20), _file_attachment(grown), _REFUSALS)
+
+        assert refused == f"too large at {MAX_BYTES + 1}"
+
+    def test_bytes_of_exactly_the_cap_come_back(self) -> None:
+        body = b"x" * MAX_BYTES
+
+        file = file_or_refusal(_summary(size=MAX_BYTES), _file_attachment(body), _REFUSALS)
+
+        assert isinstance(file, FileFromGraph)
+
     def test_the_bytes_never_leave_through_the_summary(self) -> None:
         body = b"synthetic bytes"
 
@@ -337,6 +399,83 @@ class TestWhatTheDownloadBecomes:
 
         assert isinstance(file, FileFromGraph)
         assert base64.b64encode(body).decode() not in _summary().model_dump_json()
+
+
+@dataclass(slots=True)
+class _Graph:
+    described: Attachment | None
+    whole: Attachment | None = None
+    downloads: int = 0
+
+    async def describe(self) -> Attachment | None:
+        return self.described
+
+    async def download(self) -> Attachment | None:
+        self.downloads += 1
+        return self.whole
+
+    async def read(self) -> FileFromGraph | str:
+        return await fetch_file_or_refusal(
+            self.describe, self.download, uri=_MAIL_ATTACHMENT_URI, refusals=_REFUSALS
+        )
+
+
+def _described(*, size: int | None = 20, kind: type[Attachment] = FileAttachment) -> Attachment:
+    return kind(
+        id="AAMkAGI2SYNTHETIC-attachment-0002=",
+        name="Invoice.pdf",
+        content_type="application/pdf",
+        size=size,
+    )
+
+
+class TestTheSharedRead:
+    async def test_the_described_attachment_and_its_bytes_become_a_file(self) -> None:
+        body = b"%PDF-1.7 synthetic bytes"
+        graph = _Graph(_described(size=len(body)), _file_attachment(body))
+
+        file = await graph.read()
+
+        assert isinstance(file, FileFromGraph)
+        assert file.data == body
+        assert file.to_resource_content().resource.uri == "file:///Invoice.pdf"
+        assert graph.downloads == 1
+
+    @pytest.mark.parametrize(
+        ("kind", "refusal"), [(ItemAttachment, "an item"), (ReferenceAttachment, "a link")]
+    )
+    async def test_an_item_and_a_link_are_refused_before_the_download(
+        self, kind: type[Attachment], refusal: str
+    ) -> None:
+        graph = _Graph(_described(kind=kind), _file_attachment(b"synthetic bytes"))
+
+        assert await graph.read() == refusal
+        assert graph.downloads == 0
+
+    async def test_a_size_above_the_cap_is_refused_before_the_download(self) -> None:
+        graph = _Graph(_described(size=MAX_BYTES + 1), _file_attachment(b"synthetic bytes"))
+
+        assert await graph.read() == f"too large at {MAX_BYTES + 1}"
+        assert graph.downloads == 0
+
+    async def test_no_reported_size_is_refused_before_the_download(self) -> None:
+        graph = _Graph(_described(size=None), _file_attachment(b"synthetic bytes"))
+
+        assert await graph.read() == "no size"
+        assert graph.downloads == 0
+
+    async def test_bytes_above_the_cap_are_refused_with_the_size_that_came_down(self) -> None:
+        grown = b"x" * (MAX_BYTES + 1)
+        graph = _Graph(_described(size=20), _file_attachment(grown))
+
+        assert await graph.read() == f"too large at {MAX_BYTES + 1}"
+        assert graph.downloads == 1
+
+    async def test_empty_bytes_for_an_attachment_that_holds_data_are_refused(self) -> None:
+        graph = _Graph(_described(size=20), _file_attachment(b""))
+
+        assert await graph.read() == "nothing came back"
+        assert graph.downloads == 1
 
 
 class TestTheMediaType:

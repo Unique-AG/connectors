@@ -1,9 +1,10 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Self
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.attachment import Attachment
+from msgraph.generated.models.attachment_collection_response import AttachmentCollectionResponse
 from msgraph.generated.models.file_attachment import FileAttachment
 from msgraph.generated.models.item_attachment import ItemAttachment
 from msgraph.generated.models.reference_attachment import ReferenceAttachment
@@ -133,7 +134,6 @@ class AttachmentRefusals:
 async def message_attachments(
     client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
 ) -> CollectedItems[AttachmentSummary]:
-    headers = immutable_id_headers()
     with graph_step(STEP_MESSAGE_ATTACHMENTS):
         first_page = await (
             graph_mailbox(client, mailbox)
@@ -141,26 +141,36 @@ async def message_attachments(
             .attachments.get(
                 request_configuration=RequestConfiguration[_AttachmentsQuery](
                     query_parameters=_AttachmentsQuery(select=list(ATTACHMENT_FIELDS)),
-                    headers=headers,
+                    headers=immutable_id_headers(),
                 )
             )
         )
-        assert first_page is not None, "Graph answered an attachment listing with no collection"
-        collected = await collect_pages(
-            first_page, client, limit=MAX_SCANNED_ITEMS, headers=headers
+        return await collect_attachments(
+            first_page,
+            client,
+            uri_of=lambda attachment_id: MailAttachmentHandle(handle.message_id, attachment_id).uri,
         )
 
+
+async def collect_attachments(
+    first_page: AttachmentCollectionResponse | None,
+    client: GraphServiceClient,
+    *,
+    uri_of: Callable[[str], str],
+) -> CollectedItems[AttachmentSummary]:
+    assert first_page is not None, "Graph answered an attachment listing with no collection"
+    collected = await collect_pages(
+        first_page, client, limit=MAX_SCANNED_ITEMS, headers=immutable_id_headers()
+    )
     return CollectedItems(
-        items=[_row(attachment, handle) for attachment in collected.items],
+        items=[_row(attachment, uri_of) for attachment in collected.items],
         capped=collected.capped,
     )
 
 
-def _row(attachment: Attachment, handle: MailMessageHandle) -> AttachmentSummary:
+def _row(attachment: Attachment, uri_of: Callable[[str], str]) -> AttachmentSummary:
     assert attachment.id is not None, "Graph answered an attachment with no id"
-    return AttachmentSummary.from_attachment(
-        attachment, uri=MailAttachmentHandle(handle.message_id, attachment.id).uri
-    )
+    return AttachmentSummary.from_attachment(attachment, uri=uri_of(attachment.id))
 
 
 def refusal_before_download(summary: AttachmentSummary, refusals: AttachmentRefusals) -> str | None:
@@ -175,6 +185,22 @@ def refusal_before_download(summary: AttachmentSummary, refusals: AttachmentRefu
     return None
 
 
+async def fetch_file_or_refusal(
+    describe: Callable[[], Awaitable[Attachment | None]],
+    download: Callable[[], Awaitable[Attachment | None]],
+    *,
+    uri: str,
+    refusals: AttachmentRefusals,
+) -> FileFromGraph | str:
+    described = await describe()
+    assert described is not None, "Graph answered an attachment read with no attachment"
+    summary = AttachmentSummary.from_attachment(described, uri=uri)
+    refused = refusal_before_download(summary, refusals)
+    if refused is not None:
+        return refused
+    return file_or_refusal(summary, await download(), refusals)
+
+
 def file_or_refusal(
     summary: AttachmentSummary, downloaded: Attachment | None, refusals: AttachmentRefusals
 ) -> FileFromGraph | str:
@@ -183,6 +209,8 @@ def file_or_refusal(
     if not content and summary.size > 0:
         return refusals.nothing_came_back
     body = content or b""
+    if len(body) > MAX_BYTES:
+        return refusals.too_large(len(body))
     return FileFromGraph(body, name=summary.name, mime_type=media_type(summary.content_type, body))
 
 

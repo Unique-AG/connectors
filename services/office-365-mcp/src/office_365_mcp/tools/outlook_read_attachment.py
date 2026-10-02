@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.models.attachment import Attachment
 from msgraph.generated.users.item.messages.item.attachments.item.attachment_item_request_builder import (  # noqa: E501
     AttachmentItemRequestBuilder,
 )
@@ -18,9 +19,7 @@ from office_365_mcp.shared.attachments import (
     MAX_BYTES,
     MEGABYTE,
     AttachmentRefusals,
-    AttachmentSummary,
-    file_or_refusal,
-    refusal_before_download,
+    fetch_file_or_refusal,
 )
 from office_365_mcp.shared.handles import MailAttachmentHandle, mail_attachment_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
@@ -114,43 +113,36 @@ async def read_attachment(
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    fetched = await _fetched(client, handle, mailbox=mailbox)
-    if isinstance(fetched, str):
-        raise ToolError(fetched)
-    return fetched
-
-
-async def _fetched(
-    client: GraphServiceClient, handle: MailAttachmentHandle, *, mailbox: str | None
-) -> File | str:
     attachment = (
         graph_mailbox(client, mailbox)
         .messages.by_message_id(handle.message_id)
         .attachments.by_attachment_id(handle.attachment_id)
     )
-    with graph_errors(TOOL_NAME):
+
+    async def describe() -> Attachment | None:
         with graph_step(STEP_ATTACHMENT):
-            described = await attachment.get(
+            return await attachment.get(
                 request_configuration=RequestConfiguration[_AttachmentQuery](
                     query_parameters=_AttachmentQuery(select=list(ATTACHMENT_FIELDS)),
                     headers=immutable_id_headers(),
                 )
             )
 
-        assert described is not None, "Graph answered an attachment read with no attachment"
-        summary = AttachmentSummary.from_attachment(described, uri=handle.uri)
-        refused = refusal_before_download(summary, _REFUSALS)
-        if refused is not None:
-            return refused
-
+    async def download() -> Attachment | None:
         with graph_step(STEP_CONTENT):
-            whole = await attachment.get(
+            return await attachment.get(
                 request_configuration=RequestConfiguration[_AttachmentQuery](
                     headers=immutable_id_headers()
                 )
             )
 
-    return file_or_refusal(summary, whole, _REFUSALS)
+    with graph_errors(TOOL_NAME):
+        fetched = await fetch_file_or_refusal(
+            describe, download, uri=handle.uri, refusals=_REFUSALS
+        )
+    if isinstance(fetched, str):
+        raise ToolError(fetched)
+    return fetched
 
 
 def _too_large(size: int) -> str:
