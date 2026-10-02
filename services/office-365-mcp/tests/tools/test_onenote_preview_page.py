@@ -11,7 +11,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.notes import OWNED_REFUSED
+from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_preview_page as previewer
 
 PAGE_ID = "0-SYNTHETICPAGE0000!0001"
@@ -21,8 +22,15 @@ GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 _PREVIEW_PATH = "/me/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
 _GROUP_PREVIEW_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
 
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE_PREVIEW_PATH = f"/sites/{_SITE_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001/preview()"
+
 _PAGE = OnenotePageHandle(PAGE_ID).uri
 _GROUP_PAGE = OnenotePageHandle(PAGE_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+_SITE_PAGE = OnenotePageHandle(PAGE_ID, owner=OnenoteOwner("sites", _SITE_ID)).uri
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _IMAGE_URL = "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1/content"
@@ -215,6 +223,30 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _preview(client)
+
+    @pytest.mark.parametrize(
+        ("page", "route"),
+        [(_GROUP_PAGE, _GROUP_PREVIEW_PATH), (_SITE_PAGE, _SITE_PREVIEW_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_preview_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _preview(client, page=page)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:

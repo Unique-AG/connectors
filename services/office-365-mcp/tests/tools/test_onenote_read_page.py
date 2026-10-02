@@ -4,7 +4,8 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -15,7 +16,9 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, STEP_PAGE
+from office_365_mcp.shared.notes import OWNED_REFUSED, PAGE_EXPANSIONS, PAGE_FIELDS, STEP_PAGE
+from office_365_mcp.shared.seam import READ_ONLY, Advised, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_read_page as reader
 
 from .conftest import GRAPH_V1
@@ -289,19 +292,6 @@ class TestAGroupNotebook:
         with pytest.raises(GraphNotFound):
             _ = await _read(client, transport, page=_GROUP_PAGE)
 
-    @pytest.mark.usefixtures("group_content")
-    async def test_a_403_on_the_group_page_is_a_graph_forbidden(
-        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(_GROUP_PAGE_PATH).mock(
-            return_value=httpx.Response(
-                403, json={"error": {"code": "accessDenied", "message": "denied"}}
-            )
-        )
-
-        with pytest.raises(GraphForbidden):
-            _ = await _read(client, transport, page=_GROUP_PAGE)
-
     @pytest.mark.usefixtures("group_page")
     async def test_a_404_on_the_group_content_is_a_graph_not_found(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -490,6 +480,60 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _read(client, transport)
+
+    @pytest.mark.parametrize(
+        ("page", "route"),
+        [(_GROUP_PAGE, _GROUP_PAGE_PATH), (_SITE_PAGE, _SITE_PAGE_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_page_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        page: str,
+        route: str,
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _read(client, transport, page=page)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_403_on_a_site_page_reaches_the_client_as_the_owned_advice(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        site_page = graph.get(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        advice = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=[reader.TOOL_NAME]))
+        )
+        server: FastMCP[None] = FastMCP("reader", middleware=[advice])
+
+        @server.tool(name=reader.TOOL_NAME, annotations=READ_ONLY)
+        async def read() -> str:
+            return (await _read(client, transport, page=_SITE_PAGE)).html
+
+        async with Client(FastMCPTransport(server)) as mcp_client:
+            with pytest.raises(ToolError) as raised:
+                _ = await mcp_client.call_tool(reader.TOOL_NAME, {})
+
+        assert str(raised.value).startswith(OWNED_REFUSED)
+        assert "grant the delegated" not in str(raised.value)
+        assert site_page.call_count == 1
 
     @pytest.mark.usefixtures("page")
     async def test_a_404_on_the_content_is_a_graph_not_found(

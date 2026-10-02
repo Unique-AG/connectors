@@ -19,8 +19,8 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_operation_handle,
 )
-from office_365_mcp.shared.notes import OperationSummary
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary
+from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_get_operation as getter
 from office_365_mcp.tools.onenote_get_operation import get_operation
 
@@ -442,6 +442,30 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _get(client)
+
+    @pytest.mark.parametrize(
+        ("operation", "route"),
+        [(_GROUP_OPERATION_URI, _GROUP_GET_PATH), (_SITE_OPERATION_URI, _SITE_GET_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_operation_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, operation: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _get(client, operation=operation)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
 
     async def test_the_call_example_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter

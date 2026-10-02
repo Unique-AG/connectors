@@ -19,6 +19,7 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     PAGE_EXPANSIONS,
     PAGE_FIELDS,
     PageSummary,
@@ -202,6 +203,7 @@ async def list_pages(
 
     with (
         owner_refused(group is not None or site is not None, _OWNER_REFUSED),
+        owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
         graph_errors(TOOL_NAME),
         graph_step(STEP_PAGES),
     ):

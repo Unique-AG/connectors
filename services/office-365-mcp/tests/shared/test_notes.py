@@ -459,6 +459,17 @@ class TestOwnerNamed:
             _ = notes.owner_named(group=_GROUP_ID, site=_SITE_ID)
 
 
+class TestOwnedRefused:
+    def test_it_sends_the_user_for_access_first_and_names_no_permission(self) -> None:
+        assert notes.OWNED_REFUSED == (
+            "Microsoft 365 refused this request for a notebook that a Microsoft 365 group or a "
+            + "SharePoint site owns. Most likely, the signed-in user is not a member of that group "
+            + "or site. Ask the user to get access. If the user already has access, ask a "
+            + "Microsoft 365 administrator to examine the OneNote permissions of this connector. "
+            + "This same call fails again, so do not retry it."
+        )
+
+
 class TestNotebookAudience:
     async def test_it_sends_the_exact_select(
         self, client: GraphServiceClient, graph: respx.MockRouter

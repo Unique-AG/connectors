@@ -14,8 +14,18 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import GraphResponseTooLarge, download_to_file, graph_errors
 from office_365_mcp.shared.handles import OnenoteOwner
-from office_365_mcp.shared.notes import onenote_root, owner_of_graph_url, resource_id_in
-from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
+from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
+    onenote_root,
+    owner_of_graph_url,
+    resource_id_in,
+)
+from office_365_mcp.shared.seam import (
+    READ_ONLY,
+    FileFromGraph,
+    graph_client_for_caller,
+    owner_refused,
+)
 
 TOOL_NAME = "onenote_read_resource"
 
@@ -98,7 +108,10 @@ async def _fetch(
     *,
     owner: OnenoteOwner | None,
 ) -> tuple[bytes, str]:
-    with graph_errors(TOOL_NAME, step=STEP_RESOURCE_CONTENT):
+    with (
+        owner_refused(owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_RESOURCE_CONTENT),
+    ):
         async with download_to_file(
             client,
             transport,

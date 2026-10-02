@@ -124,6 +124,15 @@ def in_a_site(*owners: OnenoteOwner | None) -> bool:
     return any(owner is not None and owner.kind == "sites" for owner in owners)
 
 
+OWNED_REFUSED = (
+    "Microsoft 365 refused this request for a notebook that a Microsoft 365 group or a "
+    + "SharePoint site owns. Most likely, the signed-in user is not a member of that group or "
+    + "site. Ask the user to get access. If the user already has access, ask a Microsoft 365 "
+    + "administrator to examine the OneNote permissions of this connector. This same call fails "
+    + "again, so do not retry it."
+)
+
+
 def group_id_of(owner: OnenoteOwner | None) -> str | None:
     return owner.owner_id if owner is not None and owner.kind == "groups" else None
 

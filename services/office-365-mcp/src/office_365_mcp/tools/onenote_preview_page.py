@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_page_handle
-from office_365_mcp.shared.notes import onenote_root
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import OWNED_REFUSED, onenote_root
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_preview_page"
 
@@ -80,7 +80,10 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP_PREVIEW):
+    with (
+        owner_refused(handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_PREVIEW),
+    ):
         fetched = await (
             onenote_root(client, handle.owner)
             .pages.by_onenote_page_id(handle.page_id)

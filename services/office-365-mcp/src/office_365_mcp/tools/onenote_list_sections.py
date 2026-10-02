@@ -32,6 +32,7 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.notes import (
     CONTAINER_ORDER_CLAUSES,
+    OWNED_REFUSED,
     ContainerOrderBy,
     created_by_contains,
     creator_name_of,
@@ -40,7 +41,7 @@ from office_365_mcp.shared.notes import (
     web_url_of,
 )
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_list_sections"
 
@@ -234,7 +235,8 @@ async def list_sections(
     top = limit if created_by is None else MAX_SECTIONS
     max_scanned = limit if created_by is None else MAX_SCANNED_ITEMS
 
-    with graph_errors(TOOL_NAME):
+    owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
         with graph_step(STEP_SECTIONS):
             first_sections = await _first_sections(
                 client, handle, top=top, query_filter=query_filter, orderby=orderby

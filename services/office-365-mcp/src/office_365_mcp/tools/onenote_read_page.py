@@ -19,8 +19,8 @@ from office_365_mcp.graph_client import (
     request_with_query,
 )
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
-from office_365_mcp.shared.notes import PageSummary, onenote_root, page_summary
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, onenote_root, page_summary
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_read_page"
 
@@ -103,7 +103,7 @@ async def onenote_read_page(
 
     refused: str | None = None
     content: bytes | None = None
-    with graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
         summary = await page_summary(client, handle.page_id, owner=handle.owner)
 
         try:

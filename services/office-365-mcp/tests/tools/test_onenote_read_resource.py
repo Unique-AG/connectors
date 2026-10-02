@@ -10,10 +10,10 @@ from fastmcp.tools import Tool
 from fastmcp.utilities.types import File
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphNotFound
+from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
-from office_365_mcp.shared.notes import resource_id_in
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.notes import OWNED_REFUSED, resource_id_in
+from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_read_resource as reader
 
 RESOURCE_ID = "1-SYNTHETICRESOURCE0000"
@@ -310,6 +310,50 @@ class TestGraphFailures:
 
         with pytest.raises(GraphNotFound):
             _ = await _read(client, transport)
+
+    async def test_a_403_on_a_me_address_is_a_graph_forbidden(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _read(client, transport)
+
+    @pytest.mark.parametrize(
+        ("address", "route"),
+        [
+            (_GROUP_ADDRESSES[0], _GROUP_CONTENT_PATH),
+            (_SITE_ADDRESSES[0], _SITE_CONTENT_PATH),
+        ],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_address_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        address: str,
+        route: str,
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _read(client, transport, resource=address)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
 
     def test_the_not_found_advice_names_onenote_read_page_and_a_fresh_address(self) -> None:
         assert "onenote_read_page" in reader.GRAPH_NOT_FOUND

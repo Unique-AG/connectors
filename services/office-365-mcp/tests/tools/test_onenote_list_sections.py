@@ -17,7 +17,8 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import ContainerOrderBy
+from office_365_mcp.shared.notes import OWNED_REFUSED, ContainerOrderBy
+from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_sections as lister
 
 from .conftest import GRAPH_V1
@@ -981,6 +982,45 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await lister.list_sections(client, parent=_NOTEBOOK, limit=50)
+
+    @pytest.mark.parametrize(
+        ("parent", "route"),
+        [
+            (_OWNED_NOTEBOOK, _OWNED_NOTEBOOK_SECTIONS_PATH),
+            (_SITE_NOTEBOOK, f"{_SITE_NOTEBOOK_PATH}/sections"),
+        ],
+        ids=["group", "site"],
+    )
+    async def test_a_403_under_an_owned_notebook_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, parent: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await lister.list_sections(client, parent=parent, limit=50)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_403_under_an_owned_section_group_stays_a_forbidden(
+        self, client: GraphServiceClient, owned_group_sections: respx.Route
+    ) -> None:
+        owned_group_sections.mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await lister.list_sections(client, parent=_OWNED_GROUP, limit=50)
 
     async def test_a_404_for_a_stale_notebook_handle_is_a_not_found(
         self, client: GraphServiceClient, notebook_sections: respx.Route

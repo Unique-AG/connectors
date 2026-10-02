@@ -11,7 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenoteOwner, OnenotePageHandle, OnenoteSectionHandle
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS
+from office_365_mcp.shared.notes import OWNED_REFUSED, PAGE_EXPANSIONS, PAGE_FIELDS
 from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_pages as lister
 
@@ -831,17 +831,44 @@ class TestGraphFailures:
         assert "are not the problem" not in str(refused.value)
         assert isinstance(refused.value.__cause__, GraphForbidden)
 
-    async def test_a_refusal_for_a_section_handle_with_no_group_or_site_stays_a_forbidden(
-        self, client: GraphServiceClient, group_section_pages: respx.Route
+    @pytest.mark.parametrize(
+        ("section", "route"),
+        [
+            (_GROUP_SECTION, _GROUP_SECTION_PAGES_PATH),
+            (_SITE_SECTION, _SITE_SECTION_PAGES_PATH),
+        ],
+        ids=["group", "site"],
+    )
+    async def test_a_refusal_for_an_owned_section_handle_arrives_as_the_owned_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter, section: str, route: str
     ) -> None:
-        group_section_pages.mock(
+        graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await lister.list_pages(client, section=section, limit=25)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_refusal_for_a_section_handle_with_no_owner_stays_a_forbidden(
+        self, client: GraphServiceClient, section_pages: respx.Route
+    ) -> None:
+        section_pages.mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "accessDenied", "message": "denied"}}
             )
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await lister.list_pages(client, section=_GROUP_SECTION, limit=25)
+            _ = await lister.list_pages(client, section=_SECTION, limit=25)
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("Notes.Read",)

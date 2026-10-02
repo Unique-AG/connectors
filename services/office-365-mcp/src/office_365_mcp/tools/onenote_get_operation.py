@@ -9,8 +9,8 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_operation_handle
-from office_365_mcp.shared.notes import OperationSummary, onenote_root
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, onenote_root
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_get_operation"
 
@@ -63,7 +63,10 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
     if handle is None:
         raise ToolError(_NOT_AN_OPERATION_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP_OPERATION):
+    with (
+        owner_refused(handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_OPERATION),
+    ):
         found = await (
             onenote_root(client, handle.owner)
             .operations.by_onenote_operation_id(handle.operation_id)
