@@ -24,7 +24,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import ZONE_NAME, wall_clock
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
+from office_365_mcp.shared.categories import (
+    LIST_CATEGORIES_GUARD,
+    CategoryName,
+    merged_categories,
+    named_in_both,
+)
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import FlagMoment, MailImportance
@@ -332,8 +337,7 @@ def _dates_refusal(change: MarkChange) -> str | None:
 
 
 def _categories_refusal(change: MarkChange) -> str | None:
-    removed = {name.casefold() for name in change.remove_categories}
-    both = next((name for name in change.add_categories if name.casefold() in removed), None)
+    both = named_in_both(change.add_categories, change.remove_categories)
     return None if both is None else _in_both_lists(both)
 
 
@@ -533,7 +537,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         add_categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(
@@ -545,7 +549,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         remove_categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(

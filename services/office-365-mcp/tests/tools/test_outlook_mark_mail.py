@@ -493,6 +493,22 @@ class TestWhatTheModelIsTold:
         assert result.is_error, _text(result)
         assert route.call_count == 0
 
+    @pytest.mark.parametrize("argument", ["add_categories", "remove_categories"])
+    async def test_a_blank_category_name_is_refused_before_graph(
+        self, server_client: Client[FastMCPTransport], graph: respx.MockRouter, argument: str
+    ) -> None:
+        route = graph.route().mock(return_value=httpx.Response(200, json=_updated()))
+
+        result = await server_client.call_tool(
+            TOOL_NAME,
+            {"message_refs": list(_REFS[:1]), "is_read": True, argument: [""]},
+            raise_on_error=False,
+        )
+
+        assert result.is_error, _text(result)
+        assert argument in _text(result)
+        assert route.call_count == 0
+
     async def test_the_new_arguments_reach_graph_through_the_published_schema(
         self, server_client: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:
@@ -1418,6 +1434,15 @@ class TestHowItDeclaresItself:
         assert arguments["add_categories"]["default"] == []
         assert arguments["remove_categories"]["default"] == []
         assert cast("list[str]", tool.parameters["required"]) == ["message_refs"]
+
+    @pytest.mark.parametrize("argument", ["add_categories", "remove_categories"])
+    async def test_a_category_name_needs_at_least_one_character(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        tool = await _registered(transport)
+
+        names = cast("Mapping[str, object]", _arguments(tool)[argument]["items"])
+        assert names["minLength"] == 1
 
     async def test_the_zone_is_held_to_the_zone_name_pattern(
         self, transport: httpx.AsyncClient
