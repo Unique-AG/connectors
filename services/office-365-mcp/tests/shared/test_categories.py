@@ -63,20 +63,29 @@ class TestTheCategoryName:
     def test_a_list_of_names_is_accepted(self) -> None:
         assert TypeAdapter(list[CategoryName]).validate_python(["Red"]) == ["Red"]
 
-    def test_an_empty_name_is_refused(self) -> None:
-        with pytest.raises(ValidationError):
-            _ = TypeAdapter(list[CategoryName]).validate_python([""])
+    def test_a_name_with_spaces_around_a_visible_character_is_kept_as_given(self) -> None:
+        assert TypeAdapter(list[CategoryName]).validate_python([" Red "]) == [" Red "]
 
-    def test_the_schema_inlines_a_minimum_length_of_one(self) -> None:
+    @pytest.mark.parametrize(
+        "name",
+        ["", "  ", "\t"],
+        ids=["empty", "spaces", "tab"],
+    )
+    def test_a_name_with_no_visible_character_is_refused(self, name: str) -> None:
+        with pytest.raises(ValidationError):
+            _ = TypeAdapter(list[CategoryName]).validate_python([name])
+
+    def test_the_schema_inlines_a_minimum_length_of_one_and_a_visible_character(self) -> None:
         schema = TypeAdapter(list[CategoryName]).json_schema()
 
         assert schema["items"]["minLength"] == 1
+        assert schema["items"]["pattern"] == "\\S"
         assert "$ref" not in json.dumps(schema)
 
 
 class TestTheListerGuard:
     def test_the_sentence_promises_the_lister_only_where_the_deployment_has_it(self) -> None:
         assert LIST_CATEGORIES_GUARD == (
-            "If this deployment exposes outlook_list_categories, that tool lists the category "
-            "names of the mailbox."
+            "If this deployment exposes outlook_list_categories, that tool lists only the "
+            "category names of the signed-in user's own mailbox."
         )

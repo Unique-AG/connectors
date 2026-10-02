@@ -3,11 +3,11 @@ from typing import Annotated
 
 from pydantic import Field
 
-CategoryName = Annotated[str, Field(min_length=1)]
+CategoryName = Annotated[str, Field(min_length=1, pattern=r"\S")]
 
 LIST_CATEGORIES_GUARD = (
-    "If this deployment exposes outlook_list_categories, that tool lists the category names of "
-    + "the mailbox."
+    "If this deployment exposes outlook_list_categories, that tool lists only the category "
+    + "names of the signed-in user's own mailbox."
 )
 
 
