@@ -769,7 +769,6 @@ GRAPH_STEPS = frozenset(
         "delete_event",
         "delete_calendar",
         "calendar_permissions",
-        "allowed_sharing_roles",
         "share_calendar",
         "calendar_permission",
         "unshare_calendar",

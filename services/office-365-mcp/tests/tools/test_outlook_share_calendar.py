@@ -1,5 +1,4 @@
 import json
-import re
 from collections.abc import Mapping, Sequence
 from typing import cast
 from urllib.parse import quote
@@ -27,7 +26,12 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.graph_client import (
+    GraphFailure,
+    GraphForbidden,
+    GraphNotFound,
+    GraphUnavailable,
+)
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CalendarHandle,
@@ -51,11 +55,12 @@ _URI = CalendarHandle(_CALENDAR_ID).uri
 
 _CALENDAR_PATH = f"/me/calendars/{quote(_CALENDAR_ID, safe='')}"
 _PERMISSIONS_PATH = f"{_CALENDAR_PATH}/calendarPermissions"
-_ROLES_PATH = rf"/me/calendars/{re.escape(_CALENDAR_ID)}/allowedCalendarSharingRoles\(User='.*'\)\Z"
 
 _DANA = "dana@example.invalid"
 
 _NOTHING_SHARED = "The calendar was not shared."
+
+_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
 _EVERY_OFFERED_ROLE = ["freeBusyRead", "limitedRead", "read", "write"]
 
@@ -79,19 +84,10 @@ def _created(
     }
 
 
-def _reads(
-    graph: respx.MockRouter,
-    *,
-    calendar: Mapping[str, object] | None = None,
-    allowed: Sequence[str] = ("none", *_EVERY_OFFERED_ROLE),
-) -> tuple[respx.Route, respx.Route]:
-    calendar_route = graph.get(_CALENDAR_PATH).mock(
+def _reads(graph: respx.MockRouter, *, calendar: Mapping[str, object] | None = None) -> respx.Route:
+    return graph.get(_CALENDAR_PATH).mock(
         return_value=httpx.Response(200, json=dict(calendar or _calendar()))
     )
-    roles_route = graph.route(method="GET", path__regex=_ROLES_PATH).mock(
-        return_value=httpx.Response(200, json={"value": list(allowed)})
-    )
-    return calendar_route, roles_route
 
 
 def _shares(graph: respx.MockRouter, payload: Mapping[str, object] | None = None) -> respx.Route:
@@ -236,7 +232,7 @@ def _property(parameters: Mapping[str, object], name: str) -> Mapping[str, objec
 
 
 class TestWhatItSendsToGraph:
-    async def test_it_reads_the_calendar_and_the_allowed_roles_then_shares(
+    async def test_it_reads_the_calendar_then_shares(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph)
@@ -247,31 +243,33 @@ class TestWhatItSendsToGraph:
         calendar = f"/v1.0/me/calendars/{_CALENDAR_ID}"
         assert [(call.request.method, call.request.url.path) for call in made] == [
             ("GET", calendar),
-            ("GET", f"{calendar}/allowedCalendarSharingRoles(User='{_DANA}')"),
             ("POST", f"{calendar}/calendarPermissions"),
         ]
+
+    @pytest.mark.parametrize("role", _EVERY_OFFERED_ROLE)
+    async def test_no_request_goes_to_allowed_calendar_sharing_roles(
+        self, client: GraphServiceClient, graph: respx.MockRouter, role: ShareRole
+    ) -> None:
+        share = _ready(graph)
+
+        _ = await _share(client, role=role)
+
+        assert not [
+            call
+            for call in cast("Sequence[Call]", graph.calls)
+            if "allowedCalendarSharingRoles" in str(call.request.url)
+        ]
+        assert _sent(share)["role"] == role
 
     async def test_the_calendar_read_asks_for_the_name_and_the_share_flag(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        calendar_route, _ = _reads(graph)
+        calendar_route = _reads(graph)
         _ = _shares(graph)
 
         _ = await _share(client)
 
         assert _made(calendar_route)[0].request.url.params["$select"] == "id,name,canShare"
-
-    async def test_an_apostrophe_in_the_address_is_doubled_inside_the_odata_string(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _, roles_route = _reads(graph)
-        _ = _shares(graph)
-
-        _ = await _share(client, address="o'brien@example.invalid")
-
-        assert _made(roles_route)[0].request.url.path.endswith(
-            "/allowedCalendarSharingRoles(User='o''brien@example.invalid')"
-        )
 
     async def test_the_body_carries_the_address_and_the_role_and_nothing_else(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -345,17 +343,33 @@ class TestWhatItRefuses:
         assert "Nothing was shared." in str(raised.value)
         assert len(graph.calls) == 0
 
-    async def test_a_calendar_the_user_cannot_share_is_refused_before_the_roles_are_read(
+    async def test_the_address_refusal_looks_for_outlook_find_recipient_only_where_it_exists(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _, roles_route = _reads(graph, calendar=_calendar(can_share=False))
+        with pytest.raises(ToolError) as raised:
+            _ = await _share(client, address="Dana Swope", confirm=_never_asked)
+
+        message = str(raised.value)
+        assert len(graph.calls) == 0
+        assert (
+            "If this deployment exposes outlook_find_recipient, use it to turn a name that the "
+            "user gave into an address. If it does not, ask the user for the address."
+        ) in message
+        assert message.endswith(_AGAIN)
+
+    async def test_a_calendar_the_user_cannot_share_is_refused_before_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        calendar_route = _reads(graph, calendar=_calendar(can_share=False))
         share = _shares(graph)
 
         with pytest.raises(ToolError, match="cannot share this calendar") as raised:
             _ = await _share(client, confirm=_never_asked)
 
-        assert "Only the person who created a calendar can share it." in str(raised.value)
-        assert roles_route.call_count == 0
+        message = str(raised.value)
+        assert "Only the person who created a calendar can share it." in message
+        assert message.endswith(_AGAIN)
+        assert calendar_route.call_count == 1
         assert share.call_count == 0
 
     async def test_an_unknown_share_flag_lets_microsoft_decide(
@@ -368,81 +382,36 @@ class TestWhatItRefuses:
 
         assert share.call_count == 1
 
-    async def test_a_role_microsoft_does_not_allow_for_the_address_is_refused_unasked(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _reads(graph, allowed=["freeBusyRead", "limitedRead", "read"])
-        share = _shares(graph)
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _share(client, role="write", confirm=_never_asked)
-
-        message = str(raised.value)
-        assert f"does not allow the role write for {_DANA}" in message
-        assert "freeBusyRead, limitedRead, read." in message
-        assert "Nothing was shared." in message
-        assert share.call_count == 0
-
-    async def test_the_refusal_names_no_delegate_role_even_when_microsoft_allows_one(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _reads(
-            graph,
-            allowed=["read", "delegateWithoutPrivateEventAccess", "delegateWithPrivateEventAccess"],
-        )
-        _ = _shares(graph)
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _share(client, role="write", confirm=_never_asked)
-
-        message = str(raised.value)
-        assert "for this address are read." in message
-        assert "delegate" not in message
-
-    async def test_an_address_with_no_offered_role_is_refused_unasked(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _reads(graph, allowed=[])
-        share = _shares(graph)
-
-        with pytest.raises(ToolError, match="allows none of the roles of this tool"):
-            _ = await _share(client, role="freeBusyRead", confirm=_never_asked)
-
-        assert share.call_count == 0
-
 
 class TestThePersonBetweenTheRequestAndTheShare:
-    async def test_a_refusal_shares_nothing_after_the_reads_that_precede_it(
+    async def test_a_refusal_shares_nothing_after_the_read_that_precedes_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        calendar_route, roles_route = _reads(graph)
+        calendar_route = _reads(graph)
         share = _shares(graph)
 
         with pytest.raises(ToolError, match=_NOTHING_SHARED):
             _ = await _share(client, confirm=_refuses)
 
         assert calendar_route.call_count == 1
-        assert roles_route.call_count == 1
         assert share.call_count == 0
 
-    async def test_the_question_is_asked_after_the_reads_and_before_the_share(
+    async def test_the_question_is_asked_after_the_read_and_before_the_share(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        calendar_route, roles_route = _reads(graph)
+        calendar_route = _reads(graph)
         share = _shares(graph)
-        made_when_asked: list[tuple[int, int, int]] = []
+        made_when_asked: list[tuple[int, int]] = []
 
         async def watching(question: str, about: str) -> str | None:
             assert question
             assert about
-            made_when_asked.append(
-                (calendar_route.call_count, roles_route.call_count, share.call_count)
-            )
+            made_when_asked.append((calendar_route.call_count, share.call_count))
             return None
 
         _ = await _share(client, confirm=watching)
 
-        assert made_when_asked == [(1, 1, 0)]
+        assert made_when_asked == [(1, 0)]
 
     @pytest.mark.parametrize(
         ("role", "words"),
@@ -619,21 +588,27 @@ class TestGraphFailures:
         assert asked == []
         assert share.call_count == 0
 
-    async def test_a_refused_roles_read_asks_nobody_and_shares_nothing(
+    async def test_a_role_microsoft_refuses_on_the_share_claims_no_share(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = graph.get(_CALENDAR_PATH).mock(return_value=httpx.Response(200, json=_calendar()))
-        _ = graph.route(method="GET", path__regex=_ROLES_PATH).mock(
-            return_value=httpx.Response(403)
+        _ = _reads(graph)
+        share = graph.post(_PERMISSIONS_PATH).mock(
+            return_value=httpx.Response(
+                400, json={"error": {"code": "invalidRequest", "message": "role not allowed"}}
+            )
         )
-        share = _shares(graph)
         asked, _bound, capture = _capturing()
 
-        with pytest.raises(GraphForbidden):
-            _ = await _share(client, confirm=capture)
+        with pytest.raises(GraphFailure) as raised:
+            _ = await _share(client, role="write", confirm=capture)
 
-        assert asked == []
-        assert share.call_count == 0
+        assert raised.value.status == 400
+        assert len(asked) == 1
+        assert share.call_count == 1
+        assert [call.request.method for call in cast("Sequence[Call]", graph.calls)] == [
+            "GET",
+            "POST",
+        ]
 
     async def test_the_call_example_reaches_graph_and_the_first_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -777,6 +752,19 @@ class TestHowItDeclaresItself:
         assert "The address must come from the user." in description
         assert "It cannot make a delegate." in description
         assert "outlook_list_calendars lists the calendars and their handles" in description
+
+    async def test_the_description_says_microsoft_can_refuse_a_role_after_the_user_agrees(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert (
+            "After the user agrees, Microsoft can refuse a role for that address on that "
+            "calendar. Then this tool shares nothing."
+        ) in description
+        assert "refuses a role" not in description
+        assert "does not allow" not in description
 
     async def test_the_description_says_a_timeout_is_not_a_reason_to_share_again(
         self, transport: httpx.AsyncClient
