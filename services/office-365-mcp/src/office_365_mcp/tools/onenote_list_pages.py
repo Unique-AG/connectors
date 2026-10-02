@@ -5,8 +5,6 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.method import Method
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page_collection_response import (
     OnenotePageCollectionResponse,
 )
@@ -14,11 +12,25 @@ from msgraph.generated.users.item.onenote.pages.pages_request_builder import Pag
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step, request_with_query
-from office_365_mcp.shared.handles import OnenoteSectionHandle, onenote_section_handle
-from office_365_mcp.shared.notes import PAGE_EXPANSIONS, PAGE_FIELDS, PageSummary
+from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.handles import (
+    OnenoteOwner,
+    OnenoteSectionHandle,
+    onenote_section_handle,
+)
+from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
+    PAGE_EXPANSIONS,
+    PAGE_FIELDS,
+    PageSummary,
+    get_with_query,
+    group_and_site_refused,
+    named_owner_refused,
+    onenote_root,
+    owner_named,
+)
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "onenote_list_pages"
@@ -33,9 +45,11 @@ GRAPH_NOT_FOUND = (
     "Microsoft 365 will not list these pages. If this call named a `section`, the handle is "
     + "well formed, so the section was most likely deleted, or moved to a different notebook, "
     + "which gives it a new handle: call onenote_list_notebooks again and take a fresh `uri` for "
-    + "the section from there, because this same handle fails again. If it named none, Microsoft "
-    + "found no OneNote for this account to list pages from at all, and no other argument here "
-    + "fixes that."
+    + "the section from there, because this same handle fails again. If this call named a "
+    + "`group` or a `site`, the id most likely names nothing that the signed-in user can reach. "
+    + "Ask the user for the correct id. This same id fails again, so do not retry it. If it "
+    + "named none of these, Microsoft found no OneNote for this account to list pages from at "
+    + "all. No other argument here fixes that."
 )
 
 MAX_PAGES = 100
@@ -65,10 +79,11 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
 }
 
 _DESCRIPTION = """\
-Finds pages across every notebook the signed-in user can reach, or inside one section. \
-`title_contains` matches the title only: Microsoft Graph has no full-text search over a page's \
-words for a work or school account. The page index can hold an empty title for days after a \
-create, so find a new page by `created_at` or by its section instead.
+Finds pages across every notebook the signed-in user can reach, inside one section, or inside the \
+notebooks of one group or one SharePoint site. `title_contains` matches the title only: Microsoft \
+Graph has no full-text search over a page's words for a work or school account. The page index can \
+hold an empty title for days after a create, so find a new page by `created_at` or by its section \
+instead.
 
 Notes:
 - The four date windows are inclusive at both ends and combine with AND. The default order is \
@@ -78,11 +93,12 @@ newest change first.
 _NOT_A_SECTION_HANDLE = (
     "onenote_list_pages takes a section handle in `section`. It looks like "
     + "onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks result. Copy it exactly. A section's name is not a handle, nor is "
-    + "a notebook's name, nor a web address, nor a bare section id. A page handle "
-    + "(onenote:///pages/{id}) is not one either, because a page holds no pages of its own to "
-    + "list. Omit `section` to search every notebook the user owns and every notebook shared "
-    + "with them instead. This same value fails again, so do not retry it."
+    + "onenote_list_notebooks result. A handle from a group or site notebook starts with "
+    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Copy it exactly. A "
+    + "section's name is not a handle, nor is a notebook's name, nor a web address, nor a bare "
+    + "section id. A page handle (onenote:///pages/{id}) is not one either, because a page holds "
+    + "no pages of its own to list. Omit `section` to search every notebook the user owns and "
+    + "every notebook shared with them instead. This same value fails again, so do not retry it."
 )
 
 _PAGELEVEL_NEEDS_A_SECTION = (
@@ -91,6 +107,12 @@ _PAGELEVEL_NEEDS_A_SECTION = (
     + "every notebook. Pass a section's `uri` from an onenote_list_notebooks result as `section` "
     + "alongside `include_level_and_order=true`, or drop `include_level_and_order` to search "
     + "every notebook without it. The same combination fails again, so do not retry it as it is."
+)
+
+_GROUP_WITH_A_SECTION = (
+    "onenote_list_pages takes `group` or `site` only without `section`. A section handle "
+    + "from a group or site notebook already carries its owner. The same combination fails "
+    + "again, so do not retry it as it is."
 )
 
 _MODIFIED_WINDOW_RUNS_BACKWARDS = (
@@ -131,7 +153,10 @@ async def list_pages(
     client: GraphServiceClient,
     *,
     section: str | None = None,
+    group: str | None = None,
+    site: str | None = None,
     title_contains: str | None = None,
+    created_by_app_id: str | None = None,
     order_by: OrderBy | None = None,
     modified_after: date | datetime | None = None,
     modified_before: date | datetime | None = None,
@@ -143,19 +168,35 @@ async def list_pages(
 ) -> PageList:
     assert 1 <= limit <= MAX_PAGES, f"limit must be within 1..{MAX_PAGES}, got {limit}"
     assert skip >= 0, f"skip must not be negative, got {skip}"
+    if group is not None and site is not None:
+        raise ToolError(group_and_site_refused(TOOL_NAME))
+    if section is not None and (group is not None or site is not None):
+        raise ToolError(_GROUP_WITH_A_SECTION)
     handle = _section_to_search(section)
+    owner = owner_named(group=group, site=site) if handle is None else handle.owner
     if include_level_and_order and handle is None:
         raise ToolError(_PAGELEVEL_NEEDS_A_SECTION)
     _refuse_backwards_windows(modified_after, modified_before, created_after, created_before)
     query_filter = _filter(
-        title_contains, modified_after, modified_before, created_after, created_before
+        title_contains,
+        created_by_app_id,
+        modified_after,
+        modified_before,
+        created_after,
+        created_before,
     )
     order_clause = _ORDER_BY_CLAUSES[order_by] if order_by is not None else None
 
-    with graph_errors(TOOL_NAME), graph_step(STEP_PAGES):
+    with (
+        owner_refused(group is not None or site is not None, named_owner_refused("Notes.Read")),
+        owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME),
+        graph_step(STEP_PAGES),
+    ):
         first_page = await _first_page(
             client,
             handle,
+            owner,
             limit=limit,
             query_filter=query_filter,
             order_by=order_clause,
@@ -166,7 +207,11 @@ async def list_pages(
         collected = await collect_pages(first_page, client, limit=limit)
 
     return PageList(
-        pages=[row for page in collected.items if (row := PageSummary.from_page(page)) is not None],
+        pages=[
+            row
+            for page in collected.items
+            if (row := PageSummary.from_page(page, owner=owner)) is not None
+        ],
         capped=collected.capped,
     )
 
@@ -217,6 +262,7 @@ def _wire(instant: datetime) -> str:
 
 def _filter(
     title_contains: str | None,
+    created_by_app_id: str | None,
     modified_after: date | datetime | None,
     modified_before: date | datetime | None,
     created_after: date | datetime | None,
@@ -234,12 +280,15 @@ def _filter(
     title_clause = _title_filter(title_contains)
     if title_clause is not None:
         clauses.append(title_clause)
+    if created_by_app_id is not None:
+        clauses.append(f"createdByAppId eq '{odata_literal(created_by_app_id)}'")
     return " and ".join(clauses) if clauses else None
 
 
 async def _first_page(
     client: GraphServiceClient,
     section: OnenoteSectionHandle | None,
+    owner: OnenoteOwner | None,
     *,
     limit: int,
     query_filter: str | None,
@@ -248,10 +297,11 @@ async def _first_page(
     include_level_and_order: bool,
 ) -> OnenotePageCollectionResponse | None:
     raw_query: dict[str, str] = {"pagelevel": "true"} if include_level_and_order else {}
+    root = onenote_root(client, owner)
     pages = (
-        client.me.onenote.pages
+        root.pages
         if section is None
-        else client.me.onenote.sections.by_onenote_section_id(section.section_id).pages
+        else root.sections.by_onenote_section_id(section.section_id).pages
     )
     fields = (*PAGE_FIELDS, *_LEVEL_AND_ORDER_FIELDS) if include_level_and_order else PAGE_FIELDS
     typed = _PagesQuery(
@@ -262,12 +312,8 @@ async def _first_page(
         orderby=[order_by] if order_by is not None else None,
         skip=skip if skip > 0 else None,
     )
-    request = request_with_query(
-        Method.GET, pages.url_template, pages.path_parameters, query=raw_query, typed=typed
-    )
-    request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, OnenotePageCollectionResponse, {"XXX": ODataError}
+    return await get_with_query(
+        client, pages, typed, OnenotePageCollectionResponse, query=raw_query
     )
 
 
@@ -287,8 +333,34 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "Search only this section's pages, as the `uri` of a section in an "
-                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section's "
-                    + "name, a notebook's name and a page handle are not section handles."
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A handle from a "
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section's name, a notebook's name and a "
+                    + "page handle are not section handles."
+                ),
+            ),
+        ] = None,
+        group: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The Microsoft 365 group or team whose pages this call searches, as its "
+                    + "Graph id. A team id is a group id. Ask the user for it, or copy a team id "
+                    + "from an earlier result. Omit it to search every notebook the user owns or "
+                    + "that somebody shares with them. Pass it only without `section`."
+                ),
+            ),
+        ] = None,
+        site: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The SharePoint site whose pages this call searches, as its Graph site id. "
+                    + "The id is a host name and two ids, joined by commas, and not "
+                    + "percent-encoded. Ask the user for it. Pass it only without `section`. "
+                    + "Pass at most one of `group` and `site`."
                 ),
             ),
         ] = None,
@@ -300,6 +372,17 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "Keep only the pages whose title contains this text, compared without "
                     + "regard to case. Omit it to list every page. Pass it to search for one "
                     + "page instead."
+                ),
+            ),
+        ] = None,
+        created_by_app_id: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Keep only the pages that one app created. Pass the `created_by_app_id` of "
+                    + "a row from an earlier result. The match is exact and case-sensitive, so "
+                    + "copy it word for word. Omit it to list pages from every app."
                 ),
             ),
         ] = None,
@@ -400,7 +483,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await list_pages(
             client,
             section=section,
+            group=group,
+            site=site,
             title_contains=title_contains,
+            created_by_app_id=created_by_app_id,
             order_by=order_by,
             modified_after=modified_after,
             modified_before=modified_before,

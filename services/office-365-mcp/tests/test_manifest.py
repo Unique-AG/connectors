@@ -203,6 +203,24 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
         assert "does not expose" not in _flat(manifest)
 
+    @pytest.mark.parametrize(
+        "preset",
+        [ToolsPreset.ONENOTE_READ, ToolsPreset.ONENOTE_WRITE, ToolsPreset.ONENOTE_DELETE],
+    )
+    async def test_a_onenote_deployment_is_told_nothing_about_teams_tools(
+        self, preset: ToolsPreset
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
+
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            manifest = await surface_manifest(mcp, selection, version=_VERSION)
+
+        assert "teams_" not in _flat(manifest)
+        if preset is not ToolsPreset.ONENOTE_READ:
+            assert "does not expose" not in _flat(manifest)
+
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
         selection = Selection(

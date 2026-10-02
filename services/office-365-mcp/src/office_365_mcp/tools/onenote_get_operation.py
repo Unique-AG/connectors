@@ -9,8 +9,8 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_operation_handle
-from office_365_mcp.shared.notes import OperationSummary
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, onenote_root
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_get_operation"
 
@@ -25,7 +25,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _NOT_AN_OPERATION_HANDLE = (
     "onenote_get_operation takes an operation handle. It looks like onenote:///operations/{id}, "
     + "with the id percent-encoded, for example "
-    + "onenote:///operations/1-SYNTHETICOPERATION0000. A page handle "
+    + "onenote:///operations/1-SYNTHETICOPERATION0000. A handle from a group or site notebook "
+    + "starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A page handle "
     + "(onenote:///pages/{id}), a section handle (onenote:///sections/{id}) and a notebook "
     + "handle (onenote:///notebooks/{id}) are none of them an operation handle: they name what a "
     + "copy reads from or, once it finishes, produces — never the copy itself. Take the `uri` "
@@ -62,13 +63,18 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
     if handle is None:
         raise ToolError(_NOT_AN_OPERATION_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP_OPERATION):
-        found = await client.me.onenote.operations.by_onenote_operation_id(
-            handle.operation_id
-        ).get()
+    with (
+        owner_refused(handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_OPERATION),
+    ):
+        found = await (
+            onenote_root(client, handle.owner)
+            .operations.by_onenote_operation_id(handle.operation_id)
+            .get()
+        )
 
     assert found is not None, "Graph answered an operation read with no operation"
-    return OperationSummary.from_operation(found)
+    return OperationSummary.from_operation(found, owner=handle.owner)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -88,8 +94,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The copy to poll: the `uri` of a onenote_copy_page, onenote_copy_section or "
                     + "onenote_copy_notebook answer, copied word for word. The shape is "
-                    + "onenote:///operations/{id}. An operation id alone, with no connector scheme "
-                    + "around it, reaches nothing."
+                    + "onenote:///operations/{id}. A handle from a group or site notebook starts "
+                    + "with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. An "
+                    + "operation id alone, with no connector scheme around it, reaches nothing."
                 ),
             ),
         ],
