@@ -92,17 +92,17 @@ GRAPH_NOT_FOUND = (
     + "the notebook was deleted, or the signed-in user lost access to it. Find it again with "
     + "onenote_list_notebooks or onenote_find_notebook_from_url, and take a fresh `uri` from that "
     + "result. If this call named a `to_group`, the id can also name no group that the user can "
-    + "reach. Take that id from teams_list_my_teams, or ask the user for it. This same call fails "
-    + "again, so do not retry it unchanged."
+    + "reach. Ask the user for the correct id. This same call fails again, so do not retry it "
+    + "unchanged."
 )
 
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `to_group` that this call named. Most likely, the "
     + "signed-in user is not a member of that group, or the id is wrong. Ask the user for the "
-    + "correct id, or ask them to get access. If this tool works without `to_group`, the "
-    + "permissions of this connector are not the problem. If it fails without it too, ask a "
-    + "Microsoft 365 administrator to grant the delegated permission Notes.Create. This same call "
-    + "fails again, so do not retry it."
+    + "correct id, or ask them to get access. If this tool also fails without `to_group`, ask a "
+    + "Microsoft 365 administrator to grant the delegated permission Notes.Create. If the user "
+    + "already has access, ask an administrator to examine the OneNote permissions of this "
+    + "connector. This same call fails again, so do not retry it."
 )
 
 _DESCRIPTION = """\
@@ -114,7 +114,7 @@ Pass the answer's `uri` to onenote_get_operation until `status` reads Completed 
 Notes:
 - This tool asks the user to agree before it writes into a Microsoft 365 group. A copy into the \
 user's own OneDrive starts without a question. The question names the group only by its id. \
-Before you call this tool, tell the user which group that id names.
+If you know the name of that group, tell it to the user before you call.
 - If a call times out, do not call this tool again first: a second call starts a second copy. \
 Before you call again, make sure that onenote_list_notebooks does not show the copy. If this call \
 named a `to_group`, pass that id to onenote_list_notebooks as `group`.
@@ -235,8 +235,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The Microsoft 365 group or team that gets the copy, as its Graph id. A team "
-                    + "id is a group id. Take it from teams_list_my_teams, or ask the user for it. "
-                    + "Omit it to copy the notebook into the user's own OneDrive."
+                    + "id is a group id. Ask the user for it, or copy a team id from an earlier "
+                    + "result. Omit it to copy the notebook into the user's own OneDrive."
                 ),
             ),
         ] = None,

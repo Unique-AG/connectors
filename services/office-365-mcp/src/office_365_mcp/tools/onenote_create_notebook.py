@@ -55,8 +55,8 @@ onenote_copy_notebook instead.
 
 Notes:
 - This tool asks the user to agree before it creates a notebook in a group or a site. Other people \
-can open that notebook. The question shows only the id of the group or the site. Before you call, \
-tell the user which group or site that id names.
+can open that notebook. The question shows only the id of the group or the site. If you know the \
+name of that group or site, tell it to the user before you call.
 - Microsoft refuses a duplicate name, and the same name fails again.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_notebooks with the same `group` or `site` does not show a notebook named `name`.
@@ -71,18 +71,17 @@ _GROUP_AND_SITE = (
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
     + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
-    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
-    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Create. This same call fails again, so do not retry it."
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
+    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Create. If the user already has access, ask an administrator to examine "
+    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 will not create this notebook. For a `group` or a `site`, the id most likely "
-    + "names nothing that the signed-in user can reach. Take a group id from "
-    + "teams_list_my_teams, or ask the user for the correct id. This same id fails again, so do "
-    + "not retry it. Without `group` or `site`, Microsoft most likely found no OneNote for this "
-    + "account."
+    + "names nothing that the signed-in user can reach. Ask the user for the correct id. This "
+    + "same id fails again, so do not retry it. Without `group` or `site`, Microsoft most likely "
+    + "found no OneNote for this account."
 )
 
 
@@ -259,8 +258,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The Microsoft 365 group or team that owns the new notebook, as its Graph "
-                    + "id. A team id is a group id. Take it from teams_list_my_teams, or ask the "
-                    + "user for it. Omit it to create the notebook in the user's own OneNote."
+                    + "id. A team id is a group id. Ask the user for it, or copy a team id from "
+                    + "an earlier result. Omit it to create the notebook in the user's own OneNote."
                 ),
             ),
         ] = None,

@@ -66,10 +66,10 @@ _GROUP_AND_SITE = (
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
     + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
-    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
-    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. This same call fails again, so do not retry it."
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
+    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
+    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (
@@ -256,8 +256,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The Microsoft 365 group or team whose notebook this address opens, as its "
-                    + "Graph id. A team id is a group id. Take it from teams_list_my_teams, or "
-                    + "ask the user for it. Omit it for a notebook that the user owns or that "
+                    + "Graph id. A team id is a group id. Ask the user for it, or copy a team id "
+                    + "from an earlier result. Omit it for a notebook that the user owns or that "
                     + "somebody shares with them."
                 ),
             ),

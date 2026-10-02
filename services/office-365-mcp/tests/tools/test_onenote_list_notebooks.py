@@ -1207,6 +1207,11 @@ class TestAnOwnerThatRefusesTheCaller:
             + "the id is wrong."
         )
         assert "grant the delegated permission Notes.Read" in message
+        assert (
+            "If the user already has access, ask an administrator to examine the OneNote "
+            + "permissions of this connector."
+        ) in message
+        assert "are not the problem" not in message
         assert "This same call fails again, so do not retry it." in message
         assert message.endswith("(HTTP 403, Graph error code accessDenied)")
 
@@ -1253,7 +1258,8 @@ class TestHowItDescribesItself:
         described = cast("str", properties["group"]["description"])
         assert "whose notebooks this call lists" in described
         assert "A team id is a group id." in described
-        assert "teams_list_my_teams" in described
+        assert "Ask the user for it, or copy a team id from an earlier result." in described
+        assert "teams_list_my_teams" not in described
         assert "Omit it to list every notebook the user owns" in described
 
     async def test_site_is_optional_and_never_empty(self, transport: httpx.AsyncClient) -> None:
@@ -1302,7 +1308,11 @@ class TestHowItDescribesItself:
         advice = lister.GRAPH_NOT_FOUND
 
         assert "`group`" in advice
-        assert "teams_list_my_teams" in advice
+        assert (
+            "names no group that the signed-in user can reach. Ask the user for the correct id."
+            in advice
+        )
+        assert "teams_list_my_teams" not in advice
         assert "fails again" in advice
 
     def test_a_not_found_names_the_site_and_says_the_same_id_fails_again(self) -> None:

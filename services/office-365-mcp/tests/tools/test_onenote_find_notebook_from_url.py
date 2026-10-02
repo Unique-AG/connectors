@@ -436,6 +436,7 @@ class TestGraphFailures:
             f"{finder._OWNER_REFUSED} "  # pyright: ignore[reportPrivateUsage]
             + "(HTTP 403, Graph error code accessDenied, Graph request id req-7)"
         )
+        assert "are not the problem" not in str(refused.value)
         assert isinstance(refused.value.__cause__, GraphForbidden)
 
     def test_the_advice_for_a_refused_owner_is_the_canonical_text(self) -> None:
@@ -443,10 +444,10 @@ class TestGraphFailures:
             "Microsoft 365 refused this request for the `group` or the `site` that this call "
             + "named. Most likely, the signed-in user is not a member of that group or site, or "
             + "the id is wrong. Ask the user for the correct id, or ask them to get access. If "
-            + "this tool works without `group` and `site`, the permissions of this connector are "
-            + "not the problem. If it fails without them too, ask a Microsoft 365 administrator "
-            + "to grant the delegated permission Notes.Read. This same call fails again, so do "
-            + "not retry it."
+            + "this tool also fails without `group` and `site`, ask a Microsoft 365 administrator "
+            + "to grant the delegated permission Notes.Read. If the user already has access, ask "
+            + "an administrator to examine the OneNote permissions of this connector. This same "
+            + "call fails again, so do not retry it."
         )
 
 
@@ -532,7 +533,8 @@ class TestHowItDeclaresItself:
             "The Microsoft 365 group or team whose notebook this address opens"
         )
         assert "A team id is a group id." in described
-        assert "Take it from teams_list_my_teams, or ask the user for it." in described
+        assert "Ask the user for it, or copy a team id from an earlier result." in described
+        assert "teams_list_my_teams" not in described
         assert 15 <= len(described.split()) <= 60
 
     async def test_the_site_argument_says_how_a_site_id_is_spelled_and_where_it_comes_from(

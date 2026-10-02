@@ -51,10 +51,10 @@ _NAME = "My Notebook"
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
     + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
-    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
-    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Create. This same call fails again, so do not retry it."
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
+    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Create. If the user already has access, ask an administrator to examine "
+    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 
@@ -356,6 +356,7 @@ class TestGraphFailures:
             _ = await _create(client, group=owner.get("group"), site=owner.get("site"))
 
         assert str(advised.value).startswith(_OWNER_REFUSED)
+        assert "are not the problem" not in str(advised.value)
         assert isinstance(advised.value.__cause__, GraphForbidden)
 
     async def test_a_403_for_a_site_reaches_the_client_as_the_owner_text(
@@ -391,7 +392,11 @@ class TestGraphFailures:
         advice = creator.GRAPH_NOT_FOUND
 
         assert "For a `group` or a `site`" in advice
-        assert "Take a group id from teams_list_my_teams" in advice
+        assert (
+            "names nothing that the signed-in user can reach. Ask the user for the correct id."
+            in advice
+        )
+        assert "teams_list_my_teams" not in advice
         assert "This same id fails again, so do not retry it." in advice
         assert "Without `group` or `site`, Microsoft most likely found no OneNote" in advice
 
@@ -874,7 +879,8 @@ class TestHowItDeclaresItself:
         assert cast("list[Mapping[str, object]]", group["anyOf"])[0]["minLength"] == 1
         described = cast("str", group["description"])
         assert "A team id is a group id." in described
-        assert "teams_list_my_teams" in described
+        assert "Ask the user for it, or copy a team id from an earlier result." in described
+        assert "teams_list_my_teams" not in described
         assert "Omit it to create the notebook in the user's own OneNote." in described
         assert 15 <= len(described.split()) <= 60
 
@@ -952,7 +958,9 @@ class TestHowItDeclaresItself:
             + "Other people can open that notebook."
         ) in flat
         assert "The question shows only the id of the group or the site." in flat
-        assert "tell the user which group or site that id names" in flat
+        assert (
+            "If you know the name of that group or site, tell it to the user before you call."
+        ) in flat
 
     async def test_the_description_has_a_lead_and_notes_in_the_house_shape(
         self, transport: httpx.AsyncClient

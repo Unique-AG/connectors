@@ -364,7 +364,8 @@ class TestGraphFailures:
 
     def test_not_found_advice_names_to_group_as_a_cause(self) -> None:
         assert "`to_group`" in copier.GRAPH_NOT_FOUND
-        assert "teams_list_my_teams" in copier.GRAPH_NOT_FOUND
+        assert "reach. Ask the user for the correct id." in copier.GRAPH_NOT_FOUND
+        assert "teams_list_my_teams" not in copier.GRAPH_NOT_FOUND
         assert "the argument is not the problem" not in copier.GRAPH_NOT_FOUND
 
     async def test_a_403_with_to_group_is_advised_about_the_group(
@@ -386,6 +387,11 @@ class TestGraphFailures:
         )
         assert "not a member of that group" in message
         assert "Notes.Create" in message
+        assert (
+            "If the user already has access, ask an administrator to examine the OneNote "
+            + "permissions of this connector."
+        ) in message
+        assert "are not the problem" not in message
         assert "do not retry it" in message
         assert "(HTTP 403" in message
         assert isinstance(refused.value.__cause__, GraphForbidden)
@@ -675,6 +681,9 @@ class TestHowItDeclaresItself:
         assert "do not call this tool again first" in description
         assert "onenote_get_operation" in description
         assert "the question names the group only by its id" in description
+        assert "if you know the name of that group, tell it to the user before you call" in (
+            description
+        )
 
     async def test_the_timed_out_note_lists_the_notebooks_of_the_target_group(
         self, transport: httpx.AsyncClient
@@ -703,7 +712,8 @@ class TestHowItDeclaresItself:
         description = cast("str", to_group["description"])
 
         assert "A team id is a group id." in description
-        assert "teams_list_my_teams" in description
+        assert "Ask the user for it, or copy a team id from an earlier result." in description
+        assert "teams_list_my_teams" not in description
         assert "own OneDrive" in description
 
     async def test_the_notebook_description_names_the_group_shape(

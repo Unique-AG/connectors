@@ -48,10 +48,10 @@ _APP_ID = "WLID-000000004C12821A"
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
     + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
-    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
-    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. This same call fails again, so do not retry it."
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
+    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
+    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 
@@ -500,7 +500,11 @@ class TestTheGroupRoute:
 
     def test_the_not_found_advice_covers_a_group_id(self) -> None:
         assert "`group`" in lister.GRAPH_NOT_FOUND
-        assert "teams_list_my_teams" in lister.GRAPH_NOT_FOUND
+        assert (
+            "names no group that the signed-in user can reach. Ask the user for the correct id."
+            in lister.GRAPH_NOT_FOUND
+        )
+        assert "teams_list_my_teams" not in lister.GRAPH_NOT_FOUND
 
 
 class TestTheSiteRoute:
@@ -824,6 +828,7 @@ class TestGraphFailures:
         assert str(refused.value) == (
             _OWNER_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
         )
+        assert "are not the problem" not in str(refused.value)
         assert isinstance(refused.value.__cause__, GraphForbidden)
 
     async def test_a_refusal_for_a_section_handle_with_no_group_or_site_stays_a_forbidden(
@@ -1165,7 +1170,8 @@ class TestItsArguments:
             "The Microsoft 365 group or team whose pages this call searches"
         )
         assert "A team id is a group id." in described
-        assert "Take it from teams_list_my_teams, or ask the user for it." in described
+        assert "Ask the user for it, or copy a team id from an earlier result." in described
+        assert "teams_list_my_teams" not in described
         assert "only without `section`" in described
         assert 15 <= len(described.split()) <= 60
 

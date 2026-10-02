@@ -43,9 +43,9 @@ GRAPH_NOT_FOUND = (
     + "well formed, so the section was most likely deleted, or moved to a different notebook, "
     + "which gives it a new handle: call onenote_list_notebooks again and take a fresh `uri` for "
     + "the section from there, because this same handle fails again. If this call named a "
-    + "`group`, the id most likely names no group that the signed-in user can reach. Take the "
-    + "id from teams_list_my_teams, or ask the user for it. This same id fails again, so do not "
-    + "retry it. If this call named a `site`, the id most likely names no site that the "
+    + "`group`, the id most likely names no group that the signed-in user can reach. Ask the "
+    + "user for the correct id. This same id fails again, so do not retry it. If this call "
+    + "named a `site`, the id most likely names no site that the "
     + "signed-in user can reach. Ask the user for the correct id. This same id fails again, so "
     + "do not retry it. If it named none of these, Microsoft found no OneNote for this account "
     + "to list pages from at all, and no other argument here fixes that."
@@ -54,10 +54,10 @@ GRAPH_NOT_FOUND = (
 _OWNER_REFUSED = (
     "Microsoft 365 refused this request for the `group` or the `site` that this call named. "
     + "Most likely, the signed-in user is not a member of that group or site, or the id is "
-    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool works "
-    + "without `group` and `site`, the permissions of this connector are not the problem. If it "
-    + "fails without them too, ask a Microsoft 365 administrator to grant the delegated "
-    + "permission Notes.Read. This same call fails again, so do not retry it."
+    + "wrong. Ask the user for the correct id, or ask them to get access. If this tool also fails "
+    + "without `group` and `site`, ask a Microsoft 365 administrator to grant the delegated "
+    + "permission Notes.Read. If the user already has access, ask an administrator to examine "
+    + "the OneNote permissions of this connector. This same call fails again, so do not retry it."
 )
 
 MAX_PAGES = 100
@@ -358,8 +358,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The Microsoft 365 group or team whose pages this call searches, as its "
-                    + "Graph id. A team id is a group id. Take it from teams_list_my_teams, or "
-                    + "ask the user for it. Omit it to search every notebook the user owns or "
+                    + "Graph id. A team id is a group id. Ask the user for it, or copy a team id "
+                    + "from an earlier result. Omit it to search every notebook the user owns or "
                     + "that somebody shares with them. Pass it only without `section`."
                 ),
             ),
