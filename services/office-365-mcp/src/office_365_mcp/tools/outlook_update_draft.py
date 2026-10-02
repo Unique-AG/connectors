@@ -23,10 +23,10 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance
+from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -133,6 +133,15 @@ def _bad_address(argument: str, value: str) -> str:
     )
 
 
+def _repeated(argument: str, address: str) -> str:
+    return (
+        f"outlook_update_draft was given {address!r} twice in `{argument}`, and this tool lists "
+        + "each address once. A change of case does not make a second address. Nothing was "
+        + "changed. Remove the repeat and call again. If you call this tool again with the same "
+        + "arguments, the call will fail the same way."
+    )
+
+
 class UpdatedDraft(BaseModel):
     uri: str = Field(
         description=(
@@ -222,8 +231,8 @@ async def update_draft(
         raise ToolError(_NOTHING_TO_CHANGE)
     wanted = replace(
         change,
-        to=_one_address_each(change.to, argument="to"),
-        cc=_one_address_each(change.cc, argument="cc"),
+        to=_addresses(change.to, argument="to"),
+        cc=_addresses(change.cc, argument="cc"),
     )
     reached = graph_mailbox(client, mailbox)
 
@@ -274,14 +283,17 @@ def _handle_for(draft_ref: str) -> MailDraftHandle:
     raise ToolError(_NOT_A_DRAFT_HANDLE)
 
 
-def _one_address_each(addresses: Sequence[str] | None, *, argument: str) -> list[str] | None:
+def _addresses(addresses: Sequence[str] | None, *, argument: str) -> tuple[str, ...] | None:
     if addresses is None:
         return None
-    trimmed = [address.strip() for address in addresses]
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _recipients(addresses: Sequence[str]) -> list[Recipient]:
@@ -450,7 +462,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         categories: Annotated[
-            list[str] | None,
+            list[CategoryName] | None,
             Field(
                 description=(
                     "The full new list of category names, one name for each entry, exactly as "

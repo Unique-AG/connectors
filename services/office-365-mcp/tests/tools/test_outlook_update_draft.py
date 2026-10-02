@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.tools import Tool
 from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
@@ -239,6 +239,17 @@ class TestWhatItSendsToGraph:
         assert _sent(patch)["importance"] == "high"
         assert _sent(patch)["categories"] == ["Finance", "Urgent"]
 
+    async def test_an_omitted_to_and_an_omitted_cc_leave_the_recipients_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(client, cc=[_ADA])
+        assert "toRecipients" not in _sent(patch)
+
+        _ = await _update(client, to=[_GRACE])
+        assert "ccRecipients" not in _sent(patch)
+
     async def test_both_requests_ask_for_immutable_ids(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -362,14 +373,31 @@ class TestWhatItRefuses:
         assert "outlook_find_recipient" in str(raised.value)
         assert len(graph.calls) == 0
 
+    @pytest.mark.parametrize(
+        ("argument", "field"), [("to", "toRecipients"), ("cc", "ccRecipients")]
+    )
     async def test_surrounding_whitespace_is_trimmed_rather_than_refused(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, graph: respx.MockRouter, argument: str, field: str
     ) -> None:
         patch = _ready(graph)
 
-        _ = await _update(client, to=[f"  {_GRACE}  "])
+        _ = await _update(client, **{argument: [f"  {_GRACE}  "]})
 
-        assert _addressed(_sent(patch), "toRecipients") == [_GRACE]
+        assert _addressed(_sent(patch), field) == [_GRACE]
+
+    @pytest.mark.parametrize("argument", ["to", "cc"])
+    async def test_an_address_repeated_in_one_list_is_refused_whatever_its_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter, argument: str
+    ) -> None:
+        _ = _ready(graph)
+
+        with pytest.raises(ToolError, match=f"twice in `{argument}`") as raised:
+            _ = await _update(client, **{argument: [_GRACE, _PAM, f" {_GRACE.upper()} "]})
+
+        assert repr(_GRACE.upper()) in str(raised.value)
+        assert "Nothing was changed." in str(raised.value)
+        assert str(raised.value).endswith(_RETRY_SENTENCE)
+        assert len(graph.calls) == 0
 
 
 class TestTheSchemaItPublishes:
@@ -408,6 +436,24 @@ class TestTheSchemaItPublishes:
         )
         assert listed["minItems"] == 1
         assert "maxItems" not in listed
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        (listed, _null) = cast(
+            "Sequence[Mapping[str, object]]", _properties(parameters)["categories"]["anyOf"]
+        )
+        assert cast("Mapping[str, object]", listed["items"])["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**updater.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
     async def test_the_category_argument_promises_the_lister_only_where_it_exists(
         self, transport: httpx.AsyncClient
