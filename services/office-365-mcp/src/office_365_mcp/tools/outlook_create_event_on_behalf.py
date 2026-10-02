@@ -35,6 +35,7 @@ from office_365_mcp.shared.calendar import (
     IMPORTANCE_FIELD,
     IS_REMINDER_ON_FIELD,
     NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
     RECURRENCE_FIELD,
     REMINDER_MINUTES_FIELD,
     RESPONSE_REQUESTED_FIELD,
@@ -73,7 +74,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.categories import CategoryName
+from office_365_mcp.shared.categories import CategoryName, merged_categories
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
@@ -512,7 +513,7 @@ def _composed(
         all_day=all_day,
         online_meeting=online_meeting,
         room_addresses=rooms,
-        categories=tuple(categories),
+        categories=tuple(merged_categories((), add=categories, remove=())),
         show_as=show_as,
         importance=importance,
         sensitivity=sensitivity,
@@ -574,7 +575,9 @@ def _question(calendar: Calendar, draft: EventDraft) -> str:
             + "and cannot be recalled: "
             + f"{', '.join(invited)}."
         )
-    elif draft.location or draft.room_addresses:
+    elif draft.room_addresses:
+        invitations = NOBODY_INVITED_BUT_A_ROOM
+    elif draft.location:
         invitations = NOBODY_INVITED_BUT_A_PLACE
     else:
         invitations = "There are no invitations: nobody else is told about it."

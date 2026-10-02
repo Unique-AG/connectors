@@ -33,6 +33,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
     NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
     EventDraft,
     EventImportance,
     EventSensitivity,
@@ -591,6 +592,26 @@ class TestWhatItSendsToGraph:
 
         assert _sent(create)["transactionId"] != _TRANSACTION
 
+    async def test_a_category_that_repeats_in_another_case_reaches_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+
+        assert _sent(create)["categories"] == ["Red"]
+
+    async def test_a_category_that_repeats_in_another_case_sends_the_id_of_the_category_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+        repeated = _sent(create)["transactionId"]
+        _ = await _create(client, categories=["Red"])
+
+        assert repeated == _sent(create)["transactionId"]
+
     async def test_two_identical_calls_send_one_transaction_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -819,7 +840,7 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
         assert with_a_place.endswith(f"? {NOBODY_INVITED_BUT_A_PLACE}")
         assert with_nowhere.endswith("? There are no invitations: nobody else is told about it.")
 
-    async def test_a_room_with_nobody_invited_says_the_room_can_reach_a_mailbox(
+    async def test_a_room_with_nobody_invited_says_the_request_reaches_the_room_mailbox(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph)
@@ -827,7 +848,28 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
         question = await _asked(client, room_addresses=[_ROOM])
 
         assert f"booking the room {_ROOM}" in question
-        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_PLACE}")
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_rooms_with_nobody_invited_are_all_named_before_the_request_text(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, room_addresses=[_ROOM, "room4@example.invalid"])
+
+        assert f"booking the rooms {_ROOM}, room4@example.invalid? " in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+
+    async def test_a_room_and_a_place_with_nobody_invited_are_asked_about_as_a_room(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, location="Room 3", room_addresses=[_ROOM])
+
+        assert "at 'Room 3'" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
 
     async def test_a_room_beside_the_invited_people_is_named_before_the_invitations(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -839,6 +881,18 @@ class TestThePersonBetweenTheRequestAndTheCalendar:
         creates, _mark, invitations = question.partition("? ")
         assert creates.endswith(f"booking the room {_ROOM}")
         assert "to 1 person" in invitations
+        assert NOBODY_INVITED_BUT_A_ROOM not in question
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_a_category_that_repeats_in_another_case_is_named_once_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, categories=["Red", "red"])
+
+        assert "tagged 'Red'" in question
+        assert "Red, red" not in question
 
     @pytest.mark.parametrize(
         ("argument", "value", "said"),

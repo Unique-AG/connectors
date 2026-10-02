@@ -40,6 +40,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.calendar import (
     NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
     STEP_CALENDAR,
     EventImportance,
     EventSensitivity,
@@ -250,6 +251,26 @@ async def _create(
     )
     assert isinstance(created, CreatedEvent), "this call was answered with a question, not an event"
     return created
+
+
+async def _asked(
+    client: GraphServiceClient,
+    *,
+    attendees: Sequence[str] = (),
+    location: str | None = None,
+    **options: Unpack[_Options],
+) -> str:
+    questions: list[str] = []
+
+    async def capturing(question: str, about: str) -> str | None:
+        assert about, "the answer was bound to nothing"
+        questions.append(question)
+        return None
+
+    _ = await _create(client, attendees=attendees, location=location, confirm=capturing, **options)
+
+    assert len(questions) == 1, "this tool asks exactly one question per call"
+    return questions[0]
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
@@ -584,6 +605,25 @@ class TestWhatItSendsToGraph:
 
         assert _sent_at(create, 0)["transactionId"] == _sent_at(create, 1)["transactionId"]
 
+    async def test_a_category_that_repeats_in_another_case_reaches_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+
+        assert _sent(create)["categories"] == ["Red"]
+
+    async def test_a_category_that_repeats_in_another_case_asks_under_the_id_of_the_category_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, categories=["Red", "red"])
+        _ = await _create(client, categories=["Red"])
+
+        assert _sent_at(create, 0)["transactionId"] == _sent_at(create, 1)["transactionId"]
+
     async def test_an_option_set_asks_under_a_different_transaction_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -901,7 +941,9 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         question = asked[0]
         assert "at 'Room 3'" in question
         assert "No person is invited" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_PLACE}")
         assert "mailbox of a room" in question, "the reason a place is asked about is not given"
+        assert NOBODY_INVITED_BUT_A_ROOM not in question
 
     async def test_a_room_with_nobody_invited_is_put_to_a_person_and_named(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -918,8 +960,50 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
 
         assert len(asked) == 1, "a room mailbox was sent a meeting request without asking anybody"
         assert f"booking the room {_ROOM}" in asked[0]
-        assert asked[0].endswith(f"? {NOBODY_INVITED_BUT_A_PLACE}")
+        assert asked[0].endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
         assert create.call_count == 1
+
+    async def test_the_question_for_rooms_with_nobody_invited_names_each_room_and_the_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, room_addresses=[_ROOM, "room-4@example.invalid"])
+
+        assert f"booking the rooms {_ROOM}, room-4@example.invalid" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_a_room_and_a_place_with_nobody_invited_are_asked_about_as_a_room(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, location="Room 3", room_addresses=[_ROOM])
+
+        assert "at 'Room 3'" in question
+        assert question.endswith(f"? {NOBODY_INVITED_BUT_A_ROOM}")
+
+    async def test_a_room_beside_a_person_leaves_the_invitation_text_as_it_was(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, attendees=[_ADA], room_addresses=[_ROOM])
+
+        assert f"and invite 1 person: {_ADA}? Microsoft mails the invitations" in question
+        assert NOBODY_INVITED_BUT_A_ROOM not in question
+        assert NOBODY_INVITED_BUT_A_PLACE not in question
+
+    async def test_a_category_that_repeats_in_another_case_is_named_once_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        question = await _asked(client, attendees=[_ADA], categories=["Red", "red"])
+
+        assert "tagged 'Red'" in question
+        assert "Red, red" not in question
 
     async def test_a_room_the_person_declined_is_never_posted(
         self, client: GraphServiceClient, graph: respx.MockRouter

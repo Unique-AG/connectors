@@ -48,6 +48,9 @@ from pydantic import BaseModel, ValidationError
 
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
+    NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
+    ROOM_ADDRESSES_FIELD,
     SUMMARY_FIELDS,
     CalendarSummary,
     EventAttendee,
@@ -1627,6 +1630,17 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         details = draft_details(_draft(body_html="<p>one</p><p>two</p>"))
 
         assert _preview_of(details) == "one two"
+
+
+class TestWhatAQuestionWithNobodyInvitedPromises:
+    def test_a_room_is_promised_the_request_and_a_place_only_the_chance(self) -> None:
+        assert "sends the meeting request to the mailbox of each room" in NOBODY_INVITED_BUT_A_ROOM
+        assert "can send" not in NOBODY_INVITED_BUT_A_ROOM
+        assert "can send the meeting request" in NOBODY_INVITED_BUT_A_PLACE
+
+    def test_the_question_for_rooms_and_the_field_that_adds_them_say_the_same_thing(self) -> None:
+        assert "the mailbox of each room gets the meeting request" in ROOM_ADDRESSES_FIELD
+        assert "the mailbox of each room" in NOBODY_INVITED_BUT_A_ROOM
 
 
 class TestTheTransactionId:

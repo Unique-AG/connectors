@@ -35,6 +35,7 @@ from office_365_mcp.shared.calendar import (
     IMPORTANCE_FIELD,
     IS_REMINDER_ON_FIELD,
     NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
     RECURRENCE_FIELD,
     REMINDER_MINUTES_FIELD,
     RESPONSE_REQUESTED_FIELD,
@@ -72,7 +73,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.categories import CategoryName
+from office_365_mcp.shared.categories import CategoryName, merged_categories
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
@@ -499,7 +500,7 @@ def _drafted(
         all_day=all_day,
         online_meeting=online_meeting,
         room_addresses=rooms,
-        categories=tuple(categories),
+        categories=tuple(merged_categories((), add=categories, remove=())),
         show_as=show_as,
         importance=importance,
         sensitivity=sensitivity,
@@ -564,7 +565,8 @@ def _question(draft: EventDraft) -> str:
     span = f"from {draft.starts_at} to {draft.ends_at} {draft.time_zone}"
     opening = f"Create {draft.subject!r} {span}{details}"
     if not invited:
-        return f"{opening}? {NOBODY_INVITED_BUT_A_PLACE}"
+        nobody = NOBODY_INVITED_BUT_A_ROOM if draft.room_addresses else NOBODY_INVITED_BUT_A_PLACE
+        return f"{opening}? {nobody}"
     return (
         f"{opening} and invite {counted_people(invited)}: {', '.join(invited)}? Microsoft mails "
         "the invitations as the event is created, and this connector cannot recall them."

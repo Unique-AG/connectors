@@ -95,6 +95,11 @@ NOBODY_INVITED_BUT_A_PLACE = (
     + "or of a bookable room that the location names."
 )
 
+NOBODY_INVITED_BUT_A_ROOM = (
+    "No person is invited. Microsoft sends the meeting request to the mailbox of each room when "
+    + "it creates the event. This connector cannot recall it."
+)
+
 _DEFAULT_WHEN_NULL = " Null sends nothing, and Microsoft then applies its own default."
 
 _KEPT_WHEN_NULL = " Null sends nothing, and the event keeps the value that it has now."
