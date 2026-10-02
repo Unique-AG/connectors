@@ -8,7 +8,7 @@ import pytest
 import respx
 from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.tools import Tool
 from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
@@ -28,8 +28,9 @@ _DRAFT_ID = "AAMkAGI2SYNTHETIC-reply-draft-0001="
 
 _MESSAGE_REF = MailMessageHandle(_MESSAGE_ID).uri
 
-_CREATE_REPLY = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/createReply"
-_CREATE_FORWARD = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D/createForward"
+_OWN_MESSAGE = "/me/messages/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+_CREATE_REPLY = f"{_OWN_MESSAGE}/createReply"
+_CREATE_FORWARD = f"{_OWN_MESSAGE}/createForward"
 _FILL = "/me/messages/AAMkAGI2SYNTHETIC-reply-draft-0001%3D"
 
 _WEB_LINK = "https://outlook.office365.invalid/owa/?ItemID=synthetic-reply-draft"
@@ -150,8 +151,13 @@ def _original(
     }
 
 
-def _reads(graph: respx.MockRouter, payload: dict[str, object] | None = None) -> respx.Route:
-    return graph.get(_SHARED_MESSAGE).mock(
+def _reads(
+    graph: respx.MockRouter,
+    payload: dict[str, object] | None = None,
+    *,
+    path: str = _SHARED_MESSAGE,
+) -> respx.Route:
+    return graph.get(path).mock(
         return_value=httpx.Response(200, json=payload if payload is not None else _original())
     )
 
@@ -330,6 +336,7 @@ class TestWhatItSendsToGraph:
     async def test_a_reply_takes_a_copy_too(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, path=_OWN_MESSAGE)
         create = _creates(graph)
         fill = _fills(graph)
 
@@ -545,6 +552,7 @@ class TestTheModesAndAddressesItRefuses:
     async def test_surrounding_whitespace_in_cc_is_trimmed_rather_than_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, path=_OWN_MESSAGE)
         _ = _creates(graph)
         fill = _fills(graph)
 
@@ -562,6 +570,147 @@ class TestTheModesAndAddressesItRefuses:
         _ = await _reply(client, mode="forward", to=many)
 
         assert _addressed(_sent(create), "ToRecipients") == many
+
+
+class TestTheCopyThatIsTheReplyRecipient:
+    @pytest.mark.parametrize("copy", [_ADA, _ADA.upper()])
+    async def test_a_cc_that_is_the_sender_is_refused_after_one_read_and_before_any_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter, copy: str
+    ) -> None:
+        read = _reads(graph, path=_OWN_MESSAGE)
+        create = _creates(graph)
+
+        with pytest.raises(ToolError, match="the reply already goes to that address") as raised:
+            _ = await _reply(client, cc=[copy])
+
+        assert repr(copy) in str(raised.value)
+        assert read.call_count == 1
+        assert create.call_count == 0
+        assert _methods(graph) == ["GET"]
+
+    @pytest.mark.parametrize("copy", ["invoices@example.invalid", "Invoices@Example.Invalid"])
+    async def test_a_cc_that_is_the_reply_to_address_is_refused_after_one_read_and_before_any_write(
+        self, client: GraphServiceClient, graph: respx.MockRouter, copy: str
+    ) -> None:
+        read = _reads(graph, _original(reply_to=["invoices@example.invalid"]), path=_OWN_MESSAGE)
+        create = _creates(graph)
+
+        with pytest.raises(ToolError, match="the reply already goes to that address"):
+            _ = await _reply(client, cc=[_PAM, copy])
+
+        assert read.call_count == 1
+        assert create.call_count == 0
+        assert _methods(graph) == ["GET"]
+
+    async def test_the_refusal_names_the_address_the_cause_and_the_remedy(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, path=_OWN_MESSAGE)
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _reply(client, cc=[_ADA])
+
+        refusal = str(raised.value)
+        assert f"given {_ADA!r} in `cc`" in refusal
+        assert (
+            "Microsoft addresses a reply to the sender of the original message, or to its "
+            + "reply-to address."
+        ) in refusal
+        assert "No draft was created." in refusal
+        assert "Remove the address from `cc`" in refusal
+        assert refusal.endswith(
+            "If you call this tool again with the same arguments, the call will fail the same way."
+        )
+        sentences = re.split(r"(?<=[.?])\s+", refusal)
+        assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
+
+    async def test_a_cc_that_differs_from_the_sender_reads_the_original_once_and_creates_the_draft(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, path=_OWN_MESSAGE)
+        _ = _creates(graph)
+        fill = _fills(graph)
+
+        _ = await _reply(client, cc=[_PAM])
+
+        assert read.call_count == 1
+        assert _methods(graph) == ["GET", "POST", "PATCH"]
+        assert _addressed(_sent(fill), "ccRecipients") == [_PAM]
+
+    async def test_a_cc_that_is_the_sender_is_kept_when_a_reply_to_address_takes_the_reply(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _original(reply_to=["invoices@example.invalid"]), path=_OWN_MESSAGE)
+        _ = _creates(graph)
+        fill = _fills(graph)
+
+        _ = await _reply(client, cc=[_ADA])
+
+        assert _methods(graph) == ["GET", "POST", "PATCH"]
+        assert _addressed(_sent(fill), "ccRecipients") == [_ADA]
+
+    async def test_a_cc_is_kept_when_the_original_names_nobody_to_reply_to(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _original(sender=None), path=_OWN_MESSAGE)
+        _ = _creates(graph)
+        fill = _fills(graph)
+
+        _ = await _reply(client, cc=[_PAM])
+
+        assert _addressed(_sent(fill), "ccRecipients") == [_PAM]
+
+    async def test_a_reply_with_no_cc_never_reads_the_original(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, path=_OWN_MESSAGE)
+        _ = _creates(graph)
+        _ = _fills(graph)
+
+        _ = await _reply(client)
+
+        assert read.call_count == 0
+        assert _methods(graph) == ["POST", "PATCH"]
+
+    async def test_a_forward_with_a_cc_that_is_the_sender_never_reads_the_original(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph, path=_OWN_MESSAGE)
+        _ = _creates(graph, _CREATE_FORWARD)
+        fill = _fills(graph)
+
+        _ = await _reply(client, mode="forward", to=[_GRACE], cc=[_ADA])
+
+        assert read.call_count == 0
+        assert _methods(graph) == ["POST", "PATCH"]
+        assert _addressed(_sent(fill), "ccRecipients") == [_ADA]
+
+    async def test_a_shared_mailbox_reply_with_a_cc_reads_once_and_asks_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph)
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(client, cc=[_PAM], mailbox=_SHARED_MAILBOX, confirm=capturing)
+
+        assert len(asked) == 1
+        assert read.call_count == 1
+        assert _methods(graph) == ["GET", "POST", "PATCH"]
+
+    async def test_a_shared_mailbox_reply_with_the_sender_in_cc_asks_nobody_and_writes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = _reads(graph)
+        _ = _shared_writes(graph)
+
+        with pytest.raises(ToolError, match="the reply already goes to that address"):
+            _ = await _reply(
+                client, cc=[_ADA.upper()], mailbox=_SHARED_MAILBOX, confirm=_never_asked
+            )
+
+        assert read.call_count == 1
+        assert _written(graph) == []
 
 
 class TestTheSchemaItPublishes:
@@ -660,10 +809,31 @@ class TestTheSchemaItPublishes:
         described = cast("str", _properties(parameters)["cc"]["description"])
         assert "from the user or outlook_find_recipient" in described
         assert "An address in `to` cannot also be in `cc`." in described
+        assert (
+            "A reply goes to the sender of the original message, or to its reply-to address. "
+            + "That address cannot be in `cc`."
+        ) in described
+
+    async def test_a_category_name_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        parameters, _tool = await _registered(transport)
+
+        items = cast("Mapping[str, object]", _properties(parameters)["categories"]["items"])
+        assert items["minLength"] == 1
+
+    async def test_a_blank_category_name_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError):
+            _ = await tool.run({**replier.GRAPH_CALL_EXAMPLE, "categories": [""]})
+
+        assert len(graph.calls) == 0, "a blank category name reached Graph"
 
     async def test_two_calls_do_not_share_one_cc_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, path=_OWN_MESSAGE)
         _ = _creates(graph)
         fill = _fills(graph)
 
@@ -1200,6 +1370,7 @@ class TestWhenTheTextCannotBeWritten:
     async def test_a_refused_fill_reports_the_copy_and_the_categories_that_never_landed(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _reads(graph, path=_OWN_MESSAGE)
         _ = _creates(graph)
         _ = graph.patch(_FILL).mock(return_value=httpx.Response(403, json=_REFUSED))
 

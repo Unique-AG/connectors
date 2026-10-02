@@ -36,7 +36,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
@@ -183,6 +183,15 @@ def _in_to_and_cc(address: str) -> str:
     )
 
 
+def _reply_already_goes_to(address: str) -> str:
+    return (
+        f"outlook_draft_reply was given {address!r} in `cc`, and the reply already goes to that "
+        + "address. Microsoft addresses a reply to the sender of the original message, or to its "
+        + "reply-to address. No draft was created. Remove the address from `cc`, and call again. "
+        + "If you call this tool again with the same arguments, the call will fail the same way."
+    )
+
+
 class MailReplyDraft(BaseModel):
     uri: str = Field(
         description=(
@@ -275,31 +284,35 @@ async def draft_reply(
     created: Message | None = None
     fill: _Fill | None = None
     with graph_errors(TOOL_NAME):
-        if mailbox is not None:
+        if mailbox is not None or (mode == "reply" and copied):
             original = await _read_original(reached, handle)
             addressed = forwarded_to or _reply_addresses(original)
-            with not_graph():
-                answer = await confirm(
-                    _question(
-                        mailbox,
-                        mode=mode,
-                        subject=original.subject,
-                        addressed=addressed,
-                        cc=copied,
-                        importance=importance,
-                        categories=categories,
-                    ),
-                    _about(
-                        mailbox,
-                        message_id=handle.message_id,
-                        mode=mode,
-                        body_html=body_html,
-                        addressed=addressed,
-                        cc=copied,
-                        importance=importance,
-                        categories=categories,
-                    ),
-                )
+            repeated = _copied_reply_address(mode, copied, addressed=addressed)
+            if repeated is not None:
+                answer = _reply_already_goes_to(repeated)
+            elif mailbox is not None:
+                with not_graph():
+                    answer = await confirm(
+                        _question(
+                            mailbox,
+                            mode=mode,
+                            subject=original.subject,
+                            addressed=addressed,
+                            cc=copied,
+                            importance=importance,
+                            categories=categories,
+                        ),
+                        _about(
+                            mailbox,
+                            message_id=handle.message_id,
+                            mode=mode,
+                            body_html=body_html,
+                            addressed=addressed,
+                            cc=copied,
+                            importance=importance,
+                            categories=categories,
+                        ),
+                    )
         if answer is None:
             created = await _create(
                 reached, handle=handle, mode=mode, recipients=_recipients(forwarded_to)
@@ -346,6 +359,15 @@ def _copied_addresses(cc: Sequence[str], *, forwarded_to: Sequence[str]) -> list
         if address.casefold() in addressed:
             raise ToolError(_in_to_and_cc(address))
     return list(checked)
+
+
+def _copied_reply_address(
+    mode: MailReplyMode, copied: Sequence[str], *, addressed: Sequence[str]
+) -> str | None:
+    if mode != "reply":
+        return None
+    replied_to = {address.casefold() for address in addressed}
+    return next((address for address in copied if address.casefold() in replied_to), None)
 
 
 def _recipients(addresses: Sequence[str]) -> list[Recipient]:
@@ -541,12 +563,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The Cc recipients, one SMTP address for each entry, from the user or "
                     + "outlook_find_recipient. This argument works in `reply` mode and in "
-                    + "`forward` mode. An address in `to` cannot also be in `cc`."
+                    + "`forward` mode. An address in `to` cannot also be in `cc`. A reply goes "
+                    + "to the sender of the original message, or to its reply-to address. That "
+                    + "address cannot be in `cc`."
                 ),
             ),
         ],
         categories: Annotated[
-            list[str],
+            list[CategoryName],
             Field(
                 default=[],
                 description=(
