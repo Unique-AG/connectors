@@ -4,7 +4,8 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context, FastMCP
+from fastmcp import Client, Context, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import (
     AcceptedElicitation,
@@ -32,8 +33,14 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Advised,
+    Confirm,
+    GraphAdviceMiddleware,
+)
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_delete_page as deleter
 from office_365_mcp.tools.onenote_delete_page import DeletedPage, a_person_agrees, delete_page
 
@@ -68,6 +75,12 @@ _SITE_NOTEBOOK_GET_PATH = f"/sites/{_SITE_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _SECTION = {"id": "SECTION1", "displayName": "General"}
 _NOTEBOOK = {"id": _NOTEBOOK_ID, "displayName": "Work"}
+
+_OWNED_PAGES = pytest.mark.parametrize(
+    ("page", "route"),
+    [(_GROUP_PAGE_URI, _GROUP_PAGE_PATH), (_SITE_PAGE_URI, _SITE_PAGE_PATH)],
+    ids=["group", "site"],
+)
 
 
 def _page_payload(
@@ -380,6 +393,72 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _delete(client)
+
+    @_OWNED_PAGES
+    async def test_a_403_on_an_owned_delete_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(return_value=httpx.Response(200, json=_page_payload()))
+        delete_route = graph.delete(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _delete(client, page=page)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert delete_route.call_count == 1
+
+    @_OWNED_PAGES
+    async def test_a_403_on_an_owned_pre_read_arrives_as_the_owned_advice_and_deletes_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        delete_route = graph.delete(route).mock(return_value=httpx.Response(204))
+
+        with pytest.raises(Advised) as refused:
+            _ = await _delete(client, page=page)
+
+        assert str(refused.value).startswith(OWNED_REFUSED)
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert delete_route.call_count == 0
+
+    async def test_a_403_on_a_site_delete_reaches_the_client_as_the_owned_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_SITE_PAGE_PATH).mock(return_value=httpx.Response(200, json=_page_payload()))
+        site_delete = graph.delete(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        advice = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=[deleter.TOOL_NAME]))
+        )
+        server: FastMCP[None] = FastMCP("deleter", middleware=[advice])
+
+        @server.tool(name=deleter.TOOL_NAME, annotations=WRITE_DESTRUCTIVE_IDEMPOTENT)
+        async def delete() -> bool:
+            return (await _delete(client, page=_SITE_PAGE_URI)).deleted
+
+        async with Client(FastMCPTransport(server)) as mcp_client:
+            with pytest.raises(ToolError) as raised:
+                _ = await mcp_client.call_tool(deleter.TOOL_NAME, {})
+
+        assert str(raised.value).startswith(OWNED_REFUSED)
+        assert "grant the delegated" not in str(raised.value)
+        assert site_delete.call_count == 1
 
     async def test_a_404_on_the_notebook_read_is_a_not_found_and_nothing_is_deleted(
         self, client: GraphServiceClient, graph: respx.MockRouter

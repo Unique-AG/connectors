@@ -26,6 +26,7 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     UNKNOWN_AUDIENCE,
     NotebookAudience,
     client_url_of,
@@ -41,6 +42,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -243,7 +245,10 @@ async def create_page(
     created: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with (
+        owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME),
+    ):
         audience = await _notebook_audience_for(client, handle)
         if answer_pending or audience.reaches_others:
             with not_graph():

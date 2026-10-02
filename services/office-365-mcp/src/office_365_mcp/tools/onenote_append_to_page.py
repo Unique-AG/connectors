@@ -15,6 +15,7 @@ from pydantic import Field
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     NotebookAudience,
     PageSummary,
     page_for_a_question,
@@ -29,6 +30,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -113,7 +115,7 @@ async def append_to_page(
     summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others:
             with not_graph():

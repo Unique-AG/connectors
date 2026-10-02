@@ -33,8 +33,8 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import PageSummary, write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_append_to_page as appender
 from office_365_mcp.tools.onenote_append_to_page import a_person_agrees, append_to_page
 
@@ -63,6 +63,21 @@ _GROUP_PATCH_PATH = f"{_GROUP_GET_PATH}/onenotePatchContent"
 _GROUP_NOTEBOOK_GET_PATH = f"/groups/{_GROUP_ID}/onenote/notebooks/{_NOTEBOOK_ID}"
 
 _GROUP_REASON = "which belongs to a Microsoft 365 group"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+
+_SITE_PAGE_URI = OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("sites", _SITE_ID)).uri
+
+_SITE_GET_PATH = f"/sites/{_SITE_ID}/onenote/pages/{_PAGE_ID}"
+
+_OWNED_PAGES = pytest.mark.parametrize(
+    ("page", "route"),
+    [(_GROUP_PAGE_URI, _GROUP_GET_PATH), (_SITE_PAGE_URI, _SITE_GET_PATH)],
+    ids=["group", "site"],
+)
 
 
 def _page_payload(
@@ -453,6 +468,63 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _append(client)
+
+    @_OWNED_PAGES
+    async def test_a_403_on_an_owned_patch_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        page_route = graph.get(route).mock(return_value=httpx.Response(200, json=_page_payload()))
+        patch = graph.post(f"{route}/onenotePatchContent").mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _append(client, page=page)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert (page_route.call_count, patch.call_count) == (1, 1)
+
+    @_OWNED_PAGES
+    async def test_a_403_on_an_owned_pre_read_arrives_as_the_owned_advice_and_patches_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        patch = graph.post(f"{route}/onenotePatchContent").mock(return_value=httpx.Response(204))
+
+        with pytest.raises(Advised) as refused:
+            _ = await _append(client, page=page)
+
+        assert str(refused.value).startswith(OWNED_REFUSED)
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert patch.call_count == 0
+
+    @_OWNED_PAGES
+    async def test_a_403_on_an_owned_reread_still_says_that_the_content_was_added(
+        self, client: GraphServiceClient, graph: respx.MockRouter, page: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            side_effect=[
+                httpx.Response(200, json=_page_payload()),
+                httpx.Response(403, json={"error": {"code": "accessDenied", "message": "denied"}}),
+            ]
+        )
+        patch = graph.post(f"{route}/onenotePatchContent").mock(return_value=httpx.Response(204))
+
+        with pytest.raises(Advised, match="Microsoft 365 added the content to the page"):
+            _ = await _append(client, page=page)
+
+        assert patch.call_count == 1
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_failed_reread_is_reported_as_a_successful_write_not_a_failure(

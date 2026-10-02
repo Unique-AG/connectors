@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenoteOwner, OnenoteSectionHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     NotebookAudience,
     onenote_root,
     page_for_a_question,
@@ -22,6 +23,7 @@ from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -121,7 +123,7 @@ async def delete_page(
     found: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         found = pre_read.page
         with not_graph():
