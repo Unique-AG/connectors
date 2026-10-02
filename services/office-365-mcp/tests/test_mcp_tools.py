@@ -513,6 +513,9 @@ def _object(value: object) -> dict[str, object]:
 
 
 _TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
+_GUARDED_MENTION = re.compile(
+    r"\bIf this deployment exposes\s+(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b"
+)
 
 
 def _described(schema: Mapping[str, object] | None) -> list[str]:
@@ -1273,7 +1276,7 @@ class TestTheToolsThisServerAdvertises:
                     *_described(tool.output_schema),
                 ]
             )
-            named = set(_TOOL_MENTION.findall(described))
+            named = set(_TOOL_MENTION.findall(_GUARDED_MENTION.sub("", described)))
             mentioned |= named
             assert not named - advertised, (
                 f"{name} tells a model about {sorted(named - advertised)}, which this server does "
@@ -1283,6 +1286,15 @@ class TestTheToolsThisServerAdvertises:
         assert len(mentioned) > 1, (
             f"nothing names another tool any more, so this proves nothing: {mentioned}"
         )
+
+    def test_only_a_mention_behind_the_deployment_guard_is_let_through(self) -> None:
+        guarded = "If this deployment exposes outlook_find_recipient, that tool finds an address."
+        unguarded = f"{guarded} outlook_find_recipient also needs a name."
+
+        assert not _TOOL_MENTION.findall(_GUARDED_MENTION.sub("", guarded))
+        assert _TOOL_MENTION.findall(_GUARDED_MENTION.sub("", unguarded)) == [
+            "outlook_find_recipient"
+        ]
 
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]

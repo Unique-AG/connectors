@@ -192,7 +192,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
         assert f"{_SECOND}'s description mentions {_THIRD}" in _flat(manifest)
 
-    async def test_a_deployment_that_exposes_everything_is_told_nothing(self) -> None:
+    async def test_a_teams_deployment_is_told_only_about_the_lookup_get_me_names(self) -> None:
         """The real registry, because a note here would be a note in production."""
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
@@ -201,7 +201,11 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
             register_tools(mcp, transport, selection)
             manifest = await surface_manifest(mcp, selection, version=_VERSION)
 
-        assert "does not expose" not in _flat(manifest)
+        assert _flat(manifest).count("does not expose") == 1
+        assert (
+            f"{ALWAYS_ON}'s description mentions outlook_find_recipient, which this deployment "
+            "does not expose"
+        ) in _flat(manifest)
 
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
