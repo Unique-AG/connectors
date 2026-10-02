@@ -22,6 +22,7 @@ from starlette.applications import Starlette
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.tools import outlook_copy_mail as copy
 from office_365_mcp.tools import outlook_mark_mail as mark
 from office_365_mcp.tools import outlook_move_mail as move
 
@@ -53,9 +54,15 @@ class _Tool:
 
 _MARK = _Tool(mark.TOOL_NAME, {"is_read": True}, "change", "PATCH")
 _MOVE = _Tool(move.TOOL_NAME, {"destination": "archive"}, "move", "POST")
+_COPY = _Tool(copy.TOOL_NAME, {"destination": "archive"}, "copy", "POST")
 
-_EITHER_TOOL = pytest.mark.parametrize(
-    "tool", [pytest.param(_MARK, id="mark"), pytest.param(_MOVE, id="move")]
+_EACH_TOOL = pytest.mark.parametrize(
+    "tool",
+    [
+        pytest.param(_MARK, id="mark"),
+        pytest.param(_MOVE, id="move"),
+        pytest.param(_COPY, id="copy"),
+    ],
 )
 
 _MARKS: Sequence[Mapping[str, object]] = (
@@ -168,7 +175,7 @@ def _arguments(tool: _Tool, *, mailbox: str | None) -> dict[str, object]:
 
 @pytest.mark.usefixtures("obo")
 class TestTheWholeConfirmationOverARealClient:
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_an_agreed_change_to_another_mailbox_writes_each_message_after_one_question(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -184,7 +191,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(written) == len(_REFS), f"an agreed change wrote {written}"
         assert all(f"/users/{_MAILBOX}/messages/" in path for path in written), written
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_person_who_says_no_leaves_the_other_mailbox_alone(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -197,7 +204,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(person.questions) == 1
         assert _writes(graph, tool) == [], f"a declined change wrote {_writes(graph, tool)}"
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_the_own_mailbox_asks_nobody_and_writes(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -212,7 +219,7 @@ class TestTheWholeConfirmationOverARealClient:
             "the own mailbox was held back by a question"
         )
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_client_pinned_to_the_handshake_era_still_asks_and_writes(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -226,7 +233,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert len(person.questions) == 1, f"the person was asked {person.questions}"
         assert len(_writes(graph, tool)) == len(_REFS), "a handshake-era change wrote too few"
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_a_handshake_era_refusal_writes_nothing(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:
@@ -252,7 +259,7 @@ class TestTheWholeConfirmationOverARealClient:
         assert "They stay recoverable in Deleted Items." in person.questions[0]
         assert len(_writes(graph, _MOVE)) == len(_REFS)
 
-    @_EITHER_TOOL
+    @_EACH_TOOL
     async def test_an_accept_that_omits_the_request_state_writes_nothing(
         self, app: Starlette, graph: respx.MockRouter, tool: _Tool
     ) -> None:

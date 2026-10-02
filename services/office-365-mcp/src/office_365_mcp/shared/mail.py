@@ -1,17 +1,28 @@
+import hashlib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 from typing import Literal, Self
 
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
+from msgraph.generated.models.mail_folder import MailFolder
+from msgraph.generated.models.mail_search_folder import MailSearchFolder
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
+from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from pydantic import BaseModel, Field
 
-from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.graph_client import GraphFailure, graph_step
+from office_365_mcp.shared.handles import (
+    MailFolderHandle,
+    MailMessageHandle,
+    mail_folder_handle,
+    mail_message_handle,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 
@@ -35,6 +46,8 @@ SUMMARY_FIELDS: tuple[str, ...] = (
 )
 
 PREVIEW_CHARACTERS = 255
+
+STEP_DESTINATION = "destination_folder"
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
@@ -262,3 +275,93 @@ def one_address_each(addresses: Sequence[str]) -> tuple[str, ...] | AddressFault
     if again is not None:
         return AddressFault(entry=again, repeated=True)
     return trimmed
+
+
+_SEARCH_FOLDER_ONLY: frozenset[str] = frozenset(
+    MailSearchFolder().get_field_deserializers()
+) - frozenset(MailFolder().get_field_deserializers())
+
+assert _SEARCH_FOLDER_ONLY, (
+    "MailSearchFolder declares no property of its own, so the destination check below accepts "
+    "every search folder silently"
+)
+
+
+class MailFault(Enum):
+    BOTH_DESTINATIONS = auto()
+    NO_DESTINATION = auto()
+    NOT_A_FOLDER_HANDLE = auto()
+    NOT_A_MESSAGE_HANDLE = auto()
+    SEARCH_FOLDER = auto()
+    HIDDEN_FOLDER = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class MailDestination:
+    folder_id: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class MessageAttempt[T]:
+    result: T
+    failure: GraphFailure | None
+
+
+def message_handles(message_refs: Sequence[str]) -> tuple[MailMessageHandle, ...] | MailFault:
+    handles = tuple(mail_message_handle(ref) for ref in message_refs)
+    named = tuple(handle for handle in handles if handle is not None)
+    return named if len(named) == len(handles) else MailFault.NOT_A_MESSAGE_HANDLE
+
+
+def destination_asked_for(
+    destination: WellKnownFolder | None, folder_ref: str | None
+) -> WellKnownFolder | MailFolderHandle | MailFault:
+    if destination is not None and folder_ref is not None:
+        return MailFault.BOTH_DESTINATIONS
+    if destination is not None:
+        return destination
+    if folder_ref is None:
+        return MailFault.NO_DESTINATION
+    handle = mail_folder_handle(folder_ref)
+    return MailFault.NOT_A_FOLDER_HANDLE if handle is None else handle
+
+
+async def resolve_destination(
+    reached: UserItemRequestBuilder, wanted: WellKnownFolder | MailFolderHandle
+) -> MailDestination | MailFault:
+    if not isinstance(wanted, MailFolderHandle):
+        return MailDestination(folder_id=wanted, name=wanted)
+    with graph_step(STEP_DESTINATION):
+        folder = await reached.mail_folders.by_mail_folder_id(wanted.folder_id).get()
+    assert folder is not None, "Graph answered a mail folder read with no folder"
+    if _is_search_folder(folder):
+        return MailFault.SEARCH_FOLDER
+    if folder.is_hidden:
+        return MailFault.HIDDEN_FOLDER
+    return MailDestination(folder_id=wanted.folder_id, name=folder.display_name or wanted.uri)
+
+
+def _is_search_folder(folder: MailFolder) -> bool:
+    if isinstance(folder, MailSearchFolder):
+        return True
+    return bool(_SEARCH_FOLDER_ONLY & frozenset(folder.additional_data or {}))
+
+
+def mail_batch_confirmation_id(
+    tool_name: str,
+    *,
+    mailbox: str,
+    handles: Sequence[MailMessageHandle],
+    target: MailDestination,
+) -> str:
+    parts = (tool_name, mailbox, target.folder_id, *(handle.uri for handle in handles))
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def raise_when_no_message_succeeded[T](attempts: Sequence[MessageAttempt[T]]) -> None:
+    if any(attempt.failure is None for attempt in attempts):
+        return
+    failed = next((attempt.failure for attempt in attempts if attempt.failure is not None), None)
+    if failed is not None:
+        raise failed

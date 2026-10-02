@@ -41,6 +41,7 @@ from office_365_mcp.shared.seam import (
     ToolAdvice,
 )
 from office_365_mcp.tools import outlook_copy_mail as copier
+from office_365_mcp.tools import outlook_move_mail as mover
 
 _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _SECOND_ID = "AAMkAGI2SYNTHETIC-immutable-0002="
@@ -58,6 +59,8 @@ _WELL_KNOWN = "/me/mailFolders/archive"
 _MAILBOX = "alex@example.invalid"
 
 _NOT_COPIED = "No message was copied."
+
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
 
 _NEVER_A_DESTINATION: tuple[str, ...] = (
     "recoverableitemsdeletions",
@@ -1028,6 +1031,31 @@ class TestThePersonBeforeAnotherMailboxIsWrittenTo:
 
         assert asked[0][1] == asked[1][1]
 
+    async def test_the_same_request_binds_a_different_agreement_than_a_move(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_copied(_FIRST_COPY_ID))
+        asked, capturing = _questions()
+        refs = [MailMessageHandle(_FIRST_ID).uri]
+
+        _ = await _copy(
+            client,
+            message_refs=refs,
+            destination="archive",
+            mailbox=_MAILBOX,
+            confirm=capturing,
+        )
+        _ = await mover.move_mail(
+            client,
+            message_refs=refs,
+            confirm=capturing,
+            destination="archive",
+            mailbox=_MAILBOX,
+        )
+
+        (_, copy_about), (_, move_about) = asked
+        assert copy_about != move_about
+
 
 def _context(answer: object) -> Context:
     class _Client:
@@ -1155,6 +1183,38 @@ class TestTheEraWithNoBackChannel:
 
         assert _posted(graph) == []
 
+    async def test_an_answer_bound_to_a_move_copies_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST").mock(return_value=_copied(_FIRST_COPY_ID))
+        refs = [MailMessageHandle(_FIRST_ID).uri]
+        asked = await mover.move_mail(
+            client,
+            message_refs=refs,
+            confirm=mover.a_person_agrees(_modern_context()),
+            destination="archive",
+            mailbox=_MAILBOX,
+        )
+        assert isinstance(asked, InputRequiredResult), "the move was never put to anybody"
+        (key,) = asked.input_requests or {}
+        assert asked.request_state, "the move question is bound to nothing"
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await copier.copy_mail(
+                client,
+                message_refs=refs,
+                confirm=copier.a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": "copy"})},
+                        state=asked.request_state,
+                    )
+                ),
+                destination="archive",
+                mailbox=_MAILBOX,
+            )
+
+        assert _posted(graph) == []
+
     async def test_the_own_mailbox_copies_in_one_round(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1272,8 +1332,7 @@ class TestWhatItSaysAboutItself:
     def test_the_permission_is_the_write_one_microsoft_documents(self) -> None:
         assert copier.GRAPH_PERMISSIONS == ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
-    def test_the_steps_name_the_destination_read_and_the_copy(self) -> None:
-        assert copier.STEP_DESTINATION == "destination_folder"
+    def test_the_step_names_the_copy(self) -> None:
         assert copier.STEP_COPY == "copy_message"
 
     def test_the_tools_that_show_the_change_are_the_two_mail_reads(self) -> None:
@@ -1324,6 +1383,9 @@ class TestWhatItSaysAboutItself:
         assert "outlook_browse_folders" in copier.GRAPH_NOT_FOUND
         assert "outlook_search_mail" in copier.GRAPH_NOT_FOUND
         assert "No message was copied." in copier.GRAPH_NOT_FOUND
+
+    def test_a_stale_handle_answer_ends_with_the_one_retry_sentence(self) -> None:
+        assert copier.GRAPH_NOT_FOUND.endswith(_RETRY)
 
     def test_a_missing_message_is_never_blamed_on_a_folder_move(self) -> None:
         assert "already moved" not in copier.GRAPH_NOT_FOUND

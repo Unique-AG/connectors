@@ -1,19 +1,50 @@
+from collections.abc import Mapping, Sequence
+
+import httpx
 import pytest
+import respx
 from msgraph.generated.models.followup_flag import FollowupFlag
 from msgraph.generated.models.followup_flag_status import FollowupFlagStatus
 from msgraph.generated.models.message import Message
+from msgraph.graph_service_client import GraphServiceClient
 
+from office_365_mcp.graph_client import GraphFailure, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.shared.mail import (
+    STEP_DESTINATION,
     AddressFault,
+    MailDestination,
+    MailFault,
+    MessageAttempt,
     carries_category,
     copied_and_marked,
+    destination_asked_for,
     has_flag_state,
+    mail_batch_confirmation_id,
+    message_handles,
     one_address_each,
+    raise_when_no_message_succeeded,
     repeated_address,
+    resolve_destination,
 )
+from office_365_mcp.shared.seam import graph_mailbox
 
 _ADA = "ada@example.invalid"
 _ALEX = "alex@example.invalid"
+
+_FIRST = MailMessageHandle("AAMkAGI2SYNTHETIC-immutable-0001=")
+_SECOND = MailMessageHandle("AAMkAGI2SYNTHETIC-immutable-0002=")
+
+_ARCHIVE_ID = "AQMkADAwSYNTHETIC-archive"
+_ARCHIVE = MailFolderHandle(_ARCHIVE_ID)
+_ARCHIVE_PATH = f"/me/mailFolders/{_ARCHIVE_ID}"
+
+_SEARCH_FOLDER_PROPERTIES: Mapping[str, object] = {
+    "filterQuery": "flagStatus eq 'flagged'",
+    "sourceFolderIds": ["AQMkADAwSYNTHETIC-inbox"],
+    "includeNestedFolders": True,
+    "isSupported": True,
+}
 
 
 def _flagged_as(status: FollowupFlagStatus) -> Message:
@@ -136,3 +167,211 @@ class TestOneAddressEach:
         assert one_address_each([_ADA, _ADA, "Ada Lovelace"]) == AddressFault(
             entry="Ada Lovelace", repeated=False
         )
+
+
+class TestMessageHandles:
+    def test_handles_come_back_in_the_order_they_were_given(self) -> None:
+        assert message_handles([_SECOND.uri, _FIRST.uri]) == (_SECOND, _FIRST)
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "Invoice 4471",
+            _ADA,
+            _FIRST.message_id,
+            _ARCHIVE.uri,
+            "https://outlook.office.example/mail/id/AAMkAGI2",
+        ],
+        ids=["subject", "address", "bare-id", "folder-handle", "web-link"],
+    )
+    def test_one_value_that_is_no_message_handle_faults_the_whole_batch(self, value: str) -> None:
+        assert message_handles([_FIRST.uri, value, _SECOND.uri]) is MailFault.NOT_A_MESSAGE_HANDLE
+
+
+class TestDestinationAskedFor:
+    def test_a_well_known_name_is_the_destination(self) -> None:
+        assert destination_asked_for("archive", None) == "archive"
+
+    def test_a_folder_handle_is_parsed(self) -> None:
+        assert destination_asked_for(None, _ARCHIVE.uri) == _ARCHIVE
+
+    def test_a_name_and_a_handle_together_are_a_fault(self) -> None:
+        assert destination_asked_for("archive", _ARCHIVE.uri) is MailFault.BOTH_DESTINATIONS
+
+    def test_neither_is_a_fault(self) -> None:
+        assert destination_asked_for(None, None) is MailFault.NO_DESTINATION
+
+    @pytest.mark.parametrize("value", ["Archive", _FIRST.uri, "archive"])
+    def test_a_folder_ref_that_is_no_folder_handle_is_a_fault(self, value: str) -> None:
+        assert destination_asked_for(None, value) is MailFault.NOT_A_FOLDER_HANDLE
+
+
+def _folder(
+    *,
+    display_name: str | None = "Archive",
+    is_hidden: bool | None = False,
+    odata_type: str | None = None,
+    extra: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {"displayName": display_name, "isHidden": is_hidden}
+    if odata_type is not None:
+        payload["@odata.type"] = odata_type
+    payload.update(extra or {})
+    return payload
+
+
+class TestResolveDestination:
+    async def test_a_well_known_name_names_itself_and_reads_no_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        found = await resolve_destination(graph_mailbox(client, None), "deleteditems")
+
+        assert found == MailDestination(folder_id="deleteditems", name="deleteditems")
+        assert graph.calls.call_count == 0
+
+    async def test_a_folder_handle_is_named_by_the_display_name_graph_reports(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(return_value=httpx.Response(200, json=_folder()))
+
+        found = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+        assert found == MailDestination(folder_id=_ARCHIVE_ID, name="Archive")
+
+    async def test_a_folder_with_no_display_name_is_named_by_its_handle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(
+            return_value=httpx.Response(200, json=_folder(display_name=None))
+        )
+
+        found = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+        assert found == MailDestination(folder_id=_ARCHIVE_ID, name=_ARCHIVE.uri)
+
+    async def test_a_mailbox_reads_the_folder_of_that_mailbox(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        shared = graph.get(f"/users/{_ALEX}/mailFolders/{_ARCHIVE_ID}").mock(
+            return_value=httpx.Response(200, json=_folder())
+        )
+        mine = graph.get(_ARCHIVE_PATH)
+
+        _ = await resolve_destination(graph_mailbox(client, _ALEX), _ARCHIVE)
+
+        assert shared.call_count == 1
+        assert mine.call_count == 0
+
+    async def test_a_hidden_folder_is_a_fault(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(
+            return_value=httpx.Response(200, json=_folder(is_hidden=True))
+        )
+
+        found = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+        assert found is MailFault.HIDDEN_FOLDER
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            _folder(odata_type="#microsoft.graph.mailSearchFolder"),
+            _folder(extra=_SEARCH_FOLDER_PROPERTIES),
+        ],
+        ids=["by-odata-type", "by-a-property-only-a-search-folder-has"],
+    )
+    async def test_a_search_folder_is_a_fault(
+        self, client: GraphServiceClient, graph: respx.MockRouter, payload: dict[str, object]
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(return_value=httpx.Response(200, json=payload))
+
+        found = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+        assert found is MailFault.SEARCH_FOLDER
+
+    async def test_a_search_folder_that_is_also_hidden_is_a_search_folder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=_folder(is_hidden=True, odata_type="#microsoft.graph.mailSearchFolder")
+            )
+        )
+
+        found = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+        assert found is MailFault.SEARCH_FOLDER
+
+    async def test_a_folder_graph_will_not_return_is_a_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ARCHIVE_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "ErrorItemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await resolve_destination(graph_mailbox(client, None), _ARCHIVE)
+
+    def test_the_graph_step_is_the_one_the_dashboard_knows(self) -> None:
+        assert STEP_DESTINATION == "destination_folder"
+
+
+_ARCHIVE_TARGET = MailDestination(folder_id="archive", name="archive")
+
+
+def _binding(
+    *,
+    tool_name: str = "outlook_move_mail",
+    mailbox: str = _ALEX,
+    handles: Sequence[MailMessageHandle] = (_FIRST, _SECOND),
+    target: MailDestination = _ARCHIVE_TARGET,
+) -> str:
+    return mail_batch_confirmation_id(tool_name, mailbox=mailbox, handles=handles, target=target)
+
+
+class TestMailBatchConfirmationId:
+    def test_the_same_request_binds_the_same_id(self) -> None:
+        assert _binding() == _binding()
+
+    def test_the_tool_that_asks_is_part_of_the_binding(self) -> None:
+        assert _binding(tool_name="outlook_move_mail") != _binding(tool_name="outlook_copy_mail")
+
+    def test_a_different_mailbox_message_or_folder_binds_a_different_id(self) -> None:
+        bound = {
+            _binding(),
+            _binding(mailbox="sam@example.invalid"),
+            _binding(handles=(_FIRST,)),
+            _binding(handles=(_SECOND, _FIRST)),
+            _binding(target=MailDestination(folder_id="inbox", name="inbox")),
+        }
+
+        assert len(bound) == 5
+
+
+_NO_FAILURE = MessageAttempt(result="done", failure=None)
+
+
+def _failed(failure: GraphFailure) -> MessageAttempt[str]:
+    return MessageAttempt(result="failed", failure=failure)
+
+
+class TestRaiseWhenNoMessageSucceeded:
+    def test_one_success_among_failures_raises_nothing(self) -> None:
+        outage = GraphUnavailable("down", status=503, code=None, request_id=None)
+
+        raise_when_no_message_succeeded([_failed(outage), _NO_FAILURE, _failed(outage)])
+
+    def test_a_batch_that_all_succeeded_raises_nothing(self) -> None:
+        raise_when_no_message_succeeded([_NO_FAILURE, _NO_FAILURE])
+
+    def test_a_batch_that_all_failed_raises_the_first_failure(self) -> None:
+        first = GraphNotFound("gone", status=404, code=None, request_id=None)
+        second = GraphUnavailable("down", status=503, code=None, request_id=None)
+
+        with pytest.raises(GraphNotFound) as raised:
+            raise_when_no_message_succeeded([_failed(first), _failed(second)])
+
+        assert raised.value is first
