@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
-from office_365_mcp.shared.messages import EVERYONE_SEES_IT
+from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -101,8 +101,9 @@ async def remove_chat_member(
         if found is None:
             refused = _NO_SUCH_MEMBER
         else:
+            chat = await chat_in_question(client, chat_id, leaving_out=membership_id)
             with not_graph():
-                answer = await confirm(_question(found), _about(chat_id, membership_id))
+                answer = await confirm(_question(found, chat), _about(chat_id, membership_id))
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
             if refused is None and asked is None:
@@ -120,8 +121,8 @@ async def remove_chat_member(
     return RemovedChatMember(chat_id=chat_id, membership_id=membership_id)
 
 
-def _question(member: ConversationMember) -> str:
-    return f"Remove {_who(member)} from the Teams chat? {EVERYONE_SEES_IT}"
+def _question(member: ConversationMember, chat: str) -> str:
+    return f"Remove {_who(member)} from {chat}? {EVERYONE_SEES_IT}"
 
 
 def _who(member: ConversationMember) -> str:

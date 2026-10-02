@@ -18,10 +18,12 @@ from mcp.types import (
 )
 from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.graph_client import (
     GraphFailure,
     GraphForbidden,
+    GraphNotFound,
     GraphThrottled,
     GraphUnavailable,
 )
@@ -34,11 +36,12 @@ from office_365_mcp.tools.teams_add_chat_member import (
     add_chat_member,
 )
 
-from .conftest import OTHER_USER_ID
+from .conftest import OTHER_USER_ID, SIGNED_IN_USER_ID
 
 _CHAT_ID = "19:release@thread.v2"
 _OTHER_CHAT_ID = "19:pricing@thread.v2"
-_MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
+_CHAT_PATH = "/chats/19%3Arelease%40thread.v2"
+_MEMBERS_PATH = f"{_CHAT_PATH}/members"
 _LOCATION = f"/chats/{_CHAT_ID}/members/MCMjU1lOVEhFVElDMCMj"
 
 _GRACE_ID = OTHER_USER_ID
@@ -46,7 +49,27 @@ _JANE_ID = "00000000-0000-4000-8000-000000000003"
 _GRACE = Person(user_id=_GRACE_ID, name="Grace Hopper")
 _JANE = Person(user_id=_JANE_ID, name="Jane Doe")
 
+_TOPIC = "Release planning"
+
 _NOTHING_ADDED = "Nobody was added."
+_EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
+_NO_HISTORY = "The new member will not see the earlier messages of the chat."
+
+_ADA_MEMBER: Mapping[str, object] = {
+    "@odata.type": "#microsoft.graph.aadUserConversationMember",
+    "id": "MCMjU1lOVEhFVElDMCMj",
+    "displayName": "Ada Lovelace",
+    "email": "ada@example.invalid",
+    "userId": SIGNED_IN_USER_ID,
+    "roles": ["owner"],
+}
+_JANE_MEMBER: Mapping[str, object] = {
+    **_ADA_MEMBER,
+    "id": "MCMjU1lOVEhFVElDMSMj",
+    "displayName": "Jane Doe",
+    "email": "jane@example.invalid",
+    "userId": _JANE_ID,
+}
 
 _ALL_HISTORY = "0001-01-01T00:00:00Z"
 
@@ -61,10 +84,41 @@ async def _refuses(question: str, about: str) -> Confirmed:
     return _NOTHING_ADDED
 
 
+def _names_the_chat(graph: respx.MockRouter, topic: str | None = _TOPIC) -> respx.Route:
+    return graph.get(_CHAT_PATH).mock(
+        return_value=httpx.Response(200, json={"id": _CHAT_ID, "topic": topic, "chatType": "group"})
+    )
+
+
+def _lists_members(graph: respx.MockRouter, *members: Mapping[str, object]) -> respx.Route:
+    return graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in members]})
+    )
+
+
 def _adds(graph: respx.MockRouter) -> respx.Route:
+    _ = _names_the_chat(graph)
     return graph.post(_MEMBERS_PATH).mock(
         return_value=httpx.Response(201, headers={"Location": _LOCATION})
     )
+
+
+def _posts(graph: respx.MockRouter) -> list[Call]:
+    made = cast("Sequence[Call]", graph.calls)
+    return [call for call in made if call.request.method == "POST"]
+
+
+async def _asked(client: GraphServiceClient, member: Person = _GRACE) -> list[str]:
+    asked: list[str] = []
+
+    async def capturing(question: str, _about: str) -> Confirmed:
+        asked.append(question)
+        return None
+
+    _ = await add_chat_member(
+        client, chat_id=_CHAT_ID, member=member, share_history=False, confirm=capturing
+    )
+    return asked
 
 
 def _body(route: respx.Route) -> Mapping[str, object]:
@@ -128,7 +182,7 @@ async def _registered(transport: httpx.AsyncClient) -> FunctionTool:
 
 
 class TestWhatItSendsToGraph:
-    async def test_it_posts_once_to_the_members_of_the_chat(
+    async def test_it_reads_the_chat_and_then_posts_once_to_the_members_of_the_chat(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         route = _adds(graph)
@@ -137,8 +191,13 @@ class TestWhatItSendsToGraph:
             client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=_agrees
         )
 
+        made = cast("Sequence[Call]", graph.calls)
+        chat = f"/v1.0/chats/{_CHAT_ID}"
+        assert [(call.request.method, call.request.url.path) for call in made] == [
+            ("GET", chat),
+            ("POST", f"{chat}/members"),
+        ], "a chat with a topic costs one read for the question and one addition, and nothing else"
         assert route.call_count == 1
-        assert len(graph.calls) == 1, "one addition costs one Graph call, and nothing else"
 
     async def test_the_body_binds_the_user_as_an_owner_and_shares_no_history_by_default(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -185,7 +244,7 @@ class TestThePersonBeforeTheChange:
             )
 
         assert route.call_count == 0
-        assert len(graph.calls) == 0
+        assert _posts(graph) == []
 
     async def test_a_decline_adds_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -236,7 +295,7 @@ class TestThePersonBeforeTheChange:
             client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=watching
         )
 
-        assert calls_when_asked == [0], "asked after the member was already added"
+        assert calls_when_asked == [1], "asked before the chat was read, or after the addition"
         assert route.call_count == 1
 
     @pytest.mark.parametrize(
@@ -269,46 +328,88 @@ class TestThePersonBeforeTheChange:
         )
 
         assert asked == [
-            f"Add 'Grace Hopper' to the Teams chat? {history} "
-            + "Everyone in the conversation can see this change."
+            f"Add 'Grace Hopper' to the Teams chat 'Release planning'? {history} "
+            + _EVERYONE_SEES_IT
         ]
 
-    async def test_the_question_shows_no_user_id_and_no_chat_id(
+    @pytest.mark.parametrize("topic", [None, "", "   "], ids=["null", "empty", "blank"])
+    async def test_a_chat_with_no_topic_is_named_by_its_members(
+        self, client: GraphServiceClient, graph: respx.MockRouter, topic: str | None
+    ) -> None:
+        _ = _adds(graph)
+        _ = _names_the_chat(graph, topic)
+        _ = _lists_members(graph, _ADA_MEMBER, _JANE_MEMBER)
+
+        asked = await _asked(client)
+
+        assert asked == [
+            "Add 'Grace Hopper' to the Teams chat with 'Ada Lovelace, Jane Doe'? "
+            + f"{_NO_HISTORY} {_EVERYONE_SEES_IT}"
+        ]
+
+    async def test_a_long_topic_is_cut(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _adds(graph)
-        asked: list[str] = []
+        _ = _names_the_chat(graph, "R" * 200)
 
-        async def capturing(question: str, _about: str) -> Confirmed:
-            asked.append(question)
-            return None
+        (question,) = await _asked(client)
 
-        _ = await add_chat_member(
-            client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=capturing
-        )
+        assert question.startswith(f"Add 'Grace Hopper' to the Teams chat {'R' * 120 + '…'!r}?")
 
-        assert _GRACE_ID not in asked[0]
-        assert _CHAT_ID not in asked[0]
+    @pytest.mark.parametrize("topic", [_TOPIC, None], ids=["topic", "no-topic"])
+    async def test_the_question_shows_no_user_id_and_no_chat_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter, topic: str | None
+    ) -> None:
+        _ = _adds(graph)
+        _ = _names_the_chat(graph, topic)
+        _ = _lists_members(graph, _ADA_MEMBER, _JANE_MEMBER)
+
+        (question,) = await _asked(client)
+
+        assert _GRACE_ID not in question
+        assert SIGNED_IN_USER_ID not in question
+        assert _JANE_ID not in question
+        assert _CHAT_ID not in question
 
     async def test_the_question_cuts_a_long_name(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _adds(graph)
+
+        (question,) = await _asked(client, Person(user_id=_GRACE_ID, name="G" * 200))
+
+        assert question.startswith(f"Add {'G' * 120 + '…'!r} to the Teams chat 'Release planning'?")
+
+    @pytest.mark.parametrize(
+        ("status", "failure"),
+        [(404, GraphNotFound), (403, GraphForbidden)],
+        ids=["not-found", "forbidden"],
+    )
+    async def test_a_chat_read_that_fails_asks_nothing_and_adds_nobody(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        status: int,
+        failure: type[GraphFailure],
+    ) -> None:
+        route = _adds(graph)
+        _ = graph.get(_CHAT_PATH).mock(
+            return_value=httpx.Response(status, json={"error": {"code": "x", "message": "x"}})
+        )
         asked: list[str] = []
 
         async def capturing(question: str, _about: str) -> Confirmed:
             asked.append(question)
             return None
 
-        _ = await add_chat_member(
-            client,
-            chat_id=_CHAT_ID,
-            member=Person(user_id=_GRACE_ID, name="G" * 200),
-            share_history=False,
-            confirm=capturing,
-        )
+        with pytest.raises(failure):
+            _ = await add_chat_member(
+                client, chat_id=_CHAT_ID, member=_GRACE, share_history=False, confirm=capturing
+            )
 
-        assert asked[0].startswith(f"Add {'G' * 120 + '…'!r} to the Teams chat?")
+        assert asked == []
+        assert route.call_count == 0
 
     def test_the_binding_differs_for_another_user_another_chat_and_another_history(
         self,
@@ -338,7 +439,7 @@ class TestTheEraWithNoBackChannel:
 
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "add"
-        assert "'Grace Hopper'" in question
+        assert "'Grace Hopper' to the Teams chat 'Release planning'" in question
         assert _GRACE_ID not in question
         assert route.call_count == 0, "an unanswered question added the member anyway"
 
@@ -371,7 +472,7 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert route.call_count == 1, "the agreed addition did not happen exactly once"
-        assert len(graph.calls) == 1
+        assert len(_posts(graph)) == 1
         assert answer == AddedChatMember(
             chat_id=_CHAT_ID, user_id=_GRACE_ID, shared_history=share_history
         )
@@ -459,6 +560,7 @@ class TestTheRetryItRefuses:
     async def test_a_post_graph_answers_503_is_never_sent_a_second_time(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _names_the_chat(graph)
         route = graph.post(_MEMBERS_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
@@ -472,6 +574,7 @@ class TestTheRetryItRefuses:
     async def test_a_throttled_post_is_not_repeated_either(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _names_the_chat(graph)
         route = graph.post(_MEMBERS_PATH).mock(
             return_value=httpx.Response(429, headers={"Retry-After": "15"})
         )
@@ -508,6 +611,7 @@ class TestTheFailuresItPassesOn:
     async def test_a_refused_addition_is_a_forbidden(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _names_the_chat(graph)
         _ = graph.post(_MEMBERS_PATH).mock(
             return_value=httpx.Response(
                 403, json={"error": {"code": "Forbidden", "message": "denied"}}
@@ -523,6 +627,7 @@ class TestTheFailuresItPassesOn:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         reason = "Cannot add members to a oneOnOne chat."
+        _ = _names_the_chat(graph)
         _ = graph.post(_MEMBERS_PATH).mock(
             return_value=httpx.Response(
                 400, json={"error": {"code": "BadRequest", "message": reason}}
@@ -539,10 +644,10 @@ class TestTheFailuresItPassesOn:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permission_is_chat_member_read_write(self) -> None:
-        assert adder.GRAPH_PERMISSIONS == ("ChatMember.ReadWrite",)
+    def test_the_permissions_are_chat_member_read_write_and_chat_read(self) -> None:
+        assert adder.GRAPH_PERMISSIONS == ("ChatMember.ReadWrite", "Chat.Read")
 
-    def test_its_one_step_is_the_one_call_it_makes(self) -> None:
+    def test_its_own_step_is_the_addition(self) -> None:
         assert adder.STEP == "add_chat_member"
 
     def test_teams_list_chat_members_shows_the_change(self) -> None:

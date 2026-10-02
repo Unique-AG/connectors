@@ -640,6 +640,35 @@ def mention_fields(mentions: Sequence[Mention]) -> tuple[str, ...]:
 EVERYONE_SEES_IT = "Everyone in the conversation can see this change."
 
 
+STEP_CHAT = "chat"
+STEP_CHAT_MEMBERS = "chat_members"
+
+_A_CHAT_WITH_NO_NAMES = "a Teams chat that has no topic"
+
+
+async def chat_in_question(
+    client: GraphServiceClient, chat_id: str, *, leaving_out: str | None = None
+) -> str:
+    chat = client.chats.by_chat_id(chat_id)
+    with graph_step(STEP_CHAT):
+        found = await chat.get()
+    assert found is not None, "Graph answered a chat read with no chat"
+    topic = _present(found.topic)
+    if topic is not None:
+        return f"the Teams chat {cut_for_a_question(topic)!r}"
+    with graph_step(STEP_CHAT_MEMBERS):
+        page = await chat.members.get()
+    assert page is not None, "Graph answered a chat member listing with no collection"
+    names = [
+        name
+        for member in page.value or []
+        if member.id != leaving_out and (name := _present(member.display_name)) is not None
+    ]
+    if not names:
+        return _A_CHAT_WITH_NO_NAMES
+    return f"the Teams chat with {cut_for_a_question(', '.join(names))!r}"
+
+
 def message_in_question(message: TeamsMessage) -> str:
     sender = message.sender.display_name if message.sender is not None else None
     sent_from = "" if sender is None else f" from {cut_for_a_question(sender)!r}"

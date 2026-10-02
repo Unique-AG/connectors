@@ -1,6 +1,8 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
+import httpx
 import pytest
+import respx
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
@@ -8,8 +10,10 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.user import User
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import ValidationError
 
+from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
 from office_365_mcp.shared.messages import (
@@ -19,6 +23,7 @@ from office_365_mcp.shared.messages import (
     ChatImportance,
     Mention,
     TeamsMessage,
+    chat_in_question,
     mention_fields,
     message_in_question,
     not_the_sender,
@@ -449,6 +454,168 @@ def _chat_message(*, sender: str | None, text: str | None) -> TeamsMessage:
     return TeamsMessage.from_message(
         message, handle=MessageHandle("1770000000000", chat_id=_CHAT_ID)
     )
+
+
+_CHAT_PATH = "/chats/19%3Arelease%40thread.v2"
+_MEMBERS_PATH = f"{_CHAT_PATH}/members"
+_ADA_MEMBERSHIP = "MCMjU1lOVEhFVElDMCMj"
+_GRACE_MEMBERSHIP = "MCMjU1lOVEhFVElDMSMj"
+
+
+def _member(membership_id: str, name: str | None, user_id: str) -> Mapping[str, object]:
+    return {
+        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+        "id": membership_id,
+        "displayName": name,
+        "userId": user_id,
+        "email": None,
+        "roles": ["owner"],
+    }
+
+
+_ADA_MEMBER = _member(_ADA_MEMBERSHIP, "Ada Lovelace", _ADA.user_id)
+_JANE_MEMBER = _member(_GRACE_MEMBERSHIP, "Jane Smith", _JANE.user_id)
+
+
+def _names_the_chat(graph: respx.MockRouter, topic: str | None) -> respx.Route:
+    return graph.get(_CHAT_PATH).mock(
+        return_value=httpx.Response(200, json={"id": _CHAT_ID, "topic": topic, "chatType": "group"})
+    )
+
+
+def _lists_members(graph: respx.MockRouter, *members: Mapping[str, object]) -> respx.Route:
+    return graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in members]})
+    )
+
+
+class TestChatInQuestion:
+    async def test_a_chat_with_a_topic_is_named_by_its_topic_and_its_members_are_not_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph, _SUBJECT)
+        members = _lists_members(graph, _ADA_MEMBER)
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        assert named == "the Teams chat 'Release plan'"
+        assert members.call_count == 0
+
+    @pytest.mark.parametrize("topic", [None, "", "   "], ids=["null", "empty", "blank"])
+    async def test_a_chat_with_no_topic_is_named_by_its_members(
+        self, client: GraphServiceClient, graph: respx.MockRouter, topic: str | None
+    ) -> None:
+        _ = _names_the_chat(graph, topic)
+        _ = _lists_members(graph, _ADA_MEMBER, _JANE_MEMBER)
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        assert named == "the Teams chat with 'Ada Lovelace, Jane Smith'"
+
+    async def test_the_member_left_out_is_not_named(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph, None)
+        _ = _lists_members(graph, _ADA_MEMBER, _JANE_MEMBER)
+
+        named = await chat_in_question(client, _CHAT_ID, leaving_out=_ADA_MEMBERSHIP)
+
+        assert named == "the Teams chat with 'Jane Smith'"
+
+    async def test_a_member_with_no_name_is_not_named(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph, None)
+        _ = _lists_members(
+            graph,
+            _member("MCMjU1lOVEhFVElDMiMj", None, _JANE.user_id),
+            _member("MCMjU1lOVEhFVElDMyMj", "  ", _JANE.user_id),
+            _JANE_MEMBER,
+        )
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        assert named == "the Teams chat with 'Jane Smith'"
+
+    @pytest.mark.parametrize(
+        ("members", "leaving_out"),
+        [
+            pytest.param((), None, id="no-member"),
+            pytest.param((_member(_ADA_MEMBERSHIP, None, _ADA.user_id),), None, id="no-name"),
+            pytest.param((_ADA_MEMBER,), _ADA_MEMBERSHIP, id="only-the-one-left-out"),
+        ],
+    )
+    async def test_a_chat_with_no_name_to_show_is_a_chat_that_has_no_topic(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        members: Sequence[Mapping[str, object]],
+        leaving_out: str | None,
+    ) -> None:
+        _ = _names_the_chat(graph, None)
+        _ = _lists_members(graph, *members)
+
+        named = await chat_in_question(client, _CHAT_ID, leaving_out=leaving_out)
+
+        assert named == "a Teams chat that has no topic"
+
+    async def test_a_long_topic_is_cut(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        long = "t" * (PREVIEW_CHARACTERS + 1)
+        _ = _names_the_chat(graph, long)
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        assert named == f"the Teams chat {'t' * PREVIEW_CHARACTERS + '…'!r}"
+
+    async def test_a_long_member_list_is_cut(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph, None)
+        _ = _lists_members(
+            graph,
+            *(
+                _member(f"MCMj{index:04d}", f"Member number {index:04d}", _JANE.user_id)
+                for index in range(20)
+            ),
+        )
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        listed = named.removeprefix("the Teams chat with ")
+        assert listed != named
+        assert len(listed) == len(repr("m" * PREVIEW_CHARACTERS + "…"))
+        assert listed.startswith("'Member number 0000, Member number 0001")
+        assert listed.endswith("…'")
+
+    async def test_the_chat_id_and_the_user_ids_are_not_in_the_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph, None)
+        _ = _lists_members(graph, _ADA_MEMBER, _JANE_MEMBER)
+
+        named = await chat_in_question(client, _CHAT_ID)
+
+        assert _CHAT_ID not in named
+        assert _ADA.user_id not in named
+        assert _JANE.user_id not in named
+        assert _ADA_MEMBERSHIP not in named
+
+    async def test_a_refused_chat_read_passes_on_the_refusal(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CHAT_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Forbidden", "message": "denied"}}
+            )
+        )
+        members = _lists_members(graph, _ADA_MEMBER)
+
+        with pytest.raises(GraphForbidden):
+            _ = await chat_in_question(client, _CHAT_ID)
+
+        assert members.call_count == 0
 
 
 class TestMessageInQuestion:

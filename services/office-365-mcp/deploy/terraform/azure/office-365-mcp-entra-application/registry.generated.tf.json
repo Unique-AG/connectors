@@ -183,7 +183,8 @@
         {
           "name": "teams_add_chat_member",
           "permissions": [
-            "ChatMember.ReadWrite"
+            "ChatMember.ReadWrite",
+            "Chat.Read"
           ]
         },
         {

@@ -11,10 +11,11 @@ from msgraph.generated.models.aad_user_conversation_member import AadUserConvers
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.handles import CHAT_PERMISSION
 from office_365_mcp.shared.identity import Person, user_bind
-from office_365_mcp.shared.messages import EVERYONE_SEES_IT
+from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -27,7 +28,7 @@ TOOL_NAME = "teams_add_chat_member"
 
 STEP = "add_chat_member"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMember.ReadWrite",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMember.ReadWrite", CHAT_PERMISSION)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_members",)
 
@@ -89,19 +90,21 @@ async def add_chat_member(
     share_history: bool,
     confirm: Confirm,
 ) -> AddedChatMember | InputRequiredResult:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_errors(TOOL_NAME):
+        chat = await chat_in_question(client, chat_id)
         with not_graph():
             answer = await confirm(
-                _question(member, share_history=share_history),
+                _question(member, chat, share_history=share_history),
                 _about(chat_id, member.user_id, share_history=share_history),
             )
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            _ = await client.chats.by_chat_id(chat_id).members.post(
-                _member(member.user_id, share_history=share_history),
-                request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
-            )
+            with graph_step(STEP):
+                _ = await client.chats.by_chat_id(chat_id).members.post(
+                    _member(member.user_id, share_history=share_history),
+                    request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
+                )
 
     if asked is not None:
         return asked
@@ -117,10 +120,10 @@ def _member(user_id: str, *, share_history: bool) -> AadUserConversationMember:
     )
 
 
-def _question(member: Person, *, share_history: bool) -> str:
+def _question(member: Person, chat: str, *, share_history: bool) -> str:
     history = _ALL_HISTORY_SHOWN if share_history else _NO_HISTORY_SHOWN
     name = cut_for_a_question(member.name)
-    return f"Add {name!r} to the Teams chat? {history} {EVERYONE_SEES_IT}"
+    return f"Add {name!r} to {chat}? {history} {EVERYONE_SEES_IT}"
 
 
 def _about(chat_id: str, user_id: str, *, share_history: bool) -> str:

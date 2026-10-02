@@ -690,6 +690,7 @@ GRAPH_STEPS = frozenset(
         "drive_item",
         "drive_content",
         "chats",
+        "chat",
         "chat_messages",
         "chat_members",
         "joined_teams",
