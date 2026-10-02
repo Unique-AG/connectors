@@ -20,7 +20,7 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphForbidden, GraphThrottled, GraphUnavailable
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
@@ -625,7 +625,7 @@ class TestTheRetryItRefuses:
         _ = _signed_in(graph)
         post = graph.post("/chats").mock(return_value=httpx.Response(503))
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphUnavailable):
             _ = await create_chat(
                 client, chat_type="group", members=[OTHER_USER_ID], confirm=_agrees
             )
@@ -641,7 +641,7 @@ class TestTheRetryItRefuses:
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
         )
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphThrottled):
             _ = await create_chat(
                 client, chat_type="group", members=[OTHER_USER_ID], confirm=_agrees
             )

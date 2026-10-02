@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Annotated, Literal, Self
@@ -18,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -197,7 +196,7 @@ def _question(chat_type: NewChatKind, others: Sequence[str], topic: str | None) 
 
 
 def _about(chat_type: NewChatKind, others: Sequence[str], topic: str | None) -> str:
-    return hashlib.sha256(json.dumps([chat_type, sorted(others), topic]).encode()).hexdigest()
+    return confirmation_id_for(chat_type, str(len(others)), *sorted(others), repr(topic))
 
 
 def _new_chat(chat_type: NewChatKind, members: Sequence[str], topic: str | None) -> Chat:

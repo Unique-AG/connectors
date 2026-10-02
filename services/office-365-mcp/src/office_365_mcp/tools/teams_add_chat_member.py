@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -14,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -124,7 +123,7 @@ def _question(chat_id: str, user_id: str, *, share_history: bool) -> str:
 
 
 def _about(chat_id: str, user_id: str, *, share_history: bool) -> str:
-    return hashlib.sha256(json.dumps([chat_id, user_id, share_history]).encode()).hexdigest()
+    return confirmation_id_for(chat_id, user_id, repr(share_history))
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
@@ -160,7 +159,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     "The Microsoft Entra object id of the person to add, as a GUID. Copy it from "
                     + "the `user_id` of a teams_list_chat_members row, of a teams_list_chats "
                     + "member, or of a message `sender`. Never build it from a name or an email "
-                    + "address."
+                    + "address. This tool adds the person as an owner, and Microsoft accepts no "
+                    + "in-tenant guest as an owner."
                 ),
             ),
         ],

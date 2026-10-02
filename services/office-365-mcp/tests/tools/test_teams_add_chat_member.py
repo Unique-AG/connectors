@@ -520,6 +520,19 @@ class TestHowItDeclaresItself:
         assert properties["share_history"]["default"] is False
         assert set(adder.GRAPH_CALL_EXAMPLE) <= set(properties)
 
+    async def test_the_user_id_says_the_owner_role_leaves_out_an_in_tenant_guest(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+        described = " ".join(str(properties["user_id"]["description"]).split())
+        assert (
+            "This tool adds the person as an owner, and Microsoft accepts no in-tenant guest as "
+            + "an owner."
+        ) in described
+        assert 15 <= len(described.split()) <= 60
+
     async def test_a_user_given_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
     ) -> None:

@@ -1,5 +1,3 @@
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -12,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, not_graph
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -90,7 +89,7 @@ def _question(chat_id: str, topic: str) -> str:
 
 
 def _about(chat_id: str, topic: str) -> str:
-    return hashlib.sha256(json.dumps([chat_id, topic]).encode()).hexdigest()
+    return confirmation_id_for(chat_id, topic)
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
