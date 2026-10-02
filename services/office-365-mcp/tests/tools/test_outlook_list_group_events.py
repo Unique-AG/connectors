@@ -27,6 +27,8 @@ _ZURICH = "Europe/Zurich"
 
 _ADA = {"name": "Ada Lovelace", "address": "ada@example.invalid"}
 
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+
 _FIELDS_ASKED_FOR = [
     "subject",
     "bodyPreview",
@@ -467,6 +469,26 @@ class TestWhatItRefuses:
 
         assert "BEHIND UTC" in str(refused.value)
 
+    @pytest.mark.parametrize(
+        ("starts_on", "ends_on", "time_zone"),
+        [(_MARCH_SUNDAY, _MARCH_MONDAY, "UTC"), (_MARCH_MONDAY, _MARCH_SUNDAY, "Zurich")],
+        ids=["a window that runs backwards", "a zone that does not resolve"],
+    )
+    async def test_every_refusal_ends_with_the_canonical_retry_sentence(
+        self, client: GraphServiceClient, starts_on: date, ends_on: date, time_zone: str
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await lister.list_group_events(
+                client,
+                group_id=_GROUP_ID,
+                starts_on=starts_on,
+                ends_on=ends_on,
+                time_zone=time_zone,
+                limit=25,
+            )
+
+        assert str(refused.value).endswith(_RETRY)
+
     @pytest.mark.parametrize("limit", [0, -1])
     async def test_a_limit_outside_the_schema_is_a_programming_error(
         self, client: GraphServiceClient, limit: int
@@ -543,6 +565,22 @@ class TestTheSchemaItPublishes:
         assert annotations is not None, "a tool with no annotations joins the write surface"
         assert annotations.read_only_hint is READ_ONLY["readOnlyHint"]
 
+    def test_every_row_field_description_is_between_fifteen_and_sixty_words(self) -> None:
+        for name, field in lister.GroupEventSummary.model_fields.items():
+            words = len((field.description or "").split())
+            assert 15 <= words <= 60, f"GroupEventSummary.{name} has {words} words"
+
+    def test_every_row_field_description_says_when_the_field_is_null(self) -> None:
+        for name, field in lister.GroupEventSummary.model_fields.items():
+            assert "null" in (field.description or ""), f"GroupEventSummary.{name} is silent"
+
+    def test_the_kind_names_the_three_values_that_a_calendar_view_returns(self) -> None:
+        described = lister.GroupEventSummary.model_fields["kind"].description or ""
+
+        for value in ("`singleInstance`", "`occurrence`", "`exception`"):
+            assert value in described
+        assert "seriesMaster" not in described
+
     async def test_every_field_of_the_answer_says_what_it_is(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -588,4 +626,4 @@ class TestGraphFailures:
 
     def test_a_group_that_will_not_resolve_is_answered_with_the_recovery_that_fits(self) -> None:
         assert "teams_list_my_teams" in lister.GRAPH_NOT_FOUND
-        assert "fail identically" in lister.GRAPH_NOT_FOUND
+        assert lister.GRAPH_NOT_FOUND.endswith(_RETRY)

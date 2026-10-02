@@ -33,11 +33,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "ends_on": "2026-03-08",
 }
 
+_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
+
 GRAPH_NOT_FOUND = (
     "Microsoft 365 reports no calendar for this `group_id`, so this tool cannot list any event. "
     + "A team name, a channel id, and a chat id are not group ids. Call teams_list_my_teams again "
-    + "and copy the `team_id` of the team exactly as it reports it. Retrying with the same "
-    + "`group_id` will fail identically."
+    + "and copy the `team_id` of the team exactly as it reports it. "
+    + _AGAIN
 )
 
 DEFAULT_TIME_ZONE = "UTC"
@@ -76,8 +78,8 @@ _ENDS_BEFORE_STARTS = (
     "This tool made no request, because `ends_on` falls before `starts_on`, and no calendar holds "
     + "a window that runs backwards. Both bounds are inside the window, and a date covers its "
     + "whole day. The same date in both lists that one day. Put the earlier bound in `starts_on` "
-    + "and the later bound in `ends_on`. Then call the tool again. Retrying with the same two "
-    + "values will fail identically."
+    + "and the later bound in `ends_on`. Then call the tool again. "
+    + _AGAIN
 )
 
 _NOT_A_ZONE = (
@@ -86,7 +88,7 @@ _NOT_A_ZONE = (
     + "zone name, a city, a country, a numeric offset such as `+02:00`, and an abbreviation "
     + "such as `CEST` are not accepted. `Etc/GMT+2` does resolve, but it is two hours BEHIND UTC. "
     + "`UTC` is the default. If the question is not about a time of day, omit the argument. "
-    + "Retrying with the same name will fail identically."
+    + _AGAIN
 )
 
 
@@ -113,28 +115,86 @@ class GroupEventWindow(BaseModel):
 
 
 class GroupEventSummary(BaseModel):
-    subject: str | None = Field(description="The subject line, or null if none.")
-    preview: str | None = Field(
-        description="A short plain-text preview of the event body, or null if none."
-    )
-    start: EventTime | None = Field(description="When the event starts, or null if unstated.")
-    end: EventTime | None = Field(description="When the event ends, or null if unstated.")
-    all_day: bool | None = Field(description="Whether this is an all-day event.")
-    cancelled: bool | None = Field(description="Whether the organizer cancelled the event.")
-    kind: str | None = Field(
+    subject: str | None = Field(
         description=(
-            "The row kind, such as `singleInstance`, `occurrence`, or `exception`. Null if "
-            + "unknown."
+            "The text of the subject line of this group event, as Graph returns it. It is the "
+            + "title of the event. This field is null when Graph returns no subject."
         )
     )
-    in_series: bool = Field(description="Whether this row belongs to a recurring series.")
-    location: str | None = Field(description="The location as one line of text, or null if none.")
-    join_url: str | None = Field(
-        description="The link that joins the online meeting, or null if none."
+    preview: str | None = Field(
+        description=(
+            "A plain-text preview of the body of this group event. The preview can run over "
+            + "several lines and can include the text of a meeting join link. This tool does not "
+            + "return the full body. This field is null when Graph returns no preview."
+        )
     )
-    organizer: MailAddress | None = Field(description="Who organized the event, or null if none.")
+    start: EventTime | None = Field(
+        description=(
+            "When this group event starts. Graph gives the time in UTC by default, and this tool "
+            + "asks for no other zone. `iso` converts the same instant into the zone that the "
+            + "`time_zone` argument names. This field is null when Graph returns no start time."
+        )
+    )
+    end: EventTime | None = Field(
+        description=(
+            "When this group event ends, in the same form as `start`. This field is null when "
+            + "Graph returns no end time."
+        )
+    )
+    all_day: bool | None = Field(
+        description=(
+            "True if this group event lasts all day, and false if it does not. Microsoft "
+            + "states that the `start` and `end` of an all-day event are both midnight in one "
+            + "zone. This field is null when Graph returns no value."
+        )
+    )
+    cancelled: bool | None = Field(
+        description=(
+            "True if this group event is canceled, and false if it is not. Report a canceled "
+            + "event as canceled, and not as planned. This field is null when Graph returns no "
+            + "value."
+        )
+    )
+    kind: str | None = Field(
+        description=(
+            "The kind of row, as Microsoft spells it. `singleInstance` is an event that does not "
+            + "repeat. `occurrence` is one date of a recurring series. `exception` is a date that "
+            + "somebody changed. A calendar view returns only these three kinds. This field is "
+            + "null when Graph returns no kind."
+        )
+    )
+    in_series: bool = Field(
+        description=(
+            "True if this row belongs to a recurring series, because Graph names a series master "
+            + "for it. False if the event does not repeat. This field is never null."
+        )
+    )
+    location: str | None = Field(
+        description=(
+            "The name of the place of this group event, as one line of text. It can be a room or "
+            + "a place that the organizer typed. This tool returns no street address and no "
+            + "coordinates. This field is null when Graph returns no location."
+        )
+    )
+    join_url: str | None = Field(
+        description=(
+            "The link that joins the online meeting of this group event. A client opens the link "
+            + "in a browser, and the link then sends the user into the meeting. This field is "
+            + "null when Graph returns no online meeting for the event."
+        )
+    )
+    organizer: MailAddress | None = Field(
+        description=(
+            "Who organized this group event, as a display name and an email address. This field "
+            + "is null when Graph returns no organizer."
+        )
+    )
     web_link: str | None = Field(
-        description="The web link that Microsoft 365 reports for the event, or null if none."
+        description=(
+            "The link that Microsoft 365 reports for this group event, to open it in Outlook on "
+            + "the web. Microsoft states that the link opens the event only in earlier versions "
+            + "of Outlook on the web. This field is null when Graph returns no link."
+        )
     )
 
     @classmethod
