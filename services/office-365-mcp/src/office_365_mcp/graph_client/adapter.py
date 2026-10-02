@@ -47,9 +47,7 @@ def request_with_json_body(
     body: Parsable,
 ) -> RequestInformation:
     request = request_with_query(method, url_template, path_parameters, query=query)
-    cast("_ParsableContent", request).set_content_from_parsable(
-        cast("RequestAdapter[httpx.Request]", client.request_adapter), "application/json", body
-    )
+    _parsable_content(request).set_content_from_parsable(_adapter(client), "application/json", body)
     return request
 
 
@@ -63,5 +61,13 @@ async def send_no_response_content(client: GraphServiceClient, request: RequestI
     await _sends(client).send_no_response_content_async(request, {"XXX": ODataError})
 
 
+def _adapter(client: GraphServiceClient) -> RequestAdapter[httpx.Request]:
+    return cast("RequestAdapter[httpx.Request]", client.request_adapter)
+
+
 def _sends(client: GraphServiceClient) -> _Sends:
-    return cast("_Sends", client.request_adapter)
+    return _adapter(client)
+
+
+def _parsable_content(request: RequestInformation) -> _ParsableContent:
+    return request
