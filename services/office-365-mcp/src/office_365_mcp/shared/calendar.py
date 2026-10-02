@@ -210,6 +210,11 @@ STORED_CATEGORIES_FIELD = (
     + "arguments. The list is empty when the event has no category."
 )
 
+EVENT_CATEGORIES_FIELD = (
+    "The categories of the event, as Microsoft 365 reports them. The list is empty when the "
+    + "event has no category."
+)
+
 STORED_IMPORTANCE_FIELD = (
     "The importance as Microsoft stored it: `low`, `normal`, or `high`. This field is null when "
     + "Graph returned no importance."
@@ -755,7 +760,7 @@ class EventSummary(BaseModel):
     show_as: str | None = Field(
         description="How the event shows in the owner's free-busy view, or null if unknown."
     )
-    categories: list[str] = Field(description=STORED_CATEGORIES_FIELD)
+    categories: list[str] = Field(description=EVENT_CATEGORIES_FIELD)
     importance: str | None = Field(description=STORED_IMPORTANCE_FIELD)
     location: str | None = Field(description="The location as one line of text, or null if none.")
     is_online_meeting: bool | None = Field(

@@ -48,6 +48,7 @@ from pydantic import BaseModel, ValidationError
 
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
+    EVENT_CATEGORIES_FIELD,
     NOBODY_INVITED_BUT_A_PLACE,
     NOBODY_INVITED_BUT_A_ROOM,
     ROOM_ADDRESSES_FIELD,
@@ -634,6 +635,12 @@ class TestOneEventRow:
         row = EventSummary.from_event(Event(id=_EVENT_ID), calendar_id=_CALENDAR_ID, zone=_UTC)
 
         assert (row.categories, row.importance) == ([], None)
+
+    def test_the_categories_of_a_row_name_no_argument_because_a_read_has_none(self) -> None:
+        description = EventSummary.model_fields["categories"].description
+
+        assert description == EVENT_CATEGORIES_FIELD
+        assert "argument" not in EVENT_CATEGORIES_FIELD
 
     @pytest.mark.parametrize(
         "name", ["kind", "in_series", "series_master_uri", "categories", "importance"]
