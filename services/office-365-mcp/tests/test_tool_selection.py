@@ -264,6 +264,10 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
+    "outlook_list_attachments": {
+        "uri": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_read_attachment": {"uri": ("outlook_list_attachments", "outlook_read_mail")},
     "outlook_browse_folders": {"parent": ("outlook_browse_folders",)},
     "outlook_read_thread": {"uri": ("outlook_search_mail",)},
     "outlook_list_mail": {"folder_ref": ("outlook_browse_folders",)},
@@ -275,6 +279,11 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread"),
         "folder_ref": ("outlook_browse_folders",),
     },
+    "outlook_copy_mail": {
+        "message_refs": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
+    },
+    "outlook_rename_folder": {"folder_ref": ("outlook_browse_folders", "outlook_create_folder")},
+    "outlook_delete_folder": {"folder_ref": ("outlook_browse_folders", "outlook_create_folder")},
     "outlook_draft_mail": {"to": ("outlook_find_recipient",)},
     "outlook_draft_reply": {
         "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
@@ -289,6 +298,13 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "draft_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
     },
     "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
+    "outlook_create_mail_rule": {"sequence": ("outlook_get_mailbox_settings",)},
+    "outlook_update_mail_rule": {
+        "rule_ref": ("outlook_get_mailbox_settings", "outlook_create_mail_rule")
+    },
+    "outlook_delete_mail_rule": {
+        "rule_ref": ("outlook_get_mailbox_settings", "outlook_create_mail_rule")
+    },
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_read_event": {"uri": ("outlook_list_events",)},
     "outlook_create_event_on_behalf": {"calendar_ref": ("outlook_list_calendars",)},
@@ -381,20 +397,26 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_find_recipient": frozenset({"query"}),
     "outlook_mark_mail": frozenset({"is_read", "flagged", "importance"}),
     "outlook_move_mail": frozenset({"destination"}),
+    "outlook_create_folder": frozenset({"name"}),
+    "outlook_rename_folder": frozenset({"name"}),
+    "outlook_get_mail_tips": frozenset({"addresses"}),
+    "outlook_set_focused_override": frozenset({"sender", "classify_as"}),
     "outlook_draft_mail": frozenset({"subject", "body_html"}),
     "outlook_draft_reply": frozenset({"mode", "body_html"}),
     "outlook_draft_reply_all": frozenset({"body_html"}),
     "outlook_set_automatic_reply": frozenset({"status"}),
     "outlook_disable_mail_rule": frozenset({"enabled"}),
+    "outlook_create_mail_rule": frozenset({"display_name", "actions"}),
+    "outlook_create_category": frozenset({"name"}),
     "outlook_list_events": frozenset({"starts_on", "ends_on", "time_zone", "subject_contains"}),
     "outlook_read_event": frozenset({"time_zone"}),
     "outlook_create_event": frozenset(
-        {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
+        {"subject", "starts_at", "ends_at", "time_zone", "attendees", "pattern_type", "range_type"}
     ),
     "outlook_create_event_on_behalf": frozenset(
-        {"subject", "starts_at", "ends_at", "time_zone", "attendees"}
+        {"subject", "starts_at", "ends_at", "time_zone", "attendees", "pattern_type", "range_type"}
     ),
-    "outlook_respond_to_invite": frozenset({"response"}),
+    "outlook_respond_to_invite": frozenset({"response", "starts_at", "ends_at", "time_zone"}),
     "outlook_check_availability": frozenset({"addresses", "starts_at", "ends_at", "time_zone"}),
     "outlook_suggest_meeting_times": frozenset(
         {"attendees", "starts_at", "ends_at", "time_zone", "display_name"}
@@ -608,9 +630,9 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ToolsPreset.OUTLOOK_READ,
         ("User.Read", "Mail.Read", "Mail.Read.Shared", "People.Read"),
         0,
-        7,
+        11,
     ),
-    (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 3),
+    (ToolsPreset.OUTLOOK_MAILBOX, ("User.Read", "MailboxSettings.Read"), 0, 4),
     (
         ToolsPreset.OUTLOOK_WRITE,
         (
@@ -622,7 +644,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.ReadWrite.Shared",
         ),
         0,
-        13,
+        22,
     ),
     (
         ToolsPreset.OUTLOOK_SEND,
@@ -638,19 +660,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Mail.Send.Shared",
         ),
         0,
-        14,
+        23,
     ),
     (
         ToolsPreset.OUTLOOK_AUTOMATE,
         ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite"),
         0,
-        4,
+        10,
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR,
         ("User.Read", "Calendars.Read", "Calendars.Read.Shared", "Calendars.ReadBasic"),
         0,
-        6,
+        7,
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR_WRITE,
@@ -662,7 +684,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Calendars.ReadWrite",
         ),
         0,
-        10,
+        11,
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR_DELEGATE,
@@ -675,7 +697,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Calendars.ReadWrite.Shared",
         ),
         0,
-        11,
+        12,
     ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),

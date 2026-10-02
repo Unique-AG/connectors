@@ -238,7 +238,7 @@ run "preset_outlook_mailbox" {
   }
 
   assert {
-    condition     = length(local.tools) == 3
+    condition     = length(local.tools) == 4
     error_message = "outlook-mailbox resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -287,7 +287,7 @@ run "preset_outlook_calendar" {
   }
 
   assert {
-    condition     = length(local.tools) == 6
+    condition     = length(local.tools) == 7
     error_message = "outlook-calendar resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -303,7 +303,7 @@ run "preset_outlook_calendar_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 11
     error_message = "outlook-calendar-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -319,7 +319,7 @@ run "preset_outlook_calendar_delegate" {
   }
 
   assert {
-    condition     = length(local.tools) == 11
+    condition     = length(local.tools) == 12
     error_message = "outlook-calendar-delegate resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 

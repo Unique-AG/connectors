@@ -95,6 +95,20 @@
           ]
         },
         {
+          "name": "outlook_list_attachments",
+          "permissions": [
+            "Mail.Read",
+            "Mail.Read.Shared"
+          ]
+        },
+        {
+          "name": "outlook_read_attachment",
+          "permissions": [
+            "Mail.Read",
+            "Mail.Read.Shared"
+          ]
+        },
+        {
           "name": "outlook_browse_folders",
           "permissions": [
             "Mail.Read",
@@ -124,6 +138,18 @@
           ]
         },
         {
+          "name": "outlook_get_mail_tips",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
+          "name": "outlook_list_focused_overrides",
+          "permissions": [
+            "Mail.Read"
+          ]
+        },
+        {
           "name": "outlook_get_mailbox_settings",
           "permissions": [
             "MailboxSettings.Read"
@@ -141,6 +167,40 @@
           "permissions": [
             "Mail.ReadWrite",
             "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_copy_mail",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_create_folder",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_rename_folder",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_delete_folder",
+          "permissions": [
+            "Mail.ReadWrite",
+            "Mail.ReadWrite.Shared"
+          ]
+        },
+        {
+          "name": "outlook_set_focused_override",
+          "permissions": [
+            "Mail.ReadWrite"
           ]
         },
         {
@@ -193,9 +253,39 @@
           ]
         },
         {
+          "name": "outlook_create_mail_rule",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_update_mail_rule",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_delete_mail_rule",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
           "name": "outlook_list_categories",
           "permissions": [
             "MailboxSettings.Read"
+          ]
+        },
+        {
+          "name": "outlook_create_category",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_list_time_zones",
+          "permissions": [
+            "User.Read"
           ]
         },
         {
@@ -419,13 +509,22 @@
         "teams_list_meeting_recordings",
         "outlook_search_mail",
         "outlook_read_mail",
+        "outlook_list_attachments",
+        "outlook_read_attachment",
         "outlook_browse_folders",
         "outlook_find_recipient",
         "outlook_read_thread",
         "outlook_list_mail",
+        "outlook_get_mail_tips",
+        "outlook_list_focused_overrides",
         "outlook_get_mailbox_settings",
         "outlook_mark_mail",
         "outlook_move_mail",
+        "outlook_copy_mail",
+        "outlook_create_folder",
+        "outlook_rename_folder",
+        "outlook_delete_folder",
+        "outlook_set_focused_override",
         "outlook_draft_mail",
         "outlook_draft_reply",
         "outlook_draft_reply_all",
@@ -433,7 +532,12 @@
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
+        "outlook_create_mail_rule",
+        "outlook_update_mail_rule",
+        "outlook_delete_mail_rule",
         "outlook_list_categories",
+        "outlook_create_category",
+        "outlook_list_time_zones",
         "outlook_list_calendars",
         "outlook_list_events",
         "outlook_read_event",
@@ -519,20 +623,33 @@
         "outlook-read": [
           "outlook_search_mail",
           "outlook_read_mail",
-          "outlook_browse_folders",
-          "outlook_find_recipient",
-          "outlook_read_thread",
-          "outlook_list_mail"
-        ],
-        "outlook-write": [
-          "outlook_search_mail",
-          "outlook_read_mail",
+          "outlook_list_attachments",
+          "outlook_read_attachment",
           "outlook_browse_folders",
           "outlook_find_recipient",
           "outlook_read_thread",
           "outlook_list_mail",
+          "outlook_get_mail_tips",
+          "outlook_list_focused_overrides"
+        ],
+        "outlook-write": [
+          "outlook_search_mail",
+          "outlook_read_mail",
+          "outlook_list_attachments",
+          "outlook_read_attachment",
+          "outlook_browse_folders",
+          "outlook_find_recipient",
+          "outlook_read_thread",
+          "outlook_list_mail",
+          "outlook_get_mail_tips",
+          "outlook_list_focused_overrides",
           "outlook_mark_mail",
           "outlook_move_mail",
+          "outlook_copy_mail",
+          "outlook_create_folder",
+          "outlook_rename_folder",
+          "outlook_delete_folder",
+          "outlook_set_focused_override",
           "outlook_draft_mail",
           "outlook_draft_reply",
           "outlook_draft_reply_all",
@@ -541,12 +658,21 @@
         "outlook-send": [
           "outlook_search_mail",
           "outlook_read_mail",
+          "outlook_list_attachments",
+          "outlook_read_attachment",
           "outlook_browse_folders",
           "outlook_find_recipient",
           "outlook_read_thread",
           "outlook_list_mail",
+          "outlook_get_mail_tips",
+          "outlook_list_focused_overrides",
           "outlook_mark_mail",
           "outlook_move_mail",
+          "outlook_copy_mail",
+          "outlook_create_folder",
+          "outlook_rename_folder",
+          "outlook_delete_folder",
+          "outlook_set_focused_override",
           "outlook_draft_mail",
           "outlook_draft_reply",
           "outlook_draft_reply_all",
@@ -555,19 +681,27 @@
         ],
         "outlook-mailbox": [
           "outlook_get_mailbox_settings",
-          "outlook_list_categories"
+          "outlook_list_categories",
+          "outlook_list_time_zones"
         ],
         "outlook-automate": [
           "outlook_get_mailbox_settings",
+          "outlook_list_categories",
+          "outlook_list_time_zones",
           "outlook_set_automatic_reply",
-          "outlook_disable_mail_rule"
+          "outlook_disable_mail_rule",
+          "outlook_create_mail_rule",
+          "outlook_update_mail_rule",
+          "outlook_delete_mail_rule",
+          "outlook_create_category"
         ],
         "outlook-calendar": [
           "outlook_list_calendars",
           "outlook_list_events",
           "outlook_read_event",
           "outlook_check_availability",
-          "outlook_suggest_meeting_times"
+          "outlook_suggest_meeting_times",
+          "outlook_list_time_zones"
         ],
         "outlook-calendar-write": [
           "outlook_list_calendars",
@@ -575,6 +709,7 @@
           "outlook_read_event",
           "outlook_check_availability",
           "outlook_suggest_meeting_times",
+          "outlook_list_time_zones",
           "outlook_create_event",
           "outlook_update_event",
           "outlook_cancel_event",
@@ -586,6 +721,7 @@
           "outlook_read_event",
           "outlook_check_availability",
           "outlook_suggest_meeting_times",
+          "outlook_list_time_zones",
           "outlook_create_event",
           "outlook_update_event",
           "outlook_cancel_event",
