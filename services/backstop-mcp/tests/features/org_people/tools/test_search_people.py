@@ -53,10 +53,10 @@ class TestSearchPeople:
         assert name.description is not None
         assert "Not a substring" in name.description
 
-    def test_says_a_status_word_is_not_an_opportunity_stage(self) -> None:
+    def test_keeps_custom_field_matching_on_the_definition_id(self) -> None:
         doc = " ".join((search_people.__doc__ or "").split())
-        assert "list_custom_fields for people and party" in doc
-        assert "not an opportunity stage" in doc
+        assert "list_custom_fields for people and party" not in doc
+        assert "not an opportunity stage" not in doc
         assert "custom_field_values" in doc
         annotations = cast("dict[str, object]", search_people.__annotations__)
         country = next(

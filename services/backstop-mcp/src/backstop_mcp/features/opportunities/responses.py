@@ -564,10 +564,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     )
     product: ProductFromOpportunityResponse | None = Field(
         default=None,
-        description=(
-            "Linked fund when the include arrived. Strategy-like labels are usually custom "
-            "fields, read from `custom_field_values`."
-        ),
+        description="Linked fund when the include arrived.",
     )
     custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
         default=None,

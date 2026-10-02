@@ -266,16 +266,7 @@ async def search_people(
     matches no location filter.
 
     Custom-field ids come from list_custom_fields. Match by definition id, not the
-    label. A missing custom-field value is not a match.
-
-    Business terms such as strategy, status, tier, investor type, or region are usually
-    custom fields. Call list_custom_fields for people and party, pick the field whose
-    name or options match the user's words, then filter or group by its definition id and
-    the exact option. If no field or several fields could be it, ask which one. Say which
-    field and options you used. A status-like word is not an opportunity stage. To group
-    or label rows, read the field from each row's `custom_field_values`. If no field on
-    people or party matches, say so rather than filling the column. `country` is the
-    stored full name.
+    label. A missing custom-field value is not a match. `country` is the stored full name.
 
     Every row carries its custom fields as `custom_field_values`. If a call times out,
     retry once with `exclude_custom_fields=true` to see whether reading them is the cause;

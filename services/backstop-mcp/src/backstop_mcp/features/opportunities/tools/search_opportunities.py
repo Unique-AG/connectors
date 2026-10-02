@@ -131,9 +131,7 @@ async def search_opportunities(
                 "Linked fund: short names (exact, e.g. NWON) or display-name substrings. "
                 "Several values are OR, so several vehicles can be one walk, e.g. "
                 '["NWON", "NWOF"]. Resolve names with get_product '
-                "first when unsure. This is not a strategy label. Strategy-like words are "
-                "usually custom fields — filter those with `custom_fields`. "
-                "Applied after the server-side read."
+                "first when unsure. Applied after the server-side read."
             )
         ),
     ] = None,
@@ -199,15 +197,9 @@ async def search_opportunities(
     OR. `mode="aggregate", group_by="product"` counts that linked fund. The chip may be
     empty, and then every open deal is `(unattributed)`.
 
-    Business terms such as strategy, status, tier, investor type, or region are usually
-    custom fields. Call list_custom_fields for organizations and opportunities, pick the
-    field whose name or options match the user's words, then filter by its definition id
-    and the exact option. If no field or several fields could be it, ask which one. Say
-    which field and options you used. The other table columns are on each row's
-    `custom_field_values`. If a call times out, retry once with `exclude_custom_fields=true`
-    to see whether reading them is the cause; otherwise leave it false. That walk is the
-    full match. Do not select deals because the name contains the word, and do not call
-    get_opportunities_by_ids to re-read fields this walk already returned.
+    If a call times out, retry once with `exclude_custom_fields=true` to see whether
+    reading them is the cause; otherwise leave it false. That walk is the full match.
+    Do not call get_opportunities_by_ids to re-read fields this walk already returned.
 
     `is_open` means the deal is still in the pipeline. `representative` matches the
     investor organization's representative login (`investor_representative` on each row),
