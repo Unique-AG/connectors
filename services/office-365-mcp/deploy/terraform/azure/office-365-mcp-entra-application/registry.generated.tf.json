@@ -148,7 +148,8 @@
           "name": "teams_read_meeting",
           "permissions": [
             "OnlineMeetings.Read",
-            "OnlineMeetingArtifact.Read.All"
+            "OnlineMeetingArtifact.Read.All",
+            "User.Read"
           ]
         },
         {

@@ -14,10 +14,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
 from office_365_mcp.shared.meetings import (
     MEETING_PERMISSION,
     not_a_meeting_handle,
+    organized_by,
     participant_id,
     resolve_meeting,
     settled,
@@ -30,7 +32,11 @@ TOOL_NAME = "teams_read_meeting"
 STEP_REPORTS = "attendance_reports"
 STEP_RECORDS = "attendance_records"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, "OnlineMeetingArtifact.Read.All")
+GRAPH_PERMISSIONS: tuple[str, ...] = (
+    MEETING_PERMISSION,
+    "OnlineMeetingArtifact.Read.All",
+    identity.GRAPH_PERMISSION,
+)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "meeting_uri": "teams:///meetings/https%3A%2F%2Fteams.microsoft.invalid%2Fl%2Fmeetup-join"
@@ -39,7 +45,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 MAX_REPORTS = 50
 
-AttendanceStatus = Literal["available", "not_ready", "no_report", "meeting_not_found"]
+AttendanceStatus = Literal[
+    "available", "not_ready", "no_report", "not_organizer", "meeting_not_found"
+]
 
 _DESCRIPTION = """\
 Reads one Teams meeting of the signed-in user and its attendance, from the `meeting_uri` that \
@@ -48,7 +56,8 @@ reports newest first, and who attended the newest session and for how long. team
 changes a meeting that the signed-in user organizes, and teams_delete_meeting deletes one.
 
 Notes:
-- Microsoft Graph gives attendance reports to the meeting organizer only.
+- Microsoft Graph gives attendance reports to the meeting organizer only. For any other user, \
+this tool returns the meeting details with the status `not_organizer`.
 - Read `status` before you decide: `not_ready` means wait, not "nobody attended".
 - This tool reads one page of records, of the newest report only. Calling it again returns the \
 same records.\
@@ -81,9 +90,8 @@ class MeetingInvitee(BaseModel):
 class MeetingDetails(BaseModel):
     meeting_uri: str = Field(
         description=(
-            "The meeting handle that this tool read. Pass it verbatim to "
-            + "teams_list_meeting_transcripts or teams_list_meeting_recordings for the other "
-            + "artifacts of this meeting."
+            "The meeting handle that this tool read. Copy it word for word when another Teams "
+            + "meeting tool asks for a `meeting_uri`."
         )
     )
     join_web_url: str | None = Field(
@@ -245,10 +253,10 @@ class MeetingAttendance(BaseModel):
     status: AttendanceStatus = Field(
         description=(
             "What this tool found:\n"
-            + "- `available`: at least one report exists.\n"
+            + "- `available`: a report exists.\n"
             + "- `not_ready`: no report exists yet. Wait, then call again.\n"
-            + "- `no_report`: the meeting is over, and no report exists. A retry does not change "
-            + "this.\n"
+            + "- `no_report`: the meeting ended with no report. A retry does not change this.\n"
+            + "- `not_organizer`: Microsoft 365 does not name this user as the organizer.\n"
             + "- `meeting_not_found`: no meeting that this user can see matched the join URL. "
             + "Do not retry or rebuild the handle."
         )
@@ -296,6 +304,15 @@ async def teams_read_meeting(
                 newest_report_attendance=[],
                 more_records=False,
             )
+        details = MeetingDetails.from_meeting(handle, meeting)
+        if not organized_by(meeting, await identity.signed_in_user(client)):
+            return MeetingAttendance(
+                status="not_organizer",
+                meeting=details,
+                reports=[],
+                newest_report_attendance=[],
+                more_records=False,
+            )
         reports_of = client.me.online_meetings.by_online_meeting_id(meeting.id).attendance_reports
         with graph_step(STEP_REPORTS):
             listed = await reports_of.get()
@@ -306,7 +323,6 @@ async def teams_read_meeting(
             key=_began_at,
             reverse=True,
         )
-        details = MeetingDetails.from_meeting(handle, meeting)
         if not reports:
             return MeetingAttendance(
                 status="no_report" if settled(meeting) else "not_ready",

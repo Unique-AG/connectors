@@ -18,12 +18,14 @@ from office_365_mcp.tools import teams_read_meeting as reader
 from .conftest import (
     GRAPH_V1,
     JOIN_WEB_URL,
+    ME,
     MEETING_ID,
     OTHER_USER_ID,
     SIGNED_IN_USER_ID,
     meeting_payload,
 )
 
+_ME = "/me"
 _MEETINGS = "/me/onlineMeetings"
 _REPORTS = f"/me/onlineMeetings/{MEETING_ID}/attendanceReports"
 _NEWEST_REPORT_ID = "c9b6db1c-d5eb-427d-a5c0-20088d9b22d7"
@@ -67,6 +69,10 @@ def _handle() -> handles.MeetingHandle:
     return handle
 
 
+def _me(graph: respx.MockRouter, user_id: str = SIGNED_IN_USER_ID) -> respx.Route:
+    return graph.get(_ME).mock(return_value=httpx.Response(200, json={**ME, "id": user_id}))
+
+
 def _resolved(
     graph: respx.MockRouter,
     *,
@@ -77,6 +83,7 @@ def _resolved(
         **meeting_payload(end=end),
         "participants": dict(participants) if participants is not None else _PARTICIPANTS,
     }
+    _ = _me(graph)
     return graph.get(_MEETINGS).mock(return_value=httpx.Response(200, json={"value": [meeting]}))
 
 
@@ -194,7 +201,7 @@ class TestTheRequestsItSends:
 
         _ = await reader.teams_read_meeting(client, handle=_handle())
 
-        assert len(graph.calls) == 3, "resolve, list the reports, list the newest records"
+        assert len(graph.calls) == 4, "resolve, read /me, list the reports, list the newest records"
         assert str(reports.calls.last.request.url) == f"{GRAPH_V1}{_REPORTS}"
         assert str(newest.calls.last.request.url) == f"{GRAPH_V1}{_NEWEST_RECORDS}"
         assert newest.call_count == 1
@@ -282,6 +289,7 @@ class TestWhatItAnswers:
 
         found = await reader.teams_read_meeting(client, handle=_handle())
 
+        assert found.status == "not_organizer"
         assert found.meeting is not None
         assert found.meeting.organizer_user_id is None
         assert found.meeting.attendees == []
@@ -360,6 +368,7 @@ class TestTheKindsOfAbsence:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_MEETINGS).mock(return_value=httpx.Response(200, json={"value": []}))
+        me = _me(graph)
         reports = _reports(graph, _NEWEST)
 
         found = await reader.teams_read_meeting(client, handle=_handle())
@@ -369,6 +378,7 @@ class TestTheKindsOfAbsence:
         assert found.reports == []
         assert found.newest_report_attendance == []
         assert found.more_records is False
+        assert not me.called, "a meeting that is not there needs no signed-in user"
         assert not reports.called
 
     async def test_a_meeting_long_over_with_no_report_has_none(
@@ -405,15 +415,82 @@ class TestTheKindsOfAbsence:
 
         assert found.status == "not_ready"
 
-    def test_the_four_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
+    def test_the_five_answers_reach_the_schema_as_an_enum_and_not_only_as_prose(self) -> None:
         status = _published("properties", "status")
 
-        assert status["enum"] == ["available", "not_ready", "no_report", "meeting_not_found"]
+        assert status["enum"] == [
+            "available",
+            "not_ready",
+            "no_report",
+            "not_organizer",
+            "meeting_not_found",
+        ]
         assert status["type"] == "string"
         assert "$ref" not in status
         described = str(status["description"])
+        assert "`not_ready`: no report exists yet. Wait, then call again." in described
         assert "A retry does not change this." in described
+        assert "`not_organizer`: Microsoft 365 does not name this user as the organizer." in (
+            described
+        )
         assert "Do not retry or rebuild the handle." in described
+
+
+class TestTheOrganizerRule:
+    @pytest.mark.parametrize(
+        ("organizer", "organizer_user_id"),
+        [({"identity": {"user": {"id": OTHER_USER_ID}}}, OTHER_USER_ID), (None, None)],
+        ids=["another-user", "no-organizer"],
+    )
+    async def test_a_meeting_of_another_organizer_keeps_its_details_and_reads_no_report(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        organizer: Mapping[str, object] | None,
+        organizer_user_id: str | None,
+    ) -> None:
+        _ = _resolved(graph, participants={**_PARTICIPANTS, "organizer": organizer})
+        reports = _reports(graph, _NEWEST)
+        records = _records(graph)
+
+        found = await reader.teams_read_meeting(client, handle=_handle())
+
+        assert found.status == "not_organizer"
+        assert found.meeting is not None
+        assert found.meeting.model_dump() == {
+            "meeting_uri": _handle().uri,
+            "join_web_url": JOIN_WEB_URL,
+            "subject": "Pricing review",
+            "started_at": datetime(2026, 2, 10, 14, 0, tzinfo=UTC),
+            "ended_at": datetime(2026, 2, 10, 15, 0, tzinfo=UTC),
+            "organizer_user_id": organizer_user_id,
+            "attendees": [{"user_id": OTHER_USER_ID, "upn": _ATTENDEE_UPN}],
+        }
+        assert found.reports == []
+        assert found.newest_report_attendance == []
+        assert found.more_records is False
+        assert not reports.called, "Microsoft Graph gives attendance reports to the organizer only"
+        assert not records.called
+
+    async def test_an_organizer_id_in_other_letter_case_still_reads_the_reports(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        lettered = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+        _ = _resolved(
+            graph,
+            participants={
+                **_PARTICIPANTS,
+                "organizer": {"identity": {"user": {"id": lettered.upper()}}},
+            },
+        )
+        _ = _me(graph, lettered)
+        reports = _reports(graph, _NEWEST)
+        _ = _records(graph)
+
+        found = await reader.teams_read_meeting(client, handle=_handle())
+
+        assert found.status == "available"
+        assert reports.called
 
 
 class TestGraphFailures:
@@ -440,8 +517,14 @@ class TestGraphFailures:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permissions_are_the_meeting_read_then_the_artifact_read(self) -> None:
-        assert reader.GRAPH_PERMISSIONS == ("OnlineMeetings.Read", "OnlineMeetingArtifact.Read.All")
+    def test_the_permissions_are_the_meeting_read_the_artifact_read_then_the_profile_read(
+        self,
+    ) -> None:
+        assert reader.GRAPH_PERMISSIONS == (
+            "OnlineMeetings.Read",
+            "OnlineMeetingArtifact.Read.All",
+            "User.Read",
+        )
 
     async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
         tool = await _registered(transport)
@@ -515,17 +598,23 @@ class TestHowItDeclaresItself:
         assert "- Microsoft Graph gives attendance reports to the meeting organizer only." in (
             description
         )
+        assert (
+            "For any other user, this tool returns the meeting details with the status "
+            + "`not_organizer`."
+        ) in description
         assert "`not_ready` means wait" in description
         assert "Calling it again returns the same records." in description
         assert 45 <= len(description.split()) <= 210
 
-    def test_the_answer_names_the_tools_for_the_other_artifacts_of_the_meeting(self) -> None:
+    def test_the_answer_hands_on_the_handle_without_naming_a_tool(self) -> None:
         meeting_uri = str(reader.MeetingDetails.model_fields["meeting_uri"].description)
 
-        assert (
-            "Pass it verbatim to teams_list_meeting_transcripts or teams_list_meeting_recordings "
-            + "for the other artifacts of this meeting."
-        ) in meeting_uri
+        assert meeting_uri == (
+            "The meeting handle that this tool read. Copy it word for word when another Teams "
+            + "meeting tool asks for a `meeting_uri`."
+        )
+        assert "teams_list_meeting_transcripts" not in meeting_uri
+        assert "teams_list_meeting_recordings" not in meeting_uri
 
     async def test_the_handle_names_both_tools_that_report_one(
         self, transport: httpx.AsyncClient
