@@ -396,6 +396,20 @@ class TestWhatItPublishes:
         assert "location_constraint" in description
         assert "must come from the user" in description
 
+    async def test_a_suggested_room_name_says_when_it_is_null_in_full_sentences(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        answer = cast("Mapping[str, object]", tool.output_schema)
+        definitions = cast("Mapping[str, Mapping[str, object]]", answer["$defs"])
+        rooms = cast(
+            "Mapping[str, Mapping[str, object]]", definitions["SuggestedRoom"]["properties"]
+        )
+        described = cast("str", rooms["display_name"]["description"])
+        assert "The value is null when Microsoft gave no name for the room." in described
+        assert 15 <= len(described.split()) <= 60
+
     async def test_the_room_address_says_it_comes_from_the_user_and_books_nothing(
         self, transport: httpx.AsyncClient
     ) -> None:

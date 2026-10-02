@@ -146,6 +146,20 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
+    @pytest.mark.parametrize(
+        "addresses", [["Ada Lovelace"], [_ADA, _ADA]], ids=["not-one-address", "repeat"]
+    )
+    async def test_a_refusal_says_the_same_arguments_fail_the_same_way(
+        self, client: GraphServiceClient, addresses: list[str]
+    ) -> None:
+        with pytest.raises(ToolError) as raised:
+            _ = await mail_tips.get_mail_tips(client, addresses=addresses)
+
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way."
+            in str(raised.value)
+        )
+
 
 class TestGraphErrors:
     async def test_a_forbidden_response_propagates_as_graph_forbidden(

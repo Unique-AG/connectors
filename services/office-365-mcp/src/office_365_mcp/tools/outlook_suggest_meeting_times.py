@@ -28,11 +28,15 @@ from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.calendar import (
     EventTime,
     event_time,
-    repeated_address,
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import (
+    ONE_ADDRESS,
+    AddressFault,
+    one_address_each,
+    repeated_address,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -158,7 +162,10 @@ class LocationConstraintInput(BaseModel):
 
 class SuggestedRoom(BaseModel):
     display_name: str | None = Field(
-        description="The name of this room, as Microsoft wrote it. Null when Microsoft gave none."
+        description=(
+            "The name of this room, as Microsoft wrote it in the suggestion. The value is null "
+            + "when Microsoft gave no name for the room."
+        )
     )
     address: str | None = Field(
         description=(
@@ -273,7 +280,9 @@ async def suggest_meeting_times(
     )
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
-    _invited_once(required, optional)
+    twice = repeated_address([*required, *optional])
+    if twice is not None:
+        raise ToolError(_invited_twice(twice))
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
@@ -323,14 +332,14 @@ async def suggest_meeting_times(
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(argument, again))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _graph_constraint(constraint: LocationConstraintInput | None) -> LocationConstraint | None:
@@ -356,13 +365,6 @@ def _room_address(address: str | None) -> str | None:
     if ONE_ADDRESS.match(trimmed) is None:
         raise ToolError(_bad_address("location_constraint", trimmed))
     return trimmed
-
-
-def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    both = {a.casefold() for a in required} & {a.casefold() for a in optional}
-    for address in required:
-        if address.casefold() in both:
-            raise ToolError(_invited_twice(address))
 
 
 def _moment(argument: str, value: str) -> datetime:

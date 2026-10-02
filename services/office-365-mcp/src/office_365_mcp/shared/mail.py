@@ -1,5 +1,6 @@
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal, Self
 
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
@@ -235,3 +236,29 @@ def copied_and_marked(
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )
+
+
+def repeated_address(addresses: Sequence[str]) -> str | None:
+    named: set[str] = set()
+    for address in addresses:
+        if address.casefold() in named:
+            return address
+        named.add(address.casefold())
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class AddressFault:
+    entry: str
+    repeated: bool
+
+
+def one_address_each(addresses: Sequence[str]) -> tuple[str, ...] | AddressFault:
+    trimmed = tuple(address.strip() for address in addresses)
+    for address in trimmed:
+        if ONE_ADDRESS.match(address) is None:
+            return AddressFault(entry=address, repeated=False)
+    again = repeated_address(trimmed)
+    if again is not None:
+        return AddressFault(entry=again, repeated=True)
+    return trimmed

@@ -72,7 +72,6 @@ from office_365_mcp.shared.calendar import (
     patch_changes,
     providers_without_teams,
     recurrence_refusal,
-    repeated_address,
     series_reach,
     transaction_id_for,
     wall_clock,
@@ -2427,24 +2426,6 @@ class TestWhichCalendarsTakeNoTeamsMeeting:
         )
 
         assert providers_without_teams(calendar) is None
-
-
-class TestOnePersonInvitedOnce:
-    def test_the_repeat_is_the_entry_that_names_an_address_already_named(self) -> None:
-        assert repeated_address([_MINE, _SOMEBODY_ELSE, _MINE]) == _MINE
-
-    def test_case_is_not_a_second_person(self) -> None:
-        """SMTP addresses are not case-sensitive, and the answer is the entry as it was written,
-        so a refusal quotes what the caller sent."""
-        assert repeated_address([_MINE, _MINE.upper()]) == _MINE.upper()
-
-    @pytest.mark.parametrize(
-        "addresses",
-        [[], [_MINE], [_MINE, _SOMEBODY_ELSE]],
-        ids=["nobody", "one-person", "two-people"],
-    )
-    def test_a_list_that_names_everybody_once_has_no_repeat(self, addresses: list[str]) -> None:
-        assert repeated_address(addresses) is None
 
 
 class TestReadingOneCalendar:

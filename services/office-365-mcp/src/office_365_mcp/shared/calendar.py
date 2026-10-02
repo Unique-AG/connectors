@@ -855,15 +855,6 @@ def resource_addresses(event: Event) -> tuple[str, ...]:
     )
 
 
-def repeated_address(addresses: Sequence[str]) -> str | None:
-    named: set[str] = set()
-    for address in addresses:
-        if address.casefold() in named:
-            return address
-        named.add(address.casefold())
-    return None
-
-
 async def event_of(
     client: GraphServiceClient,
     *,

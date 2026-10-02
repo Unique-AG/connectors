@@ -20,11 +20,10 @@ from office_365_mcp.shared.calendar import (
     EventTime,
     WorkingHoursSummary,
     event_time,
-    repeated_address,
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import AddressFault, one_address_each
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -227,14 +226,12 @@ async def check_availability(
 
 
 def _addresses(addresses: Sequence[str]) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(again))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(checked.entry) if checked.repeated else _bad_address(checked.entry)
+        )
+    return checked
 
 
 def _moment(argument: str, value: str) -> datetime:

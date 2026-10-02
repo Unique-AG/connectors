@@ -1417,6 +1417,10 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
         assert "NO EVENT WAS CREATED" in str(raised.value)
+        assert (
+            "If you call this tool again with the same arguments, the call will fail the same way."
+            in str(raised.value)
+        )
 
     async def test_twenty_one_attendees_reach_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter

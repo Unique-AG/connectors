@@ -13,8 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
-from office_365_mcp.shared.calendar import repeated_address
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import AddressFault, one_address_each
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mail_tips"
@@ -51,14 +50,16 @@ def _bad_address(value: str) -> str:
         f"outlook_get_mail_tips was given {value!r} in `addresses`, which is not one email "
         + "address. Each entry must be one address, for example `ada@example.com`. Do not use a "
         + "display name or two addresses in one entry. Call this tool again with corrected "
-        + "addresses. Retrying this value will fail identically."
+        + "addresses. If you call this tool again with the same arguments, the call will fail "
+        + "the same way."
     )
 
 
 def _repeated(address: str) -> str:
     return (
         f"outlook_get_mail_tips was given {address!r} twice in `addresses`. Remove the repeat "
-        + "and call this tool again. Retrying the same list will fail identically."
+        + "and call this tool again. If you call this tool again with the same arguments, the "
+        + "call will fail the same way."
     )
 
 
@@ -204,14 +205,12 @@ async def get_mail_tips(client: GraphServiceClient, *, addresses: Sequence[str])
 
 
 def _addresses(addresses: Sequence[str]) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(again))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(checked.entry) if checked.repeated else _bad_address(checked.entry)
+        )
+    return checked
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

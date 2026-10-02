@@ -69,14 +69,13 @@ from office_365_mcp.shared.calendar import (
     is_midnight,
     providers_without_teams,
     recurrence_refusal,
-    repeated_address,
     transaction_id_for,
     wall_clock,
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -184,7 +183,8 @@ _ROOM_ALSO_INVITED = (
     "outlook_create_event_on_behalf was given an address in `room_addresses` that is also in "
     + "`attendees` or `optional_attendees`, and this tool takes each address once. NO EVENT WAS "
     + "CREATED and nobody was invited. Put a room in `room_addresses` only, and put a person in "
-    + "one of the two attendee lists. Retrying the same lists will fail identically."
+    + "one of the two attendee lists. If you call this tool again with the same arguments, the "
+    + "call will fail the same way."
 )
 
 
@@ -540,14 +540,14 @@ def _moment(argument: str, value: str) -> datetime:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    twice = repeated_address(trimmed)
-    if twice is not None:
-        raise ToolError(_invited_twice(argument, twice))
-    return trimmed
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _invited_twice(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _no_teams_meeting(calendar: Calendar) -> str | None:

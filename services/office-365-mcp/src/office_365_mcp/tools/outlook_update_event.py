@@ -46,7 +46,6 @@ from office_365_mcp.shared.calendar import (
     invited_attendee,
     patch_changes,
     providers_without_teams,
-    repeated_address,
     resource_addresses,
     series_reach,
     wall_clock,
@@ -54,7 +53,7 @@ from office_365_mcp.shared.calendar import (
 )
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, merged_categories
 from office_365_mcp.shared.handles import event_handle
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import AddressFault, one_address_each, repeated_address
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -333,7 +332,9 @@ async def update_event(
     )
     if required is not None:
         assert optional is not None, "_attendees_given_together admits no other shape"
-        _invited_once(required, optional)
+        twice = repeated_address([*required, *optional])
+        if twice is not None:
+            raise ToolError(_invited_twice(twice))
 
     updated: Event | None = None
     asked: InputRequiredResult | None = None
@@ -451,21 +452,14 @@ def _place(location: str | None) -> str | None:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(argument, again))
-    return trimmed
-
-
-def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    both = {a.casefold() for a in required} & {a.casefold() for a in optional}
-    for address in required:
-        if address.casefold() in both:
-            raise ToolError(_invited_twice(address))
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _refusal(event: Event, patch: EventPatch) -> str | None:

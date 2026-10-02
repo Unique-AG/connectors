@@ -68,14 +68,13 @@ from office_365_mcp.shared.calendar import (
     is_midnight,
     providers_without_teams,
     recurrence_refusal,
-    repeated_address,
     transaction_id_for,
     wall_clock,
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress
+from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each, repeated_address
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -480,7 +479,9 @@ def _drafted(
     required = _addresses(attendees, argument="attendees")
     optional = _addresses(optional_attendees, argument="optional_attendees")
     rooms = _addresses(room_addresses, argument="room_addresses")
-    _invited_once(required, optional)
+    twice = repeated_address([*required, *optional])
+    if twice is not None:
+        raise ToolError(_invited_twice(twice))
     again = repeated_address([*required, *optional, *rooms])
     if again is not None:
         raise ToolError(_room_also_invited(again))
@@ -533,23 +534,14 @@ def _a_zone_of_its_own(value: str) -> bool:
 
 
 def _addresses(addresses: Sequence[str], *, argument: str) -> tuple[str, ...]:
-    trimmed = tuple(address.strip() for address in addresses)
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address(argument, address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_repeated(argument, again))
-    return trimmed
-
-
-def _invited_once(required: tuple[str, ...], optional: tuple[str, ...]) -> None:
-    both = {address.casefold() for address in required} & {
-        address.casefold() for address in optional
-    }
-    for address in required:
-        if address.casefold() in both:
-            raise ToolError(_invited_twice(address))
+    checked = one_address_each(addresses)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _repeated(argument, checked.entry)
+            if checked.repeated
+            else _bad_address(argument, checked.entry)
+        )
+    return checked
 
 
 def _no_teams_meeting_here(calendar: Calendar) -> str | None:

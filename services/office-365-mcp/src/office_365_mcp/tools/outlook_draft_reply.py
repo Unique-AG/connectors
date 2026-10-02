@@ -36,11 +36,17 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
-from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS, MailAddress, MailImportance, copied_and_marked
+from office_365_mcp.shared.mail import (
+    ONE_ADDRESS,
+    AddressFault,
+    MailAddress,
+    MailImportance,
+    copied_and_marked,
+    one_address_each,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -330,18 +336,16 @@ def _forward_addresses(mode: MailReplyMode, to: Sequence[str]) -> list[str]:
 
 
 def _copied_addresses(cc: Sequence[str], *, forwarded_to: Sequence[str]) -> list[str]:
-    trimmed = [address.strip() for address in cc]
-    for address in trimmed:
-        if ONE_ADDRESS.match(address) is None:
-            raise ToolError(_bad_address("cc", address))
-    again = repeated_address(trimmed)
-    if again is not None:
-        raise ToolError(_copied_twice(again))
+    checked = one_address_each(cc)
+    if isinstance(checked, AddressFault):
+        raise ToolError(
+            _copied_twice(checked.entry) if checked.repeated else _bad_address("cc", checked.entry)
+        )
     addressed = {address.casefold() for address in forwarded_to}
-    for address in trimmed:
+    for address in checked:
         if address.casefold() in addressed:
             raise ToolError(_in_to_and_cc(address))
-    return trimmed
+    return list(checked)
 
 
 def _recipients(addresses: Sequence[str]) -> list[Recipient]:
