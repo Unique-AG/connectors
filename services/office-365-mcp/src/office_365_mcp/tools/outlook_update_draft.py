@@ -23,7 +23,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
 from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
@@ -229,10 +229,16 @@ async def update_draft(
     handle = _handle_for(draft_ref)
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
+    named = (
+        None
+        if change.categories is None
+        else merged_categories((), add=change.categories, remove=())
+    )
     wanted = replace(
         change,
         to=_addresses(change.to, argument="to"),
         cc=_addresses(change.cc, argument="cc"),
+        categories=named,
     )
     reached = graph_mailbox(client, mailbox)
 

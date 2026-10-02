@@ -33,7 +33,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
@@ -226,6 +226,7 @@ async def draft_reply_all(
     categories: Sequence[str] = (),
     mailbox: str | None = None,
 ) -> MailReplyAllDraft | InputRequiredResult:
+    named = merged_categories((), add=categories, remove=())
     handle = mail_message_handle(message_ref)
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)
@@ -248,7 +249,7 @@ async def draft_reply_all(
                         addressed=addressed,
                         copied=copied,
                         importance=importance,
-                        categories=categories,
+                        categories=named,
                     ),
                     _about(
                         mailbox,
@@ -257,7 +258,7 @@ async def draft_reply_all(
                         addressed=addressed,
                         copied=copied,
                         importance=importance,
-                        categories=categories,
+                        categories=named,
                     ),
                 )
         if answer is None:
@@ -273,7 +274,7 @@ async def draft_reply_all(
                     body_html=body_html,
                     added=added,
                     importance=importance,
-                    categories=categories,
+                    categories=named,
                 ),
             )
 

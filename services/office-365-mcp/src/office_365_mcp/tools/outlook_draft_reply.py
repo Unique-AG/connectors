@@ -36,7 +36,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
+from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
 from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
@@ -271,6 +271,7 @@ async def draft_reply(
     categories: Sequence[str] = (),
     mailbox: str | None = None,
 ) -> MailReplyDraft | InputRequiredResult:
+    named = merged_categories((), add=categories, remove=())
     if mode not in MODES:
         raise ToolError(_UNKNOWN_MODE)
     handle = mail_message_handle(message_ref)
@@ -300,7 +301,7 @@ async def draft_reply(
                             addressed=addressed,
                             cc=copied,
                             importance=importance,
-                            categories=categories,
+                            categories=named,
                         ),
                         _about(
                             mailbox,
@@ -310,7 +311,7 @@ async def draft_reply(
                             addressed=addressed,
                             cc=copied,
                             importance=importance,
-                            categories=categories,
+                            categories=named,
                         ),
                     )
         if answer is None:
@@ -323,7 +324,7 @@ async def draft_reply(
             fill = await _fill(
                 reached,
                 draft_id=created.id,
-                body=_fill_body(body_html, cc=copied, importance=importance, categories=categories),
+                body=_fill_body(body_html, cc=copied, importance=importance, categories=named),
             )
 
     if isinstance(answer, InputRequiredResult):

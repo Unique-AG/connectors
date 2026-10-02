@@ -321,6 +321,16 @@ class TestWhatItSendsToGraph:
         assert sent["importance"] == "high"
         assert sent["categories"] == ["Finance", "Q3"]
 
+    async def test_categories_that_differ_only_in_case_reach_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        fill = _fills(graph)
+
+        _ = await _reply(client, categories=["Budget", "BUDGET"])
+
+        assert _sent(fill)["categories"] == ["Budget"]
+
     async def test_the_create_carries_none_of_what_the_fill_writes(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1158,6 +1168,20 @@ class TestThePersonBeforeTheDraftIsCreated:
         sentences = re.split(r"(?<=[.?])\s+", question)
         assert max(len(sentence.split()) for sentence in sentences) <= 20, sentences
 
+    async def test_the_question_names_categories_that_differ_only_in_case_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert "It is tagged Budget." in asked[0]
+        assert "BUDGET" not in asked[0]
+
     async def test_the_question_says_nothing_of_a_copy_an_importance_or_a_category_not_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1250,6 +1274,25 @@ class TestThePersonBeforeTheDraftIsCreated:
         _ = await _reply(client, categories=["Q3"], mailbox=_SHARED_MAILBOX, confirm=capturing)
 
         assert len({*bound}) == 5
+
+    async def test_categories_that_differ_only_in_case_bind_the_state_of_the_deduped_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _reply(client, categories=["Budget"], mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _reply(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert bound[0] == bound[1]
 
 
 class TestWhatItAnswers:

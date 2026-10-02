@@ -263,6 +263,16 @@ class TestWhatItSendsToGraph:
         assert _sent(fill)["importance"] == "high"
         assert _sent(fill)["categories"] == ["Finance"]
 
+    async def test_categories_that_differ_only_in_case_reach_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        fill = _fills(graph)
+
+        _ = await _reply_all(client, categories=["Budget", "BUDGET"])
+
+        assert _sent(fill)["categories"] == ["Budget"]
+
     async def test_neither_write_offers_an_attachment_or_a_blind_copy(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -686,6 +696,20 @@ class TestThePersonBeforeTheDraftIsCreated:
         assert "It has high importance." in asked[0]
         assert "It is tagged Finance, Urgent." in asked[0]
 
+    async def test_the_question_names_categories_that_differ_only_in_case_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        asked, capturing = _questions()
+
+        _ = await _reply_all(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert "It is tagged Budget." in asked[0]
+        assert "BUDGET" not in asked[0]
+
     async def test_a_message_with_no_subject_and_nobody_on_it_is_still_described(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -723,6 +747,27 @@ class TestThePersonBeforeTheDraftIsCreated:
 
         assert bound[0] == bound[1]
         assert len({*bound}) == 4
+
+    async def test_categories_that_differ_only_in_case_bind_the_state_of_the_deduped_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _shared_writes(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _reply_all(
+            client, categories=["Budget"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+        _ = await _reply_all(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert bound[0] == bound[1]
 
 
 class TestWhatItAnswers:

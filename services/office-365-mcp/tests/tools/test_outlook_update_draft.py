@@ -239,6 +239,15 @@ class TestWhatItSendsToGraph:
         assert _sent(patch)["importance"] == "high"
         assert _sent(patch)["categories"] == ["Finance", "Urgent"]
 
+    async def test_categories_that_differ_only_in_case_reach_graph_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(client, categories=["Budget", "BUDGET"])
+
+        assert _sent(patch)["categories"] == ["Budget"]
+
     async def test_an_omitted_to_and_an_omitted_cc_leave_the_recipients_alone(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -657,6 +666,19 @@ class TestThePersonBeforeTheDraftChanges:
         assert f"It is copied to {_PAM}." in asked[0]
         assert "The new importance is high." in asked[0]
 
+    async def test_the_question_names_categories_that_differ_only_in_case_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _SHARED_DRAFT_PATH)
+        asked, capturing = _questions()
+
+        _ = await _update(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert "The new categories are Budget." in asked[0]
+        assert "BUDGET" not in asked[0]
+
     async def test_the_question_shows_the_opening_of_new_text_and_cleared_categories(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -697,6 +719,24 @@ class TestThePersonBeforeTheDraftChanges:
 
         assert bound[0] == bound[1]
         assert len({*bound}) == 4
+
+    async def test_categories_that_differ_only_in_case_bind_the_state_of_the_deduped_list(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _SHARED_DRAFT_PATH)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _update(client, categories=["Budget"], mailbox=_SHARED_MAILBOX, confirm=capturing)
+        _ = await _update(
+            client, categories=["Budget", "BUDGET"], mailbox=_SHARED_MAILBOX, confirm=capturing
+        )
+
+        assert bound[0] == bound[1]
 
 
 class TestWhatItAnswers:
