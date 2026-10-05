@@ -106,7 +106,6 @@ class TestSearchProductsQuery:
         result = await make_search_products_query(client).run()
 
         assert _ids(result.products) == ["1", "2"]
-        assert result.scan_truncated is False
         params = recorded_requests(route.calls)[0].url.params
         assert "fields" not in params
         assert params["sort"] == "name"
@@ -222,6 +221,21 @@ class TestSearchProductsQuery:
 
         for call in recorded_requests(route.calls):
             assert call.url.params["filter[modifiedTimestamp][gt]"] == "2026-10-01"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_walks_every_page_with_no_scan_ceiling(self, client: BackstopClient) -> None:
+        next_url = f"{_PRODUCTS_URL}?page=2"
+        respx.get(_PRODUCTS_URL).mock(
+            side_effect=[
+                httpx.Response(200, json={"data": [_GLOBAL_US], "links": {"next": next_url}}),
+                httpx.Response(200, json={"data": [_GLOBAL_OFFSHORE], "links": {"next": None}}),
+            ]
+        )
+
+        result = await make_search_products_query(client).run(product_ids=["2"])
+
+        assert _ids(result.products) == ["2"]
 
     @pytest.mark.asyncio
     @respx.mock

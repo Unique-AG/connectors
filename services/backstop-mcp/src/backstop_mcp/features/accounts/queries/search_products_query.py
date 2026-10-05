@@ -9,21 +9,17 @@ A `name` that no product name contains is tried as a whole short name over an un
 because `productShortName` is not a `/products` filter.
 """
 
-import logging
 from collections.abc import Sequence
 from datetime import date
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ProductCatalogFetchDto, ProductFetchDto
-from backstop_mcp.features.accounts.responses import MAX_PRODUCT_SCAN_RECORDS
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
     normalize_matches,
     satisfies_every,
 )
-
-logger = logging.getLogger(__name__)
 
 _PRODUCTS_PATH = "/products"
 _PAGE_SIZE = 200
@@ -71,8 +67,7 @@ class SearchProductsQuery:
                 and (type_needle is None or (item.product_type or "").casefold() == type_needle)
                 and (is_onshore is None or item.is_onshore is is_onshore)
                 and satisfies_every(item.stored_custom_field_values, predicates)
-            ),
-            scan_truncated=fetched.scan_truncated,
+            )
         )
 
     async def _by_short_name(self, base: dict[str, object], name: str) -> ProductCatalogFetchDto:
@@ -84,8 +79,7 @@ class SearchProductsQuery:
                 for item in fetched.products
                 if item.product.short_name is not None
                 and item.product.short_name.casefold() == needle
-            ),
-            scan_truncated=fetched.scan_truncated,
+            )
         )
 
     async def _walk(self, params: dict[str, object]) -> ProductCatalogFetchDto:
@@ -93,15 +87,9 @@ class SearchProductsQuery:
             _PRODUCTS_PATH,
             schema=_ProductResource,
             params=params,
-            max_records=MAX_PRODUCT_SCAN_RECORDS,
+            max_records=None,
             page_size=_PAGE_SIZE,
         )
-        if page.truncated:
-            logger.warning(
-                "accounts.products.catalog_scan_ceiling_reached",
-                extra={"ceiling": MAX_PRODUCT_SCAN_RECORDS, "total_count": page.total_count},
-            )
         return ProductCatalogFetchDto(
-            products=tuple(ProductFetchDto.from_resource(resource) for resource in page.items),
-            scan_truncated=page.truncated,
+            products=tuple(ProductFetchDto.from_resource(resource) for resource in page.items)
         )

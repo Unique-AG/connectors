@@ -8,11 +8,6 @@ from pydantic import Field
 from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
 from backstop_mcp.models import OmitNoneModel
 
-# Scan ceiling for the catalog walk. `resolve_product` already warns past 400 because re-reading
-# the catalog per search stops paying for itself. This is the hard stop above that warning, so a
-# tenant with a pathological catalog gets a stated prefix rather than an unbounded read.
-MAX_PRODUCT_SCAN_RECORDS = 2_000
-
 
 class ProductDescriptionResponse(OmitNoneModel):
     """Free-text blurbs Backstop holds on the product. Blank ones are omitted."""
@@ -126,12 +121,4 @@ class ProductResolvedResponse(OmitNoneModel):
             "catalog when none was. Zero, one, or many. Several is not an error and nothing "
             "here picks one for the user."
         )
-    )
-    scan_truncated: bool = Field(
-        default=False,
-        description=(
-            f"True when the catalog walk stopped at the {MAX_PRODUCT_SCAN_RECORDS}-product scan "
-            "ceiling, so `products` is a prefix of the matches. An absent product then means "
-            "'not in what was read', not 'not in the firm'."
-        ),
     )

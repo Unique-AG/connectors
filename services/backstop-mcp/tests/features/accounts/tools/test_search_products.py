@@ -6,6 +6,7 @@ import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
+from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.accounts import ProductResolvedResponse
@@ -14,6 +15,7 @@ from backstop_mcp.features.accounts.tools.search_products import (
     search_products,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
+from backstop_mcp.models import CoercedId
 from backstop_mcp.server.tools import TOOLS
 from tests.features.accounts.conftest import make_search_products_query
 from tests.helpers import (
@@ -119,6 +121,11 @@ class TestSearchProducts:
         assert "OR" in ids
         assert "AND with every other filter" in ids
 
+    def test_product_ids_accept_json_numbers(self) -> None:
+        ids = TypeAdapter(Sequence[CoercedId])
+
+        assert ids.validate_python([1653647, " 2 "]) == ["1653647", "2"]
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_no_filters_returns_every_product_with_its_attributes(self) -> None:
@@ -149,7 +156,6 @@ class TestSearchProducts:
 
         assert products.call_count == 1
         assert "fields" not in recorded_requests(products.calls)[0].url.params
-        assert result.scan_truncated is False
         rows = [object_dict(item) for item in object_list(tool_payload(result)["products"])]
         assert [row["id"] for row in rows] == [_PRODUCT_ID, "2"]
         assert rows[0]["short_name"] == "NDSP"

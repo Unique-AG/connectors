@@ -36,7 +36,7 @@ from backstop_mcp.features.ui_links import (
     ProductLinkTarget,
     get_build_entity_link_util_factory,
 )
-from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
+from backstop_mcp.models import CoercedId, NonEmptyStr, coerce_ids, published_output_schema
 
 
 class ProductCustomFieldFilter(BaseModel):
@@ -128,7 +128,7 @@ async def search_products(
         ),
     ] = None,
     product_ids: Annotated[
-        Sequence[str],
+        Sequence[CoercedId],
         Field(
             description=(
                 "Product ids from an earlier result — never invent one. Several are OR: a "
@@ -213,7 +213,7 @@ async def search_products(
         search_products_query.run(
             name=name,
             modified_since=modified_since,
-            product_ids=product_ids,
+            product_ids=coerce_ids(product_ids),
             product_type=product_type,
             is_onshore=is_onshore,
             custom_fields=tuple(
@@ -238,4 +238,4 @@ async def search_products(
             for item in fetched.products
         )
     )
-    return ProductResolvedResponse(products=tuple(products), scan_truncated=fetched.scan_truncated)
+    return ProductResolvedResponse(products=tuple(products))

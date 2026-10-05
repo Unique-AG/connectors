@@ -53,7 +53,6 @@ from backstop_mcp.features.accounts.resolve_product import (
 )
 from backstop_mcp.features.accounts.responses import (
     MAX_CAPITAL_FLOW_SCAN_RECORDS,
-    MAX_PRODUCT_SCAN_RECORDS,
     AccountRowResponse,
     CapitalFlowPartyResponse,
     CapitalFlowRowResponse,
@@ -98,7 +97,6 @@ __all__ = [
     "HoldingsTableShapeError",
     "InvestorTypeDto",
     "MAX_CAPITAL_FLOW_SCAN_RECORDS",
-    "MAX_PRODUCT_SCAN_RECORDS",
     "MoneyDto",
     "MoneyResponse",
     "PRODUCT_SERIES",

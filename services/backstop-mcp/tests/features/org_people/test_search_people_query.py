@@ -413,6 +413,32 @@ class TestSearchPeopleQuery:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_a_two_letter_country_is_an_exact_code_not_a_substring(self) -> None:
+        base_url = f"{BASE_URL}/people-search-iso-country"
+        sydney = contact_location(
+            "l1", city="Sydney", country="Australia", countryCode="AU", isPrimaryLocation=True
+        )
+        boston = contact_location(
+            "l2", city="Boston", country="United States", countryCode="US", isPrimaryLocation=True
+        )
+        respx.get(f"{base_url}/people").mock(
+            return_value=_page(
+                linked_to_locations(resource("1", "people", "Doe, Jane"), sydney),
+                linked_to_locations(resource("2", "people", "Roe, Rich"), boston),
+                total=2,
+                included=(sydney, boston),
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            found = await make_search_people_query(client).run(
+                location_filter=LocationFilter(country="US"), fields=_FIELDS
+            )
+
+        assert [row.id for row in found.rows] == ["2"]
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_email_lookups_share_the_side_loaded_addresses(self) -> None:
         base_url = f"{BASE_URL}/people-search-email-locations"
         london = contact_location("l2", city="London", isPrimaryLocation=False)

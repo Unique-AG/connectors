@@ -562,14 +562,8 @@ class AccountLatestValueDto(BaseModel):
 
 
 class ProductCatalogFetchDto(BaseModel):
-    """The product catalog walk, and whether it read all of it.
-
-    `scan_truncated` is the walk's scan ceiling firing, which turns "the catalog" into "the
-    first N products" — the difference between "no product has this field" and "none of the
-    ones I looked at did".
-    """
+    """Every product the catalog walk read."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     products: tuple[ProductFetchDto, ...]
-    scan_truncated: bool = False

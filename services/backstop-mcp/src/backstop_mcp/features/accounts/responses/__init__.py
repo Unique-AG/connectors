@@ -19,7 +19,6 @@ from backstop_mcp.features.accounts.responses.party_accounts import (
     ShareResponse,
 )
 from backstop_mcp.features.accounts.responses.product import (
-    MAX_PRODUCT_SCAN_RECORDS,
     ProductDescriptionResponse,
     ProductRecordResponse,
     ProductResolvedResponse,
@@ -51,7 +50,6 @@ from backstop_mcp.features.accounts.responses.time_series import (
 
 __all__ = [
     "MAX_CAPITAL_FLOW_SCAN_RECORDS",
-    "MAX_PRODUCT_SCAN_RECORDS",
     "AccountRowResponse",
     "CapitalFlowPartyResponse",
     "CapitalFlowRowResponse",

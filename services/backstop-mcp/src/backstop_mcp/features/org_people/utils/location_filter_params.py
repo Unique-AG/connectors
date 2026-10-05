@@ -6,7 +6,8 @@ def location_filter_params(location_filter: LocationFilter | None) -> dict[str, 
 
     Of the `contactLocations` fields only `city` and `address` are filter fields, and both are
     `eq`: exact and case-sensitive, no `like`, no `in`. Every other field is `400 Invalid filter
-    field`, so it is left to the in-memory match.
+    field`, so it is left to the in-memory match. The filter reaches the primary location too:
+    it is one of the side-loaded `contactLocations`, as well as inlined on the party record.
     """
     if location_filter is None:
         return {}
