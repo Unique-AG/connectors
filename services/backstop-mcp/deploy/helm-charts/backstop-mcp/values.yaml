@@ -8,7 +8,7 @@ selectorComponentLabel: server
 
 # Tenant guidance overlay: text appended to the server instructions and to individual tool
 # and parameter descriptions. Set per deployment in the overlay, never here — the chart ships
-# tenant-neutral. Shape: docs/plans/tenant-guidance-overlay.md §1.1.
+# tenant-neutral. Shape: `TenantGuidance` in the server code and values.schema.json.
 # Empty means the shipped descriptions only.
 tenantGuidance: {}
 

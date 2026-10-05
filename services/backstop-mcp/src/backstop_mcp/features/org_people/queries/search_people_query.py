@@ -1,14 +1,8 @@
-"""Firm-wide `GET /people`: server filters where Backstop accepts them, then in memory.
+"""Firm-wide `GET /people`: server-side name, email, otherId and domain filters, the rest in memory.
 
-Only name, lastName, email(2/3), otherId and emailDomains filters work server-side; other
-people fields and `regularCustomFieldValues` are rejected, so those run after the fetch.
-Locations come from `include=contactLocations`; only its exact, case-sensitive `city` and
-`address` filters exist. An email is three exact lookups unioned by id, and later pages are
-requested in parallel under the per-user concurrency gate.
-
-Employment links ride on the same walk (`include=entityRelationships` plus their types) only
-when asked for: they double each page. `sort=name` is a 500 on `/people`, so the walk sorts by
-`id` and rows are ordered by name here.
+Locations come from `include=contactLocations` (only exact `city`/`address` filters exist);
+employment links are fetched only when asked for. `sort=name` is a 500 here, so rows are
+sorted by name in memory.
 """
 
 import asyncio

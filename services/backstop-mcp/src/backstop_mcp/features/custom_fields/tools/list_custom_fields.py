@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
@@ -17,6 +17,17 @@ from backstop_mcp.features.custom_fields import (
 )
 
 
+def _option_texts(option: object) -> list[str]:
+    """A picklist option as searchable text: the string, or an object's string values."""
+    if isinstance(option, str):
+        return [option]
+    if isinstance(option, Mapping):
+        return [
+            value for value in cast(Mapping[str, object], option).values() if isinstance(value, str)
+        ]
+    return [str(option)]
+
+
 def _matches(definition: CustomFieldDefinitionDto, needle: str | None) -> bool:
     """Whether `needle` is in the name, tab, group, layout, or an option, any case."""
     if needle is None:
@@ -26,7 +37,7 @@ def _matches(definition: CustomFieldDefinitionDto, needle: str | None) -> bool:
         definition.tab_name,
         definition.group_name,
         definition.layout_name,
-        *(str(option) for option in definition.select_options),
+        *(text for option in definition.select_options for text in _option_texts(option)),
     )
     return any(needle in (haystack or "").casefold() for haystack in haystacks)
 
