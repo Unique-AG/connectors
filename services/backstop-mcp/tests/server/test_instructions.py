@@ -67,8 +67,7 @@ class TestInstructions:
         assert "exact name, short name, or id is one vehicle" in INSTRUCTIONS
         assert "geographical breakdown" not in INSTRUCTIONS
         assert (
-            "If no field or several fields could be it, ask the user which one."
-            not in INSTRUCTIONS
+            "If no field or several fields could be it, ask the user which one." not in INSTRUCTIONS
         )
         assert "Investor Location" not in INSTRUCTIONS
         assert "us_domiciled" not in INSTRUCTIONS
