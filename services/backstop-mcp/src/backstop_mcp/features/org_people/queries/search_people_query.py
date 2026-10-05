@@ -1,27 +1,10 @@
 """Firm-wide `GET /people`: server filters where Backstop accepts them, then in memory.
 
-`filter[name][eq]`, `filter[lastName][like]`, `filter[email][eq]`, `filter[email2][eq]`,
-`filter[email3][eq]`, `filter[otherId][eq]`, and `filter[emailDomains][eq]` change
-`totalResourceCount`. `filter[name][like]` is an unsupported operator. `filter[firstName]`,
-`filter[jobTitle]`, `filter[companyName]`, `filter[department]`, `filter[city]`,
-`filter[country]`, `filter[state]`, and `filter[website]` are `400 Invalid filter field`.
-`filter[regularCustomFieldValues][eq]` is recognized and then rejected: Backstop cannot
-convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run after
-the fetch. `emailDomains` filters, but `fields[people]` rejects it.
-
-Locations come from `include=contactLocations` on the same walk, so a person's other
-addresses cost no extra request. `filter[contactLocations.city][eq]` matches any of a person's
-locations, but exactly and case-sensitively, with no `like` and no `in`. `city` and `address`
-are the only `contactLocations` filter fields; `state`, `country`, `postalCode`,
-`locationTitle`, and `isPrimaryLocation` are `400 Invalid filter field`. So the city and the
-street address are sent exactly as the caller wrote them, and the rest of the location filter
-runs after the fetch.
-
-An email is three exact lookups, unioned by id: a person can store the address on `email`,
-`email2`, or `email3`. A custom-field-only call reads the collection. The people collection
-is larger than organizations; a sparse page carrying `regularCustomFieldValues` takes
-seconds, and the per-user gate allows five concurrent requests, so the walk requests later
-pages in parallel. Every match is returned; the scan ceiling is the only limit.
+Only name, lastName, email(2/3), otherId and emailDomains filters work server-side; other
+people fields and `regularCustomFieldValues` are rejected, so those run after the fetch.
+Locations come from `include=contactLocations`; only its exact, case-sensitive `city` and
+`address` filters exist. An email is three exact lookups unioned by id, and later pages are
+requested in parallel under the per-user concurrency gate.
 """
 
 import asyncio

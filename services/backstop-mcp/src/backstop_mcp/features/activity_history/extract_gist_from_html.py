@@ -20,10 +20,7 @@ logger = logging.getLogger(__name__)
 # Matches a Markdown pipe-table separator cell: `---`, `:---`, `---:`, or `:---:`.
 _SEPARATOR_CELL_RE = re.compile(r"^:?-+:?$")
 
-# markdownify walks tags recursively, about two frames per level, and raises RecursionError
-# near 500 nested tags under the default limit of 1000. A Word or Outlook body can nest
-# wrappers well past that, and the exception fails the whole tool call. 200 leaves room
-# for the frames already on the stack when a tool invokes this.
+# markdownify recurses ~2 frames per tag and overflows near 500 nested tags; 200 leaves headroom.
 _MAX_TAG_DEPTH = 200
 
 # Any run of whitespace, used to find the last word boundary inside a truncation window.
