@@ -8,9 +8,9 @@ from collections.abc import Awaitable, Callable
 
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.accounts.tools.get_capital_flows import get_capital_flows
-from backstop_mcp.features.accounts.tools.get_product import get_product
 from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.accounts.tools.get_time_series import get_time_series
+from backstop_mcp.features.accounts.tools.search_products import search_products
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.features.activity_history.tools.get_activity_history import get_activity_history
 from backstop_mcp.features.activity_history.tools.get_last_activity_for_parties import (
@@ -84,7 +84,7 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_opportunities_by_ids,
     search_opportunities,
     get_time_series,
-    get_product,
+    search_products,
     get_product_investors,
     get_accounts_for_party,
     get_capital_flows,

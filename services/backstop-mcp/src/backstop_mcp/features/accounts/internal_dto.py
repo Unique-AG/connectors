@@ -1,8 +1,8 @@
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from typing import ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -35,8 +35,10 @@ __all__ = [
     "InvestorTypeDto",
     "MoneyDto",
     "ProductCatalogFetchDto",
+    "ProductDescriptionDto",
     "ProductFetchDto",
     "ProductResolution",
+    "ProductRiskFreeRateDto",
     "ResolvedProductDto",
     "SeriesFigureDto",
     "SeriesPointDto",
@@ -99,18 +101,85 @@ class ResolvedProductDto(BaseModel):
 type ProductResolution = Resolution[ResolvedProductDto]
 
 
+class ProductDescriptionDto(BaseModel):
+    """The four free-text blurbs on a product. Blank ones are absent."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    fund_description: str | None = None
+    manager_bio: str | None = None
+    thesis: str | None = None
+    investment_methodology: str | None = None
+
+
+class ProductRiskFreeRateDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    floating: bool | None = None
+    floating_rate_benchmark_symbol: str | None = None
+
+
 class ProductFetchDto(BaseModel):
-    """A product identity plus the custom-field dump `get_product` joins to the catalog."""
+    """A product identity, its filterable attributes, and the custom-field dump `search_products`
+    joins to the catalog."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     product: ResolvedProductDto
+    product_type: str | None = None
+    is_onshore: bool | None = None
+    inception_date: date | None = None
+    currency: str | None = None
+    master_product_name: str | None = None
+    fiscal_year_start_month: int | None = None
+    return_calculation_methodology: str | None = None
+    modified_timestamp: datetime | None = None
+    city: str | None = None
+    state_or_province: str | None = None
+    country: str | None = None
+    description: ProductDescriptionDto | None = None
+    risk_free_rate: ProductRiskFreeRateDto | None = None
+    service_providers: dict[str, str] = Field(default_factory=dict)
     stored_custom_field_values: tuple[CustomFieldValueAttributes, ...] = ()
 
     @classmethod
     def from_resource(cls, resource: BackstopApiResource[ProductAttributes]) -> Self:
+        configuration = resource.attributes.configuration
+        location = resource.attributes.location
+        description = resource.attributes.description
+        risk_free_rate = resource.attributes.risk_free_rate
         return cls(
             product=ResolvedProductDto.from_attributes(resource.id, resource.attributes),
+            product_type=resource.attributes.product_type,
+            is_onshore=resource.attributes.is_onshore,
+            inception_date=resource.attributes.inception_date,
+            currency=resource.attributes.default_product_currency,
+            master_product_name=None
+            if configuration is None
+            else configuration.master_product_name,
+            fiscal_year_start_month=(
+                None if configuration is None else configuration.fiscal_year_start_month
+            ),
+            return_calculation_methodology=resource.attributes.return_calculation_methodology,
+            modified_timestamp=resource.attributes.modified_timestamp,
+            city=None if location is None else location.city,
+            state_or_province=None if location is None else location.state_or_province,
+            country=None if location is None else location.country,
+            description=(
+                None
+                if description is None or not description.model_dump(exclude_none=True)
+                else ProductDescriptionDto.model_validate(description, from_attributes=True)
+            ),
+            risk_free_rate=(
+                None
+                if risk_free_rate is None or not risk_free_rate.model_dump(exclude_none=True)
+                else ProductRiskFreeRateDto.model_validate(risk_free_rate, from_attributes=True)
+            ),
+            service_providers={
+                role: name.strip()
+                for role, name in resource.attributes.service_providers.items()
+                if isinstance(name, str) and name.strip()
+            },
             stored_custom_field_values=tuple(resource.attributes.regular_custom_field_values),
         )
 

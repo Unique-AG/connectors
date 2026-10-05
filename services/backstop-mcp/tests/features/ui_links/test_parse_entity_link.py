@@ -165,7 +165,7 @@ def test_standard_entity_params_include_empty_display(
     [
         ("organization", "get_organization"),
         ("person", "get_person"),
-        ("product", "get_product"),
+        ("product", "search_products"),
         ("account", None),
         ("opportunity", "get_opportunities_by_ids"),
         ("email", "get_activity_detail"),

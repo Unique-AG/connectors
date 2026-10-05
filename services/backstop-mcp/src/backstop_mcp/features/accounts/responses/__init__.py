@@ -20,8 +20,10 @@ from backstop_mcp.features.accounts.responses.party_accounts import (
 )
 from backstop_mcp.features.accounts.responses.product import (
     MAX_PRODUCT_SCAN_RECORDS,
+    ProductDescriptionResponse,
     ProductRecordResponse,
     ProductResolvedResponse,
+    ProductRiskFreeRateResponse,
 )
 from backstop_mcp.features.accounts.responses.product_investors import (
     InvestorHoldingResponse,
@@ -68,7 +70,9 @@ __all__ = [
     "ProductCandidateResponse",
     "ProductInvestorsResolvedResponse",
     "ProductListingResponse",
+    "ProductDescriptionResponse",
     "ProductRecordResponse",
+    "ProductRiskFreeRateResponse",
     "ProductResolvedResponse",
     "ProductRefResponse",
     "ShareResponse",

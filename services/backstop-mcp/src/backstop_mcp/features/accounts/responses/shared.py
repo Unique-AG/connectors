@@ -397,8 +397,8 @@ class ProductCandidateResponse(CandidateResponse):
     id: str = Field(
         description=(
             "Backstop product id. Echo it as a `products` entry on `get_product_investors`, as "
-            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
-            "`get_time_series` — never invent one."
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         )
     )
     name: str | None = Field(
@@ -426,7 +426,7 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
     Show each candidate's `label` to the user, then retry with that `id` as a `products`
-    entry on `get_product_investors`, as `product_id` on `get_product`, or as `entity_id` with
+    entry on `get_product_investors`, as `product_ids` on `search_products`, or as `entity_id` with
     `entity_type='products'` on `get_time_series`. Never invent one.
     """
 
@@ -436,8 +436,8 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
         description=(
             "The matching products. Show `label` to the user, then retry with the chosen "
             "`id`s as `products` entries on `get_product_investors` (several are fine), as "
-            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
-            "`get_time_series` — never invent one."
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         ),
     )
 

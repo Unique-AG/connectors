@@ -33,13 +33,14 @@ Holdings: get_accounts_for_party first; read `source` and `data_caveat`. Dated s
 get_time_series on one account or one product. Do not iterate every account in a fund. \
 Fund-level assets under management are the product's `aums`. Who is in a product: \
 get_product_investors. A partial product name covers every matching vehicle; an exact name, \
-short name, or id is one vehicle. Product custom fields: get_product — omit all three \
-selectors to read the whole catalog in \
-one call. Those values are not on get_product_investors.
+short name, or id is one vehicle. Find products, or read their custom fields \
+and type: search_products — every filter you pass must hold, it \
+returns all matches, and with several matches you ask the user which they mean. Those values \
+are not on get_product_investors.
 
 A saved report is run_report by exact name. It cannot filter by product or date: follow \
 `next_offset`, then filter by the report's own columns. Resolve a short name with \
-get_product when that column holds the legal name.
+search_products when that column holds the legal name.
 
 Subscriptions, redemptions, or share class: get_capital_flows, date \
 window required. Rows have no product; join on account.id. `owner_id` is `owner.id` from a \

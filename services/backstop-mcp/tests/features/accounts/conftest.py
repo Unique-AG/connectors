@@ -8,8 +8,8 @@ from backstop_mcp.features.accounts import (
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
     GetLatestAccountValuesQuery,
-    GetProductQuery,
     GetTimeSeriesQuery,
+    SearchProductsQuery,
 )
 from tests.helpers import client_factory, credential
 
@@ -37,8 +37,8 @@ def make_get_capital_flows_query(client: BackstopClient) -> GetCapitalFlowsQuery
     return GetCapitalFlowsQuery(client=client)
 
 
-def make_get_product_query(client: BackstopClient) -> GetProductQuery:
-    return GetProductQuery(client=client)
+def make_search_products_query(client: BackstopClient) -> SearchProductsQuery:
+    return SearchProductsQuery(client=client)
 
 
 def make_get_time_series_query(client: BackstopClient) -> GetTimeSeriesQuery:

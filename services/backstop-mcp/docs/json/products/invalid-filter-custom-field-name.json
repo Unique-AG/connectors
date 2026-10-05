@@ -1,0 +1,17 @@
+{
+  "path": "/products",
+  "query": {
+    "page[limit]": "3",
+    "filter[Strategy][eq]": "Tail Hedging",
+    "fields": "name"
+  },
+  "status": 400,
+  "body": {
+    "errors": [
+      {
+        "code": "InvalidParameterException",
+        "title": "Invalid filter field Strategy"
+      }
+    ]
+  }
+}

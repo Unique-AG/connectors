@@ -90,7 +90,7 @@ async def run_report(
 
     A saved report is this tool by exact name. It cannot filter by product or date. Follow
     `next_offset` to the end, then filter by the report's own columns. Resolve a short
-    name with get_product when that column holds the legal name.
+    name with search_products when that column holds the legal name.
 
     One page per call. `total` is the full row count; `next_offset` is present when more
     rows remain. Continuation must repeat the same `as_of_date` (the default is today). Do

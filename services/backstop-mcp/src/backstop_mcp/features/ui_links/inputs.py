@@ -56,10 +56,10 @@ class AccountLinkTarget(BaseModel):
 class ProductLinkTarget(BaseModel):
     kind: Literal["product"] = Field(
         default="product",
-        description="Product CRM page. Echo a product id from get_product.",
+        description="Product CRM page. Echo a product id from search_products.",
     )
     entity_id: CoercedId = Field(
-        description="Product id from get_product. Not a party id.",
+        description="Product id from search_products. Not a party id.",
     )
 
 

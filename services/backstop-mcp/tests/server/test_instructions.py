@@ -14,7 +14,8 @@ class TestInstructions:
         assert "get_time_series" in INSTRUCTIONS
         assert "get_product_investors" in INSTRUCTIONS
         assert "not on get_product_investors" in INSTRUCTIONS
-        assert "omit all three selectors" in INSTRUCTIONS
+        assert "search_products" in INSTRUCTIONS
+        assert "every filter you pass must hold" in INSTRUCTIONS
         assert "assets under management" in INSTRUCTIONS
         assert "get_people_for_party" in INSTRUCTIONS
         assert "numberOfEmployees" in INSTRUCTIONS

@@ -130,7 +130,7 @@ async def search_opportunities(
             description=(
                 "Linked fund: short names (exact, e.g. NWON) or display-name substrings. "
                 "Several values are OR, so several vehicles can be one walk, e.g. "
-                '["NWON", "NWOF"]. Resolve names with get_product '
+                '["NWON", "NWOF"]. Resolve names with search_products '
                 "first when unsure. Applied after the server-side read."
             )
         ),
