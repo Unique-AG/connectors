@@ -240,8 +240,9 @@ class AccountRowResponse(OmitNoneModel):
     investor_type: InvestorTypeResponse | None = Field(
         default=None,
         description=(
-            "How Backstop classifies this investor (e.g. 'Fund of Funds'). Omitted when that "
-            "include was missing."
+            "The account's own investor-type pick (e.g. 'Fund of Funds'), set per account. It "
+            "can differ from how the owner organization is classified; say which one a "
+            "breakdown grouped on. Omitted when that include was missing."
         ),
     )
     currency: str | None = Field(
