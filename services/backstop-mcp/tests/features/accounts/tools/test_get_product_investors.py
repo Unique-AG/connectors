@@ -873,6 +873,45 @@ class TestGetProductInvestors:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_investor_ids_accept_the_contacts_envelope_id(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account("a1", owner_id="contact-7", currency="USD"),
+                _account("b1", owner_id="other"),
+                included=[
+                    resource(
+                        "contact-7",
+                        "contacts",
+                        name="Fabrikam Retirement",
+                        specificResource={"resourceType": "organizations", "resourceId": "org-7"},
+                    ),
+                    _owner("other", name="Contoso Pension"),
+                ],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                investor_ids=["contact-7", "org-7", "999"],
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+                get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=ProductInvestorsConfig(max_valued_accounts=1),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        assert [row.id for row in _accounts(result)] == ["a1"]
+        assert [investor.id for investor in result.investors] == ["org-7"]
+        assert result.investor_ids_not_found == ("999",)
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_without_investor_ids_not_found_is_omitted(self, client: BackstopClient) -> None:
         respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
         respx.get(_ACCOUNTS_URL).mock(

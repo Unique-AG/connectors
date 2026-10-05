@@ -36,7 +36,6 @@ from backstop_mcp.features.accounts.dependencies import (
     get_latest_account_values_query_factory,
 )
 from backstop_mcp.features.accounts.responses import (
-    InvestorResponse,
     LatestValueResponse,
     ProductListingResponse,
     investors_from_listings,
@@ -205,7 +204,7 @@ async def get_product_investors(
             investors=investors,
             latest_value_hint=latest_value_hint,
             investor_ids_not_found=(
-                _not_found(requested_investors, investors) if requested_investors else None
+                _not_found(requested_investors, listings) if requested_investors else None
             ),
         )
         accounts = [account for listing in listings for account in listing.accounts]
@@ -311,8 +310,15 @@ def _over_limit_hint(
 
 
 def _not_found(
-    investor_ids: Sequence[str], investors: Sequence[InvestorResponse]
+    investor_ids: Sequence[str], listings: Sequence[ProductListingResponse]
 ) -> tuple[str, ...]:
     """Requested ids with no listed account, in the order given, each once."""
-    listed = {investor.id for investor in investors}
+    listed = {
+        candidate
+        for listing in listings
+        for account in listing.accounts
+        if account.owner is not None
+        for candidate in (account.owner.id, account.owner.contacts_id)
+        if candidate is not None
+    }
     return tuple(dict.fromkeys(entry for entry in investor_ids if entry not in listed))

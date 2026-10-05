@@ -75,6 +75,15 @@ class OwnerResponse(OmitNoneModel):
             "not say which. Echo it with `id`."
         ),
     )
+    contacts_id: str | None = Field(
+        default=None,
+        exclude=True,
+        description="The contacts envelope id when `id` was remapped to the specific resource.",
+    )
+
+    def has_id(self, candidates: frozenset[str]) -> bool:
+        """Whether `id` or the contacts envelope id is one of `candidates`."""
+        return self.id in candidates or self.contacts_id in candidates
 
     @classmethod
     def from_owner(cls, owner: AccountOwnerDto | None) -> Self | None:
@@ -98,6 +107,7 @@ class OwnerResponse(OmitNoneModel):
                 id=specific.resource_id,
                 name=owner.attributes.name,
                 resource_type=specific.resource_type,
+                contacts_id=owner.id,
             )
         return cls(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
 
