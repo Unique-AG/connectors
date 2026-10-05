@@ -68,8 +68,9 @@ env:
   RESOLUTION_ELICIT_TIMEOUT_SECONDS: "120"
 
   # Most accounts get_product_investors values in one call. Each is one Backstop request
-  # (about 0.14s warm); keep it well inside the chat client's 60s tool-call limit.
-  PRODUCT_INVESTORS_MAX_VALUED_ACCOUNTS: "100"
+  # (about 0.14s warm, so 150 is about 21s); keep it well inside the chat client's 60s
+  # tool-call limit.
+  PRODUCT_INVESTORS_MAX_VALUED_ACCOUNTS: "150"
 
   BACKSTOP_MCP_TENANT_GUIDANCE:
     value: '{{ toJson .Values.tenantGuidance }}'
