@@ -8,6 +8,12 @@ from backstop_mcp.features.org_people import (
     LocationFilter,
     SearchPeopleResolvedResponse,
 )
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_TYPE,
+    person_org,
+    relationship_types,
+)
 from tests.features.org_people.conftest import make_search_people_query
 from tests.helpers import (
     BASE_URL,
@@ -54,6 +60,86 @@ def _person(
     if custom_fields is not None:
         attributes["regularCustomFieldValues"] = custom_fields
     return resource(person_id, "people", name, **attributes)
+
+
+def _employed(person: dict[str, object], *relationship_ids: str) -> dict[str, object]:
+    return person | {
+        "relationships": {
+            "entityRelationships": {
+                "data": [
+                    {"type": "entity-relationships", "id": relationship_id}
+                    for relationship_id in relationship_ids
+                ]
+            }
+        }
+    }
+
+
+_EMPLOYMENT_INCLUDED = (
+    person_org("er1", source_id="1", dest_id="o1"),
+    person_org("er2", source_id="1", dest_id="o2"),
+    person_org("er3", source_id="2", dest_id="o1"),
+    person_org("er4", source_id="2", dest_id="o3", type_id=FORMER_TYPE),
+    *relationship_types(EMPLOYEE_TYPE, FORMER_TYPE),
+)
+
+
+class TestSearchPeopleEmployments:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_min_current_organizations_keeps_people_under_several(self) -> None:
+        base_url = f"{BASE_URL}/people-search-multi-org"
+        route = respx.get(f"{base_url}/people").mock(
+            return_value=_page(
+                _employed(_person("1", name="Two, Current"), "er1", "er2"),
+                _employed(_person("2", name="One, Current"), "er3", "er4"),
+                total=2,
+                included=_EMPLOYMENT_INCLUDED,
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            result = await make_search_people_query(client).run(
+                min_current_organizations=2, fields=_FIELDS
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert params["include"] == (
+            "contactLocations,entityRelationships,entityRelationships.entityRelationshipType"
+        )
+        assert [row.id for row in result.rows] == ["1"]
+        employments = result.rows[0].employments or ()
+        assert sorted((link.organization_id, link.status) for link in employments) == [
+            ("o1", "current"),
+            ("o2", "current"),
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_employments_field_lists_current_and_former_without_filtering(
+        self,
+    ) -> None:
+        base_url = f"{BASE_URL}/people-search-employments"
+        respx.get(f"{base_url}/people").mock(
+            return_value=_page(
+                _employed(_person("1", name="Two, Current"), "er1", "er2"),
+                _employed(_person("2", name="One, Current"), "er3", "er4"),
+                total=2,
+                included=_EMPLOYMENT_INCLUDED,
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            result = await make_search_people_query(client).run(
+                last_name="Current", fields=_FIELDS | {"employments"}
+            )
+
+        by_id = {row.id: row.employments or () for row in result.rows}
+        assert sorted((link.organization_id, link.status) for link in by_id["2"]) == [
+            ("o1", "current"),
+            ("o3", "former"),
+        ]
+        assert len(by_id["1"]) == 2
 
 
 class TestSearchPeopleQuery:
@@ -122,7 +208,8 @@ class TestSearchPeopleQuery:
         assert params["filter[lastName][like]"] == "West"
         assert params["filter[otherId][eq]"] == "OID"
         assert params["filter[emailDomains][eq]"] == "example.com"
-        assert params["sort"] == "name"
+        assert params["sort"] == "id"
+        assert params["include"] == "contactLocations"
         assert params["page[limit]"] == "500"
         wire_fields = params["fields[people]"]
         assert "regularCustomFieldValues" in wire_fields

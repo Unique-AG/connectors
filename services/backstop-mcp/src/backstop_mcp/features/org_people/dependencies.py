@@ -54,9 +54,14 @@ def get_search_organizations_query_factory(
 @lru_cache(maxsize=1)
 def get_search_people_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+    employment_index_factory: EmploymentIndexFactory = Depends(get_employment_index_factory),
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> SearchPeopleQuery:
-    return SearchPeopleQuery(client=client, build_entity_link_util=build_entity_link_util)
+    return SearchPeopleQuery(
+        client=client,
+        employment_index_factory=employment_index_factory,
+        build_entity_link_util=build_entity_link_util,
+    )
 
 
 @lru_cache(maxsize=1)

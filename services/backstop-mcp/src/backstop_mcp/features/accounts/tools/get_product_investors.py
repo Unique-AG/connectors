@@ -17,7 +17,11 @@ from opentelemetry import trace
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.config import ProductInvestorsConfig
+from backstop_mcp.dependencies import (
+    get_backstop_client_for_current_caller,
+    get_product_investors_config,
+)
 from backstop_mcp.features.accounts import (
     GetAccountsForProductQuery,
     GetLatestAccountValuesQuery,
@@ -46,10 +50,6 @@ type GetProductInvestorsResponse = (
 )
 
 _MAX_PRODUCTS = 10
-
-# Enough for a typical fund's vehicles. Past this the answer is slow enough that
-# the user should narrow the scope rather than wait.
-_MAX_VALUED_ACCOUNTS = 50
 
 
 @tool(
@@ -93,11 +93,12 @@ async def get_product_investors(
             description=(
                 "Adds each account's latest value (amount, currency, as-of date, ACTUAL or "
                 "ESTIMATE) and per-owner totals — the answer to 'list investors by size'. It "
-                "costs one Backstop request per account and is refused past "
-                f"{_MAX_VALUED_ACCOUNTS} accounts. **Ask the user first**: list the vehicles "
-                "you resolved and whether closed accounts count, and get a yes before passing "
-                "true. Do not turn it on just because the question mentions size or balance. "
-                "For a specific date or any other series, use get_time_series instead."
+                "costs one Backstop request per account and is refused past this deployment's "
+                "account limit. Pass true when the answer needs balances: "
+                "sizing, a share of assets, or a breakdown weighted by value. Past the limit "
+                "no values are fetched and `latest_value_hint` says how to narrow. Leave it "
+                "false for a list of who holds the product. For a specific date or any other "
+                "series, use get_time_series instead."
             ),
         ),
     ] = False,
@@ -118,19 +119,20 @@ async def get_product_investors(
     get_latest_account_values_query: GetLatestAccountValuesQuery = Depends(
         get_latest_account_values_query_factory
     ),
+    config: ProductInvestorsConfig = Depends(get_product_investors_config),
 ) -> GetProductInvestorsResponse | InputRequiredResult:
     """The accounts in one or more products, and who owns them.
 
     A partial fund name returns every vehicle whose name contains it; an
     id, exact short name, or exact name is one vehicle. No figures by default.
 
-    Sizing ("list investors by size", "biggest holders"): first call without figures, tell
-    the user which vehicles and how many accounts you found, and ask whether to pull latest
-    values. Only after they confirm, call again with `include_latest_value=true` and rank by
-    `investors[].latest_value_totals`. Never call `get_time_series` once per account in the
-    fund — that is one call per (account, series) and drops rows. Fund-level AUM is
-    `get_time_series` on a product's `aums`: the product's total assets under management,
-    not one investor's balance.
+    Sizing ("list investors by size", "biggest holders", a share or breakdown by value):
+    call with `include_latest_value=true` and rank by `investors[].latest_value_totals`;
+    say which vehicles and whether closed accounts counted. Past the account limit no values
+    come back and `latest_value_hint` says how to narrow. Never call `get_time_series`
+    once per account in the fund — that is one call per (account, series) and drops rows.
+    Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
+    under management, not one investor's balance.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor
@@ -172,7 +174,9 @@ async def get_product_investors(
         latest_value_hint: str | None = None
         if include_latest_value:
             listings, latest_value_hint = await _with_latest_values(
-                listings, get_latest_account_values_query
+                listings,
+                get_latest_account_values_query,
+                max_valued_accounts=config.max_valued_accounts,
             )
         result = ProductInvestorsResolvedResponse(
             products=tuple(listings),
@@ -220,13 +224,15 @@ async def _resolve_products(
 async def _with_latest_values(
     listings: list[ProductListingResponse],
     get_latest_account_values_query: GetLatestAccountValuesQuery,
+    *,
+    max_valued_accounts: int,
 ) -> tuple[list[ProductListingResponse], str | None]:
     """Listings with `latest_value` on every account, or unchanged plus why when over the cap."""
     account_count = sum(len(listing.accounts) for listing in listings)
-    if account_count > _MAX_VALUED_ACCOUNTS:
+    if account_count > max_valued_accounts:
         return listings, (
             f"No values fetched: {account_count} accounts is over the "
-            f"{_MAX_VALUED_ACCOUNTS}-account limit. Tell the user and offer one of: narrow "
+            f"{max_valued_accounts}-account limit. Tell the user and offer one of: narrow "
             "the scope (fewer vehicles, or open accounts only) and call again; size by investor "
             "with get_accounts_for_party on each `investors[]` entry (`id` as `party_id`, "
             "`resource_type` as `search_type`) — one request per investor, balances carry no "

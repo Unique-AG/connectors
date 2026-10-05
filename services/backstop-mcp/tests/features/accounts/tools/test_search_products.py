@@ -105,6 +105,7 @@ class TestSearchProducts:
         assert "OR" in doc
         assert "never picks a product for the user" in doc
         assert "ask which they want" in doc
+        assert "vehicles of one fund" in doc
         assert "get_product_investors" in doc
 
     def test_parameter_descriptions_state_how_they_combine(self) -> None:

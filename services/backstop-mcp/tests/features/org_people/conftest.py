@@ -78,6 +78,7 @@ def make_search_people_query(
 ) -> SearchPeopleQuery:
     return SearchPeopleQuery(
         client=client,
+        employment_index_factory=build_employment_index_factory(),
         build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
     )
 

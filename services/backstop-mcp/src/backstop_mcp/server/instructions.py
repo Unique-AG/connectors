@@ -21,9 +21,10 @@ query actually used. Account, product, opportunity, and activity ids are not par
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
 organizations: search_organizations. Firm-wide people: search_people (people at the \
-organizations in the CRM, never our own staff, who are system users; `name` is the exact \
-display name, usually 'Last, First'; `last_name` is the substring Backstop filters). People \
-at an organization: get_people_for_party. \
+organizations in the CRM; our own staff are system users, and a colleague's people \
+record, found by their system-user `email`, is only for search_activities `attendees`; \
+`name` is the exact display name, usually 'Last, First'; `last_name` is the substring \
+Backstop filters). People at an organization: get_people_for_party. \
 `numberOfEmployees` is not a roster. Key employee is read-only here; set it in the CRM UI. \
 The roster is the source; the copy on get_person is present but unreliable. A person's title, \
 department, location, and email are `job_title`, `department`, the `locations` include, and \
@@ -35,9 +36,10 @@ get_time_series on one account or one product. Do not iterate every account in a
 Fund-level assets under management are the product's `aums`. Who is in a product: \
 get_product_investors. A partial product name covers every matching vehicle; an exact name, \
 short name, or id is one vehicle. Find products, or read their custom fields \
-and type: search_products — every filter you pass must hold, it \
-returns all matches, and with several matches you ask the user which they mean. Those values \
-are not on get_product_investors.
+and type: search_products — every filter you pass must hold and it returns all matches. \
+Several vehicles of one fund (the same fund in other domiciles or share classes) are it: use \
+them together unless the user named one vehicle. Ask which only when the matches are \
+different funds. Those values are not on get_product_investors.
 
 A saved report is run_report by exact name. It cannot filter by product or date: follow \
 `next_offset`, then filter by the report's own columns. Resolve a short name with \
@@ -54,13 +56,15 @@ attachment list. `attachments_count` is a count; names come from get_activity_de
 named calendar day is both `start_date` and `end_date`; then match the title. Do not answer \
 from the newest row of a wider window. A term in activities is list_activity_tags with that \
 substring, then every returned id to search_activities. Description text is not searchable; \
-read bodies after the rows are back. Who has gone quiet: get_last_activity_for_parties. \
+read bodies after the rows are back. Meetings a person attended: search_activities \
+`attendees` with that person's id. Who has gone quiet: get_last_activity_for_parties. \
 Report `unknown` parties as unchecked.
 
 Firm-wide pipeline: list_system_users, then search_opportunities. A colleague named in the \
 question (an employee, as in "<name>'s pipeline") is a system user, not a people or \
-organization record: never search_people or search_organizations for them. `representative` \
-takes that login, not a display name. A disabled login returning empty is not "no coverage". \
+organization record: never search_people or search_organizations for their pipeline. \
+`representative` takes that login, not a display name. A disabled login returning empty is \
+not "no coverage". \
 `representative` on search_opportunities matches the investor organization's representative, \
 not the deal-level field. The deal-level representative is often set too and can differ: select \
 `representative` and `investor_representative` in `fields`, and say which one the count \
@@ -76,7 +80,12 @@ follow-ups: get_tasks_for_party.
 
 Custom-field names and types: list_custom_fields. Request \
 `party` too — fields shared by \
-people and organizations are listed only there. Layout tabs and sections: \
+people and organizations are listed only there. A business term you do not know is never \
+assumed: first call list_custom_fields with `search` set to the term, then reason from the \
+names, options, tabs, and groups which field it is. Fields that share a name differ by group. \
+If none or several fit, ask; say which field and options you used. A term that is a rule, not \
+a field (a metric, a tenure), is answered by stating the rule you applied. Layout tabs and \
+sections: \
 list_custom_field_groups. Saved reports: run_report, by exact name. There is no endpoint \
 that lists reports. CRM UI URLs: build_backstop_links and parse_backstop_link. Never \
 hand-write a Backstop URL. An account URL has no tool that loads the account by id.

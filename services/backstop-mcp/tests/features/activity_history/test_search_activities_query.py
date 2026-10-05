@@ -77,6 +77,7 @@ def _request_body(
     resource_type: SearchType | None = None,
     activity_tags: tuple[str, ...] = (),
     authors: tuple[str, ...] = (),
+    attendee_ids: tuple[str, ...] = (),
     include_description: bool = False,
 ) -> dict[str, object]:
     query = SearchActivitiesQuery(client=cast(BackstopClient, object()))
@@ -90,6 +91,7 @@ def _request_body(
         resource_type=resource_type,
         activity_tags=activity_tags,
         authors=authors,
+        attendee_ids=attendee_ids,
         include_description=include_description,
     )
 
@@ -106,6 +108,7 @@ class TestEntityActivitiesRequestBody:
             resource_type="organizations",
             activity_tags=("9001", "9002"),
             authors=("cara@contoso.example",),
+            attendee_ids=("341763143", "341663859"),
             include_description=False,
         )
 
@@ -135,6 +138,24 @@ class TestEntityActivitiesRequestBody:
         assert new_filters["authors"] == [
             {"searchValues": [{"value": "cara@contoso.example", "isEmail": True}]}
         ]
+        assert new_filters["attendees"] == [
+            {
+                "type": 0,
+                "searchValues": [
+                    {"value": "PartyBean_341763143"},
+                    {"value": "PartyBean_341663859"},
+                ],
+            }
+        ]
+
+    def test_attendees_are_omitted_when_none_are_asked_for(self) -> None:
+        attributes = _body_attributes(
+            _request_body(
+                page_num=1, page_size=50, start_date=date(2026, 1, 1), end_date=date(2026, 1, 31)
+            )
+        )
+
+        assert "attendees" not in object_dict(attributes["newFilters"])
 
     def test_description_flag_is_opt_in(self) -> None:
         attributes = _body_attributes(

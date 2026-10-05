@@ -51,6 +51,7 @@ SearchPersonField = Literal[
     "locations",
     "website",
     "other_id",
+    "employments",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
     {"id", "name", "email", "job_title", "company_name", "city", "country", "locations"}
@@ -182,6 +183,18 @@ async def search_people(
             )
         ),
     ] = None,
+    min_current_organizations: Annotated[
+        int | None,
+        Field(
+            ge=2,
+            description=(
+                "Keep people currently employed at this many organizations or more — the "
+                "person who appears under several organizations. Applied after the "
+                "server-side read, so on its own it reads the collection; rows carry "
+                "`employments`."
+            ),
+        ),
+    ] = None,
     exclude_custom_fields: Annotated[
         bool,
         Field(
@@ -202,7 +215,9 @@ async def search_people(
                 "city, country, locations. `city`, `country`, `state`, `postal_code`, "
                 "`street_address`, and `location_title` are the primary location; "
                 "`locations` is every address. `id` is always included. Select `url` when "
-                "the answer will link to the person — it is off by default. "
+                "the answer will link to the person — it is off by default. Select "
+                "`employments` for every organization the person is linked to; it doubles "
+                "the read, so it is off by default. "
                 "`custom_field_values` is included automatically unless "
                 "`exclude_custom_fields` is set."
             )
@@ -214,7 +229,8 @@ async def search_people(
 
     These are the contacts and employees of the organizations in the CRM (clients and
     investors), not our own colleagues. A colleague is a Backstop user: find them with
-    list_system_users.
+    list_system_users. A colleague may also have a people record, which is what
+    search_activities `attendees` takes: look it up by their system-user `email`.
 
     `name`, `last_name`, `email`, `other_id`, and `email_domain` are sent to Backstop and
     narrow the read. `name` is the exact display name, usually 'Last, First' — not a
@@ -236,6 +252,10 @@ async def search_people(
 
     Custom-field ids come from list_custom_fields. Match by definition id, not the
     label. A missing custom-field value is not a match.
+
+    `company_name` is one text field, not the person's employers. Organizations a person
+    is linked to are `employments` (select it in `fields`); people under several
+    organizations are `min_current_organizations=2`.
 
     Every row carries its custom fields as `custom_field_values`. If a call times out,
     retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
@@ -272,6 +292,7 @@ async def search_people(
                 "location_filter": location_filter is not None,
                 "website": website is not None,
                 "custom_fields": len(predicates),
+                "min_current_organizations": min_current_organizations,
                 "exclude_custom_fields": exclude_custom_fields,
             },
         )
@@ -288,6 +309,7 @@ async def search_people(
             location_filter=location_filter,
             website=website,
             custom_fields=predicates,
+            min_current_organizations=min_current_organizations,
             exclude_custom_fields=exclude_custom_fields,
             fields=chosen,
         )

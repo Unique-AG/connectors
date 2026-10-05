@@ -22,6 +22,7 @@ from backstop_mcp.config import (
     BackstopConfig,
     DatabaseConfig,
     EncryptionConfig,
+    ProductInvestorsConfig,
     ResolutionConfig,
     TenantGuidanceConfig,
 )
@@ -67,6 +68,11 @@ def get_activity_history_config() -> ActivityHistoryConfig:
 @lru_cache(maxsize=1)
 def get_resolution_config() -> ResolutionConfig:
     return ResolutionConfig()
+
+
+@lru_cache(maxsize=1)
+def get_product_investors_config() -> ProductInvestorsConfig:
+    return ProductInvestorsConfig()
 
 
 @lru_cache(maxsize=1)

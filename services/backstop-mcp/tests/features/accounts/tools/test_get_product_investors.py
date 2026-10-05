@@ -9,6 +9,7 @@ from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopAuthError, BackstopClient
+from backstop_mcp.config import ProductInvestorsConfig
 from backstop_mcp.features.accounts import (
     AccountRowResponse,
     ProductAmbiguousResponse,
@@ -24,6 +25,8 @@ from tests.features.accounts.conftest import (
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+
+_CONFIG = ProductInvestorsConfig(max_valued_accounts=50)
 
 _PRODUCT_ID = "1292283"
 _OWNER_ID = "341688185"
@@ -171,6 +174,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -227,6 +231,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -263,6 +268,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -300,6 +306,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -329,6 +336,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -351,6 +359,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -371,6 +380,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -395,6 +405,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -425,6 +436,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -449,6 +461,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             NotFoundResponse,
         )
@@ -487,6 +500,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductAmbiguousResponse,
         )
@@ -510,6 +524,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             )
 
         assert caught.value.status_code == 500
@@ -536,7 +551,8 @@ class TestGetProductInvestors:
         assert products["maxItems"] == 10
         latest = object_dict(properties["include_latest_value"])
         assert latest["default"] is False
-        assert "Ask the user first" in str(latest["description"])
+        assert "Pass true when the answer needs balances" in str(latest["description"])
+        assert "Ask the user first" not in str(latest["description"])
 
     def test_is_registered_and_names_the_two_step(self) -> None:
         assert get_product_investors in TOOLS
@@ -548,7 +564,7 @@ class TestGetProductInvestors:
         assert "one call per (account, series)" in doc
         assert "not one investor's balance" in doc
         assert "once per account" in doc
-        assert "ask whether to pull latest" in doc
+        assert "ask whether to pull latest" not in doc
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc
         assert "Investor Location" not in doc
@@ -596,6 +612,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -670,6 +687,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -723,6 +741,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -757,6 +776,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -768,6 +788,39 @@ class TestGetProductInvestors:
         assert "run_report" in result.latest_value_hint
         assert all(row.latest_value is None for row in _accounts(result))
         assert result.investors[0].latest_value_totals is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(("limit", "fetched"), [(3, 0), (4, 4)])
+    async def test_the_account_limit_comes_from_config(
+        self, client: BackstopClient, limit: int, fetched: int
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                *(_account(f"a{index}", owner_id=_OWNER_ID) for index in range(4)),
+                included=[_owner(_OWNER_ID, name="Fabrikam Retirement")],
+            )
+        )
+        values = respx.get(url__regex=rf"{BASE_URL}/accounts/a\d+/values").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                include_latest_value=True,
+                client=client,
+                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+                get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=ProductInvestorsConfig(max_valued_accounts=limit),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        assert values.call_count == fetched
+        assert (result.latest_value_hint is not None) == (fetched == 0)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -797,6 +850,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             )
 
     @pytest.mark.asyncio
@@ -823,6 +877,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -868,6 +923,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -903,6 +959,7 @@ class TestGetProductInvestors:
                 client=client,
                 get_accounts_for_product_query=make_get_accounts_for_product_query(client),
                 get_latest_account_values_query=make_get_latest_account_values_query(client),
+                config=_CONFIG,
             ),
             ProductInvestorsResolvedResponse,
         )

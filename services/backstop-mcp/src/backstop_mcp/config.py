@@ -434,6 +434,22 @@ class ResolutionConfig(BaseSettings):
     elicit_timeout_seconds: float = Field(default=120.0, gt=0)
 
 
+class ProductInvestorsConfig(BaseSettings):
+    """Tuning knobs for `get_product_investors`.
+
+    `max_valued_accounts` caps `include_latest_value`: each account costs one Backstop
+    request under the per-user concurrency gate, so a large fund can outlast the chat
+    client's 60-second tool-call limit. Measured warm, about 0.14 s per account at the
+    default gate of 5; a cold first call is slower. Past the cap no values are fetched and
+    the response says how to narrow. Configurable so a deployment can trade coverage for
+    latency without a release.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="PRODUCT_INVESTORS_")
+
+    max_valued_accounts: int = Field(default=100, gt=0)
+
+
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 

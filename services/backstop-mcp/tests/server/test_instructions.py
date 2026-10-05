@@ -66,6 +66,10 @@ class TestInstructions:
         assert "all test records" in INSTRUCTIONS
         assert "search-then-delete" in INSTRUCTIONS
         assert "exact name, short name, or id is one vehicle" in INSTRUCTIONS
+        assert "Several vehicles of one fund" in INSTRUCTIONS
+        assert "A business term you do not know is never" in INSTRUCTIONS
+        assert "list_custom_fields with `search`" in INSTRUCTIONS
+        assert "with several matches you ask the user which they mean" not in INSTRUCTIONS
         assert "geographical breakdown" not in INSTRUCTIONS
         assert (
             "If no field or several fields could be it, ask the user which one." not in INSTRUCTIONS

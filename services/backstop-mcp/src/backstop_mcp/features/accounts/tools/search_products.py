@@ -197,7 +197,9 @@ async def search_products(
     catalog in one call, sorted by name.
 
     This tool never picks a product for the user. Zero rows means nothing matched: say so
-    rather than guessing a looser name. Several rows when the user named one product: list
+    rather than guessing a looser name. Several rows that are vehicles of one fund (the
+    same fund in other domiciles or share classes) are that fund: use them together unless the user
+    named one vehicle. Several rows that are different funds when the user named one: list
     them (name, short name, type) and ask which they want — one, some, or all — before you
     call another tool. Do not take the first row. When the user asked for a group ("every
     product of type X"), several rows are the answer.

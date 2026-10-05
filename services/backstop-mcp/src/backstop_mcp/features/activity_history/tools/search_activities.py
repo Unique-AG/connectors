@@ -15,7 +15,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
 from backstop_mcp.features.activity_history import (
@@ -44,7 +44,7 @@ from backstop_mcp.features.ui_links import (
     activity_link_target,
     get_build_entity_link_util_factory,
 )
-from backstop_mcp.models import published_output_schema
+from backstop_mcp.models import CoercedId, published_output_schema
 from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
@@ -100,10 +100,30 @@ SearchRowField = Literal[
 ]
 
 
+class AttendeeRef(BaseModel):
+    """One person who attended, as a prior tool echoed them."""
+
+    party_id: CoercedId = Field(
+        description=(
+            "Trusted id of a person from a prior response: search_people, get_person, "
+            "get_people_for_party, or a resolve echo. Never invent one."
+        )
+    )
+    search_type: Literal["people", "contacts", "employees"] = Field(
+        description=(
+            "Collection `party_id` came from. Organizations do not attend; pass their people."
+        )
+    )
+
+
 def _is_wide_sweep(
-    *, party_id: str | None, activity_tags: Sequence[str], authors: Sequence[str]
+    *,
+    party_id: str | None,
+    activity_tags: Sequence[str],
+    authors: Sequence[str],
+    attendee_ids: Sequence[str],
 ) -> bool:
-    return party_id is None and not activity_tags and not authors
+    return party_id is None and not activity_tags and not authors and not attendee_ids
 
 
 def _row_urls(
@@ -219,14 +239,26 @@ async def search_activities(
             ),
         ),
     ] = None,
+    attendees: Annotated[
+        list[AttendeeRef] | None,
+        Field(
+            default=None,
+            description=(
+                "People who attended, each with the `search_type` its id came with. Several "
+                "are OR; AND with the other filters. Our own colleagues attend as people "
+                "records too: take the colleague's email from list_system_users, then "
+                "search_people `email` for their people id."
+            ),
+        ),
+    ] = None,
     include_description: Annotated[
         bool,
         Field(
             default=False,
             description=(
                 "Opt in to the full body text (much larger rows) on every matching row. "
-                "Refused with `mode=aggregate` and on a wide sweep (no party, no tags, no "
-                "authors)."
+                "Refused with `mode=aggregate` and on a wide sweep (no party, tags, authors, "
+                "or attendees)."
             ),
         ),
     ] = False,
@@ -276,7 +308,9 @@ async def search_activities(
     `end_date`; then match the title. Do not answer from the newest row of a wider window.
     Optionally scope to a party (`search_type` plus `party_id` or `search` — a `party_id`
     without `search_type` is rejected), restrict `types`,
-    filter `activity_tag_ids` (OR, unlike get_activity_history), and filter `authors` by email.
+    filter `activity_tag_ids` (OR, unlike get_activity_history), filter `authors` by email,
+    and filter `attendees` by person. "Meetings X attended" is `attendees`, not a party
+    scope and not names read from rows.
 
     Call like: {"search_type": "organizations",
     "party_id": "<id from prior resolve echo>",
@@ -334,19 +368,25 @@ async def search_activities(
 
     tag_ids = tuple(activity_tag_ids) if activity_tag_ids else ()
     author_emails = tuple(authors) if authors else ()
+    attendee_ids = tuple(dict.fromkeys(attendee.party_id for attendee in attendees or ()))
     selected_types: tuple[EntityActivityType, ...] = (
         tuple(types) if types else ENTITY_ACTIVITY_TYPES
     )
-    wide = _is_wide_sweep(party_id=scoped_party_id, activity_tags=tag_ids, authors=author_emails)
+    wide = _is_wide_sweep(
+        party_id=scoped_party_id,
+        activity_tags=tag_ids,
+        authors=author_emails,
+        attendee_ids=attendee_ids,
+    )
     if include_description and wide:
         raise ValueError(
             "include_description is refused on a wide sweep; pass a party, "
-            + "activity_tag_ids, or authors, or leave include_description false"
+            + "activity_tag_ids, authors, or attendees, or leave include_description false"
         )
     if mode == "aggregate" and wide:
         raise ValueError(
             "mode=aggregate is refused on a wide sweep; pass a party, activity_tag_ids, "
-            + "or authors, or use mode=rows"
+            + "authors, or attendees, or use mode=rows"
         )
 
     # `description` is added to the *default* set when it was opted into, and never forced onto
@@ -375,6 +415,7 @@ async def search_activities(
             resource_type=None if resolved_party is None else resolved_party.search_type,
             activity_tags=tag_ids,
             authors=author_emails,
+            attendee_ids=attendee_ids,
             include_description=include_description,
         )
     except BackstopAuthError, BackstopRateLimitError:

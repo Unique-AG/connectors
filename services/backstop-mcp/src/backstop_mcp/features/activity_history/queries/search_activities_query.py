@@ -71,6 +71,7 @@ class SearchActivitiesQuery:
         resource_type: SearchType | None = None,
         activity_tags: Sequence[str] = (),
         authors: Sequence[str] = (),
+        attendee_ids: Sequence[str] = (),
         include_description: bool = False,
         max_rows: int | None = None,
         page_size: int = 500,
@@ -91,6 +92,7 @@ class SearchActivitiesQuery:
             party_id is not None
             or bool(activity_tags)
             or bool(authors)
+            or bool(attendee_ids)
             or (bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES))
         )
 
@@ -114,6 +116,7 @@ class SearchActivitiesQuery:
                         resource_type=resource_type,
                         activity_tags=activity_tags,
                         authors=authors,
+                        attendee_ids=attendee_ids,
                         include_description=include_description,
                     ),
                 )
@@ -209,13 +212,18 @@ class SearchActivitiesQuery:
         resource_type: SearchType | None,
         activity_tags: Sequence[str],
         authors: Sequence[str],
+        attendee_ids: Sequence[str],
         include_description: bool,
     ) -> dict[str, object]:
         """JSON:API search body. Built here, never passed through from a caller.
 
-        Date, types, tags, and authors go under `newFilters`. `filters` is ignored by
-        Backstop. A party is `entityId` + `resourceType`, not `associatedWiths`.
+        Date, types, tags, authors, and attendees go under `newFilters`. `filters` is ignored
+        by Backstop. A party is `entityId` + `resourceType`, not `associatedWiths`.
         `meeting_call` is sent as the search value `call`.
+
+        An attendee is `PartyBean_<id>` under `type` 0, several values OR. The same id is a
+        people, contacts, or employees id. A bare id, email, or name is a 500; another bean
+        prefix, or an organization id, silently matches nothing. `type` 1 ignores the values.
         """
         new_filters: dict[str, object] = {
             "effectiveDate": {
@@ -238,6 +246,15 @@ class SearchActivitiesQuery:
         if authors:
             new_filters["authors"] = [
                 {"searchValues": [{"value": email, "isEmail": True} for email in authors]}
+            ]
+        if attendee_ids:
+            new_filters["attendees"] = [
+                {
+                    "type": 0,
+                    "searchValues": [
+                        {"value": f"PartyBean_{attendee_id}"} for attendee_id in attendee_ids
+                    ],
+                }
             ]
         include_fields = ["associatedWith", "inheritedFrom", "primaryEntity"]
         if include_description:

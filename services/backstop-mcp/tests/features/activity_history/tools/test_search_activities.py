@@ -5,6 +5,7 @@ import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import ToolMeta
+from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
 from backstop_mcp.features.activity_history import (
@@ -13,7 +14,10 @@ from backstop_mcp.features.activity_history import (
     SearchActivitiesResolvedResponse,
     SearchActivitiesUnavailableResponse,
 )
-from backstop_mcp.features.activity_history.tools.search_activities import search_activities
+from backstop_mcp.features.activity_history.tools.search_activities import (
+    AttendeeRef,
+    search_activities,
+)
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
 from tests.features.activity_history.conftest import make_search_activities_query
@@ -304,6 +308,43 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
             )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_attendees_narrow_a_firm_wide_search_once_per_person(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(return_value=_page(_row(), total=1))
+
+        await search_activities(
+            ctx_never_elicit(),
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 10, 5),
+            attendees=[
+                AttendeeRef(party_id="341763143", search_type="people"),
+                AttendeeRef(party_id="791446821", search_type="employees"),
+                AttendeeRef(party_id="341763143", search_type="contacts"),
+            ],
+            include_description=True,
+            resolve_party_query=make_resolve_party_query(client),
+            search_activities_query=make_search_activities_query(client),
+        )
+
+        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        assert "entityId" not in attributes
+        assert object_dict(attributes["newFilters"])["attendees"] == [
+            {
+                "type": 0,
+                "searchValues": [
+                    {"value": "PartyBean_341763143"},
+                    {"value": "PartyBean_791446821"},
+                ],
+            }
+        ]
+
+    def test_an_organization_is_not_an_attendee(self) -> None:
+        with pytest.raises(ValidationError):
+            AttendeeRef.model_validate({"party_id": "341686787", "search_type": "organizations"})
 
     @pytest.mark.asyncio
     @respx.mock

@@ -712,6 +712,16 @@ class SearchPersonRowResponse(OmitNoneModel):
             "group it as blank, do not look it up again."
         ),
     )
+    employments: tuple[EmploymentLinkResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every organization this person is linked to by employment, `current` or "
+            "`former`, with `organization_id`. Omitted unless `fields` includes "
+            "`employments` or the call set `min_current_organizations`. Absent when "
+            "the person has no employment link. Organization names are not here: "
+            "get_organization with that id."
+        ),
+    )
 
     def project(self, *, fields: frozenset[str], url: str | None) -> Self:
         overrides: dict[str, object] = {"url": url} if "url" in fields else {}
