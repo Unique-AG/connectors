@@ -20,8 +20,8 @@ query actually used. Account, product, opportunity, and activity ids are not par
 
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
-organizations: search_organizations. Firm-wide people: search_people (people at the organizations in the CRM, never \
-our own staff, who are system users; `name` is the exact \
+organizations: search_organizations. Firm-wide people: search_people (people at the \
+organizations in the CRM, never our own staff, who are system users; `name` is the exact \
 display name, usually 'Last, First'; `last_name` is the substring Backstop filters). People \
 at an organization: get_people_for_party. \
 `numberOfEmployees` is not a roster. Key employee is read-only here; set it in the CRM UI. \
