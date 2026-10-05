@@ -1,29 +1,6 @@
-"""Firm-wide (or party) activity search via `POST /entity-activities`.
-
-Swagger documents this POST as a create (201, placeholder body). It is the CRM Activity
-Explorer's search and creates nothing. Where swagger and a response disagree, the response
-wins.
-
-**Failure is not an empty result.** A 404, a schema drift, or a 401 that re-verified
-(`BackstopTransientAuthError`) is not "no activity exists"; `search_activities` names
-`get_activity_history` as the party-scoped fallback. Keep this module's schemas lenient, and
-keep `api_responses.py` degrading unreadable fields to `None` rather than raising.
-
-**Request rules.**
-
-- Pagination is `pageNum` (1-based) × `pageSize` in the body. `pageNum × pageSize > 10000`
-  is HTTP 500, so the walk clamps before the request and returns what it already has.
-  Success is HTTP 201.
-- `filters` is ignored. The date window goes under `newFilters.effectiveDate` as ISO
-  timestamps. A party is top-level `entityId` (int) plus `resourceType`, which also returns
-  activities inherited through that party's people. `filterName` is not sent.
-- Types, tags, and authors are `newFilters` lists of one `{searchValues: [{value}]}` object;
-  any other shape is HTTP 500. Author values set `isEmail: true` on the search-value object
-  (on the filter object it is HTTP 400).
-- The tool token `meeting_call` is sent as `call` (sending `meeting_call` itself returns
-  the unfiltered set). Call rows come back as `type` "Call", `activityType` "meeting".
-- `activityTags` is OR. REST `filter[activityTagIds]` is AND.
-- `totalCount` is permission-filtered (what this credential can see) and saturates at 10000.
+"""Firm-wide (or party) activity search via `POST /entity-activities`, the CRM Activity
+Explorer's search (it creates nothing). Failure is not an empty result: 404, schema drift, or
+a re-verified 401 must surface, and the walk stops before `pageNum × pageSize` passes 10000.
 """
 
 import logging
