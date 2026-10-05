@@ -212,6 +212,10 @@ async def search_people(
 ) -> SearchPeopleResolvedResponse:
     """Filter people across the firm.
 
+    These are the contacts and employees of the organizations in the CRM (clients and
+    investors), not our own colleagues. A colleague is a Backstop user: find them with
+    list_system_users.
+
     `name`, `last_name`, `email`, `other_id`, and `email_domain` are sent to Backstop and
     narrow the read. `name` is the exact display name, usually 'Last, First' — not a
     substring. `last_name` is the substring. `email` is exact on email, email2, and email3.

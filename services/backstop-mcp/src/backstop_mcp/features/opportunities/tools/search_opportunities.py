@@ -228,6 +228,11 @@ async def search_opportunities(
     `investor.search_type` to get_last_activity_for_parties and bucket by its
     `days_since_last_activity`. Days in stage is not activity.
 
+    A colleague's name (as in "<name>'s pipeline") is resolved with list_system_users, never
+    search_people. The deal-level representative is often set and can differ from the
+    investor organization's, so this walk's count may not equal the deal-level one: select
+    `representative` and `investor_representative` and say which one the answer used.
+
     Call like: {"representative": "jdoe", "is_open": true}
     Investor-organization representative: {"representative": "jdoe", "is_open": true,
     "fields": ["name", "stage", "requested_amount", "investor", "investor_representative",

@@ -20,7 +20,8 @@ query actually used. Account, product, opportunity, and activity ids are not par
 
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
-organizations: search_organizations. Firm-wide people: search_people (`name` is the exact \
+organizations: search_organizations. Firm-wide people: search_people (people at the organizations in the CRM, never \
+our own staff, who are system users; `name` is the exact \
 display name, usually 'Last, First'; `last_name` is the substring Backstop filters). People \
 at an organization: get_people_for_party. \
 `numberOfEmployees` is not a roster. Key employee is read-only here; set it in the CRM UI. \
@@ -56,10 +57,14 @@ substring, then every returned id to search_activities. Description text is not 
 read bodies after the rows are back. Who has gone quiet: get_last_activity_for_parties. \
 Report `unknown` parties as unchecked.
 
-Firm-wide pipeline: list_system_users, then search_opportunities. `representative` takes \
-that login, not a display name. A disabled login returning empty is not "no coverage". \
+Firm-wide pipeline: list_system_users, then search_opportunities. A colleague named in the \
+question (an employee, as in "<name>'s pipeline") is a system user, not a people or \
+organization record: never search_people or search_organizations for them. `representative` \
+takes that login, not a display name. A disabled login returning empty is not "no coverage". \
 `representative` on search_opportunities matches the investor organization's representative, \
-not the deal-level field, which may be blank. A stage-change question stays on \
+not the deal-level field. The deal-level representative is often set too and can differ: select \
+`representative` and `investor_representative` in `fields`, and say which one the count \
+used. A stage-change question stays on \
 search_opportunities: select `previous_stage` and `date_entered_current_stage`, keep rows \
 inside the window including closed deals, and do not walk get_opportunities_by_ids. Those \
 two fields are the latest move only. The `product` argument is the linked fund and may be \
