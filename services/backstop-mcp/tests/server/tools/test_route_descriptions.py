@@ -36,11 +36,11 @@ _ROUTES: tuple[tuple[Callable[..., object], str], ...] = (
     (search_opportunities, "including deals that closed — do not pass `is_open`"),
     (search_opportunities, "do not walk get_opportunities_by_ids for this question"),
     (search_opportunities, "investor organization's representative"),
-    (search_organizations, "`country` is the stored full name"),
+    (search_organizations, "`location_filter` is one location"),
     (search_opportunities, "retry once with `exclude_custom_fields=true`"),
     (search_organizations, "retry once with `exclude_custom_fields=true`"),
     (search_people, "exact display name"),
-    (search_people, "`country` is the stored full name"),
+    (search_people, "`location_filter` is one location"),
     (search_people, "retry once with `exclude_custom_fields=true`"),
     (list_activity_tags, "pass every matching id to search_activities `activity_tag_ids`"),
 )

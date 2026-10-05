@@ -5,7 +5,7 @@ import pytest
 import respx
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.org_people import SearchOrganizationsResolvedResponse
+from backstop_mcp.features.org_people import LocationFilter, SearchOrganizationsResolvedResponse
 from backstop_mcp.features.org_people.tools.search_organizations import (
     OrganizationCustomFieldFilter,
     search_organizations,
@@ -38,13 +38,13 @@ class TestSearchOrganizations:
         assert "Call like:" in doc
         assert "definition_id" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
-        city = next(
+        location_filter = next(
             item
-            for item in cast("tuple[object, ...]", get_args(annotations["city"]))
+            for item in cast("tuple[object, ...]", get_args(annotations["location_filter"]))
             if isinstance(item, FieldInfo)
         )
-        assert city.description is not None
-        assert "Applied after the server-side read" in city.description
+        assert location_filter.description is not None
+        assert "sent to Backstop" in location_filter.description
 
     def test_keeps_custom_field_matching_on_the_definition_id(self) -> None:
         doc = " ".join((search_organizations.__doc__ or "").split())
@@ -52,13 +52,16 @@ class TestSearchOrganizations:
         assert "not an opportunity stage" not in doc
         assert "custom_field_values" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
-        country = next(
+        location_filter = next(
             item
-            for item in cast("tuple[object, ...]", get_args(annotations["country"]))
+            for item in cast("tuple[object, ...]", get_args(annotations["location_filter"]))
             if isinstance(item, FieldInfo)
         )
-        assert country.description is not None
-        assert "United Arab Emirates" in country.description
+        assert location_filter.description is not None
+        assert "same location" in location_filter.description
+        country = LocationFilter.model_fields["country"].description
+        assert country is not None
+        assert "United Arab Emirates" in country
 
     @pytest.mark.asyncio
     @respx.mock
@@ -97,7 +100,7 @@ class TestSearchOrganizations:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_organizations(
-                    country="united arab",
+                    location_filter=LocationFilter(country="united arab"),
                     custom_fields=[
                         OrganizationCustomFieldFilter(
                             definition_id="900011", values=["Tier 1", "Tier 3"]

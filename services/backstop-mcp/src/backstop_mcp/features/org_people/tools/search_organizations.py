@@ -1,10 +1,10 @@
 """`search_organizations`: firm-wide organization filter.
 
 `name`, `email`, `other_id`, and `matching_domain` are sent to Backstop.
-`legal_name`, the location fields, `website`, `ria`, `internal_organization`, and custom
+`legal_name`, `location_filter`, `website`, `ria`, `internal_organization`, and custom
 fields are applied after the walk: those filter fields are 400 on `GET /organizations`.
-A custom-field-only call reads the collection. The location fields are Backstop's copy of
-the primary contact location on the organization record.
+A custom-field-only call reads the collection. Every organization's contact locations ride
+on that walk, so `location_filter` can match any office or the primary one.
 """
 
 import logging
@@ -24,6 +24,7 @@ from backstop_mcp.features.org_people import (
     SearchOrganizationsResolvedResponse,
 )
 from backstop_mcp.features.org_people.dependencies import get_search_organizations_query_factory
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ SearchOrganizationField = Literal[
     "postal_code",
     "street_address",
     "location_title",
+    "locations",
     "website",
     "other_id",
     "matching_domains",
@@ -48,7 +50,7 @@ SearchOrganizationField = Literal[
     "internal_organization",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "legal_name", "email", "city", "country"}
+    {"id", "name", "legal_name", "email", "city", "country", "locations"}
 )
 
 
@@ -114,61 +116,17 @@ async def search_organizations(
         str | None,
         Field(description=("Substring of the legal name. Applied after the server-side read.")),
     ] = None,
-    city: Annotated[
-        str | None,
+    location_filter: Annotated[
+        LocationFilter | None,
         Field(
             description=(
-                "Substring of the city of the primary contact location. Applied after the "
-                "server-side read."
-            )
-        ),
-    ] = None,
-    country: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Substring of the country of the primary contact location, stored as the "
-                "full name ('United Arab Emirates', 'United States of America') — an "
-                "abbreviation like 'UAE' or 'USA' matches nothing. Spelling varies between "
-                "records ('United States', 'United States Of America'): pass the shortest "
-                "distinctive part. Applied after the server-side read."
-            )
-        ),
-    ] = None,
-    state: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Substring of the state or region of the primary contact location, as "
-                "stored — usually the abbreviation ('MA', 'NY'). Applied after the "
-                "server-side read."
-            )
-        ),
-    ] = None,
-    postal_code: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Substring of the postal code of the primary contact location. Applied "
-                "after the server-side read."
-            )
-        ),
-    ] = None,
-    street_address: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Substring of the street address of the primary contact location. Applied "
-                "after the server-side read."
-            )
-        ),
-    ] = None,
-    location_title: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Substring of the primary contact location's title, such as 'Business' or "
-                "'London'. Applied after the server-side read."
+                "One location the organization must have: any of city, country, state, "
+                "postal_code, street_address, location_title, all matched against the same "
+                "location. `city` and `street_address` are exact, case-sensitive and sent to "
+                "Backstop; the others are case-insensitive substrings applied after the "
+                "server-side read. By default any of the organization's locations may match; set "
+                "`primary_only` to read the primary one only. One location only: for several "
+                "(London or Paris), make one call each and combine the rows."
             )
         ),
     ] = None,
@@ -215,9 +173,12 @@ async def search_organizations(
         Field(
             description=(
                 "Sparse row fields. Defaults to id, name, legal_name, email, city, "
-                "country. `id` is always included. Select `url` when the answer will "
-                "link to the organization — it is off by default. `custom_field_values` is "
-                "included automatically unless `exclude_custom_fields` is set."
+                "country, locations. `city`, `country`, `state`, `postal_code`, "
+                "`street_address`, and `location_title` are the primary location; "
+                "`locations` is every address. `id` is always included. Select `url` when "
+                "the answer will link to the organization — it is off by default. "
+                "`custom_field_values` is included automatically unless "
+                "`exclude_custom_fields` is set."
             )
         ),
     ] = None,
@@ -228,29 +189,34 @@ async def search_organizations(
     """Filter organizations across the firm.
 
     `name`, `email`, `other_id`, and `matching_domain` are sent to Backstop and narrow
-    the read. `legal_name`, `city`, `country`, `state`, `postal_code`, `street_address`,
-    `location_title`, `website`, `ria`, `internal_organization`, and `custom_fields` are
-    applied after that walk. A call with only those in-memory predicates reads the
-    collection. One named organization is still get_organization, not this walk.
+    the read, and so do the `city` and `street_address` of `location_filter`.
+    `legal_name`, the rest of `location_filter`, `website`, `ria`, `internal_organization`,
+    and `custom_fields` are applied after that walk. A call with only those in-memory
+    predicates reads the collection. One named organization is still get_organization,
+    not this walk.
 
-    The location filters read the primary contact location only. An organization whose
-    only office in a city is a secondary location does not match, and one with no
-    location matches no location filter.
+    `location_filter` is one location: every field in it must match the same address of
+    the organization. `city` and `street_address` must equal the stored value exactly, case
+    included ('London', not 'london' or 'Lond'); the other fields are case-insensitive
+    substrings. Any of the organization's
+    locations may match — a London office that is not the primary one counts — unless
+    `primary_only` is true. An organization with no location matches no location filter.
+    For several locations, call once per location and combine the rows.
 
     Custom-field ids come from list_custom_fields. Match by definition id, not the
-    label. A missing custom-field value is not a match. `country` is the stored full name.
+    label. A missing custom-field value is not a match.
 
     Every row carries its custom fields as `custom_field_values`. If a call times out,
     retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
-    otherwise leave it false.
+    otherwise leave it false. Every row also carries its addresses as `locations`.
 
     `coverage.visible_count` is Backstop's total for the server-side filters, before
     the in-memory predicates. An empty `rows` list means nothing matched.
 
-    Call like: {"country": "Finland",
+    Call like: {"location_filter": {"country": "Finland"},
     "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
     "values": ["<option from list_custom_fields>"]}],
-    "fields": ["name", "city", "country"]}
+    "fields": ["name", "locations"]}
     """
     if custom_fields and exclude_custom_fields:
         raise ValueError(
@@ -268,12 +234,7 @@ async def search_organizations(
                 "other_id": other_id is not None,
                 "matching_domain": matching_domain is not None,
                 "legal_name": legal_name is not None,
-                "city": city is not None,
-                "country": country is not None,
-                "state": state is not None,
-                "postal_code": postal_code is not None,
-                "street_address": street_address is not None,
-                "location_title": location_title is not None,
+                "location_filter": location_filter is not None,
                 "website": website is not None,
                 "ria": ria is not None,
                 "internal_organization": internal_organization is not None,
@@ -287,12 +248,7 @@ async def search_organizations(
             other_id=other_id,
             matching_domain=matching_domain,
             legal_name=legal_name,
-            city=city,
-            country=country,
-            state=state,
-            postal_code=postal_code,
-            street_address=street_address,
-            location_title=location_title,
+            location_filter=location_filter,
             website=website,
             ria=ria,
             internal_organization=internal_organization,

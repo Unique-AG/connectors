@@ -8,6 +8,14 @@
 convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run
 after the fetch. `filter[email][eq]` is the primary email only.
 
+Locations come from `include=contactLocations` on the same walk, so a party's other offices
+cost no extra request. `filter[contactLocations.city][eq]` matches any of an organization's
+locations, but exactly and case-sensitively, with no `like` and no `in`. `city` and `address`
+are the only `contactLocations` filter fields; `state`, `country`, `postalCode`,
+`locationTitle`, and `isPrimaryLocation` are `400 Invalid filter field`. So the city and the
+street address are sent exactly as the caller wrote them, and the rest of the location filter
+runs after the fetch.
+
 A custom-field-only call reads the collection. Large tenants have thousands of
 organizations; a sparse page carrying `regularCustomFieldValues` takes seconds, and the
 per-user gate allows five concurrent requests, so the walk requests later pages in
@@ -20,7 +28,7 @@ from collections.abc import Sequence
 from opentelemetry import trace
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopClient, Included
 from backstop_mcp.features.collection_scan import scan_coverage
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
@@ -28,10 +36,17 @@ from backstop_mcp.features.custom_fields import (
     satisfies_every,
     stored_custom_field_values,
 )
-from backstop_mcp.features.org_people.api_responses import OrganizationResource
+from backstop_mcp.features.includes import ContactLocationResponse
+from backstop_mcp.features.org_people.api_responses import LocationResource, OrganizationResource
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.features.org_people.responses import (
     SearchOrganizationRowResponse,
     SearchOrganizationsResolvedResponse,
+)
+from backstop_mcp.features.org_people.utils import (
+    location_filter_params,
+    matches_location,
+    party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
 
@@ -62,12 +77,7 @@ class SearchOrganizationsQuery:
         other_id: str | None = None,
         matching_domain: str | None = None,
         legal_name: str | None = None,
-        city: str | None = None,
-        country: str | None = None,
-        state: str | None = None,
-        postal_code: str | None = None,
-        street_address: str | None = None,
-        location_title: str | None = None,
+        location_filter: LocationFilter | None = None,
         website: str | None = None,
         ria: bool | None = None,
         internal_organization: bool | None = None,
@@ -81,22 +91,11 @@ class SearchOrganizationsQuery:
         other_id = self._text(other_id)
         matching_domain = self._text(matching_domain)
         legal_name = self._text(legal_name)
-        city = self._text(city)
-        country = self._text(country)
-        state = self._text(state)
-        postal_code = self._text(postal_code)
-        street_address = self._text(street_address)
-        location_title = self._text(location_title)
         website = self._text(website)
         predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
             legal_name=legal_name,
-            city=city,
-            country=country,
-            state=state,
-            postal_code=postal_code,
-            street_address=street_address,
-            location_title=location_title,
+            location_filter=location_filter,
             website=website,
             ria=ria,
             internal_organization=internal_organization,
@@ -107,26 +106,25 @@ class SearchOrganizationsQuery:
             pages = await self._client.paginate(
                 "/organizations",
                 schema=OrganizationResource,
-                params=self._query_params(
-                    name=name,
-                    email=email,
-                    other_id=other_id,
-                    matching_domain=matching_domain,
-                    exclude_custom_fields=exclude_custom_fields,
-                ),
+                params={
+                    **self._query_params(
+                        name=name,
+                        email=email,
+                        other_id=other_id,
+                        matching_domain=matching_domain,
+                        exclude_custom_fields=exclude_custom_fields,
+                    ),
+                    **location_filter_params(location_filter),
+                },
                 max_records=MAX_ORGANIZATION_SCAN_RECORDS,
                 page_size=_PAGE_SIZE,
                 parallel=True,
             )
             selected, dropped = self._select(
                 pages.items,
+                Included(pages.included),
                 legal_name=legal_name,
-                city=city,
-                country=country,
-                state=state,
-                postal_code=postal_code,
-                street_address=street_address,
-                location_title=location_title,
+                location_filter=location_filter,
                 website=website,
                 ria=ria,
                 internal_organization=internal_organization,
@@ -187,6 +185,7 @@ class SearchOrganizationsQuery:
             wire_fields.append("regularCustomFieldValues")
         params: dict[str, object] = {
             "sort": "name",
+            "include": "contactLocations",
             "fields[organizations]": ",".join(wire_fields),
         }
         if name is not None:
@@ -202,14 +201,10 @@ class SearchOrganizationsQuery:
     def _select(
         self,
         resources: Sequence[OrganizationResource],
+        included: Included,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
@@ -221,13 +216,9 @@ class SearchOrganizationsQuery:
             try:
                 row = self._row(
                     resource,
+                    included,
                     legal_name=legal_name,
-                    city=city,
-                    country=country,
-                    state=state,
-                    postal_code=postal_code,
-                    street_address=street_address,
-                    location_title=location_title,
+                    location_filter=location_filter,
                     website=website,
                     ria=ria,
                     internal_organization=internal_organization,
@@ -248,14 +239,10 @@ class SearchOrganizationsQuery:
     def _row(
         self,
         resource: OrganizationResource,
+        included: Included,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
@@ -264,17 +251,11 @@ class SearchOrganizationsQuery:
         attributes = resource.attributes
         if not self._matches_text(attributes.legal_name, legal_name):
             return None
-        if not self._matches_text(attributes.city, city):
-            return None
-        if not self._matches_text(attributes.country, country):
-            return None
-        if not self._matches_text(attributes.state, state):
-            return None
-        if not self._matches_text(attributes.postal_code, postal_code):
-            return None
-        if not self._matches_text(attributes.street_address, street_address):
-            return None
-        if not self._matches_text(attributes.location_title, location_title):
+        locations = party_locations(
+            attributes,
+            included.related(resource, "contactLocations", schema=LocationResource),
+        )
+        if location_filter is not None and not matches_location(locations, location_filter):
             return None
         if not self._matches_text(attributes.website, website):
             return None
@@ -299,6 +280,13 @@ class SearchOrganizationsQuery:
             street_address=attributes.street_address,
             location_title=attributes.location_title,
             website=attributes.website,
+            locations=tuple(
+                ContactLocationResponse.model_validate(
+                    location.model_dump(exclude={"country_code"})
+                )
+                for location in locations
+            )
+            or None,
             other_id=attributes.other_id,
             matching_domains=attributes.matching_domains,
             ria=attributes.ria,
@@ -345,12 +333,7 @@ class SearchOrganizationsQuery:
         self,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
@@ -360,12 +343,7 @@ class SearchOrganizationsQuery:
             value is not None
             for value in (
                 legal_name,
-                city,
-                country,
-                state,
-                postal_code,
-                street_address,
-                location_title,
+                location_filter,
                 website,
                 ria,
                 internal_organization,

@@ -24,6 +24,7 @@ from backstop_mcp.features.org_people.dependencies import (
     get_search_organizations_query_factory,
     get_search_people_query_factory,
 )
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.features.org_people.queries import (
     MAX_ORG_PEOPLE,
     MAX_ORGANIZATION_SCAN_RECORDS,
@@ -58,6 +59,7 @@ __all__ = [
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
+    "LocationFilter",
     "OrgPeopleResolvedResponse",
     "OrganizationAttributes",
     "OrganizationRecordResponse",

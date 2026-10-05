@@ -9,6 +9,14 @@
 convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run after
 the fetch. `emailDomains` filters, but `fields[people]` rejects it.
 
+Locations come from `include=contactLocations` on the same walk, so a person's other
+addresses cost no extra request. `filter[contactLocations.city][eq]` matches any of a person's
+locations, but exactly and case-sensitively, with no `like` and no `in`. `city` and `address`
+are the only `contactLocations` filter fields; `state`, `country`, `postalCode`,
+`locationTitle`, and `isPrimaryLocation` are `400 Invalid filter field`. So the city and the
+street address are sent exactly as the caller wrote them, and the rest of the location filter
+runs after the fetch.
+
 An email is three exact lookups, unioned by id: a person can store the address on `email`,
 `email2`, or `email3`. A custom-field-only call reads the collection. The people collection
 is larger than organizations; a sparse page carrying `regularCustomFieldValues` takes
@@ -23,7 +31,7 @@ from collections.abc import Sequence
 from opentelemetry import trace
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient, PageResult
+from backstop_mcp.backstop_client import BackstopClient, Included, PageResult
 from backstop_mcp.features.collection_scan import scan_coverage
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
@@ -31,10 +39,17 @@ from backstop_mcp.features.custom_fields import (
     satisfies_every,
     stored_custom_field_values,
 )
-from backstop_mcp.features.org_people.api_responses import PersonResource
+from backstop_mcp.features.includes import ContactLocationResponse
+from backstop_mcp.features.org_people.api_responses import LocationResource, PersonResource
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.features.org_people.responses import (
     SearchPeopleResolvedResponse,
     SearchPersonRowResponse,
+)
+from backstop_mcp.features.org_people.utils import (
+    location_filter_params,
+    matches_location,
+    party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 
@@ -70,12 +85,7 @@ class SearchPeopleQuery:
         job_title: str | None = None,
         company_name: str | None = None,
         department: str | None = None,
-        city: str | None = None,
-        country: str | None = None,
-        state: str | None = None,
-        postal_code: str | None = None,
-        street_address: str | None = None,
-        location_title: str | None = None,
+        location_filter: LocationFilter | None = None,
         website: str | None = None,
         custom_fields: Sequence[CustomFieldMatch] = (),
         exclude_custom_fields: bool = False,
@@ -91,12 +101,6 @@ class SearchPeopleQuery:
         job_title = self._text(job_title)
         company_name = self._text(company_name)
         department = self._text(department)
-        city = self._text(city)
-        country = self._text(country)
-        state = self._text(state)
-        postal_code = self._text(postal_code)
-        street_address = self._text(street_address)
-        location_title = self._text(location_title)
         website = self._text(website)
         predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
@@ -104,37 +108,29 @@ class SearchPeopleQuery:
             job_title=job_title,
             company_name=company_name,
             department=department,
-            city=city,
-            country=country,
-            state=state,
-            postal_code=postal_code,
-            street_address=street_address,
-            location_title=location_title,
+            location_filter=location_filter,
             website=website,
             predicates=predicates,
         )
         with _tracer.start_as_current_span("org_people.query.search_people") as span:
             span.set_attribute("memory", should_filter_in_memory)
-            resources, total_count, ceiling_clamped = await self._read(
+            resources, included, total_count, ceiling_clamped = await self._read(
                 name=name,
                 last_name=last_name,
                 email=email,
                 other_id=other_id,
                 email_domain=email_domain,
                 exclude_custom_fields=exclude_custom_fields,
+                location_filter=location_filter,
             )
             selected, dropped = self._select(
                 resources,
+                included,
                 first_name=first_name,
                 job_title=job_title,
                 company_name=company_name,
                 department=department,
-                city=city,
-                country=country,
-                state=state,
-                postal_code=postal_code,
-                street_address=street_address,
-                location_title=location_title,
+                location_filter=location_filter,
                 website=website,
                 predicates=predicates,
             )
@@ -173,17 +169,21 @@ class SearchPeopleQuery:
         other_id: str | None,
         email_domain: str | None,
         exclude_custom_fields: bool,
-    ) -> tuple[tuple[PersonResource, ...], int | None, bool]:
-        params = self._query_params(
-            name=name,
-            last_name=last_name,
-            other_id=other_id,
-            email_domain=email_domain,
-            exclude_custom_fields=exclude_custom_fields,
-        )
+        location_filter: LocationFilter | None,
+    ) -> tuple[tuple[PersonResource, ...], Included, int | None, bool]:
+        params = {
+            **self._query_params(
+                name=name,
+                last_name=last_name,
+                other_id=other_id,
+                email_domain=email_domain,
+                exclude_custom_fields=exclude_custom_fields,
+            ),
+            **location_filter_params(location_filter),
+        }
         if email is None:
             page = await self._fetch(params)
-            return tuple(page.items), page.total_count, page.truncated
+            return tuple(page.items), Included(page.included), page.total_count, page.truncated
         pages = await asyncio.gather(
             *(self._fetch({**params, f"filter[{field}][eq]": email}) for field in _EMAIL_FIELDS)
         )
@@ -231,6 +231,7 @@ class SearchPeopleQuery:
             wire_fields.append("regularCustomFieldValues")
         params: dict[str, object] = {
             "sort": "name",
+            "include": "contactLocations",
             "fields[people]": ",".join(wire_fields),
         }
         if name is not None:
@@ -245,13 +246,14 @@ class SearchPeopleQuery:
 
     def _merge(
         self, pages: Sequence[PageResult[PersonResource]]
-    ) -> tuple[tuple[PersonResource, ...], int | None, bool]:
+    ) -> tuple[tuple[PersonResource, ...], Included, int | None, bool]:
         by_id: dict[str, PersonResource] = {}
         for page in pages:
             for resource in page.items:
                 by_id.setdefault(resource.id, resource)
         return (
             tuple(by_id.values()),
+            Included([item for page in pages for item in page.included]),
             self._visible_count(pages),
             any(page.truncated for page in pages),
         )
@@ -259,17 +261,13 @@ class SearchPeopleQuery:
     def _select(
         self,
         resources: Sequence[PersonResource],
+        included: Included,
         *,
         first_name: str | None,
         job_title: str | None,
         company_name: str | None,
         department: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
     ) -> tuple[tuple[SearchPersonRowResponse, ...], int]:
@@ -279,16 +277,12 @@ class SearchPeopleQuery:
             try:
                 row = self._row(
                     resource,
+                    included,
                     first_name=first_name,
                     job_title=job_title,
                     company_name=company_name,
                     department=department,
-                    city=city,
-                    country=country,
-                    state=state,
-                    postal_code=postal_code,
-                    street_address=street_address,
-                    location_title=location_title,
+                    location_filter=location_filter,
                     website=website,
                     predicates=predicates,
                 )
@@ -307,17 +301,13 @@ class SearchPeopleQuery:
     def _row(
         self,
         resource: PersonResource,
+        included: Included,
         *,
         first_name: str | None,
         job_title: str | None,
         company_name: str | None,
         department: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
     ) -> SearchPersonRowResponse | None:
@@ -330,17 +320,11 @@ class SearchPeopleQuery:
             return None
         if not self._matches_text(attributes.department, department):
             return None
-        if not self._matches_text(attributes.city, city):
-            return None
-        if not self._matches_text(attributes.country, country):
-            return None
-        if not self._matches_text(attributes.state, state):
-            return None
-        if not self._matches_text(attributes.postal_code, postal_code):
-            return None
-        if not self._matches_text(attributes.street_address, street_address):
-            return None
-        if not self._matches_text(attributes.location_title, location_title):
+        locations = party_locations(
+            attributes,
+            included.related(resource, "contactLocations", schema=LocationResource),
+        )
+        if location_filter is not None and not matches_location(locations, location_filter):
             return None
         if not self._matches_text(attributes.website, website):
             return None
@@ -364,6 +348,13 @@ class SearchPeopleQuery:
             street_address=attributes.street_address,
             location_title=attributes.location_title,
             website=attributes.website,
+            locations=tuple(
+                ContactLocationResponse.model_validate(
+                    location.model_dump(exclude={"country_code"})
+                )
+                for location in locations
+            )
+            or None,
             other_id=attributes.other_id,
             custom_field_values=stored_custom_field_values(attributes.regular_custom_field_values)
             or None,
@@ -410,12 +401,7 @@ class SearchPeopleQuery:
         job_title: str | None,
         company_name: str | None,
         department: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
-        postal_code: str | None,
-        street_address: str | None,
-        location_title: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
     ) -> bool:
@@ -426,12 +412,7 @@ class SearchPeopleQuery:
                 job_title,
                 company_name,
                 department,
-                city,
-                country,
-                state,
-                postal_code,
-                street_address,
-                location_title,
+                location_filter,
                 website,
             )
         ) or bool(predicates)

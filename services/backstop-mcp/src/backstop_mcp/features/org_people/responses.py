@@ -17,7 +17,11 @@ from backstop_mcp.features.data_hygiene import (
     EmploymentLinkResponse,
     ProvenanceAttributes,
 )
-from backstop_mcp.features.includes import OrganizationIncludesResponse, PersonIncludesResponse
+from backstop_mcp.features.includes import (
+    ContactLocationResponse,
+    OrganizationIncludesResponse,
+    PersonIncludesResponse,
+)
 from backstop_mcp.features.org_people.api_responses import (
     EmployeeResource,
     OrganizationAttributes,
@@ -573,6 +577,14 @@ class SearchOrganizationRowResponse(OmitNoneModel):
         description="Title of the primary contact location, such as 'Business' or 'London'.",
     )
     website: str | None = Field(default=None, description="Website on the organization record.")
+    locations: tuple[ContactLocationResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every address on file for this organization, primary first, each with "
+            "`is_primary`. The `city`, `country`, and other location fields above are the "
+            "primary one only. Absent for an organization with no address."
+        ),
+    )
     other_id: str | None = Field(
         default=None, description="Backstop `otherId`, when the organization has one."
     )
@@ -614,9 +626,10 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
     coverage: ScanCoverageResponse = Field(
         description=(
             "How much of the Backstop result was read. `visible_count` is Backstop's total "
-            "for the server-side filters, before city, country, state, legal name, website, "
-            "RIA, internal organization, and custom-field predicates. A custom-field-only "
-            "call therefore reports the whole collection here."
+            "for the server-side filters (including a location `city` and `street_address`), "
+            "before the location filter's country, state, postal code, and title, legal "
+            "name, website, RIA, internal organization, and custom-field predicates. A "
+            "call with only the in-memory predicates reports the whole collection here."
         )
     )
     rows: tuple[SearchOrganizationRowResponse, ...] = Field(
@@ -624,7 +637,7 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
         description=(
             "Every organization matching every filter, up to the scan ceiling. `id` is always "
             "present so the next call is get_organization. Default fields are id, name, "
-            "legal_name, email, city, and country."
+            "legal_name, email, city, country, and locations."
         ),
     )
 
@@ -679,6 +692,14 @@ class SearchPersonRowResponse(OmitNoneModel):
         description="Title of the primary contact location, such as 'Business' or 'London'.",
     )
     website: str | None = Field(default=None, description="Website on the person record.")
+    locations: tuple[ContactLocationResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every address on file for this person, primary first, each with "
+            "`is_primary`. The `city`, `country`, and other location fields above are the "
+            "primary one only. Absent for a person with no address."
+        ),
+    )
     other_id: str | None = Field(
         default=None, description="Backstop `otherId`, when the person has one."
     )
@@ -711,7 +732,9 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
         description=(
             "How much of the Backstop result was read. `visible_count` is Backstop's total "
             "for the server-side filters, before first name, job title, company name, "
-            "department, city, country, state, website, and custom-field predicates. An "
+            "department, the location filter's country, state, postal code, and title, "
+            "website, and custom-field predicates. A location `city` and `street_address` "
+            "are server-side filters. An "
             "`email` filter is three lookups (`email`, `email2`, `email3`) and "
             "`visible_count` is the sum of those totals, so one person stored on two of "
             "those fields can be counted twice. A custom-field-only call reports the "
@@ -723,6 +746,7 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
         description=(
             "Every person matching every filter, up to the scan ceiling. `id` is always "
             "present so the next call is get_person with `search_type` `people`. Default "
-            "fields are id, name, email, job_title, company_name, city, and country."
+            "fields are id, name, email, job_title, company_name, city, country, and "
+            "locations."
         ),
     )
