@@ -91,7 +91,7 @@ export const Subscription = z.object({
   lifecycleNotificationUrl: stringToURL().nullable(),
   expirationDateTime: isoDatetimeToDate({ offset: true }),
   creatorId: z.string(),
-  latestSupportedTlsVersion: z.string(),
+  latestSupportedTlsVersion: z.string().nullish(),
   notificationUrlAppId: z.string().nullable(),
   notificationQueryOptions: z.string().nullable(),
   encryptionCertificate: z.string().nullable(),
