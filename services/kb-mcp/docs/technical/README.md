@@ -8,5 +8,8 @@
 - [Permissions](./permissions.md) - how identity and scoping decide what a call can see
 - [Tools](./tools.md) - the four MCP tools `kb-mcp` exposes
 
-This section is for engineers integrating with or extending kb-mcp. For deployment and operations,
-see the [IT Operator Guide](../operator/README.md).
+This section is for engineers integrating with or extending `kb-mcp`.
+
+## Related Documentation
+
+- [IT Operator Guide](../operator/README.md) - deployment and operations

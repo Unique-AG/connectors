@@ -9,5 +9,6 @@ This section covers everything needed to deploy, configure, and operate `kb-mcp`
   deployment shapes in use at Unique
 - [Configuration](./configuration.md) - environment variables and `mcpConfig` values reference
 
-For what the service does and how it's built, see the
-[Technical Reference](../technical/README.md).
+## Related Documentation
+
+- [Technical Reference](../technical/README.md) - what the service does and how it's built
