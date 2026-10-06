@@ -39,6 +39,13 @@ export interface McpOptions {
      * @experimental: The current implementation does not fully comply with the MCP Specification.
      */
     statelessMode?: boolean;
+    /**
+     * Stateful mode only. A session with no open request for this long is closed and its
+     * resources released; the client gets a 404 for it and has to initialize a new session.
+     * Clients rarely send DELETE, so without this sessions live until the process restarts.
+     * Defaults to 30 minutes.
+     */
+    sessionIdleTimeoutMs?: number;
   };
 }
 

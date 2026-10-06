@@ -431,7 +431,8 @@ export class McpOAuthStore implements IOAuthStore {
     metadata: AccessTokenMetadata,
   ): Promise<void> {
     const cacheKey = this.getAccessTokenCacheKey(token);
-    const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
+    // cache-manager TTLs are in milliseconds
+    const ttl = metadata.expiresAt.getTime() - Date.now();
 
     if (ttl > 0) {
       await this.cacheManager.set(cacheKey, metadata, ttl);
@@ -443,7 +444,8 @@ export class McpOAuthStore implements IOAuthStore {
     metadata: RefreshTokenMetadata,
   ): Promise<void> {
     const cacheKey = this.getRefreshTokenCacheKey(token);
-    const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
+    // cache-manager TTLs are in milliseconds
+    const ttl = metadata.expiresAt.getTime() - Date.now();
 
     if (ttl > 0) {
       await this.cacheManager.set(cacheKey, metadata, ttl);

@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import type { Counter } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
@@ -14,14 +14,25 @@ import { buildMcpCapabilities } from '../utils/capabilities-builder';
 import { McpExecutorService } from './mcp-executor.service';
 import { McpRegistryService } from './mcp-registry.service';
 
+const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const MAX_IDLE_SWEEP_INTERVAL_MS = 60 * 1000;
+
+interface SessionActivity {
+  lastActivityAt: number;
+  openRequests: number;
+}
+
 @Injectable()
-export class McpStreamableHttpService {
+export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(McpStreamableHttpService.name);
   private readonly transports: {
     [sessionId: string]: StreamableHTTPServerTransport;
   } = {};
   private readonly mcpServers: { [sessionId: string]: McpServer } = {};
+  private readonly sessionActivity = new Map<string, SessionActivity>();
   private readonly isStatelessMode: boolean;
+  private readonly sessionIdleTimeoutMs: number;
+  private idleSweepTimer: NodeJS.Timeout | undefined;
 
   private readonly requestCounter: Counter;
 
@@ -34,9 +45,27 @@ export class McpStreamableHttpService {
   ) {
     // Determine if we're in stateless mode
     this.isStatelessMode = !!options.streamableHttp?.statelessMode;
+    this.sessionIdleTimeoutMs =
+      options.streamableHttp?.sessionIdleTimeoutMs ?? DEFAULT_SESSION_IDLE_TIMEOUT_MS;
     this.requestCounter = metricService.getCounter('mcp_requests_total', {
       description: 'Total number of MCP requests',
     });
+  }
+
+  public onModuleInit(): void {
+    if (this.isStatelessMode) {
+      return;
+    }
+    this.idleSweepTimer = setInterval(
+      () => this.closeIdleSessions(),
+      Math.min(this.sessionIdleTimeoutMs, MAX_IDLE_SWEEP_INTERVAL_MS),
+    );
+    this.idleSweepTimer.unref();
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    clearInterval(this.idleSweepTimer);
+    await Promise.all(Object.values(this.transports).map((transport) => transport.close()));
   }
 
   /**
@@ -171,6 +200,7 @@ export class McpStreamableHttpService {
     if (sessionId && this.transports[sessionId]) {
       // Reuse existing transport
       transport = this.transports[sessionId];
+      this.trackOpenRequest(sessionId, res);
     } else if (!sessionId && this.isInitializeRequest(body)) {
       // New initialization request
       transport = new StreamableHTTPServerTransport({
@@ -208,6 +238,10 @@ export class McpStreamableHttpService {
       if (transport.sessionId) {
         this.transports[transport.sessionId] = transport;
         this.mcpServers[transport.sessionId] = mcpServer;
+        this.sessionActivity.set(transport.sessionId, {
+          lastActivityAt: Date.now(),
+          openRequests: 0,
+        });
 
         // Set up cleanup when connection closes
         transport.onclose = () => {
@@ -296,6 +330,7 @@ export class McpStreamableHttpService {
 
     this.logger.debug(`Establishing SSE stream for session ${sessionId}`);
     const transport = this.transports[sessionId];
+    this.trackOpenRequest(sessionId, adaptedRes);
     await transport.handleRequest(adaptedReq.raw, adaptedRes.raw);
   }
 
@@ -352,6 +387,50 @@ export class McpStreamableHttpService {
       this.logger.debug(`Cleaning up session: ${sessionId}`);
       delete this.transports[sessionId];
       delete this.mcpServers[sessionId];
+      this.sessionActivity.delete(sessionId);
     }
+  }
+
+  // A request counts as open until its response closes, so a long tool call or an SSE stream
+  // keeps its session alive past the idle timeout.
+  private trackOpenRequest(sessionId: string, res: HttpResponse): void {
+    this.recordSessionActivity(sessionId, 1);
+    res.on?.('close', () => this.recordSessionActivity(sessionId, -1));
+  }
+
+  private recordSessionActivity(sessionId: string, openRequestsDelta: number): void {
+    const activity = this.sessionActivity.get(sessionId);
+    // The session may already be gone, e.g. the response of a DELETE closes after cleanup.
+    if (!activity) {
+      return;
+    }
+    this.sessionActivity.set(sessionId, {
+      lastActivityAt: Date.now(),
+      openRequests: activity.openRequests + openRequestsDelta,
+    });
+  }
+
+  private closeIdleSessions(): void {
+    const idleSince = Date.now() - this.sessionIdleTimeoutMs;
+    const idleSessionIds = [...this.sessionActivity]
+      .filter(
+        ([, { lastActivityAt, openRequests }]) => openRequests <= 0 && lastActivityAt < idleSince,
+      )
+      .map(([sessionId]) => sessionId);
+    if (idleSessionIds.length === 0) {
+      return;
+    }
+
+    for (const sessionId of idleSessionIds) {
+      const transport = this.transports[sessionId];
+      // transport.onclose runs cleanupSession; clean up directly too in case close() never fires it.
+      this.cleanupSession(sessionId);
+      void transport?.close().catch((error: unknown) => {
+        this.logger.warn(`Failed to close idle session ${sessionId}: ${String(error)}`);
+      });
+    }
+    this.logger.log(
+      `Closed ${idleSessionIds.length} idle MCP session(s); ${this.sessionActivity.size} still open`,
+    );
   }
 }
