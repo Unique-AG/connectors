@@ -389,7 +389,7 @@ describe('McpOAuthStore', () => {
         mockAccessTokenMetadata,
         expect.any(Number),
       );
-      // The token expires in an hour and cache-manager TTLs are in milliseconds.
+      // TTL in ms, not seconds
       expect(mockCache.set.mock.calls[0]?.[2]).toBeGreaterThan(3_500_000);
     });
 

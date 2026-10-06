@@ -23,8 +23,7 @@ class WaitTool {
   }
 }
 
-// Plain JSON-RPC over fetch, like the clients seen in production: no standalone GET SSE stream
-// and no DELETE when done.
+// Like the prod clients: no GET SSE stream and no DELETE.
 async function postMcp(
   url: URL,
   message: object,
@@ -102,7 +101,7 @@ describe('MCP stateful session idle timeout (E2E)', () => {
     const sessionId = await initializeSession(url);
     expect(await listToolsStatus(url, sessionId)).toBe(200);
 
-    // Any request counts as activity, so stay silent for the timeout plus one sweep interval.
+    // Requests count as activity, so stay silent.
     await sleep(SESSION_IDLE_TIMEOUT_MS * 3);
 
     expect(await listToolsStatus(url, sessionId)).toBe(404);

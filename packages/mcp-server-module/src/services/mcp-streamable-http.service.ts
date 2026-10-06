@@ -391,8 +391,7 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // A request counts as open until its response closes, so a long tool call or an SSE stream
-  // keeps its session alive past the idle timeout.
+  // Open requests (long tool calls, SSE streams) keep a session alive.
   private trackOpenRequest(sessionId: string, res: HttpResponse): void {
     this.recordSessionActivity(sessionId, 1);
     res.on?.('close', () => this.recordSessionActivity(sessionId, -1));
@@ -400,7 +399,7 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
   private recordSessionActivity(sessionId: string, openRequestsDelta: number): void {
     const activity = this.sessionActivity.get(sessionId);
-    // The session may already be gone, e.g. the response of a DELETE closes after cleanup.
+    // Already cleaned up, e.g. by DELETE.
     if (!activity) {
       return;
     }
@@ -423,7 +422,6 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
     for (const sessionId of idleSessionIds) {
       const transport = this.transports[sessionId];
-      // transport.onclose runs cleanupSession; clean up directly too in case close() never fires it.
       this.cleanupSession(sessionId);
       void transport?.close().catch((error: unknown) => {
         this.logger.warn(`Failed to close idle session ${sessionId}: ${String(error)}`);
