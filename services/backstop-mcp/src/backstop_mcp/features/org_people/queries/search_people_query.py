@@ -50,10 +50,6 @@ from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-# Above the people collection this was sized against (about twenty thousand). A larger
-# collection stops here and says so in `coverage`.
-MAX_PEOPLE_SCAN_RECORDS = 30_000
-
 _PAGE_SIZE = 500
 _EMAIL_FIELDS: tuple[str, ...] = ("email", "email2", "email3")
 
@@ -202,7 +198,7 @@ class SearchPeopleQuery:
             "/people",
             schema=PersonResource,
             params=params,
-            max_records=MAX_PEOPLE_SCAN_RECORDS,
+            max_records=None,
             page_size=_PAGE_SIZE,
             parallel=True,
         )
@@ -418,7 +414,7 @@ class SearchPeopleQuery:
             rows_scanned=rows_scanned,
             visible_count=total_count,
             rows_dropped=rows_dropped,
-            ceiling=MAX_PEOPLE_SCAN_RECORDS,
+            ceiling=None,
             ceiling_clamped=ceiling_clamped,
             # One `paginate` call, or three email lookups: a failed page raises.
             partial_due_to_error=False,

@@ -768,7 +768,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Canonical CRM UI URL for this activity. Not in the default fieldset — select "
-            "`url` to get it, since one URL per row is dead weight on a wide sweep. Omitted "
+            "`url` to get it, since one URL per row is dead weight on a firm-wide search. Omitted "
             "when this deployment has no UI origin, or when the row's `type` has no CRM page. "
             "Echo it; never invent one."
         ),

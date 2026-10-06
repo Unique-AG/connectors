@@ -9,14 +9,12 @@ from backstop_mcp.features.org_people.queries.search_organizations_query import 
     SearchOrganizationsQuery,
 )
 from backstop_mcp.features.org_people.queries.search_people_query import (
-    MAX_PEOPLE_SCAN_RECORDS,
     SearchPeopleQuery,
 )
 
 __all__ = [
     "MAX_ORGANIZATION_SCAN_RECORDS",
     "MAX_ORG_PEOPLE",
-    "MAX_PEOPLE_SCAN_RECORDS",
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",

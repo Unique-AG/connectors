@@ -734,8 +734,8 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
     status: Literal["resolved"] = Field(
         default="resolved",
         description=(
-            "Always 'resolved': the walk ran. An empty `rows` list is not 'nothing matched' "
-            "when `coverage` says the scan ceiling clamped the walk."
+            "Always 'resolved': the walk ran. The people walk is uncapped, so an empty `rows` "
+            "list means nothing matched."
         ),
     )
     coverage: ScanCoverageResponse = Field(
@@ -748,13 +748,13 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
             "`email` filter is three lookups (`email`, `email2`, `email3`) and "
             "`visible_count` is the sum of those totals, so one person stored on two of "
             "those fields can be counted twice. A custom-field-only call reports the "
-            "whole collection here, up to the scan ceiling."
+            "whole collection here."
         )
     )
     rows: tuple[SearchPersonRowResponse, ...] = Field(
         default=(),
         description=(
-            "Every person matching every filter, up to the scan ceiling. `id` is always "
+            "Every person matching every filter. `id` is always "
             "present so the next call is get_person with `search_type` `people`. Default "
             "fields are id, name, email, job_title, company_name, city, country, and "
             "locations."

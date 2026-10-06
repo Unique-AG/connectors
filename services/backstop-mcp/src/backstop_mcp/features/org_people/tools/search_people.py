@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
-    MAX_PEOPLE_SCAN_RECORDS,
     SearchPeopleQuery,
     SearchPeopleResolvedResponse,
 )
@@ -178,8 +177,7 @@ async def search_people(
                 "Custom-field predicates, AND. Each is a definition id from "
                 "list_custom_fields plus the stored value. Applied after the "
                 "server-side read. A call that sets only "
-                "these reads the collection (up to "
-                f"{MAX_PEOPLE_SCAN_RECORDS} rows) and says so in `coverage`."
+                "these reads the whole collection."
             )
         ),
     ] = None,

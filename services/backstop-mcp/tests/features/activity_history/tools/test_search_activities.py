@@ -283,10 +283,10 @@ class TestSearchActivities:
             await factory.aclose()
 
     @pytest.mark.asyncio
-    async def test_include_description_on_a_wide_sweep_is_refused(
+    async def test_include_description_on_a_firm_wide_search_is_refused(
         self, client: BackstopClient
     ) -> None:
-        with pytest.raises(ValueError, match="wide sweep"):
+        with pytest.raises(ValueError, match="firm-wide search"):
             await search_activities(
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
@@ -297,8 +297,8 @@ class TestSearchActivities:
             )
 
     @pytest.mark.asyncio
-    async def test_aggregate_on_a_wide_sweep_is_refused(self, client: BackstopClient) -> None:
-        with pytest.raises(ValueError, match="wide sweep"):
+    async def test_aggregate_on_a_firm_wide_search_is_refused(self, client: BackstopClient) -> None:
+        with pytest.raises(ValueError, match="firm-wide search"):
             await search_activities(
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),

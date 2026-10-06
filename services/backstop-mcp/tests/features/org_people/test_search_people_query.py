@@ -4,7 +4,6 @@ import respx
 
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
-    MAX_PEOPLE_SCAN_RECORDS,
     LocationFilter,
     SearchPeopleResolvedResponse,
 )
@@ -365,27 +364,22 @@ class TestSearchPeopleQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_memory_walk_reports_the_ceiling(self) -> None:
-        base_url = f"{BASE_URL}/people-search-ceiling"
+    async def test_memory_walk_is_never_capped(self) -> None:
+        base_url = f"{BASE_URL}/people-search-uncapped"
         items = [
-            _person(str(index), name=f"Person {index}", city="Elsewhere")
-            for index in range(MAX_PEOPLE_SCAN_RECORDS)
+            _person(str(index), name=f"Person {index}", city="Elsewhere") for index in range(600)
         ]
-        respx.get(f"{base_url}/people").mock(
-            return_value=_page(*items, total=MAX_PEOPLE_SCAN_RECORDS + 2_000)
-        )
+        respx.get(f"{base_url}/people").mock(return_value=_page(*items, total=600))
 
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
-                location_filter=LocationFilter(city="Wichita"),
+                location_filter=LocationFilter(state="Kansas"),
                 fields=_FIELDS,
             )
 
-        assert result.rows == ()
-        assert result.coverage.rows_scanned == MAX_PEOPLE_SCAN_RECORDS
-        assert result.coverage.ceiling_hit is True
-        assert result.coverage.truncated is True
-        assert result.coverage.disclaimer is not None
+        assert result.coverage.rows_scanned == 600
+        assert result.coverage.ceiling_hit is False
+        assert result.coverage.truncated is False
 
     @pytest.mark.asyncio
     @respx.mock

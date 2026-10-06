@@ -116,7 +116,7 @@ class AttendeeRef(BaseModel):
     )
 
 
-def _is_wide_sweep(
+def _is_firm_wide_search(
     *,
     party_id: str | None,
     activity_tags: Sequence[str],
@@ -257,7 +257,7 @@ async def search_activities(
             default=False,
             description=(
                 "Opt in to the full body text (much larger rows) on every matching row. "
-                "Refused with `mode=aggregate` and on a wide sweep (no party, tags, authors, "
+                "Refused with `mode=aggregate` and on a firm-wide search (no party, tags, authors, "
                 "or attendees)."
             ),
         ),
@@ -291,7 +291,7 @@ async def search_activities(
                 "short_description, associated_with, tags, attendees, author, meeting_type, "
                 "attachments_count. `description` is only filled when include_description "
                 "is true. Select `url` when the answer will link to the activities — it is "
-                "off by default so a wide sweep stays cheap. Pass `activity_id` to "
+                "off by default so a firm-wide search stays cheap. Pass `activity_id` to "
                 "get_activity_detail."
             ),
         ),
@@ -372,20 +372,20 @@ async def search_activities(
     selected_types: tuple[EntityActivityType, ...] = (
         tuple(types) if types else ENTITY_ACTIVITY_TYPES
     )
-    wide = _is_wide_sweep(
+    firm_wide = _is_firm_wide_search(
         party_id=scoped_party_id,
         activity_tags=tag_ids,
         authors=author_emails,
         attendee_ids=attendee_ids,
     )
-    if include_description and wide:
+    if include_description and firm_wide:
         raise ValueError(
-            "include_description is refused on a wide sweep; pass a party, "
+            "include_description is refused on a firm-wide search; pass a party, "
             + "activity_tag_ids, authors, or attendees, or leave include_description false"
         )
-    if mode == "aggregate" and wide:
+    if mode == "aggregate" and firm_wide:
         raise ValueError(
-            "mode=aggregate is refused on a wide sweep; pass a party, activity_tag_ids, "
+            "mode=aggregate is refused on a firm-wide search; pass a party, activity_tag_ids, "
             + "authors, or attendees, or use mode=rows"
         )
 
