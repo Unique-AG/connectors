@@ -37,6 +37,9 @@ import {
 import { normalizeError } from '../utils/normalize-error';
 import { UserAuthorizedEventDto } from './dtos/user-authorized-event.dto';
 
+// The cache is per pod: a token revoked elsewhere stays usable here until its entry expires.
+const MAX_TOKEN_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
 
@@ -437,7 +440,7 @@ export class McpOAuthStore implements IOAuthStore {
   ): Promise<void> {
     const cacheKey = this.getAccessTokenCacheKey(token);
     // cache-manager TTLs are in milliseconds
-    const ttl = metadata.expiresAt.getTime() - Date.now();
+    const ttl = Math.min(metadata.expiresAt.getTime() - Date.now(), MAX_TOKEN_CACHE_TTL_MS);
 
     if (ttl > 0) {
       await this.cacheManager.set(cacheKey, metadata, ttl);
@@ -450,7 +453,7 @@ export class McpOAuthStore implements IOAuthStore {
   ): Promise<void> {
     const cacheKey = this.getRefreshTokenCacheKey(token);
     // cache-manager TTLs are in milliseconds
-    const ttl = metadata.expiresAt.getTime() - Date.now();
+    const ttl = Math.min(metadata.expiresAt.getTime() - Date.now(), MAX_TOKEN_CACHE_TTL_MS);
 
     if (ttl > 0) {
       await this.cacheManager.set(cacheKey, metadata, ttl);
