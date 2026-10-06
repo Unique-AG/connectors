@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 /** biome-ignore-all lint/style/noNonNullAssertion: Fork of @rekog-labs/MCP-Nest */
+import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -47,6 +48,10 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
     this.isStatelessMode = !!options.streamableHttp?.statelessMode;
     this.sessionIdleTimeoutMs =
       options.streamableHttp?.sessionIdleTimeoutMs ?? DEFAULT_SESSION_IDLE_TIMEOUT_MS;
+    assert.ok(
+      Number.isFinite(this.sessionIdleTimeoutMs) && this.sessionIdleTimeoutMs > 0,
+      `streamableHttp.sessionIdleTimeoutMs must be a positive number, got ${this.sessionIdleTimeoutMs}`,
+    );
     this.requestCounter = metricService.getCounter('mcp_requests_total', {
       description: 'Total number of MCP requests',
     });
@@ -65,7 +70,14 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
   public async onModuleDestroy(): Promise<void> {
     clearInterval(this.idleSweepTimer);
-    await Promise.all(Object.values(this.transports).map((transport) => transport.close()));
+    const results = await Promise.allSettled(
+      Object.values(this.transports).map((transport) => transport.close()),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.warn({ msg: 'Failed to close MCP session on shutdown', err: result.reason });
+      }
+    }
   }
 
   /**
@@ -206,9 +218,17 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: this.options.streamableHttp?.sessionIdGenerator || (() => randomUUID()),
         enableJsonResponse: this.options.streamableHttp?.enableJsonResponse || false,
-        onsessioninitialized: (sessionId: string) => {
-          this.logger.debug(`Session initialized: ${sessionId}`);
-          this.transports[sessionId] = transport;
+        onsessioninitialized: (newSessionId: string) => {
+          this.logger.debug(`Session initialized: ${newSessionId}`);
+          this.transports[newSessionId] = transport;
+          this.mcpServers[newSessionId] = mcpServer;
+          this.sessionActivity.set(newSessionId, { lastActivityAt: Date.now(), openRequests: 0 });
+          // Keep the handler mcpServer.connect() installed so the server's own close logic runs.
+          const closeServer = transport.onclose;
+          transport.onclose = () => {
+            closeServer?.();
+            this.cleanupSession(newSessionId);
+          };
         },
       });
 
@@ -231,36 +251,13 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
       // Connect the transport to the MCP server BEFORE handling the request
       await mcpServer.connect(transport);
 
-      // Handle the initialization request
+      // Handle the initialization request; onsessioninitialized registers the session
       await transport.handleRequest(req.raw, res.raw, body);
-
-      // Store the transport and server by session ID for future requests
-      if (transport.sessionId) {
-        this.transports[transport.sessionId] = transport;
-        this.mcpServers[transport.sessionId] = mcpServer;
-        this.sessionActivity.set(transport.sessionId, {
-          lastActivityAt: Date.now(),
-          openRequests: 0,
-        });
-
-        // Set up cleanup when connection closes
-        transport.onclose = () => {
-          this.cleanupSession(transport.sessionId!);
-        };
-      }
 
       this.logger.log(`Initialized new session with ID: ${transport.sessionId}`);
       return;
     } else if (sessionId && !this.transports[sessionId]) {
-      // Provided session ID but no matching session exists
-      res.status(404).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Session not found',
-        },
-        id: null,
-      });
+      this.respondSessionNotFound(res);
       return;
     } else {
       // Invalid request - no session ID or not initialization request
@@ -278,14 +275,7 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
     // For subsequent requests to an existing session
     const mcpServer = this.mcpServers[sessionId];
     if (!mcpServer) {
-      res.status(404).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Session not found',
-        },
-        id: null,
-      });
+      this.respondSessionNotFound(res);
       return;
     }
 
@@ -323,8 +313,12 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
     const sessionId = adaptedReq.headers['mcp-session-id'] as string | undefined;
 
-    if (!sessionId || !this.transports[sessionId]) {
+    if (!sessionId) {
       adaptedRes.status(400).send('Invalid or missing session ID');
+      return;
+    }
+    if (!this.transports[sessionId]) {
+      this.respondSessionNotFound(adaptedRes);
       return;
     }
 
@@ -357,8 +351,12 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
     const sessionId = adaptedReq.headers['mcp-session-id'] as string | undefined;
 
-    if (!sessionId || !this.transports[sessionId]) {
+    if (!sessionId) {
       adaptedRes.status(400).send('Invalid or missing session ID');
+      return;
+    }
+    if (!this.transports[sessionId]) {
+      this.respondSessionNotFound(adaptedRes);
       return;
     }
 
@@ -379,6 +377,18 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
     return (
       typeof body === 'object' && body !== null && 'method' in body && body.method === 'initialize'
     );
+  }
+
+  // Clients must start a new session on 404 (MCP spec), so expired sessions use it on every method.
+  private respondSessionNotFound(res: HttpResponse): void {
+    res.status(404).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: 'Session not found',
+      },
+      id: null,
+    });
   }
 
   // Clean up session resources
@@ -424,7 +434,7 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
       const transport = this.transports[sessionId];
       this.cleanupSession(sessionId);
       void transport?.close().catch((error: unknown) => {
-        this.logger.warn(`Failed to close idle session ${sessionId}: ${String(error)}`);
+        this.logger.warn({ msg: 'Failed to close idle MCP session', sessionId, err: error });
       });
     }
     this.logger.log(

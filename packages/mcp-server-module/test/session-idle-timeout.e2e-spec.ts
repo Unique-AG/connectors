@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { type INestApplication, Injectable } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { McpModule, Tool } from '../src';
+import { McpModule, McpStreamableHttpService, Tool } from '../src';
 
 const SESSION_IDLE_TIMEOUT_MS = 200;
 
@@ -67,27 +68,26 @@ async function listToolsStatus(url: URL, sessionId: string): Promise<number> {
   return status;
 }
 
+function compileModule(sessionIdleTimeoutMs: number): Promise<TestingModule> {
+  return Test.createTestingModule({
+    imports: [
+      OpenTelemetryModule.forRoot(),
+      McpModule.forRoot({
+        name: 'test-mcp',
+        version: '1.0.0',
+        streamableHttp: { enableJsonResponse: false, statelessMode: false, sessionIdleTimeoutMs },
+      }),
+    ],
+    providers: [WaitTool],
+  }).compile();
+}
+
 describe('MCP stateful session idle timeout (E2E)', () => {
   let app: INestApplication;
   let url: URL;
 
   beforeEach(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        OpenTelemetryModule.forRoot(),
-        McpModule.forRoot({
-          name: 'test-mcp',
-          version: '1.0.0',
-          streamableHttp: {
-            enableJsonResponse: false,
-            statelessMode: false,
-            sessionIdleTimeoutMs: SESSION_IDLE_TIMEOUT_MS,
-          },
-        }),
-      ],
-      providers: [WaitTool],
-    }).compile();
-
+    const moduleFixture = await compileModule(SESSION_IDLE_TIMEOUT_MS);
     app = moduleFixture.createNestApplication({ logger: false });
     await app.listen(0, '127.0.0.1');
     url = new URL(`${await app.getUrl()}/mcp`);
@@ -135,5 +135,38 @@ describe('MCP stateful session idle timeout (E2E)', () => {
 
     await expect(client.listTools()).resolves.toMatchObject({ tools: [{ name: 'wait' }] });
     await client.close();
+  });
+
+  it('disconnects the MCP server of a session it closes', async () => {
+    const sessionId = await initializeSession(url);
+    const { mcpServers } = app.get(McpStreamableHttpService) as unknown as {
+      mcpServers: Record<string, McpServer>;
+    };
+    const mcpServer = mcpServers[sessionId];
+    expect(mcpServer?.isConnected()).toBe(true);
+
+    await sleep(SESSION_IDLE_TIMEOUT_MS * 3);
+
+    expect(mcpServer?.isConnected()).toBe(false);
+  });
+
+  it.each(['GET', 'DELETE'])('answers %s with 404 for an unknown session', async (method) => {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        accept: 'application/json, text/event-stream',
+        'mcp-session-id': 'expired-session',
+        'mcp-protocol-version': '2025-06-18',
+      },
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: { message: 'Session not found' } });
+  });
+});
+
+describe('MCP session idle timeout option', () => {
+  it.each([0, -1, Number.NaN])('rejects sessionIdleTimeoutMs = %s', async (timeoutMs) => {
+    await expect(compileModule(timeoutMs)).rejects.toThrow(/sessionIdleTimeoutMs/);
   });
 });
