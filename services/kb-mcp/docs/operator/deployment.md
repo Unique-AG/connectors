@@ -4,10 +4,10 @@
 ## Prerequisites
 
 `kb-mcp` has no knowledge-base data of its own: every tool call is a live proxy to your tenant's
-Unique API, so a Unique platform subscription is a hard requirement, not just a recommendation.
+Unique API, so a Unique platform subscription is a hard requirement.
 Where `kb-mcp` itself runs is flexible: the Helm chart below targets Kubernetes, but the same
-Docker image runs on any other cloud or locally. What changes between those is the environment
-variables, not the architecture. Zitadel is likewise fixed: it's always the same instance your
+Docker image runs on any other cloud or locally. Only the environment variables change. Zitadel
+is likewise fixed: it's always the same instance your
 Unique AI tenant already uses, never one you stand up yourself.
 
 - Kubernetes 1.25+ with a Gateway API implementation (the chart exposes itself via `HTTPRoute`, not
@@ -45,8 +45,8 @@ Deliver them through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through 
 via `extraEnvSecrets`.
 
 You'll also need `mcpConfig.zitadel.clientId`, the public (PKCE) OIDC client id for `kb-mcp`,
-registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`. It isn't a secret, it's a
-plain chart value; see [Configuration](./configuration.md#Required) for the full required-variable
+registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`. It is public, so it sits in
+plain chart values; see [Configuration](./configuration.md#Required) for the full required-variable
 reference.
 
 ## Minimal Values

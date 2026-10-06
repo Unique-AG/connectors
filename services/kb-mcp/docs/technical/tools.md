@@ -16,8 +16,8 @@ caller may raise or lower per call (`limit`, `score_threshold`, `max_tokens_per_
 
 ## How the Calling LLM Picks Arguments
 
-Tool descriptions tell the LLM exactly where an argument's value has to come from, not just its
-type. `search`'s `folder_ids`, for example, only accepts a `scope_xxx` id copied verbatim from a
+Tool descriptions tell the LLM exactly where an argument's value has to come from, as well as
+its type. `search`'s `folder_ids`, for example, only accepts a `scope_xxx` id copied verbatim from a
 `folder_id` annotation in a prior `content_tree(mode='tree')` result, never a folder name, a path,
 or a `scope_xxx` lifted from a citation link (that's the file's own folder, not necessarily the one
 the user meant). `metadata_filter`'s `path` is one of the fixed fields (`mimeType`, `key`, `title`,
@@ -135,9 +135,9 @@ Returns file content by `content_id`, as surfaced by `content_tree` or `search`.
 
 `max_tokens_per_call` (admin default `8000`) bounds one response. Larger files are split into
 virtual pages of that size, selected with `start_page` and `end_page`. A caller may raise or
-lower it, it's a default, not a cap; if the file still doesn't fit in one call and no page range
-was given, the call returns an error instead of silently truncating, naming the file's total
-token/page count so the caller can pick a range.
+lower it, since it is a default the caller can override; if the file still doesn't fit in one call
+and no page range was given, the call returns an error instead of silently truncating, naming the
+file's total token/page count so the caller can pick a range.
 
 ## Related Documentation
 

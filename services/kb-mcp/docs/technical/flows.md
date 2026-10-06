@@ -71,7 +71,7 @@ makes a folder-scoped call fast.
 
 Responses are cached in memory per pod, keyed on `(company_id, user_id, folder_scope)`. With
 multiple replicas a change can therefore take up to the cache TTL (default 600s) to appear. A
-caller's own `metadata_filter` no longer forces a second walk: only the admin filter is baked into
+caller's own `metadata_filter` doesn't force a second walk: only the admin filter is baked into
 the cached walk.
 
 ## Read File

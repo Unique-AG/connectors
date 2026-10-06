@@ -19,8 +19,8 @@ service-wide credential that could read another user's content.
 | `profile` | Basic profile claims |
 | `urn:zitadel:iam:user:resourceowner` | Resolves the user's owning organisation, which becomes the company id |
 
-`mcp:*` scopes are advertised on the OAuth metadata endpoint but never required: standard OAuth
-authorization-server metadata behavior (RFC 8414), not a kb-mcp-specific gap. Zitadel decides
+`mcp:*` scopes are advertised on the OAuth metadata endpoint but never required. This is standard OAuth
+authorization-server metadata behavior (RFC 8414). Zitadel decides
 which of them to grant, and a scope it withholds is rejected at the middleware rather than silently
 honoured.
 
