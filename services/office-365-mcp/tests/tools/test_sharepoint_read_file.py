@@ -19,6 +19,7 @@ from office_365_mcp.config import AppConfig
 from office_365_mcp.graph_client import (
     GRAPH_OPERATIONS_TOTAL,
     GRAPH_STEPS_TOTAL,
+    GraphFailure,
     GraphNotFound,
 )
 from office_365_mcp.metrics import configure_metrics
@@ -418,6 +419,32 @@ class TestWhatItRefuses:
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=b""))
 
         with pytest.raises(ToolError, match="sent no content"):
+            _ = await _read(client, transport)
+
+    @pytest.mark.usefixtures("item")
+    async def test_a_file_microsoft_will_not_convert_is_sent_back_to_the_read_without_conversion(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                406, json={"error": {"code": "notSupported", "message": "pdf"}}
+            )
+        )
+
+        with pytest.raises(ToolError, match="without `convert_to`"):
+            _ = await reader.sharepoint_read_file(client, transport, file=_FILE, convert_to="pdf")
+
+    @pytest.mark.usefixtures("item")
+    async def test_a_406_for_a_read_that_asked_for_no_conversion_is_not_blamed_on_conversion(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                406, json={"error": {"code": "notSupported", "message": "no"}}
+            )
+        )
+
+        with pytest.raises(GraphFailure):
             _ = await _read(client, transport)
 
     async def test_a_file_graph_will_not_return_is_a_not_found(

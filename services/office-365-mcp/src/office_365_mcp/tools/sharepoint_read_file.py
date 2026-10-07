@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from http import HTTPStatus
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Annotated, Literal
@@ -20,6 +21,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import (
+    GraphFailure,
     GraphResponseTooLarge,
     download_to_file,
     graph_errors,
@@ -86,6 +88,13 @@ _NOT_A_PLAIN_FILE = (
     + "not: Microsoft describes them as packages, which are folders in some places and files in "
     + "others. Open this item in a browser instead. Reading it here fails the same way every "
     + "time, and no other tool here returns it."
+)
+
+_NOT_CONVERTIBLE = (
+    "Microsoft 365 cannot convert this file to PDF. It reports that it does not support this "
+    + "format. The handle is correct, so a different handle will not help. Call this tool again "
+    + "with the same handle and without `convert_to`. This tool then returns the file in its own "
+    + "format. A second request for the conversion fails the same way."
 )
 
 _NO_SIZE = (
@@ -162,6 +171,10 @@ async def _fetched(
                     body = downloaded.path.read_bytes()
         except GraphResponseTooLarge:
             return _too_large(size=None, web_url=item.web_url)
+        except GraphFailure as failure:
+            if convert_to is not None and failure.status == HTTPStatus.NOT_ACCEPTABLE:
+                return _NOT_CONVERTIBLE
+            raise
 
         if body == b"" and item.size > 0:
             return _NOTHING_CAME_BACK
