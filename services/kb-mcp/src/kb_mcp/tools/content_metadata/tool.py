@@ -210,7 +210,7 @@ def _flatten_metadata_value(value: Any) -> list[Any]:
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "tags",
+        "unique.app/icon": "IconScrollText",
         "unique.app/system-prompt": (
             "Discover what metadata fields and values exist on the "
             "knowledge base's visible content, so a caller can build a "

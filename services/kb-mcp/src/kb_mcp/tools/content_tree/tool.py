@@ -360,7 +360,7 @@ def _file_link(
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "folder-tree",
+        "unique.app/icon": "IconFolderData",
         "unique.app/system-prompt": (
             "Browse the knowledge base's folder/file structure — use this "
             "only when you need to know what files or folders exist, not to "

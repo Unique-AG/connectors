@@ -75,7 +75,7 @@ def _effective_service_config(
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "search",
+        "unique.app/icon": "IconFolderData",
         "unique.app/system-prompt": SEARCH_SYSTEM_PROMPT,
         "unique.app/tool-format-information": UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     },

@@ -77,7 +77,7 @@ def _is_chunked(content: Content) -> bool | None:
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "file-text",
+        "unique.app/icon": "IconBook",
         "unique.app/system-prompt": (
             "Choose this tool to read the contents of a specific file once "
             "you have its content_id (e.g. from content_tree)."
