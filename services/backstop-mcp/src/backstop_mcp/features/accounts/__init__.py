@@ -1,7 +1,7 @@
 """Product index, account listing, series latest-point, and holdings / time-series shapes.
 
-`resolve_product` matches a trusted id, then a name with `filter[name][like]`, then a full
-catalog walk — not one `GET /products` page.
+`resolve_product` matches a trusted id by one GET, and anything else over one full catalog walk
+(an exact short name first) — not one `GET /products` page.
 It does not use `ResolvePartyQuery`: that path is `/quick-search`, which misses short names.
 Account listing walks `/accounts` with `include=owner,investorType` (and `product` by party).
 Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date][ge]` window —
@@ -14,8 +14,8 @@ from backstop_mcp.features.accounts.dependencies import (
     get_capital_flows_query_factory,
     get_holdings_query_factory,
     get_latest_account_values_query_factory,
-    get_product_query_factory,
     get_time_series_query_factory,
+    search_products_query_factory,
 )
 from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
@@ -40,9 +40,9 @@ from backstop_mcp.features.accounts.queries import (
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
     GetLatestAccountValuesQuery,
-    GetProductQuery,
     GetTimeSeriesQuery,
     HoldingsTableShapeError,
+    SearchProductsQuery,
     TimeSeriesEntityType,
     TimeSeriesName,
 )
@@ -53,7 +53,6 @@ from backstop_mcp.features.accounts.resolve_product import (
 )
 from backstop_mcp.features.accounts.responses import (
     MAX_CAPITAL_FLOW_SCAN_RECORDS,
-    MAX_PRODUCT_SCAN_RECORDS,
     AccountRowResponse,
     CapitalFlowPartyResponse,
     CapitalFlowRowResponse,
@@ -63,9 +62,11 @@ from backstop_mcp.features.accounts.responses import (
     MoneyResponse,
     PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
+    ProductDescriptionResponse,
     ProductInvestorsResolvedResponse,
     ProductRecordResponse,
     ProductResolvedResponse,
+    ProductRiskFreeRateResponse,
     ShareResponse,
     TimeSeriesResolvedResponse,
 )
@@ -86,7 +87,7 @@ __all__ = [
     "GetCapitalFlowsQuery",
     "GetHoldingsQuery",
     "GetLatestAccountValuesQuery",
-    "GetProductQuery",
+    "SearchProductsQuery",
     "GetTimeSeriesQuery",
     "HoldingFigureErrorDto",
     "HoldingFigureErrorResponse",
@@ -96,7 +97,6 @@ __all__ = [
     "HoldingsTableShapeError",
     "InvestorTypeDto",
     "MAX_CAPITAL_FLOW_SCAN_RECORDS",
-    "MAX_PRODUCT_SCAN_RECORDS",
     "MoneyDto",
     "MoneyResponse",
     "PRODUCT_SERIES",
@@ -105,7 +105,9 @@ __all__ = [
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductInvestorsResolvedResponse",
+    "ProductDescriptionResponse",
     "ProductRecordResponse",
+    "ProductRiskFreeRateResponse",
     "ProductResolution",
     "ProductResolvedResponse",
     "ResolvedProductDto",
@@ -118,7 +120,7 @@ __all__ = [
     "get_capital_flows_query_factory",
     "get_holdings_query_factory",
     "get_latest_account_values_query_factory",
-    "get_product_query_factory",
+    "search_products_query_factory",
     "get_time_series_query_factory",
     "raise_if_invalid_series",
     "resolve_product",

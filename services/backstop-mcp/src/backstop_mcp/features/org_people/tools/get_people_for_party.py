@@ -101,7 +101,7 @@ async def get_people_for_party(
 
     Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
 
-    This is the roster of current staff: `numberOfEmployees` on `get_organization` is often 0
+    This is the roster of current staff: `numberOfEmployees` on `get_organization` may be 0
     even when people are on file. Name and email come from
     `GET /organizations/{id}/employees` — that organization's people, not system-users.
     Echo each row's `id` and `search_type`. An `employees` id from quick-search is a

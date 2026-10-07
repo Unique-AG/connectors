@@ -26,7 +26,7 @@ def scan_coverage(
     rows_scanned: int,
     visible_count: int | None,
     rows_dropped: int,
-    ceiling: int,
+    ceiling: int | None,
     ceiling_clamped: bool,
     partial_due_to_error: bool,
     extra_disclaimers: tuple[str, ...] = (),
@@ -36,12 +36,12 @@ def scan_coverage(
     `ceiling` is the most this walk will read: an endpoint wall where there is one (10000 on
     entity-activities) and otherwise the scan ceiling the fetch caps itself at. Both saturate
     the same way from the caller's side — the answer is a prefix of the collection — so both
-    are reported as `ceiling_hit`.
+    are reported as `ceiling_hit`. `ceiling=None` is an uncapped walk: it never hits one.
     """
-    ceiling_hit = ceiling_clamped or visible_count == ceiling
+    ceiling_hit = ceiling is not None and (ceiling_clamped or visible_count == ceiling)
     truncated = ceiling_hit or partial_due_to_error
     disclaimers: list[str] = []
-    if ceiling_hit:
+    if ceiling is not None and ceiling_hit:
         disclaimers.append(_ceiling_disclaimer(ceiling))
     if partial_due_to_error:
         disclaimers.append(ERROR_DISCLAIMER)
@@ -49,7 +49,7 @@ def scan_coverage(
     return ScanCoverageResponse(
         rows_scanned=rows_scanned,
         visible_count=visible_count,
-        visible_count_is_floor=visible_count == ceiling,
+        visible_count_is_floor=ceiling is not None and visible_count == ceiling,
         truncated=truncated,
         ceiling_hit=ceiling_hit,
         partial_due_to_error=partial_due_to_error,

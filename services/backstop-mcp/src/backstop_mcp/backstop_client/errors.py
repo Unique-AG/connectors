@@ -232,6 +232,15 @@ class BackstopRateLimitError(BackstopApiError):
         self.retry_after_seconds = retry_after_seconds
 
 
+# A fan-out (one request per party, account, or row) stops on these instead of reporting one
+# item failed: every other request in it would fail the same way.
+BATCH_ABORTING_ERRORS: tuple[type[Exception], ...] = (
+    BackstopAuthError,
+    BackstopTransientAuthError,
+    BackstopRateLimitError,
+)
+
+
 class BackstopUntrustedUrlError(ToolError):
     """Raised when an upstream-supplied absolute URL points somewhere other than Backstop.
 

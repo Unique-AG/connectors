@@ -7,6 +7,8 @@ The listing asks for `fields=` and pages in parallel. `fields=` drops the whole 
 block — except for the relationships named in `include=`, which keep their `data` linkage.
 Why `closedDate` stays meaningful under `fields=` is noted on `ACCOUNT_LISTING_FIELDS`.
 `regularCustomFieldValues` is requested unless `exclude_custom_fields` is set.
+`owner_ids` (a party id or its contacts envelope id) keeps only those owners' accounts,
+before the open/closed split, so `closed_omitted` counts their closed accounts only.
 """
 
 from backstop_mcp.backstop_client import BackstopClient, Included
@@ -36,6 +38,7 @@ class GetAccountsForProductQuery:
         product: ResolvedProductDto,
         include_closed: bool = False,
         exclude_custom_fields: bool = False,
+        owner_ids: frozenset[str] | None = None,
     ) -> ProductListingResponse:
         fields = ACCOUNT_LISTING_FIELDS
         if not exclude_custom_fields:
@@ -64,6 +67,10 @@ class GetAccountsForProductQuery:
             )
             for resource in page.items
         )
+        if owner_ids is not None:
+            rows = tuple(
+                row for row in rows if row.owner is not None and row.owner.has_id(owner_ids)
+            )
         kept = rows if include_closed else tuple(row for row in rows if row.is_open)
         closed_omitted = 0 if include_closed else len(rows) - len(kept)
         return ProductListingResponse(

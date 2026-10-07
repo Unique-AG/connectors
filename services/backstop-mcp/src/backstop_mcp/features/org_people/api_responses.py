@@ -24,7 +24,7 @@ from pydantic import (
     model_validator,
 )
 
-from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiResource, IncludedResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt, LenientStr
@@ -32,9 +32,12 @@ from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt, LenientS
 __all__ = [
     "EmployeeAttributes",
     "EmployeeResource",
+    "LocationAttributes",
+    "LocationResource",
     "OrganizationAttributes",
     "OrganizationResource",
     "PersonAttributes",
+    "PersonResource",
 ]
 
 
@@ -197,5 +200,28 @@ class EmployeeAttributes(BaseModel):
     is_key_employee: LenientBool = Field(default=None, validation_alias="isKeyEmployee")
 
 
+class LocationAttributes(BaseModel):
+    """A `contact-locations` resource side-loaded by `include=contactLocations`.
+
+    The party record inlines a copy of its primary location. This is the whole list, one entry per
+    address. The street address is `address` here, not `streetAddress`, and `countryCode` is an
+    ISO code the party record does not carry. Backstop's resolved-name twins and fax are not read.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    location_title: LenientStr = Field(default=None, validation_alias="locationTitle")
+    address: LenientStr = None
+    city: LenientStr = None
+    state: LenientStr = None
+    country: LenientStr = None
+    country_code: LenientStr = Field(default=None, validation_alias="countryCode")
+    postal_code: LenientStr = Field(default=None, validation_alias="postalCode")
+    phone: LenientStr = Field(default=None, validation_alias="phoneNumber")
+    is_primary: LenientBool = Field(default=None, validation_alias="isPrimaryLocation")
+
+
 EmployeeResource = BackstopApiResource[EmployeeAttributes]
+LocationResource = IncludedResource[LocationAttributes]
 OrganizationResource = BackstopApiResource[OrganizationAttributes]
+PersonResource = BackstopApiResource[PersonAttributes]

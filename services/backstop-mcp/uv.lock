@@ -195,6 +195,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "beautifulsoup4" },
     { name = "cryptography" },
     { name = "fastmcp" },
     { name = "httpx" },
@@ -231,6 +232,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = "==1.20.0" },
     { name = "asyncpg", specifier = "==0.31.0" },
+    { name = "beautifulsoup4", specifier = "==4.15.0" },
     { name = "cryptography", specifier = "==50.0.1" },
     { name = "fastmcp", specifier = "==4.0.5" },
     { name = "httpx", specifier = "==0.28.1" },

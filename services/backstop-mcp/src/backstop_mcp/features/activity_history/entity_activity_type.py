@@ -1,8 +1,8 @@
 """Search-path activity types shared by the search tool and `SearchActivitiesQuery`.
 
 These cannot live on the query — the tool names them on its published parameter, and the
-query file is the `POST /entity-activities` walker, not the vocabulary. The tool token
-`meeting_call` is sent to Backstop as the search value `call`.
+query file is the `POST /entity-activities` walker, not the vocabulary. Each token is also
+the `newFilters.types` search value Backstop matches.
 """
 
 from typing import Literal

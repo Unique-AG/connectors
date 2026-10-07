@@ -6,7 +6,9 @@ one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never
 `get_time_series` over a fund's accounts.
 """
 
+import asyncio
 import logging
+from collections.abc import Sequence
 from typing import Annotated
 
 from fastmcp import Context
@@ -17,7 +19,11 @@ from opentelemetry import trace
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.dependencies import get_backstop_client_for_current_caller
+from backstop_mcp.config import ProductInvestorsConfig
+from backstop_mcp.dependencies import (
+    get_backstop_client_for_current_caller,
+    get_product_investors_config,
+)
 from backstop_mcp.features.accounts import (
     GetAccountsForProductQuery,
     GetLatestAccountValuesQuery,
@@ -36,7 +42,7 @@ from backstop_mcp.features.accounts.responses import (
     investors_from_listings,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, input_required
-from backstop_mcp.models import published_output_schema
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -46,10 +52,6 @@ type GetProductInvestorsResponse = (
 )
 
 _MAX_PRODUCTS = 10
-
-# Enough for an onshore/offshore pair of a typical fund. Past this the answer is slow enough that
-# the user should narrow the scope rather than wait.
-_MAX_VALUED_ACCOUNTS = 50
 
 
 @tool(
@@ -71,9 +73,9 @@ async def get_product_investors(
             description=(
                 "One to ten products: ids echoed from a prior response, short names (`NWON`), "
                 "or names. An id, exact short name, or exact name is that one vehicle. A partial "
-                "name returns every vehicle whose name contains it, up to 6 (e.g. onshore and "
-                "offshore feeders) — `['Northwind Dispersion']` returns both; more matches ask "
-                "the user. Pass several (`['NWON', 'NWOF']`) when the user names specific ones. "
+                "name returns every vehicle whose name contains it, up to 6 (several vehicles "
+                "sharing a name). More matches ask the user. Pass several (`['NWON', 'NWOF']`) "
+                "when the user names specific ones. "
                 "Never invent an id."
             ),
         ),
@@ -93,22 +95,34 @@ async def get_product_investors(
             description=(
                 "Adds each account's latest value (amount, currency, as-of date, ACTUAL or "
                 "ESTIMATE) and per-owner totals — the answer to 'list investors by size'. It "
-                "costs one Backstop request per account and is refused past "
-                f"{_MAX_VALUED_ACCOUNTS} accounts. **Ask the user first**: list the vehicles "
-                "you resolved and whether closed accounts count, and get a yes before passing "
-                "true. Do not turn it on just because the question mentions size or balance. "
-                "For a specific date or any other series, use get_time_series instead."
+                "costs one Backstop request per account and is refused past this deployment's "
+                "account limit. Pass true when the answer needs balances: "
+                "sizing, a share of assets, or a breakdown weighted by value. Past the limit "
+                "no values are fetched and `latest_value_hint` says how to narrow. Leave it "
+                "false for a list of who holds the product. For a specific date or any other "
+                "series, use get_time_series instead."
             ),
         ),
     ] = False,
+    investor_ids: Annotated[
+        Sequence[CoercedId],
+        Field(
+            description=(
+                "Only these investors' accounts are listed and valued: party ids from an "
+                "earlier result (`investors[].id`, an activity's `associated_with`, a deal's "
+                "`investor`). Pass it when the answer is about investors you already have, so "
+                "the values stay under the account limit. Ids with no account here come back "
+                "in `investor_ids_not_found`. Omit for everyone in the products."
+            ),
+        ),
+    ] = (),
     exclude_custom_fields: Annotated[
         bool,
         Field(
             description=(
                 "Every account's custom fields come back as `custom_field_values` by "
                 "default. Leave this false. Set it true only to retry a call that timed "
-                "out, to see whether reading the custom fields is what made it slow; "
-                "a geographical breakdown needs them."
+                "out, to see whether reading the custom fields is what made it slow."
             )
         ),
     ] = False,
@@ -119,19 +133,22 @@ async def get_product_investors(
     get_latest_account_values_query: GetLatestAccountValuesQuery = Depends(
         get_latest_account_values_query_factory
     ),
+    config: ProductInvestorsConfig = Depends(get_product_investors_config),
 ) -> GetProductInvestorsResponse | InputRequiredResult:
     """The accounts in one or more products, and who owns them.
 
-    A partial fund name returns every vehicle whose name contains it (onshore and offshore); an
+    A partial fund name returns every vehicle whose name contains it; an
     id, exact short name, or exact name is one vehicle. No figures by default.
 
-    Sizing ("list investors by size", "biggest holders"): first call without figures, tell
-    the user which vehicles and how many accounts you found, and ask whether to pull latest
-    values. Only after they confirm, call again with `include_latest_value=true` and rank by
-    `investors[].latest_value_totals`. Never call `get_time_series` once per account in the
-    fund — that is one call per (account, series) and drops rows. Fund-level AUM is
-    `get_time_series` on a product's `aums`: the product's total assets under management,
-    not one investor's balance.
+    Sizing ("list investors by size", "biggest holders", a share or breakdown by value):
+    call with `include_latest_value=true` and rank by `investors[].latest_value_totals`;
+    say which vehicles and whether closed accounts counted. When the investors are already
+    known (from activities or a pipeline walk), pass them as `investor_ids` so only their
+    accounts are valued. Past the account limit no values come back and
+    `latest_value_hint` says how to narrow. Never call `get_time_series`
+    once per account in the fund — that is one call per (account, series) and drops rows.
+    Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
+    under management, not one investor's balance.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor
@@ -140,31 +157,17 @@ async def get_product_investors(
     person. A listing with no accounts and `closed_omitted>0` means every account in that
     product is closed — pass `include_closed=true` rather than reading that as "no investors".
 
-    A geographical breakdown of investors uses an account custom field that holds where the
-    investor is, weighted by latest value. Which field that is differs by tenant, so look
-    before choosing: read the `name` of each entry in the accounts' `custom_field_values`
-    (present unless `exclude_custom_fields` is set) and pick the location or region field.
-    If none looks like location, or several could, ask the user which to use. Do not guess
-    and do not substitute `us_domiciled`, which is only the US/non-US flag. Weight each
-    account by `latest_value.amount` (`include_latest_value=true` on that call). An account
-    without that field in `custom_field_values` has no value — group it as blank.
-
-    A fund named without a feeder, by name or by the user's abbreviation, is every feeder in
-    this one call. Find them with get_product and pass them together. Do not ask onshore or
-    offshore before continuing. Who a colleague updates on a fund is meetings, not balances:
-    search_activities for that fund's meetings they attend, grouped by investor. Balance can
-    order that list; it is not the answer.
-
     Call like: {"products": ["NGUP"], "include_latest_value": false}
-    Both feeders: {"products": ["NWON", "NWOF"]}
-    Geography: {"products": ["NWON", "NWOF"], "include_latest_value": true}, then group on
-    the location field you found in `custom_field_values`
+    Several vehicles: {"products": ["NWON", "NWOF"]}
     """
     with _tracer.start_as_current_span("accounts.product_investors") as span:
         span.set_attribute("product_count", len(products))
         span.set_attribute("include_closed", include_closed)
         span.set_attribute("include_latest_value", include_latest_value)
         span.set_attribute("exclude_custom_fields", exclude_custom_fields)
+        requested_investors = coerce_ids(investor_ids)
+        span.set_attribute("investor_id_count", len(requested_investors))
+        owner_ids = frozenset(requested_investors) if requested_investors else None
         resolved_products = await _resolve_products(ctx, client, products=products)
         if not isinstance(resolved_products, tuple):
             return resolved_products
@@ -176,26 +179,39 @@ async def get_product_investors(
                 "include_closed": include_closed,
                 "include_latest_value": include_latest_value,
                 "exclude_custom_fields": exclude_custom_fields,
+                "investor_id_count": len(requested_investors),
             },
         )
-        listings: list[ProductListingResponse] = []
-        for resolved in resolved_products:
-            listings.append(
-                await get_accounts_for_product_query.run(
-                    product=resolved,
-                    include_closed=include_closed,
-                    exclude_custom_fields=exclude_custom_fields,
+        # Each listing is its own `/accounts` walk with no ordering between products; `gather`
+        # keeps the input order, so the output is the same as awaiting them one by one.
+        listings = list(
+            await asyncio.gather(
+                *(
+                    get_accounts_for_product_query.run(
+                        product=resolved,
+                        include_closed=include_closed,
+                        exclude_custom_fields=exclude_custom_fields,
+                        owner_ids=owner_ids,
+                    )
+                    for resolved in resolved_products
                 )
             )
+        )
         latest_value_hint: str | None = None
         if include_latest_value:
             listings, latest_value_hint = await _with_latest_values(
-                listings, get_latest_account_values_query
+                listings,
+                get_latest_account_values_query,
+                max_valued_accounts=config.max_valued_accounts,
             )
+        investors = investors_from_listings(listings)
         result = ProductInvestorsResolvedResponse(
             products=tuple(listings),
-            investors=investors_from_listings(listings),
+            investors=investors,
             latest_value_hint=latest_value_hint,
+            investor_ids_not_found=(
+                _not_found(requested_investors, listings) if requested_investors else None
+            ),
         )
         accounts = [account for listing in listings for account in listing.accounts]
         logger.info(
@@ -222,7 +238,11 @@ async def _resolve_products(
     | NotFoundResponse
     | InputRequiredResult
 ):
-    """Every entry through the family resolve, deduped by product id in the order given."""
+    """Every entry through the family resolve, deduped by product id in the order given.
+
+    Sequential on purpose: an ambiguous entry elicits the user, and two prompts at once would
+    race for the same conversation.
+    """
     collected: dict[str, ResolvedProductDto] = {}
     for entry in products:
         family = await resolve_product_family(ctx, client, product=entry)
@@ -238,21 +258,14 @@ async def _resolve_products(
 async def _with_latest_values(
     listings: list[ProductListingResponse],
     get_latest_account_values_query: GetLatestAccountValuesQuery,
+    *,
+    max_valued_accounts: int,
 ) -> tuple[list[ProductListingResponse], str | None]:
     """Listings with `latest_value` on every account, or unchanged plus why when over the cap."""
     account_count = sum(len(listing.accounts) for listing in listings)
-    if account_count > _MAX_VALUED_ACCOUNTS:
-        return listings, (
-            f"No values fetched: {account_count} accounts is over the "
-            f"{_MAX_VALUED_ACCOUNTS}-account limit. Tell the user and offer one of: narrow "
-            "the scope (fewer vehicles, or open accounts only) and call again; size by investor "
-            "with get_accounts_for_party on each `investors[]` entry (`id` as `party_id`, "
-            "`resource_type` as `search_type`) — one request per investor, balances carry no "
-            "as-of date, and it lists the investor's other funds too, so keep only this "
-            "response's `account_ids`; or, if the firm keeps a saved Report Center report of "
-            "investor balances, run_report by its exact name (ask the user for it). Fund-level "
-            "AUM alone is get_time_series on the product's `aums`. Do not call get_time_series "
-            "on every account."
+    if account_count > max_valued_accounts:
+        return listings, _over_limit_hint(
+            listings, account_count=account_count, max_valued_accounts=max_valued_accounts
         )
     latest = await get_latest_account_values_query.run(
         account_ids=[account.id for listing in listings for account in listing.accounts]
@@ -275,3 +288,47 @@ async def _with_latest_values(
         )
         for listing in listings
     ], None
+
+
+def _over_limit_hint(
+    listings: list[ProductListingResponse], *, account_count: int, max_valued_accounts: int
+) -> str:
+    """Why no values came back, and the narrower calls that would fit — cheapest first."""
+    each_vehicle_fits = len(listings) > 1 and all(
+        len(listing.accounts) <= max_valued_accounts for listing in listings
+    )
+    per_vehicle = (
+        (
+            "or call once per vehicle (each fits the limit) and add "
+            "`investors[].latest_value_totals` up by investor `id`; "
+        )
+        if each_vehicle_fits
+        else ""
+    )
+    return (
+        f"No values fetched: {account_count} accounts is over the {max_valued_accounts}-account "
+        "limit. Narrow and call again: pass `investor_ids` with only the investors the answer "
+        f"needs (ids from `investors[]`); {per_vehicle}or drop closed accounts. If none fits, "
+        "tell the user and offer: get_accounts_for_party on each `investors[]` entry (`id` as "
+        "`party_id`, `resource_type` as `search_type`) — one request per investor, balances "
+        "carry no as-of date, and it lists the investor's other funds too, so keep only this "
+        "response's `account_ids`; or, if the firm keeps a saved Report Center report of "
+        "investor balances, run_report by its exact name (ask the user for it). Fund-level AUM "
+        "alone is get_time_series on the product's `aums`. Do not call get_time_series on every "
+        "account."
+    )
+
+
+def _not_found(
+    investor_ids: Sequence[str], listings: Sequence[ProductListingResponse]
+) -> tuple[str, ...]:
+    """Requested ids with no listed account, in the order given, each once."""
+    listed = {
+        candidate
+        for listing in listings
+        for account in listing.accounts
+        if account.owner is not None
+        for candidate in (account.owner.id, account.owner.contacts_id)
+        if candidate is not None
+    }
+    return tuple(dict.fromkeys(entry for entry in investor_ids if entry not in listed))

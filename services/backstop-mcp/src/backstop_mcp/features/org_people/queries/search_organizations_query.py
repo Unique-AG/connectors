@@ -8,10 +8,24 @@
 convert a query-string value into `RegularCustomFieldValueDto`. Those predicates run
 after the fetch. `filter[email][eq]` is the primary email only.
 
-A custom-field-only call reads the collection. Large tenants have thousands of
-organizations; a sparse page carrying `regularCustomFieldValues` takes seconds, and the
-per-user gate allows five concurrent requests, so the walk requests later pages in
-parallel. Every match is returned; the scan ceiling is the only limit.
+Locations come from `include=contactLocations` on the same walk, so a party's other offices
+cost no extra request. `filter[contactLocations.city][eq]` matches any of an organization's
+locations, but exactly and case-sensitively, with no `like` and no `in`. `city` and `address`
+are the only `contactLocations` filter fields; `state`, `country`, `postalCode`,
+`locationTitle`, and `isPrimaryLocation` are `400 Invalid filter field`. So the city and the
+street address are sent exactly as the caller wrote them, and the rest of the location filter
+runs after the fetch.
+
+One call returns one page of matches and a cursor at the next unread record. Backstop sorts
+on one field only and returns records that tie on it in a different order between requests,
+so offset paging over `sort=name` would repeat or skip organizations sharing a name at page
+edges; the walk uses `sort=id`, which pages cleanly. Rows keep that order: re-sorting a page
+by name would reorder rows across pages.
+
+A custom-field-only call reads the collection until the page fills or the collection
+ends. Large tenants have thousands of organizations; a sparse page carrying
+`regularCustomFieldValues` takes seconds, and the per-user gate allows five concurrent
+requests, so a call with in-memory predicates requests later pages in parallel.
 """
 
 import logging
@@ -20,29 +34,40 @@ from collections.abc import Sequence
 from opentelemetry import trace
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.collection_scan import scan_coverage
+from backstop_mcp.backstop_client import BackstopClient, Included, SinglePage
+from backstop_mcp.features.collection_scan import (
+    SearchCursor,
+    collect_page,
+    continuation,
+    scan_coverage,
+    search_fingerprint,
+)
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
     normalize_matches,
     satisfies_every,
     stored_custom_field_values,
 )
-from backstop_mcp.features.org_people.api_responses import OrganizationResource
+from backstop_mcp.features.includes import ContactLocationResponse
+from backstop_mcp.features.org_people.api_responses import LocationResource, OrganizationResource
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.features.org_people.responses import (
     SearchOrganizationRowResponse,
     SearchOrganizationsResolvedResponse,
+)
+from backstop_mcp.features.org_people.utils import (
+    location_filter_params,
+    matches_location,
+    party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-# Scan ceiling. A larger collection stops here and says so in `coverage` rather than
-# reading without a bound.
-MAX_ORGANIZATION_SCAN_RECORDS = 10_000
-
 _PAGE_SIZE = 500
+# The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
+_SPARSE_CONCURRENCY = 5
 
 
 class SearchOrganizationsQuery:
@@ -62,88 +87,140 @@ class SearchOrganizationsQuery:
         other_id: str | None = None,
         matching_domain: str | None = None,
         legal_name: str | None = None,
-        city: str | None = None,
-        country: str | None = None,
-        state: str | None = None,
+        location_filter: LocationFilter | None = None,
         website: str | None = None,
         ria: bool | None = None,
         internal_organization: bool | None = None,
         custom_fields: Sequence[CustomFieldMatch] = (),
         exclude_custom_fields: bool = False,
         fields: frozenset[str],
+        result_size: int,
+        cursor: str | None = None,
     ) -> SearchOrganizationsResolvedResponse:
-        """Read the server-filtered collection, then apply predicates Backstop rejects."""
+        """One page of matches from the cursor: server filters on the wire, the rest in memory."""
         name = self._text(name)
         email = self._text(email)
         other_id = self._text(other_id)
         matching_domain = self._text(matching_domain)
         legal_name = self._text(legal_name)
-        city = self._text(city)
-        country = self._text(country)
-        state = self._text(state)
         website = self._text(website)
         predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
             legal_name=legal_name,
-            city=city,
-            country=country,
-            state=state,
+            location_filter=location_filter,
             website=website,
             ria=ria,
             internal_organization=internal_organization,
             predicates=predicates,
         )
-        with _tracer.start_as_current_span("org_people.query.search_organizations") as span:
-            span.set_attribute("memory", should_filter_in_memory)
-            pages = await self._client.paginate(
+        fingerprint = search_fingerprint(
+            "search_organizations",
+            {
+                "name": name,
+                "email": email,
+                "other_id": other_id,
+                "matching_domain": matching_domain,
+                "legal_name": legal_name,
+                "location_filter": location_filter,
+                "website": website,
+                "ria": ria,
+                "internal_organization": internal_organization,
+                "custom_fields": predicates,
+                "exclude_custom_fields": exclude_custom_fields,
+                "fields": sorted(fields),
+            },
+        )
+        start_offset = (
+            0
+            if cursor is None
+            else SearchCursor.decode(cursor, fingerprint=fingerprint, collections=1).offsets[0]
+        )
+        params = {
+            **self._query_params(
+                name=name,
+                email=email,
+                other_id=other_id,
+                matching_domain=matching_domain,
+                exclude_custom_fields=exclude_custom_fields,
+            ),
+            **location_filter_params(location_filter),
+        }
+        dropped = 0
+
+        async def read_at(offset: int) -> SinglePage[OrganizationResource]:
+            return await self._client.fetch_page(
                 "/organizations",
                 schema=OrganizationResource,
-                params=self._query_params(
-                    name=name,
-                    email=email,
-                    other_id=other_id,
-                    matching_domain=matching_domain,
-                    exclude_custom_fields=exclude_custom_fields,
-                ),
-                max_records=MAX_ORGANIZATION_SCAN_RECORDS,
+                params=params,
                 page_size=_PAGE_SIZE,
-                parallel=True,
+                offset=offset,
             )
-            selected, dropped = self._select(
-                pages.items,
+
+        def select(
+            page: SinglePage[OrganizationResource],
+        ) -> tuple[tuple[int, SearchOrganizationRowResponse], ...]:
+            nonlocal dropped
+            matches, page_dropped = self._select(
+                page.items,
+                Included(page.included),
                 legal_name=legal_name,
-                city=city,
-                country=country,
-                state=state,
+                location_filter=location_filter,
                 website=website,
                 ria=ria,
                 internal_organization=internal_organization,
                 predicates=predicates,
             )
-            if should_filter_in_memory:
-                selected = tuple(sorted(selected, key=self._name_order))
-            span.set_attribute("rows_scanned", len(pages.items))
-            span.set_attribute("matched", len(selected))
+            dropped += page_dropped
+            return matches
+
+        with _tracer.start_as_current_span("org_people.query.search_organizations") as span:
+            span.set_attribute("memory", should_filter_in_memory)
+            span.set_attribute("start_offset", start_offset)
+            page = await collect_page(
+                read_at=read_at,
+                select=select,
+                start_offset=start_offset,
+                output_page_size=result_size,
+                api_page_size=_PAGE_SIZE,
+                concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+            )
+            span.set_attribute("rows_scanned", page.records_scanned)
+            span.set_attribute("matched", len(page.rows))
+            span.set_attribute("stop_reason", page.stop_reason)
             logger.info(
                 "org_people.search.fetched",
                 extra={
                     "memory": should_filter_in_memory,
-                    "rows_scanned": len(pages.items),
-                    "matched": len(selected),
+                    "start_offset": start_offset,
+                    "rows_scanned": page.records_scanned,
+                    "matched": len(page.rows),
                     "dropped": dropped,
-                    "total_count": pages.total_count,
+                    "total_count": page.total_count,
+                    "request_count": page.request_count,
+                    "stop_reason": page.stop_reason,
                 },
             )
             projected = fields | {"id"}
             if not exclude_custom_fields:
                 projected = projected | {"custom_field_values"}
-            return self._to_response(
-                selected,
-                fields=projected,
-                rows_scanned=len(pages.items),
-                rows_dropped=dropped,
-                total_count=pages.total_count,
-                ceiling_clamped=pages.truncated,
+            return SearchOrganizationsResolvedResponse(
+                coverage=scan_coverage(
+                    rows_scanned=page.records_scanned,
+                    visible_count=page.total_count,
+                    rows_dropped=dropped,
+                    # No ceiling of ours: a page stops when it is full or the collection ends.
+                    ceiling=None,
+                    ceiling_clamped=False,
+                    # Every page is one request: a failed page raises.
+                    partial_due_to_error=False,
+                ),
+                rows=self._project(page.rows, fields=projected),
+                continuation=continuation(
+                    stop_reason=page.stop_reason,
+                    next_offsets=() if page.next_offset is None else (page.next_offset,),
+                    fingerprint=fingerprint,
+                    rows_returned=len(page.rows),
+                ),
             )
 
     def _query_params(
@@ -162,6 +239,9 @@ class SearchOrganizationsQuery:
             "city",
             "country",
             "state",
+            "postalCode",
+            "streetAddress",
+            "locationTitle",
             "website",
             "otherId",
             "matchingDomains",
@@ -171,7 +251,8 @@ class SearchOrganizationsQuery:
         if not exclude_custom_fields:
             wire_fields.append("regularCustomFieldValues")
         params: dict[str, object] = {
-            "sort": "name",
+            "sort": "id",
+            "include": "contactLocations",
             "fields[organizations]": ",".join(wire_fields),
         }
         if name is not None:
@@ -187,26 +268,25 @@ class SearchOrganizationsQuery:
     def _select(
         self,
         resources: Sequence[OrganizationResource],
+        included: Included,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[SearchOrganizationRowResponse, ...], int]:
-        selected: list[SearchOrganizationRowResponse] = []
+    ) -> tuple[tuple[tuple[int, SearchOrganizationRowResponse], ...], int]:
+        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+        selected: list[tuple[int, SearchOrganizationRowResponse]] = []
         dropped = 0
-        for resource in resources:
+        for index, resource in enumerate(resources):
             try:
                 row = self._row(
                     resource,
+                    included,
                     legal_name=legal_name,
-                    city=city,
-                    country=country,
-                    state=state,
+                    location_filter=location_filter,
                     website=website,
                     ria=ria,
                     internal_organization=internal_organization,
@@ -221,17 +301,16 @@ class SearchOrganizationsQuery:
                 )
                 continue
             if row is not None:
-                selected.append(row)
+                selected.append((index, row))
         return tuple(selected), dropped
 
     def _row(
         self,
         resource: OrganizationResource,
+        included: Included,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
@@ -240,11 +319,11 @@ class SearchOrganizationsQuery:
         attributes = resource.attributes
         if not self._matches_text(attributes.legal_name, legal_name):
             return None
-        if not self._matches_text(attributes.city, city):
-            return None
-        if not self._matches_text(attributes.country, country):
-            return None
-        if not self._matches_text(attributes.state, state):
+        locations = party_locations(
+            attributes,
+            included.related(resource, "contactLocations", schema=LocationResource),
+        )
+        if location_filter is not None and not matches_location(locations, location_filter):
             return None
         if not self._matches_text(attributes.website, website):
             return None
@@ -265,7 +344,17 @@ class SearchOrganizationsQuery:
             city=attributes.city,
             country=attributes.country,
             state=attributes.state,
+            postal_code=attributes.postal_code,
+            street_address=attributes.street_address,
+            location_title=attributes.location_title,
             website=attributes.website,
+            locations=tuple(
+                ContactLocationResponse.model_validate(
+                    location.model_dump(exclude={"country_code"})
+                )
+                for location in locations
+            )
+            or None,
             other_id=attributes.other_id,
             matching_domains=attributes.matching_domains,
             ria=attributes.ria,
@@ -274,26 +363,10 @@ class SearchOrganizationsQuery:
             or None,
         )
 
-    def _to_response(
-        self,
-        selected: tuple[SearchOrganizationRowResponse, ...],
-        *,
-        fields: frozenset[str],
-        rows_scanned: int,
-        rows_dropped: int,
-        total_count: int | None,
-        ceiling_clamped: bool,
-    ) -> SearchOrganizationsResolvedResponse:
-        coverage = scan_coverage(
-            rows_scanned=rows_scanned,
-            visible_count=total_count,
-            rows_dropped=rows_dropped,
-            ceiling=MAX_ORGANIZATION_SCAN_RECORDS,
-            ceiling_clamped=ceiling_clamped,
-            # One `paginate` call: a failed page raises rather than returning a short list.
-            partial_due_to_error=False,
-        )
-        rows = tuple(
+    def _project(
+        self, selected: tuple[SearchOrganizationRowResponse, ...], *, fields: frozenset[str]
+    ) -> tuple[SearchOrganizationRowResponse, ...]:
+        return tuple(
             row.project(
                 fields=fields,
                 url=(
@@ -306,15 +379,12 @@ class SearchOrganizationsQuery:
             )
             for row in selected
         )
-        return SearchOrganizationsResolvedResponse(coverage=coverage, rows=rows)
 
     def _has_in_memory_predicate(
         self,
         *,
         legal_name: str | None,
-        city: str | None,
-        country: str | None,
-        state: str | None,
+        location_filter: LocationFilter | None,
         website: str | None,
         ria: bool | None,
         internal_organization: bool | None,
@@ -324,9 +394,7 @@ class SearchOrganizationsQuery:
             value is not None
             for value in (
                 legal_name,
-                city,
-                country,
-                state,
+                location_filter,
                 website,
                 ria,
                 internal_organization,
@@ -339,10 +407,6 @@ class SearchOrganizationsQuery:
             return None
         stripped = value.strip()
         return stripped or None
-
-    @staticmethod
-    def _name_order(row: SearchOrganizationRowResponse) -> str:
-        return (row.name or "").casefold()
 
     @staticmethod
     def _matches_text(haystack: str | None, needle: str | None) -> bool:

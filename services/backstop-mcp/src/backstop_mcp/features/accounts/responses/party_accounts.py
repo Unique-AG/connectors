@@ -112,8 +112,8 @@ class HoldingRowResponse(OmitNoneModel):
     product_short_name: str | None = Field(
         default=None,
         description=(
-            "The tenant's own label for the product, e.g. `NGUP`. This is what the IR team says "
-            "out loud; there is no full product name on this row."
+            "The tenant's own label for the product, e.g. `NGUP`: the label users say, not "
+            "the full product name. There is no full product name on this row."
         ),
     )
     investor_id: str | None = Field(

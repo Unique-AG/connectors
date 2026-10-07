@@ -1,12 +1,16 @@
 """Firm-wide (or party) activity search via `POST /entity-activities`, the CRM Activity
 Explorer's search (it creates nothing). Failure is not an empty result: 404, schema drift, or
-a re-verified 401 must surface, and the walk stops before `pageNum × pageSize` passes 10000.
+a re-verified 401 must surface. Backstop 500s past offset 10000, so the walk stops before
+`pageNum × pageSize` passes it. A rows search stops once it holds at least `min_result_size`
+rows and reports the offset to resume from (see `run`).
 """
 
 import logging
 from collections.abc import Mapping, Sequence
 from datetime import date
-from typing import Literal
+from typing import ClassVar, Literal
+
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -26,14 +30,25 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
 )
+from backstop_mcp.features.collection_scan import SearchCursor, continuation
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVABLE = 10_000
-# Org search returns activity inherited through people; those rows name the person only.
-_INHERITED_PARTY_KINDS: frozenset[str] = frozenset({"people", "contacts", "employees"})
+_SET_PAGE_SIZE = 500
+# One person is reachable as people, contacts, or employees; the id is the same in all three.
+_PERSON_KINDS: frozenset[str] = frozenset({"people", "contacts", "employees"})
+# Ref kinds that name a rival party on a party search. Other refs (opportunities, products,
+# accounts) say nothing about the party. Org search also returns activity inherited through
+# people, which names the person only, so a person ref does not contradict it.
+_CONTRADICTING_KINDS: dict[SearchType, frozenset[str]] = {
+    "organizations": frozenset({"organizations"}),
+    "people": _PERSON_KINDS,
+    "contacts": _PERSON_KINDS,
+    "employees": _PERSON_KINDS,
+}
 
 _TYPE_LABELS: dict[EntityActivityType, str] = {
     "meeting": "meeting",
@@ -43,20 +58,20 @@ _TYPE_LABELS: dict[EntityActivityType, str] = {
     "email_blast": "email blast",
     "note": "note",
 }
-# Wire values for `newFilters.types`. `meeting_call` is the tool token; Backstop's filter
-# value is `call`. Sending `meeting_call` returned the unfiltered totalCount.
-_TYPE_FILTER_VALUES: dict[EntityActivityType, str] = {
-    "meeting": "meeting",
-    "meeting_call": "call",
-    "document": "document",
-    "email": "email",
-    "email_blast": "email_blast",
-    "note": "note",
-}
+
+
+class _ProjectedPage(BaseModel):
+    """One page checked against the filters: kept rows by index, dropped indices, violations."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    rows: tuple[tuple[int, EntityActivityDto], ...]
+    dropped: tuple[int, ...]
+    violating: dict[str, int]
 
 
 class SearchActivitiesQuery:
-    """Walk `POST /entity-activities` until the set is exhausted, `max_rows`, or the 10000 wall."""
+    """Walk `POST /entity-activities` to the end of the set, `min_result_size` rows, or the wall."""
 
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
@@ -71,34 +86,59 @@ class SearchActivitiesQuery:
         resource_type: SearchType | None = None,
         activity_tags: Sequence[str] = (),
         authors: Sequence[str] = (),
+        attendee_ids: Sequence[str] = (),
         include_description: bool = False,
-        max_rows: int | None = None,
-        page_size: int = 500,
+        cursor: str | None = None,
+        fingerprint: str | None = None,
+        min_result_size: int | None = None,
+        page_size: int | None = None,
         max_retrievable: int = MAX_RETRIEVABLE,
     ) -> EntityActivitiesFetchDto:
-        effective_page_size = page_size if max_rows is None else min(page_size, max_rows)
+        """Read whole pages until at least `min_result_size` rows are kept; `None` reads the set.
+
+        The search sorts on effective date, then id, so the order is the same on every request
+        and an offset resumes exactly. A rows call that stops before the end hands back a
+        `continuation` at the offset after its last page. Resuming by date window instead was
+        probed and rejected: Backstop sorts on the UTC instant but filters on the local day, so a
+        window cut at a day both repeated and lost rows. A page that shows an ignored filter, a
+        failed later page, or the 10000 wall ends the walk without a `continuation`.
+
+        `page_size` defaults to `min_result_size`, so a rows call returns fewer than two pages
+        of rows; a whole-set read pages by 500. `fingerprint` ties the cursor to one search's
+        arguments; without it no `continuation` is issued (a one-row lookup has nothing to
+        resume).
+        """
+        if page_size is None:
+            page_size = _SET_PAGE_SIZE if min_result_size is None else min_result_size
+        assert min_result_size is None or min_result_size > 0, "min_result_size must be positive"
+        assert cursor is None or fingerprint is not None, "a cursor is checked by fingerprint"
+        resume = (
+            None
+            if cursor is None or fingerprint is None
+            else SearchCursor.decode(cursor, fingerprint=fingerprint, collections=1)
+        )
+        start_offset = 0 if resume is None else resume.offsets[0]
         collected: list[EntityActivityDto] = []
         dropped = 0
         rows_received = 0
         pages_fetched = 0
         ceiling_clamped = False
-        exhausted = False
         partial_due_to_error = False
         total_count: int | None = None
-        page_num = 1
+        next_offset: int | None = None
+        page_num = start_offset // page_size + 1
         ignored_filters: list[str] = []
         scoped = (
             party_id is not None
             or bool(activity_tags)
             or bool(authors)
+            or bool(attendee_ids)
             or (bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES))
         )
 
         while True:
-            if page_num * effective_page_size > max_retrievable:
+            if page_num * page_size > max_retrievable:
                 ceiling_clamped = True
-                break
-            if max_rows is not None and len(collected) >= max_rows:
                 break
             try:
                 document = await self._client.post(
@@ -106,7 +146,7 @@ class SearchActivitiesQuery:
                     schema=EntityActivitiesDocument,
                     json=self._request_body(
                         page_num=page_num,
-                        page_size=effective_page_size,
+                        page_size=page_size,
                         start_date=start_date,
                         end_date=end_date,
                         types=types,
@@ -114,6 +154,7 @@ class SearchActivitiesQuery:
                         resource_type=resource_type,
                         activity_tags=activity_tags,
                         authors=authors,
+                        attendee_ids=attendee_ids,
                         include_description=include_description,
                     ),
                 )
@@ -133,7 +174,7 @@ class SearchActivitiesQuery:
             page = document.data.attributes
             if total_count is None:
                 total_count = page.total_count
-            rows, page_dropped, violating = self._project_rows(
+            projected = self._project_rows(
                 page.results,
                 start_date=start_date,
                 end_date=end_date,
@@ -145,56 +186,70 @@ class SearchActivitiesQuery:
                 scoped=scoped,
             )
             self._record_ignored_filters(
-                violating,
+                projected.violating,
                 total_count=total_count,
                 party_id=party_id,
                 resource_type=resource_type,
                 already_logged=ignored_filters,
             )
-            ignored_filters.extend(name for name in violating if name not in ignored_filters)
-            dropped += page_dropped
-            rows_received += len(page.results)
-            collected.extend(rows)
-            if any(name != "total_count" for name in violating):
+            ignored_filters.extend(
+                name for name in projected.violating if name not in ignored_filters
+            )
+            page_offset = (page_num - 1) * page_size
+            # Records before `start_offset` were read by the call that issued the cursor.
+            skip = min(max(0, start_offset - page_offset), len(page.results))
+            collected.extend(row for index, row in projected.rows if index >= skip)
+            dropped += sum(1 for index in projected.dropped if index >= skip)
+            rows_received += len(page.results) - skip
+            # A totalCount on the wall is saturated, not the size of the set.
+            is_last = len(page.results) < page_size or (
+                total_count is not None
+                and total_count < max_retrievable
+                and page_offset + len(page.results) >= total_count
+            )
+            if any(name != "total_count" for name in projected.violating) or is_last:
                 break
-            if len(page.results) < effective_page_size:
-                exhausted = True
-                break
-            if total_count is not None and len(collected) + dropped >= total_count:
-                exhausted = True
+            if min_result_size is not None and len(collected) >= min_result_size:
+                next_offset = page_offset + len(page.results)
+                # The last record the endpoint will serve: nothing past it to resume into.
+                if next_offset >= max_retrievable:
+                    ceiling_clamped, next_offset = True, None
                 break
             page_num += 1
-
-        kept = tuple(collected)
-        truncated_by_row_cap = False
-        if max_rows is not None and len(kept) > max_rows:
-            kept = kept[:max_rows]
-            truncated_by_row_cap = True
-        elif max_rows is not None and not exhausted and not partial_due_to_error:
-            truncated_by_row_cap = True
 
         logger.info(
             "activity_history.entity_activities.fetched",
             extra={
                 "pages": pages_fetched,
-                "returned": len(kept),
+                "returned": len(collected),
                 "dropped": dropped,
                 "received": rows_received,
                 "total_count": total_count,
+                "start_offset": start_offset,
+                "next_offset": next_offset,
                 "ceiling_clamped": ceiling_clamped,
                 "partial_due_to_error": partial_due_to_error,
             },
         )
         return EntityActivitiesFetchDto(
-            rows=kept,
+            rows=tuple(collected),
             total_count=total_count,
             rows_dropped=dropped,
             rows_received=rows_received,
             pages_fetched=pages_fetched,
             ceiling_clamped=ceiling_clamped,
-            truncated_by_row_cap=truncated_by_row_cap,
             partial_due_to_error=partial_due_to_error,
             server_filter_ignored=tuple(ignored_filters),
+            continuation=(
+                None
+                if next_offset is None or fingerprint is None
+                else continuation(
+                    stop_reason="page_full",
+                    next_offsets=(next_offset,),
+                    fingerprint=fingerprint,
+                    rows_returned=len(collected),
+                )
+            ),
         )
 
     def _request_body(
@@ -209,13 +264,11 @@ class SearchActivitiesQuery:
         resource_type: SearchType | None,
         activity_tags: Sequence[str],
         authors: Sequence[str],
+        attendee_ids: Sequence[str],
         include_description: bool,
     ) -> dict[str, object]:
-        """JSON:API search body. Built here, never passed through from a caller.
-
-        Date, types, tags, and authors go under `newFilters`. `filters` is ignored by
-        Backstop. A party is `entityId` + `resourceType`, not `associatedWiths`.
-        `meeting_call` is sent as the search value `call`.
+        """Backstop reads `newFilters`, not `filters`. Party is `entityId` + `resourceType`.
+        `meeting_call` is Call. Sort `id` after effective date. Attendees: `PartyBean_<id>`, type 0.
         """
         new_filters: dict[str, object] = {
             "effectiveDate": {
@@ -225,11 +278,7 @@ class SearchActivitiesQuery:
         }
         if types:
             new_filters["types"] = [
-                {
-                    "searchValues": [
-                        {"value": _TYPE_FILTER_VALUES[activity_type]} for activity_type in types
-                    ]
-                }
+                {"searchValues": [{"value": activity_type} for activity_type in types]}
             ]
         if activity_tags:
             new_filters["activityTags"] = [
@@ -239,13 +288,25 @@ class SearchActivitiesQuery:
             new_filters["authors"] = [
                 {"searchValues": [{"value": email, "isEmail": True} for email in authors]}
             ]
+        if attendee_ids:
+            new_filters["attendees"] = [
+                {
+                    "type": 0,
+                    "searchValues": [
+                        {"value": f"PartyBean_{attendee_id}"} for attendee_id in attendee_ids
+                    ],
+                }
+            ]
         include_fields = ["associatedWith", "inheritedFrom", "primaryEntity"]
         if include_description:
             include_fields = [*include_fields, "description"]
         attributes: dict[str, object] = {
             "pageSize": page_size,
             "pageNum": page_num,
-            "sorts": [{"columnName": "effectiveDate", "ascending": False}],
+            "sorts": [
+                {"columnName": "effectiveDate", "ascending": False},
+                {"columnName": "id", "ascending": True},
+            ],
             "newFilters": new_filters,
             "includeFields": include_fields,
         }
@@ -269,9 +330,10 @@ class SearchActivitiesQuery:
         activity_tags: Sequence[str],
         total_count: int | None,
         scoped: bool,
-    ) -> tuple[tuple[EntityActivityDto, ...], int, dict[str, int]]:
+    ) -> _ProjectedPage:
         """Drop rows that show an ignored filter. Person-only rows on a party search are kept.
 
+        Kept and dropped rows carry their index in `results`, so the walk can resume mid-page.
         A non-party search whose totalCount is 10000 is reported as `total_count`.
         """
         check_types = bool(types) and frozenset(types) != frozenset(ENTITY_ACTIVITY_TYPES)
@@ -283,14 +345,14 @@ class SearchActivitiesQuery:
         readable = 0
         party_hits = 0
         party_contradictions = 0
-        unreadable = 0
-        unprojectable = 0
-        projected: list[EntityActivityDto] = []
-        for raw in results:
+        unreadable: list[int] = []
+        unprojectable: list[int] = []
+        projected: list[tuple[int, EntityActivityDto]] = []
+        for index, raw in enumerate(results):
             attributes = EntityActivityAttributes.safe_model_validate(raw)
             if attributes is None:
                 logger.warning("activity_history.entity_activities.row_unreadable")
-                unreadable += 1
+                unreadable.append(index)
                 continue
             readable += 1
             row_violation = False
@@ -317,16 +379,16 @@ class SearchActivitiesQuery:
                 continue
             row = EntityActivityDto.from_attributes(attributes)
             if row is None:
-                unprojectable += 1
+                unprojectable.append(index)
                 continue
-            projected.append(row)
+            projected.append((index, row))
 
         party_violation = (
             party_id is not None and readable > 0 and party_hits == 0 and party_contradictions > 0
         )
         if party_violation:
             projected = []
-            unprojectable = 0
+            unprojectable = []
 
         violating: dict[str, int] = {}
         if date_violations:
@@ -339,7 +401,11 @@ class SearchActivitiesQuery:
             violating["party"] = readable
         if party_id is None and scoped and total_count == MAX_RETRIEVABLE:
             violating["total_count"] = 0
-        return tuple(projected), unreadable + unprojectable, violating
+        return _ProjectedPage(
+            rows=tuple(projected),
+            dropped=tuple(sorted((*unreadable, *unprojectable))),
+            violating=violating,
+        )
 
     def _party_relation(
         self,
@@ -347,7 +413,14 @@ class SearchActivitiesQuery:
         party_id: str,
         resource_type: SearchType | None,
     ) -> Literal["hit", "contradict", "neutral"]:
-        """`hit` names the id; `contradict` names another party of the same kind; else `neutral`."""
+        """`hit` names the id; `contradict` names another party of the same kind; else `neutral`.
+
+        Only a ref of a party kind can contradict: an opportunity or product ref next to the
+        party is not a sign Backstop ignored `entityId`.
+        """
+        contradicting_kinds = (
+            frozenset[str]() if resource_type is None else _CONTRADICTING_KINDS[resource_type]
+        )
         refs = (
             *attributes.associated_with,
             *attributes.inherited_from,
@@ -361,9 +434,8 @@ class SearchActivitiesQuery:
             if ref.resource_id == party_id:
                 named = True
                 continue
-            if resource_type == "organizations" and ref.resource_type in _INHERITED_PARTY_KINDS:
-                continue
-            other_party = True
+            if ref.resource_type in contradicting_kinds:
+                other_party = True
         if named:
             return "hit"
         if other_party:
@@ -379,12 +451,18 @@ class SearchActivitiesQuery:
         resource_type: SearchType | None,
         already_logged: Sequence[str],
     ) -> None:
-        """Warn and count each newly ignored filter, once per name per walk."""
+        """Warn and count each newly ignored filter, once per name per walk.
+
+        `total_count` (a scoped search on the 10000 ceiling) is only a hint for the model: it
+        may be a broad filter, not an ignored one. It logs at info and is not counted, since
+        the `backstop_filter_ignored_total` alert fires on any increase.
+        """
         body_shape = "newFilters+entityId" if party_id is not None else "newFilters"
         for name, rows_violating in violating.items():
             if name in already_logged:
                 continue
-            logger.warning(
+            logger.log(
+                logging.INFO if name == "total_count" else logging.WARNING,
                 "activity_history.entity_activities.filter_ignored",
                 extra={
                     "filter": name,
@@ -396,4 +474,5 @@ class SearchActivitiesQuery:
                     "endpoint": "entity-activities",
                 },
             )
-            BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})
+            if name != "total_count":
+                BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})

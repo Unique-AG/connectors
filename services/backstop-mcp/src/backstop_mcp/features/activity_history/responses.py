@@ -46,6 +46,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
     AggregateBucketResponse,
+    ContinuationResponse,
     ScanCoverageResponse,
     project_fields,
     scan_coverage,
@@ -97,11 +98,11 @@ __all__ = [
 ]
 
 _MAX_RECIPIENTS = 3
-_FULL_BODY_MAX_CHARS = 10_000_000
+# Snippet on every search row. The full body is `description`, and only when requested.
 _SHORT_DESCRIPTION_MAX_CHARS = 400
 
 
-def _markdown(html: str | None, *, max_chars: int) -> str | None:
+def _markdown(html: str | None, *, max_chars: int | None = None) -> str | None:
     if not html:
         return None
     text = extract_gist_from_html(html, max_chars=max_chars).text
@@ -689,7 +690,7 @@ class ActivityDetailResponse(OmitNoneModel):
         `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
         a handle the model can pass straight back to this tool.
         """
-        gist = extract_gist_from_html(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
+        gist = extract_gist_from_html(detail.description or "")
         return cls(
             activity_id=activity_id,
             type=detail.type,
@@ -768,7 +769,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Canonical CRM UI URL for this activity. Not in the default fieldset — select "
-            "`url` to get it, since one URL per row is dead weight on a wide sweep. Omitted "
+            "`url` to get it, since one URL per row is dead weight on a firm-wide search. Omitted "
             "when this deployment has no UI origin, or when the row's `type` has no CRM page. "
             "Echo it; never invent one."
         ),
@@ -893,7 +894,7 @@ class SearchActivitiesRowResponse(OmitNoneModel):
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
             )
         if "description" in include:
-            overrides["description"] = _markdown(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+            overrides["description"] = _markdown(row.description)
         return project_fields(row, fields=include, into=cls, overrides=overrides)
 
 
@@ -927,8 +928,15 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
     rows: tuple[SearchActivitiesRowResponse, ...] = Field(
         default=(),
         description=(
-            "Matching activities in Backstop's newest-effectiveDate-first order. Empty in "
-            "aggregate mode."
+            "One page of matching activities in Backstop's newest-effectiveDate-first order. "
+            "Empty in aggregate mode."
+        ),
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when more rows may match than this page holds. Omitted when the rows "
+            "are complete, in aggregate mode, or at the 10000 ceiling (see `coverage`)."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
@@ -955,6 +963,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         ceiling: int,
         urls: Mapping[str, str | None],
         aggregates: tuple[AggregateBucketDto, ...] = (),
+        continuation: ContinuationResponse | None = None,
     ) -> Self:
         extra: tuple[str, ...] = ()
         if any(name != "total_count" for name in fetch.server_filter_ignored):
@@ -979,6 +988,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
             mode=mode,
             coverage=coverage,
             rows=rows,
+            continuation=continuation,
             aggregates=tuple(AggregateBucketResponse.from_dto(bucket) for bucket in aggregates),
             server_filter_ignored=fetch.server_filter_ignored or None,
         )

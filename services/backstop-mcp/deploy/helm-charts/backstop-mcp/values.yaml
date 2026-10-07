@@ -6,6 +6,12 @@ nameOverride: backstop-mcp
 fullnameOverride: backstop-mcp
 selectorComponentLabel: server
 
+# Tenant guidance overlay: text appended to the server instructions and to individual tool
+# and parameter descriptions. Set per deployment in the overlay, never here — the chart ships
+# tenant-neutral. Shape: `TenantGuidance` in the server code and values.schema.json.
+# Empty means the shipped descriptions only.
+tenantGuidance: {}
+
 # Loki scrapes use this label to parse stderr as pino-json
 # (unique_mcp.configure_logging).
 podLabels:
@@ -60,6 +66,18 @@ env:
   # returning the candidate list instead. The server waits 2 minutes. The Unique chat client
   # can still cancel a tool call at 60s, and then the candidates are discarded.
   RESOLUTION_ELICIT_TIMEOUT_SECONDS: "120"
+
+  # Most accounts get_product_investors values in one call. Each is one Backstop request
+  # (about 0.14s warm, so 150 is about 21s); keep it well inside the chat client's 60s
+  # tool-call limit.
+  PRODUCT_INVESTORS_MAX_VALUED_ACCOUNTS: "150"
+
+  # Rows one search call returns before it stops and hands back a cursor to the next page.
+  SEARCH_RESULT_SIZE: "100"
+
+  BACKSTOP_MCP_TENANT_GUIDANCE:
+    value: '{{ toJson .Values.tenantGuidance }}'
+    if: '{{ not (empty .Values.tenantGuidance) }}'
 
 envVars: []
 # Required secrets (provide via envVars in overlay):

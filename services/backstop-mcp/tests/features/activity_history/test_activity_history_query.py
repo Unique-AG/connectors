@@ -8,6 +8,7 @@ that a short raw page (or, for activities, a since-cutoff) is what "exhausted" m
 `links.next`/`total_count`, which this layer's return types don't even carry.
 """
 
+import asyncio
 from collections.abc import KeysView
 from datetime import date
 from urllib.parse import quote
@@ -16,7 +17,13 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiError,
+    BackstopAuthError,
+    BackstopClient,
+    BackstopRateLimitError,
+    BackstopTransientAuthError,
+)
 from backstop_mcp.features.activity_history import (
     ActivityContinuationResponse,
     ActivityGroupResponse,
@@ -773,11 +780,11 @@ class TestActivityTagFilterAndIncludes:
             stream="meeting",
             limit=10,
             offset=0,
-            activity_tag_ids=("474963", "88"),
+            activity_tag_ids=("9001", "88"),
         )
 
         params = route.calls.last.request.url.params
-        assert params["filter[activityTagIds]"] == "474963,88"
+        assert params["filter[activityTagIds]"] == "9001,88"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -797,7 +804,7 @@ class TestActivityTagFilterAndIncludes:
     async def test_projects_tags_from_one_page_and_does_not_follow_attendee_links(
         self, client: BackstopClient
     ) -> None:
-        tag_by_id = respx.get(f"{BASE_URL}/activity-tags/474963").mock(
+        tag_by_id = respx.get(f"{BASE_URL}/activity-tags/9001").mock(
             return_value=httpx.Response(500)
         )
         attendees = respx.get(f"{BASE_URL}/meeting-or-calls/1/attendees").mock(
@@ -820,15 +827,13 @@ class TestActivityTagFilterAndIncludes:
                                 },
                             },
                             "relationships": {
-                                "activityTags": {
-                                    "data": [{"type": "activity-tags", "id": "474963"}]
-                                },
+                                "activityTags": {"data": [{"type": "activity-tags", "id": "9001"}]},
                                 "attendees": {"data": [{"type": "people", "id": "p1"}]},
                             },
                         }
                     ],
                     "included": [
-                        resource("474963", "activity-tags", name="Quarterly Review"),
+                        resource("9001", "activity-tags", name="Quarterly Review"),
                         resource("p1", "people", name="Pat Lee"),
                     ],
                     "links": {"next": None},
@@ -848,7 +853,7 @@ class TestActivityTagFilterAndIncludes:
         assert item.regarding.id == "o42"
         assert item.regarding.resource_type == "organizations"
         assert item.regarding.search_type == "organizations"
-        assert [(tag.id, tag.name) for tag in item.tags] == [("474963", "Quarterly Review")]
+        assert [(tag.id, tag.name) for tag in item.tags] == [("9001", "Quarterly Review")]
         assert item.attendees is None
 
 
@@ -999,3 +1004,69 @@ class TestAttendeeJoin:
         assert isinstance(page.items[1], ActivityRecordResponse)
         assert page.items[1].attendees is not None
         assert page.items[1].attendees[0].name == "Lucas, Margaret"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_rate_limited_attendee_fetch_fails_the_call(
+        self, client: BackstopClient
+    ) -> None:
+        """A 429 would hit every row's lookup the same way; it must not read as no attendees."""
+        _mock_party("organizations", "42")
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "m1",
+                        "activities",
+                        title="One",
+                        effectiveDate="2026-01-01",
+                        specificResource={
+                            "resourceType": "meeting-or-calls",
+                            "resourceId": "111",
+                        },
+                    ),
+                ),
+            )
+        )
+        respx.get(f"{BASE_URL}/meeting-or-calls/111/attendees").mock(
+            return_value=httpx.Response(429, json={"errors": [{"title": "Daily limit exceeded"}]})
+        )
+
+        with pytest.raises(BackstopRateLimitError):
+            await _run_stream(
+                client,
+                segment="organizations",
+                entity_id="42",
+                stream="meeting",
+                limit=10,
+                offset=0,
+            )
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            BackstopAuthError("rejected"),
+            BackstopTransientAuthError("re-verified"),
+            BackstopRateLimitError(429, "Daily limit exceeded", limit_kind="day"),
+            asyncio.CancelledError(),
+        ],
+        ids=["auth", "transient_auth", "rate_limit", "cancelled"],
+    )
+    def test_aborting_failures_are_re_raised_not_left_absent(
+        self, client: BackstopClient, failure: BaseException
+    ) -> None:
+        query = make_get_activity_history_query(client)
+
+        with pytest.raises(type(failure)):
+            query._attendee_responses("111", failure)  # pyright: ignore[reportPrivateUsage]
+
+    def test_any_other_failure_leaves_the_row_absent(self, client: BackstopClient) -> None:
+        query = make_get_activity_history_query(client)
+
+        assert (
+            query._attendee_responses(  # pyright: ignore[reportPrivateUsage]
+                "111", BackstopApiError(500, "down")
+            )
+            is None
+        )

@@ -2,10 +2,10 @@
 
 Not `ResolvePartyQuery`: `/quick-search` misses `productShortName` (`NGUP`), and
 `filter[shortName]` is not a `/products` filter (400). A trusted id is one
-`GET /products/{id}?fields=name,configuration`; a 404 is `not_found`. A name tries
-`filter[name][like]` first and walks the whole catalog only when that misses, so a short name
-still resolves and `not_found` means *absent*, not *not on this page*. Past `_LARGE_CATALOG`
-that per-search walk stops being cheap, so it logs a warning.
+`GET /products/{id}?fields=name,configuration`; a 404 is `not_found`. A name reads the whole
+catalog once and matches in memory, so an exact short name wins over a name that merely contains
+it (`ARB` over 'Convert Arb Fund') and `not_found` means *absent*, not *not on this page*. Past
+`_LARGE_CATALOG` that per-search walk stops being cheap, so it logs a warning.
 """
 
 import logging
@@ -167,16 +167,11 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
     )
 
 
-async def _index_products(
-    client: BackstopClient, *, name_like: str | None = None
-) -> tuple[ResolvedProductDto, ...]:
-    params: dict[str, object] = {"fields": _PRODUCT_FIELDS}
-    if name_like is not None:
-        params["filter[name][like]"] = name_like
+async def _index_products(client: BackstopClient) -> tuple[ResolvedProductDto, ...]:
     page = await client.paginate(
         _PRODUCTS_PATH,
         schema=_ProductResource,
-        params=params,
+        params={"fields": _PRODUCT_FIELDS},
         max_records=None,
         page_size=_PRODUCT_INDEX_PAGE_SIZE,
     )
@@ -206,8 +201,8 @@ async def resolve_product(
     """Resolve one product from a trusted id, a short name, or a name search.
 
     Exactly one of `product_id` or `product` must be set. A trusted id is one by-id request; a
-    name search uses `filter[name][like]` first, then the unfiltered catalog when that misses
-    (short names are not filterable). Ambiguous matches elicit once.
+    name search reads the unfiltered catalog once (short names are not filterable) and lets an
+    exact short name win before any name match. Ambiguous matches elicit once.
     """
     assert (product_id is None) != (product is None), (
         "Exactly one of product_id or product must be provided"
@@ -219,9 +214,7 @@ async def resolve_product(
     assert product is not None
     if not product.strip():
         return NotFound(query=product.strip(), scope=_SCOPE)
-    outcome = _match_product(await _index_products(client, name_like=product), product).resolution
-    if isinstance(outcome, NotFound):
-        outcome = _match_product(await _index_products(client), product).resolution
+    outcome = _match_product(await _index_products(client), product).resolution
     return await elicit_if_ambiguous(ctx, outcome)
 
 
@@ -244,13 +237,9 @@ async def resolve_product_family(
         by_id = await _fetch_product(client, product)
         if isinstance(by_id, Resolved):
             return (by_id.value,)
-    selected = _select_product_family(await _index_products(client, name_like=product), product)
+    selected = _select_product_family(await _index_products(client), product)
     if isinstance(selected, tuple):
         return selected
-    if isinstance(selected, NotFound):
-        selected = _select_product_family(await _index_products(client), product)
-        if isinstance(selected, tuple):
-            return selected
     outcome = await elicit_if_ambiguous(ctx, selected)
     if input_required(outcome) or not isinstance(outcome, Resolved):
         return outcome

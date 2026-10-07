@@ -23,6 +23,7 @@ from datetime import UTC, date, datetime
 from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
+    BATCH_ABORTING_ERRORS,
     BackstopApiError,
     BackstopApiResource,
     BackstopApiSingleResourceDocument,
@@ -395,7 +396,9 @@ class GetActivityHistoryQuery:
     ) -> tuple[tuple[AttendeeResponse, ...] | None, ...]:
         """Attendees per meeting or call, aligned with `resources`. Other types stay absent.
 
-        A missing id or a failed lookup leaves that row's attendees absent.
+        One request per row: `/activities` rejects `include=attendees` (400). A missing id or a
+        failed lookup leaves that row's attendees absent; see `_attendee_responses` for the
+        failures that fail the page instead.
         """
         if stream not in {"meeting", "call"}:
             return tuple(None for _ in resources)
@@ -480,8 +483,14 @@ class GetActivityHistoryQuery:
         resource_id: str,
         fetched: tuple[AttendeeDto, ...] | BaseException,
     ) -> tuple[AttendeeResponse, ...] | None:
-        """Map one attendee fetch onto the history row. A failure stays absent."""
+        """Map one attendee fetch onto the history row. A failure stays absent.
+
+        Cancellation and `BATCH_ABORTING_ERRORS` (auth, rate limit) are re-raised: every other
+        row's lookup would fail the same way, and the caller must see it, not empty attendees.
+        """
         if isinstance(fetched, BaseException):
+            if not isinstance(fetched, Exception) or isinstance(fetched, BATCH_ABORTING_ERRORS):
+                raise fetched
             logger.warning(
                 "activity_history.attendees.join_failed",
                 extra={"resource_id": resource_id},

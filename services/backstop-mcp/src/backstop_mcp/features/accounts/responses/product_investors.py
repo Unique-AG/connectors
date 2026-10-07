@@ -210,7 +210,15 @@ class ProductInvestorsResolvedResponse(OmitNoneModel):
         default=None,
         description=(
             "Set when `include_latest_value=true` was passed but no values were fetched: why, "
-            "and which other tools can size the investors instead. Tell the user and offer "
-            "those; do not fall back to calling get_time_series on every account."
+            "how to narrow the call, and which other tools can size the investors instead. Do "
+            "not fall back to calling get_time_series on every account."
+        ),
+    )
+    investor_ids_not_found: tuple[str, ...] | None = Field(
+        default=None,
+        description=(
+            "Ids passed in `investor_ids` with no account listed here: they hold none of these "
+            "products, only closed accounts (see `closed_omitted`), or hold them under another "
+            "party record. Not a zero balance. Omitted when `investor_ids` was not passed."
         ),
     )

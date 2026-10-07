@@ -3,17 +3,21 @@ from typing import cast, get_args
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.org_people import SearchOrganizationsResolvedResponse
+from backstop_mcp.config import SearchConfig
+from backstop_mcp.features.org_people import LocationFilter, SearchOrganizationsResolvedResponse
 from backstop_mcp.features.org_people.tools.search_organizations import (
     OrganizationCustomFieldFilter,
     search_organizations,
 )
 from backstop_mcp.server.tools import TOOLS
-from tests.features.org_people.conftest import make_search_organizations_query
+from tests.features.org_people.conftest import make_search_organizations_query, serve_pages
 from tests.helpers import BASE_URL, resource, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+
+_CONFIG = SearchConfig(result_size=100)
 
 
 def _page(*items: dict[str, object], total: int) -> httpx.Response:
@@ -38,27 +42,30 @@ class TestSearchOrganizations:
         assert "Call like:" in doc
         assert "definition_id" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
-        city = next(
+        location_filter = next(
             item
-            for item in cast("tuple[object, ...]", get_args(annotations["city"]))
+            for item in cast("tuple[object, ...]", get_args(annotations["location_filter"]))
             if isinstance(item, FieldInfo)
         )
-        assert city.description is not None
-        assert "Applied after the server-side read" in city.description
+        assert location_filter.description is not None
+        assert "sent to Backstop" in location_filter.description
 
-    def test_says_prospects_are_organizations_not_opportunity_stages(self) -> None:
+    def test_keeps_custom_field_matching_on_the_definition_id(self) -> None:
         doc = " ".join((search_organizations.__doc__ or "").split())
-        assert "Prospects" in doc
-        assert "not by opportunity stage" in doc
+        assert "list_custom_fields" in doc
+        assert "not an opportunity stage" not in doc
         assert "custom_field_values" in doc
         annotations = cast("dict[str, object]", search_organizations.__annotations__)
-        country = next(
+        location_filter = next(
             item
-            for item in cast("tuple[object, ...]", get_args(annotations["country"]))
+            for item in cast("tuple[object, ...]", get_args(annotations["location_filter"]))
             if isinstance(item, FieldInfo)
         )
-        assert country.description is not None
-        assert "United Arab Emirates" in country.description
+        assert location_filter.description is not None
+        assert "same location" in location_filter.description
+        country = LocationFilter.model_fields["country"].description
+        assert country is not None
+        assert "United Arab Emirates" in country
 
     @pytest.mark.asyncio
     @respx.mock
@@ -69,24 +76,24 @@ class TestSearchOrganizations:
                 resource(
                     "7",
                     "organizations",
-                    name="Abu Dhabi Pension",
+                    name="Contoso Pension",
                     country="United Arab Emirates",
                     city="Abu Dhabi",
                     regularCustomFieldValues=[
-                        {"definitionId": "261621", "name": "Investor Status", "value": "Prospect"},
-                        {"definitionId": "8646227", "name": "Grade", "value": "Focus"},
+                        {"definitionId": "900011", "name": "Tier", "value": "Tier 1"},
+                        {"definitionId": "900013", "name": "Relationship", "value": "Tier 1"},
                     ],
                 ),
                 resource(
                     "8",
                     "organizations",
-                    name="Dubai Client",
+                    name="Northwind Client",
                     country="United Arab Emirates",
                     regularCustomFieldValues=[
                         {
-                            "definitionId": "261621",
-                            "name": "Investor Status",
-                            "value": "Current Investor",
+                            "definitionId": "900011",
+                            "name": "Tier",
+                            "value": "Tier 2",
                         },
                     ],
                 ),
@@ -97,13 +104,14 @@ class TestSearchOrganizations:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_organizations(
-                    country="united arab",
+                    location_filter=LocationFilter(country="united arab"),
                     custom_fields=[
                         OrganizationCustomFieldFilter(
-                            definition_id="261621", values=["Prospect", "Former Investor"]
+                            definition_id="900011", values=["Tier 1", "Tier 3"]
                         )
                     ],
                     search_organizations_query=make_search_organizations_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOrganizationsResolvedResponse,
             )
@@ -113,8 +121,8 @@ class TestSearchOrganizations:
         row = object_dict(rows[0])
         assert row["id"] == "7"
         assert row["custom_field_values"] == [
-            {"definition_id": "261621", "name": "Investor Status", "value": "Prospect"},
-            {"definition_id": "8646227", "name": "Grade", "value": "Focus"},
+            {"definition_id": "900011", "name": "Tier", "value": "Tier 1"},
+            {"definition_id": "900013", "name": "Relationship", "value": "Tier 1"},
         ]
 
     @pytest.mark.asyncio
@@ -127,6 +135,7 @@ class TestSearchOrganizations:
                     ],
                     exclude_custom_fields=True,
                     search_organizations_query=make_search_organizations_query(client),
+                    search_config=_CONFIG,
                 )
 
     @pytest.mark.asyncio
@@ -135,7 +144,7 @@ class TestSearchOrganizations:
         base_url = f"{BASE_URL}/org-search-url"
         respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
-                resource("42", "organizations", name="Koch", city="Wichita"),
+                resource("42", "organizations", name="Contoso", city="Wichita"),
                 total=1,
             )
         )
@@ -143,14 +152,17 @@ class TestSearchOrganizations:
         async with tool_client(base_url) as client:
             query = make_search_organizations_query(client, ui_base_url="https://crm.example")
             plain = tool_model(
-                await search_organizations(name="Koch", search_organizations_query=query),
+                await search_organizations(
+                    name="Contoso", search_organizations_query=query, search_config=_CONFIG
+                ),
                 SearchOrganizationsResolvedResponse,
             )
             linked = tool_model(
                 await search_organizations(
-                    name="Koch",
+                    name="Contoso",
                     fields=["name", "url"],
                     search_organizations_query=query,
+                    search_config=_CONFIG,
                 ),
                 SearchOrganizationsResolvedResponse,
             )
@@ -161,3 +173,45 @@ class TestSearchOrganizations:
         assert plain_row["id"] == "42"
         assert "party_id=42" in str(linked_row["url"])
         assert "ManageOrganization.action" in str(linked_row["url"])
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_one_page_per_call_and_the_cursor_resumes_the_same_search(self) -> None:
+        base_url = f"{BASE_URL}/org-search-tool-cursor"
+        items = [resource(str(index), "organizations", f"Contoso {index}") for index in range(3)]
+        respx.get(f"{base_url}/organizations").mock(side_effect=serve_pages(items))
+        config = SearchConfig(result_size=2)
+
+        async with tool_client(base_url) as client:
+            query = make_search_organizations_query(client)
+            first = tool_payload(
+                tool_model(
+                    await search_organizations(
+                        name="Contoso", search_organizations_query=query, search_config=config
+                    ),
+                    SearchOrganizationsResolvedResponse,
+                )
+            )
+            cursor = str(object_dict(first["continuation"])["cursor"])
+            second = tool_payload(
+                tool_model(
+                    await search_organizations(
+                        name="Contoso",
+                        cursor=cursor,
+                        search_organizations_query=query,
+                        search_config=config,
+                    ),
+                    SearchOrganizationsResolvedResponse,
+                )
+            )
+            with pytest.raises(ToolError, match="different search"):
+                await search_organizations(
+                    name="Northwind",
+                    cursor=cursor,
+                    search_organizations_query=query,
+                    search_config=config,
+                )
+
+            assert [object_dict(row)["id"] for row in object_list(first["rows"])] == ["0", "1"]
+        assert [object_dict(row)["id"] for row in object_list(second["rows"])] == ["2"]
+        assert "continuation" not in second

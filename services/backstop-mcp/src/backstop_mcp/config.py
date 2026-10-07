@@ -1,3 +1,4 @@
+import json
 import os
 import ssl
 from datetime import timedelta
@@ -7,12 +8,15 @@ from typing import Annotated, ClassVar, Self, TypedDict, cast
 from urllib.parse import urlparse
 
 from pydantic import (
+    BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
     SecretStr,
+    StringConstraints,
     TypeAdapter,
     field_validator,
     model_validator,
@@ -430,6 +434,36 @@ class ResolutionConfig(BaseSettings):
     elicit_timeout_seconds: float = Field(default=120.0, gt=0)
 
 
+class ProductInvestorsConfig(BaseSettings):
+    """Tuning knobs for `get_product_investors`.
+
+    `max_valued_accounts` caps `include_latest_value`: each account costs one Backstop
+    request under the per-user concurrency gate, so a large fund can outlast the chat
+    client's 60-second tool-call limit. Measured warm, about 0.14 s per account at the
+    default gate of 5; a cold first call is slower. Past the cap no values are fetched and
+    the response says how to narrow. Configurable so a deployment can trade coverage for
+    latency without a release.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="PRODUCT_INVESTORS_")
+
+    max_valued_accounts: int = Field(default=100, gt=0)
+
+
+class SearchConfig(BaseSettings):
+    """Page size shared by the paged search tools.
+
+    `result_size` is how many rows one call returns before it stops and hands back a cursor.
+    The search tools read Backstop until they have that many matches, so one call stays well
+    inside the chat client's 60-second tool-call limit and the model's context, and the
+    cursor reads on from the exact row where this page stopped.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="SEARCH_")
+
+    result_size: int = Field(default=100, gt=0, le=1000)
+
+
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 
@@ -564,3 +598,52 @@ class EncryptionConfig(BaseSettings):
         if self.encryption_key is None:
             raise ValueError("BACKSTOP_MCP_ENCRYPTION_KEY not set")
         return self
+
+
+ServerGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2500)
+]
+ToolGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=800)
+]
+ParameterGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
+class ToolGuidance(BaseModel):
+    """Tenant text appended to one tool's description and to some of its parameters."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    description: ToolGuidanceText | None = None
+    parameters: dict[str, ParameterGuidanceText] = Field(default_factory=dict)
+
+
+class TenantGuidance(BaseModel):
+    """What one deployment adds to the shipped, tenant-neutral tool documentation."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    server_instructions: ServerGuidanceText | None = None
+    tools: dict[str, ToolGuidance] = Field(default_factory=dict)
+
+
+class TenantGuidanceConfig(BaseSettings):
+    """`BACKSTOP_MCP_TENANT_GUIDANCE`: a JSON `TenantGuidance`. Unset means none."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_MCP_")
+
+    tenant_guidance: Annotated[TenantGuidance, NoDecode] = Field(default_factory=TenantGuidance)
+
+    @field_validator("tenant_guidance", mode="before")
+    @classmethod
+    def _parse_tenant_guidance(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if value.strip() == "":
+            return {}
+        try:
+            return cast("object", json.loads(value))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"BACKSTOP_MCP_TENANT_GUIDANCE is not valid JSON: {exc}") from exc

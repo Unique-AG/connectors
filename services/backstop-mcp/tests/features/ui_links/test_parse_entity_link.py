@@ -165,7 +165,7 @@ def test_standard_entity_params_include_empty_display(
     [
         ("organization", "get_organization"),
         ("person", "get_person"),
-        ("product", "get_product"),
+        ("product", "search_products"),
         ("account", None),
         ("opportunity", "get_opportunities_by_ids"),
         ("email", "get_activity_detail"),
@@ -214,7 +214,10 @@ def test_landing_account_suggests_no_tool() -> None:
     parsed = _PARSER.run(url=url)
     assert isinstance(parsed, ParsedBackstopLinkResponse)
     assert parsed.suggested_tool is None
-    assert parsed.suggested_note == "No tool loads an account by id."
+    assert parsed.suggested_note is not None
+    assert parsed.suggested_note.startswith("No tool loads the account record.")
+    assert "get_time_series" in parsed.suggested_note
+    assert "get_capital_flows" in parsed.suggested_note
 
 
 _NBSP = "\u00a0"

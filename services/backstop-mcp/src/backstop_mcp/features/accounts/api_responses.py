@@ -4,7 +4,7 @@ from typing import Annotated, ClassVar, cast
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
-from backstop_mcp.dates import LenientDate
+from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt
 from backstop_mcp.models import StrippedStr
@@ -23,6 +23,9 @@ __all__ = [
     "OwnerAttributes",
     "ProductAttributes",
     "ProductConfigurationAttributes",
+    "ProductDescriptionAttributes",
+    "ProductLocationAttributes",
+    "ProductRiskFreeRateAttributes",
     "SeriesPointAttributes",
     "TableDataMoneyAttributes",
     "TableDataProductAttributes",
@@ -47,12 +50,46 @@ class ProductConfigurationAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     product_short_name: StrippedStr | None = Field(default=None, alias="productShortName")
+    master_product_name: StrippedStr | None = Field(default=None, alias="masterProductName")
+    fiscal_year_start_month: LenientInt = Field(default=None, alias="fiscalYearStartMonth")
+
+
+class ProductLocationAttributes(BaseModel):
+    """`attributes.location` on a `products` resource."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    city: StrippedStr | None = None
+    state_or_province: StrippedStr | None = Field(default=None, alias="stateOrProvince")
+    country: StrippedStr | None = None
+
+
+class ProductDescriptionAttributes(BaseModel):
+    """`attributes.description` on a `products` resource: four free-text blurbs."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    fund_description: _CleanStr = Field(default=None, alias="fundDescription")
+    manager_bio: _CleanStr = Field(default=None, alias="managerBio")
+    thesis: _CleanStr = None
+    investment_methodology: _CleanStr = Field(default=None, alias="investmentMethodology")
+
+
+class ProductRiskFreeRateAttributes(BaseModel):
+    """`attributes.riskFreeRate` on a `products` resource."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    floating: LenientBool = None
+    floating_rate_benchmark_symbol: _CleanStr = Field(
+        default=None, alias="floatingRateBenchmarkSymbol"
+    )
 
 
 class ProductAttributes(BaseModel):
     """Wire shape of a `products` resource's `attributes`.
 
-    The catalog walk for name resolution uses `fields=name,configuration`. `get_product`
+    The catalog walk for name resolution uses `fields=name,configuration`. `search_products`
     omits that sparse fieldset so `regularCustomFieldValues` arrives.
     """
 
@@ -60,6 +97,20 @@ class ProductAttributes(BaseModel):
 
     name: StrippedStr | None = None
     configuration: ProductConfigurationAttributes | None = None
+    product_type: StrippedStr | None = Field(default=None, alias="productType")
+    is_onshore: LenientBool = Field(default=None, alias="isOnshore")
+    inception_date: LenientDate = Field(default=None, alias="inceptionDate")
+    default_product_currency: StrippedStr | None = Field(
+        default=None, alias="defaultProductCurrency"
+    )
+    return_calculation_methodology: StrippedStr | None = Field(
+        default=None, alias="returnCalculationMethodology"
+    )
+    modified_timestamp: LenientDatetime = Field(default=None, alias="modifiedTimestamp")
+    location: ProductLocationAttributes | None = None
+    description: ProductDescriptionAttributes | None = None
+    risk_free_rate: ProductRiskFreeRateAttributes | None = Field(default=None, alias="riskFreeRate")
+    service_providers: dict[str, object] = Field(default_factory=dict, alias="serviceProviders")
     regular_custom_field_values: RegularCustomFieldValues = Field(
         default_factory=list, alias="regularCustomFieldValues"
     )

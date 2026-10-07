@@ -57,7 +57,8 @@ async def create_opportunity(
 
     Call like: {"opportunity": {"name": "Contoso - Harbor Select", "currency_code": "USD",
     "is_erisa": false, "search_type": "contacts",
-    "party_id": "<id from get_person with search_type contacts>", "stage": "Prospect"}}
+    "party_id": "<id from get_person with search_type contacts>",
+    "stage": "<stage name from get_opportunities>"}}
     """
     investor_result = await resolve_party_query.run(
         search_type=opportunity.search_type,

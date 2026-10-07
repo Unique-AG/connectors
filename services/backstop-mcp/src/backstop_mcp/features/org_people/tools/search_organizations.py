@@ -1,9 +1,11 @@
 """`search_organizations`: firm-wide organization filter.
 
 `name`, `email`, `other_id`, and `matching_domain` are sent to Backstop.
-`legal_name`, `city`, `country`, `state`, `website`, `ria`, `internal_organization`,
-and custom fields are applied after the walk: those filter fields are 400 on
-`GET /organizations`. A custom-field-only call reads the collection.
+`legal_name`, `location_filter`, `website`, `ria`, `internal_organization`, and custom
+fields are applied after the walk: those filter fields are 400 on `GET /organizations`.
+A custom-field-only call reads the collection. Every organization's contact locations ride
+on that walk, so `location_filter` can match any office or the primary one. One call returns
+one page of matches; `cursor` resumes at the next unread record.
 """
 
 import logging
@@ -16,13 +18,15 @@ from mcp.types import ToolAnnotations
 from opentelemetry import trace
 from pydantic import BaseModel, Field
 
+from backstop_mcp.config import SearchConfig
+from backstop_mcp.dependencies import get_search_config
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
-    MAX_ORGANIZATION_SCAN_RECORDS,
     SearchOrganizationsQuery,
     SearchOrganizationsResolvedResponse,
 )
 from backstop_mcp.features.org_people.dependencies import get_search_organizations_query_factory
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 
 logger = logging.getLogger(__name__)
@@ -37,6 +41,10 @@ SearchOrganizationField = Literal[
     "city",
     "country",
     "state",
+    "postal_code",
+    "street_address",
+    "location_title",
+    "locations",
     "website",
     "other_id",
     "matching_domains",
@@ -44,7 +52,7 @@ SearchOrganizationField = Literal[
     "internal_organization",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "legal_name", "email", "city", "country"}
+    {"id", "name", "legal_name", "email", "city", "country", "locations"}
 )
 
 
@@ -62,7 +70,7 @@ class OrganizationCustomFieldFilter(BaseModel):
         description=(
             "Stored values that satisfy this predicate, OR. Each is compared whole and "
             "case-insensitively against the select options list_custom_fields returns — "
-            "pass every option that counts (e.g. every status that means 'in dialogue'), "
+            "pass every option that counts, "
             "not a substring. A list value matches when any element equals one of these. "
             "A missing value does not match — this filter cannot mean 'the field is empty'."
         ),
@@ -110,24 +118,19 @@ async def search_organizations(
         str | None,
         Field(description=("Substring of the legal name. Applied after the server-side read.")),
     ] = None,
-    city: Annotated[
-        str | None,
-        Field(description="Substring of the city. Applied after the server-side read."),
-    ] = None,
-    country: Annotated[
-        str | None,
+    location_filter: Annotated[
+        LocationFilter | None,
         Field(
             description=(
-                "Substring of the country as stored, which is the full name ('United Arab "
-                "Emirates', 'United States of America') — an abbreviation like 'UAE' or "
-                "'USA' matches nothing. Applied after the server-side read."
+                "One location the organization must have: any of city, country, state, "
+                "postal_code, street_address, location_title, all matched against the same "
+                "location. `city` and `street_address` are exact, case-sensitive and sent to "
+                "Backstop; `state` is the whole value and `country` whole words, any case; "
+                "the rest are case-insensitive substrings. All but city and street are applied "
+                "after the server-side read. By default any of the organization's locations "
+                "may match; set `primary_only` to read the primary one only. One location "
+                "only: for several (London or Paris), make one call each and combine the rows."
             )
-        ),
-    ] = None,
-    state: Annotated[
-        str | None,
-        Field(
-            description=("Substring of the state or region. Applied after the server-side read.")
         ),
     ] = None,
     website: Annotated[
@@ -150,9 +153,8 @@ async def search_organizations(
             description=(
                 "Custom-field predicates, AND. Each is a definition id from "
                 "list_custom_fields plus the stored value. Applied after the "
-                "server-side read. A call that sets only "
-                "these reads the collection (up to "
-                f"{MAX_ORGANIZATION_SCAN_RECORDS} rows) and says so in `coverage`."
+                "server-side read, so a call that sets only these reads the collection until "
+                "the page fills."
             )
         ),
     ] = None,
@@ -161,7 +163,7 @@ async def search_organizations(
         Field(
             description=(
                 "Every row's custom fields come back as `custom_field_values` by default — "
-                "the fields a table is grouped or labelled by (Grade, Investor Type). Leave "
+                "the fields a table is grouped or labelled by. Leave "
                 "this false. Set it true only to retry a call that timed out, to see whether "
                 "reading the custom fields is what made it slow. Refused together with "
                 "`custom_fields`, which needs them."
@@ -173,51 +175,64 @@ async def search_organizations(
         Field(
             description=(
                 "Sparse row fields. Defaults to id, name, legal_name, email, city, "
-                "country. `id` is always included. Select `url` when the answer will "
-                "link to the organization — it is off by default. `custom_field_values` is "
-                "included automatically unless `exclude_custom_fields` is set."
+                "country, locations. `city`, `country`, `state`, `postal_code`, "
+                "`street_address`, and `location_title` are the primary location; "
+                "`locations` is every address. `id` is always included. Select `url` when "
+                "the answer will link to the organization — it is off by default. "
+                "`custom_field_values` is included automatically unless "
+                "`exclude_custom_fields` is set."
+            )
+        ),
+    ] = None,
+    cursor: Annotated[
+        str | None,
+        Field(
+            description=(
+                "`continuation.cursor` from the previous page of this same search. Repeat "
+                "every other argument unchanged; a cursor from different arguments is rejected."
             )
         ),
     ] = None,
     search_organizations_query: SearchOrganizationsQuery = Depends(
         get_search_organizations_query_factory
     ),
+    search_config: SearchConfig = Depends(get_search_config),
 ) -> SearchOrganizationsResolvedResponse:
     """Filter organizations across the firm.
 
     `name`, `email`, `other_id`, and `matching_domain` are sent to Backstop and narrow
-    the read. `legal_name`, `city`, `country`, `state`, `website`, `ria`,
-    `internal_organization`, and `custom_fields` are applied after that walk. A call
-    with only those in-memory predicates reads the collection. One named organization
-    is still get_organization, not this walk.
+    the read, and so do the `city` and `street_address` of `location_filter`.
+    `legal_name`, the rest of `location_filter`, `website`, `ria`, `internal_organization`,
+    and `custom_fields` are applied after that walk. A call with only those in-memory
+    predicates reads the collection. One named organization is still get_organization,
+    not this walk.
+
+    `location_filter` is one location: every field in it must match the same address of
+    the organization. `city` and `street_address` must equal the stored value exactly, case
+    included ('London', not 'london' or 'Lond'); `state` is the whole value and `country`
+    whole words, any case; the other fields are case-insensitive substrings. Any of the
+    organization's locations may match — a London office that is not the primary one counts — unless
+    `primary_only` is true. An organization with no location matches no location filter.
+    For several locations, call once per location and combine the rows.
 
     Custom-field ids come from list_custom_fields. Match by definition id, not the
     label. A missing custom-field value is not a match.
 
-    Before choosing between this tool and search_opportunities, call list_custom_fields for
-    both organizations and opportunities, and search the collection where the user's words
-    exist. "Prospects", "current investors", and "former investors" are organizations,
-    found by an organization status custom field (e.g. an "Investor Status" select) — not
-    by opportunity stage, and not by search_opportunities. Prospect, Grade, and Investor
-    Type are organization fields. Filter on the option the user named. A qualifier such as
-    "active" usually maps to a second organization status field (dialogue or relationship
-    stage): pass every option that counts as active in `values`, and state which options
-    you applied. To group rows by Grade, Investor Type, or any other field, read it from each
-    row's `custom_field_values`. A field missing from
-    list_custom_fields for organizations (often Strategy) cannot come from the company;
-    say so rather than filling the column. `country` is the stored full name.
-
     Every row carries its custom fields as `custom_field_values`. If a call times out,
     retry once with `exclude_custom_fields=true` to see whether reading them is the cause;
-    otherwise leave it false.
+    otherwise leave it false. Every row also carries its addresses as `locations`.
 
+    One call returns one page of rows in Backstop id order, not by name. `continuation`
+    means the page stopped before the end: follow `continuation.cursor`, with every other
+    argument unchanged, only when the user needs more rows than this page holds. An empty
+    `rows` list means nothing matched.
     `coverage.visible_count` is Backstop's total for the server-side filters, before
-    the in-memory predicates. An empty `rows` list means nothing matched.
+    the in-memory predicates.
 
-    Call like: {"country": "Finland",
+    Call like: {"location_filter": {"country": "Finland"},
     "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
-    "values": ["Prospect"]}],
-    "fields": ["name", "city", "country"]}
+    "values": ["<option from list_custom_fields>"]}],
+    "fields": ["name", "locations"]}
     """
     if custom_fields and exclude_custom_fields:
         raise ValueError(
@@ -235,14 +250,13 @@ async def search_organizations(
                 "other_id": other_id is not None,
                 "matching_domain": matching_domain is not None,
                 "legal_name": legal_name is not None,
-                "city": city is not None,
-                "country": country is not None,
-                "state": state is not None,
+                "location_filter": location_filter is not None,
                 "website": website is not None,
                 "ria": ria is not None,
                 "internal_organization": internal_organization is not None,
                 "custom_fields": len(predicates),
                 "exclude_custom_fields": exclude_custom_fields,
+                "cursor": cursor is not None,
             },
         )
         return await search_organizations_query.run(
@@ -251,13 +265,13 @@ async def search_organizations(
             other_id=other_id,
             matching_domain=matching_domain,
             legal_name=legal_name,
-            city=city,
-            country=country,
-            state=state,
+            location_filter=location_filter,
             website=website,
             ria=ria,
             internal_organization=internal_organization,
             custom_fields=predicates,
             exclude_custom_fields=exclude_custom_fields,
             fields=chosen,
+            result_size=search_config.result_size,
+            cursor=cursor,
         )

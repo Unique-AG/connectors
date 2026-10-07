@@ -70,7 +70,8 @@ async def list_system_users(
 
     Use when you need the `user_name` login that search_opportunities filters on, or to see
     whether a colleague is `disabled`, or the login for an opportunity `owner_login` or a
-    task assignee. These are our staff, not investors. Pass `search` to keep colleagues
+    task assignee. A colleague or employee named in a question is here, not in search_people.
+    These are our staff, not investors. Pass `search` to keep colleagues
     whose name, login, or email contains that substring. `refresh` does nothing unless the
     catalog cache is enabled (off by default).
 

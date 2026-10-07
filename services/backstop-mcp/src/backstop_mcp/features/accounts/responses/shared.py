@@ -13,6 +13,7 @@ from datetime import date as Date
 from typing import Self
 
 from pydantic import Field
+from pydantic.json_schema import SkipJsonSchema
 
 from backstop_mcp.backstop_client import Included, IncludedResource
 from backstop_mcp.features.accounts.api_responses import (
@@ -75,6 +76,15 @@ class OwnerResponse(OmitNoneModel):
             "not say which. Echo it with `id`."
         ),
     )
+    contacts_id: SkipJsonSchema[str | None] = Field(
+        default=None,
+        exclude=True,
+        description="The contacts envelope id when `id` was remapped to the specific resource.",
+    )
+
+    def has_id(self, candidates: frozenset[str]) -> bool:
+        """Whether `id` or the contacts envelope id is one of `candidates`."""
+        return self.id in candidates or self.contacts_id in candidates
 
     @classmethod
     def from_owner(cls, owner: AccountOwnerDto | None) -> Self | None:
@@ -98,6 +108,7 @@ class OwnerResponse(OmitNoneModel):
                 id=specific.resource_id,
                 name=owner.attributes.name,
                 resource_type=specific.resource_type,
+                contacts_id=owner.id,
             )
         return cls(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
 
@@ -240,8 +251,9 @@ class AccountRowResponse(OmitNoneModel):
     investor_type: InvestorTypeResponse | None = Field(
         default=None,
         description=(
-            "How Backstop classifies this investor (e.g. 'Fund of Funds'). Omitted when that "
-            "include was missing."
+            "The account's own investor-type pick (e.g. 'Fund of Funds'), set per account. It "
+            "can differ from how the owner organization is classified; say which one a "
+            "breakdown grouped on. Omitted when that include was missing."
         ),
     )
     currency: str | None = Field(
@@ -299,8 +311,7 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "US/non-US flag. True when Backstop marks the account as domiciled in the United "
-            "States. It is not a geographical breakdown: that is the tenant's location "
-            "custom field in `custom_field_values`, weighted by latest value."
+            "States."
         ),
     )
     is_open: bool = Field(
@@ -310,18 +321,14 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Only present when `include_latest_value=true` was passed on "
-            "`get_product_investors`. For any other date, use `get_time_series`. A "
-            "geographical breakdown weights each account by this amount."
+            "`get_product_investors`. For any other date, use `get_time_series`."
         ),
     )
     custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
         default=None,
         description=(
             "Every account custom field with a value. Absent when the call set "
-            "`exclude_custom_fields`. A field missing here has no value on this account — "
-            "group it as blank. Field names differ by tenant: for a geographical breakdown "
-            "pick the location or region field by its `name`, and ask the user when it is "
-            "unclear."
+            "`exclude_custom_fields`. A field missing here has no value on this account."
         ),
     )
 
@@ -402,8 +409,8 @@ class ProductCandidateResponse(CandidateResponse):
     id: str = Field(
         description=(
             "Backstop product id. Echo it as a `products` entry on `get_product_investors`, as "
-            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
-            "`get_time_series` — never invent one."
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         )
     )
     name: str | None = Field(
@@ -431,7 +438,7 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
     Show each candidate's `label` to the user, then retry with that `id` as a `products`
-    entry on `get_product_investors`, as `product_id` on `get_product`, or as `entity_id` with
+    entry on `get_product_investors`, as `product_ids` on `search_products`, or as `entity_id` with
     `entity_type='products'` on `get_time_series`. Never invent one.
     """
 
@@ -441,8 +448,8 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
         description=(
             "The matching products. Show `label` to the user, then retry with the chosen "
             "`id`s as `products` entries on `get_product_investors` (several are fine), as "
-            "`product_id` on `get_product`, or as `entity_id` with `entity_type='products'` on "
-            "`get_time_series` — never invent one."
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         ),
     )
 

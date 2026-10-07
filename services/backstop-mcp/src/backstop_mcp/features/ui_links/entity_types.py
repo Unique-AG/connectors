@@ -21,7 +21,10 @@ class BackstopUiPage(StrEnum):
     ACTIVITY = "activities.jsp"
 
 
-ACCOUNT_SUGGESTED_NOTE: Final[str] = "No tool loads an account by id."
+ACCOUNT_SUGGESTED_NOTE: Final[str] = (
+    "No tool loads the account record. Pass this id to get_time_series "
+    "(entity_type accounts) or get_capital_flows (account_ids)."
+)
 ORGANIZATION_SUGGESTED_NOTE: Final[str] = (
     "Pass this id as party_id with search_type organizations, or pass the name as search."
 )
@@ -133,7 +136,7 @@ PAGE_SPECS: Final[dict[BackstopUiPage, UiPageSpec]] = {
         buildable=True,
         supports_layout=True,
         entity_kind="product",
-        suggested_tool="get_product",
+        suggested_tool="search_products",
         suggested_note=None,
         canonical_label="Summary",
     ),
@@ -297,7 +300,7 @@ LANDING_RESOURCE_TYPE_TOOLS: Final[dict[str, LandingSuggestedLookup]] = {
         "get_person",
         "Pass party_id with search_type employees, or pass the name as search.",
     ),
-    "products": LandingSuggestedLookup("get_product"),
+    "products": LandingSuggestedLookup("search_products"),
     "accounts": LandingSuggestedLookup(None, ACCOUNT_SUGGESTED_NOTE),
     "opportunities": LandingSuggestedLookup("get_opportunities_by_ids"),
     "tasks": LandingSuggestedLookup(None, TASK_SUGGESTED_NOTE),

@@ -22,7 +22,7 @@ from tests.server.tools.helpers import object_dict, tool_model, tool_payload
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_activity_tags))
 _FETCH_LOGGER = "backstop_mcp.features.activity_tags.activity_tags_service"
 
-_LIVE_TAG_ID = "474963"
+_LIVE_TAG_ID = "9001"
 
 
 def tenant(name: str) -> str:
@@ -339,15 +339,15 @@ class TestListActivityTagsTool:
         base_url = tenant("at-prefix")
         respx.get(f"{base_url}/activity-tags").mock(
             return_value=_collection_page(
-                _tag("1", name="AT: Tail Hedging", quantityTagged=40, viewable=True),
-                _tag("2", name="Tail Hedging", quantityTagged=3, viewable=True),
-                _tag("3", name="AT: Long Vol", quantityTagged=9, viewable=True),
+                _tag("1", name="XY: Beta", quantityTagged=40, viewable=True),
+                _tag("2", name="Beta", quantityTagged=3, viewable=True),
+                _tag("3", name="XY: Alpha", quantityTagged=9, viewable=True),
             )
         )
         async with tool_client(base_url) as client:
             result = tool_model(
                 await list_activity_tags(
-                    search="Tail Hedging",
+                    search="Beta",
                     activity_tags=activity_tags_service(client),
                 ),
                 ListActivityTagsResponse,

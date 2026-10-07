@@ -80,25 +80,23 @@ async def run_report(
 ) -> RunReportToolResponse:
     """Run a saved Report Center report by name and return one page of rows.
 
-    Required: `report_name`, the exact name from Report Center. Ask the user which report —
-    there is no list endpoint. Do not invent a name. `as_of_date` defaults to today.
+    Use whenever the user mentions a report ("Report Center", "saved report", "run the X
+    report") or asks what one contains. Answer from its rows; other tools don't reproduce a
+    saved report's columns or filters. If no report is named, ask which — there is no list
+    endpoint. Never invent a name. `report_name` is the exact Report Center name;
+    `as_of_date` defaults to today.
 
-    The result is a table whose columns depend on that saved report. `columns` names the
-    keys; `rows` are dicts under those keys. Values can be any type. Ask the user what they
-    need from the data and what the columns mean — do not invent a schema or a column's
-    meaning.
+    The table's columns depend on the report: `columns` names the keys, `rows` are dicts
+    with values of any type. Ask what the user needs and what columns mean; don't invent a
+    schema.
 
-    A quoted report name, or "pull my X report", is this tool with that exact string. Do not
-    rebuild it with get_capital_flows. This tool cannot filter by product or date. For a cut
-    of the report (one fund, a date range), follow `next_offset` to the end, then keep rows
-    by the product column and the effective-date column the report returned. Resolve a short
-    name with get_product when that column holds the legal name. Keep every transaction type
-    inside the cut. A follow-up that moves to other feeders replaces the product set; run
-    both only when the user asks for both.
+    The report can't be filtered by product or date. Filter on its own columns after
+    following `next_offset` to the end. Resolve a short name with search_products when the
+    column holds the legal name.
 
     One page per call. `total` is the full row count; `next_offset` is present when more
-    rows remain. Continuation must repeat the same `as_of_date` (the default is today). Do
-    not walk every page unless the user asked for the whole report or a cut of it.
+    rows remain. Continuation must repeat the same `as_of_date`. Don't walk every page
+    unless the user asked for the whole report or a cut of it.
 
     Call like: {"report_name": "<exact Report Center name>"}
     Continue: {"report_name": "<same name>", "as_of_date": "<same date, or today if omitted>",

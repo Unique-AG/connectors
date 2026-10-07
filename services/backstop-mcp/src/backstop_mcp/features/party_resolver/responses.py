@@ -42,7 +42,9 @@ REQUIRED_SEARCH_TYPE_DESCRIPTION = (
     "id is not a people id)."
 )
 PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
-    "Trusted Backstop Party ID — an id returned by any tool on this server. "
+    "Trusted Backstop party id (an organization, person, contact, or employee) from a "
+    "prior resolve, search, or party result. Not an account, product, opportunity, task, "
+    "or activity id. "
     "Always pass together with the `search_type` that came with it, as a "
     "separate argument — `party_id` alone is rejected. "
     "Never invent or guess. Exactly one of `party_id` or `search` must be provided."
@@ -53,7 +55,9 @@ SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION = (
     "or `search` must be provided."
 )
 PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION = (
-    "Trusted Backstop Party ID — an id returned by any tool on this server. "
+    "Trusted Backstop party id (an organization, person, contact, or employee) from a "
+    "prior resolve, search, or party result. Not an account, product, opportunity, task, "
+    "or activity id. "
     "Echo the `search_type` that came with it when it is not this tool's "
     "default. Never invent or guess. Exactly one of `party_id` or `search` must be provided."
 )

@@ -156,8 +156,9 @@ class UpdatedPersonResponse(OmitNoneModel):
     location_ids: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Ids this call created or patched. Echo them as `locations[].location_id` "
-            "on a later update. They are not ids to read back from `get_person`."
+            "`contact-locations` ids this call created or patched — the same ids as "
+            "`included.locations[].id` on `get_person`. Echo them as "
+            "`locations[].location_id` on a later update."
         ),
     )
     url: str | None = Field(default=None, description=_PERSON_URL_DESCRIPTION)
@@ -182,8 +183,9 @@ class UpdatedOrganizationResponse(OmitNoneModel):
     location_ids: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Ids this call created or patched. Echo them as `locations[].location_id` "
-            "on a later update. They are not ids to read back from `get_organization`."
+            "`contact-locations` ids this call created or patched — the same ids as "
+            "`included.locations[].id` on `get_organization`. Echo them as "
+            "`locations[].location_id` on a later update."
         ),
     )
     url: str | None = Field(default=None, description=_ORGANIZATION_URL_DESCRIPTION)
