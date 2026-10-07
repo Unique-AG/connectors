@@ -10,6 +10,7 @@ from backstop_mcp.features.collection_scan import ScanCoverageResponse, project_
 from backstop_mcp.features.custom_fields import (
     RegularCustomFieldValues,
     ResolvedCustomFieldValueResponse,
+    StoredCustomFieldValueResponse,
 )
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
@@ -29,7 +30,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.models import OmitNoneModel
 
 __all__ = [
-    "MatchedCustomFieldResponse",
     "OrgPeopleResolvedResponse",
     "OrganizationRecordResponse",
     "OrganizationResolvedResponse",
@@ -534,48 +534,6 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
         )
 
 
-class MatchedCustomFieldResponse(OmitNoneModel):
-    """One custom-field value that satisfied a `search_organizations` predicate."""
-
-    definition_id: str = Field(
-        description=(
-            "Backstop custom-field definition id this value belongs to. The same id "
-            "list_custom_fields returns. Match on this, not on `name`: two definitions "
-            "can share a label."
-        )
-    )
-    name: str | None = Field(
-        default=None,
-        description="Field label as stored on the organization. Not unique.",
-    )
-    value: str = Field(
-        description=(
-            "The stored text that matched the predicate, compared case-insensitively. "
-            "A list value is the element that matched, not the whole list."
-        )
-    )
-
-
-class OrganizationCustomFieldColumnResponse(OmitNoneModel):
-    """One custom-field value published because `custom_field_columns` asked for it."""
-
-    definition_id: str = Field(
-        description=(
-            "Custom-field definition id from `custom_field_columns`. Group on this, not on "
-            "`name`: two definitions can share a label."
-        )
-    )
-    name: str | None = Field(
-        default=None,
-        description="Field label as stored on the organization. Not unique.",
-    )
-    value: str = Field(
-        description=(
-            "The stored value as text. A multi-select value is its elements joined with '; '."
-        )
-    )
-
-
 class SearchOrganizationRowResponse(OmitNoneModel):
     """One organization from a firm-wide search, limited to the fields the caller asked for."""
 
@@ -614,20 +572,13 @@ class SearchOrganizationRowResponse(OmitNoneModel):
     internal_organization: bool | None = Field(
         default=None, description="True when Backstop marks this as an internal organization."
     )
-    custom_field_values: tuple[MatchedCustomFieldResponse, ...] | None = Field(
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
         default=None,
         description=(
-            "Custom-field values that matched this call's `custom_fields` predicates. "
-            "Present only when `custom_fields` was set. For other fields to group or "
-            "label rows by, pass their ids as `custom_field_columns`."
-        ),
-    )
-    custom_field_columns: tuple[OrganizationCustomFieldColumnResponse, ...] | None = Field(
-        default=None,
-        description=(
-            "Values of the definitions named in `custom_field_columns`, in that order. A "
-            "requested definition missing here has no value on this organization — group "
-            "it as blank, do not look it up again."
+            "Every custom field with a value on this organization — group or label rows "
+            "by these (Grade, Investor Type, Investor Status). Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this "
+            "organization: group it as blank, do not look it up again."
         ),
     )
 
@@ -657,7 +608,7 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
     rows: tuple[SearchOrganizationRowResponse, ...] = Field(
         default=(),
         description=(
-            "Organizations matching every filter, capped at `max_rows`. `id` is always "
+            "Every organization matching every filter, up to the scan ceiling. `id` is always "
             "present so the next call is get_organization. Default fields are id, name, "
             "legal_name, email, city, and country."
         ),

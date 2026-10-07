@@ -6,10 +6,14 @@ Open means the `closedDate` key is absent.
 The listing asks for `fields=` and pages in parallel. `fields=` drops the whole `relationships`
 block — except for the relationships named in `include=`, which keep their `data` linkage.
 Why `closedDate` stays meaningful under `fields=` is noted on `ACCOUNT_LISTING_FIELDS`.
+`regularCustomFieldValues` is requested unless `exclude_custom_fields` is set.
 """
 
 from backstop_mcp.backstop_client import BackstopClient, Included
-from backstop_mcp.features.accounts.api_responses import ACCOUNT_LISTING_FIELDS, AccountApiResource
+from backstop_mcp.features.accounts.api_responses import (
+    ACCOUNT_LISTING_FIELDS,
+    AccountApiResource,
+)
 from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
@@ -17,6 +21,7 @@ from backstop_mcp.features.accounts.responses import (
     ProductRefResponse,
     closed_hint,
 )
+from backstop_mcp.features.custom_fields import stored_custom_field_values
 
 
 class GetAccountsForProductQuery:
@@ -26,15 +31,22 @@ class GetAccountsForProductQuery:
         self._client: BackstopClient = client
 
     async def run(
-        self, *, product: ResolvedProductDto, include_closed: bool = False
+        self,
+        *,
+        product: ResolvedProductDto,
+        include_closed: bool = False,
+        exclude_custom_fields: bool = False,
     ) -> ProductListingResponse:
+        fields = ACCOUNT_LISTING_FIELDS
+        if not exclude_custom_fields:
+            fields = f"{fields},regularCustomFieldValues"
         page = await self._client.paginate(
             "/accounts",
             schema=AccountApiResource,
             params={
                 "filter[product.id][eq]": product.id,
                 "include": "owner,investorType",
-                "fields": ACCOUNT_LISTING_FIELDS,
+                "fields": fields,
             },
             max_records=None,
             page_size=100,
@@ -42,7 +54,15 @@ class GetAccountsForProductQuery:
         )
         included = Included(page.included)
         rows = tuple(
-            AccountRowResponse.from_resource(resource, included=included) for resource in page.items
+            AccountRowResponse.from_resource(
+                resource,
+                included=included,
+                custom_field_values=None
+                if exclude_custom_fields
+                else stored_custom_field_values(resource.attributes.regular_custom_field_values)
+                or None,
+            )
+            for resource in page.items
         )
         kept = rows if include_closed else tuple(row for row in rows if row.is_open)
         closed_omitted = 0 if include_closed else len(rows) - len(kept)

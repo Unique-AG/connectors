@@ -419,14 +419,15 @@ class ResolutionConfig(BaseSettings):
     tool until the *client* cancels the call, which discards the candidates already fetched and
     returns nothing at all.
 
-    It must stay below the calling client's tool-call deadline — 60s for the Unique chat client
-    that prompted this knob — and the margin has to cover the upstream search that runs before
-    the prompt. Configurable so that deadline can be matched per deployment without a release.
+    The server waits 2 minutes so a user who reads the candidates before picking is not cut
+    off. The Unique chat client can still cancel a tool call at 60 seconds, and then the
+    candidates are discarded. Configurable so the deadline can be matched per deployment
+    without a release.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="RESOLUTION_")
 
-    elicit_timeout_seconds: float = Field(default=45.0, gt=0)
+    elicit_timeout_seconds: float = Field(default=120.0, gt=0)
 
 
 class DatabaseConfig(BaseSettings):

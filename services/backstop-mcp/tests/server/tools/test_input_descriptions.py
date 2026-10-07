@@ -181,7 +181,7 @@ _USAGE_SAMPLE_NEEDLES: dict[str, tuple[str, ...]] = {
         "list_custom_fields",
         "get_organization",
         '"values"',
-        "custom_field_columns",
+        "exclude_custom_fields",
     ),
     "build_backstop_links": (
         '"kind"',

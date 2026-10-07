@@ -25,6 +25,7 @@ __all__ = [
     "ListCustomFieldGroupsResponse",
     "ListCustomFieldsResponse",
     "ResolvedCustomFieldValueResponse",
+    "StoredCustomFieldValueResponse",
     "UpdateCustomFieldValuesResponse",
 ]
 
@@ -390,4 +391,29 @@ class UpdateCustomFieldValuesResponse(OmitNoneModel):
             "Messages Backstop returned that could not be attributed to a single request "
             "row. Empty when every message landed on a record."
         ),
+    )
+
+
+class StoredCustomFieldValueResponse(OmitNoneModel):
+    """One custom-field value as stored on a search or listing row.
+
+    Read straight off the record, so it needs no catalog and carries no type, tab, or group.
+    `get_organization`, `get_person`, and the opportunity readers return the catalog-joined
+    `ResolvedCustomFieldValueResponse` instead.
+    """
+
+    definition_id: str = Field(
+        description=(
+            "Custom-field definition id, as in list_custom_fields. Group on this, not on "
+            "`name`: two definitions can share a label."
+        )
+    )
+    name: str | None = Field(
+        default=None,
+        description="Field label as stored on the record. Not unique.",
+    )
+    value: str = Field(
+        description=(
+            "The stored value as text. A multi-select value is its elements joined with '; '."
+        )
     )

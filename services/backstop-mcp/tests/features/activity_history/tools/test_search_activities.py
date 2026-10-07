@@ -431,13 +431,69 @@ class TestSearchActivities:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_party_search_returns_every_row(self, client: BackstopClient) -> None:
+        route = respx.post(_URL).mock(
+            side_effect=[
+                _page(*(_row(row_id) for row_id in range(1, 501)), total=608),
+                _page(*(_row(row_id) for row_id in range(501, 609)), total=608),
+            ]
+        )
+
+        result = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2020, 1, 1),
+                end_date=date(2026, 9, 30),
+                search_type="organizations",
+                party_id=_PARTY_ID,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        assert route.call_count == 2
+        assert len(result.rows) == 608
+        assert result.coverage.truncated is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_include_description_returns_every_row_with_its_body(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            side_effect=[
+                _page(*(_row(row_id) for row_id in range(1, 501)), total=608),
+                _page(*(_row(row_id) for row_id in range(501, 609)), total=608),
+            ]
+        )
+
+        result = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2020, 1, 1),
+                end_date=date(2026, 9, 30),
+                search_type="organizations",
+                party_id=_PARTY_ID,
+                include_description=True,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        assert len(result.rows) == 608
+        assert result.coverage.truncated is False
+        assert result.coverage.disclaimer is None
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_end_date_without_start_date_still_searches(self, client: BackstopClient) -> None:
         route = respx.post(_URL).mock(return_value=_page(_row(), total=1))
 
         await search_activities(
             ctx_never_elicit(),
             end_date=date(2024, 12, 31),
-            max_rows=1000,
             resolve_party_query=make_resolve_party_query(client),
             search_activities_query=make_search_activities_query(client),
         )
@@ -481,4 +537,3 @@ class TestSearchActivities:
         assert result.coverage.truncated is True
         assert result.coverage.disclaimer is not None
         assert "partial" in result.coverage.disclaimer
-        assert "Raise max_rows" not in result.coverage.disclaimer

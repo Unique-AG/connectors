@@ -2,9 +2,9 @@ import httpx
 import pytest
 import respx
 
+from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
     MAX_ORGANIZATION_SCAN_RECORDS,
-    OrganizationCustomFieldMatch,
     SearchOrganizationsResolvedResponse,
 )
 from tests.features.org_people.conftest import make_search_organizations_query
@@ -97,10 +97,9 @@ class TestSearchOrganizationsQuery:
                 city="wichita",
                 ria=True,
                 custom_fields=(
-                    OrganizationCustomFieldMatch(definition_id="10", values=("yes",)),
-                    OrganizationCustomFieldMatch(definition_id="12", values=("emea",)),
+                    CustomFieldMatch(definition_id="10", values=("yes",)),
+                    CustomFieldMatch(definition_id="12", values=("emea",)),
                 ),
-                max_rows=100,
                 fields=_FIELDS,
             )
 
@@ -119,8 +118,10 @@ class TestSearchOrganizationsQuery:
         assert "filter[regularCustomFieldValues]" not in params
         assert [row.id for row in result.rows] == ["1"]
         assert result.rows[0].custom_field_values is not None
-        matched = {(item.definition_id, item.value) for item in result.rows[0].custom_field_values}
-        assert matched == {("10", "Yes"), ("12", "EMEA")}
+        published = {
+            (item.definition_id, item.value) for item in result.rows[0].custom_field_values
+        }
+        assert published == {("10", "Yes"), ("11", "No"), ("12", "EMEA; US")}
         assert result.coverage.ceiling_hit is False
 
     @pytest.mark.asyncio
@@ -170,12 +171,11 @@ class TestSearchOrganizationsQuery:
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 custom_fields=(
-                    OrganizationCustomFieldMatch(definition_id="261621", values=("prospect",)),
-                    OrganizationCustomFieldMatch(
+                    CustomFieldMatch(definition_id="261621", values=("prospect",)),
+                    CustomFieldMatch(
                         definition_id="8646237", values=("1 - Dialogue", "2 - Project")
                     ),
                 ),
-                max_rows=100,
                 fields=_FIELDS,
             )
 
@@ -190,7 +190,7 @@ class TestSearchOrganizationsQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_publishes_requested_columns_without_filtering_on_them(self) -> None:
+    async def test_publishes_every_set_custom_field_without_filtering(self) -> None:
         base_url = f"{BASE_URL}/org-search-columns"
         route = respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
@@ -215,23 +215,46 @@ class TestSearchOrganizationsQuery:
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 name="Helsinki",
-                custom_field_columns=("261623", "8646227", "99", "261623"),
-                max_rows=100,
                 fields=_FIELDS,
             )
 
         params = recorded_requests(route.calls)[0].url.params
         assert "regularCustomFieldValues" in params["fields[organizations]"]
         assert [row.id for row in result.rows] == ["1", "2"]
-        first = result.rows[0].custom_field_columns
+        first = result.rows[0].custom_field_values
         assert first is not None
         assert [(item.definition_id, item.name, item.value) for item in first] == [
-            ("261623", "Investor Type", "Public Pension"),
             ("8646227", "Grade", "Focus"),
+            ("261623", "Investor Type", "Public Pension"),
             ("99", "Regions", "EMEA; APAC"),
         ]
+        assert result.rows[1].custom_field_values is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exclude_custom_fields_does_not_request_them(self) -> None:
+        base_url = f"{BASE_URL}/org-search-exclude"
+        route = respx.get(f"{base_url}/organizations").mock(
+            return_value=_page(
+                _org(
+                    "1",
+                    name="Helsinki Pension",
+                    custom_fields=[{"definitionId": "8646227", "name": "Grade", "value": "Focus"}],
+                ),
+                total=1,
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            result = await make_search_organizations_query(client).run(
+                name="Helsinki",
+                exclude_custom_fields=True,
+                fields=_FIELDS,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert "regularCustomFieldValues" not in params["fields[organizations]"]
         assert result.rows[0].custom_field_values is None
-        assert result.rows[1].custom_field_columns is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -248,7 +271,6 @@ class TestSearchOrganizationsQuery:
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 city="WICHITA",
-                max_rows=100,
                 fields=_FIELDS,
             )
 
@@ -256,32 +278,29 @@ class TestSearchOrganizationsQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_server_only_stops_at_max_rows(self) -> None:
-        base_url = f"{BASE_URL}/org-search-cap"
+    async def test_server_only_filter_returns_every_match(self) -> None:
+        base_url = f"{BASE_URL}/org-search-all"
         route = respx.get(f"{base_url}/organizations").mock(
             return_value=_page(
-                _org("1", name="One", city="Wichita"),
-                _org("2", name="Two", city="Wichita"),
-                total=5,
+                *(
+                    _org(str(index), name=f"Koch {index:03}", city="Wichita")
+                    for index in range(150)
+                ),
+                total=150,
             )
         )
 
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 name="Koch",
-                max_rows=2,
                 fields=_FIELDS,
             )
 
-        assert route.call_count == 1
         params = recorded_requests(route.calls)[0].url.params
-        assert params["page[limit]"] == "2"
-        assert "regularCustomFieldValues" not in params["fields[organizations]"]
-        assert [row.id for row in result.rows] == ["1", "2"]
-        assert result.rows[0].custom_field_values is None
-        assert result.coverage.truncated is True
-        assert result.coverage.ceiling_hit is False
-        assert result.coverage.visible_count == 5
+        assert "regularCustomFieldValues" in params["fields[organizations]"]
+        assert len(result.rows) == 150
+        assert result.coverage.truncated is False
+        assert result.coverage.visible_count == 150
 
     @pytest.mark.asyncio
     @respx.mock
@@ -298,7 +317,6 @@ class TestSearchOrganizationsQuery:
         async with tool_client(base_url) as client:
             result = await make_search_organizations_query(client).run(
                 city="Wichita",
-                max_rows=100,
                 fields=_FIELDS,
             )
 

@@ -1,10 +1,5 @@
-"""Firm-wide `GET /opportunities` walk: sparse fields, includes, optional login filter.
-
-`filter[representative.name][eq]` is the only server-side filter that works, and it takes a
-**login** (`userName` from `list_system_users`), not a display name. `filter[stage.name]`,
-`filter[product.name]`, and `filter[isOpen]` are `400 Invalid filter field` — those stay
-client-side after this walk. The investor include arrives as a `contacts` resource, so the
-sparse key is `fields[contacts]`, not `fields[organizations]`.
+"""Firm-wide `GET /opportunities` walk, filtered in memory: the server-side filters are `400`
+or match the often-blank deal representative, so it side-loads `investor.representative`.
 """
 
 import asyncio
@@ -19,7 +14,14 @@ from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
     scan_coverage,
 )
-from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
+from backstop_mcp.features.custom_fields import (
+    CustomFieldFilters,
+    CustomFieldMatch,
+    CustomFieldsService,
+    normalize_matches,
+    satisfies_every,
+    stored_custom_field_values,
+)
 from backstop_mcp.features.opportunities.api_responses import (
     OpportunityResource,
     SearchContactAttributes,
@@ -35,6 +37,7 @@ from backstop_mcp.features.opportunities.responses import (
     SearchOpportunitiesResolvedResponse,
     SearchOpportunityRowResponse,
 )
+from backstop_mcp.features.system_users import SystemUserAttributes
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
 
 logger = logging.getLogger(__name__)
@@ -74,9 +77,10 @@ class SearchOpportunitiesQuery:
         is_open: bool | None = None,
         stage: str | None = None,
         products: Sequence[str] = (),
+        custom_fields: Sequence[CustomFieldMatch] = (),
+        exclude_custom_fields: bool = False,
         mode: SearchMode = "rows",
         group_by: OpportunityGroupBy | None = None,
-        max_rows: int,
         fields: frozenset[str],
     ) -> SearchOpportunitiesResolvedResponse:
         """Walk the firm-wide opportunities collection, then filter and project.
@@ -86,11 +90,12 @@ class SearchOpportunitiesQuery:
         miss must be reported as `custom_fields_unavailable` rather than inferred from
         empty values.
         """
+        predicates = normalize_matches(custom_fields)
         pages, catalog = await asyncio.gather(
             self._client.paginate(
                 "/opportunities",
                 schema=OpportunityResource,
-                params=self._query_params(representative=representative),
+                params=self._query_params(exclude_custom_fields=exclude_custom_fields),
                 max_records=MAX_OPPORTUNITY_SCAN_RECORDS,
                 page_size=500,
                 parallel=True,
@@ -103,6 +108,8 @@ class SearchOpportunitiesQuery:
         opportunities_mapped: list[SearchOpportunityRowResponse] = []
         dropped = 0
         for opportunity in pages.items:
+            if not satisfies_every(opportunity.attributes.regular_custom_field_values, predicates):
+                continue
             try:
                 opportunity_mapped = await self.map_opportunity_to_response_util.run(
                     row=opportunity,
@@ -113,11 +120,21 @@ class SearchOpportunitiesQuery:
                         target=OpportunityLinkTarget(entity_id=opportunity.id),
                     ),
                 )
-                investor = InvestorFromOpportunityResponse.from_included(
-                    included.first(
-                        opportunity,
-                        "investor",
-                        schema=IncludedResource[SearchContactAttributes],
+                investor_include = included.first(
+                    opportunity,
+                    "investor",
+                    schema=IncludedResource[SearchContactAttributes],
+                )
+                investor = InvestorFromOpportunityResponse.from_included(investor_include)
+                investor_representative = (
+                    None
+                    if investor_include is None
+                    else self._login(
+                        included.first(
+                            investor_include,
+                            "representative",
+                            schema=IncludedResource[SystemUserAttributes],
+                        )
                     )
                 )
                 product_response = ProductFromOpportunityResponse.from_included(
@@ -132,6 +149,18 @@ class SearchOpportunitiesQuery:
                         opportunity_mapped,
                         investor=investor,
                         product=product_response,
+                        investor_representative=investor_representative,
+                        representative=self._login(
+                            included.first(
+                                opportunity,
+                                "representative",
+                                schema=IncludedResource[SystemUserAttributes],
+                            )
+                        ),
+                        custom_field_values=stored_custom_field_values(
+                            opportunity.attributes.regular_custom_field_values
+                        )
+                        or None,
                     )
                 )
             except ValidationError as exc:
@@ -143,18 +172,27 @@ class SearchOpportunitiesQuery:
                 )
 
         product_needles = tuple(item.strip().casefold() for item in products if item.strip())
+        investor_representative = (representative or "").strip().casefold() or None
         selected = tuple(
             opportunity
             for opportunity in opportunities_mapped
             if self._matches_filters(
-                opportunity, is_open=is_open, stage=stage, product_needles=product_needles
+                opportunity,
+                is_open=is_open,
+                stage=stage,
+                product_needles=product_needles,
+                investor_representative=investor_representative,
             )
         )
+        projected = fields
+        if investor_representative:
+            projected = projected | {"investor_representative"}
+        if not exclude_custom_fields:
+            projected = projected | {"custom_field_values"}
         return self._to_response(
             selected,
             mode=mode,
-            fields=fields,
-            max_rows=max_rows,
+            fields=projected,
             group_by=group_by,
             opportunities_received=len(pages.items),
             opportunities_dropped=dropped,
@@ -163,22 +201,39 @@ class SearchOpportunitiesQuery:
             custom_fields_unavailable=catalog is None,
         )
 
-    def _query_params(self, *, representative: str | None) -> dict[str, object]:
-        params: dict[str, object] = {
-            "include": "investor,product,stage",
-            "fields[contacts]": "name,country,state,city,specificResource",
+    def _query_params(self, *, exclude_custom_fields: bool) -> dict[str, object]:
+        wire_fields = [
+            "name",
+            "isOpen",
+            "probability",
+            "requestedAmount",
+            "allocatedAmount",
+            "weightedValue",
+            "weightedAllocatedValue",
+            "currencyCode",
+            "expectedInvestmentDate",
+            "closedDate",
+            "daysOpen",
+            "daysInCurrentStage",
+            "dateEnteredCurrentStage",
+            "previousStage",
+            "representative",
+        ]
+        if not exclude_custom_fields:
+            wire_fields.append("regularCustomFieldValues")
+        return {
+            "include": "investor,investor.representative,representative,product,stage",
+            "fields[contacts]": "name,country,state,city,specificResource,representative",
+            "fields[system-users]": "userName",
             "fields[products]": "name,configuration",
             "fields[opportunity-stages]": "name",
-            "fields[opportunities]": (
-                "name,isOpen,probability,requestedAmount,allocatedAmount,weightedValue,"
-                "weightedAllocatedValue,currencyCode,"
-                "expectedInvestmentDate,closedDate,daysOpen,daysInCurrentStage,"
-                "dateEnteredCurrentStage,previousStage"
-            ),
+            "fields[opportunities]": ",".join(wire_fields),
         }
-        if representative:
-            params["filter[representative.name][eq]"] = representative
-        return params
+
+    def _login(self, user: IncludedResource[SystemUserAttributes] | None) -> str | None:
+        if user is None or user.attributes.user_name is None:
+            return None
+        return user.attributes.user_name.strip() or None
 
     def _matches_filters(
         self,
@@ -187,8 +242,14 @@ class SearchOpportunitiesQuery:
         is_open: bool | None,
         stage: str | None,
         product_needles: Sequence[str],
+        investor_representative: str | None,
     ) -> bool:
         if is_open is not None and opportunity.is_open is not is_open:
+            return False
+        if (
+            investor_representative is not None
+            and (opportunity.investor_representative or "").casefold() != investor_representative
+        ):
             return False
         if stage is not None:
             name = (opportunity.stage or "").casefold()
@@ -215,7 +276,6 @@ class SearchOpportunitiesQuery:
         *,
         mode: SearchMode,
         fields: frozenset[str],
-        max_rows: int,
         group_by: OpportunityGroupBy | None,
         opportunities_received: int,
         opportunities_dropped: int,
@@ -223,14 +283,12 @@ class SearchOpportunitiesQuery:
         truncated: bool,
         custom_fields_unavailable: bool,
     ) -> SearchOpportunitiesResolvedResponse:
-        truncated_by_row_cap = mode == "rows" and len(selected) > max_rows
         coverage = scan_coverage(
             rows_scanned=opportunities_received,
             visible_count=total_count,
             rows_dropped=opportunities_dropped,
             ceiling=MAX_OPPORTUNITY_SCAN_RECORDS,
             ceiling_clamped=truncated,
-            truncated_by_row_cap=truncated_by_row_cap,
             # One `paginate` call: a failed page raises rather than returning a short list, so this
             # walk has no partial mode to report.
             partial_due_to_error=False,
@@ -238,9 +296,7 @@ class SearchOpportunitiesQuery:
         opportunities: tuple[SearchOpportunityRowResponse, ...] = ()
         aggregates: tuple[AggregateBucketResponse, ...] = ()
         if mode == "rows":
-            opportunities = tuple(
-                opportunity.project(fields=fields) for opportunity in selected[:max_rows]
-            )
+            opportunities = tuple(opportunity.project(fields=fields) for opportunity in selected)
         else:
             assert group_by is not None
             aggregates = tuple(

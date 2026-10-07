@@ -57,10 +57,9 @@ env:
   BACKSTOP_TIME_ZONE_CACHE_ENABLED: "false"
 
   # Bounds how long a tool waits for the user to choose between ambiguous matches before
-  # returning the candidate list instead. A property of the *client*, not of this server: it
-  # must stay under that client's tool-call deadline, with margin for the upstream search that
-  # precedes the prompt. Lower it in an overlay whose client cancels sooner than 60s.
-  RESOLUTION_ELICIT_TIMEOUT_SECONDS: "45"
+  # returning the candidate list instead. The server waits 2 minutes. The Unique chat client
+  # can still cancel a tool call at 60s, and then the candidates are discarded.
+  RESOLUTION_ELICIT_TIMEOUT_SECONDS: "120"
 
 envVars: []
 # Required secrets (provide via envVars in overlay):

@@ -109,7 +109,7 @@ class TestGetAccountsForProductQuery:
         assert params["filter[product.id][eq]"] == _PRODUCT_ID
         assert params["include"] == "owner,investorType"
         assert params["page[limit]"] == "100"
-        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS | {"regularCustomFieldValues"}
         assert "product" not in params["include"]
         assert len(listing.accounts) == 1
         assert listing.accounts[0].owner is not None
@@ -118,6 +118,39 @@ class TestGetAccountsForProductQuery:
         assert listing.accounts[0].investor_type.name == "Fund of Funds"
         assert listing.product.id == _PRODUCT_ID
         assert listing.product.short_name == "NGUP"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_investor_type_name_and_classification_are_separate(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account("1", investor_type_id="10", name="Named"),
+                _account("2", investor_type_id="20", name="Classified"),
+                included=[
+                    resource(
+                        "10",
+                        "investor-types",
+                        name="Fund of Funds",
+                        classificationType="Institutional",
+                    ),
+                    resource("20", "investor-types", classificationType="Endowment/Foundation"),
+                ],
+            )
+        )
+
+        listing = await make_get_accounts_for_product_query(client).run(product=_PRODUCT)
+
+        types = [
+            (account.investor_type.name, account.investor_type.classification_type)
+            for account in listing.accounts
+            if account.investor_type
+        ]
+        assert types == [
+            ("Fund of Funds", "Institutional"),
+            (None, "Endowment/Foundation"),
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -192,3 +225,70 @@ class TestGetAccountsForProductQuery:
 
         assert [account.id for account in listing.accounts] == ["ok"]
         assert listing.accounts[0].is_employee_account is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_exclude_custom_fields_does_not_request_them(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account(
+                    "1",
+                    name="Europe feeder",
+                    regularCustomFieldValues=[
+                        {"definitionId": 8689949, "name": "Investor Location", "value": "Europe"}
+                    ],
+                )
+            )
+        )
+
+        listing = await make_get_accounts_for_product_query(client).run(
+            product=_PRODUCT, exclude_custom_fields=True
+        )
+
+        params = route.calls.last.request.url.params
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS
+        assert listing.accounts[0].custom_field_values is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_publishes_every_set_custom_field(self, client: BackstopClient) -> None:
+        route = respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account(
+                    "1",
+                    name="Europe feeder",
+                    usDomiciled=False,
+                    regularCustomFieldValues=[
+                        {
+                            "definitionId": 8689949,
+                            "name": "Investor Location",
+                            "value": "Europe",
+                        },
+                        {
+                            "definitionId": "2",
+                            "name": "Tags",
+                            "value": ["Middle East", "Europe"],
+                        },
+                        {"definitionId": "3", "name": "Unset", "value": None},
+                    ],
+                ),
+                _account("2", name="Blank location", regularCustomFieldValues=[]),
+            )
+        )
+
+        listing = await make_get_accounts_for_product_query(client).run(
+            product=_PRODUCT,
+        )
+
+        params = route.calls.last.request.url.params
+        assert set(params["fields"].split(",")) == _EXPECTED_FIELDS | {"regularCustomFieldValues"}
+        values = listing.accounts[0].custom_field_values
+        assert values is not None
+        assert [(item.definition_id, item.name, item.value) for item in values] == [
+            ("8689949", "Investor Location", "Europe"),
+            ("2", "Tags", "Middle East; Europe"),
+        ]
+        assert listing.accounts[0].us_domiciled is False
+        assert listing.accounts[1].custom_field_values is None

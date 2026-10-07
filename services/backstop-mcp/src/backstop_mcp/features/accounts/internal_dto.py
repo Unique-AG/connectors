@@ -160,6 +160,7 @@ class InvestorTypeDto(BaseModel):
 
     id: str
     name: str | None = None
+    classification_type: str | None = None
 
     @classmethod
     def from_included(
@@ -172,7 +173,11 @@ class InvestorTypeDto(BaseModel):
         )
         if parsed is None:
             return None
-        return cls(id=parsed.id, name=parsed.attributes.name)
+        return cls(
+            id=parsed.id,
+            name=parsed.attributes.name,
+            classification_type=parsed.attributes.classification_type,
+        )
 
 
 class AccountRecordDto(BaseModel):
