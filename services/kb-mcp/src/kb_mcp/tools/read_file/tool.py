@@ -33,6 +33,7 @@ from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
 from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.references import (
     MIME_TYPE_JSON,
     MIME_TYPE_PDF,
@@ -232,6 +233,7 @@ async def _download_with_retry(
 @tool(
     name="read_file",
     meta=_META,
+    icons=tool_icons("file-text"),
     annotations=ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,

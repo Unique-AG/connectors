@@ -39,6 +39,7 @@ from kb_mcp.common.cached_walk import (
     uniqueql_predicate,
 )
 from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.metadata_filter import (
     DEFAULT_METADATA_FILTER_STATEMENT,
     merge_request_metadata_filter,
@@ -385,6 +386,7 @@ _META = merge_tool_meta(
 @tool(
     name="content_tree",
     meta=_META,
+    icons=tool_icons("folder-tree"),
     annotations=ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,

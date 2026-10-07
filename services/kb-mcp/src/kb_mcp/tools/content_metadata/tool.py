@@ -34,6 +34,7 @@ from unique_toolkit.experimental.components.content_tree import ContentTree
 
 from kb_mcp.common.cached_walk import resolve_filtered_snapshot
 from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.metadata_filter import (
     DEFAULT_METADATA_FILTER_STATEMENT,
     merge_request_metadata_filter,
@@ -237,6 +238,7 @@ _META = merge_tool_meta(
     name="content_metadata",
     output_schema=ContentMetadataOutput.model_json_schema(),
     meta=_META,
+    icons=tool_icons("tags"),
     annotations=ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,
