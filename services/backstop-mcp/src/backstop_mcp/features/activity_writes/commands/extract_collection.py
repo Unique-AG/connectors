@@ -41,7 +41,8 @@ def extract_collection(
     if "/" in handle.handle:
         raise ToolError(
             f"activity_id {handle.handle!r} is not a Backstop activity id. Echo an id from a "
-            + "create, a search_activities row, or a get_activity_history handle."
+            + "create, a search_activities row, a history handle, attach_file, or "
+            + "get_tasks_for_party."
         )
     if handle.resource_type is None or handle.resource_type in _COMPOSITE_TYPES[kind]:
         resource_id = handle.resource_id

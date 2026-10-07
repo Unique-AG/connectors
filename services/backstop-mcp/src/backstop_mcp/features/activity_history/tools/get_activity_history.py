@@ -67,8 +67,8 @@ async def get_activity_history(
 ) -> GetActivityHistoryResponse | InputRequiredResult:
     """Party-scoped stream pages. Do not start here — always use `search_activities` first.
 
-    Fallback when `search_activities` is unavailable (`POST /entity-activities` may 404
-    on another tenant). Use `search_activities` for a date window, activity
+    The documented fallback when `search_activities` is unavailable; that is not "no
+    activity". Use `search_activities` for a date window, activity
     types, tags, authors, note text, or a firm-wide question. This tool pages one party's REST
     streams only when that primary is missing. REST `activity_tag_ids` are AND;
     `search_activities` tag filters are OR. A 403 on one stream (empty `items` plus `error`) is
@@ -91,8 +91,7 @@ async def get_activity_history(
     future `effectiveDate`s, so an upcoming meeting can appear at the top of its stream.
 
     There is no default date window: omitting `since`/`until` returns the newest activity in
-    each requested stream regardless of age, which may be old — activity history in this CRM is
-    often sparse.
+    each requested stream regardless of age, which may be old.
 
     Each meeting and call row carries the structured attendee list (`attendees`). Never take
     attendee names from the title, gist, or description. Absent `attendees` means the lookup

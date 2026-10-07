@@ -21,7 +21,13 @@ class BackstopUiPage(StrEnum):
     ACTIVITY = "activities.jsp"
 
 
-ACCOUNT_SUGGESTED_NOTE: Final[str] = "This is an account id, not a party id."
+ACCOUNT_SUGGESTED_NOTE: Final[str] = "No tool loads an account by id."
+ORGANIZATION_SUGGESTED_NOTE: Final[str] = (
+    "Pass this id as party_id with search_type organizations, or pass the name as search."
+)
+PERSON_SUGGESTED_NOTE: Final[str] = (
+    "Pass this id as party_id with search_type people, or pass the name as search."
+)
 TASK_SUGGESTED_NOTE: Final[str] = (
     "This is a taskId; no MCP tool loads a task by id (get_tasks_for_party is party-scoped)."
 )
@@ -85,7 +91,7 @@ PAGE_SPECS: Final[dict[BackstopUiPage, UiPageSpec]] = {
         supports_layout=True,
         entity_kind="organization",
         suggested_tool="get_organization",
-        suggested_note=None,
+        suggested_note=ORGANIZATION_SUGGESTED_NOTE,
         canonical_label="Open",
     ),
     BackstopUiPage.PERSON: UiPageSpec(
@@ -102,7 +108,7 @@ PAGE_SPECS: Final[dict[BackstopUiPage, UiPageSpec]] = {
         supports_layout=True,
         entity_kind="person",
         suggested_tool="get_person",
-        suggested_note=None,
+        suggested_note=PERSON_SUGGESTED_NOTE,
         canonical_label="Open",
     ),
     BackstopUiPage.PRODUCT: UiPageSpec(
@@ -144,7 +150,7 @@ PAGE_SPECS: Final[dict[BackstopUiPage, UiPageSpec]] = {
         buildable=True,
         supports_layout=True,
         entity_kind="account",
-        suggested_tool="get_accounts_for_party",
+        suggested_tool=None,
         suggested_note=ACCOUNT_SUGGESTED_NOTE,
         canonical_label="Open",
     ),
@@ -281,12 +287,18 @@ IGNORED_QUERY_PARAMS: Final[frozenset[str]] = frozenset(
     {"display", "view", "showControls", "popupAddEditTask"}
 )
 LANDING_RESOURCE_TYPE_TOOLS: Final[dict[str, LandingSuggestedLookup]] = {
-    "organizations": LandingSuggestedLookup("get_organization"),
-    "people": LandingSuggestedLookup("get_person"),
-    "contacts": LandingSuggestedLookup("get_person"),
-    "employees": LandingSuggestedLookup("get_person"),
+    "organizations": LandingSuggestedLookup("get_organization", ORGANIZATION_SUGGESTED_NOTE),
+    "people": LandingSuggestedLookup("get_person", PERSON_SUGGESTED_NOTE),
+    "contacts": LandingSuggestedLookup(
+        "get_person",
+        "Pass party_id with search_type contacts, or pass the name as search.",
+    ),
+    "employees": LandingSuggestedLookup(
+        "get_person",
+        "Pass party_id with search_type employees, or pass the name as search.",
+    ),
     "products": LandingSuggestedLookup("get_product"),
-    "accounts": LandingSuggestedLookup("get_accounts_for_party", ACCOUNT_SUGGESTED_NOTE),
+    "accounts": LandingSuggestedLookup(None, ACCOUNT_SUGGESTED_NOTE),
     "opportunities": LandingSuggestedLookup("get_opportunities_by_ids"),
     "tasks": LandingSuggestedLookup(None, TASK_SUGGESTED_NOTE),
 }

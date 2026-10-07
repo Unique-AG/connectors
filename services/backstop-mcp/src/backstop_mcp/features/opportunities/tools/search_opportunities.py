@@ -72,23 +72,22 @@ async def search_opportunities(
         Field(
             description=(
                 "Backstop **login** (`user_name` from list_system_users), not a display name. "
-                "This is the only server-side filter. 'Ben Lazarus' returns 0 rows; "
-                "'blazarus' returns that colleague's book. A disabled login returns empty — "
-                "check list_system_users before concluding there is no pipeline."
+                "This is the only server-side filter. A display name such as 'Jane Doe' "
+                "returns 0 rows; the login 'jdoe' returns that colleague's book. A disabled "
+                "login returns empty — check list_system_users before concluding there is "
+                "no pipeline."
             )
         ),
     ] = None,
     is_open: Annotated[
         bool | None,
-        Field(
-            description=("Client-side open/closed split. filter[isOpen] is 400 on this collection.")
-        ),
+        Field(description="Open/closed split, applied after the server-side read."),
     ] = None,
     stage: Annotated[
         str | None,
         Field(
             description=(
-                "Client-side stage name match. filter[stage.name] is 400 on this collection."
+                "One stage name, exact match, case-insensitive. Applied after the server-side read."
             )
         ),
     ] = None,
@@ -96,10 +95,10 @@ async def search_opportunities(
         list[str] | None,
         Field(
             description=(
-                "List of product short names (exact, e.g. NWON) or display-name substrings. "
+                "Product short names (exact, e.g. NWON) or display-name substrings. "
                 "Several values are OR, so onshore and offshore can be one walk, e.g. "
                 '["NWON", "NWOF"]. Resolve names with get_product '
-                "first when unsure. filter[product.name] is 400 on this collection."
+                "first when unsure. Applied after the server-side read."
             )
         ),
     ] = None,
@@ -109,7 +108,15 @@ async def search_opportunities(
     ] = "rows",
     group_by: Annotated[
         OpportunityGroupBy | None,
-        Field(description="Required when mode is aggregate: stage, product, period, or party."),
+        Field(
+            description=(
+                "Required when mode is aggregate: `stage`, `product`, `period`, or `party`. "
+                "`period` is YYYY-MM of `expected_investment_date`, else "
+                "`date_entered_current_stage`. `party` is the investor. Missing stage is "
+                "`(unknown)`; a deal with no product or investor is `(unattributed)`; a "
+                "period with no date is `(undated)`."
+            )
+        ),
     ] = None,
     max_rows: Annotated[
         int,
@@ -147,8 +154,7 @@ async def search_opportunities(
 
     Use for coverage questions, stuck-in-stage, closing windows, and product pipeline. Pass
     `representative` as a **login** from list_system_users — a display name silently returns
-    zero rows. Stage, product, and open/closed are filtered here after the walk;
-    filter[stage.name], filter[product.name], and filter[isOpen] are invalid on this collection.
+    zero rows.     Stage, product, and open/closed are applied after the server-side read.
 
     For 'what changed stage since X', select `previous_stage` and
     `date_entered_current_stage` and keep rows whose `date_entered_current_stage` is on or
@@ -169,7 +175,7 @@ async def search_opportunities(
     `days_since_last_activity`. Days in stage is not activity. "Prospect" as an investor
     status is an organization field (search_organizations), not a stage here.
 
-    Call like: {"representative": "blazarus", "is_open": true}
+    Call like: {"representative": "jdoe", "is_open": true}
     Product pipeline: {"product": ["NWON", "NWOF"], "is_open": true}
     Stage changes: {"is_open": true, "fields": ["name", "stage", "previous_stage",
     "date_entered_current_stage", "investor"]}

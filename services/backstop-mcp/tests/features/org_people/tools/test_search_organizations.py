@@ -44,7 +44,7 @@ class TestSearchOrganizations:
             if isinstance(item, FieldInfo)
         )
         assert city.description is not None
-        assert "400" in city.description
+        assert "Applied after the server-side read" in city.description
 
     def test_says_prospects_are_organizations_not_opportunity_stages(self) -> None:
         doc = " ".join((search_organizations.__doc__ or "").split())

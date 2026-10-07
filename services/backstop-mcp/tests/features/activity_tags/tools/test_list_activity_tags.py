@@ -345,7 +345,7 @@ class TestListActivityTagsInput:
     def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
         doc = list_activity_tags.__doc__ or ""
         assert "refresh=true" in doc
-        assert "missing field" in doc
+        assert "missing tag" in doc
         assert "activity-tag" in doc.casefold() or "activity tag" in doc.casefold()
         assert "tenant" not in doc.casefold()
         for banned in (
@@ -364,5 +364,5 @@ class TestListActivityTagsInput:
             if isinstance(item, FieldInfo)
         )
         assert field_info.description is not None
-        assert "missing field" in field_info.description
+        assert "missing tag" in field_info.description
         assert "search" in without_injected_parameters(list_activity_tags).__annotations__

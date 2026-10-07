@@ -56,8 +56,10 @@ async def delete_activity(
 ) -> DeleteActivityResponse | InputRequiredResult:
     """Permanently delete a CRM note, meeting, call, task, email, or document.
 
-    Required on `activity`: `kind` and `activity_id`. Never invent an id — echo a create, a
-    `search_activities` row, or a `get_activity_history` handle. Deletion is permanent:
+    Required on `activity`: `kind` and `activity_id`. Never invent an id. Note, meeting,
+    call, and document ids come from a create echo, a `search_activities` row, or a history
+    handle. Email ids come from `attach_file` or a history email `activity_id`. Task ids
+    come from the create echo or `get_tasks_for_party`. Deletion is permanent:
     Backstop has no recycle bin. Refuse bulk wipes, "all test records", and any
     search-then-delete sweep. Use this to undo a wrongly logged activity or an
     `attach_file` upload.

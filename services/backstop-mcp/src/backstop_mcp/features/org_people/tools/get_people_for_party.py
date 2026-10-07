@@ -25,6 +25,8 @@ from backstop_mcp.features.org_people.dependencies import (
     get_people_for_organization_query_factory,
 )
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
     ResolvePartyQuery,
@@ -60,20 +62,13 @@ async def get_people_for_party(
     party_id: Annotated[
         str | None,
         Field(
-            description=(
-                "The argument is `party_id`. Trusted Backstop organization Party ID from a "
-                "prior resolve echo (`id` / `search_type` / `name`). Never invent or guess. "
-                "Exactly one of `party_id` or `search` must be provided."
-            ),
+            description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search: Annotated[
         str | None,
         Field(
-            description=(
-                "Organization name or email to resolve when no trusted `party_id` is "
-                "available. Exactly one of `party_id` or `search` must be provided."
-            ),
+            description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search_type: Annotated[
@@ -107,20 +102,15 @@ async def get_people_for_party(
     Call like: {"search_type": "organizations", "party_id": "<id from prior resolve echo>"}
 
     This is the roster of current staff: `numberOfEmployees` on `get_organization` is often 0
-    even when people are on file. Name and email come from `/employees` (same ids as people)
-    side-loaded with employment relationships on that walk — not a fetch per person.
+    even when people are on file. Name and email come from
+    `GET /organizations/{id}/employees` — that organization's people, not system-users.
+    Echo each row's `id` and `search_type`. An `employees` id from quick-search is a
+    different collection.
 
-    Each row is identity (`id` / `search_type` / name / email / `categories` /
-    `is_key_employee`) plus `employment` from `EmploymentIndex` — `status` is `current`
-    or `former` at this organization. `is_key_employee` is org-scoped: it only appears
-    on this roster (`GET /organizations/{id}/employees`), not on `get_person`. It cannot
-    be set or cleared through these tools — personal API tokens do not persist
-    `isKeyRelationship`. Set Key employee in the CRM UI. Default is current only.
-    `/employees` does not list former staff; those links are on the organization's
-    `entityRelationships`.
-    When they are omitted, `former_omitted` and `include_former_hint` say so — pass
-    `include_former=true` to include them (contact fields may be absent). Call
-    `get_person` with that row's `id` and `search_type` for the full record.
+    `status` is `current` or `former` at this organization. Key employee on this roster
+    is the source; the copy on `get_person` is unreliable. Default is current only.
+    Former staff are omitted unless `include_former=true` (`former_omitted` counts them).
+    Call `get_person` with that row's `id` and `search_type` for the full record.
     """
     if (party_id is None) == (search is None):
         raise ValueError("Exactly one of party_id or search must be provided")

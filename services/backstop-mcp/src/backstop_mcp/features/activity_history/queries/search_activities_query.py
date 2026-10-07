@@ -1,4 +1,7 @@
-"""Firm-wide or party activity search via `POST /entity-activities` (a search, not a create)."""
+"""Firm-wide (or party) activity search via `POST /entity-activities`, the CRM Activity
+Explorer's search (it creates nothing). Failure is not an empty result: 404, schema drift, or
+a re-verified 401 must surface, and the walk stops before `pageNum × pageSize` passes 10000.
+"""
 
 import logging
 from collections.abc import Mapping, Sequence

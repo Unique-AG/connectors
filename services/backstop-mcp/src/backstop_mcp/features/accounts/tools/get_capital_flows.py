@@ -32,15 +32,11 @@ _MAX_ROWS = 1_000
 async def get_capital_flows(
     start_date: Annotated[
         date,
-        Field(
-            description=(
-                "Inclusive start of filter[transactionDate]. Required — an unfiltered read is 400."
-            )
-        ),
+        Field(description=("Inclusive start of the transaction-date window. Required.")),
     ],
     end_date: Annotated[
         date,
-        Field(description="Inclusive end of filter[transactionDate]. Required."),
+        Field(description="Inclusive end of the transaction-date window. Required."),
     ],
     max_rows: Annotated[
         int,
@@ -55,8 +51,10 @@ async def get_capital_flows(
         Field(
             default=None,
             description=(
-                "Keep flows whose included owner id matches. Echo from get_accounts_for_party "
-                "or a prior resolve. Unattributed rows have no owner and drop out."
+                "Keep flows whose `owner.id` matches. That id is the contacts envelope id on a "
+                "capital-flows row — pass `owner.id` from a prior capital-flows row. It is "
+                "not necessarily the party id from `get_accounts_for_party`. Unattributed "
+                "rows have no owner and drop out."
             ),
         ),
     ] = None,

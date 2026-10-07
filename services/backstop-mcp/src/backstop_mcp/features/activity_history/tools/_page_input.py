@@ -103,10 +103,10 @@ class ActivityHistoryFirstPageInput(BaseModel):
         Field(
             min_length=1,
             description=(
-                "AND: a row must carry every id. For any of these tags, use search_activities, "
-                "whose list is OR. Echo ids from list_activity_tags; never invent them. Tag "
-                "names carry prefixes, so pass every id the search returned. Emails have no "
-                "tags and are omitted from the result when this is set."
+                "AND: a row must carry every id. To match any of several tags, use "
+                "search_activities, whose list is OR. Echo ids from list_activity_tags; never "
+                "invent them. Emails have no tags and are omitted from the result when this "
+                "is set."
             ),
         ),
     ] = None

@@ -467,6 +467,6 @@ class TestGetOpportunitiesByIds:
     def test_docstring_names_the_token_cost_and_batching(self) -> None:
         doc = get_opportunities_by_ids.__doc__
         assert doc is not None
-        assert "37,000" in doc
+        assert "custom fields, stage history" in doc
         assert "batch" in doc.lower()
         assert "not_found" in doc

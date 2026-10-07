@@ -1,16 +1,12 @@
 """Backstop HTTP failures, as typed exceptions.
 
-Layering decision, stated once here because it shapes every module: this service is MCP-only,
-so a transport error *is* a tool error. These types subclass `fastmcp.exceptions.ToolError` and
-propagate straight to the MCP client with the joined error messages intact, rather than being
-translated at a boundary. The cost is that `backstop_client` depends on fastmcp and that
-non-tool callers (startup warming, login-form credential verification) can see a `ToolError`;
-both already handle their own failures. The benefit is that no tool has to catch-and-rewrap,
-and no upstream detail is lost on the way out. `auth.context.NotConnectedError` follows the
-same rule.
+Some of these subclass `fastmcp.exceptions.ToolError` and propagate to the MCP client.
+`BackstopAuthError`, `BackstopSessionRevokedError`, and `BackstopUnreachableError` do not.
+Nothing warms catalogs at startup.
 
-`BackstopUnreachableError` stays a plain `Exception` — the login form must re-render, not
-surface a tool error. Mid-session 401s split: a re-check that still authenticates raises
+`BackstopUnreachableError` is any status other than 401/403 from the credential check, and
+a network error — the login form must re-render, not surface a tool error. Mid-session 401s
+split: a re-check that still authenticates raises
 `BackstopTransientAuthError` (a `ToolError`, session kept); a re-check that confirms the
 credential is dead revokes MCP tokens and raises `BackstopSessionRevokedError`, which the
 HTTP middleware turns into 401 so the MCP client reconnects on this call, not the next one.
@@ -155,10 +151,9 @@ class BackstopSessionRevokedError(BackstopAuthError):
 
 
 class BackstopUnreachableError(Exception):
-    """Raised when Backstop can't be reached at all (network error, 5xx) during verification.
+    """Credential check got any status other than 401/403, or the network failed.
 
-    Distinct from "invalid credentials" (401/403) — the caller should show a different
-    message ("Backstop is unreachable, try again") rather than blaming the submitted token.
+    Distinct from invalid credentials — the caller should retry rather than blame the token.
     """
 
 

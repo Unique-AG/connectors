@@ -27,9 +27,8 @@ async def list_contact_categories(
         str | None,
         Field(
             description=(
-                "Optional case-insensitive substring of the category name. The argument is "
-                "`search`. Filters the walk in memory — the query never sends "
-                "`filter[name][like]`."
+                "Optional case-insensitive substring of the category name. Applied after "
+                "the server-side read."
             ),
         ),
     ] = None,

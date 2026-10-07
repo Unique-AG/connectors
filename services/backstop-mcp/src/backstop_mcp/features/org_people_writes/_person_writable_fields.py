@@ -21,15 +21,11 @@ LAST_NAME_DESCRIPTION = (
 )
 GENDER_DESCRIPTION = "Replacement gender."
 KEY_EMPLOYEE_NOT_WRITABLE = (
-    "is_key_employee cannot be written through the API. Personal API tokens do not "
-    "persist isKeyRelationship; set Key employee in the Backstop CRM UI. Read it on "
-    "get_people_for_party."
+    "is_key_employee is read-only. Set Key employee in the CRM UI. Read it on get_people_for_party."
 )
 KEY_EMPLOYEE_NOT_WRITABLE_DESCRIPTION = (
-    "Not writable. Personal API tokens do not persist Key employee "
-    "(`isKeyRelationship` on the employment row / `isKeyEmployee` on the org roster). "
-    "Set it in the Backstop CRM UI. Read it on `get_people_for_party`. Distinct from "
-    "`is_employee`."
+    "Rejected. Key employee is read-only; set it in the CRM UI. Read it on "
+    "`get_people_for_party`. Distinct from `is_employee`."
 )
 
 
@@ -108,7 +104,10 @@ class _PersonWritableFields(BaseModel):
 
     company_id: NonEmptyStr | None = Field(
         default=None,
-        description="Employer organization id. Never invent or guess.",
+        description=(
+            "Sets the person's `company` link. Employment rows are `create_employment`. "
+            "Never invent or guess."
+        ),
     )
     contact_source_id: NonEmptyStr | None = Field(
         default=None,

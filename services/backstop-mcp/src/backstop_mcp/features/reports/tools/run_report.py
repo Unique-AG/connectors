@@ -89,11 +89,12 @@ async def run_report(
     meaning.
 
     One page only. `total` is the full row count; `next_offset` is present when more rows
-    remain. Call again with that offset. Do not walk every page unless the user asked for
-    the whole report.
+    remain. Continuation must repeat the same `as_of_date` (the default is today). Do not
+    walk every page unless the user asked for the whole report.
 
     Call like: {"report_name": "<exact Report Center name>"}
-    Continue: {"report_name": "<same name>", "as_of_date": "2026-09-17", "offset": 100}
+    Continue: {"report_name": "<same name>", "as_of_date": "<same date, or today if omitted>",
+    "offset": 100}
     """
     as_of = as_of_date if as_of_date is not None else date.today()
     with _tracer.start_as_current_span("reports.run") as span:

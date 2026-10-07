@@ -1,6 +1,9 @@
 """Who holds one or more products, and each account's latest value only when asked.
 
-Values are one request per account and capped. Any other dated figure is `get_time_series`.
+One listing per product plus one entry per investor across them. No figures by default;
+`include_latest_value=true` adds each account's latest `values` point and per-investor totals,
+one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never loops
+`get_time_series` over a fund's accounts.
 """
 
 import logging
@@ -44,8 +47,8 @@ type GetProductInvestorsResponse = (
 
 _MAX_PRODUCTS = 10
 
-# Both vehicles of a fund with ~25 open accounts fit comfortably. Past this the answer is slow
-# enough that the user should narrow the scope rather than wait.
+# Enough for an onshore/offshore pair of a typical fund. Past this the answer is slow enough that
+# the user should narrow the scope rather than wait.
 _MAX_VALUED_ACCOUNTS = 50
 
 
@@ -67,10 +70,11 @@ async def get_product_investors(
             max_length=_MAX_PRODUCTS,
             description=(
                 "One to ten products: ids echoed from a prior response, short names (`NWON`), "
-                "or names. A name covers every vehicle it matches (onshore and offshore) — "
-                "`['Northwind Dispersion Fund']` returns both feeders. An exact short name or id "
-                "is exactly that one vehicle; pass several (`['NWON', 'NWOF']`) when the user "
-                "names specific ones. Never invent an id."
+                "or names. An id, exact short name, or exact name is that one vehicle. A partial "
+                "name returns every vehicle whose name contains it, up to 6 (e.g. onshore and "
+                "offshore feeders) — `['Northwind Dispersion']` returns both; more matches ask "
+                "the user. Pass several (`['NWON', 'NWOF']`) when the user names specific ones. "
+                "Never invent an id."
             ),
         ),
     ],
@@ -78,8 +82,8 @@ async def get_product_investors(
         bool,
         Field(
             description=(
-                "When false (default), only open accounts are returned (`closedDate` key "
-                "absent). Pass true to include closed accounts."
+                "When false (default), only open accounts are returned. Pass true to include "
+                "closed accounts."
             ),
         ),
     ] = False,
@@ -107,16 +111,16 @@ async def get_product_investors(
 ) -> GetProductInvestorsResponse | InputRequiredResult:
     """The accounts in one or more products, and who owns them.
 
-    A fund name covers every vehicle it matches (onshore and offshore); an exact short name is
-    one vehicle. No figures by default.
+    A partial fund name returns every vehicle whose name contains it (onshore and offshore); an
+    id, exact short name, or exact name is one vehicle. No figures by default.
 
     Sizing ("list investors by size", "biggest holders"): first call without figures, tell
     the user which vehicles and how many accounts you found, and ask whether to pull latest
     values. Only after they confirm, call again with `include_latest_value=true` and rank by
     `investors[].latest_value_totals`. Never call `get_time_series` once per account in the
-    fund — that is one call per (account, series), reconstitutes the fan-out this connector
-    removed, and drops rows. Fund-level AUM is `get_time_series` on a product's `aums`, which
-    is the product's total assets under management, not one investor's balance.
+    fund — that is one call per (account, series) and drops rows. Fund-level AUM is
+    `get_time_series` on a product's `aums`: the product's total assets under management,
+    not one investor's balance.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor

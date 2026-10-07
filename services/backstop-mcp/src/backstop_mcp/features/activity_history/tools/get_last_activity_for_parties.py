@@ -124,7 +124,7 @@ async def get_last_activity_for_parties(
     ignored a filter). Report it as unchecked, never as inactive. `activity_count` is
     what this credential can see.
 
-    Call like: {"parties": [{"party_id": "341760991", "search_type": "organizations"}],
+    Call like: {"parties": [{"party_id": "<investor.id>", "search_type": "organizations"}],
     "start_date": "2025-09-30", "types": ["meeting", "meeting_call", "note", "email"]}
     """
     start, end = date_window(start_date, end_date, today=date.today())

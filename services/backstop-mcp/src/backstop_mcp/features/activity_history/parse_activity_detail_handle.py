@@ -28,7 +28,7 @@ def parse_activity_detail_handle(activity_id: str) -> ParsedActivityHandle:
             f"{activity_id!r} is a get_activity_history email handle, not an "
             + "activity_id `get_activity_detail` can fetch. History emails come from "
             + "`/emails` (body via contentUrl), not `/entity-activity-details`. Use "
-            + "`search_activities` for the body and attachment list."
+            + "`search_activities` for the email body (`include_description`)."
         )
     if parsed.resource_type is None:
         logger.info("activity_history.handle.bare_id", extra={"activity_id": parsed.handle})

@@ -10,19 +10,17 @@ calls a `resource:` or `resource:List<>` field — `investor`, `product`, `stage
 
 **Every field is optional and every scalar is lenient, and that is what makes a typed page schema
 safe here.** `client.paginate` deserializes a whole page in one pass, so a required field or a
-strict type would fail all 100 opportunities over one malformed record — the reason the fetch
-passed `dict[str, object]` in the first place. The `Lenient*` coercers turn an unparseable scalar
-into `None` instead of a `ValidationError`, so the only remaining way to lose a page is a
-structurally broken resource object (missing `id`, non-object `attributes`), which the untyped
-dict would have failed on too.
+strict type would fail a whole page over one malformed record. The `Lenient*` coercers turn an
+unparseable scalar into `None` instead of a `ValidationError`, so the only remaining way to lose
+a page is a structurally broken resource object (missing `id`, non-object `attributes`).
 
-Backstop's `type` attribute is the deal's *classification* (`"NTE"`, blank on most records), not
-the JSON:API resource type sitting one level up. It is named `classification` here for the same
-reason `previousStage` is spelled out in `responses.py`: the obvious reading is the wrong one.
+Backstop's `type` attribute is the deal's classification (a short code, blank on most records),
+not the JSON:API resource type sitting one level up. It is named `classification` here for the
+same reason `previousStage` is spelled out in `responses.py`: the obvious reading is the wrong one.
 
 Dates split by what actually arrives. `createdTimestamp` / `modifiedTimestamp` come as full
-offset timestamps (`2020-06-24T17:10:52.842-0400`); the others come as midnight-local timestamps
-that only mean a calendar day, and are read as one.
+offset timestamps; the others come as midnight-local timestamps that only mean a calendar day,
+and are read as one.
 """
 
 from typing import ClassVar
@@ -102,9 +100,8 @@ class OpportunityStageAttributes(BaseModel):
     """Wire shape for `opportunity-stages` attributes (the vocabulary subset).
 
     Every field is optional because `client.paginate` deserializes a whole page in one pass: a
-    required field would fail the entire seven-row fetch over one malformed row. Optional fields
-    plus the drop in `OpportunityStageResponse.from_resource` keep one bad row from costing the
-    other six.
+    required field would fail the fetch over one malformed row. Optional fields plus the drop
+    in `OpportunityStageResponse.from_resource` keep one bad row from costing the rest.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
