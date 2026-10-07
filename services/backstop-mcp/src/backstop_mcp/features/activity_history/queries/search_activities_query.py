@@ -267,21 +267,8 @@ class SearchActivitiesQuery:
         attendee_ids: Sequence[str],
         include_description: bool,
     ) -> dict[str, object]:
-        """JSON:API search body. Built here, never passed through from a caller.
-
-        Date, types, tags, authors, and attendees go under `newFilters`. `filters` is ignored
-        by Backstop. A party is `entityId` + `resourceType`, not `associatedWiths`.
-        Type tokens are the wire values: `meeting_call` matches exactly the `Call` rows, while
-        `call` matched none, so calls never came back. `id` breaks effective-date ties:
-        on date alone, paging one 366-row day by 50 skipped and repeated about 30 rows per walk;
-        with `id` the walks matched the single 500-row page.
-
-        Attendees, as probed: `PartyBean_<id>` under `type` 0 applies the filter, several
-        values OR, for an id taken from people, contacts, or employees alike (one person has
-        one id in all three). `PersonBean_`, `ContactBean_`, `EmployeeBean_`, or an
-        organization id silently match nothing; a bare id, email, path, or name is a 500.
-        `type` 1 ignores the values. A row's `attendees[]` chips carry a name and no id, so
-        `_project_rows` cannot re-check this filter the way it re-checks tags.
+        """Backstop reads `newFilters`, not `filters`. Party is `entityId` + `resourceType`.
+        `meeting_call` is Call. Sort `id` after effective date. Attendees: `PartyBean_<id>`, type 0.
         """
         new_filters: dict[str, object] = {
             "effectiveDate": {
