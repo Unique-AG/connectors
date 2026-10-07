@@ -34,10 +34,10 @@ carry `:` and `@` (`19:...@thread.v2`). The parser rejects half-encoded input, s
 handle comes back as "not a handle" rather than as a truncated URL Graph ignores.
 
 Each mail `outlook:///` family is one segment, because Outlook addresses each of these by a single
-opaque id. There are four mail families rather than one. Graph gives them all one id space, but
-this connector keeps them apart: a draft is a message with `isDraft` set. Splitting them into four
-families keeps a message that a reader found from being spelled as a draft and handed to the tool
-that sends.
+opaque id. There are three mail families: messages, folders and rules. A draft is a message with
+`isDraft` set, and Graph gives it the same id space as any other message, so it has no family of
+its own. Whether a message is a draft is a fact that Graph reports. `outlook_send_draft` reads it
+before every send.
 
 A calendar is one segment: Graph says container types such as `calendar` support no immutable id,
 "but their regular IDs were already constant"
@@ -132,23 +132,6 @@ class MailFolderHandle:
     @property
     def uri(self) -> str:
         return f"outlook:///folders/{_segment(self.folder_id)}"
-
-
-@dataclass(frozen=True, slots=True)
-class MailDraftHandle:
-    """This identifies a draft that this connector composed. It is the only thing the sending
-    tool accepts.
-
-    Graph gives a draft the same id space as any other message. Keeping the families apart stops
-    a message that a reader found from being spelled as a draft. This is what makes "send the
-    mail you just wrote" expressible, and "send that mail I found" unspellable.
-    """
-
-    draft_id: str
-
-    @property
-    def uri(self) -> str:
-        return f"outlook:///drafts/{_segment(self.draft_id)}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,7 +240,6 @@ _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 _TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
 _MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
 _MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
-_MAIL_DRAFT_HANDLE = re.compile(r"\Aoutlook:///drafts/([^/]+)\Z")
 _MAIL_RULE_HANDLE = re.compile(r"\Aoutlook:///rules/([^/]+)\Z")
 _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
@@ -324,11 +306,6 @@ def mail_message_handle(uri: str) -> MailMessageHandle | None:
 def mail_folder_handle(uri: str) -> MailFolderHandle | None:
     folder_id = _single_id(_MAIL_FOLDER_HANDLE, uri)
     return None if folder_id is None else MailFolderHandle(folder_id)
-
-
-def mail_draft_handle(uri: str) -> MailDraftHandle | None:
-    draft_id = _single_id(_MAIL_DRAFT_HANDLE, uri)
-    return None if draft_id is None else MailDraftHandle(draft_id)
 
 
 def mail_rule_handle(uri: str) -> MailRuleHandle | None:

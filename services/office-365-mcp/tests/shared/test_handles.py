@@ -204,15 +204,14 @@ class TestTheMailHandleGrammar:
 
         assert handles.mail_message_handle(handle.uri) == handle
 
+    def test_a_draft_is_a_message_so_it_has_no_handle_of_its_own(self) -> None:
+        assert handles.mail_message_handle(f"outlook:///drafts/{_DRAFT_ID}") is None
+        assert not hasattr(handles, "MailDraftHandle")
+
     def test_a_folder_handle_round_trips_its_id(self) -> None:
         handle = handles.MailFolderHandle(_FOLDER_ID)
 
         assert handles.mail_folder_handle(handle.uri) == handle
-
-    def test_a_draft_handle_round_trips_its_id(self) -> None:
-        handle = handles.MailDraftHandle(_DRAFT_ID)
-
-        assert handles.mail_draft_handle(handle.uri) == handle
 
     def test_a_rule_handle_round_trips_its_id(self) -> None:
         handle = handles.MailRuleHandle(_RULE_ID)
@@ -262,22 +261,6 @@ class TestTheMailHandleGrammar:
     )
     def test_what_is_not_a_mail_folder_handle(self, uri: str) -> None:
         assert handles.mail_folder_handle(uri) is None
-
-    @pytest.mark.parametrize(
-        "uri",
-        [
-            # The one that matters: a message a reader minted is not sendable.
-            f"outlook:///messages/{_DRAFT_ID}",
-            f"outlook:///folders/{_FOLDER_ID}",
-            f"outlook:///rules/{_RULE_ID}",
-            f"outlook:///calendars/{_CALENDAR_ID}",
-            f"outlook:///events/{_CALENDAR_ID}/{_EVENT_ID}",
-            "outlook:///drafts/%20",
-            "",
-        ],
-    )
-    def test_what_is_not_a_mail_draft_handle(self, uri: str) -> None:
-        assert handles.mail_draft_handle(uri) is None
 
     @pytest.mark.parametrize(
         "uri",

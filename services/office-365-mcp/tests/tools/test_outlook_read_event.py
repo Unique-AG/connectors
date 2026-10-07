@@ -14,7 +14,6 @@ from office_365_mcp.shared.calendar import SUMMARY_FIELDS
 from office_365_mcp.shared.handles import (
     CalendarHandle,
     EventHandle,
-    MailDraftHandle,
     MailFolderHandle,
     MailMessageHandle,
 )
@@ -491,7 +490,6 @@ class TestWhatItRefuses:
         [
             CalendarHandle(_CALENDAR_ID).uri,
             MailMessageHandle(_EVENT_ID).uri,
-            MailDraftHandle("AAMkAGI2SYNTHETIC-draft-0001=").uri,
             MailFolderHandle("AQMkADAwSYNTHETIC-folder").uri,
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
             f"outlook:///events/{_EVENT_ID}",
