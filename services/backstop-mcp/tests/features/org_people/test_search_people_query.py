@@ -1,6 +1,7 @@
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
@@ -13,7 +14,7 @@ from tests.features.data_hygiene.helpers import (
     person_org,
     relationship_types,
 )
-from tests.features.org_people.conftest import make_search_people_query
+from tests.features.org_people.conftest import make_search_people_query, serve_pages
 from tests.helpers import (
     BASE_URL,
     contact_location,
@@ -25,6 +26,7 @@ from tests.helpers import (
 )
 
 _FIELDS = frozenset({"id", "name", "email", "job_title", "company_name", "city", "country"})
+_RESULT_SIZE = 100
 
 
 def _page(
@@ -99,7 +101,7 @@ class TestSearchPeopleEmployments:
 
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
-                min_current_organizations=2, fields=_FIELDS
+                min_current_organizations=2, result_size=_RESULT_SIZE, fields=_FIELDS
             )
 
         params = recorded_requests(route.calls)[0].url.params
@@ -130,7 +132,7 @@ class TestSearchPeopleEmployments:
 
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
-                last_name="Current", fields=_FIELDS | {"employments"}
+                last_name="Current", result_size=_RESULT_SIZE, fields=_FIELDS | {"employments"}
             )
 
         by_id = {row.id: row.employments or () for row in result.rows}
@@ -198,6 +200,7 @@ class TestSearchPeopleQuery:
                     CustomFieldMatch(definition_id="10", values=("yes",)),
                     CustomFieldMatch(definition_id="12", values=("emea",)),
                 ),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
@@ -228,36 +231,58 @@ class TestSearchPeopleQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_email_is_three_lookups_unioned_by_id(self) -> None:
+    async def test_email_matches_any_of_the_three_fields_in_memory(self) -> None:
         base_url = f"{BASE_URL}/people-search-email"
-
-        def respond(request: httpx.Request) -> httpx.Response:
-            params = request.url.params
-            assert params["filter[lastName][like]"] == "West"
-            if "filter[email][eq]" in params:
-                assert params["filter[email][eq]"] == "a@example.com"
-                return _page(_person("1", name="West, Ann"), total=1)
-            if "filter[email2][eq]" in params:
-                assert params["filter[email2][eq]"] == "a@example.com"
-                return _page(_person("2", name="Alpha, Bob"), total=1)
-            if "filter[email3][eq]" in params:
-                assert params["filter[email3][eq]"] == "a@example.com"
-                return _page(_person("1", name="West, Ann"), total=1)
-            raise AssertionError(dict(params))
-
-        route = respx.get(f"{base_url}/people").mock(side_effect=respond)
+        route = respx.get(f"{base_url}/people").mock(
+            return_value=_page(
+                resource("1", "people", "West, Ann", email="A@Example.com"),
+                resource("2", "people", "West, Bob", email="b@example.com", email2="a@example.com"),
+                resource("3", "people", "West, Cy", email3="a@example.com"),
+                resource("4", "people", "West, Di", email="aa@example.com"),
+                total=4,
+            )
+        )
 
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
                 last_name="West",
                 email="a@example.com",
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
-        assert len(route.calls) == 3
-        assert [row.id for row in result.rows] == ["2", "1"]
-        assert result.coverage.visible_count == 3
-        assert result.coverage.rows_scanned == 2
+        params = recorded_params(route)
+        assert len(params) == 1
+        assert params[0]["filter[lastName][like]"] == "West"
+        assert not any(key.startswith("filter[email") for key, _ in params[0].multi_items())
+        assert [row.id for row in result.rows] == ["1", "2", "3"]
+        assert result.coverage.visible_count == 4
+        assert result.continuation is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_email_search_pages_with_a_cursor(self) -> None:
+        base_url = f"{BASE_URL}/people-search-email-paged"
+        items = [
+            resource(str(index), "people", f"West, {index}", email="a@example.com")
+            for index in range(3)
+        ]
+        respx.get(f"{base_url}/people").mock(side_effect=serve_pages(items))
+
+        async with tool_client(base_url) as client:
+            query = make_search_people_query(client)
+            first = await query.run(email="a@example.com", result_size=2, fields=_FIELDS)
+            assert first.continuation is not None
+            second = await query.run(
+                email="a@example.com",
+                result_size=2,
+                fields=_FIELDS,
+                cursor=first.continuation.cursor,
+            )
+
+        assert [row.id for row in first.rows] == ["0", "1"]
+        assert [row.id for row in second.rows] == ["2"]
+        assert second.continuation is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -309,6 +334,7 @@ class TestSearchPeopleQuery:
                     CustomFieldMatch(definition_id="900011", values=("tier 1",)),
                     CustomFieldMatch(definition_id="900014", values=("Stage A", "Stage B")),
                 ),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
@@ -335,6 +361,7 @@ class TestSearchPeopleQuery:
             result = await make_search_people_query(client).run(
                 last_name="West",
                 exclude_custom_fields=True,
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
@@ -344,12 +371,12 @@ class TestSearchPeopleQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_sorts_memory_matches_by_name(self) -> None:
-        base_url = f"{BASE_URL}/people-search-sort"
-        respx.get(f"{base_url}/people").mock(
+    async def test_keeps_the_server_id_order(self) -> None:
+        base_url = f"{BASE_URL}/people-search-order"
+        route = respx.get(f"{base_url}/people").mock(
             return_value=_page(
-                _person("2", name="Zebra", city="Wichita"),
-                _person("1", name="Alpha", city="Wichita"),
+                _person("1", name="Zebra", city="Wichita"),
+                _person("2", name="Alpha", city="Wichita"),
                 total=2,
             )
         )
@@ -357,29 +384,94 @@ class TestSearchPeopleQuery:
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
                 location_filter=LocationFilter(city="Wichita"),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
+        assert recorded_params(route)[0]["sort"] == "id"
         assert [row.id for row in result.rows] == ["1", "2"]
+        assert result.continuation is None
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_memory_walk_is_never_capped(self) -> None:
-        base_url = f"{BASE_URL}/people-search-uncapped"
+    async def test_a_full_page_hands_back_a_cursor_that_resumes_without_repeats(self) -> None:
+        base_url = f"{BASE_URL}/people-search-pages"
         items = [
-            _person(str(index), name=f"Person {index}", city="Elsewhere") for index in range(600)
+            _person(str(index), name=f"West, {index}", job_title="Director" if index % 2 else None)
+            for index in range(1_200)
         ]
-        respx.get(f"{base_url}/people").mock(return_value=_page(*items, total=600))
+        respx.get(f"{base_url}/people").mock(side_effect=serve_pages(items))
+
+        async with tool_client(base_url) as client:
+            query = make_search_people_query(client)
+            first = await query.run(
+                last_name="West", job_title="director", result_size=250, fields=_FIELDS
+            )
+            assert first.continuation is not None
+            second = await query.run(
+                last_name="West",
+                job_title="director",
+                result_size=250,
+                fields=_FIELDS,
+                cursor=first.continuation.cursor,
+            )
+            assert second.continuation is not None
+            third = await query.run(
+                last_name="West",
+                job_title="director",
+                result_size=250,
+                fields=_FIELDS,
+                cursor=second.continuation.cursor,
+            )
+
+        assert third.continuation is None
+        returned = [row.id for page in (first, second, third) for row in page.rows]
+        assert returned == [str(index) for index in range(1, 1_200, 2)]
+        assert [len(page.rows) for page in (first, second, third)] == [250, 250, 100]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_sparse_filter_reads_to_the_end_in_one_call(self) -> None:
+        base_url = f"{BASE_URL}/people-search-sparse"
+        total = 30_600
+        items = [
+            _person(
+                str(index),
+                name=f"Person {index}",
+                job_title="CIO" if index == total - 50 else None,
+            )
+            for index in range(total)
+        ]
+        respx.get(f"{base_url}/people").mock(side_effect=serve_pages(items))
 
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
-                location_filter=LocationFilter(state="Kansas"),
-                fields=_FIELDS,
+                job_title="cio", result_size=_RESULT_SIZE, fields=_FIELDS
             )
 
-        assert result.coverage.rows_scanned == 600
-        assert result.coverage.ceiling_hit is False
+        assert [row.id for row in result.rows] == [str(total - 50)]
+        assert result.continuation is None
+        assert result.coverage.rows_scanned == total
         assert result.coverage.truncated is False
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_cursor_from_other_arguments_is_rejected(self) -> None:
+        base_url = f"{BASE_URL}/people-search-cursor-mismatch"
+        items = [_person(str(index), name=f"West, {index}") for index in range(3)]
+        respx.get(f"{base_url}/people").mock(side_effect=serve_pages(items))
+
+        async with tool_client(base_url) as client:
+            query = make_search_people_query(client)
+            first = await query.run(last_name="West", result_size=2, fields=_FIELDS)
+            assert first.continuation is not None
+            with pytest.raises(ToolError, match="different search"):
+                await query.run(
+                    last_name="Weston",
+                    result_size=2,
+                    fields=_FIELDS,
+                    cursor=first.continuation.cursor,
+                )
 
     @pytest.mark.asyncio
     @respx.mock
@@ -416,6 +508,7 @@ class TestSearchPeopleQuery:
         async with tool_client(base_url) as client:
             result = await make_search_people_query(client).run(
                 location_filter=LocationFilter(city="London"),
+                result_size=_RESULT_SIZE,
                 fields=frozenset({"name", "city", "locations"}),
             )
 
@@ -448,10 +541,14 @@ class TestSearchPeopleQuery:
         async with tool_client(base_url) as client:
             query = make_search_people_query(client)
             other_office = await query.run(
-                location_filter=LocationFilter(city="London", primary_only=True), fields=_FIELDS
+                location_filter=LocationFilter(city="London", primary_only=True),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
             primary = await query.run(
-                location_filter=LocationFilter(city="Boston", primary_only=True), fields=_FIELDS
+                location_filter=LocationFilter(city="Boston", primary_only=True),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
 
         assert other_office.rows == ()
@@ -479,13 +576,18 @@ class TestSearchPeopleQuery:
             query = make_search_people_query(client)
             split_across = await query.run(
                 location_filter=LocationFilter(city="London", country="United States"),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
             by_name = await query.run(
-                location_filter=LocationFilter(city="London", country="kingdom"), fields=_FIELDS
+                location_filter=LocationFilter(city="London", country="kingdom"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
             by_code = await query.run(
-                location_filter=LocationFilter(city="London", country="gb"), fields=_FIELDS
+                location_filter=LocationFilter(city="London", country="gb"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
 
         assert split_across.rows == ()
@@ -513,19 +615,23 @@ class TestSearchPeopleQuery:
 
         async with tool_client(base_url) as client:
             found = await make_search_people_query(client).run(
-                location_filter=LocationFilter(country="US"), fields=_FIELDS
+                location_filter=LocationFilter(country="US"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
 
         assert [row.id for row in found.rows] == ["2"]
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_email_lookups_share_the_side_loaded_addresses(self) -> None:
+    async def test_email_and_location_filter_combine(self) -> None:
         base_url = f"{BASE_URL}/people-search-email-locations"
         london = contact_location("l2", city="London", isPrimaryLocation=False)
         respx.get(f"{base_url}/people").mock(
             return_value=_page(
-                linked_to_locations(resource("1", "people", "Doe, Jane"), london),
+                linked_to_locations(
+                    resource("1", "people", "Doe, Jane", email="jane@example.com"), london
+                ),
                 total=1,
                 included=(london,),
             )
@@ -535,6 +641,7 @@ class TestSearchPeopleQuery:
             result = await make_search_people_query(client).run(
                 email="jane@example.com",
                 location_filter=LocationFilter(city="London"),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
 
@@ -548,7 +655,9 @@ class TestSearchPeopleQuery:
 
         async with tool_client(base_url) as client:
             await make_search_people_query(client).run(
-                location_filter=LocationFilter(country="Finland", state="MA"), fields=_FIELDS
+                location_filter=LocationFilter(country="Finland", state="MA"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
 
         params = recorded_params(route)
@@ -578,12 +687,19 @@ class TestSearchPeopleQuery:
                 location_filter=LocationFilter(
                     city="London", street_address="10 New Burlington St"
                 ),
+                result_size=_RESULT_SIZE,
                 fields=_FIELDS,
             )
             lowercase = await query.run(
-                location_filter=LocationFilter(city="london"), fields=_FIELDS
+                location_filter=LocationFilter(city="london"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
             )
-            partial = await query.run(location_filter=LocationFilter(city="Lond"), fields=_FIELDS)
+            partial = await query.run(
+                location_filter=LocationFilter(city="Lond"),
+                result_size=_RESULT_SIZE,
+                fields=_FIELDS,
+            )
 
         sent = recorded_params(route)
         assert [params["filter[contactLocations.city][eq]"] for params in sent] == [
@@ -596,20 +712,3 @@ class TestSearchPeopleQuery:
         assert [row.id for row in exact.rows] == ["1"]
         assert lowercase.rows == ()
         assert partial.rows == ()
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_the_location_filter_rides_on_every_email_lookup(self) -> None:
-        base_url = f"{BASE_URL}/people-search-email-city"
-        route = respx.get(f"{base_url}/people").mock(return_value=_page(total=0))
-
-        async with tool_client(base_url) as client:
-            await make_search_people_query(client).run(
-                email="jane@example.com",
-                location_filter=LocationFilter(city="London"),
-                fields=_FIELDS,
-            )
-
-        params = recorded_params(route)
-        assert len(params) == 3
-        assert {item["filter[contactLocations.city][eq]"] for item in params} == {"London"}

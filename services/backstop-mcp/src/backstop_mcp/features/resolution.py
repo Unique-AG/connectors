@@ -535,9 +535,9 @@ class AmbiguousResponse[CandidateT: CandidateResponse](BaseModel):
     candidates: list[CandidateT] = Field(
         default_factory=list,
         description=(
-            "The matching records. Quick-search returns at most 10. Show `label` to the user, "
-            "then retry with that candidate's `id` (and `search_type` when the candidate has "
-            "one) — never invent an id."
+            "The matching records — not necessarily every match; how many depends on the "
+            "lookup. Show `label` to the user, then retry with that candidate's `id` (and "
+            "`search_type` when the candidate has one) — never invent an id."
         ),
     )
 

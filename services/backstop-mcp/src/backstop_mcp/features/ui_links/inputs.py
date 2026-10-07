@@ -49,7 +49,10 @@ class AccountLinkTarget(BaseModel):
         description="Account CRM page. Uses an account id, which is not a party id.",
     )
     entity_id: CoercedId = Field(
-        description=("Account id. No tool loads an account by id. This is not a party id."),
+        description=(
+            "Account id, not a party id. No tool loads the account record; the id goes to "
+            "get_time_series (entity_type accounts) or get_capital_flows `account_ids`."
+        ),
     )
 
 

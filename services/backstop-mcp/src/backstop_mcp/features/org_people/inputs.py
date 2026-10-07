@@ -22,15 +22,19 @@ class LocationFilter(BaseModel):
     country: LenientStr = Field(
         default=None,
         description=(
-            "Substring of the country, any case, stored as the full name ('United Arab "
+            "Whole words of the country, any case, stored as the full name ('United Arab "
             "Emirates', 'United States of America'). Spelling varies between records "
             "('United States', 'United States Of America'): pass the shortest distinctive "
-            "part. A two-letter ISO code ('US', 'GB') also matches, exactly."
+            "words — 'United States' matches both, 'Niger' does not match 'Nigeria'. A "
+            "two-letter ISO code ('US', 'GB') also matches, exactly."
         ),
     )
     state: LenientStr = Field(
         default=None,
-        description="Substring of the state or region, any case, usually the code ('MA', 'NY').",
+        description=(
+            "The whole state or region as stored, any case, usually the code ('MA', 'NY'). "
+            "Not a substring: 'Kansas' does not match 'Arkansas'."
+        ),
     )
     postal_code: LenientStr = Field(default=None, description="Substring of the postal code.")
     street_address: LenientStr = Field(

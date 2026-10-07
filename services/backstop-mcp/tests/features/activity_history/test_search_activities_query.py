@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import cast
+from typing import cast, final
 
 import httpx
 import pytest
@@ -8,11 +8,16 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_history import (
+    EntityActivitiesFetchDto,
     EntityActivityType,
     SearchActivitiesQuery,
 )
+from backstop_mcp.features.collection_scan import SearchCursor
 from backstop_mcp.features.entity_types import SearchType
-from tests.features.activity_history.conftest import make_search_activities_query
+from tests.features.activity_history.conftest import (
+    make_search_activities_query,
+    serve_entity_activities,
+)
 from tests.helpers import BASE_URL, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
 
@@ -122,7 +127,10 @@ class TestEntityActivitiesRequestBody:
             "inheritedFrom",
             "primaryEntity",
         ]
-        assert attributes["sorts"] == [{"columnName": "effectiveDate", "ascending": False}]
+        assert attributes["sorts"] == [
+            {"columnName": "effectiveDate", "ascending": False},
+            {"columnName": "id", "ascending": True},
+        ]
         assert attributes["entityId"] == 354566359
         assert attributes["resourceType"] == "organizations"
         assert "filters" not in attributes
@@ -131,7 +139,9 @@ class TestEntityActivitiesRequestBody:
             "startTimestamp": "2025-08-20T00:00:00",
             "endTimestamp": "2026-08-20T23:59:59",
         }
-        assert new_filters["types"] == [{"searchValues": [{"value": "call"}, {"value": "email"}]}]
+        assert new_filters["types"] == [
+            {"searchValues": [{"value": "meeting_call"}, {"value": "email"}]}
+        ]
         assert new_filters["activityTags"] == [
             {"searchValues": [{"value": "9001"}, {"value": "9002"}]}
         ]
@@ -232,7 +242,6 @@ class TestFetchEntityActivities:
             2,
         ]
         assert [row.id for row in result.rows] == ["1", "2", "3"]
-        assert result.truncated_by_row_cap is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -256,24 +265,6 @@ class TestFetchEntityActivities:
         assert result.ceiling_clamped is True
         assert route.call_count == 2
         assert [row.id for row in result.rows] == [str(index) for index in range(20)]
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_row_cap_stops_after_one_page(self, client: BackstopClient) -> None:
-        route = respx.post(_URL).mock(
-            return_value=_page(_meeting(1), _meeting(2), _meeting(3), total=50)
-        )
-
-        result = await make_search_activities_query(client).run(
-            start_date=date(2024, 1, 1),
-            end_date=date(2026, 8, 20),
-            page_size=3,
-            max_rows=2,
-        )
-
-        assert route.call_count == 1
-        assert [row.id for row in result.rows] == ["1", "2"]
-        assert result.truncated_by_row_cap is True
 
     @pytest.mark.asyncio
     @respx.mock
@@ -307,22 +298,6 @@ class TestFetchEntityActivities:
         assert route.call_count == 2
         assert [row.id for row in result.rows] == ["1", "2"]
         assert result.partial_due_to_error is True
-        assert result.truncated_by_row_cap is False
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_max_rows_narrows_page_size_on_the_wire(self, client: BackstopClient) -> None:
-        route = respx.post(_URL).mock(return_value=_page(_meeting(1), _meeting(2), total=50))
-
-        result = await make_search_activities_query(client).run(
-            start_date=date(2024, 1, 1),
-            end_date=date(2026, 8, 20),
-            max_rows=2,
-        )
-
-        assert _body_attributes(recorded_json_bodies(route)[0])["pageSize"] == 2
-        assert [row.id for row in result.rows] == ["1", "2"]
-        assert result.truncated_by_row_cap is True
 
     @pytest.mark.asyncio
     @respx.mock
@@ -370,6 +345,223 @@ class TestFetchEntityActivities:
             )
 
         assert raised.value.status_code == 404
+
+
+def _on(row_id: int, day: str) -> dict[str, object]:
+    return _meeting(row_id) | {"effectiveDate": day}
+
+
+def _page_nums(route: respx.Route) -> list[object]:
+    return [_body_attributes(body)["pageNum"] for body in recorded_json_bodies(route)]
+
+
+_FINGERPRINT = "test-search"
+
+
+def _cursor(offset: int) -> str:
+    return SearchCursor(offsets=(offset,), fingerprint=_FINGERPRINT).encode()
+
+
+def _resume_offset(result: EntityActivitiesFetchDto) -> int | None:
+    """The offset the result's continuation resumes from."""
+    if result.continuation is None:
+        return None
+    return SearchCursor.decode(
+        result.continuation.cursor, fingerprint=_FINGERPRINT, collections=1
+    ).offsets[0]
+
+
+async def _read_every_page(
+    client: BackstopClient, *, min_result_size: int, page_size: int
+) -> list[EntityActivitiesFetchDto]:
+    pages: list[EntityActivitiesFetchDto] = []
+    cursor: str | None = None
+    while True:
+        page = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            cursor=cursor,
+            fingerprint=_FINGERPRINT,
+            min_result_size=min_result_size,
+            page_size=page_size,
+        )
+        pages.append(page)
+        if page.continuation is None:
+            return pages
+        cursor = page.continuation.cursor
+
+
+_DAYS = ("8/5/2026", "8/4/2026", "8/3/2026", "8/2/2026", "8/1/2026", "7/31/2026")
+# 3 rows on the first day, 2 on each later one: 13 rows.
+_SET = tuple(
+    _on(row_id, day)
+    for row_id, day in enumerate(
+        (day for index, day in enumerate(_DAYS) for _ in range(3 if index == 0 else 2)), start=1
+    )
+)
+
+
+class TestResultPages:
+    """Rows mode returns whole pages until `min_result_size`; the cursor is the next offset."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_whole_pages_and_points_past_the_last_one(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(side_effect=serve_entity_activities(_SET))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            min_result_size=2,
+            fingerprint=_FINGERPRINT,
+            page_size=4,
+        )
+
+        assert [row.id for row in result.rows] == ["1", "2", "3", "4"]
+        assert _resume_offset(result) == 4
+        assert result.rows_received == 4
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_mid_page_offset_rereads_the_page_and_skips_what_came_before(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(side_effect=serve_entity_activities(_SET))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            cursor=_cursor(3),
+            min_result_size=2,
+            fingerprint=_FINGERPRINT,
+            page_size=2,
+        )
+
+        assert _page_nums(route) == [2, 3]
+        assert [row.id for row in result.rows] == ["4", "5", "6"]
+        assert _resume_offset(result) == 6
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(("min_result_size", "page_size"), [(1, 1), (2, 2), (2, 3), (5, 2)])
+    async def test_reading_every_page_returns_each_row_once(
+        self, client: BackstopClient, min_result_size: int, page_size: int
+    ) -> None:
+        respx.post(_URL).mock(side_effect=serve_entity_activities(_SET))
+
+        pages = await _read_every_page(client, min_result_size=min_result_size, page_size=page_size)
+
+        assert [row.id for page in pages for row in page.rows] == [str(row["id"]) for row in _SET]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_unreadable_row_still_advances_the_offset(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            side_effect=serve_entity_activities(
+                (
+                    _on(1, "8/3/2026"),
+                    _on(9, "8/2/2026") | {"attendees": "nope"},
+                    _on(2, "8/2/2026"),
+                )
+            )
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            min_result_size=1,
+            fingerprint=_FINGERPRINT,
+            page_size=2,
+        )
+
+        assert [row.id for row in result.rows] == ["1"]
+        assert result.rows_dropped == 1
+        assert _resume_offset(result) == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_the_wall_ends_the_walk_without_a_resume_point(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(side_effect=serve_entity_activities(_SET, wall=4))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            min_result_size=5,
+            fingerprint=_FINGERPRINT,
+            page_size=2,
+            max_retrievable=4,
+        )
+
+        assert _page_nums(route) == [1, 2]
+        assert [row.id for row in result.rows] == ["1", "2", "3", "4"]
+        assert result.continuation is None
+        assert result.ceiling_clamped is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filling_on_the_last_servable_record_ends_at_the_wall(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(side_effect=serve_entity_activities(_SET, wall=4))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            cursor=_cursor(2),
+            min_result_size=2,
+            fingerprint=_FINGERPRINT,
+            page_size=2,
+            max_retrievable=4,
+        )
+
+        assert [row.id for row in result.rows] == ["3", "4"]
+        assert result.continuation is None
+        assert result.ceiling_clamped is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filling_on_the_last_record_ends_without_a_resume_point(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(return_value=_page(_on(1, "8/3/2026"), _on(2, "8/2/2026")))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            min_result_size=2,
+            fingerprint=_FINGERPRINT,
+            page_size=5,
+        )
+
+        assert [row.id for row in result.rows] == ["1", "2"]
+        assert result.continuation is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_ignored_filter_ends_the_page_without_a_resume_point(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=_page(_on(1, "8/3/2026"), _on(2, "8/2/2026"), _on(3, "1/1/2020"), total=50)
+        )
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 8, 20),
+            min_result_size=1,
+            fingerprint=_FINGERPRINT,
+            page_size=3,
+        )
+
+        assert [row.id for row in result.rows] == ["1", "2"]
+        assert result.server_filter_ignored == ("effective_date",)
+        assert result.continuation is None
 
 
 def _party_row(
@@ -633,3 +825,144 @@ class TestIgnoredEntityActivityFilters:
 
         assert [row.id for row in result.rows] == ["1"]
         assert result.server_filter_ignored == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_opportunity_ref_on_an_org_search_does_not_drop_the_page(
+        self, client: BackstopClient
+    ) -> None:
+        """Only party refs contradict. A row tied to a deal names the opportunity, not a rival."""
+        row = _party_row(1, effective_date="9/22/2026", party_id=None)
+        row["associatedWith"] = [{"resourceType": "opportunities", "resourceId": "55"}]
+        respx.post(_URL).mock(return_value=_page(row, total=1))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="341764767",
+            resource_type="organizations",
+        )
+
+        assert [kept.id for kept in result.rows] == ["1"]
+        assert result.server_filter_ignored == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("resource_type", ["people", "contacts", "employees"])
+    async def test_an_organization_ref_on_a_person_search_is_neutral(
+        self, client: BackstopClient, resource_type: SearchType
+    ) -> None:
+        row = _party_row(1, effective_date="9/22/2026", party_id="1")
+        respx.post(_URL).mock(return_value=_page(row, total=1))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="357918383",
+            resource_type=resource_type,
+        )
+
+        assert [kept.id for kept in result.rows] == ["1"]
+        assert result.server_filter_ignored == ()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("ref_kind", ["people", "contacts", "employees"])
+    async def test_another_person_on_a_contacts_search_drops_the_page(
+        self, client: BackstopClient, ref_kind: str
+    ) -> None:
+        """people / contacts / employees are one person under three names, so any rivals."""
+        row = _party_row(1, effective_date="9/22/2026", party_id=None)
+        row["associatedWith"] = [{"resourceType": ref_kind, "resourceId": "2"}]
+        respx.post(_URL).mock(return_value=_page(row, total=1))
+
+        result = await make_search_activities_query(client).run(
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 9, 30),
+            party_id="357918383",
+            resource_type="contacts",
+        )
+
+        assert result.rows == ()
+        assert result.server_filter_ignored == ("party",)
+
+
+@final
+class _StubCounter:
+    """Stands in for `BACKSTOP_FILTER_IGNORED`, recording each increment's attributes."""
+
+    def __init__(self) -> None:
+        self.recorded: list[dict[str, object]] = []
+
+    def add(self, _amount: int, attributes: dict[str, object] | None = None) -> None:
+        self.recorded.append(dict(attributes or {}))
+
+
+class TestFilterIgnoredMetric:
+    """`backstop_filter_ignored_total` pages on any increase, so only real ignored filters count."""
+
+    @staticmethod
+    def _counter(monkeypatch: pytest.MonkeyPatch) -> _StubCounter:
+        counter = _StubCounter()
+        # Patched where it is bound at import, not on `metrics`.
+        monkeypatch.setattr(
+            "backstop_mcp.features.activity_history.queries.search_activities_query"
+            + ".BACKSTOP_FILTER_IGNORED",
+            counter,
+        )
+        return counter
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_saturated_total_is_a_hint_logged_at_info_and_not_counted(
+        self,
+        client: BackstopClient,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        counter = self._counter(monkeypatch)
+        respx.post(_URL).mock(return_value=_page(_meeting(1), total=10_000))
+
+        with caplog.at_level(logging.INFO):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2026, 6, 1),
+                end_date=date(2026, 9, 30),
+                activity_tags=("9001",),
+            )
+
+        assert result.server_filter_ignored == ("total_count",)
+        assert counter.recorded == []
+        ignored_logs = [
+            record
+            for record in caplog.records
+            if record.message == "activity_history.entity_activities.filter_ignored"
+        ]
+        assert [record.levelno for record in ignored_logs] == [logging.INFO]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_ignored_filter_is_counted_once_and_warned(
+        self,
+        client: BackstopClient,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        counter = self._counter(monkeypatch)
+        untagged: dict[str, object] = {**_meeting(2), "activityTags": []}
+        respx.post(_URL).mock(return_value=_page(_meeting(1), untagged, total=10_000))
+
+        with caplog.at_level(logging.INFO):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2026, 6, 1),
+                end_date=date(2026, 9, 30),
+                activity_tags=("9001",),
+            )
+
+        assert result.server_filter_ignored == ("activity_tags", "total_count")
+        assert counter.recorded == [{"endpoint": "entity-activities", "filter": "activity_tags"}]
+        levels = {
+            record.__dict__["filter"]: record.levelno
+            for record in caplog.records
+            if record.message == "activity_history.entity_activities.filter_ignored"
+        }
+        assert levels == {"activity_tags": logging.WARNING, "total_count": logging.INFO}

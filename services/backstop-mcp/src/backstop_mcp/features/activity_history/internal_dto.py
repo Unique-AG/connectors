@@ -8,6 +8,7 @@ from backstop_mcp.backstop_client import ResourceRef
 from backstop_mcp.features.activity_history.api_responses import (
     EntityActivityAttributes,
 )
+from backstop_mcp.features.collection_scan import ContinuationResponse
 from backstop_mcp.features.entity_types import SearchType, party_search_type
 
 __all__ = [
@@ -216,9 +217,10 @@ class EntityActivitiesFetchDto(BaseModel):
     rows_received: int
     pages_fetched: int
     ceiling_clamped: bool
-    truncated_by_row_cap: bool
     partial_due_to_error: bool = False
     server_filter_ignored: tuple[str, ...] = ()
+    # `None` when the walk read to the end it can reach.
+    continuation: ContinuationResponse | None = None
 
 
 class PartyLastActivityDto(BaseModel):

@@ -95,7 +95,8 @@ class TestInstructions:
         assert "usually tenant custom fields" not in INSTRUCTIONS
         assert "exact option text" not in INSTRUCTIONS
         assert "Country is the stored full name" in INSTRUCTIONS
-        assert "investor organization's representative" in INSTRUCTIONS
+        assert "matches the deal-level representative" in INSTRUCTIONS
+        assert "never filtered on" in INSTRUCTIONS
         assert "Leave `exclude_custom_fields` false" in INSTRUCTIONS
         assert "to retry a call that timed out" in INSTRUCTIONS
         assert "then every returned id to" in INSTRUCTIONS
@@ -171,5 +172,6 @@ class TestInstructions:
         assert "applied_count == total_count" in INSTRUCTIONS
         assert "no endpoint that lists reports" in INSTRUCTIONS
         assert "Never hand-write a Backstop URL" in INSTRUCTIONS
-        assert "no tool that loads the account by id" in INSTRUCTIONS
+        assert "No tool loads the account record" in INSTRUCTIONS
+        assert "get_capital_flows (`account_ids`)" in INSTRUCTIONS
         assert "backfill_opportunity_stage_history" in INSTRUCTIONS

@@ -21,7 +21,8 @@ fetches for a composite. A search id waits on the detail record's `type`. See
 `queries/get_activity_detail_query.py`. `ActivityDetailResponse`/`AttendeeResponse`: that
 tool's wire shape and the pure conversion into it. See `responses.py`.
 
-`SearchActivitiesQuery`: `POST /entity-activities` pageNum loop for `search_activities`.
+`SearchActivitiesQuery`: `POST /entity-activities` pageNum loop for `search_activities`: the
+whole set for aggregates, or whole pages from a cursor until at least `min_result_size` rows.
 Rows that show Backstop ignored an accepted filter are dropped and flagged in the same pass
 that projects them (`server_filter_ignored`).
 `GetMeetingAttendeesQuery`: `GET /meeting-or-calls/{id}/attendees`. Detail and history both

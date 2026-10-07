@@ -15,7 +15,6 @@ from backstop_mcp.features.opportunities.dependencies import (
 from backstop_mcp.features.opportunities.opportunity_stages_service import OpportunityStagesService
 from backstop_mcp.features.opportunities.queries import (
     MAX_OPPORTUNITY_IDS,
-    MAX_OPPORTUNITY_SCAN_RECORDS,
     GetOpportunitiesByIdsQuery,
     GetOpportunitiesQuery,
     OpportunityGroupBy,
@@ -41,7 +40,6 @@ from backstop_mcp.features.opportunities.responses import (
 
 __all__ = [
     "MAX_OPPORTUNITY_IDS",
-    "MAX_OPPORTUNITY_SCAN_RECORDS",
     "GetOpportunitiesByIdsQuery",
     "GetOpportunitiesByIdsResponse",
     "GetOpportunitiesQuery",

@@ -72,6 +72,9 @@ env:
   # tool-call limit.
   PRODUCT_INVESTORS_MAX_VALUED_ACCOUNTS: "150"
 
+  # Rows one search call returns before it stops and hands back a cursor to the next page.
+  SEARCH_RESULT_SIZE: "100"
+
   BACKSTOP_MCP_TENANT_GUIDANCE:
     value: '{{ toJson .Values.tenantGuidance }}'
     if: '{{ not (empty .Values.tenantGuidance) }}'

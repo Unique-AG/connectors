@@ -25,6 +25,7 @@ from backstop_mcp.dependencies import (
     get_engine,
     get_product_investors_config,
     get_resolution_config,
+    get_search_config,
     get_session_factory,
     get_tenant_guidance_config,
 )
@@ -129,6 +130,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_auth_config,
     get_activity_history_config,
     get_resolution_config,
+    get_search_config,
     get_product_investors_config,
     get_tenant_guidance_config,
     get_engine,

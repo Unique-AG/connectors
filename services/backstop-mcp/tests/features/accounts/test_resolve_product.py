@@ -15,7 +15,7 @@ from backstop_mcp.features.accounts import (
 )
 from backstop_mcp.features.resolution import Ambiguous, NotFound, Resolved
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
-from tests.helpers import BASE_URL, collection, recorded_requests, resource
+from tests.helpers import BASE_URL, collection, resource
 
 _PRODUCTS_URL = f"{BASE_URL}/products"
 _PRODUCT_URL = f"{BASE_URL}/products/1292283"
@@ -90,7 +90,7 @@ class TestTheRequest:
         params = route.calls.last.request.url.params
         assert params["fields"] == "name,configuration"
         assert params["page[limit]"] == "200"
-        assert params["filter[name][like]"] == "NGUP"
+        assert "filter[name][like]" not in params
         assert route.call_count == 1
 
     @pytest.mark.asyncio
@@ -180,44 +180,21 @@ class TestTheRequest:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_name_like_miss_walks_the_unfiltered_catalog_for_a_short_name(
+    async def test_a_name_search_is_one_unfiltered_catalog_read(
         self, client: BackstopClient
     ) -> None:
-        def _respond(request: httpx.Request) -> httpx.Response:
-            if request.url.params.get("filter[name][like]") == "NGUP":
-                return _index()
-            return _sample_index()
-
-        route = respx.get(_PRODUCTS_URL).mock(side_effect=_respond)
-
-        result = await resolve_product(ctx_never_elicit(), client, product="NGUP")
-
-        assert isinstance(result, Resolved)
-        assert result.value.short_name == "NGUP"
-        assert route.call_count == 2
-        calls = recorded_requests(route.calls)
-        assert calls[0].url.params["filter[name][like]"] == "NGUP"
-        assert "filter[name][like]" not in calls[1].url.params
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_name_like_hit_does_not_walk_the_unfiltered_catalog(
-        self, client: BackstopClient
-    ) -> None:
-        def _respond(request: httpx.Request) -> httpx.Response:
-            if request.url.params.get("filter[name][like]") == "Dispersion":
-                return _index(
-                    _product("1653647", name="Northwind Dispersion Fund", short_name="NDSP")
-                )
-            raise AssertionError("unfiltered catalog must not be walked after a LIKE hit")
-
-        route = respx.get(_PRODUCTS_URL).mock(side_effect=_respond)
+        route = respx.get(_PRODUCTS_URL).mock(
+            return_value=_index(
+                _product("1653647", name="Northwind Dispersion Fund", short_name="NDSP")
+            )
+        )
 
         result = await resolve_product(ctx_never_elicit(), client, product="Dispersion")
 
         assert isinstance(result, Resolved)
         assert result.value.id == "1653647"
         assert route.call_count == 1
+        assert "filter[name][like]" not in route.calls.last.request.url.params
 
 
 class TestResolveSearch:
@@ -484,6 +461,39 @@ class TestExactShortName:
         assert result.value.id == "700"
         assert result.value.name is None
         assert result.value.short_name == "NONM"
+
+
+class TestShortNameInsideAnotherName:
+    """`ARB` is one vehicle's short name and a substring of another vehicle's name only."""
+
+    @staticmethod
+    def _catalog() -> httpx.Response:
+        return _index(
+            _product("300", name="Convert Arb Fund", short_name="CVAF"),
+            _product("301", name="Merger Opportunities Partners", short_name="ARB"),
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolve_product_picks_the_short_name(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=self._catalog())
+
+        result = await resolve_product(ctx_never_elicit(), client, product="arb")
+
+        assert isinstance(result, Resolved)
+        assert result.value.id == "301"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolve_product_family_is_the_short_name_alone(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=self._catalog())
+
+        result = await resolve_product_family(ctx_never_elicit(), client, product="ARB")
+
+        assert isinstance(result, tuple)
+        assert [product.id for product in result] == ["301"]
 
 
 class TestExactName:

@@ -1,11 +1,14 @@
-"""Firm-wide `GET /people`: server-side name, email, otherId and domain filters, the rest in memory.
+"""Firm-wide `GET /people`: server-side name, otherId and domain filters, the rest in memory.
 
 Locations come from `include=contactLocations` (only exact `city`/`address` filters exist);
-employment links are fetched only when asked for. `sort=name` is a 500 here, so rows are
-sorted by name in memory.
+employment links are fetched only when asked for. `sort=name` is a 500 here, so rows come in
+`sort=id` order: one call returns one page of matches and a cursor at the next unread record,
+and re-sorting a page by name would reorder rows across pages.
+
+`email` is matched in memory against `email`, `email2` and `email3`: Backstop filters only
+AND together, so "any of the three" is not one request.
 """
 
-import asyncio
 import logging
 from collections.abc import Sequence
 
@@ -16,9 +19,16 @@ from backstop_mcp.backstop_client import (
     BackstopApiResource,
     BackstopClient,
     Included,
-    PageResult,
+    SinglePage,
 )
-from backstop_mcp.features.collection_scan import scan_coverage
+from backstop_mcp.features.collection_scan import (
+    ContinuationResponse,
+    SearchCursor,
+    collect_page,
+    continuation,
+    scan_coverage,
+    search_fingerprint,
+)
 from backstop_mcp.features.custom_fields import (
     CustomFieldMatch,
     normalize_matches,
@@ -51,7 +61,8 @@ logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
 _PAGE_SIZE = 500
-_EMAIL_FIELDS: tuple[str, ...] = ("email", "email2", "email3")
+# The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
+_SPARSE_CONCURRENCY = 5
 
 
 class SearchPeopleQuery:
@@ -86,8 +97,10 @@ class SearchPeopleQuery:
         min_current_organizations: int | None = None,
         exclude_custom_fields: bool = False,
         fields: frozenset[str],
+        result_size: int,
+        cursor: str | None = None,
     ) -> SearchPeopleResolvedResponse:
-        """Read the server-filtered collection, then apply predicates Backstop rejects."""
+        """One page of matches from the cursor: server filters on the wire, the rest in memory."""
         name = self._text(name)
         last_name = self._text(last_name)
         email = self._text(email)
@@ -100,6 +113,7 @@ class SearchPeopleQuery:
         website = self._text(website)
         predicates = normalize_matches(custom_fields)
         should_filter_in_memory = self._has_in_memory_predicate(
+            email=email,
             first_name=first_name,
             job_title=job_title,
             company_name=company_name,
@@ -109,71 +123,32 @@ class SearchPeopleQuery:
             predicates=predicates,
             min_current_organizations=min_current_organizations,
         )
+        fingerprint = search_fingerprint(
+            "search_people",
+            {
+                "name": name,
+                "last_name": last_name,
+                "email": email,
+                "other_id": other_id,
+                "email_domain": email_domain,
+                "first_name": first_name,
+                "job_title": job_title,
+                "company_name": company_name,
+                "department": department,
+                "location_filter": location_filter,
+                "website": website,
+                "custom_fields": predicates,
+                "min_current_organizations": min_current_organizations,
+                "exclude_custom_fields": exclude_custom_fields,
+                "fields": sorted(fields),
+            },
+        )
+        start_offset = (
+            0
+            if cursor is None
+            else SearchCursor.decode(cursor, fingerprint=fingerprint, collections=1).offsets[0]
+        )
         with_employments = min_current_organizations is not None or "employments" in fields
-        with _tracer.start_as_current_span("org_people.query.search_people") as span:
-            span.set_attribute("memory", should_filter_in_memory)
-            resources, included, total_count, ceiling_clamped = await self._read(
-                name=name,
-                last_name=last_name,
-                email=email,
-                other_id=other_id,
-                email_domain=email_domain,
-                exclude_custom_fields=exclude_custom_fields,
-                location_filter=location_filter,
-                with_employments=with_employments,
-            )
-            selected, dropped = self._select(
-                resources,
-                included,
-                employments=self._employments_by_person(included) if with_employments else None,
-                min_current_organizations=min_current_organizations,
-                first_name=first_name,
-                job_title=job_title,
-                company_name=company_name,
-                department=department,
-                location_filter=location_filter,
-                website=website,
-                predicates=predicates,
-            )
-            selected = tuple(sorted(selected, key=self._name_order))
-            span.set_attribute("rows_scanned", len(resources))
-            span.set_attribute("matched", len(selected))
-            logger.info(
-                "org_people.search_people.fetched",
-                extra={
-                    "memory": should_filter_in_memory,
-                    "rows_scanned": len(resources),
-                    "matched": len(selected),
-                    "dropped": dropped,
-                    "total_count": total_count,
-                },
-            )
-            projected = fields | {"id"}
-            if min_current_organizations is not None:
-                projected = projected | {"employments"}
-            if not exclude_custom_fields:
-                projected = projected | {"custom_field_values"}
-            return self._to_response(
-                selected,
-                fields=projected,
-                rows_scanned=len(resources),
-                rows_dropped=dropped,
-                total_count=total_count,
-                ceiling_clamped=ceiling_clamped,
-            )
-
-    async def _read(
-        self,
-        *,
-        name: str | None,
-        last_name: str | None,
-        email: str | None,
-        other_id: str | None,
-        email_domain: str | None,
-        exclude_custom_fields: bool,
-        location_filter: LocationFilter | None,
-        with_employments: bool,
-    ) -> tuple[tuple[PersonResource, ...], Included, int | None, bool]:
         params = {
             **self._query_params(
                 name=name,
@@ -185,23 +160,78 @@ class SearchPeopleQuery:
             ),
             **location_filter_params(location_filter),
         }
-        if email is None:
-            page = await self._fetch(params)
-            return tuple(page.items), Included(page.included), page.total_count, page.truncated
-        pages = await asyncio.gather(
-            *(self._fetch({**params, f"filter[{field}][eq]": email}) for field in _EMAIL_FIELDS)
-        )
-        return self._merge(pages)
+        dropped = 0
 
-    async def _fetch(self, params: dict[str, object]) -> PageResult[PersonResource]:
-        return await self._client.paginate(
-            "/people",
-            schema=PersonResource,
-            params=params,
-            max_records=None,
-            page_size=_PAGE_SIZE,
-            parallel=True,
-        )
+        def select(
+            resources: Sequence[PersonResource], included: Included
+        ) -> tuple[tuple[int, SearchPersonRowResponse], ...]:
+            nonlocal dropped
+            matches, page_dropped = self._select(
+                resources,
+                included,
+                employments=self._employments_by_person(included) if with_employments else None,
+                min_current_organizations=min_current_organizations,
+                email=email,
+                first_name=first_name,
+                job_title=job_title,
+                company_name=company_name,
+                department=department,
+                location_filter=location_filter,
+                website=website,
+                predicates=predicates,
+            )
+            dropped += page_dropped
+            return matches
+
+        async def read_at(offset: int) -> SinglePage[PersonResource]:
+            return await self._client.fetch_page(
+                "/people", schema=PersonResource, params=params, page_size=_PAGE_SIZE, offset=offset
+            )
+
+        projected = fields | {"id"}
+        if min_current_organizations is not None:
+            projected = projected | {"employments"}
+        if not exclude_custom_fields:
+            projected = projected | {"custom_field_values"}
+        with _tracer.start_as_current_span("org_people.query.search_people") as span:
+            span.set_attribute("memory", should_filter_in_memory)
+            span.set_attribute("start_offset", start_offset)
+            page = await collect_page(
+                read_at=read_at,
+                select=lambda fetched: select(fetched.items, Included(fetched.included)),
+                start_offset=start_offset,
+                output_page_size=result_size,
+                api_page_size=_PAGE_SIZE,
+                concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+            )
+            span.set_attribute("rows_scanned", page.records_scanned)
+            span.set_attribute("matched", len(page.rows))
+            span.set_attribute("stop_reason", page.stop_reason)
+            logger.info(
+                "org_people.search_people.fetched",
+                extra={
+                    "memory": should_filter_in_memory,
+                    "start_offset": start_offset,
+                    "rows_scanned": page.records_scanned,
+                    "matched": len(page.rows),
+                    "dropped": dropped,
+                    "total_count": page.total_count,
+                    "stop_reason": page.stop_reason,
+                },
+            )
+            return self._to_response(
+                page.rows,
+                fields=projected,
+                rows_scanned=page.records_scanned,
+                rows_dropped=dropped,
+                total_count=page.total_count,
+                next_page=continuation(
+                    stop_reason=page.stop_reason,
+                    next_offsets=() if page.next_offset is None else (page.next_offset,),
+                    fingerprint=fingerprint,
+                    rows_returned=len(page.rows),
+                ),
+            )
 
     def _query_params(
         self,
@@ -252,20 +282,6 @@ class SearchPeopleQuery:
             params["filter[emailDomains][eq]"] = email_domain
         return params
 
-    def _merge(
-        self, pages: Sequence[PageResult[PersonResource]]
-    ) -> tuple[tuple[PersonResource, ...], Included, int | None, bool]:
-        by_id: dict[str, PersonResource] = {}
-        for page in pages:
-            for resource in page.items:
-                by_id.setdefault(resource.id, resource)
-        return (
-            tuple(by_id.values()),
-            Included([item for page in pages for item in page.included]),
-            self._visible_count(pages),
-            any(page.truncated for page in pages),
-        )
-
     def _employments_by_person(
         self, included: Included
     ) -> dict[str, tuple[EmploymentLinkResponse, ...]]:
@@ -292,6 +308,7 @@ class SearchPeopleQuery:
         *,
         employments: dict[str, tuple[EmploymentLinkResponse, ...]] | None,
         min_current_organizations: int | None,
+        email: str | None,
         first_name: str | None,
         job_title: str | None,
         company_name: str | None,
@@ -299,16 +316,18 @@ class SearchPeopleQuery:
         location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[SearchPersonRowResponse, ...], int]:
-        selected: list[SearchPersonRowResponse] = []
+    ) -> tuple[tuple[tuple[int, SearchPersonRowResponse], ...], int]:
+        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+        selected: list[tuple[int, SearchPersonRowResponse]] = []
         dropped = 0
-        for resource in resources:
+        for index, resource in enumerate(resources):
             try:
                 row = self._row(
                     resource,
                     included,
                     employments=None if employments is None else employments.get(resource.id, ()),
                     min_current_organizations=min_current_organizations,
+                    email=email,
                     first_name=first_name,
                     job_title=job_title,
                     company_name=company_name,
@@ -326,7 +345,7 @@ class SearchPeopleQuery:
                 )
                 continue
             if row is not None:
-                selected.append(row)
+                selected.append((index, row))
         return tuple(selected), dropped
 
     def _row(
@@ -336,6 +355,7 @@ class SearchPeopleQuery:
         *,
         employments: tuple[EmploymentLinkResponse, ...] | None,
         min_current_organizations: int | None,
+        email: str | None,
         first_name: str | None,
         job_title: str | None,
         company_name: str | None,
@@ -345,6 +365,11 @@ class SearchPeopleQuery:
         predicates: tuple[CustomFieldMatch, ...],
     ) -> SearchPersonRowResponse | None:
         attributes = resource.attributes
+        if email is not None and email.casefold() not in {
+            (stored or "").casefold()
+            for stored in (attributes.email, attributes.email2, attributes.email3)
+        }:
+            return None
         if not self._matches_text(attributes.first_name, first_name):
             return None
         if not self._matches_text(attributes.job_title, job_title):
@@ -408,15 +433,16 @@ class SearchPeopleQuery:
         rows_scanned: int,
         rows_dropped: int,
         total_count: int | None,
-        ceiling_clamped: bool,
+        next_page: ContinuationResponse | None,
     ) -> SearchPeopleResolvedResponse:
         coverage = scan_coverage(
             rows_scanned=rows_scanned,
             visible_count=total_count,
             rows_dropped=rows_dropped,
+            # No ceiling of ours: a page stops when it is full or the collection ends.
             ceiling=None,
-            ceiling_clamped=ceiling_clamped,
-            # One `paginate` call, or three email lookups: a failed page raises.
+            ceiling_clamped=False,
+            # One request per page: a failed page raises.
             partial_due_to_error=False,
         )
         rows = tuple(
@@ -432,11 +458,12 @@ class SearchPeopleQuery:
             )
             for row in selected
         )
-        return SearchPeopleResolvedResponse(coverage=coverage, rows=rows)
+        return SearchPeopleResolvedResponse(coverage=coverage, rows=rows, continuation=next_page)
 
     def _has_in_memory_predicate(
         self,
         *,
+        email: str | None,
         first_name: str | None,
         job_title: str | None,
         company_name: str | None,
@@ -451,6 +478,7 @@ class SearchPeopleQuery:
             or any(
                 value is not None
                 for value in (
+                    email,
                     first_name,
                     job_title,
                     company_name,
@@ -463,24 +491,11 @@ class SearchPeopleQuery:
         )
 
     @staticmethod
-    def _visible_count(pages: Sequence[PageResult[PersonResource]]) -> int | None:
-        total = 0
-        for page in pages:
-            if page.total_count is None:
-                return None
-            total += page.total_count
-        return total
-
-    @staticmethod
     def _text(value: str | None) -> str | None:
         if value is None:
             return None
         stripped = value.strip()
         return stripped or None
-
-    @staticmethod
-    def _name_order(row: SearchPersonRowResponse) -> str:
-        return (row.name or "").casefold()
 
     @staticmethod
     def _matches_text(haystack: str | None, needle: str | None) -> bool:

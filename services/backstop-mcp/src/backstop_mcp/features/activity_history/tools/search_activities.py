@@ -18,6 +18,8 @@ from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
+from backstop_mcp.config import SearchConfig
+from backstop_mcp.dependencies import get_search_config
 from backstop_mcp.features.activity_history import (
     ENTITY_ACTIVITY_TYPES,
     MAX_RETRIEVABLE,
@@ -31,6 +33,10 @@ from backstop_mcp.features.activity_history import (
     aggregate_entity_activities,
 )
 from backstop_mcp.features.activity_history.dependencies import get_search_activities_query_factory
+from backstop_mcp.features.collection_scan import (
+    InvalidCursorError,
+    search_fingerprint,
+)
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver import (
     ResolvedPartyResponse,
@@ -256,7 +262,7 @@ async def search_activities(
         Field(
             default=False,
             description=(
-                "Opt in to the full body text (much larger rows) on every matching row. "
+                "Opt in to the full body text (much larger rows) on each returned row. "
                 "Refused with `mode=aggregate` and on a firm-wide search (no party, tags, authors, "
                 "or attendees)."
             ),
@@ -267,8 +273,9 @@ async def search_activities(
         Field(
             default="rows",
             description=(
-                "`rows` returns every matching activity. `aggregate` returns "
-                "counts grouped by `group_by` so a counting question never pays for row bodies."
+                "`rows` returns one page of matching activities, newest first. `aggregate` "
+                "returns counts grouped by `group_by` over the whole set so a counting question "
+                "never pays for row bodies."
             ),
         ),
     ] = "rows",
@@ -296,9 +303,21 @@ async def search_activities(
             ),
         ),
     ] = None,
+    cursor: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description=(
+                "`continuation.cursor` from the previous page of this same search. Repeat every "
+                "other argument unchanged; a cursor from different arguments is rejected. "
+                "Rows mode only."
+            ),
+        ),
+    ] = None,
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
+    search_config: SearchConfig = Depends(get_search_config),
 ) -> GetSearchActivitiesResponse | InputRequiredResult:
     """Search activities firm-wide or for one party: meetings, calls, notes, emails, documents.
 
@@ -321,10 +340,13 @@ async def search_activities(
     get_activity_history (party-scoped) instead, not a retry of this tool. An empty `rows`
     list with status resolved is genuinely none in that window.
 
-    Counts cover only what this credential can see. A set larger than the 10000 ceiling
-    comes back partial, with a disclaimer on `coverage`.
+    Counts cover only what this credential can see. An aggregate over a set larger than the
+    10000 ceiling comes back partial, with a disclaimer on `coverage`; rows mode pages past it.
 
-    `mode=aggregate` with `group_by` answers a counting question without row bodies.
+    `mode=rows` returns one page per call, newest first; `coverage.visible_count` is the
+    total that matched. `continuation` means more rows may match: pass `continuation.cursor`
+    back with the same arguments only when the user needs more rows. To count, use
+    `mode=aggregate` with `group_by`, not paging — it answers without row bodies.
     A party missing from a firm-wide row sample is not
     inactive; for "who has had no activity since X" use get_last_activity_for_parties.
     `attachments_count` is a count only — pass the row `activity_id` (or `id`) to
@@ -342,6 +364,8 @@ async def search_activities(
         raise ValueError("group_by is required when mode is aggregate")
     if mode == "rows" and group_by is not None:
         raise ValueError("group_by is only used when mode is aggregate")
+    if cursor is not None and mode == "aggregate":
+        raise ValueError("cursor is only used when mode is rows; aggregate reads the whole set")
     if include_description and mode == "aggregate":
         raise ValueError(
             "include_description is refused in aggregate mode; counts do not use row bodies"
@@ -398,12 +422,33 @@ async def search_activities(
     else:
         selected_fields = _DEFAULT_FIELDS
 
+    resource_type = None if resolved_party is None else resolved_party.search_type
+    # The resolved window and party, so a cursor issued for a defaulted window or a `search`
+    # still matches the next call that day, and a different party is a different search.
+    fingerprint = search_fingerprint(
+        "search_activities",
+        {
+            "start_date": start_date,
+            "end_date": end_date,
+            "party_id": scoped_party_id,
+            "search_type": resource_type,
+            "types": selected_types,
+            "activity_tag_ids": tag_ids,
+            "authors": author_emails,
+            "attendee_ids": attendee_ids,
+            "include_description": include_description,
+            "mode": mode,
+            "fields": sorted(selected_fields),
+        },
+    )
+
     logger.info(
         "activity_history.search.start",
         extra={
             "mode": mode,
             "include_description": include_description,
             "party": None if resolved_party is None else resolved_party.id,
+            "cursor": cursor is not None,
         },
     )
     try:
@@ -412,16 +457,19 @@ async def search_activities(
             end_date=end_date,
             types=selected_types,
             party_id=scoped_party_id,
-            resource_type=None if resolved_party is None else resolved_party.search_type,
+            resource_type=resource_type,
             activity_tags=tag_ids,
             authors=author_emails,
             attendee_ids=attendee_ids,
             include_description=include_description,
+            cursor=cursor,
+            fingerprint=fingerprint,
+            min_result_size=search_config.result_size if mode == "rows" else None,
         )
-    except BackstopAuthError, BackstopRateLimitError:
-        # Neither is "this endpoint is unavailable". A dead credential fails the documented
-        # fallback the same way, and a rate limit is a "slow down" that naming a second tool
-        # would answer with more load.
+    except BackstopAuthError, BackstopRateLimitError, InvalidCursorError:
+        # None is "this endpoint is unavailable". A dead credential fails the documented
+        # fallback the same way, a rate limit is a "slow down" that naming a second tool
+        # would answer with more load, and a cursor from another search is the caller's error.
         raise
     except Exception as exc:
         # Broad on purpose, matching `GetHoldingsQuery`: HTTP status, transport timeout,
@@ -451,4 +499,5 @@ async def search_activities(
         else {},
         aggregates=aggregates,
         ceiling=MAX_RETRIEVABLE,
+        continuation=fetch.continuation,
     )

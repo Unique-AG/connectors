@@ -46,6 +46,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
     AggregateBucketResponse,
+    ContinuationResponse,
     ScanCoverageResponse,
     project_fields,
     scan_coverage,
@@ -927,8 +928,15 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
     rows: tuple[SearchActivitiesRowResponse, ...] = Field(
         default=(),
         description=(
-            "Matching activities in Backstop's newest-effectiveDate-first order. Empty in "
-            "aggregate mode."
+            "One page of matching activities in Backstop's newest-effectiveDate-first order. "
+            "Empty in aggregate mode."
+        ),
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when more rows may match than this page holds. Omitted when the rows "
+            "are complete, in aggregate mode, or at the 10000 ceiling (see `coverage`)."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
@@ -955,6 +963,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         ceiling: int,
         urls: Mapping[str, str | None],
         aggregates: tuple[AggregateBucketDto, ...] = (),
+        continuation: ContinuationResponse | None = None,
     ) -> Self:
         extra: tuple[str, ...] = ()
         if any(name != "total_count" for name in fetch.server_filter_ignored):
@@ -979,6 +988,7 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
             mode=mode,
             coverage=coverage,
             rows=rows,
+            continuation=continuation,
             aggregates=tuple(AggregateBucketResponse.from_dto(bucket) for bucket in aggregates),
             server_filter_ignored=fetch.server_filter_ignored or None,
         )

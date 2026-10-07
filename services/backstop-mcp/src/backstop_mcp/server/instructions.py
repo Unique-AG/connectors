@@ -10,13 +10,14 @@ Backstop CRM. People and organizations are the records; each tool answers one qu
 Identity. A name is not a handle. Every party-scoped tool takes `search` (a name or email) \
 or a trusted `party_id` together with that id's `search_type` — two separate arguments. Echo \
 `search_type` with `party_id`. Omission is rejected only on tools that say so \
-(`search_activities`, `get_tasks_for_party`, `get_accounts_for_party`, `get_opportunities`, \
-and activity writes). Others default `search_type` and still want the echoed type when it is \
-not that default. Never invent an id: only echo one a prior resolve returned. The four party \
-collections are organizations, people, contacts, and employees, and their ids are not \
-interchangeable — a contacts or employees id is not a people id. An ambiguous name comes \
-back as `candidates` (quick-search returns at most 10), never a guess; `not_found` names the \
-query actually used. Account, product, opportunity, and activity ids are not party ids.
+(`search_activities`, `get_activity_history`, `get_last_activity_for_parties`, \
+`get_tasks_for_party`, `get_accounts_for_party`, `get_opportunities`, and activity writes). \
+Others default `search_type` and still want the echoed type when it is not that default. \
+Never invent an id: only echo one a prior resolve returned. The four party collections are \
+organizations, people, contacts, and employees, and their ids are not interchangeable — a \
+contacts or employees id is not a people id. An ambiguous name comes back as `candidates`, \
+never a guess; `not_found` names the query actually used. Account, product, opportunity, and \
+activity ids are not party ids.
 
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
@@ -46,8 +47,9 @@ A saved report is run_report by exact name. It cannot filter by product or date:
 search_products when that column holds the legal name.
 
 Subscriptions, redemptions, or share class: get_capital_flows, date \
-window required. Rows have no product; join on account.id. `owner_id` is `owner.id` from a \
-capital-flows row.
+window required. Scope with `account_ids` from get_accounts_for_party or \
+get_product_investors. Rows have no product; join on account.id. `owner_id` is `owner.id` \
+from a capital-flows row.
 
 Meetings, calls, notes, emails, documents: always start with search_activities. \
 get_activity_history is only the party-scoped fallback when that primary is missing; do not \
@@ -65,10 +67,10 @@ question (an employee, as in "<name>'s pipeline") is a system user, not a people
 organization record: never search_people or search_organizations for their pipeline. \
 `representative` takes that login, not a display name. A disabled login returning empty is \
 not "no coverage". \
-`representative` on search_opportunities matches the investor organization's representative, \
-not the deal-level field. The deal-level representative is often set too and can differ: select \
-`representative` and `investor_representative` in `fields`, and say which one the count \
-used. A stage-change question stays on \
+`representative` on search_opportunities matches the deal-level representative: the deals \
+assigned to that colleague. `investor_representative` is the investor organization's \
+representative, an output field only; it can differ and is never filtered on. \
+A stage-change question stays on \
 search_opportunities: select `previous_stage` and `date_entered_current_stage`, keep rows \
 inside the window including closed deals, and do not walk get_opportunities_by_ids. Those \
 two fields are the latest move only. The `product` argument is the linked fund and may be \
@@ -88,7 +90,8 @@ a field (a metric, a tenure), is answered by stating the rule you applied. Layou
 sections: \
 list_custom_field_groups. Saved reports: run_report, by exact name. There is no endpoint \
 that lists reports. CRM UI URLs: build_backstop_links and parse_backstop_link. Never \
-hand-write a Backstop URL. An account URL has no tool that loads the account by id.
+hand-write a Backstop URL. No tool loads the account record behind an account URL; its id \
+goes to get_time_series (`entity_type` accounts) and get_capital_flows (`account_ids`).
 
 Writes. Creates are not idempotent — a repeated call makes a second record. delete_person, \
 delete_organization, delete_activity, and delete_opportunity hard-delete one trusted id \
@@ -112,4 +115,10 @@ that stays on the row when the catalog flag is true. Leave `exclude_custom_field
 set it true only to retry a call that timed out, to see whether reading them is the cause. \
 get_opportunities_by_ids cannot resolve field types while that flag is true. If a field is \
 absent from the fetched record too, say Backstop does not record it.
+
+Paging. search_organizations, search_people, search_opportunities (rows), and \
+search_activities (rows) return one page per call. `continuation` means more may match: \
+pass its `cursor` back with every other argument unchanged for the next page, and relay \
+its `message` when the user asks whether that is all. Page on only when the user needs more \
+rows than one page holds; a count is aggregate mode, not a walk of every page.
 """

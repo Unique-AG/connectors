@@ -7,8 +7,9 @@ inactive. This runs through `SearchActivitiesQuery`, so a filter Backstop ignore
 same way (`server_filter_ignored`). The per-user request gate on `BackstopClient` bounds how many
 are in flight. The caller owns the party cap.
 
-One party failing costs that party's answer, not the batch. Auth and rate-limit errors still
-abort: the rest would fail the same way. A non-`Exception` (cancellation) is re-raised.
+One party failing costs that party's answer, not the batch. `BATCH_ABORTING_ERRORS` (auth,
+transient auth, rate limit) still abort: the rest would fail the same way. A non-`Exception`
+(cancellation) is re-raised.
 """
 
 import asyncio
@@ -18,10 +19,7 @@ from datetime import date
 
 from opentelemetry import trace
 
-from backstop_mcp.backstop_client import (
-    BackstopAuthError,
-    BackstopRateLimitError,
-)
+from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS
 from backstop_mcp.features.activity_history.entity_activity_type import EntityActivityType
 from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
@@ -34,8 +32,6 @@ from backstop_mcp.features.entity_types import SearchType
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
-
-_ABORTS_BATCH = (BackstopAuthError, BackstopRateLimitError)
 
 
 class GetLastActivityForPartiesQuery:
@@ -62,8 +58,7 @@ class GetLastActivityForPartiesQuery:
                         types=types,
                         party_id=party_id,
                         resource_type=search_type,
-                        max_rows=1,
-                        page_size=1,
+                        min_result_size=1,
                     )
                     for party_id, search_type in parties
                 ),
@@ -94,7 +89,7 @@ class GetLastActivityForPartiesQuery:
         settled: EntityActivitiesFetchDto | BaseException,
     ) -> PartyLastActivityDto:
         if isinstance(settled, BaseException):
-            if not isinstance(settled, Exception) or isinstance(settled, _ABORTS_BATCH):
+            if not isinstance(settled, Exception) or isinstance(settled, BATCH_ABORTING_ERRORS):
                 raise settled
             logger.warning(
                 "activity_history.last_activity.party_failed",

@@ -450,6 +450,20 @@ class ProductInvestorsConfig(BaseSettings):
     max_valued_accounts: int = Field(default=100, gt=0)
 
 
+class SearchConfig(BaseSettings):
+    """Page size shared by the paged search tools.
+
+    `result_size` is how many rows one call returns before it stops and hands back a cursor.
+    The search tools read Backstop until they have that many matches, so one call stays well
+    inside the chat client's 60-second tool-call limit and the model's context, and the
+    cursor reads on from the exact row where this page stopped.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="SEARCH_")
+
+    result_size: int = Field(default=100, gt=0, le=1000)
+
+
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials.
 

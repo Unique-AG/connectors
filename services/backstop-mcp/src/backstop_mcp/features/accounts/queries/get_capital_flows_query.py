@@ -9,6 +9,11 @@ has no `fundAccount` of its own — it reaches an account only through
 
 Neither collection takes a product or account filter, so a walk is the whole window. Each is
 capped at `MAX_CAPITAL_FLOW_SCAN_RECORDS`, and hitting the cap is reported as `scan_truncated`.
+
+Not cursor-paged like the search tools: Backstop sorts on one field and flows sharing a
+transaction date reorder between requests, so offset paging on `-transactionDate` repeats and
+skips rows, and a correct page would still re-read the whole window. The volume is small:
+measured about 450 flows a year (peak 734) and about 5,400 in total, so every match is returned.
 """
 
 import asyncio

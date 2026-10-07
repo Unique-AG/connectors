@@ -5,15 +5,18 @@ import pytest
 import respx
 from pydantic.fields import FieldInfo
 
+from backstop_mcp.config import SearchConfig
 from backstop_mcp.features.org_people import LocationFilter, SearchPeopleResolvedResponse
 from backstop_mcp.features.org_people.tools.search_people import (
     PersonCustomFieldFilter,
     search_people,
 )
 from backstop_mcp.server.tools import TOOLS
-from tests.features.org_people.conftest import make_search_people_query
+from tests.features.org_people.conftest import make_search_people_query, serve_pages
 from tests.helpers import BASE_URL, resource, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+
+_CONFIG = SearchConfig(result_size=100)
 
 
 def _page(*items: dict[str, object], total: int) -> httpx.Response:
@@ -108,6 +111,7 @@ class TestSearchPeople:
                         PersonCustomFieldFilter(definition_id="900011", values=["Tier 1", "Tier 3"])
                     ],
                     search_people_query=make_search_people_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchPeopleResolvedResponse,
             )
@@ -129,6 +133,7 @@ class TestSearchPeople:
                     custom_fields=[PersonCustomFieldFilter(definition_id="1", values=["Yes"])],
                     exclude_custom_fields=True,
                     search_people_query=make_search_people_query(client),
+                    search_config=_CONFIG,
                 )
 
     @pytest.mark.asyncio
@@ -145,7 +150,9 @@ class TestSearchPeople:
         async with tool_client(base_url) as client:
             query = make_search_people_query(client, ui_base_url="https://crm.example")
             plain = tool_model(
-                await search_people(last_name="West", search_people_query=query),
+                await search_people(
+                    last_name="West", search_people_query=query, search_config=_CONFIG
+                ),
                 SearchPeopleResolvedResponse,
             )
             linked = tool_model(
@@ -153,6 +160,7 @@ class TestSearchPeople:
                     last_name="West",
                     fields=["name", "url"],
                     search_people_query=query,
+                    search_config=_CONFIG,
                 ),
                 SearchPeopleResolvedResponse,
             )
@@ -163,3 +171,37 @@ class TestSearchPeople:
         assert plain_row["id"] == "42"
         assert "party_id=42" in str(linked_row["url"])
         assert "ManagePerson.action" in str(linked_row["url"])
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_one_page_per_call_and_the_cursor_resumes_the_same_search(self) -> None:
+        base_url = f"{BASE_URL}/people-search-tool-cursor"
+        items = [resource(str(index), "people", f"West, {index}") for index in range(3)]
+        respx.get(f"{base_url}/people").mock(side_effect=serve_pages(items))
+        config = SearchConfig(result_size=2)
+
+        async with tool_client(base_url) as client:
+            query = make_search_people_query(client)
+            first = tool_payload(
+                tool_model(
+                    await search_people(
+                        last_name="West", search_people_query=query, search_config=config
+                    ),
+                    SearchPeopleResolvedResponse,
+                )
+            )
+            second = tool_payload(
+                tool_model(
+                    await search_people(
+                        last_name="West",
+                        cursor=str(object_dict(first["continuation"])["cursor"]),
+                        search_people_query=query,
+                        search_config=config,
+                    ),
+                    SearchPeopleResolvedResponse,
+                )
+            )
+
+        assert [object_dict(row)["id"] for row in object_list(first["rows"])] == ["0", "1"]
+        assert [object_dict(row)["id"] for row in object_list(second["rows"])] == ["2"]
+        assert "continuation" not in second

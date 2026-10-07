@@ -13,6 +13,7 @@ from datetime import date as Date
 from typing import Self
 
 from pydantic import Field
+from pydantic.json_schema import SkipJsonSchema
 
 from backstop_mcp.backstop_client import Included, IncludedResource
 from backstop_mcp.features.accounts.api_responses import (
@@ -75,7 +76,7 @@ class OwnerResponse(OmitNoneModel):
             "not say which. Echo it with `id`."
         ),
     )
-    contacts_id: str | None = Field(
+    contacts_id: SkipJsonSchema[str | None] = Field(
         default=None,
         exclude=True,
         description="The contacts envelope id when `id` was remapped to the specific resource.",

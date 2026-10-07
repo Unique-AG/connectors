@@ -21,7 +21,10 @@ class BackstopUiPage(StrEnum):
     ACTIVITY = "activities.jsp"
 
 
-ACCOUNT_SUGGESTED_NOTE: Final[str] = "No tool loads an account by id."
+ACCOUNT_SUGGESTED_NOTE: Final[str] = (
+    "No tool loads the account record. Pass this id to get_time_series "
+    "(entity_type accounts) or get_capital_flows (account_ids)."
+)
 ORGANIZATION_SUGGESTED_NOTE: Final[str] = (
     "Pass this id as party_id with search_type organizations, or pass the name as search."
 )

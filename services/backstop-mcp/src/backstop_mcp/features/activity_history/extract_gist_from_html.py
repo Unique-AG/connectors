@@ -4,7 +4,7 @@ optionally truncate at a word boundary to a caller-supplied budget.
 A gist is a prefix, not a summary: it keeps whatever the body starts with, which may be a
 table rather than the discussion. See `extract_gist_from_html` for the library choice this
 rests on. Omit `max_chars` and the body is not truncated. A conversion that raises returns
-the original HTML so one bad body cannot fail the tool call.
+the original HTML, under the same `max_chars` cap, so one bad body cannot fail the tool call.
 """
 
 import logging
@@ -56,8 +56,10 @@ def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
     two of markdownify's own artifacts — the synthetic blank header row it invents for a
     `<th>`-less `<table>`, and runs of blank lines — before truncation ever sees the text.
 
-    Any failure returns `html` unchanged. One bad body must not fail the tool call, and a
-    truncated slice of raw HTML would cut through a tag.
+    Any failure returns the raw `html` instead, so one bad body cannot fail the tool call.
+    The two modes still hold: with `max_chars` it is hard-cut to `max_chars` (a list row's
+    budget binds whatever the text is, even if the cut lands inside a tag) and marked
+    truncated; without it the whole body comes back.
     """
     try:
         return _gist(_html_to_markdown(html), max_chars=max_chars)
@@ -67,7 +69,9 @@ def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
             extra={"html_chars": len(html)},
             exc_info=True,
         )
-        return Gist(text=html, truncated=False, full_length=len(html))
+        if max_chars is None or len(html) <= max_chars:
+            return Gist(text=html, truncated=False, full_length=len(html))
+        return Gist(text=html[:max_chars], truncated=True, full_length=len(html))
 
 
 def _gist(markdown: str, *, max_chars: int | None) -> Gist:

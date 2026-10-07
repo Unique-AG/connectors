@@ -10,20 +10,12 @@ from urllib.parse import quote
 
 from opentelemetry import trace
 
-from backstop_mcp.backstop_client import (
-    BackstopAuthError,
-    BackstopClient,
-    BackstopRateLimitError,
-    BackstopTransientAuthError,
-)
+from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
-
-# The rest of the batch would fail the same way, so these abort instead of costing one row.
-_ABORTS_BATCH = (BackstopAuthError, BackstopTransientAuthError, BackstopRateLimitError)
 
 
 class GetLatestAccountValuesQuery:
@@ -64,7 +56,7 @@ class GetLatestAccountValuesQuery:
         self, account_id: str, settled: SeriesFigureDto | BaseException | None
     ) -> AccountLatestValueDto:
         if isinstance(settled, BaseException):
-            if not isinstance(settled, Exception) or isinstance(settled, _ABORTS_BATCH):
+            if not isinstance(settled, Exception) or isinstance(settled, BATCH_ABORTING_ERRORS):
                 raise settled
             logger.warning(
                 "accounts.latest_values.series_failed",

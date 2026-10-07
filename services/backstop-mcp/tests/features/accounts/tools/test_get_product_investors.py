@@ -555,6 +555,15 @@ class TestGetProductInvestors:
         assert "Pass true when the answer needs balances" in str(latest["description"])
         assert "Ask the user first" not in str(latest["description"])
 
+    def test_the_contacts_envelope_id_is_not_in_the_published_schema(self) -> None:
+        meta = get_fastmcp_meta(get_product_investors)
+        assert isinstance(meta, ToolMeta)
+        schema = meta.output_schema
+
+        assert schema is not None
+        assert "OwnerResponse" in str(schema)
+        assert "contacts_id" not in str(schema)
+
     def test_is_registered_and_names_the_two_step(self) -> None:
         assert get_product_investors in TOOLS
         meta = get_fastmcp_meta(get_product_investors)
@@ -578,12 +587,7 @@ class TestGetProductInvestors:
     async def test_each_product_is_its_own_listing_and_an_investor_appears_once(
         self, client: BackstopClient
     ) -> None:
-        def products(request: httpx.Request) -> httpx.Response:
-            if request.url.params.get("filter[name][like]"):
-                return _product_page()
-            return _product_page(_nwon(), _nwof())
-
-        respx.get(_PRODUCTS_URL).mock(side_effect=products)
+        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_nwon(), _nwof()))
 
         def accounts(request: httpx.Request) -> httpx.Response:
             if request.url.params.get("filter[product.id][eq]") == "11":
@@ -942,12 +946,7 @@ class TestGetProductInvestors:
     async def test_over_the_limit_hint_offers_investor_ids_and_per_vehicle_when_each_fits(
         self, client: BackstopClient, offshore_accounts: int, offers_per_vehicle: bool
     ) -> None:
-        def products(request: httpx.Request) -> httpx.Response:
-            if request.url.params.get("filter[name][like]"):
-                return _product_page()
-            return _product_page(_nwon(), _nwof())
-
-        respx.get(_PRODUCTS_URL).mock(side_effect=products)
+        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_nwon(), _nwof()))
 
         def accounts(request: httpx.Request) -> httpx.Response:
             if request.url.params.get("filter[product.id][eq]") == "11":

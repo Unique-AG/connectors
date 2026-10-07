@@ -41,7 +41,7 @@ def scan_coverage(
     ceiling_hit = ceiling is not None and (ceiling_clamped or visible_count == ceiling)
     truncated = ceiling_hit or partial_due_to_error
     disclaimers: list[str] = []
-    if ceiling_hit:
+    if ceiling is not None and ceiling_hit:
         disclaimers.append(_ceiling_disclaimer(ceiling))
     if partial_due_to_error:
         disclaimers.append(ERROR_DISCLAIMER)

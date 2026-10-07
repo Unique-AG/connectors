@@ -186,27 +186,28 @@ class TestSearchProducts:
             result = tool_model(await _call(client, name="Global"), ProductResolvedResponse)
 
         assert [row.id for row in result.products] == ["1", "2"]
-        assert recorded_requests(index.calls)[0].url.params["filter[name][like]"] == "Global"
+        assert "filter[name][like]" not in recorded_requests(index.calls)[0].url.params
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_filters_and_together_and_a_miss_is_an_empty_list(self) -> None:
         base_url = tenant("sp-and")
-        respx.get(f"{base_url}/products").mock(
+        respx.get(f"{base_url}/products/1").mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": [
-                        _product(
-                            "1",
-                            name="Northwind Dispersion Fund",
-                            short_name="NDSP",
-                            values=_strategy_value(),
-                        ),
-                        _product("2", name="Northwind Tail Fund", short_name="NTLF"),
-                    ],
-                    "links": {"next": None},
+                    "data": _product(
+                        "1",
+                        name="Northwind Dispersion Fund",
+                        short_name="NDSP",
+                        values=_strategy_value(),
+                    )
                 },
+            )
+        )
+        respx.get(f"{base_url}/products/2").mock(
+            return_value=httpx.Response(
+                200, json={"data": _product("2", name="Northwind Tail Fund", short_name="NTLF")}
             )
         )
         _definitions_route(base_url)

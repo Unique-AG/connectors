@@ -6,6 +6,7 @@ one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never
 `get_time_series` over a fund's accounts.
 """
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Annotated
@@ -181,16 +182,21 @@ async def get_product_investors(
                 "investor_id_count": len(requested_investors),
             },
         )
-        listings: list[ProductListingResponse] = []
-        for resolved in resolved_products:
-            listings.append(
-                await get_accounts_for_product_query.run(
-                    product=resolved,
-                    include_closed=include_closed,
-                    exclude_custom_fields=exclude_custom_fields,
-                    owner_ids=owner_ids,
+        # Each listing is its own `/accounts` walk with no ordering between products; `gather`
+        # keeps the input order, so the output is the same as awaiting them one by one.
+        listings = list(
+            await asyncio.gather(
+                *(
+                    get_accounts_for_product_query.run(
+                        product=resolved,
+                        include_closed=include_closed,
+                        exclude_custom_fields=exclude_custom_fields,
+                        owner_ids=owner_ids,
+                    )
+                    for resolved in resolved_products
                 )
             )
+        )
         latest_value_hint: str | None = None
         if include_latest_value:
             listings, latest_value_hint = await _with_latest_values(
@@ -232,7 +238,11 @@ async def _resolve_products(
     | NotFoundResponse
     | InputRequiredResult
 ):
-    """Every entry through the family resolve, deduped by product id in the order given."""
+    """Every entry through the family resolve, deduped by product id in the order given.
+
+    Sequential on purpose: an ambiguous entry elicits the user, and two prompts at once would
+    race for the same conversation.
+    """
     collected: dict[str, ResolvedProductDto] = {}
     for entry in products:
         family = await resolve_product_family(ctx, client, product=entry)

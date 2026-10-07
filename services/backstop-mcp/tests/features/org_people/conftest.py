@@ -1,5 +1,6 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable, Sequence
 
+import httpx
 import pytest
 
 from backstop_mcp.backstop_client import BackstopClient
@@ -98,3 +99,23 @@ def make_get_people_for_organization_query(
         ),
         build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
     )
+
+
+def serve_pages(
+    items: Sequence[dict[str, object]],
+) -> Callable[[httpx.Request], httpx.Response]:
+    """A respx side effect that serves `items` as a server-ordered collection by offset."""
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        offset = int(request.url.params["page[offset]"])
+        limit = int(request.url.params["page[limit]"])
+        return httpx.Response(
+            200,
+            json={
+                "data": list(items[offset : offset + limit]),
+                "links": {"next": None},
+                "meta": {"totalResourceCount": len(items)},
+            },
+        )
+
+    return respond

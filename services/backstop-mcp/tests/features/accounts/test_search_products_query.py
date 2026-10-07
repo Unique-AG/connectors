@@ -5,7 +5,7 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import ProductFetchDto
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from tests.features.accounts.conftest import make_search_products_query
@@ -91,8 +91,13 @@ def _ids(products: Sequence[ProductFetchDto]) -> list[str]:
     return [item.product.id for item in products]
 
 
-def _has_name_filter(request: httpx.Request) -> bool:
-    return "filter[name][like]" in request.url.params
+def _by_id_routes(*products: dict[str, object]) -> list[respx.Route]:
+    return [
+        respx.get(f"{_PRODUCTS_URL}/{product['id']}").mock(
+            return_value=httpx.Response(200, json={"data": product})
+        )
+        for product in products
+    ]
 
 
 class TestSearchProductsQuery:
@@ -161,10 +166,12 @@ class TestSearchProductsQuery:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_name_is_a_server_side_like_and_modified_since_a_gt(
+    async def test_name_is_matched_in_memory_and_modified_since_is_a_server_side_gt(
         self, client: BackstopClient
     ) -> None:
-        route = respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE))
+        route = respx.get(_PRODUCTS_URL).mock(
+            return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
+        )
 
         result = await make_search_products_query(client).run(
             name="  Global ", modified_since=date(2026, 10, 1)
@@ -173,54 +180,45 @@ class TestSearchProductsQuery:
         assert _ids(result.products) == ["1", "2"]
         assert route.call_count == 1
         params = recorded_requests(route.calls)[0].url.params
-        assert params["filter[name][like]"] == "Global"
+        assert "filter[name][like]" not in params
         assert params["filter[modifiedTimestamp][gt]"] == "2026-10-01"
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_name_no_product_contains_is_tried_as_a_whole_short_name(
+    async def test_a_whole_short_name_matches_case_insensitively(
         self, client: BackstopClient
     ) -> None:
-        def answer(request: httpx.Request) -> httpx.Response:
-            if _has_name_filter(request):
-                return _page()
-            return _page(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
-
-        route = respx.get(_PRODUCTS_URL).mock(side_effect=answer)
+        route = respx.get(_PRODUCTS_URL).mock(
+            return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
+        )
 
         result = await make_search_products_query(client).run(name="cgup")
 
         assert _ids(result.products) == ["1"]
-        assert route.call_count == 2
-        fallback = recorded_requests(route.calls)[1].url.params
-        assert "filter[name][like]" not in fallback
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_short_name_inside_another_name_ranks_first(
+        self, client: BackstopClient
+    ) -> None:
+        convert_arb = _product("10", name="Convert Arb Fund", short_name="CVAF")
+        global_arb = _product("11", name="Global Arbor Fund", short_name="GARB")
+        merger = _product("12", name="Merger Opportunities Partners", short_name="ARB")
+        respx.get(_PRODUCTS_URL).mock(return_value=_page(convert_arb, global_arb, merger))
+
+        result = await make_search_products_query(client).run(name="arb")
+
+        assert _ids(result.products) == ["12", "10", "11"]
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_a_short_name_fragment_finds_nothing(self, client: BackstopClient) -> None:
-        def answer(request: httpx.Request) -> httpx.Response:
-            return _page() if _has_name_filter(request) else _page(_GLOBAL_US, _GLOBAL_OFFSHORE)
-
-        respx.get(_PRODUCTS_URL).mock(side_effect=answer)
+        respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE))
 
         result = await make_search_products_query(client).run(name="CGU")
 
         assert result.products == ()
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_the_short_name_fallback_keeps_modified_since(
-        self, client: BackstopClient
-    ) -> None:
-        def answer(request: httpx.Request) -> httpx.Response:
-            return _page() if _has_name_filter(request) else _page(_GLOBAL_US)
-
-        route = respx.get(_PRODUCTS_URL).mock(side_effect=answer)
-
-        await make_search_products_query(client).run(name="CGUP", modified_since=date(2026, 10, 1))
-
-        for call in recorded_requests(route.calls):
-            assert call.url.params["filter[modifiedTimestamp][gt]"] == "2026-10-01"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -233,7 +231,7 @@ class TestSearchProductsQuery:
             ]
         )
 
-        result = await make_search_products_query(client).run(product_ids=["2"])
+        result = await make_search_products_query(client).run(name="Offshore")
 
         assert _ids(result.products) == ["2"]
 
@@ -243,12 +241,10 @@ class TestSearchProductsQuery:
         respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE))
         query = make_search_products_query(client)
 
-        by_ids = await query.run(product_ids=["2", "3", "999"])
         by_type = await query.run(product_type="offshore_balance_driven_tmv")
         onshore = await query.run(is_onshore=True)
         offshore = await query.run(is_onshore=False)
 
-        assert _ids(by_ids.products) == ["2", "3"]
         assert _ids(by_type.products) == ["2"]
         assert _ids(onshore.products) == ["1"]
         assert _ids(offshore.products) == ["2"]
@@ -256,7 +252,7 @@ class TestSearchProductsQuery:
     @pytest.mark.asyncio
     @respx.mock
     async def test_filters_and_together(self, client: BackstopClient) -> None:
-        respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE))
+        _by_id_routes(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
 
         both = await make_search_products_query(client).run(
             product_ids=["1", "2"], is_onshore=False
@@ -295,3 +291,102 @@ class TestSearchProductsQuery:
         )
 
         assert result.products == ()
+
+
+class TestSearchProductsByIds:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_reads_each_id_without_a_fieldset_and_never_walks_the_catalog(
+        self, client: BackstopClient
+    ) -> None:
+        catalog = respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US))
+        routes = _by_id_routes(_GLOBAL_US, _GLOBAL_OFFSHORE)
+
+        result = await make_search_products_query(client).run(product_ids=["2", " 1 ", "2"])
+
+        assert catalog.call_count == 0
+        assert [route.call_count for route in routes] == [1, 1]
+        for route in routes:
+            assert dict(recorded_requests(route.calls)[0].url.params) == {}
+        full = next(item for item in result.products if item.product.id == "1")
+        assert full.product_type == "ONSHORE_BALANCE_DRIVEN_TMV"
+        assert [value.definition_id for value in full.stored_custom_field_values] == [
+            _FLAVOR,
+            _REGION,
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_sorts_by_name_like_the_catalog_read(self, client: BackstopClient) -> None:
+        _by_id_routes(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
+
+        result = await make_search_products_query(client).run(product_ids=["1", "2", "3"])
+
+        assert _ids(result.products) == ["3", "2", "1"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_missing_or_invalid_id_is_absent_not_an_error(
+        self, client: BackstopClient
+    ) -> None:
+        _by_id_routes(_BARE)
+        respx.get(f"{_PRODUCTS_URL}/999").mock(
+            return_value=httpx.Response(
+                404,
+                json={
+                    "errors": [
+                        {
+                            "code": "ResourceNotFoundException",
+                            "title": "Resource products not found by id 999",
+                        }
+                    ]
+                },
+            )
+        )
+        respx.get(f"{_PRODUCTS_URL}/NGUP").mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "errors": [
+                        {
+                            "code": "InvalidParameterException",
+                            "title": "Resource products with id NGUP is invalid",
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await make_search_products_query(client).run(product_ids=["3", "999", "NGUP"])
+
+        assert _ids(result.products) == ["3"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_any_other_error_stays_an_error(self, client: BackstopClient) -> None:
+        respx.get(f"{_PRODUCTS_URL}/3").mock(
+            return_value=httpx.Response(403, json={"errors": [{"title": "Forbidden"}]})
+        )
+
+        with pytest.raises(BackstopApiError) as caught:
+            await make_search_products_query(client).run(product_ids=["3"])
+
+        assert caught.value.status_code == 403
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_name_and_modified_since_apply_in_memory(self, client: BackstopClient) -> None:
+        _by_id_routes(_GLOBAL_US, _GLOBAL_OFFSHORE, _BARE)
+        query = make_search_products_query(client)
+
+        by_name = await query.run(product_ids=["1", "2", "3"], name="bare")
+        by_short_name = await query.run(product_ids=["1", "2", "3"], name="cgol")
+        modified_after = await query.run(
+            product_ids=["1", "2", "3"], modified_since=date(2026, 10, 1)
+        )
+        same_day = await query.run(product_ids=["1", "2", "3"], modified_since=date(2026, 10, 2))
+
+        assert _ids(by_name.products) == ["3"]
+        assert _ids(by_short_name.products) == ["2"]
+        assert _ids(modified_after.products) == ["1"]
+        assert same_day.products == ()

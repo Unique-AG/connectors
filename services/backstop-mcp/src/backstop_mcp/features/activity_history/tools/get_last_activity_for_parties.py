@@ -46,11 +46,14 @@ _FALLBACK_MESSAGE = (
 class PartyRef(BaseModel):
     """One party to check, as a prior tool echoed it."""
 
+    # Backstop party ids are numeric. Anything else would fail `entityId` inside the batch and
+    # read as the endpoint being down, so it is rejected here.
     party_id: CoercedId = Field(
+        pattern=r"^[0-9]+$",
         description=(
             "Trusted party id from a prior response — for a deal, the row's `investor.id`. "
             "Never invent one."
-        )
+        ),
     )
     search_type: SearchType = Field(
         description=(

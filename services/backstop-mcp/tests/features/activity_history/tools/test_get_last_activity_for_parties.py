@@ -6,8 +6,14 @@ from typing import cast
 import httpx
 import pytest
 import respx
+from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopAuthError,
+    BackstopClient,
+    BackstopRateLimitError,
+    BackstopTransientAuthError,
+)
 from backstop_mcp.features.activity_history import (
     GetLastActivityForPartiesQuery,
     LastActivityForPartiesResolvedResponse,
@@ -40,13 +46,19 @@ def _page(*rows: dict[str, object], total: int) -> httpx.Response:
     )
 
 
-def _row(party_id: str, *, row_id: int, effective_date: str) -> dict[str, object]:
+def _row(
+    party_id: str,
+    *,
+    row_id: int,
+    effective_date: str,
+    resource_type: str = "organizations",
+) -> dict[str, object]:
     return {
         "id": row_id,
         "type": "Meeting",
         "title": "Quarterly review",
         "effectiveDate": effective_date,
-        "associatedWith": [{"resourceType": "organizations", "resourceId": party_id}],
+        "associatedWith": [{"resourceType": resource_type, "resourceId": party_id}],
     }
 
 
@@ -82,7 +94,10 @@ class TestGetLastActivityForParties:
             {
                 100: _page(_row("100", row_id=11, effective_date="8/20/2026"), total=7),
                 200: _page(total=0),
-                300: _page(_row("999", row_id=31, effective_date="9/1/2026"), total=10),
+                300: _page(
+                    _row("999", row_id=31, effective_date="9/1/2026", resource_type="people"),
+                    total=10,
+                ),
             }
         )
 
@@ -115,7 +130,7 @@ class TestGetLastActivityForParties:
             object_dict(item)["value"] for item in object_list(type_filter["searchValues"])
         }
         assert "email_blast" not in sent_types
-        assert {"meeting", "call", "note", "email", "document"} <= sent_types
+        assert {"meeting", "meeting_call", "note", "email", "document"} <= sent_types
 
         found, none, unknown = result.parties
         assert found.party_id == "100"
@@ -262,3 +277,37 @@ class TestGetLastActivityForParties:
         assert found.last_activity.id == "11"
         assert found.activity_count == 1
         assert result.unknown_count == 0
+
+
+class TestPartyRefValidation:
+    """A non-numeric id used to fail inside the batch and read as the endpoint being down."""
+
+    @pytest.mark.parametrize("party_id", ["abc", "12a", "people/12", "   ", "-12", "１２"])
+    def test_a_non_numeric_id_is_rejected_at_input(self, party_id: str) -> None:
+        with pytest.raises(ValidationError):
+            _ = PartyRef(party_id=party_id, search_type="organizations")
+
+    @pytest.mark.parametrize(("party_id", "expected"), [(341764767, "341764767"), (" 42 ", "42")])
+    def test_a_numeric_id_keeps_its_coercion(self, party_id: str | int, expected: str) -> None:
+        ref = PartyRef.model_validate({"party_id": party_id, "search_type": "organizations"})
+
+        assert ref.party_id == expected
+
+
+class TestLastActivityBatchAborts:
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            BackstopAuthError("rejected"),
+            BackstopTransientAuthError("re-verified"),
+            BackstopRateLimitError(429, "Daily limit exceeded", limit_kind="day"),
+        ],
+        ids=["auth", "transient_auth", "rate_limit"],
+    )
+    def test_a_batch_aborting_failure_is_re_raised(
+        self, client: BackstopClient, failure: Exception
+    ) -> None:
+        with pytest.raises(type(failure)):
+            _ = _query(client)._outcome(  # pyright: ignore[reportPrivateUsage]
+                "100", "organizations", failure
+            )

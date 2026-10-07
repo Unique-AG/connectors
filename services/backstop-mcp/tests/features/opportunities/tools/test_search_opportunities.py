@@ -1,15 +1,21 @@
-from typing import cast, get_args
+from collections.abc import Callable
+from typing import TypedDict, Unpack, cast, get_args
 
 import httpx
 import pytest
 import respx
+from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
-from backstop_mcp.features.opportunities import SearchOpportunitiesResolvedResponse
+from backstop_mcp.config import SearchConfig
+from backstop_mcp.features.opportunities import (
+    SearchOpportunitiesResolvedResponse,
+)
 from backstop_mcp.features.opportunities.tools.search_opportunities import (
     OpportunityCustomFieldFilter,
+    SearchRowField,
     search_opportunities,
 )
 from backstop_mcp.models import CoercedId
@@ -24,6 +30,7 @@ from tests.helpers import (
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(search_opportunities))
+_CONFIG = SearchConfig(result_size=100)
 
 
 def tenant(name: str) -> str:
@@ -164,6 +171,7 @@ class TestSearchOpportunities:
             result = tool_model(
                 await search_opportunities(
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -183,6 +191,8 @@ class TestSearchOpportunities:
         assert "regularCustomFieldValues" in params["fields[opportunities]"]
         assert params["page[limit]"] == "500"
         assert params["page[offset]"] == "0"
+        # A stable order is what makes a cursor offset land on the same record next call.
+        assert params["sort"] == "id"
         assert "filter[isOpen]" not in params
         assert "filter[stage.name]" not in params
         assert "filter[product.name]" not in params
@@ -201,15 +211,17 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_representative_is_the_investor_organization_book(self) -> None:
+    async def test_representative_is_the_deal_level_server_filter(self) -> None:
         base_url = tenant("so-representative")
+        # Backstop applies the filter, so the page holds only that login's deals. The
+        # investor organization's representative differs on deal 2 and is published, not
+        # filtered on.
         opportunities = respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Deal and org", stage_id="42482", representative_id="u1"),
-                _deal("2", name="Org only", stage_id="42482"),
+                _deal("1", name="Same rep", stage_id="42482", representative_id="u1"),
                 _deal(
-                    "3",
-                    name="Deal only",
+                    "2",
+                    name="Other org rep",
                     stage_id="42482",
                     investor_id="c2",
                     representative_id="u1",
@@ -231,7 +243,7 @@ class TestSearchOpportunities:
                     resource("u1", "system-users", userName="jdoe"),
                     resource("u2", "system-users", userName="asmith"),
                 ],
-                total=3,
+                total=2,
             )
         )
         _stub_supporting_collections(base_url)
@@ -239,20 +251,60 @@ class TestSearchOpportunities:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
-                    representative="Jdoe",
-                    fields=["name", "representative"],
+                    representative=" jdoe ",
+                    fields=["name", "representative", "investor_representative"],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
 
         params = recorded_requests(opportunities.calls)[0].url.params
-        assert "filter[representative.name][eq]" not in params
-        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert params["filter[representative.name][eq]"] == "jdoe"
+        payload = tool_payload(result)
+        assert object_dict(payload["coverage"])["visible_count"] == 2
+        rows = [object_dict(item) for item in object_list(payload["rows"])]
         assert [row["id"] for row in rows] == ["1", "2"]
-        assert [row["investor_representative"] for row in rows] == ["jdoe", "jdoe"]
-        assert rows[0]["representative"] == "jdoe"
-        assert "representative" not in rows[1]
+        assert [row["representative"] for row in rows] == ["jdoe", "jdoe"]
+        assert [row["investor_representative"] for row in rows] == ["jdoe", "asmith"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_investor_representative_is_not_projected_unless_selected(self) -> None:
+        base_url = tenant("so-representative-projection")
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Deal", stage_id="42482", representative_id="u1"),
+                included=[
+                    resource("42482", "opportunity-stages", name="Stage B"),
+                    {
+                        **resource("c1", "contacts", name="Contoso"),
+                        "relationships": {
+                            "representative": {"data": {"id": "u2", "type": "system-users"}}
+                        },
+                    },
+                    resource("u1", "system-users", userName="jdoe"),
+                    resource("u2", "system-users", userName="asmith"),
+                ],
+                total=1,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    representative="jdoe",
+                    fields=["name"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [row["id"] for row in rows] == ["1"]
+        assert "investor_representative" not in rows[0]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -275,6 +327,7 @@ class TestSearchOpportunities:
                     is_open=True,
                     stage="Stage B",
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -303,6 +356,7 @@ class TestSearchOpportunities:
                     mode="aggregate",
                     group_by="stage",
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -333,6 +387,7 @@ class TestSearchOpportunities:
                 await search_opportunities(
                     fields=["name", "requested_amount"],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -344,7 +399,7 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_second_page_is_requested_in_parallel_by_offset(self) -> None:
+    async def test_aggregate_walks_every_page_in_parallel_without_a_cursor(self) -> None:
         base_url = tenant("so-pages")
         first = _deal("1", name="a", stage_id="42482")
         second = _deal("2", name="b", stage_id="42482")
@@ -364,7 +419,10 @@ class TestSearchOpportunities:
         async with tool_client(base_url) as client:
             result = tool_model(
                 await search_opportunities(
+                    mode="aggregate",
+                    group_by="stage",
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=SearchConfig(result_size=1),
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -374,8 +432,12 @@ class TestSearchOpportunities:
         assert params[0]["page[offset]"] == "0"
         assert params[1]["page[offset]"] == "1"
         assert params[1]["page[limit]"] == "1"
-        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
-        assert {item["id"] for item in rows} == {"1", "2"}
+        assert "sort" not in params[0]
+        # Aggregate mode counts every match, whatever the result page size.
+        buckets = [object_dict(item) for item in object_list(tool_payload(result)["aggregates"])]
+        assert buckets == [{"key": "42482", "label": "Stage B", "count": 2}]
+        assert result.continuation is None
+        assert result.coverage.rows_scanned == 2
 
     @pytest.mark.asyncio
     @respx.mock
@@ -396,6 +458,7 @@ class TestSearchOpportunities:
                 await search_opportunities(
                     fields=["name"],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -423,12 +486,12 @@ class TestSearchOpportunities:
                 client, ui_base_url="https://tenant.example.test"
             )
             default_result = tool_model(
-                await search_opportunities(search_opportunities_query=query),
+                await search_opportunities(search_opportunities_query=query, search_config=_CONFIG),
                 SearchOpportunitiesResolvedResponse,
             )
             selected_result = tool_model(
                 await search_opportunities(
-                    fields=["name", "url"], search_opportunities_query=query
+                    fields=["name", "url"], search_opportunities_query=query, search_config=_CONFIG
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -444,15 +507,24 @@ class TestSearchOpportunities:
     @respx.mock
     async def test_catalog_failure_keeps_the_rows(self) -> None:
         base_url = tenant("so-catalog-down")
+        stored = [{"definitionId": "d1", "value": "Converts"}]
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
-                _deal("1", name="Contoso - Harbor Select", stage_id="42482"),
+                *(
+                    _deal(
+                        deal_id,
+                        name="Contoso - Harbor Select",
+                        stage_id="42482",
+                        regularCustomFieldValues=stored,
+                    )
+                    for deal_id in ("1", "2", "3")
+                ),
                 included=_included(),
-                total=1,
+                total=3,
             )
         )
         respx.get(f"{base_url}/opportunity-stages").mock(return_value=_stages_page())
-        respx.get(f"{base_url}/custom-field-definitions").mock(
+        definitions = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
         )
 
@@ -460,13 +532,17 @@ class TestSearchOpportunities:
             result = tool_model(
                 await search_opportunities(
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
 
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
-        assert [item["id"] for item in rows] == ["1"]
+        assert [item["id"] for item in rows] == ["1", "2", "3"]
+        assert all(item["custom_field_values"] for item in rows)
         assert result.custom_fields_unavailable is True
+        # One catalog load for the walk: rows publish stored values, so no row re-joins them.
+        assert definitions.call_count == 1
 
 
 def _product_page() -> httpx.Response:
@@ -521,6 +597,7 @@ class TestSearchOpportunitiesProductFilter:
                 await search_opportunities(
                     product=product,
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -543,6 +620,7 @@ class TestSearchOpportunitiesProductFilter:
                 await search_opportunities(
                     product=["NWON"],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -607,6 +685,7 @@ class TestSearchOpportunitiesCustomFields:
                     ],
                     fields=["name", "stage", "investor"],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -647,6 +726,7 @@ class TestSearchOpportunitiesCustomFields:
                 await search_opportunities(
                     exclude_custom_fields=True,
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
@@ -664,6 +744,7 @@ class TestSearchOpportunitiesCustomFields:
                     custom_fields=[OpportunityCustomFieldFilter(definition_id="1", values=["Yes"])],
                     exclude_custom_fields=True,
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 )
 
     @pytest.mark.asyncio
@@ -704,12 +785,149 @@ class TestSearchOpportunitiesCustomFields:
                         OpportunityCustomFieldFilter(definition_id="900002", values=["Kind B"]),
                     ],
                     search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
 
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
         assert [item["id"] for item in rows] == ["both"]
+
+
+def _paged(deals: list[dict[str, object]]) -> Callable[[httpx.Request], httpx.Response]:
+    """Serve `deals` as a server-ordered collection read by `page[offset]` / `page[limit]`."""
+
+    def serve(request: httpx.Request) -> httpx.Response:
+        offset = int(request.url.params["page[offset]"])
+        limit = int(request.url.params["page[limit]"])
+        return _page(
+            *deals[offset : offset + limit],
+            included=[resource("42482", "opportunity-stages", name="Stage B")],
+            total=len(deals),
+        )
+
+    return serve
+
+
+def _closed_except(total: int, *, open_positions: set[int]) -> list[dict[str, object]]:
+    return [
+        _deal(
+            str(position),
+            name=f"deal {position}",
+            stage_id="42482",
+            is_open=position in open_positions,
+            investor_id=None,
+            product_id=None,
+        )
+        for position in range(total)
+    ]
+
+
+class _SearchArguments(TypedDict, total=False):
+    is_open: bool
+    stage: str
+    fields: list[SearchRowField]
+
+
+async def _search_page(
+    base_url: str,
+    *,
+    result_size: int,
+    cursor: str | None = None,
+    **arguments: Unpack[_SearchArguments],
+) -> SearchOpportunitiesResolvedResponse:
+    async with tool_client(base_url) as client:
+        return tool_model(
+            await search_opportunities(
+                **arguments,
+                cursor=cursor,
+                search_opportunities_query=make_search_opportunities_query(client),
+                search_config=SearchConfig(result_size=result_size),
+            ),
+            SearchOpportunitiesResolvedResponse,
+        )
+
+
+def _ids(result: SearchOpportunitiesResolvedResponse) -> list[str | None]:
+    return [row.id for row in result.rows]
+
+
+class TestSearchOpportunitiesPaging:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_full_page_hands_back_a_cursor_that_resumes_at_the_next_row(self) -> None:
+        base_url = tenant("so-page-full")
+        route = respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(_closed_except(5, open_positions=set()))
+        )
+        _stub_supporting_collections(base_url)
+
+        first = await _search_page(base_url, result_size=2, fields=["name"])
+        assert first.continuation is not None
+        second = await _search_page(
+            base_url, result_size=2, cursor=first.continuation.cursor, fields=["name"]
+        )
+        assert second.continuation is not None
+        third = await _search_page(
+            base_url, result_size=2, cursor=second.continuation.cursor, fields=["name"]
+        )
+
+        assert _ids(first) + _ids(second) + _ids(third) == ["0", "1", "2", "3", "4"]
+        assert third.continuation is None
+        assert first.coverage.visible_count == 5
+        assert first.coverage.truncated is False
+        params = [request.url.params for request in recorded_requests(route.calls)]
+        assert {param["sort"] for param in params} == {"id"}
+        # A cursor that lands mid-page re-reads that page from its start.
+        assert {param["page[offset]"] for param in params} == {"0"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_sparse_filter_reads_to_the_end_in_one_call(self) -> None:
+        base_url = tenant("so-sparse")
+        total = 20_600
+        late_match = 20_100
+        route = respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(_closed_except(total, open_positions={3, late_match}))
+        )
+        _stub_supporting_collections(base_url)
+
+        result = await _search_page(base_url, result_size=10, is_open=True)
+
+        assert _ids(result) == ["3", str(late_match)]
+        assert result.continuation is None
+        assert result.coverage.rows_scanned == total
+        assert result.coverage.truncated is False
+        assert route.call_count == total // 500 + 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_cursor_from_other_arguments_is_rejected(self) -> None:
+        base_url = tenant("so-cursor-mismatch")
+        respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(_closed_except(3, open_positions=set()))
+        )
+        _stub_supporting_collections(base_url)
+
+        first = await _search_page(base_url, result_size=1, stage="Stage B")
+        assert first.continuation is not None
+
+        with pytest.raises(ToolError, match="different search"):
+            _ = await _search_page(
+                base_url, result_size=1, stage="Prospect", cursor=first.continuation.cursor
+            )
+
+    @pytest.mark.asyncio
+    async def test_a_cursor_is_refused_in_aggregate_mode(self) -> None:
+        async with tool_client(tenant("so-cursor-aggregate")) as client:
+            with pytest.raises(ValueError, match="cursor"):
+                await search_opportunities(
+                    mode="aggregate",
+                    group_by="stage",
+                    cursor="anything",
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
 
 
 class TestSearchOpportunitiesInput:

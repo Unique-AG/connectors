@@ -257,7 +257,36 @@ class TestDeeplyNestedHtml:
         assert "buried note" in gist.text
         assert gist.truncated is False
 
-    def test_conversion_failure_returns_the_original_html(
+    def test_conversion_failure_in_list_mode_caps_the_raw_html(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A list row's budget binds the fallback too, or one bad body blows the page."""
+        html = "<table><tr><td>Allstate</td><td>Aaron</td></tr></table>"
+
+        def _boom(_html: str) -> str:
+            raise RuntimeError("markdownify broke")
+
+        monkeypatch.setattr(_gist_module, "markdownify", _boom)
+
+        gist = extract_gist_from_html(html, max_chars=20)
+
+        assert gist == Gist(text=html[:20], truncated=True, full_length=len(html))
+
+    def test_conversion_failure_within_the_budget_returns_the_original_html(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        html = "<p>Allstate</p>"
+
+        def _boom(_html: str) -> str:
+            raise RuntimeError("markdownify broke")
+
+        monkeypatch.setattr(_gist_module, "markdownify", _boom)
+
+        gist = extract_gist_from_html(html, max_chars=20)
+
+        assert gist == Gist(text=html, truncated=False, full_length=len(html))
+
+    def test_conversion_failure_in_detail_mode_returns_the_whole_html(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         html = "<table><tr><td>Allstate</td><td>Aaron</td></tr></table>"
@@ -267,7 +296,7 @@ class TestDeeplyNestedHtml:
 
         monkeypatch.setattr(_gist_module, "markdownify", _boom)
 
-        gist = extract_gist_from_html(html, max_chars=20)
+        gist = extract_gist_from_html(html)
 
         assert gist == Gist(text=html, truncated=False, full_length=len(html))
 

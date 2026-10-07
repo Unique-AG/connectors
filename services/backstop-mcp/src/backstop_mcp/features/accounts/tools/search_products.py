@@ -1,7 +1,8 @@
 """`search_products`: every product that matches the filters, with custom-field values.
 
-`name` and `modified_since` are sent to Backstop. `product_ids`, `product_type`, `is_onshore`,
-and `custom_fields` are applied after the read: those are 400 on `GET /products`. Product custom
+`modified_since` is sent to Backstop. `product_ids` reads those products by id instead of the
+catalog. `name`, `product_type`, `is_onshore`, and `custom_fields` are applied after the read:
+the last three are 400 on `GET /products`, and a short name is not filterable. Product custom
 fields live here — not on get_product_investors (owners only) and not on list_custom_fields
 (definitions only).
 """
@@ -121,9 +122,10 @@ async def search_products(
         Field(
             description=(
                 "Case-insensitive substring of the product name: 'Global' finds 'Acme "
-                "Global Fund'. If no product name contains it, it is tried once as a whole "
-                "short name ('NGUP', case-insensitive). A fragment of a short name finds "
-                "nothing. Sent to Backstop."
+                "Global Fund'. Also matched as a whole short name ('NGUP', "
+                "case-insensitive); a product whose short name equals it comes first, ahead "
+                "of the names that contain it. A fragment of a short name matches only "
+                "through the product name."
             ),
         ),
     ] = None,
@@ -134,8 +136,8 @@ async def search_products(
                 "Product ids from an earlier result — never invent one. Several are OR: a "
                 "product with any of these ids passes. AND with every other filter, so "
                 "`product_ids` with `name` returns only those ids whose name also matches. "
-                "Ids with no product are absent from the result, not an error. Applied "
-                "after the read."
+                "Ids with no product are absent from the result, not an error. Each id is "
+                "read directly, not found by walking the catalog."
             ),
         ),
     ] = (),

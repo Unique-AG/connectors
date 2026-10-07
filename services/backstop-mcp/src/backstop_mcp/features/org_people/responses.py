@@ -6,7 +6,11 @@ from typing import ClassVar, Literal, Self
 from pydantic import ConfigDict, Field
 from pydantic.json_schema import SkipJsonSchema
 
-from backstop_mcp.features.collection_scan import ScanCoverageResponse, project_fields
+from backstop_mcp.features.collection_scan import (
+    ContinuationResponse,
+    ScanCoverageResponse,
+    project_fields,
+)
 from backstop_mcp.features.custom_fields import (
     RegularCustomFieldValues,
     ResolvedCustomFieldValueResponse,
@@ -614,30 +618,37 @@ class SearchOrganizationRowResponse(OmitNoneModel):
 
 
 class SearchOrganizationsResolvedResponse(OmitNoneModel):
-    """A completed firm-wide organization search: matching rows plus how much was read."""
+    """One page of a firm-wide organization search: matching rows plus how much was read."""
 
     status: Literal["resolved"] = Field(
         default="resolved",
         description=(
-            "Always 'resolved': the walk ran. An empty `rows` list is not 'nothing matched' "
-            "when `coverage` says the scan ceiling clamped the walk."
+            "Always 'resolved': the read ran. An empty `rows` list means nothing matched."
         ),
     )
     coverage: ScanCoverageResponse = Field(
         description=(
-            "How much of the Backstop result was read. `visible_count` is Backstop's total "
-            "for the server-side filters (including a location `city` and `street_address`), "
-            "before the location filter's country, state, postal code, and title, legal "
-            "name, website, RIA, internal organization, and custom-field predicates. A "
-            "call with only the in-memory predicates reports the whole collection here."
+            "How much of the Backstop result this call read. `visible_count` is Backstop's "
+            "total for the server-side filters (including a location `city` and "
+            "`street_address`), before the location filter's country, state, postal code, and "
+            "title, legal name, website, RIA, internal organization, and custom-field "
+            "predicates. A call with only the in-memory predicates reports the whole "
+            "collection here. `rows_scanned` is this call's records only."
         )
     )
     rows: tuple[SearchOrganizationRowResponse, ...] = Field(
         default=(),
         description=(
-            "Every organization matching every filter, up to the scan ceiling. `id` is always "
-            "present so the next call is get_organization. Default fields are id, name, "
-            "legal_name, email, city, country, and locations."
+            "This page of organizations matching every filter, in Backstop id order (not by "
+            "name). `id` is always present so the next call is get_organization. Default "
+            "fields are id, name, legal_name, email, city, country, and locations."
+        ),
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match."
         ),
     )
 
@@ -729,34 +740,41 @@ class SearchPersonRowResponse(OmitNoneModel):
 
 
 class SearchPeopleResolvedResponse(OmitNoneModel):
-    """A completed firm-wide people search: matching rows plus how much was read."""
+    """One page of a firm-wide people search: matching rows plus how much was read."""
 
     status: Literal["resolved"] = Field(
         default="resolved",
         description=(
-            "Always 'resolved': the walk ran. The people walk is uncapped, so an empty `rows` "
-            "list means nothing matched."
+            "Always 'resolved': the read ran. An empty `rows` list means nothing matched."
         ),
     )
     coverage: ScanCoverageResponse = Field(
         description=(
-            "How much of the Backstop result was read. `visible_count` is Backstop's total "
-            "for the server-side filters, before first name, job title, company name, "
+            "How much of the Backstop result this call read. `visible_count` is Backstop's "
+            "total for the server-side filters, before first name, job title, company name, "
             "department, the location filter's country, state, postal code, and title, "
             "website, and custom-field predicates. A location `city` and `street_address` "
             "are server-side filters. An "
             "`email` filter is three lookups (`email`, `email2`, `email3`) and "
             "`visible_count` is the sum of those totals, so one person stored on two of "
             "those fields can be counted twice. A custom-field-only call reports the "
-            "whole collection here."
+            "whole collection here. `rows_scanned` is this call's records only."
         )
     )
     rows: tuple[SearchPersonRowResponse, ...] = Field(
         default=(),
         description=(
-            "Every person matching every filter. `id` is always "
-            "present so the next call is get_person with `search_type` `people`. Default "
-            "fields are id, name, email, job_title, company_name, city, country, and "
-            "locations."
+            "This page of people matching every filter, in Backstop id order (not by name). "
+            "`id` is always present so the next call is get_person with `search_type` "
+            "`people`. Default fields are id, name, email, job_title, company_name, city, "
+            "country, and locations."
+        ),
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match. An `email` search is never "
+            "paged."
         ),
     )
