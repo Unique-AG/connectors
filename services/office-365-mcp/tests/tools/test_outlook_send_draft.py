@@ -35,7 +35,7 @@ from office_365_mcp.tools.outlook_send_draft import MailSent, a_person_agrees, s
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
-_DRAFT_REF = "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
+_DRAFT_REF = "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 
 _DRAFT_PATH = "/me/messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 _SEND_PATH = f"{_DRAFT_PATH}/send"
@@ -84,6 +84,10 @@ async def _agrees(draft: Message, mailbox: str | None) -> Confirmed:
     assert draft is not None
     assert mailbox is None or mailbox
     return None
+
+
+async def _never_asked(draft: Message, mailbox: str | None) -> Confirmed:
+    raise AssertionError(f"a person was asked about {draft!r} as {mailbox!r}")
 
 
 async def _refuses(draft: Message, mailbox: str | None) -> Confirmed:
@@ -579,37 +583,26 @@ class TestTheMessagesItRefusesToSend:
 
         assert send.call_count == 0
 
-    async def test_the_refusal_says_the_mail_may_already_have_gone(
+    async def test_the_refusal_names_both_ways_a_message_can_be_no_draft(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph, _draft(is_draft=False))
 
-        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
+        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL") as refusal:
             _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
-    async def test_a_message_handle_is_refused_and_told_why(
+        assert "sent to the user" in str(refusal.value)
+        assert "already sent" in str(refusal.value)
+
+    async def test_mail_a_reader_found_is_read_refused_and_nobody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
+        send = _ready(graph, _draft(is_draft=False))
 
-        with pytest.raises(ToolError, match="COMPOSED"):
-            _ = await send_draft(
-                client,
-                confirm=_agrees,
-                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-            )
-
-        assert len(graph.calls) == 0, "a refused argument never reaches the mailbox"
-
-    async def test_the_message_refusal_points_at_the_drafting_tools(
-        self, client: GraphServiceClient
-    ) -> None:
         with pytest.raises(ToolError, match="outlook_draft_reply"):
-            _ = await send_draft(
-                client,
-                confirm=_agrees,
-                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-            )
+            _ = await send_draft(client, confirm=_never_asked, draft_ref=_DRAFT_REF)
+
+        assert send.call_count == 0
 
     @pytest.mark.parametrize(
         "draft_ref",
@@ -617,20 +610,21 @@ class TestTheMessagesItRefusesToSend:
             "outlook:///folders/AQMkADAwSYNTHETIC-folder",
             "outlook:///rules/SYNTHETIC-rule-0001",
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
-            "outlook:///drafts/",
-            "outlook:///drafts/%20",
+            "outlook:///messages/",
+            "outlook:///messages/%20",
+            "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D",
             "AAMkAGI2SYNTHETIC-draft-0001=",
             "https://outlook.office365.invalid/owa/?ItemID=synthetic-draft",
             _SUBJECT,
             _ADA,
         ],
     )
-    async def test_anything_that_is_not_a_draft_handle_never_reaches_graph(
+    async def test_anything_that_is_not_a_message_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, draft_ref: str
     ) -> None:
         _ = _ready(graph)
 
-        with pytest.raises(ToolError):
+        with pytest.raises(ToolError, match="outlook:///messages/"):
             _ = await send_draft(client, confirm=_agrees, draft_ref=draft_ref)
 
         assert len(graph.calls) == 0

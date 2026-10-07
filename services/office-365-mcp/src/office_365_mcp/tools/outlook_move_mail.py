@@ -122,7 +122,7 @@ _NOT_A_MESSAGE_HANDLE = (
     "outlook_move_mail takes message handles in `message_refs`: outlook:///messages/{id}, "
     + "exactly as outlook_search_mail, outlook_list_mail or outlook_read_thread reported them "
     + "in `uri`. One of these is not a handle. A subject line, an email address, an Outlook web "
-    + "link and a bare message id are not handles. Neither is a folder, draft or rule handle "
+    + "link and a bare message id are not handles. Neither is a folder or rule handle "
     + "under the same scheme. This tool makes sure that every handle is valid before any "
     + "message moves, so nothing moved. Fix the value and call again with the whole batch."
 )
