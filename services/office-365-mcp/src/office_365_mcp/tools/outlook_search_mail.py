@@ -41,7 +41,9 @@ MAX_RESULTS = 1000
 
 _DESCRIPTION = (
     "Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by "
-    "keyword, sender, recipient, subject, or attachment file name."
+    "keyword, sender, recipient, subject, or attachment file name. "
+    "This tool has no `folder` or `unread_only` parameter: outlook_list_mail lists one folder "
+    "and can return only unread mail."
 )
 
 
