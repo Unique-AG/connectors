@@ -18,6 +18,18 @@ back as `candidates` to pick from, never a guess; `not_found` names the query ac
 used. Account, product, opportunity, and activity ids are none of these and are not party \
 ids.
 
+Firm-wide organization filters: search_organizations. name, email, other_id, and \
+matching_domain are sent to Backstop. legal name, city, country, state, website, ria, \
+internal organization, and custom fields are applied after that walk — a custom-field-only \
+call reads the collection. Custom-field ids come from list_custom_fields; match by \
+definition id, not the label (two fields can share a name). One named organization is \
+still get_organization. "Prospects", "current investors", and "former investors" are \
+organizations with that value in an organization status custom field (e.g. Investor \
+Status) — never an opportunity stage. "Active" narrows by a second organization status \
+field: pass every option that counts as active and say which you used. Group by Grade, \
+Investor Type, and similar fields with `custom_field_columns`, not get_organization per row. \
+Countries are stored spelled out ("United Arab Emirates").
+
 Contact details (emails, locations, primary contact, the organization a person works at): \
 get_person / get_organization with `include`. `representative` is our internal account owner, \
 not a way to reach the investor. Contact Source is a standard vocabulary, not a custom \
@@ -44,9 +56,12 @@ Product Strategy, Domicile, Fee Structure: get_product (`search` like other tool
 omit it to walk the catalog in one request; slice with custom_field_names=['Strategy']). \
 Those values are not on get_product_investors.
 
-Product chain: resolve a product, then get_product_investors for who is in it (owners only, \
-no figures), then get_time_series for the specific accounts in question. Do not iterate \
-every account in a fund. Fund-level totals are get_time_series on the product's `aums`.
+Product chain: get_product_investors with `products` (a fund name covers all its \
+vehicles; several entries are fine) for who is in it — owners only, no figures — then \
+get_time_series for the specific accounts in question. Do not iterate every account in a \
+fund. To rank investors by size, confirm the vehicles and open/closed scope with the user \
+and ask before passing `include_latest_value=true` (one request per account); then rank by \
+`investors[].latest_value_totals`. Fund-level totals are get_time_series on the product's `aums`.
 
 Subscriptions, redemptions, and share class: get_capital_flows with a mandatory date \
 window. Scope with owner_id or account_ids from get_accounts_for_party / \
@@ -58,7 +73,7 @@ account through originalSubscription is unattributed, not missing.
 Meetings, calls, notes, emails, documents: always start with search_activities — that is \
 the filtered search (start_date/end_date — omit start_date for one year before end_date, \
 omit end_date for today; optional types, activity_tag_ids, authors, party). That primary \
-is an undocumented UI search and may 404 — that is not "no \
+is a POST /entity-activities search (swagger calls it a create) and may 404 — that is not "no \
 activity exists". get_activity_history is only the party-scoped fallback for paging one \
 REST stream when that primary is missing; do not start with it, including for notes. A \
 403 on one history stream is not an empty stream — retry those types on search_activities. \
@@ -66,8 +81,16 @@ Then get_activity_detail with that row's `id` (or a get_activity_history \
 meeting/call/note/document `activity_id`) for the full untruncated body and the \
 attachment list. History email ids are `/emails` collection ids, not detail ids — \
 use search_activities for email body. Prefer search_activities with \
-include_description for note text while the primary answers. Do not look for those \
-on get_person / get_organization.
+include_description for note text while the primary answers. Attendee names come from \
+the structured `attendees` on activity rows or get_activity_detail, never from note \
+text; split internal vs investor by `company`. When the answer depends on what was \
+sent or attached, list the attachments from get_activity_detail. Do not infer \
+attachment contents from titles, later packs, or note text; say not attached when \
+the list is empty. Do not look for those \
+on get_person / get_organization. Who has gone quiet (no activity in 30/60/90 days): \
+get_last_activity_for_parties with the parties' ids — one check per party. Never call a \
+party inactive because it is missing from a capped firm-wide search_activities sample, \
+and report `unknown` parties as unchecked.
 
 Write-back: log_activity for a note, meeting, call, or task. attach_file for a \
 document file or a real .msg/.eml email — Backstop will not create an email record \
@@ -91,9 +114,18 @@ enforced. A `201` is not success on a batch write — read `records[].status`.
 
 Firm-wide pipeline: look up a colleague's login with list_system_users, then \
 search_opportunities. filter[representative.name] takes that login, not a display name. \
-A disabled login returning empty is not "no coverage". One party's deals: \
-get_opportunities (cheap; do not walk the firm for that). `previous_stage` is the stage \
-the deal just left, not where it is now. Master Pipeline custom fields and stage history \
+A disabled login returning empty is not "no coverage". Never infer strategy or product \
+from the deal name. Filter with `product` (short name or name substring; several values \
+are OR) and select the `product` field to group by it. \
+One party's deals: \
+get_opportunities (cheap; do not walk the firm for that). For which deals changed stage \
+since a date, select `previous_stage` and `date_entered_current_stage` and keep rows \
+whose date is on or after that day. That is the latest move per deal; earlier moves \
+need get_opportunities_by_ids. Inactive deals: pass each row's `investor.id` and \
+`investor.search_type` to get_last_activity_for_parties — days in stage is not activity. \
+`previous_stage` is the stage \
+the deal just left, not where it is now. Full stage history is by-id only. \
+Master Pipeline custom fields \
 are not on a search row — fetch those ids with get_opportunities_by_ids before answering \
 anything the row cannot support. Amounts are on the row; ask for them with `fields`. If \
 the field is absent from the fetched record too, say Backstop does not record it — never \

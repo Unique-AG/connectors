@@ -178,7 +178,7 @@ class OpportunityResponse(OmitNoneModel):
     )
     name: StrippedStr | None = Field(
         default=None,
-        description="Name of the deal, usually 'investor - fund' — e.g. 'Koch - CATS Select'.",
+        description="Name of the deal, usually 'investor - fund' — e.g. 'Contoso - Harbor Select'.",
     )
     stage: str | None = Field(
         default=None,
@@ -425,10 +425,29 @@ class GetOpportunitiesByIdsResponse(OmitNoneModel):
     )
 
 
+_INVESTOR_SEARCH_TYPES: dict[str, Literal["organizations", "people"]] = {
+    "organizations": "organizations",
+    "people": "people",
+}
+
+
 class InvestorFromOpportunityResponse(OmitNoneModel):
     """The investor on a deal. The include arrives as a `contacts` resource."""
 
-    id: str = Field(description="Backstop contacts id of the investor. Echo it; never invent one.")
+    id: str = Field(
+        description=(
+            "Backstop contacts id of the investor — the same number as its organization or "
+            "person id. Echo it with `search_type` as a party; never invent one."
+        )
+    )
+    search_type: Literal["organizations", "people"] | None = Field(
+        default=None,
+        description=(
+            "Collection `id` belongs to, from the contact's `specificResource`. Pass it as "
+            "`search_type` with `id` as `party_id` (e.g. to get_last_activity_for_parties). "
+            "Absent when Backstop did not say — do not guess organizations."
+        ),
+    )
     name: str | None = Field(default=None, description="Investor name as published on the contact.")
     country: str | None = Field(default=None, description="Country on the investor contact.")
     state: str | None = Field(
@@ -442,8 +461,12 @@ class InvestorFromOpportunityResponse(OmitNoneModel):
     ) -> Self | None:
         if included is None:
             return None
+        specific = included.attributes.specific_resource
         return cls(
             id=included.id,
+            search_type=_INVESTOR_SEARCH_TYPES.get(
+                (specific.resource_type if specific is not None else None) or ""
+            ),
             name=included.attributes.name,
             country=included.attributes.country,
             state=included.attributes.state,
@@ -458,6 +481,12 @@ class ProductFromOpportunityResponse(OmitNoneModel):
         description="Backstop product id. Echo it into get_time_series / get_product_investors."
     )
     name: str | None = Field(default=None, description="Product name as published.")
+    short_name: str | None = Field(
+        default=None,
+        description=(
+            "Product short name (`productShortName`), e.g. NWON. Echo it; never invent one."
+        ),
+    )
 
     @classmethod
     def from_included(
@@ -465,7 +494,13 @@ class ProductFromOpportunityResponse(OmitNoneModel):
     ) -> Self | None:
         if included is None:
             return None
-        return cls(id=included.id, name=included.attributes.name)
+        attributes = included.attributes
+        configuration = attributes.configuration
+        return cls(
+            id=included.id,
+            name=attributes.name,
+            short_name=None if configuration is None else configuration.product_short_name,
+        )
 
 
 class SearchOpportunityRowResponse(OmitNoneModel):

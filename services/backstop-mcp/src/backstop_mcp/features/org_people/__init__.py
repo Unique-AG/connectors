@@ -21,14 +21,19 @@ from backstop_mcp.features.org_people.dependencies import (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_person_query_factory,
+    get_search_organizations_query_factory,
 )
 from backstop_mcp.features.org_people.queries import (
     MAX_ORG_PEOPLE,
+    MAX_ORGANIZATION_SCAN_RECORDS,
     GetOrganizationQuery,
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
+    OrganizationCustomFieldMatch,
+    SearchOrganizationsQuery,
 )
 from backstop_mcp.features.org_people.responses import (
+    MatchedCustomFieldResponse,
     OrganizationRecordResponse,
     OrganizationResolvedResponse,
     OrgPeopleResolvedResponse,
@@ -38,16 +43,21 @@ from backstop_mcp.features.org_people.responses import (
     PersonAtOrganizationResponse,
     PersonRecordResponse,
     PersonResolvedResponse,
+    SearchOrganizationRowResponse,
+    SearchOrganizationsResolvedResponse,
 )
 
 __all__ = [
+    "MAX_ORGANIZATION_SCAN_RECORDS",
     "MAX_ORG_PEOPLE",
     "EmployeeAttributes",
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
+    "MatchedCustomFieldResponse",
     "OrgPeopleResolvedResponse",
     "OrganizationAttributes",
+    "OrganizationCustomFieldMatch",
     "OrganizationRecordResponse",
     "OrganizationResolvedResponse",
     "PartyOrgPeopleResponse",
@@ -57,7 +67,11 @@ __all__ = [
     "PersonAttributes",
     "PersonRecordResponse",
     "PersonResolvedResponse",
+    "SearchOrganizationRowResponse",
+    "SearchOrganizationsQuery",
+    "SearchOrganizationsResolvedResponse",
     "get_organization_query_factory",
     "get_people_for_organization_query_factory",
     "get_person_query_factory",
+    "get_search_organizations_query_factory",
 ]

@@ -2,8 +2,8 @@
 
 `get_accounts_for_party` publishes `HoldingRowResponse`, not `AccountRowResponse`. The
 account-row tree (`AccountRowResponse` and its nested owner / investor-type refs) is the
-listing `get_product_investors` publishes — identity and owner, no figures. The product
-itself sits once on that tool's resolved response, not on every row.
+listing `get_product_investors` publishes — identity and owner, plus `latest_value` only when
+the caller opted in. The product itself sits once per product listing, not on every row.
 
 `OmitNoneModel` drops nulls: a missing figure is absent, never `0.0`. A `0.0` Backstop
 published is a real point and is kept.
@@ -22,6 +22,7 @@ from backstop_mcp.features.accounts.api_responses import (
     OwnerAttributes,
 )
 from backstop_mcp.features.accounts.internal_dto import (
+    AccountLatestValueDto,
     AccountOwnerDto,
     AccountRecordDto,
     InvestorTypeDto,
@@ -149,8 +150,65 @@ class InvestorQualificationResponse(OmitNoneModel):
         return cls(status=qualification.status, option=qualification.option)
 
 
+class LatestValueResponse(OmitNoneModel):
+    """An account's newest `values` point that carries a number."""
+
+    available: bool = Field(
+        description=(
+            "False when there is no figure to report — Backstop publishes no valued point, or "
+            "the request failed (see `error`). Never read a missing figure as zero."
+        )
+    )
+    amount: float | None = Field(
+        default=None, description="The account's value. A published 0.0 is a real zero."
+    )
+    currency: str | None = Field(
+        default=None, description="ISO currency code of `amount`, from the account."
+    )
+    as_of: Date | None = Field(
+        default=None,
+        description=(
+            "The date `amount` is for. Accounts can differ — say so when they do, rather than "
+            "presenting one as-of date for all of them."
+        ),
+    )
+    status: str | None = Field(
+        default=None,
+        description="`ACTUAL` or `ESTIMATE` as Backstop labels the point. Omitted when unlabelled.",
+    )
+    pending_as_of: Date | None = Field(
+        default=None,
+        description=(
+            "A newer dated point Backstop has published with no number yet. With `amount`, the "
+            "amount is older than this date; without it (`available=false`), no point carries "
+            "a number yet and this is the newest date Backstop has published."
+        ),
+    )
+    error: str | None = Field(
+        default=None,
+        description="Why this account's figure could not be read. Relay it; do not guess.",
+    )
+
+    @classmethod
+    def from_dto(cls, latest: AccountLatestValueDto, *, currency: str | None) -> Self:
+        figure = latest.figure
+        if figure is None:
+            return cls(available=False, error=latest.error)
+        valued = figure.valued
+        if valued is None:
+            return cls(available=False, pending_as_of=figure.latest.date)
+        return cls(
+            available=True,
+            amount=valued.value,
+            currency=currency,
+            as_of=valued.date,
+            status=valued.value_status,
+            pending_as_of=figure.latest.date if figure.latest.date != valued.date else None,
+        )
+
+
 class AccountRowResponse(OmitNoneModel):
-    """One account: identity, owner, status, and the product when it was side-loaded."""
+    """One account: identity, owner, investor type, and open/closed status."""
 
     id: str = Field(
         description=(
@@ -228,6 +286,13 @@ class AccountRowResponse(OmitNoneModel):
     is_open: bool = Field(
         description="True when `closedDate` was absent on the account. A present null is closed."
     )
+    latest_value: LatestValueResponse | None = Field(
+        default=None,
+        description=(
+            "Only present when `include_latest_value=true` was passed on "
+            "`get_product_investors`. For any other date, use `get_time_series`."
+        ),
+    )
 
     @classmethod
     def from_record(cls, account: AccountRecordDto) -> Self:
@@ -303,8 +368,9 @@ class ProductCandidateResponse(CandidateResponse):
     )
     id: str = Field(
         description=(
-            "Backstop product id. Echo it as `product_id` on `get_product_investors`, or as "
-            "`entity_id` with `entity_type='products'` on `get_time_series` — never invent one."
+            "Backstop product id. Echo it as a `products` entry on `get_product_investors`, or "
+            "as `entity_id` with `entity_type='products'` on `get_time_series` — never invent "
+            "one."
         )
     )
     name: str | None = Field(
@@ -331,8 +397,8 @@ class ProductCandidateResponse(CandidateResponse):
 class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
-    Show each candidate's `label` to the user, then retry with that `id` as `product_id`
-    on `get_product_investors`, or as `entity_id` with `entity_type='products'` on
+    Show each candidate's `label` to the user, then retry with that `id` as a `products`
+    entry on `get_product_investors`, or as `entity_id` with `entity_type='products'` on
     `get_time_series`. Never invent one.
     """
 
@@ -340,9 +406,9 @@ class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     candidates: list[ProductCandidateResponse] = Field(
         default_factory=list,
         description=(
-            "The matching products. Show `label` to the user, then retry with that "
-            "candidate's `id` as `product_id` on `get_product_investors`, or as `entity_id` "
-            "with `entity_type='products'` on `get_time_series` — never invent one."
+            "The matching products. Show `label` to the user, then retry with the chosen "
+            "`id`s as `products` entries on `get_product_investors` (several are fine), or as "
+            "`entity_id` with `entity_type='products'` on `get_time_series` — never invent one."
         ),
     )
 

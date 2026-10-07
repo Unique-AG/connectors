@@ -17,21 +17,21 @@ from backstop_mcp.features.accounts.api_responses import ACCOUNT_LISTING_FIELDS,
 from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
-    ProductInvestorsResolvedResponse,
+    ProductListingResponse,
     ProductRefResponse,
     closed_hint,
 )
 
 
 class GetAccountsForProductQuery:
-    """Accounts in one product, with owners, and no figures."""
+    """Accounts in one product, with owners, and no figures. The tool adds investors."""
 
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
     async def run(
         self, *, product: ResolvedProductDto, include_closed: bool = False
-    ) -> ProductInvestorsResolvedResponse:
+    ) -> ProductListingResponse:
         page = await self._client.paginate(
             "/accounts",
             schema=AccountApiResource,
@@ -50,7 +50,7 @@ class GetAccountsForProductQuery:
         )
         kept = rows if include_closed else tuple(row for row in rows if row.is_open)
         closed_omitted = 0 if include_closed else len(rows) - len(kept)
-        return ProductInvestorsResolvedResponse(
+        return ProductListingResponse(
             product=ProductRefResponse.from_product(product),
             accounts=kept,
             closed_omitted=closed_omitted,

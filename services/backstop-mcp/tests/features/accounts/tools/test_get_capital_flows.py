@@ -102,10 +102,10 @@ class TestGetCapitalFlows:
                 _sub("s1"),
                 included=[
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -120,10 +120,10 @@ class TestGetCapitalFlows:
                         },
                     },
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -179,10 +179,10 @@ class TestGetCapitalFlows:
                         },
                     },
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -303,10 +303,10 @@ class TestGetCapitalFlows:
                 _sub("s2", account_id="a1"),
                 included=[
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )

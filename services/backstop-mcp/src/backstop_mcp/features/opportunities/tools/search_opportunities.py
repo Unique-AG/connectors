@@ -26,6 +26,7 @@ from backstop_mcp.models import published_output_schema
 
 logger = logging.getLogger(__name__)
 
+
 _DEFAULT_MAX_ROWS = 100
 _MAX_ROWS = 1_000
 
@@ -92,10 +93,13 @@ async def search_opportunities(
         ),
     ] = None,
     product: Annotated[
-        str | None,
+        list[str] | None,
         Field(
             description=(
-                "Client-side product name match. filter[product.name] is 400 on this collection."
+                "List of product short names (exact, e.g. NWON) or display-name substrings. "
+                "Several values are OR, so onshore and offshore can be one walk, e.g. "
+                '["NWON", "NWOF"]. Resolve names with get_product '
+                "first when unsure. filter[product.name] is 400 on this collection."
             )
         ),
     ] = None,
@@ -123,7 +127,8 @@ async def search_opportunities(
         list[SearchRowField] | None,
         Field(
             description=(
-                "Sparse row fields. Defaults to id, name, stage, is_open, dates, chips. "
+                "Sparse row fields. Defaults to id, name, stage, is_open, "
+                "expected_investment_date, investor, product. "
                 "`id` is always included. Select `url` when the answer will link to the "
                 "deals — it is off by default so a wide walk stays cheap."
             ),
@@ -135,12 +140,20 @@ async def search_opportunities(
 ) -> SearchOpportunitiesResolvedResponse:
     """Walk the firm-wide pipeline.
 
+    Never infer strategy or product from the deal name. Filter with `product`; the `product`
+    chip is on every row by default, and `mode="aggregate", group_by="product"` counts by it.
+    A short name matches exactly; a display-name substring matches every vehicle whose name
+    contains it. Several `product` values are OR.
+
     Use for coverage questions, stuck-in-stage, closing windows, and product pipeline. Pass
     `representative` as a **login** from list_system_users — a display name silently returns
     zero rows. Stage, product, and open/closed are filtered here after the walk;
     filter[stage.name], filter[product.name], and filter[isOpen] are invalid on this collection.
 
-    This walk does not return custom-field values or stage history. For those, call
+    For 'what changed stage since X', select `previous_stage` and
+    `date_entered_current_stage` and keep rows whose `date_entered_current_stage` is on or
+    after X. That covers the latest move per deal; earlier moves need get_opportunities_by_ids.
+    This walk does not return full stage history or custom-field values. For those, call
     get_opportunities_by_ids with the ids — `id` is always projected so that handoff works.
     `custom_fields_unavailable` is still set: a catalog miss here is the same miss that
     get_opportunities_by_ids would report.
@@ -151,22 +164,36 @@ async def search_opportunities(
     counting question without row bodies. Investor geography is on the `investor` chip (the
     include is a contacts resource).
 
+    For deals with no activity in 30/60/90 days, pass each distinct `investor.id` and
+    `investor.search_type` to get_last_activity_for_parties and bucket by its
+    `days_since_last_activity`. Days in stage is not activity. "Prospect" as an investor
+    status is an organization field (search_organizations), not a stage here.
+
     Call like: {"representative": "blazarus", "is_open": true}
+    Product pipeline: {"product": ["NWON", "NWOF"], "is_open": true}
+    Stage changes: {"is_open": true, "fields": ["name", "stage", "previous_stage",
+    "date_entered_current_stage", "investor"]}
     """
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
     if mode == "rows" and group_by is not None:
         raise ValueError("group_by is only used when mode is aggregate")
 
+    products = tuple(product or ())
     logger.info(
         "opportunities.search.start",
-        extra={"representative": representative, "mode": mode, "stage": stage, "product": product},
+        extra={
+            "representative": representative,
+            "mode": mode,
+            "stage": stage,
+            "product": products,
+        },
     )
     return await search_opportunities_query.run(
         representative=representative,
         is_open=is_open,
         stage=stage,
-        product=product,
+        products=products,
         mode=mode,
         group_by=group_by,
         max_rows=max_rows,

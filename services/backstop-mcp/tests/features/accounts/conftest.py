@@ -7,6 +7,7 @@ from backstop_mcp.features.accounts import (
     GetAccountsForProductQuery,
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
+    GetLatestAccountValuesQuery,
     GetProductQuery,
     GetTimeSeriesQuery,
 )
@@ -26,6 +27,10 @@ def make_get_holdings_query(client: BackstopClient) -> GetHoldingsQuery:
 
 def make_get_accounts_for_product_query(client: BackstopClient) -> GetAccountsForProductQuery:
     return GetAccountsForProductQuery(client=client)
+
+
+def make_get_latest_account_values_query(client: BackstopClient) -> GetLatestAccountValuesQuery:
+    return GetLatestAccountValuesQuery(client=client)
 
 
 def make_get_capital_flows_query(client: BackstopClient) -> GetCapitalFlowsQuery:

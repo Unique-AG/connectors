@@ -40,10 +40,11 @@ async def list_activity_tags(
 ) -> ListActivityTagsResponse:
     """List the standard Backstop activity-tag catalog.
 
-    Use when you need tag ids, names, how many activities currently carry each tag, and whether
-    a tag is shown in the Backstop UI. Instance tag names come back as data. Pass `search` to
-    keep tags whose name contains that substring. Pass refresh=true only when the user reports
-    a missing field.
+    Tag names carry prefixes (e.g. 'AT: Tail Hedging'). Search by the core term and pass
+    every matching id — do not require an exact name. Use when you need tag ids, names, how
+    many activities currently carry each tag, and whether a tag is shown in the Backstop UI.
+    Instance tag names come back as data. Pass `search` to keep tags whose name contains
+    that substring. Pass refresh=true only when the user reports a missing field.
 
     Call like: {"search": "follow"}
     """

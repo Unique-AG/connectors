@@ -30,6 +30,7 @@ from backstop_mcp.features.accounts import (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
+    get_latest_account_values_query_factory,
     get_product_query_factory,
     get_time_series_query_factory,
 )
@@ -37,6 +38,8 @@ from backstop_mcp.features.activity_history import (
     get_activity_detail_query_factory,
     get_activity_history_query_factory,
     get_activity_history_settings,
+    get_last_activity_for_parties_query_factory,
+    get_meeting_attendees_query_factory,
     get_search_activities_query_factory,
 )
 from backstop_mcp.features.activity_tags import get_activity_tags_service
@@ -82,6 +85,7 @@ from backstop_mcp.features.org_people import (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_person_query_factory,
+    get_search_organizations_query_factory,
 )
 from backstop_mcp.features.org_people_writes import (
     get_create_employment_command_factory,
@@ -130,7 +134,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_activity_history_settings,
     get_activity_detail_query_factory,
     get_activity_history_query_factory,
+    get_meeting_attendees_query_factory,
     get_search_activities_query_factory,
+    get_last_activity_for_parties_query_factory,
     get_log_activity_command_factory,
     get_log_note_command_factory,
     get_log_meeting_or_call_command_factory,
@@ -169,6 +175,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_person_query_factory,
     get_organization_query_factory,
     get_people_for_organization_query_factory,
+    get_search_organizations_query_factory,
     get_party_name_query_factory,
     get_resolve_party_query_factory,
     get_modify_contact_location_command_factory,
@@ -183,6 +190,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
+    get_latest_account_values_query_factory,
     get_product_query_factory,
     get_time_series_query_factory,
     get_build_entity_link_util_factory,

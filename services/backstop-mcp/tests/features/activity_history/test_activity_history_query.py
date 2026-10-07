@@ -424,6 +424,9 @@ class TestActivityParsing:
                 ),
             )
         )
+        respx.get(f"{BASE_URL}/meeting-or-calls/76280387/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
 
         page = await _run_stream(
             client, segment="organizations", entity_id="42", stream="call", limit=5, offset=0
@@ -846,4 +849,153 @@ class TestActivityTagFilterAndIncludes:
         assert item.regarding.resource_type == "organizations"
         assert item.regarding.search_type == "organizations"
         assert [(tag.id, tag.name) for tag in item.tags] == [("474963", "Quarterly Review")]
-        assert item.attendees == ()
+        assert item.attendees is None
+
+
+class TestAttendeeJoin:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetches_attendees_for_meetings_and_leaves_notes_absent(
+        self, client: BackstopClient
+    ) -> None:
+        _mock_party("organizations", "42")
+
+        def activities(request: httpx.Request) -> httpx.Response:
+            if request.url.params.get("filter[activityType][eq]") == "meetings":
+                return httpx.Response(
+                    200,
+                    json=collection(
+                        resource(
+                            "m1",
+                            "activities",
+                            title="One",
+                            effectiveDate="2026-01-01",
+                            specificResource={
+                                "resourceType": "meeting-or-calls",
+                                "resourceId": "111",
+                            },
+                        ),
+                        resource(
+                            "m2",
+                            "activities",
+                            title="Two",
+                            effectiveDate="2026-01-02",
+                            specificResource={
+                                "resourceType": "meeting-or-calls",
+                                "resourceId": "222",
+                            },
+                        ),
+                    ),
+                )
+            if request.url.params.get("filter[activityType][eq]") == "notes":
+                return httpx.Response(
+                    200,
+                    json=collection(
+                        resource(
+                            "n1",
+                            "activities",
+                            title="A note",
+                            effectiveDate="2026-01-03",
+                        )
+                    ),
+                )
+            raise AssertionError("unexpected activity type")
+
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(side_effect=activities)
+        first = respx.get(f"{BASE_URL}/meeting-or-calls/111/attendees").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "341763893",
+                        "people",
+                        name="Doe, Jane",
+                        companyName="Northwind Investment Advisors",
+                        jobTitle="Managing Director",
+                    )
+                ),
+            )
+        )
+        second = respx.get(f"{BASE_URL}/meeting-or-calls/222/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = await make_get_activity_history_query(client).run(
+            segment="organizations",
+            entity_id="42",
+            party=ResolvedPartyDto(id="42", search_type="organizations", name="Party"),
+            continuations={
+                "meeting": ActivityContinuationResponse(limit=10, offset=0),
+                "note": ActivityContinuationResponse(limit=10, offset=0),
+            },
+            gist_max_chars=300,
+        )
+
+        assert first.call_count == 1
+        assert second.call_count == 1
+        meetings = result.groups["meeting"].items
+        assert len(meetings) == 2
+        assert isinstance(meetings[0], ActivityRecordResponse)
+        assert meetings[0].attendees is not None
+        assert [(item.name, item.company, item.job_title) for item in meetings[0].attendees] == [
+            ("Doe, Jane", "Northwind Investment Advisors", "Managing Director")
+        ]
+        assert isinstance(meetings[1], ActivityRecordResponse)
+        assert meetings[1].attendees == ()
+        note = result.groups["note"].items[0]
+        assert isinstance(note, ActivityRecordResponse)
+        assert note.attendees is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_failed_attendee_fetch_leaves_that_row_absent(
+        self, client: BackstopClient
+    ) -> None:
+        _mock_party("organizations", "42")
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource(
+                        "m1",
+                        "activities",
+                        title="One",
+                        effectiveDate="2026-01-01",
+                        specificResource={
+                            "resourceType": "meeting-or-calls",
+                            "resourceId": "111",
+                        },
+                    ),
+                    resource(
+                        "m2",
+                        "activities",
+                        title="Two",
+                        effectiveDate="2026-01-02",
+                        specificResource={
+                            "resourceType": "meeting-or-calls",
+                            "resourceId": "222",
+                        },
+                    ),
+                ),
+            )
+        )
+        respx.get(f"{BASE_URL}/meeting-or-calls/111/attendees").mock(
+            return_value=httpx.Response(500, json={"errors": [{"title": "down"}]})
+        )
+        respx.get(f"{BASE_URL}/meeting-or-calls/222/attendees").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("1", "people", name="Lucas, Margaret")),
+            )
+        )
+
+        page = await _run_stream(
+            client, segment="organizations", entity_id="42", stream="meeting", limit=10, offset=0
+        )
+
+        assert len(page.items) == 2
+        assert isinstance(page.items[0], ActivityRecordResponse)
+        assert page.items[0].attendees is None
+        assert isinstance(page.items[1], ActivityRecordResponse)
+        assert page.items[1].attendees is not None
+        assert page.items[1].attendees[0].name == "Lucas, Margaret"
