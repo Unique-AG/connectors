@@ -47,7 +47,13 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "draft_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }
 
-_DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "isDraft")
+_DRAFT_FIELDS: tuple[str, ...] = (
+    "toRecipients",
+    "ccRecipients",
+    "bccRecipients",
+    "subject",
+    "isDraft",
+)
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
@@ -104,6 +110,7 @@ class MailSent(BaseModel):
 SEND = "send"
 _DO_NOT_SEND = "do not send"
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
+_NO_ADDRESS = "an address Microsoft did not record"
 
 type _Confirm = Callable[[Message, str | None], Awaitable[Confirmed]]
 
@@ -113,9 +120,12 @@ def a_person_agrees(ctx: Context) -> _Confirm:
 
     async def asked(draft: Message, mailbox: str | None) -> Confirmed:
         everyone = [
-            one.address or one.name or "an address Microsoft did not record"
+            one.address or one.name or _NO_ADDRESS
             for one in MailAddress.each_of(draft.to_recipients)
             + MailAddress.each_of(draft.cc_recipients)
+        ] + [
+            f"{one.address or one.name or _NO_ADDRESS} (blind copy)"
+            for one in MailAddress.each_of(draft.bcc_recipients)
         ]
         identity = f" as {mailbox}" if mailbox is not None else ""
         question = (

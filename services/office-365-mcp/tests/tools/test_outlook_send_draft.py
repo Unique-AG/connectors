@@ -24,7 +24,9 @@ from mcp.types import (
     InputResponse,
 )
 from mcp.types.version import LATEST_MODERN_VERSION
+from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.message import Message
+from msgraph.generated.models.recipient import Recipient
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -84,6 +86,28 @@ async def _agrees(draft: Message, mailbox: str | None) -> Confirmed:
     assert draft is not None
     assert mailbox is None or mailbox
     return None
+
+
+def _recipients(*addresses: str) -> list[Recipient]:
+    return [Recipient(email_address=EmailAddress(address=one)) for one in addresses]
+
+
+async def _question_about(draft: Message) -> str:
+    asked: list[str] = []
+
+    class _Client:
+        request_context: object = None
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            asked.append(message)
+            assert response_type is not None
+            return AcceptedElicitation(data=sender.SEND)
+
+    confirm = a_person_agrees(cast("Context", cast("object", _Client())))
+    _ = await confirm(draft, None)
+
+    assert len(asked) == 1
+    return asked[0]
 
 
 async def _never_asked(draft: Message, mailbox: str | None) -> Confirmed:
@@ -249,6 +273,30 @@ class TestHowTheQuestionReachesAPerson:
 
         assert len(asked) == 1
         assert "alex@example.invalid" in asked[0]
+
+    async def test_the_question_text_names_each_blind_copy_recipient_as_one(self) -> None:
+        question = await _question_about(
+            Message(
+                subject="Invoice 4471",
+                to_recipients=_recipients(_ADA),
+                cc_recipients=_recipients(_GRACE),
+                bcc_recipients=_recipients(_PAM),
+            )
+        )
+
+        assert _ADA in question
+        assert _GRACE in question
+        assert f"{_PAM} (blind copy)" in question
+
+    async def test_a_draft_with_only_a_blind_copy_recipient_is_not_described_as_going_nowhere(
+        self,
+    ) -> None:
+        question = await _question_about(
+            Message(subject="Invoice 4471", bcc_recipients=_recipients(_PAM))
+        )
+
+        assert f"{_PAM} (blind copy)" in question
+        assert "nobody" not in question
 
     async def test_the_question_text_names_no_mailbox_when_sending_as_the_signed_in_user(
         self,
@@ -480,6 +528,7 @@ class TestWhatItAsksGraphFor:
         selected = read.calls.last.request.url.params["$select"]
         assert "toRecipients" in selected
         assert "ccRecipients" in selected
+        assert "bccRecipients" in selected
         assert "subject" in selected
         assert "isDraft" in selected
 
