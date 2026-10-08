@@ -49,11 +49,14 @@ class GetIntentionsQuery:
             updated_since=updated_since,
         )
         details = await asyncio.gather(*(self._fetch_intention(entry.id) for entry in listed))
+        refusals = [error for _, error in details if error is not None]
+        if listed and len(refusals) == len(listed):
+            raise refusals[0]
         intentions = [
-            IntentionResponse.from_attributes(detail)
-            if detail
+            IntentionResponse.from_attributes(record)
+            if record is not None
             else IntentionResponse.from_listing(listed[index])
-            for index, detail in enumerate(details)
+            for index, (record, _) in enumerate(details)
         ]
         response = InvestorIntentionsResponse(
             investor_id=investor.id,
@@ -70,11 +73,15 @@ class GetIntentionsQuery:
         )
         return response
 
-    async def _fetch_intention(self, intention_id: int) -> IntentionExtendedAttributes | None:
+    async def _fetch_intention(
+        self, intention_id: int
+    ) -> tuple[IntentionExtendedAttributes | None, NotEntitled | None]:
         try:
-            return await self._client.get_json(f"/v3/intentions/{intention_id}", _INTENTION)
-        except NotEntitled, NotFound:
-            return None
+            return await self._client.get_json(f"/v3/intentions/{intention_id}", _INTENTION), None
+        except NotFound:
+            return None, None
+        except NotEntitled as error:
+            return None, error
 
     async def _list_intentions(
         self,

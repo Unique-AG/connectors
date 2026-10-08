@@ -76,6 +76,21 @@ class TestEntitlement:
         assert "add-on" in result.hint
 
     @respx.mock
+    async def test_a_refused_detail_is_the_add_on_not_an_empty_row(self) -> None:
+        respx.get(f"{BASE_URL}/v3/intentions").mock(
+            return_value=httpx.Response(
+                200, json=page_body([{"id": 7, "date": "2026-06-01"}], total=1)
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/intentions/7").mock(return_value=httpx.Response(403))
+        _mock_investor()
+        client, _ = build_client()
+        result = await get_intentions(investor_id=2504, client=client)
+        assert isinstance(result, InvestorNotEntitledResponse)
+        assert result.hint is not None
+        assert "add-on" in result.hint
+
+    @respx.mock
     async def test_an_empty_page_stays_an_empty_list(self) -> None:
         respx.get(f"{BASE_URL}/v3/intentions").mock(
             return_value=httpx.Response(200, json=page_body([], total=0))
