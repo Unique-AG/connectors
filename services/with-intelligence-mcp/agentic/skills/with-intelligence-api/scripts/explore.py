@@ -1,12 +1,21 @@
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#   "httpx==0.28.1",
+#   "pydantic==2.13.5",
+#   "python-dotenv==1.2.3",
+# ]
+# ///
+
 """GET-only CLI for the live With Intelligence v3 API. Loads .env from this directory.
 
-Run from services/with-intelligence-mcp so `uv run` supplies httpx:
+Run from this skill's directory (the folder that contains SKILL.md):
 
-    uv run python agentic/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
+    uv run scripts/explore.py /v3/investors/2504
 
 Signs in once, caches the access token for its hour, and caches responses under `.probe-cache/`
 so a recorded body can become a test fixture. The only POST it makes is `/v3/auth/sign-in`.
-Read `agentic/skills/with-intelligence-api/SKILL.md` first.
+Read SKILL.md in the parent directory first.
 """
 
 from __future__ import annotations

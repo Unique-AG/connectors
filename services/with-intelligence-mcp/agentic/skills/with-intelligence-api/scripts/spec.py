@@ -1,10 +1,18 @@
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#   "httpx==0.28.1",
+#   "pydantic==2.13.5",
+# ]
+# ///
+
 """Query the public With Intelligence OpenAPI spec. No credentials needed.
 
-Run from services/with-intelligence-mcp so `uv run` supplies httpx:
+Run from this skill's directory (the folder that contains SKILL.md):
 
-    uv run python agentic/skills/with-intelligence-api/scripts/spec.py paths [filter]
-    uv run python agentic/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
-    uv run python agentic/skills/with-intelligence-api/scripts/spec.py snapshot
+    uv run scripts/spec.py paths [filter]
+    uv run scripts/spec.py schema InvestorExtended
+    uv run scripts/spec.py snapshot
 
 Output is tab-separated. `snapshot` refreshes that service's tests/spec/wi_schemas.json.
 
