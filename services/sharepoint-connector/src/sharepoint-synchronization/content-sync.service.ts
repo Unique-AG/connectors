@@ -18,6 +18,7 @@ import { buildFileDiffKey, getItemUrl, SUBSITE_KEY_SEPARATOR } from '../utils/sh
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { MoveUpdatedFilesToExpectedScopeCommand } from './move-updated-files-to-expected-scope.command';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -30,6 +31,7 @@ export class ContentSyncService {
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
+    private readonly moveUpdatedFilesToExpectedScopeCommand: MoveUpdatedFilesToExpectedScopeCommand,
     private readonly scopeManagementService: ScopeManagementService,
     @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
     @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
@@ -103,8 +105,20 @@ export class ContentSyncService {
       return;
     }
 
+    // A file that was edited and moved is reported only as updated. Move it into the scope for
+    // its new path before upsert, and leave failed moves out of this cycle.
+    const keysToLeaveOut = await this.moveUpdatedFilesToExpectedScopeCommand.execute({
+      updatedFileKeys: Array.from(updatedFileKeys),
+      items,
+      scopes,
+      context,
+    });
+
     const newItems = items.filter((item) => newFileKeys.has(buildFileDiffKey(item)));
-    const updatedItems = items.filter((item) => updatedFileKeys.has(buildFileDiffKey(item)));
+    const updatedItems = items.filter((item) => {
+      const key = buildFileDiffKey(item);
+      return updatedFileKeys.has(key) && !keysToLeaveOut.has(key);
+    });
 
     const getScopeIdForItem = (item: SharepointContentItem): string => {
       const rootScopeId = context.rootScopeId;
