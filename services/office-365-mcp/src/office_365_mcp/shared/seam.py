@@ -100,6 +100,8 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
+        "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite",
@@ -297,6 +299,7 @@ class ToolAdvice:
     permissions: tuple[str, ...]
     not_found: str | None = None
     shown_by: tuple[str, ...] = ()
+    forbidden: str | None = None
 
 
 _NARROWED_PERMISSIONS = "office_365_mcp.narrowed_permissions"
@@ -358,6 +361,7 @@ class GraphAdviceMiddleware(Middleware):
                         known.not_found,
                         repeatable=repeatable,
                         shown_by=known.shown_by,
+                        forbidden=known.forbidden,
                     )
                 )
         return None
@@ -451,9 +455,15 @@ def _advice(
     *,
     repeatable: bool,
     shown_by: tuple[str, ...] = (),
+    forbidden: str | None = None,
 ) -> str:
     return _remedy(
-        failure, permissions, not_found, repeatable=repeatable, shown_by=shown_by
+        failure,
+        permissions,
+        not_found,
+        repeatable=repeatable,
+        shown_by=shown_by,
+        forbidden=forbidden,
     ) + _diagnostics(failure)
 
 
@@ -464,6 +474,7 @@ def _remedy(
     *,
     repeatable: bool,
     shown_by: tuple[str, ...],
+    forbidden: str | None,
 ) -> str:
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
@@ -492,6 +503,8 @@ def _remedy(
             )
         if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
             return _TRANSCRIPTS_SWITCHED_OFF
+        if forbidden is not None:
+            return forbidden
         named = _named(permissions)
         noun = "permissions" if len(permissions) > 1 else "permission"
         return (

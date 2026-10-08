@@ -595,6 +595,49 @@ class TestOnenoteContainerHandle:
         assert handles.onenote_container_handle(uri) is None
 
 
+_DRIVE_ID = "b!SYNTHETICDRIVE0000"
+_DRIVE_ITEM_ID = "01SYNTHETICITEM0000"
+
+
+class TestDriveItemHandle:
+    def test_a_file_uri_parses_as_a_file_handle(self) -> None:
+        file = handles.DriveFileHandle(_DRIVE_ID, _DRIVE_ITEM_ID)
+
+        assert handles.drive_item_handle(file.uri) == file
+
+    def test_a_folder_uri_parses_as_a_folder_handle(self) -> None:
+        folder = handles.DriveFolderHandle(_DRIVE_ID, _DRIVE_ITEM_ID)
+
+        assert handles.drive_item_handle(folder.uri) == folder
+
+    def test_ids_that_carry_separators_survive_the_round_trip(self) -> None:
+        folder = handles.DriveFolderHandle("b!drive/with?marks", "01#item/0000")
+
+        assert handles.drive_item_handle(folder.uri) == folder
+
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            handles.OnenoteSectionHandle(_ONENOTE_SECTION_ID).uri,
+            handles.MailMessageHandle(_MAIL_ID).uri,
+            _CHAT_URI,
+            "drive:///items/b%21SYNTHETICDRIVE0000/01SYNTHETICITEM0000",
+            "sharepoint:///items/b%21SYNTHETICDRIVE0000/01SYNTHETICITEM0000",
+            _DRIVE_ITEM_ID,
+            _DRIVE_ID,
+            "sharepoint:///files/01SYNTHETICITEM0000",
+            "sharepoint:///files/b%21SYNTHETICDRIVE0000/Reports/Q1.docx",
+            "sharepoint:///folders/b!SYNTHETICDRIVE0000/Reports/2026",
+            "sharepoint:///folders/%20/01SYNTHETICITEM0000",
+            "sharepoint:///files/b%21SYNTHETICDRIVE0000/",
+            "https://contoso.sharepoint.invalid/sites/finance/Shared%20Documents/Q1.docx",
+            "",
+        ],
+    )
+    def test_it_refuses_everything_that_is_neither(self, uri: str) -> None:
+        assert handles.drive_item_handle(uri) is None
+
+
 type _OnenoteHandle = (
     handles.OnenoteSectionHandle
     | handles.OnenotePageHandle

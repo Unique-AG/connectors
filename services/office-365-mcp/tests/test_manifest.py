@@ -24,6 +24,8 @@ _VERSION = "9.9.9"
 _SECOND = "second_tool"
 _THIRD = "third_tool"
 
+_NO_VERDICT = "Synthetic.NoVerdict.All"
+
 
 @pytest.fixture
 def registry_of_three(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
@@ -246,9 +248,13 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
 class TestTheManifestRefusesToGuess:
     async def test_a_permission_with_no_verdict_is_an_assertion_and_not_a_shrug(self) -> None:
+        assert _NO_VERDICT not in NEEDS_ADMIN_CONSENT
+        assert _NO_VERDICT not in REQUESTABLE_PERMISSIONS
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON,), permissions=("Sites.Read.All",), graph_scopes=()
+            preset=None, tools=(ALWAYS_ON,), permissions=(_NO_VERDICT,), graph_scopes=()
         )
 
-        with pytest.raises(AssertionError, match="no admin-consent verdict for Sites.Read.All"):
+        with pytest.raises(
+            AssertionError, match=f"no admin-consent verdict for {re.escape(_NO_VERDICT)}"
+        ):
             await _manifest_of(selection)

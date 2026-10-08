@@ -38,6 +38,8 @@ mock_provider "azuread" {
         "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
+        "Files.ReadWrite.All"              = "c2222222-2222-2222-2222-222222222222"
+        "Sites.Read.All"                   = "c3333333-3333-3333-3333-333333333333"
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
@@ -358,6 +360,54 @@ run "preset_sharepoint_read" {
   assert {
     condition     = local.admin_consent == ["Files.Read.All"]
     error_message = "reading a file costs no permission beyond the one the search already needs; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_write" {
+  variables {
+    tools_preset = "sharepoint-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "Files.ReadWrite.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_share" {
+  variables {
+    tools_preset = "sharepoint-share"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-share composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_sites" {
+  variables {
+    tools_preset = "sharepoint-sites"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Sites.Read.All"
+    error_message = "sharepoint-sites composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Sites.Read.All"]
+    error_message = "Sites.Read.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 

@@ -3,6 +3,11 @@
 This package knows nothing about Teams, mail, calendars, or the service config.
 """
 
+from office_365_mcp.graph_client.adapter import (
+    request_with_json_body,
+    send_no_response_content,
+    send_parsed,
+)
 from office_365_mcp.graph_client.client import (
     FetchedResponse,
     TypedQueryParameters,
@@ -75,5 +80,8 @@ __all__ = [
     "native_response",
     "no_retry",
     "not_graph",
+    "request_with_json_body",
     "request_with_query",
+    "send_no_response_content",
+    "send_parsed",
 ]
