@@ -1,6 +1,7 @@
 import ast
 import logging
 import pathlib
+import re
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
 from importlib import import_module
 from types import ModuleType
@@ -24,13 +25,14 @@ from starlette.applications import Starlette
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden
-from office_365_mcp.shared.handles import onenote_page_handle
+from office_365_mcp.shared.handles import message_handle, onenote_page_handle
 from office_365_mcp.shared.seam import (
     Advised,
     GraphAdviceMiddleware,
     ToolAdvice,
 )
 from office_365_mcp.tools import (
+    PRESETS,
     TOOL_NAMES,
     GraphCallExample,
     Selection,
@@ -39,6 +41,7 @@ from office_365_mcp.tools import (
     onenote_append_to_page,
     onenote_edit_page,
     onenote_rename_page,
+    register_tools,
     resolve,
 )
 
@@ -87,8 +90,25 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "sharepoint_create_folder",
         "sharepoint_create_text_file",
         "sharepoint_invite",
+        "teams_add_chat_member",
+        "teams_create_chat",
+        "teams_delete_meeting",
+        "teams_delete_message",
+        "teams_react_to_message",
+        "teams_remove_chat_member",
         "teams_send_channel_message",
+        "teams_send_channel_message_with_files",
         "teams_send_chat_message",
+        "teams_send_chat_message_with_files",
+    }
+)
+
+_WRITES_THAT_NOTHING_SHOWS_IN_A_PRESET_ON_PURPOSE: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("teams-write", "teams_send_channel_message"),
+        ("teams-write-files", "teams_send_channel_message"),
+        ("teams-write-files", "teams_send_channel_message_with_files"),
+        ("sharepoint-share", "sharepoint_invite"),
     }
 )
 
@@ -143,6 +163,21 @@ _WRITES_THEN_REREADS: tuple[str, ...] = (
     onenote_rename_page.TOOL_NAME,
 )
 _WRITTEN_BUT_UNREAD = "Then this connector did not receive the updated page from Microsoft 365."
+
+_SIGNED_IN_USER = {"id": "00000000-0000-4000-8000-000000000001", "displayName": "Ada Lovelace"}
+_FROM_ANOTHER_PERSON = {
+    "id": "1770000000000",
+    "messageType": "message",
+    "from": {
+        "user": {
+            "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+            "id": "00000000-0000-4000-8000-000000000002",
+            "displayName": "Grace Hopper",
+        }
+    },
+    "body": {"contentType": "text", "content": "Ship it Friday."},
+}
+_NOT_THE_SENDER = "Microsoft 365 does not name the signed-in user as the sender of this message."
 
 
 class _StubOboCredential:
@@ -498,6 +533,38 @@ def _raised_from_a_graph_failure(path: pathlib.Path) -> Iterator[tuple[int, tupl
                 yield node.lineno, _named(node.exc.func, module)
 
 
+class TestARefusalBeforeTheQuestion:
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        ("tool", "verb"),
+        [("teams_edit_message", "changes"), ("teams_delete_message", "deletes")],
+    )
+    async def test_a_message_from_another_person_is_refused_in_the_tools_own_words(
+        self, agreeing_client: Client[FastMCPTransport], tool: str, verb: str
+    ) -> None:
+        example = _EVERY_REGISTERED_TOOL[tool]
+        handle = message_handle(str(example.arguments["uri"]))
+        assert handle is not None, f"{tool}'s own call example names no message"
+        assert handle.chat_id is not None, f"{tool}'s own call example names no chat"
+
+        with respx.mock(base_url=GRAPH_V1, assert_all_called=False) as graph:
+            _ = graph.get(f"{_CHAT_MESSAGES}/{handle.message_id}").mock(
+                return_value=httpx.Response(200, json=_FROM_ANOTHER_PERSON)
+            )
+            _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_SIGNED_IN_USER))
+            written = graph.route(method__in=["PATCH", "POST", "DELETE"]).mock(
+                return_value=httpx.Response(204)
+            )
+            with pytest.raises(ToolError) as raised:
+                _ = await agreeing_client.call_tool(tool, dict(example.arguments))
+
+        message = str(raised.value)
+        assert _NOT_THE_SENDER in message, message
+        assert f"This tool {verb} only a message that the signed-in user sent." in message
+        assert "administrator" not in message, message
+        assert written.call_count == 0, f"{tool} wrote to a message that another person sent"
+
+
 class TestAToolsOwnWordsForALandedWrite:
     @pytest.mark.usefixtures("obo", "retry_sleeps")
     @pytest.mark.parametrize("status", [404, 503])
@@ -548,6 +615,27 @@ class TestAToolsOwnWordsForALandedWrite:
             "GraphAdviceMiddleware replaces a ToolError chained to a Graph failure with its "
             + f"generic advice. Raise Advised instead at {reworded}"
         )
+
+
+async def _registered_descriptions(selection: Selection) -> dict[str, str]:
+    server: FastMCP = FastMCP("descriptions-under-test", version="0")
+    async with httpx.AsyncClient() as transport:
+        register_tools(server, transport, selection)
+        return {tool.name: tool.description or "" for tool in await server.list_tools()}
+
+
+def _tools_named_by_the_retry_advice(description: str) -> set[str]:
+    bullets = [
+        line
+        for line in description.partition("Notes:")[2].splitlines()
+        if line.startswith("- ") and "times out" in line
+    ]
+    return {
+        name
+        for name in TOOL_NAMES
+        for bullet in bullets
+        if re.search(rf"\b{re.escape(name)}\b", bullet)
+    }
 
 
 class TestAWriteThatFailsCanAlreadyBeDone:
@@ -644,6 +732,38 @@ class TestAWriteThatFailsCanAlreadyBeDone:
 
         assert _EVERY_ADVICE[channel].shown_by == ("teams_browse_channel",)
         assert graph_advice(resolve(preset="teams-write", enabled=None))[channel].shown_by == ()
+
+    async def test_a_retry_bullet_that_names_a_tool_is_in_the_registered_descriptions(self) -> None:
+        descriptions = await _registered_descriptions(resolve(preset=None, enabled=TOOL_NAMES))
+
+        assert any(_tools_named_by_the_retry_advice(text) for text in descriptions.values())
+
+    @pytest.mark.parametrize("preset", list(PRESETS))
+    async def test_the_retry_advice_of_a_tool_names_only_tools_that_its_preset_registers(
+        self, preset: str
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        descriptions = await _registered_descriptions(selection)
+
+        unregistered = {
+            tool: sorted(named)
+            for tool, text in descriptions.items()
+            if (named := _tools_named_by_the_retry_advice(text) - set(selection.tools))
+        }
+
+        assert not unregistered, f"{preset} sends the model to tools it lacks: {unregistered}"
+
+    def test_a_write_shows_its_change_in_every_preset_but_the_ones_named_on_purpose(
+        self,
+    ) -> None:
+        shown_by_nothing = {
+            (preset, tool)
+            for preset in PRESETS
+            for tool, advice in graph_advice(resolve(preset=preset, enabled=None)).items()
+            if tool in _A_REPEAT_CAN_WRITE_TWICE and not advice.shown_by
+        }
+
+        assert shown_by_nothing == _WRITES_THAT_NOTHING_SHOWS_IN_A_PRESET_ON_PURPOSE
 
     @pytest.mark.usefixtures("obo", "retry_sleeps")
     @pytest.mark.parametrize("tool", TOOL_NAMES)

@@ -4,6 +4,7 @@ The families are separate because the tools and the permissions behind them are,
 assertions are the ones that matter. Every id below is invented.
 """
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -48,11 +49,6 @@ _REPLY_HANDLE = handles.MessageHandle(
 
 
 class TestTheMessageHandleGrammar:
-    """`teams_search_messages` mints two of these, `teams_browse_channel` the third, and
-    `teams_read_message` reads
-    all three back. The grammar is neither tool's: a handle one mints and another 404s on does not
-    look like a disagreement."""
-
     def test_it_reads_the_two_shapes_search_emits_and_decodes_their_ids(self) -> None:
         chat = handles.message_handle(_CHAT_URI)
         channel = handles.message_handle(_CHANNEL_URI)
@@ -60,10 +56,7 @@ class TestTheMessageHandleGrammar:
         assert chat == _CHAT_HANDLE
         assert channel == _CHANNEL_HANDLE
 
-    def test_it_reads_the_reply_shape_that_only_browsing_a_channel_can_mint(self) -> None:
-        """Graph addresses a channel reply under the post it answers, and the search projection
-        carries no `replyToId`, so a search hit on a reply degrades to the unreadable root-post
-        shape; only `teams_browse_channel`, walking post by post, knows each reply's parent."""
+    def test_it_reads_the_reply_shape_that_a_search_cannot_mint(self) -> None:
         reply = handles.message_handle(_REPLY_URI)
 
         assert reply == _REPLY_HANDLE
@@ -115,6 +108,60 @@ class TestTheMessageHandleGrammar:
     )
     def test_it_refuses_everything_else(self, uri: str) -> None:
         assert handles.message_handle(uri) is None
+
+
+_MESSAGE_SHAPES = (
+    "teams:///chats/{chat_id}/messages/{message_id}",
+    "teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}",
+    "teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}",
+)
+
+_FAILS_THE_SAME_WAY = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
+
+
+class TestTheRefusalOfAValueThatIsNotAMessageHandle:
+    def test_it_names_the_tool_first(self) -> None:
+        refusal = handles.not_a_message_handle("teams_react_to_message", "No reaction was changed.")
+
+        assert refusal.startswith(
+            "teams_react_to_message takes the `uri` handle of a Teams message from another Teams "
+            + "tool, and this value is not one."
+        )
+
+    def test_it_shows_each_shape_on_its_own_line_and_the_example(self) -> None:
+        refusal = handles.not_a_message_handle("teams_read_message", "")
+
+        lines = refusal.splitlines()
+        assert [line.strip() for line in lines if line.startswith("  ")] == list(_MESSAGE_SHAPES)
+        assert f"for example {_CHAT_URI}." in refusal
+
+    def test_every_shape_it_shows_is_one_the_parser_reads(self) -> None:
+        refusal = handles.not_a_message_handle("teams_read_message", "")
+
+        shown = [line.strip() for line in refusal.splitlines() if line.startswith("  teams:///")]
+        assert len(shown) == 3
+        assert all(
+            handles.message_handle(re.sub(r"\{\w+\}", "1770000000000", shape)) is not None
+            for shape in shown
+        )
+        assert handles.message_handle(_CHAT_URI) == _CHAT_HANDLE
+
+    def test_the_outcome_comes_just_before_the_closing_sentence(self) -> None:
+        refusal = handles.not_a_message_handle("teams_react_to_message", "No reaction was changed.")
+
+        assert refusal.endswith(
+            "Copy the `uri` of a tool result word for word. No reaction was changed. "
+            + _FAILS_THE_SAME_WAY
+        )
+
+    def test_an_empty_outcome_leaves_no_gap(self) -> None:
+        refusal = handles.not_a_message_handle("teams_read_message", "")
+
+        assert refusal.endswith(
+            "Copy the `uri` of a tool result word for word. " + _FAILS_THE_SAME_WAY
+        )
 
 
 class TestTheHandleGrammar:

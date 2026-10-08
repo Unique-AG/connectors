@@ -11,14 +11,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 71 tools in total. A
-deployment turns on a fixed subset of these 71 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 88 tools in total. A
+deployment turns on a fixed subset of these 88 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 71 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 88 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -38,17 +38,34 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. |
+| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. Each chat shows a preview of its last message, the sender, and whether the user read it. An unnamed chat also shows its members, each with a user id. |
+| `teams_list_chat_messages` | Read | `Chat.Read` | No | The newest messages of one Teams chat, newest first, by the `chat_id` that `teams_list_chats` reported. Each message has a handle that `teams_read_message` accepts. |
+| `teams_list_chat_members` | Read | `Chat.Read` | No | The members of one Teams chat, by the `chat_id` that `teams_list_chats` reported. Each member has a user id, a display name, an email address, and roles. The tool reads one page, and `more_members` is true when the chat has more. |
 | `teams_list_my_teams` | Read | `Team.ReadBasic.All` | No | The teams that the signed-in user is a member of. |
 | `teams_list_channels` | Read | `Channel.ReadBasic.All` | No | The channels of one team that the signed-in user can access. |
+| `teams_get_channel_files_folder` | Read | `Files.Read.All` | No | The SharePoint folder that holds the files of one Teams channel. The answer is the folder and not its contents. `sharepoint_browse_folder` lists what the folder holds. |
 | `teams_browse_channel` | Read | `ChannelMessage.Read.All` | Yes | One Teams channel's posts, with their replies. |
+| `teams_list_message_replies` | Read | `ChannelMessage.Read.All` | Yes | The replies to one Teams channel post, oldest first, by the `uri` of that post. The tool reads at most 50 replies, and `more_replies` is true when the list is not the whole thread. |
 | `teams_search_messages` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | A full-text search across every Teams message, in chats and channels, that the signed-in user can see. |
 | `teams_read_message` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | One Microsoft Teams message in full, from a handle that another tool minted. |
 | `teams_list_meeting_transcripts` | Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
 | `teams_read_transcript` | Read | `OnlineMeetingTranscript.Read.All` | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
 | `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
-| `teams_send_chat_message` | Write, adds | `ChatMessage.Send` | No | Posts one plain-text message to an existing Teams chat, after the user approves it. |
-| `teams_send_channel_message` | Write, adds | `ChannelMessage.Send` | No | Posts one plain-text message to an existing Teams channel, after the user approves it. |
+| `teams_read_meeting` | Read | `OnlineMeetings.Read`, `OnlineMeetingArtifact.Read.All`, `User.Read` | No | One Teams meeting of the signed-in user, from the `meeting_uri` that `teams_list_chats` or `teams_create_meeting` reports, with its attendance reports. The answer names who attended the newest session, and for how long. Microsoft Graph gives attendance reports to the meeting organizer only. For any other user, the answer has the meeting details and the status `not_organizer`, with no attendance. |
+| `teams_send_chat_message` | Write, adds | `ChatMessage.Send`, `Chat.Read` | No | Posts one message to an existing Teams chat, after the user approves it. The `message` text is plain text. The message can @mention people, can have a subject, and can have an importance of `normal`, `high`, or `urgent`. The tool reads the members of the chat. It refuses a mention of a person that is not a member of the chat. The question shows the Microsoft Entra object id of each mentioned member. The question and the message show the name that Microsoft 365 gives that member. |
+| `teams_send_channel_message` | Write, adds | `ChannelMessage.Send` | No | Posts one message to an existing Teams channel, after the user approves it. The message can @mention people, can have a subject, and can have an importance of `normal` or `high`. With `reply_to_id`, the tool replies in the thread of an existing post. The tool refuses a `subject` together with `reply_to_id`. The question shows the Microsoft Entra object id of each mentioned person. The name of a mention is only a label from the request, and the message shows that label. |
+| `teams_send_chat_message_with_files` | Write, adds | `ChatMessage.Send`, `Files.Read.All`, `Chat.Read` | No | Posts one message to an existing Teams chat, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_chat_message` posts a message with no file. The message can @mention a member of the chat, and the tool reads the members of the chat. The question shows the Microsoft Entra object id of each mentioned member. The question and the message show the name that Microsoft 365 gives that member. |
+| `teams_send_channel_message_with_files` | Write, adds | `ChannelMessage.Send`, `Files.Read.All` | No | Posts one message to an existing Teams channel, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_channel_message` posts a message with no file. The message can @mention people. The question shows the Microsoft Entra object id of each mentioned person. The name of a mention is only a label from the request, and the message shows that label. |
+| `teams_react_to_message` | Write, changes or removes | `ChatMessage.Send`, `ChannelMessage.Send`, `Chat.Read`, `Channel.ReadBasic.All`, `Team.ReadBasic.All` | No | Adds or removes one reaction on one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of a chat message, or the channel and the team of a channel message. |
+| `teams_edit_message` | Write, changes or removes, safe to repeat | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | Yes | Replaces all of the text of one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. The tool changes only a message that the signed-in user sent. It refuses any other message before it asks. The new text can @mention people. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of the message, and the attachments that the change can remove. The question shows the Microsoft Entra object id of each mentioned person. For a chat message, the tool reads the members of the chat. It refuses a mention of a person that is not a member of the chat. The question and the message show the name that Microsoft 365 gives that member. For a channel message, the name of a mention is only a label from the request, and the message shows that label. |
+| `teams_delete_message` | Write, changes or removes | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | Yes | Deletes one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. This is a soft delete, and Teams shows the message as deleted. This connector cannot restore a deleted message. The tool changes only a message that the signed-in user sent. It refuses any other message before it asks. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of the message. |
+| `teams_create_meeting` | Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | Creates one Teams online meeting as the signed-in user, with the attendees that the user names. The meeting is on no calendar, and the tool sends no invitation. A repeat of the same request returns the same meeting. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each attendee. The name in the question is only a label. |
+| `teams_update_meeting` | Write, changes or removes, safe to repeat | `OnlineMeetings.ReadWrite`, `User.Read` | No | Changes the subject, the time, or the attendee list of one Teams online meeting that the signed-in user organizes. The change goes to the Teams online meeting only, and never to a calendar event. A new attendee list replaces the current list. An empty list removes every attendee. An invitee without a Microsoft Entra id cannot stay on a new list. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each person on the new list. The name of that person in the question is only a label. The question also names each person that the change removes. |
+| `teams_delete_meeting` | Write, changes or removes | `OnlineMeetings.ReadWrite`, `User.Read` | No | Deletes one Teams online meeting that the signed-in user organizes. The tool deletes only the Teams online meeting, and never a calendar event. This connector cannot restore a deleted meeting. The tool asks the user to approve each change. |
+| `teams_create_chat` | Write, adds | `Chat.Create`, `User.Read` | No | Creates one Teams chat, one-to-one or group, for the signed-in user and the people that the user names. Each person has a Microsoft Entra id and a name, and the tool sends only the id to Microsoft 365. The tool adds the signed-in user to the chat, and it posts no message. If the one-to-one chat exists already, Microsoft returns that chat and creates no new chat. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each person. The name in the question is only a label. |
+| `teams_add_chat_member` | Write, adds | `ChatMember.ReadWrite`, `Chat.Read` | Yes | Adds one person to an existing Teams chat, as the signed-in user, with the `owner` role. The person has a Microsoft Entra id and a name, and the tool sends only the id to Microsoft 365. Microsoft accepts no in-tenant guest as an owner. With `share_history`, the new member can see all earlier messages of the chat. Microsoft refuses an addition to a one-to-one chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of the person. The name of the person in the question is only a label. The question names the chat by its topic, or by its members when the chat has no topic. |
+| `teams_remove_chat_member` | Write, changes or removes | `ChatMember.ReadWrite`, `Chat.Read` | Yes | Removes one member from an existing Teams chat, as the signed-in user, by the `membership_id` that `teams_list_chat_members` reported. Microsoft refuses a removal from a one-to-one chat. Everyone in the conversation can see the change. The tool reads the member first, and it refuses a member that Microsoft 365 does not find. The tool asks the user to approve each change. The question gives the name and the email address of the member, as Microsoft 365 holds them. It also names the chat, by its topic or, when the chat has no topic, by its other members. |
+| `teams_rename_chat` | Write, changes or removes, safe to repeat | `Chat.ReadWrite` | No | Changes the topic of one Teams group chat, as the signed-in user. The topic is the title of the chat. Microsoft 365 accepts a new topic only for a group chat, never for a one-to-one chat or a meeting chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. |
 
 ### Outlook mail
 
@@ -154,7 +171,7 @@ model to ask the user to get access.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 24 named bundles in the table below.
+- **A preset.** One of the 29 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -167,19 +184,24 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 24 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 29 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
 | --- | --- | --- |
-| `teams` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_search_messages`, `teams_read_message`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Every Teams tool this server has. |
-| `teams-chat` | `teams_list_chats` | The list of the signed-in user's Teams chats. It cannot read a chat message. |
-| `teams-messages` | `teams_list_chats`, `teams_search_messages`, `teams_read_message` | Finds a message anywhere, and reads it in full. |
-| `teams-channels` | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel` | Walks a team's channels, and reads the posts in one channel. |
+| `teams` | `teams_list_chats`, `teams_list_chat_messages`, `teams_list_chat_members`, `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_list_message_replies`, `teams_search_messages`, `teams_read_message`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Every Teams tool of the Read kind, except `teams_get_channel_files_folder` and `teams_read_meeting`. |
+| `teams-chat` | `teams_list_chats`, `teams_list_chat_members` | The signed-in user's Teams chats, and the members of one chat. It cannot read a chat message. |
+| `teams-messages` | `teams_list_chats`, `teams_list_chat_messages`, `teams_search_messages`, `teams_read_message`, `teams_list_message_replies` | Finds a message anywhere, and reads it in full. It also lists the newest messages of a chat, and the replies to a channel post. |
+| `teams-channels` | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_list_message_replies` | Walks a team's channels, and reads the posts in one channel. It also lists the replies to one post. |
 | `teams-transcripts` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | Finds a meeting, and reads the transcript of it. |
 | `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
 | `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
-| `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message` | Finds a chat or a channel, and posts a new message to either. |
+| `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members` | Finds a chat or a channel, and posts a new message to either. It also adds or removes a reaction, and lists the messages and members of a chat. |
+| `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach, and lists the drives that hold it. |
+| `teams-edit` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_browse_channel`, `teams_list_message_replies`, `teams_edit_message`, `teams_delete_message` | Everything in `teams-write`. It also edits and deletes a message. It reads the posts of a channel and the replies to a post, to find a channel message to change. |
+| `teams-meetings-write` | `teams_list_chats`, `teams_list_chat_members`, `teams_read_meeting`, `teams_create_meeting`, `teams_update_meeting`, `teams_delete_meeting` | Finds a meeting chat, and reads one meeting and its attendance. It also creates a Teams online meeting, and changes or deletes one that the signed-in user organizes. It also lists the members of a chat, to find the id of an attendee. |
+| `teams-chat-admin` | `teams_list_chats`, `teams_list_chat_members`, `teams_create_chat`, `teams_add_chat_member`, `teams_remove_chat_member`, `teams_rename_chat` | Everything in `teams-chat`. It also creates a chat, adds or removes a member, and renames a group chat. |
+| `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. It also searches for a file and lists the drives. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
 | `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
 | `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft. |
@@ -265,7 +287,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 24 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 29 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.
@@ -306,7 +328,7 @@ the same resource.
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
 | Capture a transcript into Unique's knowledge base | No | Yes, opt-in, needs a database |
-| Read the replies inside a channel thread | Yes | No, root posts only |
+| Read the replies inside a channel thread | Yes, with limits. `teams_list_message_replies` reads up to 50 replies of one post in one call. `teams_browse_channel` reads the replies of each post on one page of the channel. Neither tool uses the cursor from Microsoft. | No, root posts only |
 | Read a transcript, or a recording's metadata, live, with no configuration | Yes | No, ingest only |
 | Plain, normalized text, not raw HTML | Yes | No |
 

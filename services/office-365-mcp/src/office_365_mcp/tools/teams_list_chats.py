@@ -17,7 +17,9 @@ import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
+from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat import Chat
+from msgraph.generated.models.chat_message_info import ChatMessageInfo
 from msgraph.generated.models.chat_type import ChatType
 from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.generated.users.item.chats.chats_request_builder import ChatsRequestBuilder
@@ -26,7 +28,10 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
+from office_365_mcp.shared.messages import MessageSender
+from office_365_mcp.shared.prose import PREVIEW_CHARACTERS, body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_chats"
 
@@ -48,8 +53,9 @@ type _ChatsQuery = ChatsRequestBuilder.ChatsRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
 This tool lists the signed-in user's Teams chats: one-to-one chats, group chats, and meeting \
-chats, newest last message first. The result shows who is in a conversation, when it was last \
-active, and a meeting's `meeting_uri` for its transcripts and recordings. This tool does not \
+chats, newest last message first. The result shows who is in a conversation and when it was \
+last active. It also shows the last message, its sender, and whether the user read it. A \
+meeting chat reports a `meeting_uri` for its transcripts and recordings. This tool does not \
 cover channel activity. teams_browse_channel walks one channel, and teams_search_messages \
 searches message text across chats and channels.
 
@@ -73,14 +79,20 @@ class ChatMember(BaseModel):
             + "rooms and phone dial-ins."
         ),
     )
+    user_id: str | None = Field(
+        description=(
+            "The member's Microsoft Entra object id. It is the same id as `user_id` in get_me "
+            + "and in a message mention. Null for a member that is not a Microsoft Entra user."
+        )
+    )
 
     @classmethod
     def from_conversation_member(cls, member: ConversationMember, *, include_email: bool) -> Self:
+        user = member if isinstance(member, AadUserConversationMember) else None
         return cls(
             display_name=member.display_name,
-            email=member.email
-            if include_email and isinstance(member, AadUserConversationMember)
-            else None,
+            email=user.email if include_email and user is not None else None,
+            user_id=user.user_id if user is not None else None,
         )
 
 
@@ -118,16 +130,34 @@ class ChatSummary(BaseModel):
             + "this field."
         )
     )
+    last_message_preview: str | None = Field(
+        description=(
+            f"The first {PREVIEW_CHARACTERS} characters of the last message as plain text. A "
+            + "longer text ends with an ellipsis. Null when no one posted yet, the message was "
+            + "deleted, or it has no text, as with a system event."
+        )
+    )
+    last_message_sender: MessageSender | None = Field(
+        description=(
+            "Who sent the last message. Null when no one posted yet, or when the last message "
+            + "is a system event with no sender."
+        )
+    )
+    unread: bool | None = Field(
+        description=(
+            "True when the last message is newer than the time the user last read the chat. "
+            + "False when it is not. Null when either time is missing."
+        )
+    )
     created_at: datetime | None = Field(
         description="When the chat was created. Distinguish chats with the same topic."
     )
     members: list[ChatMember] | None = Field(
         description=(
             "Who is in the chat, returned only for unnamed chats. Named chats show `topic` "
-            + "instead, and this field is null there. If `include_member_emails` is set, match a "
-            + "member by `display_name` or by `email`. Otherwise, match by `display_name` only. "
-            + "No member here carries a `user_id`, so none can be matched against get_me's "
-            + "`user_id`."
+            + "instead, and this field is null there. Match a member by `user_id` against the "
+            + "`user_id` from get_me, or by `display_name`. If `include_member_emails` is true, "
+            + "you can also match by `email`."
         )
     )
     members_may_be_incomplete: bool = Field(
@@ -154,6 +184,11 @@ class ChatSummary(BaseModel):
             topic=topic,
             meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
             last_message_at=preview.created_date_time if preview is not None else None,
+            last_message_preview=_preview_text(preview),
+            last_message_sender=MessageSender.from_identity(
+                preview.from_ if preview is not None else None
+            ),
+            unread=_unread(chat),
             created_at=chat.created_date_time,
             members=members,
             members_may_be_incomplete=members is not None and len(members) >= MEMBERS_PER_CHAT,
@@ -250,6 +285,27 @@ def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
         ChatMember.from_conversation_member(member, include_email=include_emails)
         for member in chat.members or []
     ]
+
+
+def _preview_text(preview: ChatMessageInfo | None) -> str | None:
+    if preview is None or preview.is_deleted or preview.body is None:
+        return None
+    content = preview.body.content
+    if content is None:
+        return None
+    if preview.body.content_type == BodyType.Html:
+        return body_opening(content) or None
+    return cut_for_a_question(content.strip()) or None
+
+
+def _unread(chat: Chat) -> bool | None:
+    preview = chat.last_message_preview
+    viewpoint = chat.viewpoint
+    sent = preview.created_date_time if preview is not None else None
+    read = viewpoint.last_message_read_date_time if viewpoint is not None else None
+    if sent is None or read is None:
+        return None
+    return as_utc(sent) > as_utc(read)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

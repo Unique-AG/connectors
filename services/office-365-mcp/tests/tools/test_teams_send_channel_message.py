@@ -1,12 +1,13 @@
 import json
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from typing import cast
 
 import httpx
 import pytest
 import respx
 from fastmcp import Context, FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp.exceptions import ToolError, ValidationError
 from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation
 from fastmcp.tools import Tool
 from mcp.types import (
@@ -20,8 +21,15 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.messages import TeamsMessage
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+    graph_errors,
+)
+from office_365_mcp.shared.handles import MessageHandle, message_handle
+from office_365_mcp.shared.messages import ChannelImportance, Mention, TeamsMessage
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_channel_message as sender
 from office_365_mcp.tools.teams_send_channel_message import a_person_agrees, send_channel_message
@@ -31,12 +39,18 @@ from .conftest import TEAMS_SENDER, message_payload
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
 _SEND_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages"
+_ROOT_ID = "1770000000001"
+_REPLY_PATH = f"{_SEND_PATH}/{_ROOT_ID}/replies"
 
 _MESSAGE = "Ship it Friday."
+_SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000002"
 _SENT_WEB_URL = f"https://teams.microsoft.invalid/l/message/{_CHANNEL_ID}/{_SENT_MESSAGE_ID}"
 
 _NOTHING_SENT = "Nothing was posted."
+
+_JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
+_ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -67,6 +81,22 @@ def _posts(graph: respx.MockRouter, payload: Mapping[str, object] | None = None)
     )
 
 
+def _replies(graph: respx.MockRouter) -> respx.Route:
+    return graph.post(_REPLY_PATH).mock(
+        return_value=httpx.Response(
+            201,
+            json=message_payload(
+                message_id=_SENT_MESSAGE_ID,
+                content=_MESSAGE,
+                content_type="text",
+                sender=TEAMS_SENDER,
+                reply_to_id=_ROOT_ID,
+                web_url=_SENT_WEB_URL,
+            ),
+        )
+    )
+
+
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:
     mcp: FastMCP = FastMCP(name="schema-under-test")
     sender.register(mcp, transport)
@@ -75,12 +105,59 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
     return cast("Mapping[str, object]", tool.parameters), tool
 
 
+async def _listed(transport: httpx.AsyncClient) -> Mapping[str, Mapping[str, object]]:
+    mcp: FastMCP = FastMCP(name="schema-under-test")
+    sender.register(mcp, transport)
+    (tool,) = await mcp.list_tools()
+    return cast("Mapping[str, Mapping[str, object]]", tool.parameters["properties"])
+
+
 async def _send(
-    client: GraphServiceClient, *, message: str = _MESSAGE, confirm: Confirm
+    client: GraphServiceClient,
+    *,
+    message: str = _MESSAGE,
+    confirm: Confirm,
+    mentions: Sequence[Mention] = (),
+    subject: str | None = None,
+    importance: ChannelImportance | None = None,
+    reply_to_id: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
     return await send_channel_message(
-        client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message=message, confirm=confirm
+        client,
+        team_id=_TEAM_ID,
+        channel_id=_CHANNEL_ID,
+        message=message,
+        confirm=confirm,
+        mentions=mentions,
+        subject=subject,
+        importance=importance,
+        reply_to_id=reply_to_id,
     )
+
+
+async def _question_for(
+    client: GraphServiceClient,
+    *,
+    subject: str | None = None,
+    importance: ChannelImportance | None = None,
+    reply_to_id: str | None = None,
+) -> str:
+    asked: list[str] = []
+
+    async def capturing(question: str, _about: str) -> Confirmed:
+        asked.append(question)
+        return None
+
+    _ = await _send(
+        client,
+        confirm=capturing,
+        subject=subject,
+        importance=importance,
+        reply_to_id=reply_to_id,
+    )
+
+    assert len(asked) == 1
+    return asked[0]
 
 
 class TestThePersonBeforeThePost:
@@ -127,26 +204,165 @@ class TestThePersonBeforeThePost:
         assert _TEAM_ID in asked[0]
         assert _CHANNEL_ID in asked[0]
 
-    def test_the_binding_differs_for_two_messages_with_the_same_120_char_preview(self) -> None:
-        common_prefix = "x" * 120
+    async def test_the_question_names_the_people_it_mentions(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
 
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " short tail", _TEAM_ID, _CHANNEL_ID
-        )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            common_prefix + " a very different, much longer tail", _TEAM_ID, _CHANNEL_ID
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(client, confirm=capturing, mentions=[_JANE, _ADA])
+
+        assert len(asked) == 1
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Jane Smith' is only a label from the request), the person with the "
+            + f"Microsoft Entra object id {_ADA.user_id!r} (the name 'Ada Lovelace' is only a "
+            + "label from the request)."
+        ) in asked[0]
+        assert "cannot be recalled" in asked[0]
+
+    async def test_a_label_that_names_another_person_still_shows_the_id_that_teams_binds(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(
+            client,
+            confirm=capturing,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
         )
 
-        assert first != second
+        assert len(asked) == 1
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Ada Lovelace' is only a label from the request)."
+        ) in asked[0]
+        assert _ADA.user_id not in asked[0]
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert cast("Mapping[str, object]", mentioned["user"])["id"] == _JANE.user_id
 
-    def test_the_binding_differs_for_the_same_message_to_a_different_channel(self) -> None:
-        first = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _TEAM_ID, _CHANNEL_ID
+    async def test_the_question_names_the_subject_and_the_importance(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+
+        question = await _question_for(client, subject=_SUBJECT, importance="high")
+
+        assert (
+            f"Post {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to channel "
+            + f"{_CHANNEL_ID!r}"
+        ) in question
+
+    async def test_the_question_names_a_subject_that_comes_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+
+        question = await _question_for(client, subject=_SUBJECT)
+
+        assert f"Post {_MESSAGE!r} with the subject {_SUBJECT!r} to channel" in question
+        assert "importance" not in question
+
+    async def test_the_question_names_an_importance_that_comes_alone(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+
+        question = await _question_for(client, importance="normal")
+
+        assert f"Post {_MESSAGE!r} with normal importance to channel" in question
+        assert "subject" not in question
+
+    async def test_the_question_names_neither_when_neither_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+
+        question = await _question_for(client)
+
+        assert "subject" not in question
+        assert "importance" not in question
+
+    async def test_the_question_for_a_reply_names_the_post_it_answers(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _replies(graph)
+
+        question = await _question_for(client, reply_to_id=_ROOT_ID)
+
+        assert question == (
+            f"Post {_MESSAGE!r} as a reply to post {_ROOT_ID!r} in channel {_CHANNEL_ID!r} in "
+            + f"team {_TEAM_ID!r} now? This cannot be recalled once posted."
         )
-        second = sender._about(  # pyright: ignore[reportPrivateUsage]
-            _MESSAGE, _TEAM_ID, "19:other@thread.tacv2"
+
+    async def test_a_refused_reply_posts_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reply = _replies(graph)
+
+        with pytest.raises(ToolError, match=_NOTHING_SENT):
+            _ = await _send(client, confirm=_refuses, reply_to_id=_ROOT_ID)
+
+        assert reply.call_count == 0, "a declined reply still reached the thread"
+
+    async def test_the_binding_differs_for_each_team_each_channel_and_each_thread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            assert question
+            bound.append(about)
+            return _NOTHING_SENT
+
+        for team_id, channel_id, reply_to_id in (
+            (_TEAM_ID, _CHANNEL_ID, None),
+            ("0d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6", _CHANNEL_ID, None),
+            (_TEAM_ID, "19:other@thread.tacv2", None),
+            (_TEAM_ID, _CHANNEL_ID, _ROOT_ID),
+        ):
+            with pytest.raises(ToolError, match=_NOTHING_SENT):
+                _ = await send_channel_message(
+                    client,
+                    team_id=team_id,
+                    channel_id=channel_id,
+                    message=_MESSAGE,
+                    confirm=capturing,
+                    reply_to_id=reply_to_id,
+                )
+
+        assert len(set(bound)) == 4
+        assert len(graph.calls) == 0
+
+    async def test_a_subject_on_a_reply_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError) as raised:
+            _ = await _send(client, confirm=capturing, subject=_SUBJECT, reply_to_id=_ROOT_ID)
+
+        assert str(raised.value).endswith(
+            "Nothing was posted. If you call this tool again with the same arguments, the call "
+            + "will fail the same way."
         )
-        assert first != second
+        assert asked == [], "the user was asked to agree to a call that cannot succeed"
+        assert len(graph.calls) == 0, "a reply with a subject reached Graph"
 
     async def test_the_confirmation_happens_before_the_post(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -318,6 +534,112 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "message B went out on an accept given for message A"
 
+    @pytest.mark.parametrize(
+        "other",
+        [
+            pytest.param(_ADA, id="another-person"),
+            pytest.param(Mention(user_id=_ADA.user_id, name=_JANE.name), id="same-label-other-id"),
+            pytest.param(Mention(user_id=_JANE.user_id, name=_ADA.name), id="same-id-other-label"),
+        ],
+    )
+    async def test_an_accept_for_one_set_of_mentions_cannot_post_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter, other: Mention
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()), mentions=[_JANE])
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                mentions=[other],
+            )
+
+        assert post.call_count == 0, f"{other} went out on an accept given for {_JANE}"
+
+    async def test_an_accept_for_one_subject_cannot_post_under_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()), subject=_SUBJECT)
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                subject="Release cancelled",
+            )
+
+        assert post.call_count == 0, "a post went out under a subject nobody agreed to"
+
+    async def test_an_accept_for_a_post_cannot_send_it_as_high_importance(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                importance="high",
+            )
+
+        assert post.call_count == 0, "a high-importance post went out on an accept for a plain one"
+
+    async def test_an_accept_for_a_post_cannot_send_a_reply(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        reply = _replies(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()))
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(
+                client,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+                reply_to_id=_ROOT_ID,
+            )
+
+        assert post.call_count == 0
+        assert reply.call_count == 0, "a reply went out on an accept given for a new post"
+
 
 class TestWhatItAsksGraphFor:
     async def test_it_makes_exactly_one_call(
@@ -343,6 +665,62 @@ class TestWhatItAsksGraphFor:
         sent = cast("Mapping[str, object]", body["body"])
         assert sent["content"] == _MESSAGE
         assert sent["contentType"] == "text"
+        assert "mentions" not in body
+
+    async def test_the_post_body_carries_the_subject_as_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await _send(client, confirm=_agrees, subject=_SUBJECT)
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["subject"] == _SUBJECT
+
+    @pytest.mark.parametrize("importance", ["normal", "high"])
+    async def test_the_post_body_carries_the_importance(
+        self, client: GraphServiceClient, graph: respx.MockRouter, importance: ChannelImportance
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await _send(client, confirm=_agrees, importance=importance)
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["importance"] == importance
+
+    async def test_the_post_body_carries_no_importance_and_no_subject_when_none_is_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await _send(client, confirm=_agrees)
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert "importance" not in body, "an unset importance reached Graph as a value or a null"
+        assert "subject" not in body, "an unset subject reached Graph as a value or a null"
+
+    async def test_a_mention_goes_out_as_html_with_its_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+
+        _ = await _send(client, confirm=_agrees, mentions=[_JANE])
+
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "contentType": "html",
+        }
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert len(mentions) == 1
+        assert mentions[0]["id"] == 0
+        assert mentions[0]["mentionText"] == "Jane Smith"
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert mentioned["user"] == {
+            "id": _JANE.user_id,
+            "displayName": "Jane Smith",
+            "userIdentityType": "aadUser",
+        }
 
     async def test_the_channel_id_is_only_ever_read_together_with_its_team_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -353,6 +731,63 @@ class TestWhatItAsksGraphFor:
 
         assert post.call_count == 1
 
+    async def test_a_reply_posts_once_to_the_replies_of_the_post(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        reply = _replies(graph)
+
+        _ = await _send(client, confirm=_agrees, reply_to_id=_ROOT_ID)
+
+        assert reply.call_count == 1
+        assert post.call_count == 0, "a reply started a new post instead"
+        assert len(graph.calls) == 1
+        assert reply.calls.last.request.url.raw_path.decode() == "/v1.0" + _REPLY_PATH
+
+    async def test_the_reply_body_carries_the_message_the_mentions_and_the_importance(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reply = _replies(graph)
+
+        _ = await _send(
+            client, confirm=_agrees, mentions=[_JANE], importance="high", reply_to_id=_ROOT_ID
+        )
+
+        body = cast("Mapping[str, object]", json.loads(reply.calls.last.request.content))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "contentType": "html",
+        }
+        assert len(cast("Sequence[object]", body["mentions"])) == 1
+        assert body["importance"] == "high"
+        assert "subject" not in body
+
+    @pytest.mark.parametrize(
+        ("reply_to_id", "expected"),
+        [(None, sender.STEP_SEND), (_ROOT_ID, sender.STEP_REPLY)],
+    )
+    async def test_a_new_post_and_a_reply_are_measured_under_their_own_step(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+        reply_to_id: str | None,
+        expected: str,
+    ) -> None:
+        _ = _posts(graph)
+        _ = _replies(graph)
+        measured: list[str | None] = []
+
+        def recording(operation: str, *, step: str | None = None) -> AbstractContextManager[None]:
+            measured.append(step)
+            return graph_errors(operation, step=step)
+
+        monkeypatch.setattr(sender, "graph_errors", recording)
+
+        _ = await _send(client, confirm=_agrees, reply_to_id=reply_to_id)
+
+        assert measured == [expected]
+
 
 class TestTheRetryItRefuses:
     @pytest.mark.usefixtures("retry_sleeps")
@@ -361,10 +796,21 @@ class TestTheRetryItRefuses:
     ) -> None:
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphUnavailable):
             _ = await _send(client, confirm=_agrees)
 
         assert post.call_count == 1
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_reply_graph_answers_503_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        reply = graph.post(_REPLY_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _send(client, confirm=_agrees, reply_to_id=_ROOT_ID)
+
+        assert reply.call_count == 1
 
     @pytest.mark.usefixtures("retry_sleeps")
     async def test_a_throttled_post_is_not_repeated_either(
@@ -374,7 +820,7 @@ class TestTheRetryItRefuses:
             return_value=httpx.Response(429, headers={"Retry-After": "12"})
         )
 
-        with pytest.raises(Exception):  # noqa: B017, PT011
+        with pytest.raises(GraphThrottled):
             _ = await _send(client, confirm=_agrees)
 
         assert post.call_count == 1
@@ -395,6 +841,23 @@ class TestWhatItAnswers:
         assert answer.uri == (
             f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/"
             + _SENT_MESSAGE_ID
+        )
+
+    async def test_a_reply_answers_with_a_reply_handle_teams_read_message_can_read_back(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _replies(graph)
+
+        answer = await _send(client, confirm=_agrees, reply_to_id=_ROOT_ID)
+
+        assert not isinstance(answer, InputRequiredResult)
+        assert answer.uri == (
+            f"teams:///teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/"
+            + f"{_ROOT_ID}/replies/{_SENT_MESSAGE_ID}"
+        )
+        assert answer.reply_to_id == _ROOT_ID
+        assert message_handle(answer.uri) == MessageHandle(
+            _SENT_MESSAGE_ID, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, reply_to_id=_ROOT_ID
         )
 
     async def test_the_answer_carries_the_web_url_graph_gave_the_post(
@@ -448,8 +911,9 @@ class TestHowItDeclaresItself:
     def test_the_permission_is_channel_message_send(self) -> None:
         assert sender.GRAPH_PERMISSIONS == ("ChannelMessage.Send",)
 
-    def test_its_one_step_is_the_one_call_it_makes(self) -> None:
+    def test_its_two_steps_are_the_two_calls_it_can_make(self) -> None:
         assert sender.STEP_SEND == "send_channel_message"
+        assert sender.STEP_REPLY == "reply_channel_message"
 
     async def test_it_announces_itself_as_an_addition_rather_than_a_destructive_write(
         self, transport: httpx.AsyncClient
@@ -467,18 +931,137 @@ class TestHowItDeclaresItself:
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        lowered = (tool.description or "").casefold()
-        assert "after the user approves it" in lowered
+        description = tool.description or ""
+        assert (
+            "This tool asks the user to agree before it posts anything, every time. This tool "
+            + "posts nothing unless the user agrees."
+        ) in " ".join(description.split())
 
-    async def test_the_three_arguments_are_team_id_channel_id_and_message(
+    async def test_the_description_says_a_posted_message_cannot_be_recalled(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "nothing here can recall it" in (tool.description or "")
+
+    async def test_the_description_says_the_question_shows_the_object_id_of_a_mention(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "The question shows the Microsoft Entra object id of each person in `mentions`. The "
+            + "`name` in the question is only a label. The message shows the same label."
+        ) in " ".join((tool.description or "").split())
+
+    async def test_the_retry_note_names_no_tool_and_the_outage_advice_names_the_reader(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        (retry,) = [
+            " ".join(bullet.split())
+            for bullet in (tool.description or "").split("\n- ")
+            if bullet.startswith("If a call times out")
+        ]
+        assert retry == (
+            "If a call times out, do not call this tool again first. Before you call again, make "
+            + "sure that the channel does not already show the message."
+        )
+        assert "teams_browse_channel" not in retry
+        assert sender.CHANGE_SHOWN_BY == ("teams_browse_channel",)
+
+    async def test_the_description_says_reply_to_id_replies_in_a_thread(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "With `reply_to_id`, this tool replies in the thread of an existing post."
+        ) in " ".join((tool.description or "").split())
+
+    async def test_reply_to_id_takes_the_id_of_a_post_and_is_never_empty(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        reply_to_id = (await _listed(transport))["reply_to_id"]
+
+        described = str(reply_to_id["description"])
+        assert "from a channel message that another Teams tool returned." in described
+        assert "teams_browse_channel" not in described
+        assert "teams_read_message" not in described
+        assert "Give the id of a post, never the id of a reply." in described
+        assert "To answer a reply, give the `reply_to_id` of that reply." in described
+        text = cast("Sequence[Mapping[str, object]]", reply_to_id["anyOf"])[0]
+        assert text["minLength"] == 1
+
+    async def test_the_subject_says_it_is_refused_on_a_reply(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        subject = (await _listed(transport))["subject"]
+
+        assert "This tool refuses a subject together with `reply_to_id`." in str(
+            subject["description"]
+        )
+
+    async def test_the_arguments_are_team_id_channel_id_message_and_the_optional_rest(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"team_id", "channel_id", "message"}
+        assert set(properties) == {
+            "team_id",
+            "channel_id",
+            "message",
+            "mentions",
+            "subject",
+            "importance",
+            "reply_to_id",
+        }
         assert set(cast("Sequence[str]", parameters["required"])) == {
             "team_id",
             "channel_id",
             "message",
         }
+
+    async def test_the_importance_is_normal_or_high_and_nothing_else(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        importance = (await _listed(transport))["importance"]
+
+        options = cast("Sequence[Mapping[str, object]]", importance["anyOf"])
+        assert [option.get("enum") for option in options] == [["normal", "high"], None]
+
+    async def test_an_urgent_importance_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="importance"):
+            _ = await tool.run({**sender.GRAPH_CALL_EXAMPLE, "importance": "urgent"})
+
+        assert len(graph.calls) == 0, "an importance the schema refuses reached Graph"
+
+    async def test_the_subject_is_never_empty_and_has_no_ceiling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        subject = (await _listed(transport))["subject"]
+
+        text = cast("Sequence[Mapping[str, object]]", subject["anyOf"])[0]
+        assert text["minLength"] == 1
+        assert "maxLength" not in text, "Microsoft documents no subject limit for a channel post"
+
+    async def test_a_mention_by_email_address_never_reaches_this_tool(
+        self, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        with pytest.raises(ValidationError, match="match pattern"):
+            _ = await tool.run(
+                {
+                    **sender.GRAPH_CALL_EXAMPLE,
+                    "mentions": [{"user_id": "jane@example.invalid", "name": "Jane Smith"}],
+                }
+            )
+
+        assert len(graph.calls) == 0, "a mention the schema refuses reached Graph"

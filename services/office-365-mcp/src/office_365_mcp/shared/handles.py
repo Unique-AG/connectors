@@ -16,8 +16,7 @@ Three of the five shapes are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a
 search cannot mint. Graph addresses a reply *under* its parent post, and the search projection
 carries no `replyToId`. So a channel hit that is really a reply becomes the plain channel shape
-instead, and Graph answers 404 to that. Only `teams_browse_channel` walks a channel post by post
-and knows each reply's parent.
+instead, and Graph answers 404 to that.
 
 A meeting is addressed by join URL, because that is the only route Graph gives a delegated
 caller from chat to meeting. No chat id, topic, or date turns into one. A transcript is addressed
@@ -271,10 +270,17 @@ _ONENOTE_OPERATION_HANDLE = re.compile(
 _ONENOTE_ROOT = "onenote:///"
 
 
+_MESSAGE_HANDLE_SHAPES = """\
+A message handle has one of exactly three shapes:
+  teams:///chats/{chat_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
+The ids are percent-encoded, for example \
+teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
+word for word."""
+
+
 def message_handle(uri: str) -> MessageHandle | None:
-    """`uri` as a message handle, or None if it is not one this connector can read. None rather than
-    an exception carrying advice: what to tell a caller about a malformed handle is each reader
-    tool's own wording."""
     chat = _CHAT_HANDLE.match(uri)
     if chat is not None:
         chat_id, message_id = (unquote(part) for part in chat.groups())
@@ -297,6 +303,20 @@ def message_handle(uri: str) -> MessageHandle | None:
             MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id)
         )
     return None
+
+
+def not_a_message_handle(tool: str, outcome: str) -> str:
+    return " ".join(
+        part
+        for part in (
+            f"{tool} takes the `uri` handle of a Teams message from another Teams tool, and this "
+            + "value is not one.",
+            _MESSAGE_HANDLE_SHAPES,
+            outcome,
+            "If you call this tool again with the same arguments, the call will fail the same way.",
+        )
+        if part
+    )
 
 
 def meeting_handle(uri: str) -> MeetingHandle | None:

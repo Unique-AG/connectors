@@ -571,6 +571,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
+    "teams_list_chat_messages": ("sent_before",),
     "sharepoint_search_files": ("modified_after", "modified_before"),
     "onenote_list_pages": (
         "modified_after",
@@ -585,6 +586,8 @@ _MESSAGE_TOOLS: tuple[str, ...] = (
     "teams_read_message",
     "teams_browse_channel",
     "teams_search_messages",
+    "teams_list_chat_messages",
+    "teams_list_message_replies",
 )
 
 
@@ -656,6 +659,18 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "sharepoint_invite",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+        "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
     }
 )
 
@@ -669,9 +684,12 @@ class TestTheToolsThisServerAdvertises:
         assert set(tools) == {
             "get_me",
             "teams_list_chats",
+            "teams_list_chat_messages",
+            "teams_list_chat_members",
             "teams_list_my_teams",
             "teams_list_channels",
             "teams_browse_channel",
+            "teams_list_message_replies",
             "teams_search_messages",
             "teams_read_message",
             "teams_list_meeting_transcripts",
@@ -767,12 +785,24 @@ class TestTheToolsThisServerAdvertises:
             "job_title",
         }
         assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
+        assert set(_properties(tools["teams_list_chat_messages"].output_schema)) == {
+            "messages",
+            "more_messages",
+        }
+        assert set(_properties(tools["teams_list_chat_members"].output_schema)) == {
+            "members",
+            "more_members",
+        }
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
+        }
+        assert set(_properties(tools["teams_list_message_replies"].output_schema)) == {
+            "messages",
+            "more_replies",
         }
         assert set(_properties(tools["teams_search_messages"].output_schema)) == {
             "messages",
@@ -936,6 +966,8 @@ class TestTheToolsThisServerAdvertises:
 
         assert "teams_search_messages" in described
         assert "teams_browse_channel" in described
+        assert "teams_list_message_replies" in described
+        assert "teams_list_chat_messages" in described
 
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -2526,7 +2558,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert "replies of each post on the channel's first page" in message, message
+        assert "replies of the posts on the first page of the channel" in message, message
         assert "no route to its full text" in message
         assert "a second browse returns the same window" in message
         assert "stop looking" in message
