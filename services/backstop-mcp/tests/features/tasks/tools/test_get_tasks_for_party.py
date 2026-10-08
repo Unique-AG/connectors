@@ -40,9 +40,7 @@ class TestGetTasksForParty:
     def test_is_registered_and_names_the_bean_pair(self) -> None:
         assert get_tasks_for_party in TOOLS
         doc = get_tasks_for_party.__doc__ or ""
-        assert "OrganizationBean" in doc
-        assert "entityType" in doc
-        assert "entityId" in doc
+        assert 'search_type="organizations"' in doc
 
     @pytest.mark.asyncio
     @respx.mock

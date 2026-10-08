@@ -70,7 +70,7 @@ def _organization_document(
             "id": "o42",
             "attributes": attributes
             or {
-                "name": "Koch Investments Group",
+                "name": "Contoso Pension",
                 "modifiedTimestamp": "2025-03-01T10:00:00Z",
                 "modifiedBy": "ops",
             },
@@ -87,7 +87,7 @@ def _location(resource_id: str, title: str, *, primary: bool) -> dict[str, objec
         "id": resource_id,
         "attributes": {
             "locationTitle": title,
-            "address": "18867 North Thompson Peak Parkway, Suite 250",
+            "address": "1 Contoso Way",
             "city": "Scottsdale",
             "cityResolvedName": "Scottsdale",
             "state": "AZ",
@@ -96,7 +96,7 @@ def _location(resource_id: str, title: str, *, primary: bool) -> dict[str, objec
             "countryResolvedName": "United States of America",
             "countryCode": "US",
             "postalCode": "85255",
-            "phoneNumber": "(480) 419-3625",
+            "phoneNumber": "(555) 010-0000",
             "secondaryPhoneNumber": "",
             "fax": "",
             "isPrimaryLocation": primary,
@@ -569,12 +569,12 @@ class TestGetOrganizationIncludes:
         assert locations[0].model_dump() == {
             "id": "loc-1",
             "location_title": "Business",
-            "address": "18867 North Thompson Peak Parkway, Suite 250",
+            "address": "1 Contoso Way",
             "city": "Scottsdale",
             "state": "AZ",
             "country": "United States of America",
             "postal_code": "85255",
-            "phone": "(480) 419-3625",
+            "phone": "(555) 010-0000",
             "is_primary": True,
         }
 
@@ -622,15 +622,15 @@ class TestGetOrganizationIncludes:
                             "type": "people",
                             "id": "p1",
                             "attributes": {
-                                "name": "Voss, Kent",
+                                "name": "Ada, North",
                                 "firstName": "Kent",
-                                "lastName": "Voss",
+                                "lastName": "North",
                                 "jobTitle": "Managing Director, Research",
-                                "email": "vossk@kochinvests.com",
-                                "phone": "(480) 419-3625",
-                                "companyName": "Koch Investments Group",
+                                "email": "ada@contoso.example",
+                                "phone": "(555) 010-0000",
+                                "companyName": "Contoso Pension",
                                 "companyId": 341208613,
-                                "streetAddress": "18867 North Thompson Peak Parkway",
+                                "streetAddress": "1 Contoso Way",
                                 "city": "Scottsdale",
                                 "state": "AZ",
                                 "postalCode": "85255",
@@ -670,11 +670,11 @@ class TestGetOrganizationIncludes:
         assert card is not None
         assert card.model_dump() == {
             "id": "p1",
-            "name": "Voss, Kent",
+            "name": "Ada, North",
             "job_title": "Managing Director, Research",
-            "email": "vossk@kochinvests.com",
-            "phone": "(480) 419-3625",
-            "company_name": "Koch Investments Group",
+            "email": "ada@contoso.example",
+            "phone": "(555) 010-0000",
+            "company_name": "Contoso Pension",
         }
 
     @pytest.mark.asyncio
@@ -847,7 +847,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 200,
                 json=_organization_document(
                     attributes={
-                        "name": "Koch Investments Group",
+                        "name": "Contoso Pension",
                         "website": None,
                         "modifiedTimestamp": "2025-03-01T10:00:00Z",
                         "modifiedBy": "ops",
@@ -870,7 +870,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
 
         organization = object_dict(payload["organization"])
         assert "website" not in organization
-        assert organization["name"] == "Koch Investments Group"
+        assert organization["name"] == "Contoso Pension"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -883,7 +883,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
                 200,
                 json=_organization_document(
                     attributes={
-                        "name": "Koch Investments Group",
+                        "name": "Contoso Pension",
                         "regularCustomFieldValues": [
                             {"definitionId": 343439, "name": "Shared Name", "value": "kept"}
                         ],
@@ -920,7 +920,7 @@ class TestGetOrganizationOmitsNullsFromTheWire:
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(
                 200,
-                json=_organization_document(attributes={"name": "Koch Investments Group"}),
+                json=_organization_document(attributes={"name": "Contoso Pension"}),
             )
         )
 
@@ -989,7 +989,7 @@ def _definitions_route(*definitions: dict[str, object]) -> respx.Route:
 def _org_custom_field_document(values: Sequence[Mapping[str, object]]) -> dict[str, object]:
     return _organization_document(
         attributes={
-            "name": "Koch Investments Group",
+            "name": "Contoso Pension",
             "regularCustomFieldValues": values,
             "modifiedTimestamp": "2025-03-01T10:00:00Z",
             "modifiedBy": "ops",
@@ -1342,7 +1342,7 @@ class TestGetOrganizationCustomFields:
             )
         )
 
-        assert object_dict(payload["organization"])["name"] == "Koch Investments Group"
+        assert object_dict(payload["organization"])["name"] == "Contoso Pension"
         assert object_list(payload["custom_field_values"]) == []
         assert "regularCustomFieldValues" not in object_dict(payload["organization"])
 
@@ -1380,7 +1380,7 @@ class TestGetOrganizationCustomFields:
         assert result.status == "resolved"
         assert [item.definition_id for item in result.custom_field_values] == ["101"]
         assert result.custom_field_values[0].value == "org-value"
-        assert result.organization.name == "Koch Investments Group"
+        assert result.organization.name == "Contoso Pension"
 
         paths = [request.url.path for request in recorded_requests(respx.calls)]
         assert org_get.call_count == 1

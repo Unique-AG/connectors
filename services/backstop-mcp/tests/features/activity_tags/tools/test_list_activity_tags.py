@@ -22,7 +22,7 @@ from tests.server.tools.helpers import object_dict, tool_model, tool_payload
 _INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_activity_tags))
 _FETCH_LOGGER = "backstop_mcp.features.activity_tags.activity_tags_service"
 
-_LIVE_TAG_ID = "474963"
+_LIVE_TAG_ID = "9001"
 
 
 def tenant(name: str) -> str:
@@ -333,6 +333,28 @@ class TestListActivityTagsTool:
         assert [tag.id for tag in first.tags] == [_LIVE_TAG_ID]
         assert [tag.id for tag in cached.tags] == ["88"]
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_core_term_keeps_the_prefixed_tag(self) -> None:
+        base_url = tenant("at-prefix")
+        respx.get(f"{base_url}/activity-tags").mock(
+            return_value=_collection_page(
+                _tag("1", name="XY: Beta", quantityTagged=40, viewable=True),
+                _tag("2", name="Beta", quantityTagged=3, viewable=True),
+                _tag("3", name="XY: Alpha", quantityTagged=9, viewable=True),
+            )
+        )
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await list_activity_tags(
+                    search="Beta",
+                    activity_tags=activity_tags_service(client),
+                ),
+                ListActivityTagsResponse,
+            )
+
+        assert sorted(tag.id for tag in result.tags) == ["1", "2"]
+
 
 class TestListActivityTagsInput:
     def test_accepts_search(self) -> None:
@@ -345,7 +367,7 @@ class TestListActivityTagsInput:
     def test_refresh_is_only_for_a_user_reported_missing_field(self) -> None:
         doc = list_activity_tags.__doc__ or ""
         assert "refresh=true" in doc
-        assert "missing field" in doc
+        assert "missing tag" in doc
         assert "activity-tag" in doc.casefold() or "activity tag" in doc.casefold()
         assert "tenant" not in doc.casefold()
         for banned in (
@@ -364,5 +386,5 @@ class TestListActivityTagsInput:
             if isinstance(item, FieldInfo)
         )
         assert field_info.description is not None
-        assert "missing field" in field_info.description
+        assert "missing tag" in field_info.description
         assert "search" in without_injected_parameters(list_activity_tags).__annotations__

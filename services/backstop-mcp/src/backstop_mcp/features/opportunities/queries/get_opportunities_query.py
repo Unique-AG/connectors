@@ -10,7 +10,10 @@ from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.opportunities.api_responses import OpportunityResource
-from backstop_mcp.features.opportunities.resource_utils import MapOpportunityToResponseUtil
+from backstop_mcp.features.opportunities.resource_utils import (
+    MapOpportunityToResponseUtil,
+    get_stage_id_to_name_map,
+)
 from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
     PartyOpportunitiesResponse,
@@ -66,6 +69,7 @@ class GetOpportunitiesQuery:
             ),
             self._custom_fields_service.load_catalog(),
         )
+        stage_id_to_name = get_stage_id_to_name_map(pages.included)
         opportunities_mapped: list[OpportunityResponse] = []
         for opportunity in pages.items:
             try:
@@ -73,6 +77,7 @@ class GetOpportunitiesQuery:
                     row=opportunity,
                     api_include_resources=pages.included,
                     custom_fields_filters=custom_fields_filters,
+                    stage_id_to_name=stage_id_to_name,
                     url=self._build_entity_link_util.canonical_url(
                         target=OpportunityLinkTarget(entity_id=opportunity.id),
                     ),

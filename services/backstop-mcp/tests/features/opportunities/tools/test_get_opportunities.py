@@ -103,7 +103,7 @@ def _open_deal() -> dict[str, object]:
     return _opportunity(
         "5755031",
         stage_id="42482",
-        name="Koch - CATS Select",
+        name="Contoso - Harbor Select",
         isOpen=True,
         previousStage="Client Approval",
         dateEnteredCurrentStage="2026-03-01T00:00:00.000-0500",
@@ -114,7 +114,7 @@ def _closed_deal() -> dict[str, object]:
     return _opportunity(
         "5072909",
         stage_id="96016",
-        name="Koch - Invested",
+        name="Contoso - Invested",
         isOpen=False,
         dateEnteredCurrentStage="2024-11-13T00:00:00.000-0500",
     )
@@ -146,7 +146,7 @@ class TestGetOpportunities:
         assert result.total == 1
         assert result.open_count == 1
         assert result.closed_count == 0
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
         assert result.opportunities[0].previous_stage == "Client Approval"
         assert result.custom_fields_unavailable is False
 
@@ -157,7 +157,7 @@ class TestGetOpportunities:
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource(_ORG_ID, "organizations", name="Koch")),
+                json=collection(resource(_ORG_ID, "organizations", name="Contoso")),
             )
         )
         respx.get(_STAGES_URL).mock(return_value=_stages_response())
@@ -169,15 +169,15 @@ class TestGetOpportunities:
             await get_opportunities(
                 ctx_never_elicit(),
                 search_type="organizations",
-                search="Koch",
+                search="Contoso",
                 resolve_party_query=make_resolve_party_query(client),
                 get_opportunities_query=make_get_opportunities_query(client),
             ),
             OpportunitiesResolvedResponse,
         )
 
-        assert result.resolved.name == "Koch"
-        assert result.opportunities[0].name == "Koch - CATS Select"
+        assert result.resolved.name == "Contoso"
+        assert result.opportunities[0].name == "Contoso - Harbor Select"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -329,8 +329,8 @@ class TestGetOpportunities:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Koch"),
-                    resource("o2", "organizations", name="Koch Investments"),
+                    resource("o1", "organizations", name="Contoso"),
+                    resource("o2", "organizations", name="Contoso Investments"),
                 ),
             )
         )
@@ -339,7 +339,7 @@ class TestGetOpportunities:
             await get_opportunities(
                 ctx_decline(),
                 search_type="organizations",
-                search="Koch",
+                search="Contoso",
                 resolve_party_query=make_resolve_party_query(client),
                 get_opportunities_query=make_get_opportunities_query(client),
             ),
@@ -418,7 +418,7 @@ class TestGetOpportunities:
                 _opportunity(
                     "5755031",
                     stage_id="42482",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=True,
                     regularCustomFieldValues=[
                         {"definitionId": 8648265, "name": "Probability", "value": 0.3},
@@ -530,7 +530,7 @@ class TestGetOpportunities:
                 _opportunity(
                     "5755031",
                     stage_id="42482",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=True,
                     regularCustomFieldValues=[
                         {"definitionId": "8648265", "value": 0.3},
@@ -588,7 +588,7 @@ class TestGetOpportunities:
                 _opportunity(
                     "5755031",
                     stage_id="42482",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=True,
                     regularCustomFieldValues=[
                         {"definitionId": "8648265", "value": 0.3},

@@ -52,12 +52,10 @@ async def create_employment(
     `organization_id` or `organization_search`. Do not pass a relationship-type id — the
     command resolves it from the catalog. One POST also creates the reverse mirror row
     (person→org and org→person). A repeated call creates a second pair of records.
-    `destructive_hint` is true because this writes a new CRM record.
+    `is_key_employee` is rejected; set Key employee in the CRM UI.
 
     Call like: {"employment": {"search_type": "people", "party_id": "<id from get_person>",
     "organization_id": "<id from get_organization>", "start_date": "2026-01-15"}}
-    Key employee (`is_key_employee`) cannot be set here — personal API tokens do not persist
-    `isKeyRelationship`. Set it in the CRM UI. Read it on `get_people_for_party`.
     """
     person_result = await resolve_party_query.run(
         search_type=employment.search_type,

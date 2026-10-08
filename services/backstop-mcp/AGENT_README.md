@@ -34,9 +34,13 @@ Run the scripts from `services/backstop-mcp` so `uv run` picks up the service ve
 | `explore.py` | `GET` only against `BACKSTOP_BASE_URL` (API token). 2-minute timeout. | `.probe-cache/` |
 | `docs.py` | Elevio help via help-prod SSO (web username/password). Never POST to the CRM. | `.docs-cache/` |
 | `test_set.py` | Optional local question harness. Not CI. | `.test-set-runs/` |
+| `report_definitions.py` | Report Center definitions via a browser you log into. The browser quits before any definition is read. One HTTPS GET with `Connection: close`, then a pause. Stops on the first refused connection. | `.probe-cache/report-center-definitions.json` |
 
 Reuse a cached probe instead of hitting the API again. Do not rewrite these scripts.
 The `backstop-api` skill is the workflow; this folder is the tooling.
+
+Live response captures stay in `.probe-cache/`. Committed JSON fixtures must be synthetic
+and minimal.
 
 ---
 
@@ -384,7 +388,7 @@ only when the set is no longer small.
 `canonical_url` do not take an origin. Commands and queries that publish a record `url`
 take `BuildEntityLinkUtil` as a constructor argument. Their factories inject it with
 `Depends(get_build_entity_link_util_factory)`. Tools that have no query/command
-(`get_person`, `get_product`, `get_accounts_for_party`), or that assemble the rows
+(`get_person`, `search_products`, `get_accounts_for_party`), or that assemble the rows
 themselves (`search_activities`), Depends the util the same way.
 
 DTOs, attributes, and responses never build URLs. They take `url` as a constructor

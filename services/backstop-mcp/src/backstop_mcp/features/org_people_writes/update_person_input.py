@@ -28,8 +28,8 @@ from backstop_mcp.features.org_people_writes.contact_location_input import (
     reject_location_write_conflicts,
 )
 from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
 )
@@ -44,7 +44,7 @@ UPDATE_PERSON_INPUT_DESCRIPTION = (
     "Required. The person to patch. Needs exactly one of `party_id` or `search`, plus "
     "`search_type` (defaults to people), and at least one field to change. `last_name` "
     "cannot be cleared. Custom fields go through `update_custom_field_values`. Location "
-    "ids come from `get_person` with `include=contactLocations`, not `include=locations`. "
+    'ids are `included.locations[].id` from `get_person` with `include=["locations"]`. '
     "Omit a field to leave it unchanged. Never invent an id."
 )
 
@@ -52,9 +52,6 @@ _IDENTITY_FIELDS = frozenset({"party_id", "search", "search_type"})
 _PERSON_SEARCH_TYPE_DESCRIPTION = (
     "Collection to resolve against. Echo `search_type` from a prior resolve when retrying "
     "with `party_id` — a contact or employee id is not a people id. Defaults to people."
-)
-_LOCATION_ID_HINT = (
-    "Ids come from `get_person` with `include=contactLocations`, not `include=locations`."
 )
 
 
@@ -65,10 +62,10 @@ class _UpdatePersonIdentity(BaseModel):
         default="people", description=_PERSON_SEARCH_TYPE_DESCRIPTION
     )
     party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
 
     @field_validator("party_id", "search", mode="before")

@@ -1,7 +1,7 @@
 """Published discriminated link target. Each kind names its own id so a mix-up cannot build.
 
-Email uses `entity_activity_details_id` (the `/entity-activity-details` id). It does
-not accept `activity_id` — that name is an `/emails` collection id on history rows.
+Activity links take the bare `id` of a `search_activities` row. Never a
+`meeting-or-calls_…` handle. Rows already carry `url` when that field is selected.
 """
 
 from typing import Annotated, Literal
@@ -50,8 +50,8 @@ class AccountLinkTarget(BaseModel):
     )
     entity_id: CoercedId = Field(
         description=(
-            "Account id from get_accounts_for_party. This is not a party id — do not pass it "
-            "to get_organization or get_person."
+            "Account id, not a party id. No tool loads the account record; the id goes to "
+            "get_time_series (entity_type accounts) or get_capital_flows `account_ids`."
         ),
     )
 
@@ -59,10 +59,10 @@ class AccountLinkTarget(BaseModel):
 class ProductLinkTarget(BaseModel):
     kind: Literal["product"] = Field(
         default="product",
-        description="Product CRM page. Echo a product id from get_product.",
+        description="Product CRM page. Echo a product id from search_products.",
     )
     entity_id: CoercedId = Field(
-        description="Product id from get_product. Not a party id.",
+        description="Product id from search_products. Not a party id.",
     )
 
 
@@ -90,15 +90,14 @@ class EmailLinkTarget(BaseModel):
     kind: Literal["email"] = Field(
         default="email",
         description=(
-            "Email CRM page. Requires entity_activity_details_id from search_activities or "
-            "get_activity_detail. An email activity_id from get_activity_history is a "
-            "different id space and will not open this page."
+            "Email CRM page. Pass the bare `id` of a `search_activities` row. Never a "
+            "`meeting-or-calls_…` handle, and never a history email `activity_id`."
         ),
     )
     entity_activity_details_id: CoercedId = Field(
         description=(
-            "Id from search_activities or get_activity_detail (`entity_activity_details_id`). "
-            "Never a get_activity_history email activity_id — those id spaces do not match."
+            "Bare `id` of a `search_activities` email row. Never a history email "
+            "`activity_id` and never a `meeting-or-calls_…` handle."
         ),
     )
 
@@ -106,15 +105,11 @@ class EmailLinkTarget(BaseModel):
 class CallLinkTarget(BaseModel):
     kind: Literal["call"] = Field(
         default="call",
-        description=(
-            "Call CRM page (`activities.jsp/calls`). Echo entity_activity_details_id from "
-            "search_activities or get_activity_detail."
-        ),
+        description=("Call CRM page. Pass the bare `id` of a `search_activities` row."),
     )
     entity_activity_details_id: CoercedId = Field(
         description=(
-            "Id from search_activities or get_activity_detail (`entity_activity_details_id`). "
-            "Not a get_activity_history activity_id."
+            "Bare `id` of a `search_activities` row. Never a `meeting-or-calls_…` handle."
         ),
     )
 
@@ -122,15 +117,11 @@ class CallLinkTarget(BaseModel):
 class MeetingLinkTarget(BaseModel):
     kind: Literal["meeting"] = Field(
         default="meeting",
-        description=(
-            "Meeting CRM page (`activities.jsp/meetings`). Echo entity_activity_details_id "
-            "from search_activities or get_activity_detail."
-        ),
+        description=("Meeting CRM page. Pass the bare `id` of a `search_activities` row."),
     )
     entity_activity_details_id: CoercedId = Field(
         description=(
-            "Id from search_activities or get_activity_detail (`entity_activity_details_id`). "
-            "Not a get_activity_history activity_id."
+            "Bare `id` of a `search_activities` row. Never a `meeting-or-calls_…` handle."
         ),
     )
 
@@ -138,15 +129,11 @@ class MeetingLinkTarget(BaseModel):
 class NoteLinkTarget(BaseModel):
     kind: Literal["note"] = Field(
         default="note",
-        description=(
-            "Note CRM page (`activities.jsp/notes`). Echo entity_activity_details_id from "
-            "search_activities or get_activity_detail."
-        ),
+        description=("Note CRM page. Pass the bare `id` of a `search_activities` row."),
     )
     entity_activity_details_id: CoercedId = Field(
         description=(
-            "Id from search_activities or get_activity_detail (`entity_activity_details_id`). "
-            "Not a get_activity_history activity_id."
+            "Bare `id` of a `search_activities` row. Never a `meeting-or-calls_…` handle."
         ),
     )
 
@@ -154,15 +141,11 @@ class NoteLinkTarget(BaseModel):
 class DocumentLinkTarget(BaseModel):
     kind: Literal["document"] = Field(
         default="document",
-        description=(
-            "Document CRM page (`activities.jsp/documents`). Echo entity_activity_details_id "
-            "from search_activities or get_activity_detail."
-        ),
+        description=("Document CRM page. Pass the bare `id` of a `search_activities` row."),
     )
     entity_activity_details_id: CoercedId = Field(
         description=(
-            "Id from search_activities or get_activity_detail (`entity_activity_details_id`). "
-            "Not a get_activity_history activity_id."
+            "Bare `id` of a `search_activities` row. Never a `meeting-or-calls_…` handle."
         ),
     )
 

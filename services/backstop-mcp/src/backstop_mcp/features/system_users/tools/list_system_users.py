@@ -50,26 +50,32 @@ async def list_system_users(
         str | None,
         Field(
             description=(
-                "Optional case-insensitive substring of the display name or login. Filters "
-                "the cached catalog in memory — the catalog walk never sends "
-                "`filter[name][like]`."
+                "Optional case-insensitive substring of the display name, login, or email."
             ),
         ),
     ] = None,
     refresh: Annotated[
         bool,
-        Field(description="Do not pass true unless the user reports a missing colleague."),
+        Field(
+            description=(
+                "Refetch the catalog. Does nothing unless the catalog cache is enabled; "
+                "it is off by default. Pass true only when the user reports a missing colleague "
+                "and the cache is on."
+            )
+        ),
     ] = False,
     system_users: SystemUsersService = Depends(get_system_users_service),
 ) -> ListSystemUsersResponse:
     """List our colleagues' Backstop logins.
 
     Use when you need the `user_name` login that search_opportunities filters on, or to see
-    whether a colleague is `disabled`. These are our staff, not investors. Pass `search` to
-    keep colleagues whose name or login contains that substring. Pass refresh=true only when
-    the user reports a missing colleague.
+    whether a colleague is `disabled`, or the login for an opportunity `owner_login` or a
+    task assignee. A colleague or employee named in a question is here, not in search_people.
+    These are our staff, not investors. Pass `search` to keep colleagues
+    whose name, login, or email contains that substring. `refresh` does nothing unless the
+    catalog cache is enabled (off by default).
 
-    Call like: {"search": "lazarus"}
+    Call like: {"search": "doe"}
     """
     catalog, cache = await system_users.get(refresh=refresh)
     selected = tuple(catalog.values())

@@ -5,7 +5,8 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context, FastMCP
+from fastmcp import Client, Context, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import (
     AcceptedElicitation,
@@ -28,12 +29,15 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
+    OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import OperationSummary, write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_copy_section as copier
 from office_365_mcp.tools.onenote_copy_section import a_person_agrees, copy_section
 
@@ -42,15 +46,37 @@ _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
 _GROUP_ID = "1-SYNTHETICGROUP0000!0-ABCDEF"
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 
+_OWNER_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+_OTHER_OWNER_ID = "0f9e8a9c-3c47-4a24-9b1e-5c6b7a812f0d"
+
 _SECTION_URI = OnenoteSectionHandle(_SECTION_ID).uri
 _NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID).uri
 _GROUP_URI = OnenoteSectionGroupHandle(_GROUP_ID).uri
+_OWNED_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+_OWNED_NOTEBOOK_URI = OnenoteNotebookHandle(
+    _NOTEBOOK_ID, owner=OnenoteOwner("groups", _OTHER_OWNER_ID)
+).uri
+_OWNED_GROUP_URI = OnenoteSectionGroupHandle(
+    _GROUP_ID, owner=OnenoteOwner("groups", _OTHER_OWNER_ID)
+).uri
 
 _SECTION_GET_PATH = f"/me/onenote/sections/{_SECTION_ID}"
 _COPY_TO_NOTEBOOK_PATH = f"/me/onenote/sections/{_SECTION_ID}/copyToNotebook"
 _COPY_TO_GROUP_PATH = f"/me/onenote/sections/{_SECTION_ID}/copyToSectionGroup"
 _NOTEBOOK_GET_PATH = f"/me/onenote/notebooks/{_NOTEBOOK_ID}"
 _GROUP_GET_PATH = f"/me/onenote/sectionGroups/{_GROUP_ID}"
+
+_OWNER_ROOT = f"/groups/{_OWNER_ID}/onenote"
+_OTHER_OWNER_ROOT = f"/groups/{_OTHER_OWNER_ID}/onenote"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+_SITE_NOTEBOOK_URI = OnenoteNotebookHandle(_NOTEBOOK_ID, owner=_SITE).uri
+_SITE_GROUP_URI = OnenoteSectionGroupHandle(_GROUP_ID, owner=_SITE).uri
 
 
 def _notebook_payload(
@@ -267,7 +293,7 @@ class TestWhatItSendsToGraphForANotebookDestination:
 
         assert _sent(copy) == {"id": _NOTEBOOK_ID, "renameAs": "Renamed section"}
 
-    async def test_no_group_or_site_keys_are_ever_sent(
+    async def test_no_group_or_site_keys_are_sent_for_a_destination_outside_a_group(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _private_notebook(graph)
@@ -669,7 +695,7 @@ class TestThePersonBetweenTheCopyAndTheOthersInTheNotebook:
         assert "Notes" in question
         assert "Work" in question
         assert "shared with other people" in question
-        assert bound == [write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_URI, "")]
+        assert bound == [write_state_for("copy_section", _SECTION_URI, _NOTEBOOK_URI, "")]
 
     async def test_the_question_mentions_the_new_name_when_one_is_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -840,7 +866,7 @@ class TestTheEraWithNoBackChannel:
 
         assert isinstance(answer, InputRequiredResult)
         assert answer.request_state == write_state_for(
-            "copy_section", _SECTION_ID, _NOTEBOOK_URI, ""
+            "copy_section", _SECTION_URI, _NOTEBOOK_URI, ""
         )
         assert copy.call_count == 0
 
@@ -872,7 +898,7 @@ class TestTheEraWithNoBackChannel:
         _ = _notebook_route(graph, is_shared=True, user_role="Owner")
         _ = _section_name_route(graph)
         copy = _copies_to_notebook_with_header_only(graph)
-        state = write_state_for("copy_section", _SECTION_ID, _NOTEBOOK_URI, "")
+        state = write_state_for("copy_section", _SECTION_URI, _NOTEBOOK_URI, "")
 
         first = await copy_section(
             client,
@@ -1092,6 +1118,396 @@ class TestHowRegisterWiresThePendingAnswer:
         assert notebook_route.call_count == 2
 
 
+def _owned_notebook_read(
+    graph: respx.MockRouter, *, is_shared: bool | None = False, user_role: str | None = "Owner"
+) -> respx.Route:
+    return graph.get(f"{_OTHER_OWNER_ROOT}/notebooks/{_NOTEBOOK_ID}").mock(
+        return_value=httpx.Response(
+            200, json=_notebook_payload(is_shared=is_shared, user_role=user_role)
+        )
+    )
+
+
+def _owned_section_group_read(graph: respx.MockRouter) -> respx.Route:
+    return graph.get(f"{_OTHER_OWNER_ROOT}/sectionGroups/{_GROUP_ID}").mock(
+        return_value=httpx.Response(200, json=_group_payload(notebook=_GROUP_UNDER_NOTEBOOK))
+    )
+
+
+def _owned_section_name_read(
+    graph: respx.MockRouter, *, display_name: str | None = "Notes"
+) -> respx.Route:
+    return graph.get(f"{_OWNER_ROOT}/sections/{_SECTION_ID}").mock(
+        return_value=httpx.Response(200, json=_section_name_payload(display_name=display_name))
+    )
+
+
+def _owned_source_copies(graph: respx.MockRouter, *, action: str = "copyToNotebook") -> respx.Route:
+    location = f"https://graph.microsoft.com/v1.0{_OWNER_ROOT}/operations/{_OPERATION_ID}"
+    return graph.post(f"{_OWNER_ROOT}/sections/{_SECTION_ID}/{action}").mock(
+        return_value=httpx.Response(202, content=b"", headers={"Operation-Location": location})
+    )
+
+
+class TestNotebooksOfAMicrosoft365Group:
+    async def test_a_group_source_is_copied_under_the_group_that_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        copy = _owned_source_copies(graph)
+
+        _ = await _copy(client, section=_OWNED_SECTION_URI)
+
+        assert copy.call_count == 1
+        assert _sent(copy) == {"id": _NOTEBOOK_ID}, "a personal destination names no group"
+
+    async def test_a_group_source_reads_its_name_under_the_group_that_holds_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        name = _owned_section_name_read(graph, display_name="Plans")
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _owned_source_copies(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _copy(client, section=_OWNED_SECTION_URI, confirm=capturing)
+
+        assert name.call_count == 1
+        assert name.calls.last.request.url.params["$select"] == "id,displayName"
+        assert "Plans" in asked[0]
+
+    async def test_a_group_notebook_destination_is_read_under_its_group_and_named_in_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        notebook = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        _ = await _copy(client, to_notebook=_OWNED_NOTEBOOK_URI, new_name="Renamed section")
+
+        assert notebook.call_count == 1
+        sent = _sent(copy)
+        assert sent == {
+            "id": _NOTEBOOK_ID,
+            "groupId": _OTHER_OWNER_ID,
+            "renameAs": "Renamed section",
+        }
+        assert "siteId" not in sent
+        assert "siteCollectionId" not in sent
+
+    async def test_a_group_section_group_destination_is_read_under_its_group_and_named_in_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        section_group = _owned_section_group_read(graph)
+        notebook = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_group_with_header_only(graph)
+
+        _ = await _copy(client, to_notebook=None, to_section_group=_OWNED_GROUP_URI)
+
+        assert section_group.call_count == 1
+        assert notebook.call_count == 1
+        sent = _sent(copy)
+        assert sent == {"id": _GROUP_ID, "groupId": _OTHER_OWNER_ID}
+        assert "siteId" not in sent
+        assert "siteCollectionId" not in sent
+
+    async def test_a_group_source_copies_into_the_section_group_of_another_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_section_group_read(graph)
+        _ = _owned_notebook_read(graph)
+        _ = _owned_section_name_read(graph)
+        copy = _owned_source_copies(graph, action="copyToSectionGroup")
+
+        answer = await _copy(
+            client, section=_OWNED_SECTION_URI, to_notebook=None, to_section_group=_OWNED_GROUP_URI
+        )
+
+        assert copy.call_count == 1
+        assert _sent(copy) == {"id": _GROUP_ID, "groupId": _OTHER_OWNER_ID}
+        assert (
+            answer.uri
+            == OnenoteOperationHandle(_OPERATION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+        )
+
+    @pytest.mark.parametrize(
+        ("to_notebook", "to_section_group"),
+        [(_OWNED_NOTEBOOK_URI, None), (None, _OWNED_GROUP_URI)],
+        ids=["notebook", "section-group"],
+    )
+    async def test_a_group_destination_is_asked_about_even_when_it_reads_private(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        _ = _owned_section_group_read(graph)
+        _ = _owned_notebook_read(graph, is_shared=False, user_role="Owner")
+        _ = _section_name_route(graph)
+        notebook_copy = _copies_to_notebook_with_header_only(graph)
+        group_copy = _copies_to_group_with_header_only(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _copy(
+            client, to_notebook=to_notebook, to_section_group=to_section_group, confirm=capturing
+        )
+
+        assert len(asked) == 1
+        assert "which belongs to a Microsoft 365 group" in asked[0]
+        assert notebook_copy.call_count + group_copy.call_count == 1
+
+    async def test_a_declined_group_destination_copies_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        with pytest.raises(ToolError, match="Nothing was copied"):
+            _ = await _copy(client, to_notebook=_OWNED_NOTEBOOK_URI, confirm=_refuses)
+
+        assert copy.call_count == 0
+
+    async def test_the_operation_handle_carries_the_source_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        _ = _owned_source_copies(graph)
+
+        answer = await _copy(client, section=_OWNED_SECTION_URI)
+
+        assert (
+            answer.uri
+            == OnenoteOperationHandle(_OPERATION_ID, owner=OnenoteOwner("groups", _OWNER_ID)).uri
+        )
+
+    async def test_the_operation_handle_of_a_copy_posted_under_me_names_no_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        _ = _copies_to_notebook_with_body(graph)
+
+        answer = await _copy(client, to_notebook=_OWNED_NOTEBOOK_URI)
+
+        assert answer.uri == OnenoteOperationHandle(_OPERATION_ID).uri
+
+    async def test_about_binds_the_source_handle_and_the_destination_handle(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        _ = _copies_to_notebook_with_header_only(graph)
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _owned_section_name_read(graph)
+        _ = _owned_source_copies(graph)
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _copy(client, to_notebook=_OWNED_NOTEBOOK_URI, confirm=capturing)
+        _ = await _copy(client, section=_OWNED_SECTION_URI, confirm=capturing)
+        _ = await _copy(client, confirm=capturing)
+
+        assert bound == [
+            write_state_for("copy_section", _SECTION_URI, _OWNED_NOTEBOOK_URI, ""),
+            write_state_for("copy_section", _OWNED_SECTION_URI, _NOTEBOOK_URI, ""),
+            write_state_for("copy_section", _SECTION_URI, _NOTEBOOK_URI, ""),
+        ]
+        assert len(set(bound)) == 3
+
+    async def test_the_second_round_copies_into_the_group_it_was_agreed_to_by(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        first = await copy_section(
+            client,
+            section=_SECTION_URI,
+            to_notebook=_OWNED_NOTEBOOK_URI,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        assert copy.call_count == 0
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+        state = first.request_state
+        assert state == write_state_for("copy_section", _SECTION_URI, _OWNED_NOTEBOOK_URI, "")
+
+        answer = await copy_section(
+            client,
+            section=_SECTION_URI,
+            to_notebook=_OWNED_NOTEBOOK_URI,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": "copy"})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, OperationSummary)
+        assert copy.call_count == 1
+        assert _sent(copy) == {"id": _NOTEBOOK_ID, "groupId": _OTHER_OWNER_ID}
+
+    async def test_an_answer_agreed_for_a_group_notebook_copies_nothing_into_a_personal_one(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _owned_notebook_read(graph)
+        _ = _notebook_route(graph, is_shared=True, user_role="Owner")
+        _ = _section_name_route(graph)
+        copy = _copies_to_notebook_with_header_only(graph)
+
+        first = await copy_section(
+            client,
+            section=_SECTION_URI,
+            to_notebook=_OWNED_NOTEBOOK_URI,
+            confirm=a_person_agrees(_modern_context()),
+        )
+        assert isinstance(first, InputRequiredResult)
+        requests = first.input_requests or {}
+        key = next(iter(requests))
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await copy_section(
+                client,
+                section=_SECTION_URI,
+                to_notebook=_NOTEBOOK_URI,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": "copy"})},
+                        state=first.request_state,
+                    )
+                ),
+                answer_pending=True,
+            )
+
+        assert copy.call_count == 0
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    @pytest.mark.parametrize(
+        ("action", "to_notebook", "to_section_group"),
+        [
+            ("copyToNotebook", _OWNED_NOTEBOOK_URI, None),
+            ("copyToSectionGroup", None, _OWNED_GROUP_URI),
+        ],
+        ids=["notebook", "section-group"],
+    )
+    async def test_a_group_copy_graph_declines_is_never_sent_a_second_time(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        action: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        _ = _owned_section_group_read(graph)
+        _ = _owned_notebook_read(graph)
+        _ = _owned_section_name_read(graph)
+        copy = graph.post(f"{_OWNER_ROOT}/sections/{_SECTION_ID}/{action}").mock(
+            return_value=httpx.Response(503)
+        )
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _copy(
+                client,
+                section=_OWNED_SECTION_URI,
+                to_notebook=to_notebook,
+                to_section_group=to_section_group,
+            )
+
+        assert copy.call_count == 1, "no_retry means one attempt, however Graph answers"
+
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group", "copy_path"),
+        [
+            (
+                _OWNED_SECTION_URI,
+                _NOTEBOOK_URI,
+                None,
+                f"{_OWNER_ROOT}/sections/{_SECTION_ID}/copyToNotebook",
+            ),
+            (_SECTION_URI, _OWNED_NOTEBOOK_URI, None, _COPY_TO_NOTEBOOK_PATH),
+            (_SECTION_URI, None, _OWNED_GROUP_URI, _COPY_TO_GROUP_PATH),
+        ],
+        ids=["group-section", "group-notebook", "group-section-group"],
+    )
+    async def test_a_403_on_an_owned_copy_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+        copy_path: str,
+    ) -> None:
+        _private_notebook(graph)
+        _ = _owned_section_group_read(graph)
+        _ = _owned_notebook_read(graph)
+        _ = _section_name_route(graph)
+        copy = graph.post(copy_path).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _copy(
+                client, section=section, to_notebook=to_notebook, to_section_group=to_section_group
+            )
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert copy.call_count == 1
+
+    async def test_a_403_for_a_group_source_reaches_the_client_as_the_owned_advice(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _private_notebook(graph)
+        copy = graph.post(f"{_OWNER_ROOT}/sections/{_SECTION_ID}/copyToNotebook").mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        advice = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=[copier.TOOL_NAME]))
+        )
+        server: FastMCP[None] = FastMCP("copier", middleware=[advice])
+
+        @server.tool(name=copier.TOOL_NAME, annotations=WRITE_ADDITIVE)
+        async def copy_the_section() -> str:
+            return (await _copy(client, section=_OWNED_SECTION_URI)).uri
+
+        async with Client(FastMCPTransport(server)) as mcp_client:
+            with pytest.raises(ToolError) as raised:
+                _ = await mcp_client.call_tool(copier.TOOL_NAME, {})
+
+        assert str(raised.value).startswith(OWNED_REFUSED)
+        assert "grant the delegated" not in str(raised.value)
+        assert copy.call_count == 1
+
+
 class TestHowItDeclaresItself:
     def test_the_permission_is_notes_create(self) -> None:
         assert copier.GRAPH_PERMISSIONS == ("Notes.Create",)
@@ -1166,3 +1582,95 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", tool.parameters["properties"])
         to_section_group = cast("Mapping[str, object]", properties["to_section_group"])
         assert "onenote_create_section_group" in cast("str", to_section_group["description"])
+
+    async def test_the_description_says_either_side_can_be_in_a_group(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "can each be in a notebook of a Microsoft 365 group" in (tool.description or "")
+
+    async def test_the_description_leaves_the_site_refusal_to_the_handle_arguments(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert "SharePoint site" not in (tool.description or "")
+
+    @pytest.mark.parametrize("argument", ["section", "to_notebook", "to_section_group"])
+    async def test_each_handle_argument_names_the_group_and_site_shapes(
+        self, transport: httpx.AsyncClient, argument: str
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        field = cast("Mapping[str, object]", properties[argument])
+
+        assert (
+            "A handle from a group notebook starts with onenote:///groups/{group}/ instead. This "
+            + "tool refuses a handle from a site notebook, which starts with "
+            + "onenote:///sites/{site}/."
+            in cast("str", field["description"])
+        )
+
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group"),
+        [
+            ("onenote:///groups/", _NOTEBOOK_URI, None),
+            (_SECTION_URI, "onenote:///groups/", None),
+            (_SECTION_URI, None, "onenote:///groups/"),
+        ],
+        ids=["section", "to_notebook", "to_section_group"],
+    )
+    async def test_each_refusal_names_the_group_and_site_shapes(
+        self,
+        client: GraphServiceClient,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _copy(
+                client, section=section, to_notebook=to_notebook, to_section_group=to_section_group
+            )
+
+        message = str(refused.value)
+        assert "onenote:///groups/{group}/" in message
+        assert "onenote:///sites/{site}/" in message
+        assert "This tool refuses a handle from a site notebook" in message
+
+
+class TestNotebooksOfASharePointSite:
+    @pytest.mark.parametrize(
+        ("section", "to_notebook", "to_section_group"),
+        [
+            (_SITE_SECTION_URI, _NOTEBOOK_URI, None),
+            (_SITE_SECTION_URI, None, _GROUP_URI),
+            (_SECTION_URI, _SITE_NOTEBOOK_URI, None),
+            (_SECTION_URI, None, _SITE_GROUP_URI),
+            (_OWNED_SECTION_URI, _SITE_NOTEBOOK_URI, None),
+            (_SITE_SECTION_URI, _OWNED_NOTEBOOK_URI, None),
+        ],
+    )
+    async def test_a_site_source_or_destination_is_refused_before_any_graph_call(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        section: str,
+        to_notebook: str | None,
+        to_section_group: str | None,
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await copy_section(
+                client,
+                section=section,
+                to_notebook=to_notebook,
+                to_section_group=to_section_group,
+                confirm=_agrees,
+                answer_pending=True,
+            )
+
+        assert len(graph.calls) == 0, "a copy from or into a site notebook reached Graph"
+        message = str(refused.value)
+        assert message.startswith("onenote_copy_section ")
+        assert "notebook of a SharePoint site" in message
+        assert "This same call fails again" in message

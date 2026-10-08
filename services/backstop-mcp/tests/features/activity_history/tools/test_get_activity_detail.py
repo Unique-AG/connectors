@@ -308,7 +308,7 @@ class TestErrorPropagation:
                 json=_detail_document(
                     activity_id,
                     type="meeting",
-                    title="Koch 2025 Review",
+                    title="Contoso 2025 Review",
                     description="<p>Keystone demo.</p>",
                 ),
             )
@@ -319,7 +319,7 @@ class TestErrorPropagation:
                 json=_specifics_document(
                     activity_id,
                     startTimestamp="2025-12-01T15:00:00Z",
-                    location="Koch HQ",
+                    location="Contoso HQ",
                     timeZone="America/Chicago",
                 ),
             )
@@ -338,7 +338,7 @@ class TestErrorPropagation:
 
         assert result.activity_id == activity_id
         assert result.type == "meeting"
-        assert result.location == "Koch HQ"
+        assert result.location == "Contoso HQ"
         assert result.start == datetime.fromisoformat("2025-12-01T15:00:00+00:00")
         assert [attendee.name for attendee in result.attendees] == ["Jane Doe"]
 

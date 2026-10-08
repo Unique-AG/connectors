@@ -90,8 +90,8 @@ async def get_accounts_for_party(
         bool,
         Field(
             description=(
-                "When false (default), only open accounts are returned (`closedDate` key "
-                "absent). Pass true to include closed accounts."
+                "When false (default), only open accounts are returned. Pass true to include "
+                "closed accounts. `continuous_since` counts closed accounts either way."
             ),
         ),
     ] = False,
@@ -104,17 +104,19 @@ async def get_accounts_for_party(
 
     Required: `search_type` plus exactly one of `party_id` or `search`. A `party_id` without
     `search_type` is rejected. Pass a trusted `party_id` from a prior resolve echo — never
-    invent one — or `search`. Ownership is the account's owner, not its name: ACCOUNT
-    quick-search matches names and will miss a differently named vehicle.
+    invent one — or `search`. Ownership is by account owner, not account name. `source` /
+    `data_caveat` say which path answered.
 
-    The primary path is Backstop's undocumented UI table-data endpoint and may 404, or refuse
-    the credential while documented endpoints still authenticate, on another tenant — that is
-    not "holds nothing". This tool then falls back internally to the documented `/accounts`
-    walk; `data_caveat` (`fallback_note`) lists the fields that path omits. Each row
-    carries the account and product ids, tenure dates, and the snapshot figures —
+    Each row carries the account and product ids, tenure dates, and the snapshot figures —
     `balance`, `commitment`, `unfunded_commitment`, share of product and of master. This answers
     "how much does X have in fund Y", "summarise X's investments", and "how long have they been
     in Y" in one call.
+
+    **Tenure:** "since when", "how long", or "longest-standing" for the party as a whole is
+    `continuous_since`, not any row's `funded_date`. A row's date is when that account started,
+    and investors who rotate accounts (private banks, platforms, nominees) have no single old
+    account. `continuous_since` merges every owned account, closed ones included, into the
+    unbroken run that reaches today.
 
     **Read `data_caveat` before quoting a figure.** Two endpoints can answer this, and they differ
     in what they know: the fast one publishes a balance with no as-of date and no
@@ -122,10 +124,11 @@ async def get_accounts_for_party(
     says which one answered. A dated, labelled NAV is `get_time_series` on that account's
     `values`, not this listing.
 
-    A missing figure is omitted, never zeroed. `figure_errors` on a row distinguishes "the request
-    failed" from "Backstop publishes no number".
+    Check a money figure's `formatted`: `amount` 0.0 with `formatted` `-` means no figure is
+    recorded, not zero. A figure with no data at all is omitted; `figure_errors` on a row
+    distinguishes "the request failed" from "Backstop publishes no number".
 
-    Tenants may call a product a fund, vehicle, or share class; the Backstop name is still
+    Tenants may call a product a fund or vehicle; the Backstop name is still
     `product`. An empty list with `closed_omitted>0` means every owned account is closed — pass
     `include_closed=true` rather than reading that as "owns nothing".
     """

@@ -26,11 +26,11 @@ class OpportunityStagesService:
     pointer — and only some of the stages it points at arrive in the response's `included`
     array. The rest are named from here.
 
-    Composes `CachedValue` with `serve_stale=False`. The custom-field catalog is 3,274
-    definitions and 6.15 s unfiltered, so refetching it is expensive enough to be worth
-    softening a failure; this vocabulary is seven rows in one page, and a stage history that
-    silently loses half its entries reads as complete when it isn't. So a failed fetch
-    propagates and the caller fails with it.
+    Composes `CachedValue` with `serve_stale=False`. Large tenants have thousands of custom-field
+    definitions and a multi-second walk, so that catalog softens a failed refresh; this
+    vocabulary is a small collection in one page, and a stage history that silently loses
+    entries reads as complete when it isn't. So a failed fetch propagates and the caller
+    fails with it.
 
     A failure is remembered for `_FAILURE_COOLDOWN` and re-raised, rather than re-fetched, for
     callers that arrive inside it. The in-flight pin already collapses concurrent waiters onto

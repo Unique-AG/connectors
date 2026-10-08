@@ -109,12 +109,12 @@ class TestAccountIsOpen:
 class TestProjectOwner:
     def test_org_owner_uses_specific_resource_type(self) -> None:
         owner = AccountOwnerDto.from_included(
-            _owner("341688185", name="PSP Investments", resource_type="organizations")
+            _owner("341688185", name="Tailspin Investments", resource_type="organizations")
         )
 
         assert owner == AccountOwnerDto(
             id="341688185",
-            name="PSP Investments",
+            name="Tailspin Investments",
             resource_type="organizations",
         )
 
@@ -122,7 +122,7 @@ class TestProjectOwner:
         owner = AccountOwnerDto.from_included(
             _owner(
                 "contact-1",
-                name="PSP Investments",
+                name="Tailspin Investments",
                 resource_type="organizations",
                 specific_id="341688185",
             )
@@ -130,7 +130,7 @@ class TestProjectOwner:
 
         assert owner == AccountOwnerDto(
             id="341688185",
-            name="PSP Investments",
+            name="Tailspin Investments",
             resource_type="organizations",
         )
 
@@ -139,13 +139,13 @@ class TestProjectOwner:
             resource(
                 "contact-1",
                 "contacts",
-                name="PSP Investments",
+                name="Tailspin Investments",
                 specificResource={"resourceId": "341688185"},
             )
         )
 
         assert owner == AccountOwnerDto(
-            id="contact-1", name="PSP Investments", resource_type="contacts"
+            id="contact-1", name="Tailspin Investments", resource_type="contacts"
         )
 
     def test_person_owner_keeps_json_api_type(self) -> None:
@@ -163,7 +163,7 @@ class TestProjectOwner:
 class TestProjectAccount:
     def test_projects_includes_and_status_fields(self) -> None:
         included = [
-            _owner("341688185", name="PSP Investments", resource_type="organizations"),
+            _owner("341688185", name="Tailspin Investments", resource_type="organizations"),
             resource("10", "investor-types", name="Fund of Funds"),
             resource(
                 "1292283",
@@ -178,7 +178,7 @@ class TestProjectAccount:
                 owner_id="341688185",
                 investor_type_id="10",
                 product_id="1292283",
-                name="PSP NGUP",
+                name="Tailspin NGUP",
                 currency="USD",
                 accountStartDate="2019-03-01",
                 ownershipType="Direct",
@@ -193,10 +193,10 @@ class TestProjectAccount:
         )
 
         assert record.id == "27871657"
-        assert record.name == "PSP NGUP"
+        assert record.name == "Tailspin NGUP"
         assert record.owner == AccountOwnerDto(
             id="341688185",
-            name="PSP Investments",
+            name="Tailspin Investments",
             resource_type="organizations",
         )
         assert record.investor_type is not None

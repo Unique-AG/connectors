@@ -70,7 +70,7 @@ class PartyResolveItemDto(BaseModel):
 class QuickSearchOptionsDto(BaseModel):
     """Caller-overridable knobs for `GET /quick-search`.
 
-    `full_email_match=None` means auto: true when the search looks like an email, else omit/false.
+    `full_email_match=None` omits the parameter.
     `filter_type=None` means omit the param (API default). Pagination is first page only;
     `page[limit]` is aligned with `limit` by the search layer.
     """

@@ -61,7 +61,7 @@ def _service(client: BackstopClient, *, ttl_minutes: int = 60) -> CustomFieldsSe
 def _definition_resource(
     resource_id: str,
     *,
-    name: str | None = "Grade",
+    name: str | None = "Flavor",
     entity_type: str | None = "OrganizationBean",
     **attrs: object,
 ) -> BackstopApiResource[CustomFieldDefinitionAttributes]:
@@ -97,7 +97,7 @@ class TestDefinitionFromResource:
         definition = CustomFieldDefinitionDto.from_resource(
             _definition_resource(
                 "42",
-                name="Grade",
+                name="Flavor",
                 entity_type="OrganizationBean",
                 fieldType="picklist",
                 fieldTypeDisplay="Picklist",
@@ -117,7 +117,7 @@ class TestDefinitionFromResource:
 
         assert definition is not None
         assert definition.id == "42"
-        assert definition.name == "Grade"
+        assert definition.name == "Flavor"
         assert definition.entity_type == "OrganizationBean"
         assert definition.field_type == "picklist"
         assert definition.field_type_display == "Picklist"

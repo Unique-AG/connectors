@@ -31,10 +31,14 @@ from backstop_mcp.backstop_client import BackstopApiResource, IncludedResource
 from backstop_mcp.dates import LenientDate
 from backstop_mcp.features.collection_scan import (
     AggregateBucketResponse,
+    ContinuationResponse,
     ScanCoverageResponse,
     project_fields,
 )
-from backstop_mcp.features.custom_fields import ResolvedCustomFieldValueResponse
+from backstop_mcp.features.custom_fields import (
+    ResolvedCustomFieldValueResponse,
+    StoredCustomFieldValueResponse,
+)
 from backstop_mcp.features.opportunities.api_responses import (
     OpportunityResource,
     OpportunityStageAttributes,
@@ -122,12 +126,7 @@ class OpportunityStageResponse(OmitNoneModel):
 
 
 class StageChangeResponse(OmitNoneModel):
-    """One move in a deal's stage history: which stage it entered, and when.
-
-    Validated from a side-loaded `opportunity-stage-history` entry's `attributes`. That entry
-    points at its stage through Backstop's inline `ResourceRef` format, which is resolved to
-    `stage`/`stage_id` before validation rather than modelled here.
-    """
+    """One move in a deal's stage history: which stage it entered, and when."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
         frozen=True, extra="ignore", populate_by_name=True
@@ -156,11 +155,7 @@ class OpportunityResponse(OmitNoneModel):
     """One deal in the pipeline for a person or organization.
 
     Amounts are in `currency`; `probability` is a fraction, not a percentage. The stage timings
-    (`days_open`, `days_in_current_stage`) are Backstop's own counters, carried through as they
-    are stored.
-
-    Every wire field is optional: a record missing one is still a deal worth reporting, and no
-    field below was measured as load-bearing enough to drop the record over.
+    (`days_open`, `days_in_current_stage`) are Backstop's own counters.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -178,7 +173,7 @@ class OpportunityResponse(OmitNoneModel):
     )
     name: StrippedStr | None = Field(
         default=None,
-        description="Name of the deal, usually 'investor - fund' — e.g. 'Koch - CATS Select'.",
+        description="Name of the deal, e.g. 'Contoso - Harbor Select'.",
     )
     stage: str | None = Field(
         default=None,
@@ -264,7 +259,7 @@ class OpportunityResponse(OmitNoneModel):
     date_entered_current_stage: LenientDate = Field(
         default=None,
         validation_alias="dateEnteredCurrentStage",
-        description="Day the deal entered `stage`. Deals are returned newest-first by this day.",
+        description="Day the deal entered `stage`.",
     )
     custom_field_values: tuple[ResolvedCustomFieldValueResponse, ...] = Field(
         default=(),
@@ -425,10 +420,29 @@ class GetOpportunitiesByIdsResponse(OmitNoneModel):
     )
 
 
-class InvestorFromOpportunityResponse(OmitNoneModel):
-    """The investor on a deal. The include arrives as a `contacts` resource."""
+_INVESTOR_SEARCH_TYPES: dict[str, Literal["organizations", "people"]] = {
+    "organizations": "organizations",
+    "people": "people",
+}
 
-    id: str = Field(description="Backstop contacts id of the investor. Echo it; never invent one.")
+
+class InvestorFromOpportunityResponse(OmitNoneModel):
+    """The investor on a deal."""
+
+    id: str = Field(
+        description=(
+            "Backstop id of the investor organization or person (`search_type` says which). "
+            "Pass it as `party_id` with `search_type`; never invent one."
+        )
+    )
+    search_type: Literal["organizations", "people"] | None = Field(
+        default=None,
+        description=(
+            "Collection `id` belongs to, from the contact's `specificResource`. Pass it as "
+            "`search_type` with `id` as `party_id` (e.g. to get_last_activity_for_parties). "
+            "Absent when Backstop did not say — do not guess organizations."
+        ),
+    )
     name: str | None = Field(default=None, description="Investor name as published on the contact.")
     country: str | None = Field(default=None, description="Country on the investor contact.")
     state: str | None = Field(
@@ -442,8 +456,16 @@ class InvestorFromOpportunityResponse(OmitNoneModel):
     ) -> Self | None:
         if included is None:
             return None
+        specific = included.attributes.specific_resource
+        search_type = _INVESTOR_SEARCH_TYPES.get(
+            (specific.resource_type if specific is not None else None) or ""
+        )
+        # The id comes from the same reference as the type, never mixed (see OwnerResponse).
         return cls(
-            id=included.id,
+            id=specific.resource_id
+            if specific is not None and search_type is not None
+            else included.id,
+            search_type=search_type,
             name=included.attributes.name,
             country=included.attributes.country,
             state=included.attributes.state,
@@ -458,6 +480,12 @@ class ProductFromOpportunityResponse(OmitNoneModel):
         description="Backstop product id. Echo it into get_time_series / get_product_investors."
     )
     name: str | None = Field(default=None, description="Product name as published.")
+    short_name: str | None = Field(
+        default=None,
+        description=(
+            "Product short name (`productShortName`), e.g. NWON. Echo it; never invent one."
+        ),
+    )
 
     @classmethod
     def from_included(
@@ -465,7 +493,13 @@ class ProductFromOpportunityResponse(OmitNoneModel):
     ) -> Self | None:
         if included is None:
             return None
-        return cls(id=included.id, name=included.attributes.name)
+        attributes = included.attributes
+        configuration = attributes.configuration
+        return cls(
+            id=included.id,
+            name=attributes.name,
+            short_name=None if configuration is None else configuration.product_short_name,
+        )
 
 
 class SearchOpportunityRowResponse(OmitNoneModel):
@@ -485,7 +519,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             "Omitted when this deployment has no UI origin. Echo it; never invent one."
         ),
     )
-    name: str | None = Field(default=None, description="Deal name, usually 'investor - fund'.")
+    name: str | None = Field(default=None, description="Deal name.")
     stage: str | None = Field(default=None, description="The stage the deal is in now.")
     stage_id: str | None = Field(default=None, description="Backstop id of the current stage.")
     previous_stage: str | None = Field(
@@ -521,8 +555,34 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     investor: InvestorFromOpportunityResponse | None = Field(
         default=None, description="Investor contact chip when the include arrived."
     )
+    investor_representative: str | None = Field(
+        default=None,
+        description=(
+            "Login of the representative on the investor organization, which can differ from "
+            "the deal's `representative`. What `representative_scope` `investor` and `either` "
+            "match. "
+            "Absent when the organization has no representative."
+        ),
+    )
+    representative: str | None = Field(
+        default=None,
+        description=(
+            "Login stored as the representative on the deal itself — the colleague the deal is "
+            "assigned to, and what the default `representative` filter matches."
+        ),
+    )
     product: ProductFromOpportunityResponse | None = Field(
-        default=None, description="Product chip when the include arrived."
+        default=None,
+        description="Linked fund when the include arrived.",
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every opportunity custom field with a value on this deal, as stored text — no "
+            "catalog needed. Absent when the call set `exclude_custom_fields`. A field "
+            "missing here has no value on this deal: leave the cell blank, do not look it "
+            "up again with get_opportunities_by_ids."
+        ),
     )
 
     @classmethod
@@ -532,6 +592,9 @@ class SearchOpportunityRowResponse(OmitNoneModel):
         *,
         investor: InvestorFromOpportunityResponse | None,
         product: ProductFromOpportunityResponse | None,
+        investor_representative: str | None = None,
+        representative: str | None = None,
+        custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = None,
     ) -> Self:
         return cls(
             id=deal.id,
@@ -553,7 +616,10 @@ class SearchOpportunityRowResponse(OmitNoneModel):
             days_in_current_stage=deal.days_in_current_stage,
             date_entered_current_stage=deal.date_entered_current_stage,
             investor=investor,
+            investor_representative=investor_representative,
+            representative=representative,
             product=product,
+            custom_field_values=custom_field_values,
         )
 
     def project(self, *, fields: frozenset[str]) -> Self:
@@ -565,21 +631,39 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
 
     status: Literal["resolved"] = Field(
         default="resolved",
-        description="Always 'resolved': the walk ran. An empty `rows` list is 'none matching'.",
+        description=(
+            "Always 'resolved': the search ran. An empty `rows` list with no `continuation` is "
+            "'none matching'."
+        ),
     )
     mode: Literal["rows", "aggregate"] = Field(
         description="`rows` returns deal bodies; `aggregate` returns counts grouped by `group_by`."
     )
     coverage: ScanCoverageResponse = Field(
-        description="How much of the matching set was scanned, and whether it was truncated."
+        description=(
+            "`visible_count` is Backstop's total before the client-side filters (stage, linked "
+            "fund, open/closed, custom fields). In rows mode `rows_scanned` is the records this "
+            "page read; whether more remain is `continuation`. In aggregate mode `truncated` means "
+            "a later page failed."
+        )
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Rows mode only: present when this page stopped before the matches ran out. Absent "
+            "means this was the last page; aggregate mode never has one."
+        ),
     )
     rows: tuple[SearchOpportunityRowResponse, ...] = Field(
         default=(),
         description=(
-            "Matching deals after client-side filters. Empty in aggregate mode. `id` is always "
+            "One page of matching deals after client-side filters, in Backstop id order. "
+            "Empty in aggregate mode. An empty list with no `continuation` means nothing "
+            "matched. `id` is always "
             "present so the row can be handed to get_opportunities_by_ids. Amounts are already "
-            "on this walk — select them with `fields`. Master Pipeline custom fields and stage "
-            "history are not; fetch those ids with get_opportunities_by_ids."
+            "on this walk — select them with `fields`. Custom-field values are on every row "
+            "unless the call set `exclude_custom_fields`. Stage history is not on this "
+            "walk; fetch those ids with get_opportunities_by_ids."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
@@ -588,5 +672,10 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
     )
     custom_fields_unavailable: bool = Field(
         default=False,
-        description=_CUSTOM_FIELDS_UNAVAILABLE_DESCRIPTION,
+        description=(
+            "True when the custom-field catalog failed to load. `custom_field_values` on the "
+            "rows is the stored text and is still there. "
+            "get_opportunities_by_ids cannot resolve field types while this is true — an "
+            "empty resolved list there means the catalog missed, not that the deal has none."
+        ),
     )

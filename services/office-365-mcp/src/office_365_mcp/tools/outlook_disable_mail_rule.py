@@ -54,8 +54,8 @@ _NOT_A_RULE_HANDLE = (
     + "has exactly one shape, outlook:///rules/{rule_id} with the id percent-encoded. "
     + "outlook_get_mailbox_settings reports one as `uri` on every rule it lists. It is the only "
     + "tool here that mints them. Copy that value rather than assembling one: a rule's display "
-    + "name, a sender's address and a bare id are not handles. Neither is a message, folder or "
-    + "draft handle under the same scheme, which addresses other things entirely. Call "
+    + "name, a sender's address and a bare id are not handles. Neither is a message or folder "
+    + "handle under the same scheme, which addresses other things entirely. Call "
     + "outlook_get_mailbox_settings with include=rules to see the rules and their handles, then "
     + "call again. Retrying this value will fail identically."
 )

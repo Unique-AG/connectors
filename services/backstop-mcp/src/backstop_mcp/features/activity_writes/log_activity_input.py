@@ -43,12 +43,7 @@ LOG_ACTIVITY_INPUT_DESCRIPTION = (
 class ActivityBaseInput(PartyTargetInput, SecondaryPartyInput):
     """Party targeting plus the title every `log_activity` kind writes."""
 
-    title: str = Field(
-        description=(
-            "Required. Title written on the activity. On a task this is mapped to Backstop "
-            "`name` on create."
-        )
-    )
+    title: str = Field(description="Required. Title written on the activity.")
 
 
 class _DatedTaggedActivityInput(ActivityBaseInput):
@@ -56,7 +51,10 @@ class _DatedTaggedActivityInput(ActivityBaseInput):
 
     effective_date: date | None = Field(
         default=None,
-        description="Calendar day on the activity, for backdating. Omit to use today.",
+        description=(
+            "Calendar day on the activity, for backdating. On a note, omit to use today. "
+            "On a meeting or call, omit to leave the date unset."
+        ),
     )
     activity_tag_ids: tuple[str, ...] = Field(
         default=(),
@@ -78,9 +76,8 @@ class _MeetingOrCallFields(_DatedTaggedActivityInput):
 
     time_zone: str = Field(
         description=(
-            "Required. A `/time-zones` shortName (e.g. US/Eastern), not the catalog id and "
-            "not the display name — name is ambiguous. Resolve via the time-zone catalog "
-            "before calling."
+            "Required. A Backstop time-zone short name (for example `US/Eastern`). A unique "
+            "display name also resolves."
         )
     )
     start: datetime = Field(
@@ -112,25 +109,22 @@ class NoteActivityInput(_DatedTaggedActivityInput):
 
 
 class MeetingActivityInput(_MeetingOrCallFields):
-    """A face-to-face meeting. Maps to meeting-or-calls `type=FACE_TO_FACE` later."""
+    """A face-to-face meeting."""
 
     kind: Literal["meeting"] = Field(
-        description="Log a face-to-face meeting. Requires `time_zone`."
+        description="Log a face-to-face meeting. Also needs `start` and `stop`."
     )
 
 
 class CallActivityInput(_MeetingOrCallFields):
-    """A phone call. Maps to meeting-or-calls `PHONE_OUT` / `PHONE_IN` later."""
+    """A phone call."""
 
     kind: Literal["call"] = Field(
         description="Log a phone call. Requires `time_zone`. Defaults to an outbound call."
     )
     direction: Literal["PHONE_OUT", "PHONE_IN"] = Field(
         default="PHONE_OUT",
-        description=(
-            "PHONE_OUT is the default (we called them). PHONE_IN is inbound. Written as "
-            "meeting-or-calls `type`."
-        ),
+        description=("PHONE_OUT is the default (we called them). PHONE_IN is inbound."),
     )
 
 
@@ -138,7 +132,10 @@ class TaskActivityInput(ActivityBaseInput):
     """A CRM task. Tasks have no activity tags, no effective date, and no author field."""
 
     kind: Literal["task"] = Field(
-        description="Log a CRM task. Requires `assigned_user`; tasks have no activity tags."
+        description=(
+            "Log a CRM task. Also needs `assigned_user` and `due_date`. Tasks have no "
+            "activity tags."
+        )
     )
     assigned_user: str = Field(
         description=(
@@ -146,9 +143,7 @@ class TaskActivityInput(ActivityBaseInput):
             "party id. Tasks have no author field; this is who the task is assigned to."
         )
     )
-    description: str | None = Field(
-        default=None, description="Task body, mapped to wire `details`. Omit when there is none."
-    )
+    description: str | None = Field(default=None, description="Task body. Omit when there is none.")
     due_date: date | datetime = Field(
         description=(
             "Required. Due day or timestamp. Backstop rejects a task create without it "

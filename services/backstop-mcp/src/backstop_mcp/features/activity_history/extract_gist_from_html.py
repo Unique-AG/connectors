@@ -1,15 +1,17 @@
 """HTML→Markdown gist conversion: convert, squeeze markdownify's own conversion artifacts, and
-truncate at a word boundary to a caller-supplied budget.
+optionally truncate at a word boundary to a caller-supplied budget.
 
-Note what a gist is *not*: the first ~300 chars of a meeting note are usually its attendee
-table, so the gist answers "who" far better than "what was discussed" — nothing here tries to
-summarize. See `extract_gist_from_html` for the library choice this rests on.
+A gist is a prefix, not a summary: it keeps whatever the body starts with, which may be a
+table rather than the discussion. See `extract_gist_from_html` for the library choice this
+rests on. Omit `max_chars` and the body is not truncated. A conversion that raises returns
+the original HTML, under the same `max_chars` cap, so one bad body cannot fail the tool call.
 """
 
 import logging
 import re
 from typing import ClassVar
 
+from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
 from pydantic import BaseModel, ConfigDict
 
@@ -17,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Matches a Markdown pipe-table separator cell: `---`, `:---`, `---:`, or `:---:`.
 _SEPARATOR_CELL_RE = re.compile(r"^:?-+:?$")
+
+# markdownify recurses ~2 frames per tag and overflows near 500 nested tags; 200 leaves headroom.
+_MAX_TAG_DEPTH = 200
 
 # Any run of whitespace, used to find the last word boundary inside a truncation window.
 _WHITESPACE_RE = re.compile(r"\s")
@@ -37,19 +42,42 @@ class Gist(BaseModel):
     full_length: int
 
 
-def extract_gist_from_html(html: str, *, max_chars: int) -> Gist:
-    """Convert `html` to a squeezed Markdown gist, truncated at a word boundary to `max_chars`.
+def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
+    """Convert `html` to a squeezed Markdown gist.
+
+    Pass `max_chars` only for a prefix: a timeline page, so a page of gists fits in context,
+    or a search row's `short_description`. The cut lands on a word boundary. Omit it for a
+    full body — `description` and `get_activity_detail` — and nothing is truncated.
 
     Conversion is `markdownify` (see module docstring): it renders tables as Markdown pipe
     rows instead of flattening them to a run-on line, which is what keeps a meeting note's
-    firm/person attendee pairs from being scrambled together. Squeezing removes two of
-    markdownify's own artifacts — the synthetic blank header row it invents for a `<th>`-less
-    `<table>`, and runs of blank lines — before truncation ever sees the text.
+    firm/person attendee pairs from being scrambled together. A body nested deeper than
+    markdownify can walk is flattened at that depth and converted again. Squeezing removes
+    two of markdownify's own artifacts — the synthetic blank header row it invents for a
+    `<th>`-less `<table>`, and runs of blank lines — before truncation ever sees the text.
+
+    Any failure returns the raw `html` instead, so one bad body cannot fail the tool call.
+    The two modes still hold: with `max_chars` it is hard-cut to `max_chars` (a list row's
+    budget binds whatever the text is, even if the cut lands inside a tag) and marked
+    truncated; without it the whole body comes back.
     """
-    converted = markdownify(html)
-    squeezed = _squeeze(converted)
+    try:
+        return _gist(_html_to_markdown(html), max_chars=max_chars)
+    except Exception:
+        logger.warning(
+            "activity_history.gist.conversion_failed",
+            extra={"html_chars": len(html)},
+            exc_info=True,
+        )
+        if max_chars is None or len(html) <= max_chars:
+            return Gist(text=html, truncated=False, full_length=len(html))
+        return Gist(text=html[:max_chars], truncated=True, full_length=len(html))
+
+
+def _gist(markdown: str, *, max_chars: int | None) -> Gist:
+    squeezed = _squeeze(markdown)
     full_length = len(squeezed)
-    if full_length <= max_chars:
+    if max_chars is None or full_length <= max_chars:
         return Gist(text=squeezed, truncated=False, full_length=full_length)
     truncated_text = _truncate_at_word_boundary(squeezed, max_chars)
     logger.debug(
@@ -57,6 +85,46 @@ def extract_gist_from_html(html: str, *, max_chars: int) -> Gist:
         extra={"full_length": full_length, "max_chars": max_chars, "kept": len(truncated_text)},
     )
     return Gist(text=truncated_text, truncated=True, full_length=full_length)
+
+
+def _html_to_markdown(html: str) -> str:
+    """Convert `html` to Markdown, flattening over-deep subtrees instead of overflowing."""
+    try:
+        return markdownify(html)
+    except RecursionError:
+        capped = _cap_nesting(html, max_depth=_MAX_TAG_DEPTH)
+        logger.warning(
+            "activity_history.gist.nesting_capped",
+            extra={"html_chars": len(html), "max_depth": _MAX_TAG_DEPTH},
+        )
+        return markdownify(capped)
+
+
+def _cap_nesting(html: str, *, max_depth: int) -> str:
+    """Replace every tag nested deeper than `max_depth` with its own text.
+
+    Only the over-deep subtree is flattened, so a table sitting higher in the body still
+    converts to Markdown pipe rows.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    too_deep: list[Tag] = []
+    seen: set[int] = set()
+    stack: list[tuple[Tag, int]] = [(soup, 0)]
+    while stack:
+        node, depth = stack.pop()
+        node_id = id(node)
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        if node is not soup and depth > max_depth:
+            too_deep.append(node)
+            continue
+        for child in tuple(node.contents):
+            if isinstance(child, Tag):
+                stack.append((child, depth + 1))
+    for node in too_deep:
+        node.replace_with(node.get_text("\n", strip=True))
+    return str(soup)
 
 
 def _squeeze(markdown: str) -> str:
@@ -68,15 +136,9 @@ def _squeeze(markdown: str) -> str:
 def _drop_synthetic_table_headers(markdown: str) -> str:
     """Remove markdownify's blank `|  |  |  |` header row plus its `| --- | --- |` separator.
 
-    That pair is markdownify's own artifact for a `<table>` with no `<th>` cells (a plain
-    layout table using only `<td>`), and it always emits it as the first two lines of the
-    table's block of pipe-table lines — never anywhere deeper. So a genuine blank spacer row or
-    a row of `-` placeholder cells further down in a real table must not be mistaken for it, and
-    a real `<th>` header (whose cells hold actual text) never matches the blank-row shape in the
-    first place. Detecting table blocks first (contiguous runs of pipe-table lines, verified
-    empirically to be how markdownify delimits adjacent tables) and only inspecting each block's
-    first two lines is what tells the synthetic artifact apart from structurally identical rows
-    that happen to appear later.
+    markdownify emits that pair only as the first two lines of a `<th>`-less table's block of
+    contiguous pipe-table lines, so only those two lines are checked — identical rows deeper in
+    a table are real content and are kept.
     """
     lines = markdown.split("\n")
     kept: list[str] = []

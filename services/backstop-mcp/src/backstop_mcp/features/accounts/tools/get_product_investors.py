@@ -1,36 +1,43 @@
-"""`get_product_investors`: who holds a product, with no figures.
+"""Who holds one or more products, and each account's latest value only when asked.
 
-Step 1 of two. Dated NAV, IRR, and other series are `get_time_series` on a specific account
-(or on this product's `aums` for the fund-level number). Do not call `get_time_series` once
-per account in the fund — that reconstitutes the fan-out this connector removed.
+One listing per product plus one entry per investor across them. No figures by default;
+`include_latest_value=true` adds each account's latest `values` point and per-investor totals,
+one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never loops
+`get_time_series` over a fund's accounts.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from opentelemetry import trace
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
-    GetAccountsForProductQuery,
+    GetProductInvestorsQuery,
     ProductAmbiguousResponse,
     ProductInvestorsResolvedResponse,
-    resolve_product_query,
+    ResolvedProductDto,
+    resolve_product_family,
 )
-from backstop_mcp.features.accounts.dependencies import get_accounts_for_product_query_factory
-from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
-from backstop_mcp.models import published_output_schema
+from backstop_mcp.features.accounts.dependencies import get_product_investors_query_factory
+from backstop_mcp.features.resolution import NotFoundResponse, input_required
+from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
 logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 type GetProductInvestorsResponse = (
     ProductAmbiguousResponse | NotFoundResponse | ProductInvestorsResolvedResponse
 )
+
+_MAX_PRODUCTS = 10
 
 
 @tool(
@@ -44,95 +51,168 @@ type GetProductInvestorsResponse = (
 )
 async def get_product_investors(
     ctx: Context,
-    product_id: Annotated[
-        str | None,
+    products: Annotated[
+        list[str],
         Field(
+            min_length=1,
+            max_length=_MAX_PRODUCTS,
             description=(
-                "Trusted Backstop product id from a prior resolve echo. A short name here is "
-                "resolved through the catalog rather than failing. Never invent one. Exactly "
-                "one of `product_id` or `product`/`search` must be provided."
+                "One to ten products: ids echoed from a prior response, short names (`NWON`), "
+                "or names. An id, exact short name, or exact name is that one vehicle. A partial "
+                "name returns every vehicle whose name contains it, up to 6 (several vehicles "
+                "sharing a name). More matches ask the user. Pass several (`['NWON', 'NWOF']`) "
+                "when the user names specific ones. "
+                "Never invent an id."
             ),
         ),
-    ] = None,
-    product: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Product short name (`NGUP`) or display name. Same catalog resolve as "
-                "`product_id`. Duplicate short names are ambiguous — "
-                "pick from the candidates rather than guessing. Same lookup as `search`. "
-                "Exactly one of `product_id` or `product`/`search` must be provided."
-            ),
-        ),
-    ] = None,
-    search: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Product short name (`NGUP`) or display name — same lookup as `product`. "
-                "Use this the way get_person uses `search`. Duplicate short names are "
-                "ambiguous — pick from the candidates rather than guessing. Exactly one of "
-                "`product_id` or `product`/`search` must be provided."
-            ),
-        ),
-    ] = None,
+    ],
     include_closed: Annotated[
         bool,
         Field(
             description=(
-                "When false (default), only open accounts are returned (`closedDate` key "
-                "absent). Pass true to include closed accounts."
+                "When false (default), only open accounts are returned. Pass true to include "
+                "closed accounts. `investors[].continuous_since` counts closed accounts either way."
             ),
         ),
     ] = False,
+    include_latest_value: Annotated[
+        bool,
+        Field(
+            description=(
+                "Adds each account's latest value (amount, currency, as-of date, ACTUAL or "
+                "ESTIMATE) and per-owner totals — the answer to 'list investors by size'. It "
+                "costs one Backstop request per account and is refused past this deployment's "
+                "account limit. Pass true when the answer needs balances: "
+                "sizing, a share of assets, or a breakdown weighted by value. Past the limit "
+                "no values are fetched and `latest_value_hint` says how to narrow. Leave it "
+                "false for a list of who holds the product. For a specific date or any other "
+                "series, use get_time_series instead."
+            ),
+        ),
+    ] = False,
+    investor_ids: Annotated[
+        Sequence[CoercedId],
+        Field(
+            description=(
+                "Only these investors' accounts are listed and valued: party ids from an "
+                "earlier result (`investors[].id`, an activity's `associated_with`, a deal's "
+                "`investor`). Pass it when the answer is about investors you already have, so "
+                "the values stay under the account limit. Ids with no account here come back "
+                "in `investor_ids_not_found`. Omit for everyone in the products."
+            ),
+        ),
+    ] = (),
+    exclude_custom_fields: Annotated[
+        bool,
+        Field(
+            description=(
+                "Every account's custom fields come back as `custom_field_values` by "
+                "default. Leave this false. Set it true only to retry a call that timed "
+                "out, to see whether reading the custom fields is what made it slow."
+            )
+        ),
+    ] = False,
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
-    get_accounts_for_product_query: GetAccountsForProductQuery = Depends(
-        get_accounts_for_product_query_factory
+    get_product_investors_query: GetProductInvestorsQuery = Depends(
+        get_product_investors_query_factory
     ),
 ) -> GetProductInvestorsResponse | InputRequiredResult:
-    """The accounts in one product, and who owns them. No balances, no series.
+    """The accounts in one or more products, and who owns them.
 
-    Pass a trusted `product_id`, or `search` / `product` (short name or display name).
-    `search` is the same name lookup as on get_person. This is step 1 of
-    two: identity and owners only. A dated figure is step 2 — `get_time_series` on that
-    account. Figures cost one call per (account, series), so a fund with 200 accounts is
-    not a question to answer account-by-account — that reconstitutes the fan-out this
-    connector removed. Fund-level AUM is `get_time_series` on this product's `aums`, which
-    is the product's total assets under management, not one investor's balance.
+    A partial fund name returns every vehicle whose name contains it; an
+    id, exact short name, or exact name is one vehicle. No figures by default.
 
-    Owner `resource_type` may be `contacts` even when the party is an organization — echo
-    `id` and `resource_type` together as a later party resolve; do not assume `contacts`
-    means a person. An empty list with `closed_omitted>0` means every account is closed —
-    pass `include_closed=true` rather than reading that as "no investors".
+    Sizing ("list investors by size", "biggest holders", a share or breakdown by value):
+    call with `include_latest_value=true` and rank by `investors[].latest_value_totals`;
+    say which vehicles and whether closed accounts counted. When the investors are already
+    known (from activities or a pipeline walk), pass them as `investor_ids` so only their
+    accounts are valued. Past the account limit no values come back and
+    `latest_value_hint` says how to narrow. Never call `get_time_series`
+    once per account in the fund — that is one call per (account, series) and drops rows.
+    Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
+    under management, not one investor's balance.
+
+    Tenure ("since when", "longest-standing", "longest consecutive investor"): rank by
+    `investors[].continuous_since`, which merges every account the investor has had in these
+    products, closed ones included, into the unbroken run that reaches today. Never rank by an
+    open account's `account_start_date`: investors who rotate accounts (private banks,
+    platforms, nominees) have no single old account. It covers only the products passed.
+
+    `products` has one listing per vehicle with its accounts. `investors` has one entry per
+    owner across every vehicle, with a holding per vehicle they are in. Investor
+    `resource_type` may be `contacts` even when the party is an organization — echo `id` and
+    `resource_type` together as a later party resolve; do not assume `contacts` means a
+    person. A listing with no accounts and `closed_omitted>0` means every account in that
+    product is closed — pass `include_closed=true` rather than reading that as "no investors".
+
+    Call like: {"products": ["NGUP"], "include_latest_value": false}
+    Several vehicles: {"products": ["NWON", "NWOF"]}
     """
-    if product is not None and search is not None:
-        raise ValueError("Pass at most one of product or search")
-    name = product if product is not None else search
-    if (product_id is None) == (name is None):
-        raise ValueError("Exactly one of product_id or product must be provided")
+    with _tracer.start_as_current_span("accounts.product_investors") as span:
+        span.set_attribute("product_count", len(products))
+        span.set_attribute("include_closed", include_closed)
+        span.set_attribute("include_latest_value", include_latest_value)
+        span.set_attribute("exclude_custom_fields", exclude_custom_fields)
+        requested_investors = coerce_ids(investor_ids)
+        span.set_attribute("investor_id_count", len(requested_investors))
+        resolved_products = await _resolve_products(ctx, client, products=products)
+        if not isinstance(resolved_products, tuple):
+            return resolved_products
 
-    query = product_id if product_id is not None else name
-    assert query is not None
-    outcome = await resolve_product_query(ctx, client, query=query)
-    if input_required(outcome):
-        return outcome
-    if not isinstance(outcome, Resolved):
-        return ProductAmbiguousResponse.from_unresolved(outcome)
+        logger.info(
+            "accounts.product_investors.start",
+            extra={
+                "product_ids": [item.id for item in resolved_products],
+                "include_closed": include_closed,
+                "include_latest_value": include_latest_value,
+                "exclude_custom_fields": exclude_custom_fields,
+                "investor_id_count": len(requested_investors),
+            },
+        )
+        result = await get_product_investors_query.run(
+            products=resolved_products,
+            include_closed=include_closed,
+            include_latest_value=include_latest_value,
+            exclude_custom_fields=exclude_custom_fields,
+            investor_ids=requested_investors,
+        )
+        accounts = [account for listing in result.products for account in listing.accounts]
+        logger.info(
+            "accounts.product_investors.completed",
+            extra={
+                "product_ids": [listing.product.id for listing in result.products],
+                "returned": len(accounts),
+                "closed_omitted": sum(listing.closed_omitted for listing in result.products),
+                "valued": sum(
+                    1
+                    for account in accounts
+                    if account.latest_value is not None and account.latest_value.available
+                ),
+            },
+        )
+        return result
 
-    resolved = outcome.value
-    logger.info(
-        "accounts.product_investors.start",
-        extra={"product_id": resolved.id, "include_closed": include_closed},
-    )
-    result = await get_accounts_for_product_query.run(
-        product=resolved, include_closed=include_closed
-    )
-    logger.info(
-        "accounts.product_investors.completed",
-        extra={
-            "product_id": resolved.id,
-            "returned": len(result.accounts),
-            "closed_omitted": result.closed_omitted,
-        },
-    )
-    return result
+
+async def _resolve_products(
+    ctx: Context, client: BackstopClient, *, products: list[str]
+) -> (
+    tuple[ResolvedProductDto, ...]
+    | ProductAmbiguousResponse
+    | NotFoundResponse
+    | InputRequiredResult
+):
+    """Every entry through the family resolve, deduped by product id in the order given.
+
+    Sequential on purpose: an ambiguous entry elicits the user, and two prompts at once would
+    race for the same conversation.
+    """
+    collected: dict[str, ResolvedProductDto] = {}
+    for entry in products:
+        family = await resolve_product_family(ctx, client, product=entry)
+        if input_required(family):
+            return family
+        if not isinstance(family, tuple):
+            return ProductAmbiguousResponse.from_unresolved(family)
+        for product in family:
+            collected.setdefault(product.id, product)
+    return tuple(collected.values())

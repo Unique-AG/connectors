@@ -108,7 +108,7 @@ class TestGetActivityHistoryDocstring:
         doc = get_activity_history.__doc__ or ""
         assert "search_activities" in doc
         assert "Do not start here" in doc
-        assert "fallback" in doc
+        assert "fallback" in doc.lower()
         assert "include_description" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
@@ -183,6 +183,9 @@ class TestFirstCallByTrustedPartyId:
     ) -> None:
         respx.get(f"{BASE_URL}/organizations/o42").mock(
             return_value=httpx.Response(200, json=_org_document())
+        )
+        respx.get(f"{BASE_URL}/meeting-or-calls/76280387/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
         )
         _activities_route("organizations", "o42", "meetings").mock(
             return_value=httpx.Response(

@@ -105,7 +105,7 @@ def _accounts_page(*, closed: bool = False) -> httpx.Response:
                 resource(
                     _ORG_ID,
                     "contacts",
-                    name="PSP Investments",
+                    name="Tailspin Investments",
                     specificResource={
                         "resourceType": "organizations",
                         "resourceId": _ORG_ID,
@@ -157,7 +157,7 @@ def _mock_quick_search_hit() -> None:
                     {
                         "id": _ORG_ID,
                         "type": "quick-search",
-                        "attributes": {"name": "PSP Investments", "resourceId": _ORG_ID},
+                        "attributes": {"name": "Tailspin Investments", "resourceId": _ORG_ID},
                     }
                 ]
             },
@@ -263,7 +263,11 @@ class TestOwnsNothingIsVerified:
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": {"id": _ORG_ID, "type": "organizations", "attributes": {"name": "PSP"}}
+                    "data": {
+                        "id": _ORG_ID,
+                        "type": "organizations",
+                        "attributes": {"name": "Tailspin"},
+                    }
                 },
             )
         )
@@ -283,7 +287,7 @@ class TestOwnsNothingIsVerified:
 
         assert confirm.called
         assert result.holdings == ()
-        assert result.resolved.name == "PSP"
+        assert result.resolved.name == "Tailspin"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -323,7 +327,7 @@ class TestOwnsNothingIsVerified:
             await get_accounts_for_party(
                 ctx_never_elicit(),
                 search_type="organizations",
-                search="PSP Investments",
+                search="Tailspin Investments",
                 resolve_party_query=make_resolve_party_query(client),
                 get_party_name_query=make_get_party_name_query(client),
                 get_holdings_query=make_get_holdings_query(client),
@@ -334,7 +338,7 @@ class TestOwnsNothingIsVerified:
 
         assert not confirm.called
         assert result.holdings == ()
-        assert result.resolved.name == "PSP Investments"
+        assert result.resolved.name == "Tailspin Investments"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -438,8 +442,7 @@ class TestContract:
         assert "get_product_positions" not in doc
         assert "get_time_series" in doc
         assert "data_caveat" in doc
-        assert "undocumented" in doc
-        assert "may 404" in doc
+        assert "source" in doc
         assert "search_type" in doc
         assert "rejected" in doc
 
@@ -451,7 +454,7 @@ class TestContract:
         dumped = str(schema)
         assert "0.796 is 79.6%" in dumped
         assert "no figure is recorded" in dumped
-        assert "Omitted, never zeroed" in dumped
+        assert "not recorded" in dumped
 
     @pytest.mark.asyncio
     @respx.mock

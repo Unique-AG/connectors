@@ -5,7 +5,7 @@ catalog fetch (`custom_fields`), name-to-record lookup (`party_resolver`), produ
 match (`accounts`), people linked to an organization (`org_people`), read-response provenance
 and departed-contact detection (`data_hygiene`), a person's or organization's interaction
 record (`activity_history`), logging notes, meetings, calls, tasks, emails, and documents
-(`activity_writes`), a party's pipeline (`opportunities`), the time-zone catalog
+(`activity_writes`), a party's pipeline (`opportunities`), time zones
 (`time_zones`), the `?include=` allowlist and the shapes side-loads project onto (`includes`),
 the shared entity-type vocabulary (`entity_types`), the resolution algebra party lookup
 uses (`resolution`), and hard-delete confirmation (`elicitation_utils`).

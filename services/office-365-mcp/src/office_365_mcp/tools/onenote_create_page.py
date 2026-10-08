@@ -26,10 +26,12 @@ from office_365_mcp.shared.handles import (
     onenote_section_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     UNKNOWN_AUDIENCE,
     NotebookAudience,
     client_url_of,
     default_notebook_audience,
+    onenote_root,
     section_audience,
     web_url_of,
     write_state_for,
@@ -40,6 +42,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -72,9 +75,11 @@ GRAPH_NOT_FOUND = (
 _NOT_A_SECTION_HANDLE = (
     "onenote_create_page takes a section handle in `section`, if it is given at all. It looks "
     + "like onenote:///sections/{id}, and it comes from the `uri` of a section in an "
-    + "onenote_list_notebooks result. Copy it exactly. A section name is not a handle, and "
-    + "neither is a notebook name, a path, a web address or a bare id. Omit `section` entirely "
-    + "to create the page in the default section of the default notebook instead."
+    + "onenote_list_notebooks result. A handle from a group or site notebook starts with "
+    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Copy it exactly. A section "
+    + "name is not a handle, and neither is a notebook name, a path, a web address or a bare id. "
+    + "Omit `section` entirely to create the page in the default section of the default notebook "
+    + "instead."
 )
 
 _BOTH_SECTION_AND_SECTION_NAME = (
@@ -87,9 +92,10 @@ _BOTH_SECTION_AND_SECTION_NAME = (
 )
 
 _DESCRIPTION = """\
-Writes a new page into the signed-in user's OneNote. There is no way to attach a file or an \
-image. onenote_append_to_page adds to a page later. OneNote can show the change to everyone who \
-opens the notebook.
+Writes a new page into the signed-in user's OneNote, or into a notebook that a Microsoft 365 \
+group or a SharePoint site owns. There is no way to attach a file or an image. \
+onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
+the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -100,15 +106,20 @@ section of the default notebook.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
 days.
+- To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
+on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
+empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
+Graph does not support custom tags.
 """
 
 
 class CreatedPage(BaseModel):
     uri: str = Field(
         description=(
-            "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. Pass "
-            + "it to onenote_read_page to read the page back, or to onenote_append_to_page to "
-            + "add more to it."
+            "This new page's handle: onenote:///pages/{id}, with the id percent-encoded. A "
+            + "handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. Pass it to onenote_read_page to read the page "
+            + "back, or to onenote_append_to_page to add more to it."
         )
     )
     title: str | None = Field(
@@ -137,9 +148,10 @@ class CreatedPage(BaseModel):
     section_uri: str | None = Field(
         description=(
             "The handle of the section this page was written into: onenote:///sections/{id}. "
-            + "This is the `section` argument's own handle when one was given, though "
-            + "Microsoft's own response can name a different section instead. Null when "
-            + "`section` was omitted and `section_name` created a new section."
+            + "A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+            + "onenote:///sites/{site}/ instead. This is the `section` argument's own handle when "
+            + "one was given, though Microsoft's own response can name a different section "
+            + "instead. Null when `section` was omitted and `section_name` created a new section."
         )
     )
 
@@ -158,10 +170,12 @@ async def _notebook_audience_for(
 ) -> NotebookAudience:
     if handle is None:
         return await default_notebook_audience(client) or UNKNOWN_AUDIENCE
-    return await section_audience(client, handle.section_id)
+    return await section_audience(client, handle.section_id, owner=handle.owner)
 
 
 def _route(handle: OnenoteSectionHandle | None, section_name: str | None) -> tuple[str, ...]:
+    if handle is not None and handle.owner is not None:
+        return (handle.owner.kind, handle.owner.owner_id, "section", handle.section_id)
     if handle is not None:
         return ("section", handle.section_id)
     if section_name is not None:
@@ -215,7 +229,9 @@ async def create_page(
     pages = (
         client.me.onenote.pages
         if handle is None
-        else client.me.onenote.sections.by_onenote_section_id(handle.section_id).pages
+        else onenote_root(client, handle.owner)
+        .sections.by_onenote_section_id(handle.section_id)
+        .pages
     )
     raw_query: dict[str, str] = {"sectionName": section_name} if section_name is not None else {}
     request = request_with_query(
@@ -229,7 +245,10 @@ async def create_page(
     created: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with (
+        owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME),
+    ):
         audience = await _notebook_audience_for(client, handle)
         if answer_pending or audience.reaches_others:
             with not_graph():
@@ -273,16 +292,17 @@ def _envelope(title: str, body_html: str, created_at: datetime) -> str:
 
 def _answer(page: OnenotePage, handle: OnenoteSectionHandle | None) -> CreatedPage:
     assert page.id is not None, "Graph created a page it gave no id, which cannot be addressed"
+    owner = None if handle is None else handle.owner
     parent = page.parent_section
     parent_id = parent.id if parent is not None else None
     if parent_id is not None:
-        section_uri = OnenoteSectionHandle(parent_id).uri
+        section_uri = OnenoteSectionHandle(parent_id, owner=owner).uri
     elif handle is not None:
         section_uri = handle.uri
     else:
         section_uri = None
     return CreatedPage(
-        uri=OnenotePageHandle(page.id).uri,
+        uri=OnenotePageHandle(page.id, owner=owner).uri,
         title=page.title,
         web_url=web_url_of(page.links),
         client_url=client_url_of(page.links),
@@ -332,8 +352,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 min_length=1,
                 description=(
                     "The section to create the page in, as the `uri` of a section from an "
-                    + "onenote_list_notebooks result: onenote:///sections/{id}. A section name, "
-                    + "a notebook name and a web address are not handles."
+                    + "onenote_list_notebooks result: onenote:///sections/{id}. A handle from a "
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section name, a notebook name and a web "
+                    + "address are not handles."
                 ),
             ),
         ] = None,

@@ -47,7 +47,7 @@ async def client() -> AsyncGenerator[BackstopClient]:
 def _create(**payload: object) -> CreateOpportunityInput:
     return _OPPORTUNITY.validate_python(
         {
-            "name": "Koch - CATS Select",
+            "name": "Contoso - Harbor Select",
             "currency_code": "USD",
             "is_erisa": False,
             "party_id": _INVESTOR_ID,
@@ -159,7 +159,7 @@ class TestCreateOpportunityCommand:
     async def test_create_opportunity_sends_investor_as_a_relationship(
         self, client: BackstopClient
     ) -> None:
-        route = _mock_write(name="Koch - CATS Select")
+        route = _mock_write(name="Contoso - Harbor Select")
 
         await make_command(client).run(opportunity=_create(), investor_id=_INVESTOR_ID)
 
@@ -177,7 +177,7 @@ class TestCreateOpportunityCommand:
         await make_command(client).run(opportunity=_create(), investor_id=_INVESTOR_ID)
 
         assert _attributes(recorded_json_bodies(route)[0]) == {
-            "name": "Koch - CATS Select",
+            "name": "Contoso - Harbor Select",
             "currencyCode": "USD",
             "isErisa": False,
         }
@@ -196,7 +196,9 @@ class TestCreateOpportunityCommand:
     async def test_stage_name_is_resolved_to_a_catalog_id(self, client: BackstopClient) -> None:
         route = _mock_write(stage_id="42482")
 
-        await make_command(client).run(opportunity=_create(stage="IDD"), investor_id=_INVESTOR_ID)
+        await make_command(client).run(
+            opportunity=_create(stage="Stage B"), investor_id=_INVESTOR_ID
+        )
 
         stage = object_dict(_relationships(recorded_json_bodies(route)[0])["stage"])
         assert object_dict(stage["data"]) == {"type": "opportunity-stages", "id": "42482"}
@@ -206,7 +208,7 @@ class TestCreateOpportunityCommand:
         respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
         post = respx.post(f"{BASE_URL}/opportunities")
 
-        with pytest.raises(ToolError, match="Available stages:.*IDD"):
+        with pytest.raises(ToolError, match="Available stages:.*Stage B"):
             await make_command(client).run(
                 opportunity=_create(stage="Not A Stage"), investor_id=_INVESTOR_ID
             )
@@ -223,20 +225,20 @@ class TestCreateOpportunityCommand:
         )
         get_route = respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
             return_value=_opportunity_document(
-                _ID, stage_id="42482", attributes={"name": "Koch - CATS Select"}
+                _ID, stage_id="42482", attributes={"name": "Contoso - Harbor Select"}
             )
         )
 
         result = await make_command(client).run(
-            opportunity=_create(stage="IDD"), investor_id=_INVESTOR_ID
+            opportunity=_create(stage="Stage B"), investor_id=_INVESTOR_ID
         )
 
         assert recorded_params(get_route)[0]["include"] == "stage,clientDefinedEntityType"
         assert isinstance(result, CreatedOpportunityResponse)
         assert result.id == _ID
         assert result.resource_type == "opportunities"
-        assert result.name == "Koch - CATS Select"
-        assert result.stage == "IDD"
+        assert result.name == "Contoso - Harbor Select"
+        assert result.stage == "Stage B"
         assert result.stage_id == "42482"
         assert result.warnings == ()
 
@@ -275,7 +277,7 @@ class TestCreateOpportunityCommand:
 class TestUniqueCatalogEntityTypeId:
     def test_returns_the_only_type_id(self) -> None:
         catalog = {
-            "a": OpportunityStageResponse(id="a", name="IDD", opportunity_type_ids=("16",)),
+            "a": OpportunityStageResponse(id="a", name="Stage B", opportunity_type_ids=("16",)),
             "b": OpportunityStageResponse(id="b", name="Project", opportunity_type_ids=("16",)),
         }
         assert unique_catalog_entity_type_id(catalog) == "16"

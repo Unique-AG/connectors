@@ -1,3 +1,4 @@
+import json
 import os
 import ssl
 from datetime import timedelta
@@ -7,12 +8,15 @@ from typing import Annotated, ClassVar, Self, TypedDict, cast
 from urllib.parse import urlparse
 
 from pydantic import (
+    BaseModel,
     BeforeValidator,
+    ConfigDict,
     Field,
     HttpUrl,
     PostgresDsn,
     PrivateAttr,
     SecretStr,
+    StringConstraints,
     TypeAdapter,
     field_validator,
     model_validator,
@@ -210,10 +214,12 @@ class BackstopConfig(BaseSettings):
     # a host from the shared `api.backstopsolutions.com` API. See `effective_ui_base_url`.
     ui_base_url: HttpUrlStr | None = None
 
-    # httpx's undocumented default is ~5s; ordinary CRUD calls get a saner explicit timeout.
-    default_timeout_seconds: float = Field(default=30.0, gt=0)
-    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
-    reports_timeout_seconds: float = Field(default=120.0, gt=0)
+    # httpx's documented default timeout is 5s; ordinary CRUD calls get 2 minutes.
+    default_timeout_seconds: float = Field(default=120.0, gt=0)
+    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records,
+    # and a cold report build sends nothing for minutes. Only /reports runs in the background
+    # (`run_report`); no tool calls /analytics yet, and one that does needs the same.
+    reports_timeout_seconds: float = Field(default=600.0, gt=0)
 
     # Backstop hard-limits each user token to 5 concurrent connections.
     max_concurrent_requests_per_user: int = Field(default=5, ge=1)
@@ -237,12 +243,12 @@ class BackstopConfig(BaseSettings):
     page_limit_param: str = Field(default="page[limit]", min_length=1)
     page_offset_param: str = Field(default="page[offset]", min_length=1)
 
-    # How long a fetched custom-field catalog stays usable before it is re-fetched. Measured
-    # against a client-obtained tenant: 3,274 definitions, 2.77 MiB, 6.15 s per unfiltered walk.
-    # Two hours bounds how long a CRM-admin-added field stays invisible;
-    # `list_custom_fields(refresh=true)`
-    # (and the groups list) force a refetch. Capped at 24 hours. Values above the cap (including
-    # the previous documented example of 10080) are clamped so existing deploys still boot.
+    # How long a fetched custom-field catalog stays usable before it is re-fetched. Large
+    # tenants have thousands of definitions and a multi-second unfiltered walk. Two hours
+    # bounds how long a CRM-admin-added field stays invisible;
+    # `list_custom_fields(refresh=true)` (and the groups list) force a refetch. Capped at
+    # 24 hours. Values above the cap (including the previous documented example of 10080)
+    # are clamped so existing deploys still boot.
     custom_field_schema_ttl_minutes: Annotated[
         int, BeforeValidator(_cap_custom_field_schema_ttl_minutes)
     ] = Field(
@@ -252,33 +258,18 @@ class BackstopConfig(BaseSettings):
     )
 
     # Whether the custom-field catalogs (definitions and groups) are held between calls.
-    # On: every party and product read otherwise pays that 6.15 s walk. Cold start
-    # and TTL expiry still cost one caller the walk (~12 times a day per process);
-    # CachedValue's single-flight pin shares it with concurrent callers. After one successful
-    # load, a failed refresh re-serves the previous catalog.
-    #
-    # The held catalog is process-wide, so whichever caller loads it serves every other caller
-    # until the TTL expires — which is only sound because the definitions collection is tenant
-    # schema, not a per-caller projection. What was checked: `/custom-field-definitions` carries
-    # no permission attribute (`fieldClassification`, the only candidate, is null on all 3,274
-    # rows), the API publishes no permission, role or field-security endpoint, and Backstop's own
-    # per-caller marker — `restricted` on an inline `ResourceRef` — sits on the *value*, which
-    # arrives on the caller's own GET, never on the definition. Not proven by a second
-    # credential: one narrower user loading the catalog first would make `join_values` skip a
-    # definition a broader user can see, logged as `custom_fields.values.definition_missing` and
-    # invisible in the response. If that log ever fires for a definition `list_custom_fields`
-    # can show, this cache needs a per-caller key.
-    #
-    # Covers both custom-field catalogs, mirroring `custom_field_schema_ttl_minutes`. The
-    # histograms label the two separately (`catalog="custom-field"` and
-    # `catalog="custom-field group"`), so if they diverge, splitting this flag is the next step.
-    # Set `BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED=false` to turn it off.
+    # On by default: large tenants have thousands of definitions and a multi-second walk,
+    # and every party and product read otherwise pays it. The catalog is tenant schema, not
+    # a per-caller projection — definitions carry no permission attribute. If
+    # `custom_fields.values.definition_missing` fires for a definition `list_custom_fields`
+    # can show, this cache needs a per-caller key. Set
+    # `BACKSTOP_CUSTOM_FIELD_SCHEMA_CACHE_ENABLED=false` to turn it off.
     custom_field_schema_cache_enabled: bool = True
 
-    # How long a fetched opportunity-stage vocabulary stays usable. Seven rows on the instance
-    # this was built against, and a stage is added about as often as a custom field, so the same
-    # one-hour default and 24-hour cap apply. No cache flag: `OpportunityStagesService` composes
-    # `CachedValue` with serve-stale off and always holds its vocabulary.
+    # How long a fetched opportunity-stage vocabulary stays usable. The collection is small.
+    # Default is one hour (the custom-field catalog default is 120 minutes); cap is 24 hours.
+    # No cache flag: `OpportunityStagesService` composes `CachedValue` with serve-stale off
+    # and always holds its vocabulary.
     opportunity_stage_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
     # How long a fetched entity-relationship-type vocabulary stays usable. Same default and cap
@@ -286,24 +277,24 @@ class BackstopConfig(BaseSettings):
     entity_relationship_type_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
 
     # How long a fetched contact-source vocabulary stays usable before it is re-fetched.
-    # Thirteen rows on the instance this was built against; a source is added about as often
-    # as an activity tag, so the same 24-hour default and cap apply.
-    # `list_contact_sources(refresh=true)` forces a refetch when a source is missing.
+    # The collection is small; a source is added about as often as an activity tag, so the
+    # same 24-hour default and cap apply. `list_contact_sources(refresh=true)` forces a
+    # refetch when a source is missing.
     contact_source_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
-    # Whether the contact-source catalog is held between calls. Off by default: thirteen rows
-    # is not expensive enough to justify the staleness. Set
+    # Whether the contact-source catalog is held between calls. Off by default: the collection
+    # is small enough that a TTL is not worth the staleness. Set
     # `BACKSTOP_CONTACT_SOURCE_CACHE_ENABLED=true` once its histograms say so.
     contact_source_cache_enabled: bool = False
 
     # How long a fetched contact-category vocabulary stays usable before it is re-fetched.
-    # A few hundred rows on the instance this was built against; a category is added about
-    # as often as a contact source, so the same 24-hour default and cap apply.
-    # `list_contact_categories(refresh=true)` forces a refetch when a category is missing.
+    # The collection is small; a category is added about as often as a contact source, so
+    # the same 24-hour default and cap apply. `list_contact_categories(refresh=true)` forces
+    # a refetch when a category is missing.
     contact_category_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
-    # Whether the contact-category catalog is held between calls. Off by default: a few
-    # hundred rows is not expensive enough to justify the staleness. Set
+    # Whether the contact-category catalog is held between calls. Off by default: the
+    # collection is small enough that a TTL is not worth the staleness. Set
     # `BACKSTOP_CONTACT_CATEGORY_CACHE_ENABLED=true` once its histograms say so.
     contact_category_cache_enabled: bool = False
 
@@ -330,12 +321,12 @@ class BackstopConfig(BaseSettings):
     # staleness. Set `BACKSTOP_SYSTEM_USER_CACHE_ENABLED=true` once its histograms say so.
     system_user_cache_enabled: bool = False
 
-    # How long a fetched time-zone catalog stays usable before it is re-fetched. Zones change
+    # How long a fetched time-zone list stays usable before it is re-fetched. Zones change
     # rarely; the default is 24 hours. Capped at 24 hours so a stale catalog cannot sit for
     # days after a CRM admin adds a zone.
     time_zone_ttl_minutes: int = Field(default=24 * 60, ge=1, le=24 * 60)
 
-    # Whether the time-zone catalog is held between calls. Off by default: unlike the
+    # Whether the time-zone list is held between calls. Off by default: unlike the
     # custom-field walk, this one has not been measured as expensive enough to justify the
     # staleness. Set `BACKSTOP_TIME_ZONE_CACHE_ENABLED=true` once its histograms say so.
     time_zone_cache_enabled: bool = False
@@ -344,11 +335,10 @@ class BackstopConfig(BaseSettings):
     # for departed-contact detection (UN-23678). Comma-separated env values. Ids match a type id
     # exactly; markers match case-insensitively as substrings of the type's name.
     #
-    # The FORMER half is what actually detects a departure. A tenant models one as a separate
-    # relationship type rather than as a date: the instance this was built against carries both
-    # `is employee of` and `is a former employee of`, and fills in `endDate` on well under one
-    # percent of records. Which is also why the two marker lists must not overlap — matching
-    # "employee" cannot tell those two type names apart, so the departure word is the marker.
+    # The FORMER half is what actually detects a departure. A tenant may model one as a
+    # separate relationship type rather than as a date, and `endDate` is often unset. The two
+    # marker lists must not overlap — a shared substring such as "employee" cannot tell a
+    # current type from a former type, so the departure word is the marker.
     #
     # Ids are exact but per-instance (an admin's numeric ids mean nothing on another deployment)
     # and so have no default; `GET /entity-relationship-types` lists the ones a deployment can
@@ -434,14 +424,45 @@ class ResolutionConfig(BaseSettings):
     tool until the *client* cancels the call, which discards the candidates already fetched and
     returns nothing at all.
 
-    It must stay below the calling client's tool-call deadline — 60s for the Unique chat client
-    that prompted this knob — and the margin has to cover the upstream search that runs before
-    the prompt. Configurable so that deadline can be matched per deployment without a release.
+    The server waits 2 minutes so a user who reads the candidates before picking is not cut
+    off. The Unique chat client can still cancel a tool call at 60 seconds, and then the
+    candidates are discarded. Configurable so the deadline can be matched per deployment
+    without a release.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="RESOLUTION_")
 
-    elicit_timeout_seconds: float = Field(default=45.0, gt=0)
+    elicit_timeout_seconds: float = Field(default=120.0, gt=0)
+
+
+class ProductInvestorsConfig(BaseSettings):
+    """Tuning knobs for `get_product_investors`.
+
+    `max_valued_accounts` caps `include_latest_value`: each account costs one Backstop
+    request under the per-user concurrency gate, so a large fund can outlast the chat
+    client's 60-second tool-call limit. Measured warm, about 0.14 s per account at the
+    default gate of 5; a cold first call is slower. Past the cap no values are fetched and
+    the response says how to narrow. Configurable so a deployment can trade coverage for
+    latency without a release.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="PRODUCT_INVESTORS_")
+
+    max_valued_accounts: int = Field(default=100, gt=0)
+
+
+class SearchConfig(BaseSettings):
+    """Page size shared by the paged search tools.
+
+    `result_size` is how many rows one call returns before it stops and hands back a cursor.
+    The search tools read Backstop until they have that many matches, so one call stays well
+    inside the chat client's 60-second tool-call limit and the model's context, and the
+    cursor reads on from the exact row where this page stopped.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="SEARCH_")
+
+    result_size: int = Field(default=100, gt=0, le=1000)
 
 
 class DatabaseConfig(BaseSettings):
@@ -578,3 +599,52 @@ class EncryptionConfig(BaseSettings):
         if self.encryption_key is None:
             raise ValueError("BACKSTOP_MCP_ENCRYPTION_KEY not set")
         return self
+
+
+ServerGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2500)
+]
+ToolGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=800)
+]
+ParameterGuidanceText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
+class ToolGuidance(BaseModel):
+    """Tenant text appended to one tool's description and to some of its parameters."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    description: ToolGuidanceText | None = None
+    parameters: dict[str, ParameterGuidanceText] = Field(default_factory=dict)
+
+
+class TenantGuidance(BaseModel):
+    """What one deployment adds to the shipped, tenant-neutral tool documentation."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    server_instructions: ServerGuidanceText | None = None
+    tools: dict[str, ToolGuidance] = Field(default_factory=dict)
+
+
+class TenantGuidanceConfig(BaseSettings):
+    """`BACKSTOP_MCP_TENANT_GUIDANCE`: a JSON `TenantGuidance`. Unset means none."""
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_MCP_")
+
+    tenant_guidance: Annotated[TenantGuidance, NoDecode] = Field(default_factory=TenantGuidance)
+
+    @field_validator("tenant_guidance", mode="before")
+    @classmethod
+    def _parse_tenant_guidance(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if value.strip() == "":
+            return {}
+        try:
+            return cast("object", json.loads(value))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"BACKSTOP_MCP_TENANT_GUIDANCE is not valid JSON: {exc}") from exc

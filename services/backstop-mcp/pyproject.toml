@@ -1,10 +1,10 @@
 [project]
 name = "backstop-mcp"
-version = "0.0.7"
+version = "0.0.8"
 description = "Backstop CRM FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==4.0.5",
+    "fastmcp==4.0.10",
     "uvicorn[standard]==0.53.0",
     "pydantic[email]==2.13.5",
     "pydantic-settings==2.15.0",
@@ -22,6 +22,7 @@ dependencies = [
     "tenacity==9.1.4",
     "unique-mcp==2026.38.0",
     "markdownify==1.2.3",
+    "beautifulsoup4==4.15.0",
     "starlette==1.6.0",
     "mcp==2.2.0",
     "mcp-credential-auth==0.1.0",
@@ -77,7 +78,7 @@ venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests", "agent-explore"]
-exclude = [".venv", "**/__pycache__", "agent-explore/test_set.py"]
+exclude = [".venv", "**/__pycache__", "agent-explore/test_set.py", "agent-explore/report_definitions.py"]
 extraPaths = ["src", ".", "agent-explore"]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
@@ -85,7 +86,7 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv]
-override-dependencies = ["fastmcp==4.0.5", "pyjwt==2.14.0"]
+override-dependencies = ["fastmcp==4.0.10", "pyjwt==2.14.0"]
 
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }

@@ -10,26 +10,24 @@ calls a `resource:` or `resource:List<>` field — `investor`, `product`, `stage
 
 **Every field is optional and every scalar is lenient, and that is what makes a typed page schema
 safe here.** `client.paginate` deserializes a whole page in one pass, so a required field or a
-strict type would fail all 100 opportunities over one malformed record — the reason the fetch
-passed `dict[str, object]` in the first place. The `Lenient*` coercers turn an unparseable scalar
-into `None` instead of a `ValidationError`, so the only remaining way to lose a page is a
-structurally broken resource object (missing `id`, non-object `attributes`), which the untyped
-dict would have failed on too.
+strict type would fail a whole page over one malformed record. The `Lenient*` coercers turn an
+unparseable scalar into `None` instead of a `ValidationError`, so the only remaining way to lose
+a page is a structurally broken resource object (missing `id`, non-object `attributes`).
 
-Backstop's `type` attribute is the deal's *classification* (`"NTE"`, blank on most records), not
-the JSON:API resource type sitting one level up. It is named `classification` here for the same
-reason `previousStage` is spelled out in `responses.py`: the obvious reading is the wrong one.
+Backstop's `type` attribute is the deal's classification (a short code, blank on most records),
+not the JSON:API resource type sitting one level up. It is named `classification` here for the
+same reason `previousStage` is spelled out in `responses.py`: the obvious reading is the wrong one.
 
 Dates split by what actually arrives. `createdTimestamp` / `modifiedTimestamp` come as full
-offset timestamps (`2020-06-24T17:10:52.842-0400`); the others come as midnight-local timestamps
-that only mean a calendar day, and are read as one.
+offset timestamps; the others come as midnight-local timestamps that only mean a calendar day,
+and are read as one.
 """
 
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.backstop_client import BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
 from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt, LenientStr
@@ -42,6 +40,7 @@ __all__ = [
     "OpportunityStageHistoryAttributes",
     "SearchContactAttributes",
     "SearchProductAttributes",
+    "SearchProductConfigurationAttributes",
 ]
 
 
@@ -101,9 +100,8 @@ class OpportunityStageAttributes(BaseModel):
     """Wire shape for `opportunity-stages` attributes (the vocabulary subset).
 
     Every field is optional because `client.paginate` deserializes a whole page in one pass: a
-    required field would fail the entire seven-row fetch over one malformed row. Optional fields
-    plus the drop in `OpportunityStageResponse.from_resource` keep one bad row from costing the
-    other six.
+    required field would fail the fetch over one malformed row. Optional fields plus the drop
+    in `OpportunityStageResponse.from_resource` keep one bad row from costing the rest.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
@@ -115,22 +113,39 @@ class OpportunityStageAttributes(BaseModel):
 
 
 class SearchContactAttributes(BaseModel):
-    """Sparse `contacts` attributes from the investor include on `GET /opportunities`."""
+    """Sparse `contacts` attributes from the investor include on `GET /opportunities`.
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+    `specificResource` names the concrete collection (`organizations` / `people`) under the
+    same id; `fields[contacts]` accepts it.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
     country: str | None = None
     state: str | None = None
     city: str | None = None
+    specific_resource: ResourceRef | None = Field(default=None, alias="specificResource")
+
+
+class SearchProductConfigurationAttributes(BaseModel):
+    """`attributes.configuration` on the product include; the short name lives only here.
+
+    `fields[products]=productShortName` is `400`, so there is no top-level short name to read.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    product_short_name: str | None = Field(default=None, validation_alias="productShortName")
 
 
 class SearchProductAttributes(BaseModel):
-    """Sparse `products` attributes from the product include on `GET /opportunities`."""
+    """Sparse `products` attributes (`name,configuration`) from the opportunity product include."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str | None = None
+    configuration: SearchProductConfigurationAttributes | None = None
 
 
 class OpportunityStageHistoryAttributes(BaseModel):

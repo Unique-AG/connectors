@@ -1,5 +1,6 @@
 import re
-from collections.abc import Awaitable, Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
@@ -278,6 +279,19 @@ def answer_pending(ctx: Context) -> bool:
 
 class Advised(ToolError):
     pass
+
+
+_FORBIDDEN = 403
+
+
+@contextmanager
+def owner_refused(named: bool, advice: str) -> Generator[None]:
+    try:
+        yield
+    except GraphForbidden as refusal:
+        if not named or refusal.status != _FORBIDDEN:
+            raise
+        raise Advised(advice + _diagnostics(refusal)) from refusal
 
 
 @dataclass(frozen=True, slots=True)

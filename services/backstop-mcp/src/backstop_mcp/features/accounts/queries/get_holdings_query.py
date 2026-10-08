@@ -1,44 +1,23 @@
 """A party's holdings: the undocumented UI table first, the documented walk when it fails.
 
-`_holdings_table` is one request and carries figures. It is also an unsupported endpoint that
-can disappear on another tenant, so this query owns the decision of when to stop trusting it
-and what the documented path can honestly produce instead.
+`GET /bsg-account-table-data?entityId={partyId}` is one request with figures, but unsupported.
+Any HTTP error (including a 401 that re-verified), timeout, unparseable body, or count/row
+contradiction falls back to the documented walk: every `/accounts` page (`filter[owner]` is 400)
+filtered to the owner, plus two series requests per owned account. Not a fallback trigger: an
+empty table (a successful "owns nothing" — though table-data fails open on a bad id), a dead
+credential (`BackstopAuthError`), or a rate limit.
 
-**What triggers the fallback.** Any HTTP error, timeout, or unparseable body from table-data,
-including a mid-session 401 that re-verified (`BackstopTransientAuthError`): the credential still
-works, this unsupported endpoint did not — same as a 404. Deliberately *not*:
+The fallback cannot produce commitment, share of master, account term, or `otherId`; those are
+omitted, never zeroed, and named in `omitted_fields`. Its `funded_date` is `accountStartDate`.
 
-- **An empty table.** `accounts: []` is a successful "owns nothing" and walking 815 accounts to
-  confirm it would be pure cost. The catch is that table-data **fails open** — a nonexistent id
-  and a wrong-typed id return the same empty `200`. `owner_id` should therefore be a resolved
-  party id, but nothing here can verify that; see the fail-open note on `_holdings_table`.
-- **`BackstopAuthError`.** The credential is dead; the documented walk would fail the same way,
-  slower.
-
-**What the fallback cannot produce.** The documented `/accounts` walk has no commitment, no
-share-of-master, no account-term reference, and no `otherId` in the listing fieldset; the series
-endpoints give a number with no currency rendering. Those fields are **omitted, never zeroed**,
-and are named in `omitted_fields` so the answer cannot be read as "this party has no commitment".
-`funded_date` falls back to `accountStartDate`, which is a near neighbour of table-data's
-`fundedDate` rather than the same field.
-
-**Cost.** Table-data is 1 request. The fallback is ~9 parallel pages (measured: 9.1s/4.3 MiB for
-this instance's 815 accounts) plus 2 series requests per *owned* account — which is affordable
-only because a party owns a handful of them. It is never run product-wide.
-
-The table endpoint itself is undocumented. It was found by watching the Backstop web app: one
-`GET /bsg-account-table-data?entityId={partyId}` serves the account table a user looks at.
-Paging params are ignored; row order is not stable; a product id fails open as an empty table.
-Keep the documented fallback working. The counts checked in `_reject_contradictory_counts` are
-the tripwire for a silent shape change.
-
-By-party listing on the fallback walks `/accounts` because `filter[owner]` is 400 and neither
-party collection exposes an `accounts` subcollection. Open means the `closedDate` key is absent.
+Tenure is measured on both paths over every owned account before the open/closed split, so
+`include_closed=false` hides closed rows without shortening the relationship.
 """
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from datetime import date
 
 from backstop_mcp.backstop_client import (
     BackstopAuthError,
@@ -59,6 +38,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    AccountSpanDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
@@ -66,7 +46,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     SeriesFigureDto,
     ShareDto,
 )
-from backstop_mcp.features.accounts.utils import fetch_series
+from backstop_mcp.features.accounts.utils import continuous_tenure, fetch_series
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +81,9 @@ class HoldingsTableShapeError(Exception):
 class GetHoldingsQuery:
     """A party's holdings with figures, from whichever path is available."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(self, *, client: BackstopClient, clock: Callable[[], date] = date.today) -> None:
         self._client: BackstopClient = client
+        self._clock: Callable[[], date] = clock
 
     async def run(self, *, owner_id: str, include_closed: bool = False) -> HoldingListingDto:
         """`owner_id` should be a resolved party id; an unresolved one returns "owns nothing"."""
@@ -110,8 +91,8 @@ class GetHoldingsQuery:
             return await self._holdings_table(owner_id=owner_id, include_closed=include_closed)
         except BackstopAuthError, BackstopRateLimitError:
             # Neither is "this endpoint is unavailable". A dead credential fails the walk the same
-            # way, slower. A rate limit is worse: the fallback is ~9 pages plus two requests per
-            # account, so falling back would answer a "slow down" with an order of magnitude more
+            # way, slower. A rate limit is worse: the fallback is a full /accounts walk plus two
+            # requests per account, so falling back would answer a "slow down" with far more
             # load — and a rate limit is the likeliest transient failure of an unbounded payload.
             raise
         except Exception as exc:
@@ -165,12 +146,22 @@ class GetHoldingsQuery:
             open_count=table.open_count,
             all_count=table.all_count,
             closed_count=table.closed_count,
+            tenure=continuous_tenure(
+                (
+                    AccountSpanDto(
+                        start=row.funded_date, end=row.closed_date, is_open=not row.closed
+                    )
+                    for row in all_rows
+                ),
+                today=self._clock(),
+            ),
         )
 
     async def _documented_holdings(
         self, *, owner_id: str, include_closed: bool
     ) -> HoldingListingDto:
-        listing = await self._accounts_for_party(owner_id=owner_id, include_closed=include_closed)
+        owned = await self._owned_accounts_for_party(owner_id=owner_id)
+        listing = self._split_open(owned, include_closed=include_closed)
         # `return_exceptions` so one row raising does not leave its siblings unawaited; the first
         # failure is then re-raised deliberately.
         settled = await asyncio.gather(
@@ -192,11 +183,20 @@ class GetHoldingsQuery:
             ),
             source="accounts-api",
             omitted_fields=FALLBACK_OMITTED_FIELDS,
+            tenure=continuous_tenure(
+                (
+                    AccountSpanDto(
+                        start=record.account_start_date,
+                        end=record.closed_date,
+                        is_open=record.is_open,
+                    )
+                    for record in owned
+                ),
+                today=self._clock(),
+            ),
         )
 
-    async def _accounts_for_party(
-        self, *, owner_id: str, include_closed: bool
-    ) -> AccountListingDto:
+    async def _owned_accounts_for_party(self, *, owner_id: str) -> tuple[AccountRecordDto, ...]:
         page = await self._client.paginate(
             "/accounts",
             schema=AccountApiResource,
@@ -205,10 +205,7 @@ class GetHoldingsQuery:
             page_size=100,
             parallel=True,
         )
-        return self._split_open(
-            self._owned_accounts(page.items, included=page.included, owner_id=owner_id),
-            include_closed=include_closed,
-        )
+        return self._owned_accounts(page.items, included=page.included, owner_id=owner_id)
 
     def _split_open(
         self, records: Sequence[AccountRecordDto], *, include_closed: bool

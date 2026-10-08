@@ -10,8 +10,8 @@ from backstop_mcp.features.org_people_writes._person_writable_fields import (
     reject_key_employee_write,
 )
 from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
     require_path_segment,
@@ -28,8 +28,7 @@ CREATE_EMPLOYMENT_INPUT_DESCRIPTION = (
     "is the same as `get_person`: exactly one of `party_id` or `search`, plus `search_type`. "
     "Organization identity is exactly one of `organization_id` or `organization_search`. "
     "There is no relationship-type parameter — the command resolves the employment type from "
-    "the catalog. `is_key_employee` cannot be written through the API (personal tokens do "
-    "not persist `isKeyRelationship`); set Key employee in the CRM UI. One POST also "
+    "the catalog. `is_key_employee` is rejected; set Key employee in the CRM UI. One POST also "
     "creates the reverse mirror row (person→org and org→person). Never invent an id."
 )
 
@@ -47,10 +46,10 @@ class CreateEmploymentInput(BaseModel):
         default="people", description=_PERSON_SEARCH_TYPE_DESCRIPTION
     )
     party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     organization_id: NonEmptyStr | None = Field(
         default=None,

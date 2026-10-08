@@ -54,11 +54,11 @@ async def create_opportunity(
     pointer. `stage` is a **name** resolved against this instance's vocabulary, not an
     id. A repeated call creates a second record. Custom fields go through
     `update_custom_field_values`. To change an existing deal, use `update_opportunity`.
-    `destructive_hint` is true because this writes a new CRM record.
 
-    Call like: {"opportunity": {"name": "Koch - CATS Select", "currency_code": "USD",
+    Call like: {"opportunity": {"name": "Contoso - Harbor Select", "currency_code": "USD",
     "is_erisa": false, "search_type": "contacts",
-    "party_id": "<id from get_person with search_type contacts>", "stage": "Prospect"}}
+    "party_id": "<id from get_person with search_type contacts>",
+    "stage": "<stage name from get_opportunities>"}}
     """
     investor_result = await resolve_party_query.run(
         search_type=opportunity.search_type,

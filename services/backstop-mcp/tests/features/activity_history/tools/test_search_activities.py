@@ -4,9 +4,12 @@ import httpx
 import pytest
 import respx
 from fastmcp.decorators import get_fastmcp_meta
+from fastmcp.exceptions import ToolError
 from fastmcp.tools.function_tool import ToolMeta
+from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.config import SearchConfig
 from backstop_mcp.features.activity_history import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
@@ -14,18 +17,22 @@ from backstop_mcp.features.activity_history import (
     SearchActivitiesUnavailableResponse,
 )
 from backstop_mcp.features.activity_history.tools.search_activities import (
-    _date_window,  # pyright: ignore[reportPrivateUsage]
+    AttendeeRef,
     search_activities,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from backstop_mcp.server.tools import TOOLS
-from tests.features.activity_history.conftest import make_search_activities_query
+from tests.features.activity_history.conftest import (
+    make_search_activities_query,
+    serve_entity_activities,
+)
 from tests.features.party_resolver.helpers import ctx_never_elicit, make_resolve_party_query
 from tests.helpers import BASE_URL, client_factory, credential, recorded_json_bodies
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _URL = f"{BASE_URL}/entity-activities"
 _PARTY_ID = "354566359"
+_SEARCH_CONFIG = SearchConfig(result_size=100)
 
 
 def _page(*rows: dict[str, object], total: int | None = None) -> httpx.Response:
@@ -51,7 +58,7 @@ def _row(row_id: int = 1, **overrides: object) -> dict[str, object]:
         "title": "Catch-up",
         "effectiveDate": "8/20/2026",
         "meetingType": "Phone - Outbound",
-        "activityTags": [{"id": 474963, "name": "AT: Dispersion"}],
+        "activityTags": [{"id": 9001, "name": "XY: Alpha"}],
         "associatedWith": [{"resourceType": "people", "resourceId": _PARTY_ID}],
         "author": {"name": "Asaph Stephen", "id": 3406537},
         "attendees": [{"name": "Ada"}],
@@ -72,7 +79,7 @@ class TestSearchActivities:
         assert "fallback only" in doc
         assert "get_activity_history" in doc
         assert "10000" in doc
-        assert "visible to you" in doc
+        assert "this credential can see" in doc
         assert "get_activity_detail" in doc
         assert "activity_id" in doc
         assert "history email ids do not" in doc
@@ -89,9 +96,10 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 search_type="people",
                 party_id=_PARTY_ID,
-                activity_tag_ids=["474963", "455289"],
+                activity_tag_ids=["9001", "9002"],
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -99,9 +107,15 @@ class TestSearchActivities:
         assert route.call_count == 1
         envelope = object_dict(recorded_json_bodies(route)[0]["data"])
         attributes = object_dict(envelope["attributes"])
-        filters = object_dict(attributes["filters"])
-        assert filters["associatedWiths"] == [f"PartyBean_{_PARTY_ID}"]
-        assert filters["activityTags"] == ["474963", "455289"]
+        filters = object_dict(attributes["newFilters"])
+        assert "filters" not in attributes
+        assert attributes["entityId"] == int(_PARTY_ID)
+        assert attributes["resourceType"] == "people"
+        tag_filter = object_dict(object_list(filters["activityTags"])[0])
+        assert [object_dict(item)["value"] for item in object_list(tag_filter["searchValues"])] == [
+            "9001",
+            "9002",
+        ]
         effective = object_dict(filters["effectiveDate"])
         assert effective["startTimestamp"] == "2024-01-01T00:00:00"
         assert effective["endTimestamp"] == "2026-08-20T23:59:59"
@@ -135,6 +149,7 @@ class TestSearchActivities:
                     fields=fields,  # pyright: ignore[reportArgumentType]
                     resolve_party_query=make_resolve_party_query(client),
                     search_activities_query=make_search_activities_query(client),
+                    search_config=_SEARCH_CONFIG,
                     build_entity_link_util=BuildEntityLinkUtil(
                         ui_base_url="https://tenant.example.test"
                     ),
@@ -168,6 +183,7 @@ class TestSearchActivities:
                 end_date=date(2020, 1, 2),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -189,6 +205,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -215,6 +232,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -234,6 +252,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             )
 
     @pytest.mark.asyncio
@@ -241,7 +260,7 @@ class TestSearchActivities:
     async def test_a_reverified_401_names_the_documented_fallback(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Credential still works; the undocumented search refused us — same as a 404."""
+        """Credential still works; the activity search refused us — same as a 404."""
 
         async def instant_sleep(_delay: float) -> None:
             return None
@@ -266,6 +285,7 @@ class TestSearchActivities:
                     end_date=date(2026, 8, 20),
                     resolve_party_query=make_resolve_party_query(client),
                     search_activities_query=make_search_activities_query(client),
+                    search_config=_SEARCH_CONFIG,
                 ),
                 SearchActivitiesUnavailableResponse,
             )
@@ -276,10 +296,10 @@ class TestSearchActivities:
             await factory.aclose()
 
     @pytest.mark.asyncio
-    async def test_include_description_on_a_wide_sweep_is_refused(
+    async def test_include_description_on_a_firm_wide_search_is_refused(
         self, client: BackstopClient
     ) -> None:
-        with pytest.raises(ValueError, match="wide sweep"):
+        with pytest.raises(ValueError, match="firm-wide search"):
             await search_activities(
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
@@ -287,20 +307,72 @@ class TestSearchActivities:
                 include_description=True,
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             )
 
     @pytest.mark.asyncio
-    async def test_aggregate_on_a_wide_sweep_is_refused(self, client: BackstopClient) -> None:
-        with pytest.raises(ValueError, match="wide sweep"):
+    @respx.mock
+    async def test_aggregate_counts_a_firm_wide_search(self, client: BackstopClient) -> None:
+        route = respx.post(_URL).mock(
+            return_value=_page(_row(1, type="Meeting"), _row(2, type="Call"), total=2)
+        )
+
+        result = tool_model(
             await search_activities(
                 ctx_never_elicit(),
-                start_date=date(2024, 1, 1),
-                end_date=date(2026, 8, 20),
+                start_date=date(2026, 7, 1),
+                end_date=date(2026, 9, 30),
                 mode="aggregate",
                 group_by="type",
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
-            )
+                search_config=_SEARCH_CONFIG,
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        assert "entityId" not in attributes
+        payload = [object_dict(item) for item in object_list(tool_payload(result)["aggregates"])]
+        assert {item["key"]: item["count"] for item in payload} == {"Meeting": 1, "Call": 1}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_attendees_narrow_a_firm_wide_search_once_per_person(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(return_value=_page(_row(), total=1))
+
+        await search_activities(
+            ctx_never_elicit(),
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 10, 5),
+            attendees=[
+                AttendeeRef(party_id="341763143", search_type="people"),
+                AttendeeRef(party_id="791446821", search_type="employees"),
+                AttendeeRef(party_id="341763143", search_type="contacts"),
+            ],
+            include_description=True,
+            resolve_party_query=make_resolve_party_query(client),
+            search_activities_query=make_search_activities_query(client),
+            search_config=_SEARCH_CONFIG,
+        )
+
+        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        assert "entityId" not in attributes
+        assert object_dict(attributes["newFilters"])["attendees"] == [
+            {
+                "type": 0,
+                "searchValues": [
+                    {"value": "PartyBean_341763143"},
+                    {"value": "PartyBean_791446821"},
+                ],
+            }
+        ]
+
+    def test_an_organization_is_not_an_attendee(self) -> None:
+        with pytest.raises(ValidationError):
+            AttendeeRef.model_validate({"party_id": "341686787", "search_type": "organizations"})
 
     @pytest.mark.asyncio
     @respx.mock
@@ -319,11 +391,12 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 mode="aggregate",
                 group_by="type",
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -343,12 +416,13 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 include_description=True,
                 mode="aggregate",
                 group_by="type",
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             )
 
     @pytest.mark.asyncio
@@ -363,6 +437,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -387,6 +462,7 @@ class TestSearchActivities:
                 fields=["id", "title"],
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -401,8 +477,8 @@ class TestSearchActivities:
             return_value=_page(
                 _row(
                     1,
-                    shortDescription="Ross Kasarda, Greg Hines&nbsp;",
-                    formattedDescription="<p>Discussed <b>dispersion</b>.</p>",
+                    shortDescription="Ada North, Ben West&nbsp;",
+                    formattedDescription="<p>Discussed <b>alpha</b>.</p>",
                 ),
                 total=1,
             )
@@ -413,10 +489,11 @@ class TestSearchActivities:
                 ctx_never_elicit(),
                 start_date=date(2024, 1, 1),
                 end_date=date(2026, 8, 20),
-                activity_tag_ids=["474963"],
+                activity_tag_ids=["9001"],
                 include_description=True,
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -424,23 +501,161 @@ class TestSearchActivities:
         row = object_dict(object_list(tool_payload(result)["rows"])[0])
         assert "&nbsp;" not in str(row.get("short_description", ""))
         assert "<p>" not in str(row.get("description", ""))
-        assert "dispersion" in str(row.get("description", ""))
+        assert "alpha" in str(row.get("description", ""))
 
-    def test_omitted_start_date_is_one_year_before_end_date(self) -> None:
-        since, until = _date_window(None, date(2024, 12, 31), today=date(2026, 8, 21))
-        assert (since, until) == (date(2023, 12, 31), date(2024, 12, 31))
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rows_mode_returns_one_page_and_resumes_at_the_next(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.post(_URL).mock(
+            side_effect=serve_entity_activities(
+                (
+                    _row(1, effectiveDate="8/20/2026"),
+                    _row(2, effectiveDate="8/19/2026"),
+                    _row(3, effectiveDate="8/19/2026"),
+                    _row(4, effectiveDate="8/18/2026"),
+                    _row(5, effectiveDate="8/17/2026"),
+                )
+            )
+        )
 
-    def test_leap_day_minus_one_year_lands_on_february_28(self) -> None:
-        since, until = _date_window(None, date(2024, 2, 29), today=date(2026, 8, 21))
-        assert (since, until) == (date(2023, 2, 28), date(2024, 2, 29))
+        async def run(cursor: str | None) -> SearchActivitiesResolvedResponse:
+            return tool_model(
+                await search_activities(
+                    ctx_never_elicit(),
+                    start_date=date(2026, 1, 1),
+                    end_date=date(2026, 8, 20),
+                    search_type="organizations",
+                    party_id=_PARTY_ID,
+                    include_description=True,
+                    cursor=cursor,
+                    resolve_party_query=make_resolve_party_query(client),
+                    search_activities_query=make_search_activities_query(client),
+                    search_config=SearchConfig(result_size=2),
+                ),
+                SearchActivitiesResolvedResponse,
+            )
 
-    def test_omitted_end_date_is_today(self) -> None:
-        since, until = _date_window(date(2025, 8, 21), None, today=date(2026, 8, 21))
-        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
+        first = await run(None)
+        assert [row.id for row in first.rows] == ["1", "2"]
+        assert first.continuation is not None
+        assert first.coverage.visible_count == 5
+        assert first.coverage.truncated is False
+        assert first.coverage.ceiling_hit is False
 
-    def test_both_dates_omitted_are_the_year_ending_today(self) -> None:
-        since, until = _date_window(None, None, today=date(2026, 8, 21))
-        assert (since, until) == (date(2025, 8, 21), date(2026, 8, 21))
+        second = await run(first.continuation.cursor)
+        assert [row.id for row in second.rows] == ["3", "4"]
+        assert second.continuation is not None
+        # Rows mode pages by `result_size`, and the resumed call reads the next page.
+        assert [
+            object_dict(object_dict(body["data"])["attributes"])["pageNum"]
+            for body in recorded_json_bodies(route)
+        ] == [1, 2]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_page_that_reaches_the_end_has_no_continuation(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(return_value=_page(_row(1), _row(2)))
+
+        result = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 8, 20),
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=SearchConfig(result_size=2),
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        assert len(result.rows) == 2
+        assert result.continuation is None
+        assert "continuation" not in tool_payload(result)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_cursor_from_different_arguments_is_rejected(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(side_effect=serve_entity_activities((_row(1), _row(2), _row(3))))
+
+        first = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 8, 20),
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=SearchConfig(result_size=2),
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+        assert first.continuation is not None
+
+        with pytest.raises(ToolError, match="different search"):
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2026, 2, 1),
+                end_date=date(2026, 8, 20),
+                cursor=first.continuation.cursor,
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=SearchConfig(result_size=2),
+            )
+
+    @pytest.mark.asyncio
+    async def test_a_cursor_in_aggregate_mode_is_refused(self, client: BackstopClient) -> None:
+        with pytest.raises(ValueError, match="cursor"):
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                activity_tag_ids=["9001"],
+                mode="aggregate",
+                group_by="type",
+                cursor="anything",
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
+            )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_mode_still_reads_the_whole_set(self, client: BackstopClient) -> None:
+        route = respx.post(_URL).mock(
+            side_effect=[
+                _page(*(_row(row_id) for row_id in range(1, 501)), total=608),
+                _page(*(_row(row_id, type="Note") for row_id in range(501, 609)), total=608),
+            ]
+        )
+
+        result = tool_model(
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2020, 1, 1),
+                end_date=date(2026, 9, 30),
+                search_type="organizations",
+                party_id=_PARTY_ID,
+                mode="aggregate",
+                group_by="type",
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=SearchConfig(result_size=2),
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        assert route.call_count == 2
+        assert {bucket.key: bucket.count for bucket in result.aggregates} == {
+            "Meeting": 500,
+            "Note": 108,
+        }
+        assert result.continuation is None
+        assert result.coverage.truncated is False
 
     @pytest.mark.asyncio
     @respx.mock
@@ -450,13 +665,13 @@ class TestSearchActivities:
         await search_activities(
             ctx_never_elicit(),
             end_date=date(2024, 12, 31),
-            max_rows=1000,
             resolve_party_query=make_resolve_party_query(client),
             search_activities_query=make_search_activities_query(client),
+            search_config=_SEARCH_CONFIG,
         )
 
         filters = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
-        effective = object_dict(object_dict(filters["filters"])["effectiveDate"])
+        effective = object_dict(object_dict(filters["newFilters"])["effectiveDate"])
         assert effective["startTimestamp"] == "2023-12-31T00:00:00"
         assert effective["endTimestamp"] == "2024-12-31T23:59:59"
 
@@ -469,6 +684,7 @@ class TestSearchActivities:
                 end_date=date(2026, 8, 20),
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
             )
 
     def test_from_fetch_marks_a_mid_scan_failure_as_partial(self) -> None:
@@ -480,7 +696,6 @@ class TestSearchActivities:
                 rows_received=500,
                 pages_fetched=1,
                 ceiling_clamped=False,
-                truncated_by_row_cap=False,
                 partial_due_to_error=True,
             ),
             mode="aggregate",
@@ -494,4 +709,3 @@ class TestSearchActivities:
         assert result.coverage.truncated is True
         assert result.coverage.disclaimer is not None
         assert "partial" in result.coverage.disclaimer
-        assert "Raise max_rows" not in result.coverage.disclaimer
