@@ -22,7 +22,7 @@ async def resolve_investor_record(
     investor_id: int | None,
 ) -> InvestorRecordResolution:
     if investor_id is None:
-        if name is None:
+        if name is None or not name.strip():
             return InvestorNotFoundResponse(
                 searched_for="", hint="Pass either name or investor_id."
             )

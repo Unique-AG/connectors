@@ -6,14 +6,13 @@ from typing import Literal, Self
 from pydantic import Field
 
 from with_intelligence_mcp.features.investors.api_responses import (
-    ClassificationAttributes,
     ConsultantAttributes,
     EntityAttributes,
     InvestorExtendedAttributes,
     StrategyGroupAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, names, when_present
 
 
 class AssetsUnderManagementResponse(OmitNoneModel):
@@ -136,41 +135,41 @@ class InvestorProfileResponse(OmitNoneModel):
             location=_location(attributes),
             aum=_assets_under_management(attributes),
             updated_at=attributes.updated_at,
-            asset_classes=_when_present(
-                attributes, "asset_classes", _names(attributes.asset_classes)
+            asset_classes=when_present(
+                attributes, "asset_classes", names(attributes.asset_classes)
             ),
-            strategies=_when_present(
+            strategies=when_present(
                 attributes,
                 "investment_strategies",
                 [_strategy_group(group) for group in attributes.investment_strategies],
             ),
-            investment_regions=_when_present(
-                attributes, "investment_regions", _names(attributes.investment_regions)
+            investment_regions=when_present(
+                attributes, "investment_regions", names(attributes.investment_regions)
             ),
-            investment_countries=_when_present(
-                attributes, "investment_countries", _names(attributes.investment_countries)
+            investment_countries=when_present(
+                attributes, "investment_countries", names(attributes.investment_countries)
             ),
-            fund_structures=_when_present(
+            fund_structures=when_present(
                 attributes,
                 "investment_fund_structures",
-                _names(attributes.investment_fund_structures),
+                names(attributes.investment_fund_structures),
             ),
-            instruments=_when_present(
-                attributes, "investment_instruments", _names(attributes.investment_instruments)
+            instruments=when_present(
+                attributes, "investment_instruments", names(attributes.investment_instruments)
             ),
-            capital_structure_ids=_when_present(
+            capital_structure_ids=when_present(
                 attributes,
                 "investment_capital_structures",
                 _ids(attributes.investment_capital_structures),
             ),
-            managers=_when_present(attributes, "managers", _names(attributes.managers)),
-            consultants=_when_present(
+            managers=when_present(attributes, "managers", names(attributes.managers)),
+            consultants=when_present(
                 attributes,
                 "consultants",
                 [_consultant(entry) for entry in attributes.consultants],
             ),
             contacts_total=attributes.contacts_total,
-            contact_ids=_when_present(attributes, "contacts", _ids(attributes.contacts)),
+            contact_ids=when_present(attributes, "contacts", _ids(attributes.contacts)),
             preferences_available="preferences" in attributes.model_fields_set,
             preferences=attributes.preferences,
         )
@@ -205,19 +204,11 @@ class InvestorNotEntitledResponse(OmitNoneModel):
     hint: str | None = None
 
 
-def _when_present[T](attributes: InvestorExtendedAttributes, field: str, value: T) -> T | None:
-    return value if field in attributes.model_fields_set else None
-
-
 def _strategy_group(attributes: StrategyGroupAttributes) -> StrategyGroupResponse:
     return StrategyGroupResponse(
         primary=attributes.primary_strategy.name if attributes.primary_strategy else None,
-        secondary=[entry.name for entry in attributes.secondary_strategies if entry.name],
+        secondary=names(attributes.secondary_strategies),
     )
-
-
-def _names(values: list[ClassificationAttributes]) -> list[str]:
-    return [value.name for value in values if value.name]
 
 
 def _ids(values: list[EntityAttributes]) -> list[int]:

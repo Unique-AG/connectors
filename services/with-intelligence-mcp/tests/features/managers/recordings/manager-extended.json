@@ -1,0 +1,21 @@
+{
+  "id": 1,
+  "name": "Example Manager",
+  "city": "Westport",
+  "country": { "id": 840, "name": "United States" },
+  "administrator": [{ "id": 1, "name": "State Street" }],
+  "auditor": [{ "id": 2, "name": "Example Auditor" }],
+  "custodian": [{ "id": 3, "name": "Example Custodian" }],
+  "legal_advisor": [{ "id": 4, "name": "Example Counsel" }],
+  "prime_broker": [{ "id": 5, "name": "JP Morgan" }],
+  "aums": [
+    {
+      "as_of": "2025-12-31T00:00:00",
+      "aum": 85000,
+      "aum_type": 1,
+      "is_estimate": true,
+      "type_name": "GROUP"
+    }
+  ],
+  "summary": "A global macro firm. Risk parity&#039;s home."
+}

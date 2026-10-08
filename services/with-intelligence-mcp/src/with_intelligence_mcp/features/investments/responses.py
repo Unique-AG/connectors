@@ -5,8 +5,8 @@ from pydantic import Field
 from with_intelligence_mcp.features.investments.api_responses import (
     InvestmentExtendedAttributes,
 )
-from with_intelligence_mcp.features.investors.api_responses import ClassificationAttributes
 from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.utils import names
 
 
 class PositionAmountResponse(OmitNoneModel):
@@ -73,18 +73,18 @@ class PositionResponse(OmitNoneModel):
             manager_id=attributes.manager_firm.id if attributes.manager_firm else None,
             amount=_amount(attributes),
             asset_classes=(
-                _names(attributes.asset_classes)
+                names(attributes.asset_classes)
                 if "asset_classes" in attributes.model_fields_set
                 else None
             ),
             strategies=(
-                _names(attributes.fund_primary_strategies)
-                + _names(attributes.fund_secondary_strategies)
+                names(attributes.fund_primary_strategies)
+                + names(attributes.fund_secondary_strategies)
                 if strategy_available
                 else None
             ),
             structures=(
-                _names(attributes.fund_structures)
+                names(attributes.fund_structures)
                 if "fund_structures" in attributes.model_fields_set
                 else None
             ),
@@ -111,10 +111,6 @@ class InvestorPositionsResponse(OmitNoneModel):
     has_more: bool = Field(
         default=False, description="True when another page of positions is available."
     )
-
-
-def _names(values: list[ClassificationAttributes]) -> list[str]:
-    return [value.name for value in values if value.name]
 
 
 def _amount(attributes: InvestmentExtendedAttributes) -> PositionAmountResponse | None:
