@@ -13,7 +13,7 @@ from msgraph.generated.models.user import User
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import ValidationError
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, GraphForbidden
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
 from office_365_mcp.shared.messages import (
@@ -38,6 +38,8 @@ from office_365_mcp.shared.messages import (
     unknown_enum_headers,
 )
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
+
+from .conftest import GRAPH_V1
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
@@ -702,6 +704,28 @@ class TestChatInQuestion:
 
 _OUTSIDER_ID = "00000000-0000-4000-8000-000000000009"
 
+_SECOND_MEMBERS_PAGE = f"{GRAPH_V1}{_MEMBERS_PATH}?$skiptoken=second"
+
+
+def _lists_members_on_two_pages(
+    graph: respx.MockRouter,
+    first: Sequence[Mapping[str, object]],
+    second: Sequence[Mapping[str, object]],
+) -> tuple[respx.Route, respx.Route]:
+    later = graph.get(_MEMBERS_PATH, params={"$skiptoken": "second"}).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in second]})
+    )
+    earlier = graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [dict(member) for member in first],
+                "@odata.nextLink": _SECOND_MEMBERS_PAGE,
+            },
+        )
+    )
+    return earlier, later
+
 
 class TestMentionedMembers:
     async def test_each_mention_takes_its_name_from_the_members_of_the_chat_in_one_read(
@@ -827,6 +851,76 @@ class TestMentionedMembers:
 
         with pytest.raises(GraphForbidden):
             _ = await mentioned_members(client, _CHAT_ID, (_JANE,))
+
+    async def test_the_first_page_of_members_is_not_the_whole_chat(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        first, second = _lists_members_on_two_pages(graph, (_ADA_MEMBER,), (_JANE_MEMBER,))
+
+        resolved = await mentioned_members(client, _CHAT_ID, (_JANE, _ADA))
+
+        assert resolved == (
+            MentionedMember(user_id=_JANE.user_id, name="Jane Smith"),
+            MentionedMember(user_id=_ADA.user_id, name="Ada Lovelace"),
+        )
+        assert (first.call_count, second.call_count) == (1, 1)
+
+    async def test_a_person_on_no_page_is_refused_after_every_page_is_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        first, second = _lists_members_on_two_pages(graph, (_ADA_MEMBER,), (_JANE_MEMBER,))
+
+        refused = await mentioned_members(
+            client, _CHAT_ID, (_ADA, Mention(user_id=_OUTSIDER_ID, name="Bob"))
+        )
+
+        assert refused == (
+            "Microsoft 365 shows no named member of this chat for this Microsoft Entra object id: "
+            + "'00000000-0000-4000-8000-000000000009'. This tool mentions only a member of the "
+            + "chat, by the name that Microsoft 365 gives. Copy each `user_id` from a "
+            + "teams_list_chat_members row for this chat. Nobody was mentioned. Nothing was sent. "
+            + "If you call this tool again with the same arguments, the call will fail the same "
+            + "way."
+        )
+        assert (first.call_count, second.call_count) == (1, 1)
+
+    async def test_no_page_is_read_after_every_mention_is_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        first, second = _lists_members_on_two_pages(
+            graph, (_ADA_MEMBER, _JANE_MEMBER), (_member(_ADA_MEMBERSHIP, "Ada", _OUTSIDER_ID),)
+        )
+
+        resolved = await mentioned_members(client, _CHAT_ID, (_JANE, _ADA))
+
+        assert resolved == (
+            MentionedMember(user_id=_JANE.user_id, name="Jane Smith"),
+            MentionedMember(user_id=_ADA.user_id, name="Ada Lovelace"),
+        )
+        assert (first.call_count, second.call_count) == (1, 0)
+
+    async def test_a_chat_with_more_members_than_the_scan_reads_is_refused_and_says_so(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        crowd = tuple(
+            _member(
+                f"MCMj{index:04d}", f"Member {index:04d}", f"10000000-0000-4000-8000-{index:012d}"
+            )
+            for index in range(MAX_SCANNED_ITEMS)
+        )
+        first, second = _lists_members_on_two_pages(graph, crowd, (_JANE_MEMBER,))
+
+        refused = await mentioned_members(client, _CHAT_ID, (_JANE,))
+
+        assert refused == (
+            "Microsoft 365 shows more than 1000 members of this chat, and this tool reads only the "
+            + "first 1000. Among these members, Microsoft 365 shows no named member for this "
+            + "Microsoft Entra object id: '00000000-0000-4000-8000-000000000003'. This tool "
+            + "mentions only a member of the chat, by the name that Microsoft 365 gives. Nobody "
+            + "was mentioned. Nothing was sent. If you call this tool again with the same "
+            + "arguments, the call will fail the same way."
+        )
+        assert (first.call_count, second.call_count) == (1, 0)
 
 
 class TestMessageInQuestion:

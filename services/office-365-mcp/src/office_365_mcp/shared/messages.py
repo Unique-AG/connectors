@@ -37,7 +37,7 @@ from msgraph.generated.teams.item.channels.item.messages.item.replies.item impor
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
@@ -696,16 +696,24 @@ async def mentioned_members(
 ) -> tuple[MentionedMember, ...] | str:
     if not mentions:
         return ()
+    wanted = {mention.user_id.casefold() for mention in mentions}
+
+    def is_wanted(member: ConversationMember) -> bool:
+        found = _named_member(member)
+        return found is not None and found.user_id.casefold() in wanted
+
+    with graph_step(STEP_CHAT_MEMBERS):
+        first_page = await client.chats.by_chat_id(chat_id).members.get()
+        assert first_page is not None, "Graph answered a chat member listing with no collection"
+        collected = await collect_pages(first_page, client, limit=len(wanted), matches=is_wanted)
     named = {
-        member.user_id.casefold(): MentionedMember(user_id=member.user_id, name=name)
-        for member in await _chat_members(client, chat_id)
-        if isinstance(member, AadUserConversationMember)
-        and member.user_id is not None
-        and (name := _present(member.display_name)) is not None
+        found.user_id.casefold(): found
+        for member in collected.items
+        if (found := _named_member(member)) is not None
     }
     missing = [mention.user_id for mention in mentions if mention.user_id.casefold() not in named]
     if missing:
-        return _not_named_members(missing)
+        return _not_named_members(missing, capped=collected.capped)
     return tuple(named[mention.user_id.casefold()] for mention in mentions)
 
 
@@ -716,19 +724,37 @@ async def _chat_members(client: GraphServiceClient, chat_id: str) -> list[Conver
     return page.value or []
 
 
-def _not_named_members(user_ids: Sequence[str]) -> str:
+def _named_member(member: ConversationMember) -> MentionedMember | None:
+    if not isinstance(member, AadUserConversationMember) or member.user_id is None:
+        return None
+    name = _present(member.display_name)
+    return None if name is None else MentionedMember(user_id=member.user_id, name=name)
+
+
+def _not_named_members(user_ids: Sequence[str], *, capped: bool) -> str:
     ids = (
         "this Microsoft Entra object id"
         if len(user_ids) == 1
         else "these Microsoft Entra object ids"
     )
     listed = ", ".join(repr(user_id) for user_id in user_ids)
+    only_members = (
+        "This tool mentions only a member of the chat, by the name that Microsoft 365 gives."
+    )
+    refused = (
+        f"Nobody was mentioned. {CHAT_SEND.nothing_sent} If you call this tool again with the "
+        + "same arguments, the call will fail the same way."
+    )
+    if capped:
+        return (
+            f"Microsoft 365 shows more than {MAX_SCANNED_ITEMS} members of this chat, and this "
+            + f"tool reads only the first {MAX_SCANNED_ITEMS}. Among these members, Microsoft 365 "
+            + f"shows no named member for {ids}: {listed}. {only_members} {refused}"
+        )
     return (
-        f"Microsoft 365 shows no named member of this chat for {ids}: {listed}. This tool "
-        + "mentions only a member of the chat, by the name that Microsoft 365 gives. Copy each "
-        + "`user_id` from a teams_list_chat_members row for this chat. Nobody was mentioned. "
-        + f"{CHAT_SEND.nothing_sent} If you call this tool again with the same arguments, the "
-        + "call will fail the same way."
+        f"Microsoft 365 shows no named member of this chat for {ids}: {listed}. {only_members} "
+        + "Copy each `user_id` from a teams_list_chat_members row for this chat. "
+        + refused
     )
 
 
