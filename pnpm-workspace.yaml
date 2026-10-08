@@ -17,7 +17,7 @@ savePrefix: ""
 catalog:
   "@golevelup/nestjs-rabbitmq": 9.0.2
   "@microsoft/microsoft-graph-client": 3.0.7
-  "@modelcontextprotocol/sdk": 1.30.0
+  "@modelcontextprotocol/sdk": 1.31.0
   "@nestjs/cache-manager": 3.1.3
   "@nestjs/cli": 11.0.24
   "@nestjs/common": 11.2.3
