@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#   "httpx==0.28.1",
+#   "pydantic==2.13.5",
+#   "python-dotenv==1.2.3",
+# ]
+# ///
 """Read Backstop's Elevio help center. Not part of the shipped MCP server.
 
 Elevio is a different host and a different credential from the REST API. The service
@@ -6,10 +14,11 @@ API token cannot read it. This script SSOs through help-prod with a web username
 password (POST j_security_check there only — never against BACKSTOP_BASE_URL), then
 GETs category/article HTML and parses window.initialData.
 
-Usage, from services/backstop-mcp:
-  uv run python agent-explore/docs.py tree
-  uv run python agent-explore/docs.py category 21
-  uv run python agent-explore/docs.py article 941
+Run from this skill's directory (the folder that contains SKILL.md):
+
+    uv run scripts/docs.py tree
+    uv run scripts/docs.py category 21
+    uv run scripts/docs.py article 941
 """
 
 from __future__ import annotations
@@ -52,7 +61,17 @@ class _Args(argparse.Namespace):
 
 
 def _env_file() -> Path:
-    return Path(__file__).resolve().parent / ".env"
+    local = Path(__file__).resolve().parent / ".env"
+    if local.is_file():
+        return local
+    for directory in local.parent.parents:
+        candidate = directory / "services" / "backstop-mcp" / "agent-explore" / ".env"
+        if candidate.is_file():
+            return candidate
+        sibling = directory / "agent-explore" / ".env"
+        if sibling.is_file() and (directory / "pyproject.toml").is_file():
+            return sibling
+    return local
 
 
 def _cache_dir() -> Path:
@@ -108,8 +127,8 @@ def _require_docs_credentials() -> tuple[str, str]:
         raise SystemExit(
             "Elevio docs need a web login, not the API token. Set "
             + "BACKSTOP_DOCS_USERNAME and BACKSTOP_DOCS_PASSWORD in "
-            + "services/backstop-mcp/agent-explore/.env (username may fall back to "
-            + "BACKSTOP_SERVICE_USERNAME)."
+            + f"{_env_file()} (username may fall back to "
+            + "BACKSTOP_SERVICE_USERNAME). Copy .env.example next to this script."
         )
     return username, password
 
@@ -341,7 +360,7 @@ def _fetch_html(client: httpx.Client, path: str) -> str:
     if response.status_code == 401 or _still_login_form(response.text):
         raise SystemExit(
             "Elevio session expired; delete "
-            + "services/backstop-mcp/agent-explore/.docs-cache/session.json and retry."
+            + f"{_cache_dir() / 'session.json'} and retry."
         )
     if response.status_code != 200:
         raise SystemExit(f"GET {path} failed: HTTP {response.status_code}")
