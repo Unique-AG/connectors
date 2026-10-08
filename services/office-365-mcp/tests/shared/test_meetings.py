@@ -281,7 +281,9 @@ class TestThePeopleTheUserNames:
     def test_no_person_is_no_person(self) -> None:
         assert meetings.distinct_people([]) == ()
 
-    def test_the_question_counts_the_people_and_quotes_each_name(self) -> None:
+    def test_the_question_counts_the_people_and_shows_each_object_id_with_its_label(
+        self,
+    ) -> None:
         named = meetings.named_people(
             [
                 Person(user_id=_ATTENDEE_ID, name="Ada"),
@@ -289,19 +291,33 @@ class TestThePeopleTheUserNames:
             ]
         )
 
-        assert named == "2 people: 'Ada', 'Bob'"
+        assert named == (
+            "2 people: the person with the Microsoft Entra object id "
+            + "'00000000-0000-4000-8000-000000000002' (the name 'Ada' is only a label from the "
+            + "request), the person with the Microsoft Entra object id "
+            + "'00000000-0000-4000-8000-000000000003' (the name 'Bob' is only a label from the "
+            + "request)"
+        )
 
-    def test_one_person_is_counted_once_and_named_without_the_id(self) -> None:
+    def test_one_person_is_counted_once_and_shown_by_the_object_id(self) -> None:
         named = meetings.named_people([Person(user_id=_ATTENDEE_ID, name="Ada")])
 
-        assert named == "1 person: 'Ada'"
-        assert _ATTENDEE_ID not in named
+        assert named.startswith("1 person: the person with the Microsoft Entra object id ")
+        assert _ATTENDEE_ID in named
+        assert "'Ada' is only a label from the request" in named
 
-    def test_a_long_name_is_cut_for_the_question(self) -> None:
+    def test_a_name_of_another_person_still_shows_the_object_id_that_graph_binds(self) -> None:
+        named = meetings.named_people([Person(user_id=_OTHER_ATTENDEE_ID, name="Ada Lovelace")])
+
+        assert _OTHER_ATTENDEE_ID in named
+        assert "'Ada Lovelace' is only a label from the request" in named
+
+    def test_a_long_name_is_cut_for_the_question_and_the_object_id_is_kept(self) -> None:
         named = meetings.named_people([Person(user_id=_ATTENDEE_ID, name="A" * 500)])
 
-        assert len(named) < 500
-        assert named.endswith("…'")
+        assert "A" * 500 not in named
+        assert "…' is only a label from the request" in named
+        assert _ATTENDEE_ID in named
 
 
 class TestTheMeetingRefusals:

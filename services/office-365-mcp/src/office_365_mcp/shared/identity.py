@@ -11,6 +11,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.prose import cut_for_a_question
 
 # User.Read is the least-privileged delegated permission for /me. It needs no admin consent.
 GRAPH_PERMISSION = "User.Read"
@@ -41,11 +42,29 @@ class Person(BaseModel, frozen=True):
     name: str = Field(
         min_length=1,
         description=(
-            "The name of the person. Copy the `display_name` from the same result as `user_id`. If "
-            + "that result has no display name, copy its sign-in name or its email address. This "
-            + "tool shows the name to the user in its question and never sends it to Microsoft 365."
+            "The name of the person, as a label only. Teams identifies the person only by "
+            + "`user_id`. Copy the `display_name` from the same result as `user_id`. If that "
+            + "result has no display name, copy its sign-in name or its email address. This tool "
+            + "shows the name to the user in its question, beside `user_id`, and never sends it "
+            + "to Microsoft 365."
         ),
     )
+
+
+def person_in_question(user_id: str, name: str) -> str:
+    return _with_object_id(
+        user_id, f"the name {cut_for_a_question(name)!r} is only a label from the request"
+    )
+
+
+def member_in_question(user_id: str, name: str) -> str:
+    return _with_object_id(
+        user_id, f"the name {cut_for_a_question(name)!r} comes from Microsoft 365"
+    )
+
+
+def _with_object_id(user_id: str, named: str) -> str:
+    return f"the person with the Microsoft Entra object id {user_id!r} ({named})"
 
 
 def user_bind(user_id: str) -> dict[str, str]:

@@ -22,9 +22,12 @@ from office_365_mcp.shared.messages import (
     ChannelImportance,
     ChatImportance,
     Mention,
+    MentionedMember,
+    OutgoingMention,
     TeamsMessage,
     chat_in_question,
     mention_fields,
+    mentioned_members,
     message_in_question,
     not_the_sender,
     outgoing_message,
@@ -38,6 +41,15 @@ from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
+
+_JANE_LABELED = (
+    "the person with the Microsoft Entra object id '00000000-0000-4000-8000-000000000003' "
+    + "(the name 'Jane Smith' is only a label from the request)"
+)
+_ADA_LABELED = (
+    "the person with the Microsoft Entra object id '00000000-0000-4000-8000-000000000001' "
+    + "(the name 'Ada Lovelace' is only a label from the request)"
+)
 
 _BUDGET = AttachableFile(
     attachment_id="153fa47d-18c9-4179-be08-9879815a9f90",
@@ -180,6 +192,23 @@ class TestOutgoingMessage:
         assert built.mentions is not None
         assert len(built.mentions) == 1
 
+    def test_a_mentioned_member_posts_the_name_that_microsoft_365_gives(self) -> None:
+        member = MentionedMember(user_id=_JANE.user_id, name="Jane Smith (Finance)")
+
+        built = outgoing_message("Ship it.", mentions=[member])
+
+        assert built.body is not None
+        assert built.body.content == '<at id="0">Jane Smith (Finance)</at> Ship it.'
+        assert built.mentions is not None
+        assert built.mentions[0].mention_text == "Jane Smith (Finance)"
+        mentioned = built.mentions[0].mentioned
+        assert mentioned is not None
+        assert mentioned.user is not None
+        assert (mentioned.user.id, mentioned.user.display_name) == (
+            _JANE.user_id,
+            "Jane Smith (Finance)",
+        )
+
 
 class TestMention:
     @pytest.mark.parametrize(
@@ -223,9 +252,56 @@ class TestSendQuestion:
 
         assert question == (
             "Send 'Ship it Friday.' with the subject 'Release plan' and high importance to chat "
-            + "'19:release@thread.v2' now? It mentions 'Jane Smith', 'Ada Lovelace'. This cannot "
-            + "be recalled once sent."
+            + f"'19:release@thread.v2' now? It mentions {_JANE_LABELED}, {_ADA_LABELED}. This "
+            + "cannot be recalled once sent."
         )
+
+    def test_a_mention_shows_its_object_id_and_its_name_only_as_a_label(self) -> None:
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (_JANE,), subject=None, importance=None
+        )
+
+        assert (
+            "It mentions the person with the Microsoft Entra object id "
+            + "'00000000-0000-4000-8000-000000000003' (the name 'Jane Smith' is only a label "
+            + "from the request)."
+        ) in question
+
+    def test_a_name_of_another_person_still_shows_the_object_id_that_graph_binds(self) -> None:
+        misnamed = Mention(user_id=_JANE.user_id, name="Ada Lovelace")
+
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (misnamed,), subject=None, importance=None
+        )
+
+        assert _JANE.user_id in question
+        assert _ADA.user_id not in question
+        assert "(the name 'Ada Lovelace' is only a label from the request)" in question
+
+    def test_a_mentioned_member_shows_its_object_id_and_the_name_from_microsoft_365(self) -> None:
+        member = MentionedMember(user_id=_JANE.user_id, name="Jane Smith (Finance)")
+
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (member,), subject=None, importance=None
+        )
+
+        assert question == (
+            "Send 'Ship it Friday.' to chat '19:release@thread.v2' now? It mentions the person "
+            + "with the Microsoft Entra object id '00000000-0000-4000-8000-000000000003' (the "
+            + "name 'Jane Smith (Finance)' comes from Microsoft 365). This cannot be recalled "
+            + "once sent."
+        )
+
+    def test_a_long_label_is_cut_and_the_object_id_is_kept(self) -> None:
+        long = Mention(user_id=_JANE.user_id, name="J" * (PREVIEW_CHARACTERS + 1))
+
+        question = send_question(
+            CHAT_SEND, _MESSAGE, _TO_THE_CHAT, (long,), subject=None, importance=None
+        )
+
+        assert _JANE.user_id in question
+        assert "J" * (PREVIEW_CHARACTERS + 1) not in question
+        assert f"'{'J' * PREVIEW_CHARACTERS}…' is only a label from the request" in question
 
     def test_the_files_come_after_the_mentions_in_the_order_given(self) -> None:
         question = send_question(
@@ -239,8 +315,9 @@ class TestSendQuestion:
         )
 
         assert question == (
-            "Send 'Ship it Friday.' to chat '19:release@thread.v2' now? It mentions 'Jane Smith'. "
-            + "It attaches 'Budget.docx', 'Plan <draft>.pptx'. This cannot be recalled once sent."
+            "Send 'Ship it Friday.' to chat '19:release@thread.v2' now? It mentions "
+            + f"{_JANE_LABELED}. It attaches 'Budget.docx', 'Plan <draft>.pptx'. This cannot be "
+            + "recalled once sent."
         )
 
     def test_a_channel_post_names_the_channel_the_team_and_that_it_cannot_be_recalled(
@@ -271,7 +348,7 @@ class TestSendQuestion:
         assert question == (
             "Post 'Ship it Friday.' with the subject 'Release plan' and high importance to channel "
             + "'19:general@thread.tacv2' in team '8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81' now? It "
-            + "mentions 'Jane Smith'. It attaches 'Budget.docx'. This cannot be recalled once "
+            + f"mentions {_JANE_LABELED}. It attaches 'Budget.docx'. This cannot be recalled once "
             + "posted."
         )
 
@@ -279,7 +356,7 @@ class TestSendQuestion:
 def _bound(
     message: str = _MESSAGE,
     chat_id: str = _CHAT_ID,
-    mentions: Sequence[Mention] = (),
+    mentions: Sequence[OutgoingMention] = (),
     *,
     subject: str | None = None,
     importance: ChatImportance | None = None,
@@ -441,6 +518,11 @@ class TestMentionFields:
 
     def test_no_mention_is_a_count_of_zero(self) -> None:
         assert mention_fields(()) == ("0",)
+
+    def test_a_mentioned_member_binds_its_id_and_the_name_from_microsoft_365(self) -> None:
+        member = MentionedMember(user_id=_JANE.user_id, name="Jane Smith (Finance)")
+
+        assert mention_fields((member,)) == ("1", _JANE.user_id, "Jane Smith (Finance)")
 
 
 def _chat_message(*, sender: str | None, text: str | None) -> TeamsMessage:
@@ -616,6 +698,135 @@ class TestChatInQuestion:
             _ = await chat_in_question(client, _CHAT_ID)
 
         assert members.call_count == 0
+
+
+_OUTSIDER_ID = "00000000-0000-4000-8000-000000000009"
+
+
+class TestMentionedMembers:
+    async def test_each_mention_takes_its_name_from_the_members_of_the_chat_in_one_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        members = _lists_members(
+            graph, _ADA_MEMBER, _member(_GRACE_MEMBERSHIP, "Jane Smith (Finance)", _JANE.user_id)
+        )
+        misnamed = Mention(user_id=_JANE.user_id, name="Grace Hopper")
+
+        resolved = await mentioned_members(client, _CHAT_ID, (misnamed, _ADA))
+
+        assert resolved == (
+            MentionedMember(user_id=_JANE.user_id, name="Jane Smith (Finance)"),
+            MentionedMember(user_id=_ADA.user_id, name="Ada Lovelace"),
+        )
+        assert members.call_count == 1
+
+    async def test_the_ids_compare_without_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _lists_members(graph, _JANE_MEMBER)
+        shouted = Mention(user_id=_JANE.user_id.upper(), name="Jane")
+
+        resolved = await mentioned_members(client, _CHAT_ID, (shouted,))
+
+        assert resolved == (MentionedMember(user_id=_JANE.user_id, name="Jane Smith"),)
+
+    async def test_no_mention_reads_no_member(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        members = _lists_members(graph, _JANE_MEMBER)
+
+        resolved = await mentioned_members(client, _CHAT_ID, ())
+
+        assert resolved == ()
+        assert members.call_count == 0
+
+    async def test_a_person_outside_the_chat_is_refused_and_nothing_is_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _lists_members(graph, _ADA_MEMBER)
+        outsider = Mention(user_id=_OUTSIDER_ID, name="Jane Smith")
+
+        refused = await mentioned_members(client, _CHAT_ID, (_ADA, outsider))
+
+        assert refused == (
+            "Microsoft 365 shows no named member of this chat for this Microsoft Entra object id: "
+            + "'00000000-0000-4000-8000-000000000009'. This tool mentions only a member of the "
+            + "chat, by the name that Microsoft 365 gives. Copy each `user_id` from a "
+            + "teams_list_chat_members row for this chat. Nobody was mentioned. Nothing was sent. "
+            + "If you call this tool again with the same arguments, the call will fail the same "
+            + "way."
+        )
+
+    async def test_every_person_outside_the_chat_is_named_in_the_refusal(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _lists_members(graph, _ADA_MEMBER)
+
+        refused = await mentioned_members(
+            client, _CHAT_ID, (_JANE, Mention(user_id=_OUTSIDER_ID, name="Bob"))
+        )
+
+        assert isinstance(refused, str)
+        assert (
+            "for these Microsoft Entra object ids: '00000000-0000-4000-8000-000000000003', "
+            + "'00000000-0000-4000-8000-000000000009'."
+        ) in refused
+        assert "Nobody was mentioned. Nothing was sent." in refused
+
+    @pytest.mark.parametrize(
+        "member",
+        [
+            pytest.param(_member(_GRACE_MEMBERSHIP, None, _JANE.user_id), id="no-name"),
+            pytest.param(_member(_GRACE_MEMBERSHIP, "  ", _JANE.user_id), id="blank-name"),
+            pytest.param(
+                {
+                    **_member(_GRACE_MEMBERSHIP, "Jane Smith", _JANE.user_id),
+                    "@odata.type": "#microsoft.graph.anonymousGuestConversationMember",
+                },
+                id="not-an-entra-user",
+            ),
+        ],
+    )
+    async def test_a_member_with_no_name_or_no_entra_id_is_refused(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        member: Mapping[str, object],
+    ) -> None:
+        _ = _lists_members(graph, member)
+
+        refused = await mentioned_members(client, _CHAT_ID, (_JANE,))
+
+        assert isinstance(refused, str)
+        assert repr(_JANE.user_id) in refused
+        assert "Nobody was mentioned. Nothing was sent." in refused
+
+    async def test_the_label_of_the_request_never_reaches_the_binding(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _lists_members(graph, _JANE_MEMBER)
+
+        bindings: set[str] = set()
+        for label in ("Jane Smith", "Grace Hopper"):
+            resolved = await mentioned_members(
+                client, _CHAT_ID, (Mention(user_id=_JANE.user_id, name=label),)
+            )
+            assert not isinstance(resolved, str)
+            bindings.add(_bound(mentions=resolved))
+
+        assert len(bindings) == 1
+
+    async def test_a_refused_member_read_passes_on_the_refusal(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_MEMBERS_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Forbidden", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await mentioned_members(client, _CHAT_ID, (_JANE,))
 
 
 class TestMessageInQuestion:

@@ -35,9 +35,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import MeetingHandle
-from office_365_mcp.shared.identity import Person
+from office_365_mcp.shared.identity import Person, person_in_question
 from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.window import as_utc
 
 # This is the least-privileged permission for the resolve filter, and it needs no admin consent.
@@ -153,8 +152,8 @@ def distinct_people(people: Sequence[Person]) -> tuple[Person, ...]:
 
 
 def named_people(people: Sequence[Person]) -> str:
-    names = [repr(cut_for_a_question(person.name)) for person in people]
-    return f"{counted_people(names)}: {', '.join(names)}"
+    named = [person_in_question(person.user_id, person.name) for person in people]
+    return f"{counted_people(named)}: {', '.join(named)}"
 
 
 def not_a_meeting_handle(tool: str, *, tail: str) -> str:

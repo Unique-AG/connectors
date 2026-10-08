@@ -11,6 +11,7 @@ from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
     ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
 )
+from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
@@ -22,6 +23,7 @@ from msgraph.generated.models.chat_message_mentioned_identity_set import (
 )
 from msgraph.generated.models.chat_message_reaction import ChatMessageReaction
 from msgraph.generated.models.chat_message_type import ChatMessageType
+from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.generated.models.identity import Identity
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.teamwork_user_identity_type import TeamworkUserIdentityType
@@ -39,7 +41,11 @@ from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
-from office_365_mcp.shared.identity import ENTRA_OBJECT_ID_PATTERN
+from office_365_mcp.shared.identity import (
+    ENTRA_OBJECT_ID_PATTERN,
+    member_in_question,
+    person_in_question,
+)
 from office_365_mcp.shared.prose import cut_for_a_question
 
 
@@ -423,16 +429,28 @@ class Mention(BaseModel, frozen=True):
     name: str = Field(
         min_length=1,
         description=(
-            "The text that Teams shows for the mention, usually the display name of the person. "
-            + "Use the `display_name` from the same result as the `user_id`."
+            "The name of the person, as a label only. Teams identifies the person only by "
+            + "`user_id`. Copy the `display_name` from the same result as `user_id`. In a new "
+            + "chat message, this tool posts the name that Microsoft 365 gives the chat member, "
+            + "not this label. In a channel message, this tool cannot read that name, so it posts "
+            + "this label."
         ),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class MentionedMember:
+    user_id: str
+    name: str
+
+
+type OutgoingMention = Mention | MentionedMember
 
 
 def outgoing_message(
     text: str,
     *,
-    mentions: Sequence[Mention] = (),
+    mentions: Sequence[OutgoingMention] = (),
     importance: ChatMessageImportance | None = None,
     subject: str | None = None,
     attachments: Sequence[AttachableFile] = (),
@@ -587,13 +605,13 @@ def send_question(
     words: SendWords,
     message: str,
     destination: str,
-    mentions: Sequence[Mention],
+    mentions: Sequence[OutgoingMention],
     *,
     subject: str | None,
     importance: ChatImportance | None,
     files: Sequence[AttachableFile] = (),
 ) -> str:
-    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
+    named = ", ".join(_mention_in_question(mention) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
     listed = ", ".join(repr(cut_for_a_question(file.name)) for file in files)
     attached = f" It attaches {listed}." if files else ""
@@ -612,10 +630,16 @@ def send_question(
     )
 
 
+def _mention_in_question(mention: OutgoingMention) -> str:
+    if isinstance(mention, MentionedMember):
+        return member_in_question(mention.user_id, mention.name)
+    return person_in_question(mention.user_id, mention.name)
+
+
 def send_binding(
     destination: Sequence[str],
     message: str,
-    mentions: Sequence[Mention],
+    mentions: Sequence[OutgoingMention],
     *,
     subject: str | None,
     importance: ChatImportance | None,
@@ -632,7 +656,7 @@ def send_binding(
     )
 
 
-def mention_fields(mentions: Sequence[Mention]) -> tuple[str, ...]:
+def mention_fields(mentions: Sequence[OutgoingMention]) -> tuple[str, ...]:
     return (
         str(len(mentions)),
         *(field for mention in mentions for field in (mention.user_id, mention.name)),
@@ -651,24 +675,61 @@ _A_CHAT_WITH_NO_NAMES = "a Teams chat that has no topic"
 async def chat_in_question(
     client: GraphServiceClient, chat_id: str, *, leaving_out: str | None = None
 ) -> str:
-    chat = client.chats.by_chat_id(chat_id)
     with graph_step(STEP_CHAT):
-        found = await chat.get()
+        found = await client.chats.by_chat_id(chat_id).get()
     assert found is not None, "Graph answered a chat read with no chat"
     topic = _present(found.topic)
     if topic is not None:
         return f"the Teams chat {cut_for_a_question(topic)!r}"
-    with graph_step(STEP_CHAT_MEMBERS):
-        page = await chat.members.get()
-    assert page is not None, "Graph answered a chat member listing with no collection"
     names = [
         name
-        for member in page.value or []
+        for member in await _chat_members(client, chat_id)
         if member.id != leaving_out and (name := _present(member.display_name)) is not None
     ]
     if not names:
         return _A_CHAT_WITH_NO_NAMES
     return f"the Teams chat with {cut_for_a_question(', '.join(names))!r}"
+
+
+async def mentioned_members(
+    client: GraphServiceClient, chat_id: str, mentions: Sequence[Mention]
+) -> tuple[MentionedMember, ...] | str:
+    if not mentions:
+        return ()
+    named = {
+        member.user_id.casefold(): MentionedMember(user_id=member.user_id, name=name)
+        for member in await _chat_members(client, chat_id)
+        if isinstance(member, AadUserConversationMember)
+        and member.user_id is not None
+        and (name := _present(member.display_name)) is not None
+    }
+    missing = [mention.user_id for mention in mentions if mention.user_id.casefold() not in named]
+    if missing:
+        return _not_named_members(missing)
+    return tuple(named[mention.user_id.casefold()] for mention in mentions)
+
+
+async def _chat_members(client: GraphServiceClient, chat_id: str) -> list[ConversationMember]:
+    with graph_step(STEP_CHAT_MEMBERS):
+        page = await client.chats.by_chat_id(chat_id).members.get()
+    assert page is not None, "Graph answered a chat member listing with no collection"
+    return page.value or []
+
+
+def _not_named_members(user_ids: Sequence[str]) -> str:
+    ids = (
+        "this Microsoft Entra object id"
+        if len(user_ids) == 1
+        else "these Microsoft Entra object ids"
+    )
+    listed = ", ".join(repr(user_id) for user_id in user_ids)
+    return (
+        f"Microsoft 365 shows no named member of this chat for {ids}: {listed}. This tool "
+        + "mentions only a member of the chat, by the name that Microsoft 365 gives. Copy each "
+        + "`user_id` from a teams_list_chat_members row for this chat. Nobody was mentioned. "
+        + f"{CHAT_SEND.nothing_sent} If you call this tool again with the same arguments, the "
+        + "call will fail the same way."
+    )
 
 
 def message_in_question(message: TeamsMessage) -> str:
