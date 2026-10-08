@@ -559,7 +559,8 @@ class SearchOpportunityRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Login of the representative on the investor organization, which can differ from "
-            "the deal's `representative`. Output only; the colleague filter never reads it. "
+            "the deal's `representative`. What `representative_scope` `investor` and `either` "
+            "match. "
             "Absent when the organization has no representative."
         ),
     )
@@ -567,7 +568,7 @@ class SearchOpportunityRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Login stored as the representative on the deal itself — the colleague the deal is "
-            "assigned to, and what the `representative` filter matches."
+            "assigned to, and what the default `representative` filter matches."
         ),
     )
     product: ProductFromOpportunityResponse | None = Field(
@@ -646,6 +647,13 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
             "a later page failed."
         )
     )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Rows mode only: present when this page stopped before the matches ran out. Absent "
+            "means this was the last page; aggregate mode never has one."
+        ),
+    )
     rows: tuple[SearchOpportunityRowResponse, ...] = Field(
         default=(),
         description=(
@@ -669,12 +677,5 @@ class SearchOpportunitiesResolvedResponse(OmitNoneModel):
             "rows is the stored text and is still there. "
             "get_opportunities_by_ids cannot resolve field types while this is true — an "
             "empty resolved list there means the catalog missed, not that the deal has none."
-        ),
-    )
-    continuation: ContinuationResponse | None = Field(
-        default=None,
-        description=(
-            "Rows mode only: present when this page stopped before the matches ran out. Absent "
-            "means this was the last page; aggregate mode never has one."
         ),
     )

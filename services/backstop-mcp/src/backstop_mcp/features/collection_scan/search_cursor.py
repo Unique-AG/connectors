@@ -23,7 +23,11 @@ _MISMATCH = (
     "This cursor belongs to a different search. Pass it back to the same tool with every other "
     "argument unchanged, or omit `cursor` to start a new search."
 )
-_MALFORMED = "This cursor is not one this server issued. Omit `cursor` to start the search over."
+_MALFORMED = (
+    "This cursor is not one this server issued. `cursor` takes the exact `continuation.cursor` "
+    "string from the previous page, copied unchanged; it is not a page number or an offset. Omit "
+    "`cursor` to start the search over."
+)
 
 
 class InvalidCursorError(ToolError):

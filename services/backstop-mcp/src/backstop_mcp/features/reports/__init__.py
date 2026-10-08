@@ -6,23 +6,29 @@ from backstop_mcp.features.reports.api_responses import (
     ReportResourceAttributes,
     ReportResultAttributes,
 )
-from backstop_mcp.features.reports.dependencies import get_run_report_query_factory
+from backstop_mcp.features.reports.dependencies import (
+    get_report_run_cache,
+    get_run_report_query_factory,
+)
 from backstop_mcp.features.reports.queries import (
     DEFAULT_REPORT_PAGE_SIZE,
     MAX_REPORT_PAGE_SIZE,
+    ReportRunCache,
     RunReportQuery,
 )
-from backstop_mcp.features.reports.responses import ReportColumnResponse, RunReportResponse
+from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
 
 __all__ = [
     "DEFAULT_REPORT_PAGE_SIZE",
     "MAX_REPORT_PAGE_SIZE",
-    "ReportColumnResponse",
     "ReportHeaderAttributes",
     "ReportResource",
     "ReportResourceAttributes",
     "ReportResultAttributes",
+    "ReportRunCache",
+    "RunReportPendingResponse",
     "RunReportQuery",
     "RunReportResponse",
+    "get_report_run_cache",
     "get_run_report_query_factory",
 ]

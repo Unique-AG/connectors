@@ -636,19 +636,19 @@ class SearchOrganizationsResolvedResponse(OmitNoneModel):
             "collection here. `rows_scanned` is this call's records only."
         )
     )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match."
+        ),
+    )
     rows: tuple[SearchOrganizationRowResponse, ...] = Field(
         default=(),
         description=(
             "This page of organizations matching every filter, in Backstop id order (not by "
             "name). `id` is always present so the next call is get_organization. Default "
             "fields are id, name, legal_name, email, city, country, and locations."
-        ),
-    )
-    continuation: ContinuationResponse | None = Field(
-        default=None,
-        description=(
-            "Present when this page stopped before the end of the result: more rows may "
-            "match. Absent means these rows are every match."
         ),
     )
 
@@ -761,6 +761,14 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
             "whole collection here. `rows_scanned` is this call's records only."
         )
     )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match. An `email` search is never "
+            "paged."
+        ),
+    )
     rows: tuple[SearchPersonRowResponse, ...] = Field(
         default=(),
         description=(
@@ -768,13 +776,5 @@ class SearchPeopleResolvedResponse(OmitNoneModel):
             "`id` is always present so the next call is get_person with `search_type` "
             "`people`. Default fields are id, name, email, job_title, company_name, city, "
             "country, and locations."
-        ),
-    )
-    continuation: ContinuationResponse | None = Field(
-        default=None,
-        description=(
-            "Present when this page stopped before the end of the result: more rows may "
-            "match. Absent means these rows are every match. An `email` search is never "
-            "paged."
         ),
     )

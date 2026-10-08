@@ -98,7 +98,8 @@ class SearchActivitiesQuery:
 
         The search sorts on effective date, then id, so the order is the same on every request
         and an offset resumes exactly. A rows call that stops before the end hands back a
-        `continuation` at the offset after its last page. Resuming by date window instead was
+        `continuation` at the position after its last page; a page short by an activity with
+        no `regarding` party is not the end. Resuming by date window instead was
         probed and rejected: Backstop sorts on the UTC instant but filters on the local day, so a
         window cut at a day both repeated and lost rows. A page that shows an ignored filter, a
         failed later page, or the 10000 wall ends the walk without a `continuation`.
@@ -201,16 +202,22 @@ class SearchActivitiesQuery:
             collected.extend(row for index, row in projected.rows if index >= skip)
             dropped += sum(1 for index in projected.dropped if index >= skip)
             rows_received += len(page.results) - skip
-            # A totalCount on the wall is saturated, not the size of the set.
-            is_last = len(page.results) < page_size or (
-                total_count is not None
-                and total_count < max_retrievable
-                and page_offset + len(page.results) >= total_count
-            )
+            # An activity with no `regarding` party still holds its position but is left out of
+            # `results`, so a short page is not the end: probed, page 1 of 100 came back with 99
+            # rows and page 2 began at position 100. The end is where the positions reach
+            # totalCount, which counts the omitted activity too. A totalCount on the wall is
+            # saturated, so only an empty page ends that walk.
+            if total_count is None:
+                is_last = len(page.results) < page_size
+            elif total_count < max_retrievable:
+                is_last = page_offset + page_size >= total_count
+            else:
+                is_last = not page.results
             if any(name != "total_count" for name in projected.violating) or is_last:
                 break
             if min_result_size is not None and len(collected) >= min_result_size:
-                next_offset = page_offset + len(page.results)
+                # Positions, not rows returned: an omitted activity still took one.
+                next_offset = page_offset + page_size
                 # The last record the endpoint will serve: nothing past it to resume into.
                 if next_offset >= max_retrievable:
                     ceiling_clamped, next_offset = True, None

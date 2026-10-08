@@ -199,6 +199,17 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
         ActivityType,
         Field(description="Which stream this group is: meeting, call, note, email, or document."),
     ]
+    next: Annotated[
+        ActivityContinuationResponse | None,
+        Field(
+            description=(
+                "Params to fetch this stream's next page. Omitted (or null) once the stream is "
+                "exhausted. To continue, copy this object exactly, field for field, into a "
+                "`type=next` request's `next` map under this `activity_type`. Never edit or "
+                "compute its values."
+            ),
+        ),
+    ] = None
     items: Annotated[
         tuple[ItemT, ...],
         Field(description="This page's records for `activity_type`, in Backstop fetch order."),
@@ -209,16 +220,6 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
             description=(
                 "Oldest and newest `occurred_at` dates among this page's dated items. Omitted "
                 "(or null) when the page is empty or every item lacks a date."
-            ),
-        ),
-    ] = None
-    next: Annotated[
-        ActivityContinuationResponse | None,
-        Field(
-            description=(
-                "Params to fetch this stream's next page. Omitted (or null) once the stream is "
-                "exhausted. To continue, copy this object into a `type=next` request's `next` "
-                "map under this `activity_type`."
             ),
         ),
     ] = None
@@ -849,8 +850,10 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     attendees: tuple[str, ...] | None = Field(
         default=None,
         description=(
-            "Full display names from the structured Attendees field. Use these for attendee "
-            "columns in a table — not names read out of the title, gist, or description."
+            "Full display names from the structured Attendees field, on meeting and call rows "
+            "only. Use these for attendee columns in a table — not names read out of the title, "
+            "gist, or description. Names only: when a meeting or call row has none, or you need "
+            "a people id or firm, call get_activity_detail with this row's `activity_id`."
         ),
     )
     tags: tuple[ActivityTagChipResponse, ...] | None = Field(
@@ -925,18 +928,18 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
     coverage: ScanCoverageResponse = Field(
         description="How much of the matching set was scanned, and whether it was truncated."
     )
-    rows: tuple[SearchActivitiesRowResponse, ...] = Field(
-        default=(),
-        description=(
-            "One page of matching activities in Backstop's newest-effectiveDate-first order. "
-            "Empty in aggregate mode."
-        ),
-    )
     continuation: ContinuationResponse | None = Field(
         default=None,
         description=(
             "Present when more rows may match than this page holds. Omitted when the rows "
             "are complete, in aggregate mode, or at the 10000 ceiling (see `coverage`)."
+        ),
+    )
+    rows: tuple[SearchActivitiesRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "One page of matching activities in Backstop's newest-effectiveDate-first order. "
+            "Empty in aggregate mode."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(

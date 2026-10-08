@@ -19,6 +19,7 @@ from backstop_mcp.features.opportunities.queries import (
     GetOpportunitiesQuery,
     OpportunityGroupBy,
     OpportunityStatus,
+    RepresentativeScope,
     SearchMode,
     SearchOpportunitiesQuery,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "OpportunityStagesService",
     "OpportunityStatus",
     "PartyOpportunitiesResponse",
+    "RepresentativeScope",
     "SearchMode",
     "SearchOpportunitiesQuery",
     "SearchOpportunitiesResolvedResponse",

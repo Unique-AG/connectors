@@ -262,7 +262,8 @@ async def search_activities(
         Field(
             default=False,
             description=(
-                "Opt in to the full body text (much larger rows) on each returned row. "
+                "Opt in to the full body text (much larger rows) on each returned row. Set it "
+                "true to summarize activities: `short_description` is cut at 400 characters. "
                 "Refused with `mode=aggregate` and on a firm-wide search (no party, tags, authors, "
                 "or attendees)."
             ),
@@ -308,7 +309,8 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "`continuation.cursor` from the previous page of this same search. Repeat every "
+                "`continuation.cursor` from the previous page of this same search, copied "
+                "exactly: an opaque string, never a page number or offset. Repeat every "
                 "other argument unchanged; a cursor from different arguments is rejected. "
                 "Rows mode only."
             ),
@@ -340,12 +342,13 @@ async def search_activities(
     get_activity_history (party-scoped) instead, not a retry of this tool. An empty `rows`
     list with status resolved is genuinely none in that window.
 
-    Counts cover only what this credential can see. An aggregate over a set larger than the
-    10000 ceiling comes back partial, with a disclaimer on `coverage`; rows mode pages past it.
+    Counts cover only what this credential can see. A set larger than the 10000 ceiling
+    comes back partial, with a disclaimer on `coverage`.
 
     `mode=rows` returns one page per call, newest first; `coverage.visible_count` is the
     total that matched. `continuation` means more rows may match: pass `continuation.cursor`
-    back with the same arguments only when the user needs more rows. To count, use
+    back with the same arguments. An overview or a list of all follows it until it is gone.
+    Never ask the user how many rows to fetch; the page size is fixed. To count, use
     `mode=aggregate` with `group_by`, not paging — it answers without row bodies.
     A party missing from a firm-wide row sample is not
     inactive; for "who has had no activity since X" use get_last_activity_for_parties.
@@ -354,10 +357,15 @@ async def search_activities(
 
     A term in activities is list_activity_tags with that substring, then every returned id
     in `activity_tag_ids`. Description text is not searchable; read bodies after the rows
-    are back. Meeting, call,
+    are back. To summarize activities, pass `include_description: true` and summarize from
+    `description`, never from the truncated `short_description`; scope the search first, since
+    a firm-wide search refuses it. Meeting, call,
     note, and document rows from `get_activity_history` use the
     same argument; history email ids do not. Attendee columns use the structured
-    `attendees` names on these rows, not names read out of the title or body.
+    `attendees` names on these rows, not names read out of the title or body. Only meeting
+    and call rows have attendees; notes, documents, and emails never do. When a meeting or
+    call row has no `attendees`, or you need an attendee's people id or firm, call
+    `get_activity_detail` with that row's `activity_id`.
     """
     start_date, end_date = date_window(start_date, end_date, today=date.today())
     if mode == "aggregate" and group_by is None:
@@ -406,11 +414,6 @@ async def search_activities(
         raise ValueError(
             "include_description is refused on a firm-wide search; pass a party, "
             + "activity_tag_ids, authors, or attendees, or leave include_description false"
-        )
-    if mode == "aggregate" and firm_wide:
-        raise ValueError(
-            "mode=aggregate is refused on a firm-wide search; pass a party, activity_tag_ids, "
-            + "authors, or attendees, or use mode=rows"
         )
 
     # `description` is added to the *default* set when it was opted into, and never forced onto

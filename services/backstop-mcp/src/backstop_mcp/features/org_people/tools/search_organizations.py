@@ -165,8 +165,8 @@ async def search_organizations(
                 "Every row's custom fields come back as `custom_field_values` by default — "
                 "the fields a table is grouped or labelled by. Leave "
                 "this false. Set it true only to retry a call that timed out, to see whether "
-                "reading the custom fields is what made it slow. Refused together with "
-                "`custom_fields`, which needs them."
+                "reading the custom fields is what made it slow. Ignored when "
+                "`custom_fields` is set, which needs them."
             )
         ),
     ] = False,
@@ -188,7 +188,8 @@ async def search_organizations(
         str | None,
         Field(
             description=(
-                "`continuation.cursor` from the previous page of this same search. Repeat "
+                "`continuation.cursor` from the previous page of this same search, copied "
+                "exactly: an opaque string, never a page number or offset. Repeat "
                 "every other argument unchanged; a cursor from different arguments is rejected."
             )
         ),
@@ -224,8 +225,9 @@ async def search_organizations(
 
     One call returns one page of rows in Backstop id order, not by name. `continuation`
     means the page stopped before the end: follow `continuation.cursor`, with every other
-    argument unchanged, only when the user needs more rows than this page holds. An empty
-    `rows` list means nothing matched.
+    argument unchanged. An overview or a list of all follows it until it is gone. Never ask
+    the user how many rows to fetch; the page size is fixed. An empty `rows` list means
+    nothing matched.
     `coverage.visible_count` is Backstop's total for the server-side filters, before
     the in-memory predicates.
 
@@ -234,10 +236,8 @@ async def search_organizations(
     "values": ["<option from list_custom_fields>"]}],
     "fields": ["name", "locations"]}
     """
-    if custom_fields and exclude_custom_fields:
-        raise ValueError(
-            "exclude_custom_fields cannot be combined with custom_fields: the filter reads them"
-        )
+    # A custom-field filter reads the custom fields anyway, so skipping them saves nothing.
+    skip_custom_fields = exclude_custom_fields and not custom_fields
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
     with _tracer.start_as_current_span("org_people.search") as span:
@@ -255,7 +255,7 @@ async def search_organizations(
                 "ria": ria is not None,
                 "internal_organization": internal_organization is not None,
                 "custom_fields": len(predicates),
-                "exclude_custom_fields": exclude_custom_fields,
+                "exclude_custom_fields": skip_custom_fields,
                 "cursor": cursor is not None,
             },
         )
@@ -270,7 +270,7 @@ async def search_organizations(
             ria=ria,
             internal_organization=internal_organization,
             custom_fields=predicates,
-            exclude_custom_fields=exclude_custom_fields,
+            exclude_custom_fields=skip_custom_fields,
             fields=chosen,
             result_size=search_config.result_size,
             cursor=cursor,

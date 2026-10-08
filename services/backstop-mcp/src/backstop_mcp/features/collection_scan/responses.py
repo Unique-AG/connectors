@@ -96,7 +96,8 @@ class ContinuationResponse(OmitNoneModel):
     cursor: str = Field(
         description=(
             "Pass back as `cursor`, with every other argument unchanged, to read the next page. "
-            "Opaque: do not edit or build one."
+            "Opaque: copy it exactly and in full; never shorten, edit, or build one, and never "
+            "pass a page number instead."
         )
     )
     message: str = Field(description="Why this call stopped and what the next call does.")

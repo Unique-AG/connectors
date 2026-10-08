@@ -8,6 +8,11 @@ resumed call neither repeats nor skips a row.
 
 Offsets on the wire stay multiples of `api_page_size` (Backstop rejects anything else); a cursor
 that lands mid-page re-reads that page and skips the rows before it.
+
+A record the credential cannot see can keep its position and its place in the total while being
+left out of a page (probed on `POST /entity-activities`: page 1 of 100 held 99 rows). So the end
+is where positions reach the total, not a short page, and on a short page an index is not a
+position: a result that fills there takes the rest of that page and resumes at the next one.
 """
 
 import asyncio
@@ -67,19 +72,25 @@ async def collect_page[I, R](
             if total_count is None:
                 total_count = page.total_count
             end = offset + len(page.items)
+            # Without a total, a short page is the end. With one, a short page may only be
+            # missing a record this credential cannot see.
             is_last = (
-                end >= total_count if total_count is not None else len(page.items) < api_page_size
+                offset + api_page_size >= total_count
+                if total_count is not None
+                else len(page.items) < api_page_size
             )
-            # A short page in the middle of the collection would shift every later offset.
-            assert is_last or len(page.items) == api_page_size, (
-                f"Backstop served {len(page.items)} records for a page of {api_page_size} at "
-                f"offset {offset} with more remaining; offsets would drift"
+            # Every index is a position only when the page holds all it should: the last page of
+            # a collection is short without missing anything.
+            complete = (
+                len(page.items) == min(api_page_size, total_count - offset)
+                if total_count is not None
+                else True
             )
             for index, row in select(page):
                 if offset + index < start_offset:
                     continue
                 rows.append(row)
-                if len(rows) == output_page_size:
+                if complete and len(rows) == output_page_size:
                     consumed = offset + index + 1
                     done = is_last and consumed >= end
                     return CollectedPage[R](
@@ -96,6 +107,17 @@ async def collect_page[I, R](
                     rows=tuple(rows),
                     next_offset=None,
                     stop_reason="exhausted",
+                    records_scanned=scanned,
+                    request_count=requests,
+                    total_count=total_count,
+                )
+            # Filled inside a short page: no index there is a known position, so take the whole
+            # page and resume at the next one rather than risk a repeated or skipped row.
+            if len(rows) >= output_page_size:
+                return CollectedPage[R](
+                    rows=tuple(rows),
+                    next_offset=offset + api_page_size,
+                    stop_reason="page_full",
                     records_scanned=scanned,
                     request_count=requests,
                     total_count=total_count,

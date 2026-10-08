@@ -57,6 +57,9 @@ class TestInstructions:
         assert "list_contact_categories" in INSTRUCTIONS
         assert "category_ids" in INSTRUCTIONS
         assert "Key employee is read-only" in INSTRUCTIONS
+        assert "try a few variants" in INSTRUCTIONS
+        assert "character for character" in INSTRUCTIONS
+        assert "never pass a page number" in INSTRUCTIONS
         assert "CRM UI" in INSTRUCTIONS
         assert "delete_activity" in INSTRUCTIONS
         assert "delete_person" in INSTRUCTIONS
@@ -89,14 +92,17 @@ class TestInstructions:
         assert "Do not ask the user for standard field names" in INSTRUCTIONS
         assert "The roster leaves department off" in INSTRUCTIONS
         assert "A stage-change question stays on search_opportunities" in INSTRUCTIONS
-        assert "including closed deals" in INSTRUCTIONS
+        assert "keep closed deals" in INSTRUCTIONS
+        assert "`entered_stage_from`/`entered_stage_to`" in INSTRUCTIONS
+        assert "Never filter that date yourself from unfiltered pages" in INSTRUCTIONS
         assert "do not walk get_opportunities_by_ids" in INSTRUCTIONS
         assert "two fields are the latest move only" in INSTRUCTIONS
         assert "usually tenant custom fields" not in INSTRUCTIONS
         assert "exact option text" not in INSTRUCTIONS
         assert "Country is the stored full name" in INSTRUCTIONS
         assert "matches the deal-level representative" in INSTRUCTIONS
-        assert "never filtered on" in INSTRUCTIONS
+        assert "never filtered on" not in INSTRUCTIONS
+        assert "`representative_scope` `investor` matches the login there" in INSTRUCTIONS
         assert "Leave `exclude_custom_fields` false" in INSTRUCTIONS
         assert "to retry a call that timed out" in INSTRUCTIONS
         assert "then every returned id to" in INSTRUCTIONS

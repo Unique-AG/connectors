@@ -1,7 +1,18 @@
 import pytest
 from fastmcp.exceptions import ToolError
+from pydantic import BaseModel
 
+from backstop_mcp.features.activity_history import (
+    ActivityGroupResponse,
+    SearchActivitiesResolvedResponse,
+)
 from backstop_mcp.features.collection_scan import SearchCursor, continuation, search_fingerprint
+from backstop_mcp.features.opportunities import SearchOpportunitiesResolvedResponse
+from backstop_mcp.features.org_people import (
+    SearchOrganizationsResolvedResponse,
+    SearchPeopleResolvedResponse,
+)
+from backstop_mcp.features.reports import RunReportResponse
 
 
 class TestSearchCursor:
@@ -30,6 +41,11 @@ class TestSearchCursor:
         with pytest.raises(ToolError, match="not one this server issued"):
             _ = SearchCursor.decode(token, fingerprint="x", collections=1)
 
+    @pytest.mark.parametrize("token", ["1", "2", "100"])
+    def test_a_page_number_is_rejected_with_how_to_page(self, token: str) -> None:
+        with pytest.raises(ToolError, match="not a page number"):
+            _ = SearchCursor.decode(token, fingerprint="x", collections=1)
+
     def test_the_wrong_number_of_offsets_is_rejected(self) -> None:
         token = SearchCursor(offsets=(1, 2), fingerprint="x").encode()
 
@@ -53,6 +69,7 @@ class TestContinuation:
 
         assert result is not None
         assert "Stopped at 100 rows" in result.message
+        assert "copied exactly and in full" in result.message
         assert SearchCursor.decode(result.cursor, fingerprint="x", collections=1).offsets == (100,)
 
     def test_a_finished_search_has_no_continuation(self) -> None:
@@ -65,3 +82,34 @@ class TestContinuation:
             )
             is None
         )
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        SearchActivitiesResolvedResponse,
+        SearchOpportunitiesResolvedResponse,
+        SearchOrganizationsResolvedResponse,
+        SearchPeopleResolvedResponse,
+    ],
+)
+def test_the_cursor_is_serialized_before_the_rows(response: type[BaseModel]) -> None:
+    """A long page cut short by the client must not lose the cursor at its end."""
+    fields = list(response.model_fields)
+
+    assert fields.index("continuation") < fields.index("rows")
+
+
+@pytest.mark.parametrize(
+    ("response", "handle", "payload"),
+    [
+        (RunReportResponse, "next_offset", "rows"),
+        (ActivityGroupResponse, "next", "items"),
+    ],
+)
+def test_every_paging_handle_is_serialized_before_its_rows(
+    response: type[BaseModel], handle: str, payload: str
+) -> None:
+    fields = list(response.model_fields)
+
+    assert fields.index(handle) < fields.index(payload)

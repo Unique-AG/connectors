@@ -1,7 +1,5 @@
 from collections.abc import Callable, Sequence
 
-import pytest
-
 from backstop_mcp.backstop_client import SinglePage
 from backstop_mcp.features.collection_scan import CollectedPage, collect_page
 
@@ -23,6 +21,21 @@ class FakeCollection:
         return SinglePage[Record](
             items=list(range(offset, min(offset + self.page_size, self.size))),
             total_count=self.size if self.with_total else None,
+        )
+
+
+class HiddenRecords(FakeCollection):
+    """Records at `hidden` positions count in the total but are left out of their page."""
+
+    def __init__(self, size: int, *, page_size: int, hidden: set[int]) -> None:
+        super().__init__(size, page_size=page_size)
+        self.hidden: set[int] = hidden
+
+    async def read_at(self, offset: int) -> SinglePage[Record]:
+        page = await super().read_at(offset)
+        return SinglePage[Record](
+            items=[item for item in page.items if item not in self.hidden],
+            total_count=page.total_count,
         )
 
 
@@ -113,15 +126,28 @@ class TestCollectPage:
         assert collection.reads == [0, 10, 20, 30]
         assert page.request_count == 4
 
-    async def test_a_short_page_mid_collection_is_an_invariant_failure(self) -> None:
-        async def short_read(offset: int) -> SinglePage[Record]:
-            return SinglePage[Record](items=[offset], total_count=100)
+    async def test_a_page_short_by_a_hidden_record_is_not_the_end(self) -> None:
+        """Position 3 is hidden: it counts in the total but is left out of its page."""
+        collection = HiddenRecords(20, page_size=10, hidden={3})
+        first = await collect(collection, output_page_size=15)
+        assert first.next_offset is not None
+        second = await collect(collection, start_offset=first.next_offset, output_page_size=15)
 
-        with pytest.raises(AssertionError, match="offsets would drift"):
-            _ = await collect_page(
-                read_at=short_read,
-                select=every,
-                start_offset=0,
-                output_page_size=5,
-                api_page_size=10,
-            )
+        assert first.rows + second.rows == tuple(item for item in range(20) if item != 3)
+        assert second.stop_reason == "exhausted"
+
+    async def test_filling_inside_a_short_page_takes_the_page_and_resumes_after_it(
+        self,
+    ) -> None:
+        page = await collect(HiddenRecords(30, page_size=10, hidden={3}), output_page_size=5)
+
+        assert page.rows == (0, 1, 2, 4, 5, 6, 7, 8, 9)
+        assert page.stop_reason == "page_full"
+        assert page.next_offset == 10
+
+    async def test_a_last_page_short_by_a_hidden_record_is_exhausted(self) -> None:
+        page = await collect(HiddenRecords(15, page_size=10, hidden={12}), output_page_size=50)
+
+        assert page.rows == tuple(item for item in range(15) if item != 12)
+        assert page.stop_reason == "exhausted"
+        assert page.next_offset is None

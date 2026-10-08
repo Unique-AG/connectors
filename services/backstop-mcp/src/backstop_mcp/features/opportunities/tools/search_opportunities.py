@@ -1,12 +1,17 @@
 """`search_opportunities`: firm-wide pipeline search over `GET /opportunities`.
 
 `representative` is sent as `filter[representative.name][eq]`, the only server-side filter: the
-deal-level representative, matched on the exact login. Every other filter is client-side. Rows
+deal-level representative, matched on the exact login. With `representative_scope` `investor` or
+`either` it is matched in memory instead, since Backstop cannot filter on the investor
+organization's representative. Every other filter is client-side;
+Backstop answers `filter[dateEnteredCurrentStage][ge]` with `400 Invalid filter field`, so the
+stage-change window is too. Rows
 mode returns one page per call and a cursor; aggregate mode reads every match.
 """
 
 import logging
 from collections.abc import Sequence
+from datetime import date
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
@@ -20,6 +25,7 @@ from backstop_mcp.features.collection_scan import SearchCursor, search_fingerpri
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.opportunities import (
     OpportunityGroupBy,
+    RepresentativeScope,
     SearchMode,
     SearchOpportunitiesQuery,
     SearchOpportunitiesResolvedResponse,
@@ -108,13 +114,25 @@ async def search_opportunities(
         Field(
             description=(
                 "Backstop **login** (`user_name` from list_system_users), exactly as listed, "
-                "not a display name. Keeps the deals assigned to that colleague: the "
-                "deal-level representative (`representative` on each row). Not the investor "
-                "organization's representative. A display name such as 'Jane Doe' returns 0 "
-                "rows. Sent to Backstop as the server-side filter."
+                "not a display name. By default keeps the deals assigned to that colleague: "
+                "the deal-level representative (`representative` on each row); "
+                "`representative_scope` widens it to the investor organization's "
+                "representative. A display name such as 'Jane Doe' returns 0 rows."
             )
         ),
     ] = None,
+    representative_scope: Annotated[
+        RepresentativeScope,
+        Field(
+            description=(
+                "Which representative `representative` matches. `deal` (default): the "
+                "deal-level representative, filtered by Backstop. `investor`: the investor "
+                "organization's representative (`investor_representative` on each row). "
+                "`either`: a deal matching on either link, once. `investor` and `either` "
+                "are applied after the server-side read, over every deal."
+            )
+        ),
+    ] = "deal",
     is_open: Annotated[
         bool | None,
         Field(description="Open/closed split, applied after the server-side read."),
@@ -138,6 +156,25 @@ async def search_opportunities(
             )
         ),
     ] = None,
+    entered_stage_from: Annotated[
+        date | None,
+        Field(
+            description=(
+                "Inclusive start of the window on `date_entered_current_stage`: keeps the deals "
+                "whose latest stage move is on or after this date, open or closed. A deal with "
+                "no date does not match. Applied after the server-side read, over every deal."
+            )
+        ),
+    ] = None,
+    entered_stage_to: Annotated[
+        date | None,
+        Field(
+            description=(
+                "Inclusive end of the window on `date_entered_current_stage`. Omit for "
+                "'since X'. Applied after the server-side read, over every deal."
+            )
+        ),
+    ] = None,
     custom_fields: Annotated[
         list[OpportunityCustomFieldFilter] | None,
         Field(
@@ -157,8 +194,8 @@ async def search_opportunities(
                 "(the fields a table is grouped or labelled by), so the rows answer the table. "
                 "Leave this "
                 "false. Set it true only to retry a call that timed out, to see whether "
-                "reading the custom fields is what made it slow. Refused together with "
-                "`custom_fields`, which needs them."
+                "reading the custom fields is what made it slow. Ignored when "
+                "`custom_fields` is set, which needs them."
             )
         ),
     ] = False,
@@ -198,7 +235,8 @@ async def search_opportunities(
         str | None,
         Field(
             description=(
-                "`continuation.cursor` from the previous page of this same search. Repeat "
+                "`continuation.cursor` from the previous page of this same search, copied "
+                "exactly: an opaque string, never a page number or offset. Repeat "
                 "every other argument unchanged; a cursor from different arguments is "
                 "rejected. Rows mode only."
             )
@@ -212,8 +250,9 @@ async def search_opportunities(
     """Search the firm-wide pipeline.
 
     Rows mode returns one page of deals per call. `continuation` means more may match: follow
-    `continuation.cursor`, with every other argument unchanged, only when the user needs more
-    rows. A counting question uses `mode=aggregate`, which reads every match in one call and
+    `continuation.cursor`, with every other argument unchanged. An overview or a list of all
+    follows it until it is gone. Never ask the user how many rows to fetch; the page size is
+    fixed. A counting question uses `mode=aggregate`, which reads every match in one call and
     has no cursor.
 
     `product` matches the linked fund. A short name matches exactly; a display-name
@@ -228,15 +267,18 @@ async def search_opportunities(
     `is_open` means the deal is still in the pipeline. `representative` matches the
     deal-level representative login (`representative` on each row) — the deals assigned to
     that colleague. Pass that **login** from list_system_users. A display name silently
-    returns zero rows. Backstop applies `representative`; every other filter is applied
-    after the server-side read.
-    `coverage.visible_count` is Backstop's total after `representative` and before the
-    other filters. An empty `rows` list with no `continuation` means nothing matched.
+    returns zero rows. With the default `representative_scope="deal"` Backstop applies
+    `representative`; every other filter is applied after the server-side read.
+    `coverage.visible_count` is Backstop's total after a `deal`-scope `representative` and
+    before the other filters. An empty `rows` list with no `continuation` means nothing matched.
 
-    A stage-change question ("what moved stage since X") stays on this tool. Select
-    `previous_stage` and `date_entered_current_stage` and keep rows whose
-    `date_entered_current_stage` is inside the window, including deals that closed — do not
-    pass `is_open`. Do not ask the user for those field names, and do not walk
+    A stage-change question ("what moved stage since X", "in the last six months") stays on
+    this tool. Pass the window as `entered_stage_from` (and `entered_stage_to` when it has an
+    end) so the server checks every deal, and select `previous_stage` and
+    `date_entered_current_stage`. Never filter that date yourself from unfiltered pages: they
+    are ordered by id, not by date, so the early pages are the oldest deals. Include deals
+    that closed — do not pass `is_open`. "How many moved, per stage" is the same window with
+    `mode="aggregate", group_by="stage"`. Do not ask the user for those field names, and do not walk
     get_opportunities_by_ids for this question. Those two fields are the latest move per
     deal only; say so. `id` is always projected. `custom_fields_unavailable` means the
     catalog missed: stored values on this row are still the text Backstop sent, and
@@ -252,20 +294,22 @@ async def search_opportunities(
     `days_since_last_activity`. Days in stage is not activity.
 
     A colleague's name (as in "<name>'s pipeline" or "deals assigned to <name>") is resolved
-    with list_system_users, never search_people. `investor_representative` is a separate
-    output field — the colleague who covers the investor organization. It can differ from
-    the deal-level representative and is never filtered on; select it only to compare.
+    with list_system_users, never search_people. `investor_representative` is the colleague
+    who covers the investor organization; it can differ from the deal-level representative.
+    `representative_scope="investor"` matches the login there instead, and `"either"` keeps
+    a deal assigned to them or held by an organization they cover. Select both fields so the
+    answer can say which link matched.
 
     Call like: {"representative": "jdoe", "is_open": true}
-    Compare with the investor organization's coverage: {"representative": "jdoe",
-    "is_open": true, "fields": ["name", "stage", "requested_amount", "investor",
-    "representative", "investor_representative"]}
+    Deals assigned to them or at organizations they cover: {"representative": "jdoe",
+    "representative_scope": "either", "is_open": true, "fields": ["name", "stage",
+    "requested_amount", "investor", "representative", "investor_representative"]}
     One custom-field option: {"is_open": true, "custom_fields": [{"definition_id":
     "<id from list_custom_fields>", "values": ["<option from list_custom_fields>"]}],
     "fields": ["name", "stage", "requested_amount", "expected_investment_date", "investor"]}
     Several vehicles: {"product": ["NWON", "NWOF"], "is_open": true}
-    Stage changes: {"fields": ["name", "stage", "previous_stage",
-    "date_entered_current_stage", "is_open", "investor"]}
+    Stage changes: {"entered_stage_from": "2026-01-01", "fields": ["name", "stage",
+    "previous_stage", "date_entered_current_stage", "is_open", "investor"]}
     """
     if mode == "aggregate" and group_by is None:
         raise ValueError("group_by is required when mode is aggregate")
@@ -275,20 +319,31 @@ async def search_opportunities(
     if mode == "aggregate" and cursor is not None:
         raise ValueError("cursor is only used when mode is rows: aggregate reads every match")
 
-    if custom_fields and exclude_custom_fields:
-        raise ValueError(
-            "exclude_custom_fields cannot be combined with custom_fields: the filter reads them"
-        )
+    if representative_scope != "deal" and not (representative or "").strip():
+        raise ValueError("representative_scope needs a representative login")
+
+    if (
+        entered_stage_from is not None
+        and entered_stage_to is not None
+        and entered_stage_from > entered_stage_to
+    ):
+        raise ValueError("entered_stage_from is after entered_stage_to")
+
+    # A custom-field filter reads the custom fields anyway, so skipping them saves nothing.
+    skip_custom_fields = exclude_custom_fields and not custom_fields
 
     fingerprint = search_fingerprint(
         "search_opportunities",
         {
             "representative": representative,
+            "representative_scope": representative_scope,
             "is_open": is_open,
             "stage": stage,
             "product": product,
+            "entered_stage_from": entered_stage_from,
+            "entered_stage_to": entered_stage_to,
             "custom_fields": custom_fields,
-            "exclude_custom_fields": exclude_custom_fields,
+            "exclude_custom_fields": skip_custom_fields,
             "mode": mode,
             "group_by": group_by,
             "fields": fields,
@@ -305,21 +360,27 @@ async def search_opportunities(
         "opportunities.search.start",
         extra={
             "representative": representative,
+            "representative_scope": representative_scope,
             "mode": mode,
             "stage": stage,
             "product": products,
+            "entered_stage_from": entered_stage_from,
+            "entered_stage_to": entered_stage_to,
             "custom_fields": len(predicates),
-            "exclude_custom_fields": exclude_custom_fields,
+            "exclude_custom_fields": skip_custom_fields,
             "start_offset": start_offset,
         },
     )
     return await search_opportunities_query.run(
         representative=representative,
+        representative_scope=representative_scope,
         is_open=is_open,
         stage=stage,
         products=products,
+        entered_stage_from=entered_stage_from,
+        entered_stage_to=entered_stage_to,
         custom_fields=predicates,
-        exclude_custom_fields=exclude_custom_fields,
+        exclude_custom_fields=skip_custom_fields,
         mode=mode,
         group_by=group_by,
         fields=(frozenset(fields) if fields else _DEFAULT_FIELDS) | {"id"},

@@ -106,6 +106,10 @@ class BackstopClient:
         self._gate: RequestGate = gate
         self._retry_policy: RetryPolicy = retry_policy
 
+    async def caller_username(self) -> str:
+        """Backstop username of whoever this client's next request authenticates as."""
+        return (await self._session()).credential.username
+
     async def get(
         self, path: str, *, schema: type[T], params: dict[str, object] | None = None
     ) -> T:
