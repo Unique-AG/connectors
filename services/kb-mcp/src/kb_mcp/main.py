@@ -25,6 +25,7 @@ from kb_mcp.common.references import (
     SERVER_INSTRUCTIONS_SKILL_POINTER,
 )
 from kb_mcp.common.tree_cache import expire_idle_trees_loop
+from kb_mcp.favicon import add_favicon_route
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
 from kb_mcp.settings import ENV_FILE, Settings, get_settings
@@ -133,6 +134,7 @@ def main() -> None:
         lifespan=tree_cache_expire_lifespan,
     )
     apply_enabled_tools(mcp, settings)
+    add_favicon_route(mcp)
 
     # No CORS: /mcp is server-side and OAuth redirects are top-level navigation.
     middleware = [
