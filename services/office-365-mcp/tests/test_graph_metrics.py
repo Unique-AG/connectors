@@ -253,7 +253,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         with pytest.raises(ToolError):
             _ = await send_draft(
-                client, confirm=declines, draft_ref=f"outlook:///messages/{draft_id}"
+                client, confirm=declines, message_ref=f"outlook:///messages/{draft_id}"
             )
 
         assert sent.call_count == 0, "a declined send reached the mailbox"
@@ -287,7 +287,7 @@ class TestAGraphCallIsCountedAndTimed:
             _ = await send_draft(
                 client,
                 confirm=a_person_agrees(cast("Context", cast("object", _CannotAsk()))),
-                draft_ref=f"outlook:///messages/{draft_id}",
+                message_ref=f"outlook:///messages/{draft_id}",
             )
 
         assert sent.call_count == 0
@@ -313,7 +313,7 @@ class TestAGraphCallIsCountedAndTimed:
             return None
 
         _ = await send_draft(
-            client, confirm=thinks_about_it, draft_ref=f"outlook:///messages/{draft_id}"
+            client, confirm=thinks_about_it, message_ref=f"outlook:///messages/{draft_id}"
         )
 
         timed = (

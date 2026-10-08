@@ -391,10 +391,10 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "message_ref": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
     },
     "outlook_update_draft": {
-        "draft_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
+        "message_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
     },
     "outlook_send_draft": {
-        "draft_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
+        "message_ref": ("outlook_draft_mail", "outlook_draft_reply", "outlook_draft_reply_all")
     },
     "outlook_disable_mail_rule": {"rule_ref": ("outlook_get_mailbox_settings",)},
     "outlook_create_mail_rule": {"sequence": ("outlook_get_mailbox_settings",)},

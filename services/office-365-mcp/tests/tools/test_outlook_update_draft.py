@@ -131,7 +131,7 @@ async def _update(client: GraphServiceClient, **overrides: object) -> UpdatedDra
     )
     answer = await updater.update_draft(
         client,
-        draft_ref=cast("str", overrides.get("draft_ref", _DRAFT_REF)),
+        message_ref=cast("str", overrides.get("message_ref", _DRAFT_REF)),
         change=change,
         confirm=cast("Confirm", overrides.get("confirm", _never_asked)),
         mailbox=cast("str | None", overrides.get("mailbox")),
@@ -305,7 +305,7 @@ class TestWhatItRefuses:
         assert len(graph.calls) == 0
 
     @pytest.mark.parametrize(
-        "draft_ref",
+        "message_ref",
         [
             "outlook:///folders/AQMkADAwSYNTHETIC-folder",
             "outlook:///rules/SYNTHETIC-rule-0001",
@@ -317,12 +317,12 @@ class TestWhatItRefuses:
         ],
     )
     async def test_anything_that_is_not_a_message_handle_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter, draft_ref: str
+        self, client: GraphServiceClient, graph: respx.MockRouter, message_ref: str
     ) -> None:
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="outlook:///messages/"):
-            _ = await _update(client, draft_ref=draft_ref, subject="Invoice 4471 (final)")
+            _ = await _update(client, message_ref=message_ref, subject="Invoice 4471 (final)")
 
         assert len(graph.calls) == 0
 
@@ -330,7 +330,7 @@ class TestWhatItRefuses:
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(ToolError) as refused:
-            _ = await _update(client, draft_ref=_SUBJECT, subject="Invoice 4471 (final)")
+            _ = await _update(client, message_ref=_SUBJECT, subject="Invoice 4471 (final)")
 
         assert str(refused.value).endswith(_RETRY_SENTENCE)
 
@@ -504,7 +504,7 @@ class TestTheSchemaItPublishes:
         parameters, _tool = await _registered(transport)
 
         assert set(_properties(parameters)) == {
-            "draft_ref",
+            "message_ref",
             "subject",
             "body_html",
             "to",
@@ -513,7 +513,7 @@ class TestTheSchemaItPublishes:
             "categories",
             "mailbox",
         }
-        assert cast("Sequence[str]", parameters["required"]) == ["draft_ref"]
+        assert cast("Sequence[str]", parameters["required"]) == ["message_ref"]
 
     @pytest.mark.parametrize("word", ["bcc", "attach", "file", "send"])
     async def test_no_argument_offers_a_blind_copy_a_file_or_a_send(
@@ -697,7 +697,7 @@ class TestThePersonBeforeTheDraftChanges:
 
         answer = await updater.update_draft(
             client,
-            draft_ref=_DRAFT_REF,
+            message_ref=_DRAFT_REF,
             change=DraftChange(subject="Invoice 4471 (final)"),
             confirm=_asks_the_client,
             mailbox=_SHARED_MAILBOX,

@@ -171,7 +171,7 @@ class TestThePersonBetweenTheDraftAndTheSend:
         send = _ready(graph)
 
         with pytest.raises(ToolError, match="Nothing was sent"):
-            _ = await send_draft(client, confirm=_refuses, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_refuses, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0, "a declined send still reached the mailbox"
 
@@ -186,7 +186,7 @@ class TestThePersonBetweenTheDraftAndTheSend:
             assert mailbox is None
             calls_when_asked.append(len(graph.calls))
 
-        _ = await send_draft(client, confirm=watching, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=watching, message_ref=_DRAFT_REF)
 
         assert calls_when_asked == [1], "asked before the read, or after the send"
         assert send.call_count == 1
@@ -201,7 +201,7 @@ class TestThePersonBetweenTheDraftAndTheSend:
             assert mailbox is None
             asked.append(draft)
 
-        _ = await send_draft(client, confirm=capturing, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=capturing, message_ref=_DRAFT_REF)
 
         assert len(asked) == 1
         addresses = {
@@ -395,7 +395,7 @@ class TestTheEraWithNoBackChannel:
         send = _sends(graph)
 
         answer = await send_draft(
-            client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
         )
 
         _key, _question, _state, _agrees_with = _the_question(answer)
@@ -411,7 +411,7 @@ class TestTheEraWithNoBackChannel:
         )
 
         answer = await send_draft(
-            client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+            client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
         )
 
         _key, question, _state, _agrees_with = _the_question(answer)
@@ -426,7 +426,7 @@ class TestTheEraWithNoBackChannel:
         send = _ready(graph)
         key, _question, state, agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
 
@@ -438,7 +438,7 @@ class TestTheEraWithNoBackChannel:
                     state=state,
                 )
             ),
-            draft_ref=_DRAFT_REF,
+            message_ref=_DRAFT_REF,
         )
 
         posted = [
@@ -457,7 +457,7 @@ class TestTheEraWithNoBackChannel:
         send = _ready(graph)
         key, _question, _state, agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
 
@@ -472,7 +472,7 @@ class TestTheEraWithNoBackChannel:
                         state="Send the draft 'something else' to nobody?",
                     )
                 ),
-                draft_ref=_DRAFT_REF,
+                message_ref=_DRAFT_REF,
             )
 
         assert send.call_count == 0, "mail went out under an answer nobody gave for this draft"
@@ -483,7 +483,7 @@ class TestTheEraWithNoBackChannel:
         send = _ready(graph)
         key, _question, state, _agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
 
@@ -493,7 +493,7 @@ class TestTheEraWithNoBackChannel:
                 confirm=a_person_agrees(
                     _modern_context(answers={key: ElicitResult(action="decline")}, state=state)
                 ),
-                draft_ref=_DRAFT_REF,
+                message_ref=_DRAFT_REF,
             )
 
         assert str(raised.value).startswith(_NOTHING_SENT)
@@ -506,7 +506,7 @@ class TestTheEraWithNoBackChannel:
         send = _sends(graph)
         key, _question, state, agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
         _ = read.mock(return_value=httpx.Response(200, json=_draft(is_draft=False)))
@@ -522,7 +522,7 @@ class TestTheEraWithNoBackChannel:
                         state=state,
                     )
                 ),
-                draft_ref=_DRAFT_REF,
+                message_ref=_DRAFT_REF,
             )
 
         assert send.call_count == 0, "a message that was no longer a draft was sent anyway"
@@ -534,7 +534,7 @@ class TestTheEraWithNoBackChannel:
         send = _sends(graph)
         key, _question, state, agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
         _ = read.mock(return_value=httpx.Response(200, json=_draft(change_key=_NEXT_CHANGE_KEY)))
@@ -550,7 +550,7 @@ class TestTheEraWithNoBackChannel:
                         state=state,
                     )
                 ),
-                draft_ref=_DRAFT_REF,
+                message_ref=_DRAFT_REF,
             )
 
         assert str(raised.value).startswith(_NOTHING_SENT)
@@ -563,14 +563,14 @@ class TestTheEraWithNoBackChannel:
         _ = _sends(graph)
         _key, first_question, first_state, _agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
         _ = read.mock(return_value=httpx.Response(200, json=_draft(change_key=_NEXT_CHANGE_KEY)))
 
         _key, second_question, second_state, _agrees_with = _the_question(
             await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
         )
 
@@ -585,7 +585,7 @@ class TestTheEraWithNoBackChannel:
 
         with pytest.raises(AssertionError, match="no changeKey"):
             _ = await send_draft(
-                client, confirm=a_person_agrees(_modern_context()), draft_ref=_DRAFT_REF
+                client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
             )
 
         assert send.call_count == 0, "an accept bound to the bare question reached the mailbox"
@@ -599,7 +599,7 @@ class TestTheDraftThatChangesWhileThePersonIsAsked:
         send = _sends(graph)
 
         with pytest.raises(ToolError, match="changed after this tool asked the user") as raised:
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert "agreed to the earlier version" in str(raised.value)
         assert "asks the user about the draft as it is now" in str(raised.value)
@@ -614,7 +614,7 @@ class TestTheDraftThatChangesWhileThePersonIsAsked:
         read = _reads_in_turn(graph, _draft(), _draft())
         send = _sends(graph)
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert answer.subject == _SUBJECT
         assert read.call_count == 2
@@ -627,7 +627,7 @@ class TestTheDraftThatChangesWhileThePersonIsAsked:
         send = _sends(graph)
 
         with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert read.call_count == 2
         assert send.call_count == 0, "a message that went out while the person was asked went again"
@@ -639,7 +639,7 @@ class TestTheDraftThatChangesWhileThePersonIsAsked:
         send = _sends(graph)
 
         with pytest.raises(ToolError, match="Nothing was sent"):
-            _ = await send_draft(client, confirm=_refuses, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_refuses, message_ref=_DRAFT_REF)
 
         assert read.call_count == 1, "a refusal read the draft again for nothing"
         assert send.call_count == 0
@@ -652,7 +652,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         send = _sends(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert read.call_count == 2
         assert send.call_count == 1
@@ -666,7 +666,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         _ = _sends(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         made = cast("Sequence[Call]", read.calls)
         selected = [call.request.url.params["$select"] for call in made]
@@ -680,7 +680,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         _ = _sends(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         selected = read.calls.last.request.url.params["$select"]
         assert "toRecipients" in selected
@@ -696,7 +696,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         _ = _sends(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         selected = read.calls.last.request.url.params["$select"]
         assert "body" not in selected.casefold()
@@ -707,7 +707,7 @@ class TestWhatItAsksGraphFor:
         read = _reads(graph, _draft())
         send = _sends(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert read.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
         assert send.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
@@ -717,7 +717,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         send = _ready(graph)
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.calls.last.request.content == b""
 
@@ -729,7 +729,7 @@ class TestTheSendThatIsNeverMade:
         _ = _ready(graph)
         one_shot = graph.post(_SEND_MAIL_PATH).mock(return_value=httpx.Response(202))
 
-        _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert one_shot.call_count == 0
 
@@ -748,7 +748,7 @@ class TestTheRetryItRefuses:
         send = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 1
 
@@ -762,7 +762,7 @@ class TestTheRetryItRefuses:
         )
 
         with pytest.raises(Exception):  # noqa: B017, PT011
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 1
 
@@ -775,7 +775,7 @@ class TestTheMessagesItRefusesToSend:
         send = _sends(graph)
 
         with pytest.raises(ToolError):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0, "the pre-read is what stops the send, so nothing went out"
 
@@ -786,7 +786,7 @@ class TestTheMessagesItRefusesToSend:
         send = _sends(graph)
 
         with pytest.raises(ToolError):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -796,7 +796,7 @@ class TestTheMessagesItRefusesToSend:
         _ = _ready(graph, _draft(is_draft=False))
 
         with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL") as refusal:
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert "sent to the user" in str(refusal.value)
         assert "already sent" in str(refusal.value)
@@ -807,12 +807,12 @@ class TestTheMessagesItRefusesToSend:
         send = _ready(graph, _draft(is_draft=False))
 
         with pytest.raises(ToolError, match="outlook_draft_reply"):
-            _ = await send_draft(client, confirm=_never_asked, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_never_asked, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
     @pytest.mark.parametrize(
-        "draft_ref",
+        "message_ref",
         [
             "outlook:///folders/AQMkADAwSYNTHETIC-folder",
             "outlook:///rules/SYNTHETIC-rule-0001",
@@ -827,12 +827,12 @@ class TestTheMessagesItRefusesToSend:
         ],
     )
     async def test_anything_that_is_not_a_message_handle_never_reaches_graph(
-        self, client: GraphServiceClient, graph: respx.MockRouter, draft_ref: str
+        self, client: GraphServiceClient, graph: respx.MockRouter, message_ref: str
     ) -> None:
         _ = _ready(graph)
 
         with pytest.raises(ToolError, match="outlook:///messages/"):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=draft_ref)
+            _ = await send_draft(client, confirm=_agrees, message_ref=message_ref)
 
         assert len(graph.calls) == 0
 
@@ -849,7 +849,7 @@ class TestWhatItAnswers:
             ),
         )
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert [address.address for address in answer.to] == [_ADA, _GRACE]
         assert [address.address for address in answer.cc] == [_PAM]
@@ -859,7 +859,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject="Invoice 4471 (final)"))
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert answer.subject == "Invoice 4471 (final)"
 
@@ -868,7 +868,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(subject=None))
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert answer.subject is None
 
@@ -877,7 +877,7 @@ class TestWhatItAnswers:
     ) -> None:
         _ = _ready(graph, _draft(cc=[]))
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert answer.cc == []
 
@@ -887,7 +887,7 @@ class TestWhatItAnswers:
         _ = _ready(graph)
         before = datetime.now(UTC)
 
-        answer = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         sent_at = datetime.fromisoformat(answer.sent_at)
         assert sent_at.utcoffset() == UTC.utcoffset(None)
@@ -909,7 +909,7 @@ class TestTheFailuresItPassesOn:
         send = _sends(graph)
 
         with pytest.raises(GraphForbidden):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -924,7 +924,7 @@ class TestTheFailuresItPassesOn:
         send = _sends(graph)
 
         with pytest.raises(GraphNotFound):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         assert send.call_count == 0
 
@@ -939,7 +939,7 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
+            _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
     def test_its_not_found_advice_never_reports_the_mail_as_sent(self) -> None:
         assert "Never report the mail as sent" in sender.GRAPH_NOT_FOUND
@@ -953,8 +953,8 @@ class TestTheSchemaItPublishes:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"draft_ref", "mailbox"}
-        assert cast("Sequence[str]", parameters["required"]) == ["draft_ref"]
+        assert set(properties) == {"message_ref", "mailbox"}
+        assert cast("Sequence[str]", parameters["required"]) == ["message_ref"]
 
     @pytest.mark.parametrize(
         "word",
@@ -976,7 +976,7 @@ class TestMailboxTargeting:
         read = _reads(graph, _draft())
         send = _sends(graph)
 
-        _ = _mail_sent(await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF))
+        _ = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
 
         assert read.called
         assert send.called
@@ -995,7 +995,7 @@ class TestMailboxTargeting:
             await send_draft(
                 client,
                 confirm=_agrees,
-                draft_ref=_DRAFT_REF,
+                message_ref=_DRAFT_REF,
                 mailbox="alex@example.invalid",
             )
         )
@@ -1022,7 +1022,7 @@ class TestMailboxTargeting:
             return None
 
         _ = await send_draft(
-            client, confirm=capturing, draft_ref=_DRAFT_REF, mailbox="alex@example.invalid"
+            client, confirm=capturing, message_ref=_DRAFT_REF, mailbox="alex@example.invalid"
         )
 
         assert asked == ["mailbox=alex@example.invalid"]
@@ -1039,7 +1039,7 @@ class TestMailboxTargeting:
             asked.append(mailbox)
             return None
 
-        _ = await send_draft(client, confirm=capturing, draft_ref=_DRAFT_REF)
+        _ = await send_draft(client, confirm=capturing, message_ref=_DRAFT_REF)
 
         assert asked == [None]
 
@@ -1126,11 +1126,11 @@ class TestHowItDeclaresItself:
         assert 45 <= len(description.split()) <= 210
 
     @pytest.mark.parametrize("name", _DRAFTING_TOOLS)
-    async def test_the_description_and_the_draft_ref_name_every_tool_that_hands_back_a_draft(
+    async def test_the_description_and_the_message_ref_name_every_tool_that_hands_back_a_draft(
         self, transport: httpx.AsyncClient, name: str
     ) -> None:
         parameters, tool = await _registered(transport)
 
         properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
         assert name in (tool.description or "")
-        assert name in properties["draft_ref"]["description"]
+        assert name in properties["message_ref"]["description"]

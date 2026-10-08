@@ -51,7 +51,7 @@ STEP_UPDATE_DRAFT = "update_draft"
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
-    "draft_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D",
+    "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D",
     "subject": "Invoice 4471 (final)",
 }
 
@@ -90,7 +90,7 @@ GRAPH_NOT_FOUND = (
 )
 
 _NOT_A_MESSAGE_HANDLE = (
-    "outlook_update_draft takes the `draft_ref` handle that outlook_draft_mail, "
+    "outlook_update_draft takes the `message_ref` handle that outlook_draft_mail, "
     + "outlook_draft_reply or outlook_draft_reply_all answered with, and this is not one. A "
     + "handle has exactly one shape: outlook:///messages/{message_id}, with the id "
     + "percent-encoded. A subject line, an email address, a bare message id and an Outlook web "
@@ -236,12 +236,12 @@ def a_person_agrees(ctx: Context) -> Confirm:
 async def update_draft(
     client: GraphServiceClient,
     *,
-    draft_ref: str,
+    message_ref: str,
     change: DraftChange,
     confirm: Confirm,
     mailbox: str | None = None,
 ) -> UpdatedDraft | InputRequiredResult:
-    handle = _handle_for(draft_ref)
+    handle = _handle_for(message_ref)
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
     named = (
@@ -299,8 +299,8 @@ async def update_draft(
     return _answer(updated, handle=handle)
 
 
-def _handle_for(draft_ref: str) -> MailMessageHandle:
-    handle = mail_message_handle(draft_ref)
+def _handle_for(message_ref: str) -> MailMessageHandle:
+    handle = mail_message_handle(message_ref)
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)
     return handle
@@ -433,7 +433,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
     async def outlook_update_draft(
-        draft_ref: Annotated[
+        message_ref: Annotated[
             str,
             Field(
                 min_length=1,
@@ -511,7 +511,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     ) -> UpdatedDraft | InputRequiredResult:
         return await update_draft(
             client,
-            draft_ref=draft_ref,
+            message_ref=message_ref,
             change=DraftChange(
                 subject=subject,
                 body_html=body_html,

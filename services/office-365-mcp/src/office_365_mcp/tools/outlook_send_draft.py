@@ -45,7 +45,7 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
 CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
-    "draft_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
+    "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }
 
 _DRAFT_FIELDS: tuple[str, ...] = (
@@ -77,7 +77,7 @@ call again, make sure that outlook_list_mail does not show the message in `senti
 """
 
 _NOT_A_MESSAGE_HANDLE = (
-    "outlook_send_draft takes the `draft_ref` handle of the draft to send, and this is not one. "
+    "outlook_send_draft takes the `message_ref` handle of the draft to send, and this is not one. "
     + "Use the `uri` that outlook_draft_mail or outlook_draft_reply answered with. A handle has "
     + "exactly one shape:\n"
     + "  outlook:///messages/{message_id}\n"
@@ -106,7 +106,7 @@ _NOT_A_DRAFT = (
 _CHANGED_AFTER_ASKING = (
     "The draft changed after this tool asked the user. This tool sent nothing, because the user "
     + "agreed to the earlier version of the draft. Call this tool again with the same "
-    + "`draft_ref`. The new call asks the user about the draft as it is now."
+    + "`message_ref`. The new call asks the user about the draft as it is now."
 )
 
 GRAPH_NOT_FOUND = (
@@ -163,9 +163,9 @@ def a_person_agrees(ctx: Context) -> _Confirm:
 
 
 async def send_draft(
-    client: GraphServiceClient, *, draft_ref: str, confirm: _Confirm, mailbox: str | None = None
+    client: GraphServiceClient, *, message_ref: str, confirm: _Confirm, mailbox: str | None = None
 ) -> MailSent | InputRequiredResult:
-    handle = _handle_for(draft_ref)
+    handle = _handle_for(message_ref)
     reached = graph_mailbox(client, mailbox)
 
     asked: InputRequiredResult | None = None
@@ -190,8 +190,8 @@ async def send_draft(
     return _answer(draft, sent_at=sent_at)
 
 
-def _handle_for(draft_ref: str) -> MailMessageHandle:
-    handle = mail_message_handle(draft_ref)
+def _handle_for(message_ref: str) -> MailMessageHandle:
+    handle = mail_message_handle(message_ref)
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)
     return handle
@@ -250,7 +250,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         annotations=WRITE_DESTRUCTIVE,
     )
     async def outlook_send_draft(
-        draft_ref: Annotated[
+        message_ref: Annotated[
             str,
             Field(
                 min_length=1,
@@ -266,5 +266,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         client: GraphServiceClient = graph,
     ) -> MailSent | InputRequiredResult:
         return await send_draft(
-            client, draft_ref=draft_ref, confirm=a_person_agrees(ctx), mailbox=mailbox
+            client, message_ref=message_ref, confirm=a_person_agrees(ctx), mailbox=mailbox
         )
