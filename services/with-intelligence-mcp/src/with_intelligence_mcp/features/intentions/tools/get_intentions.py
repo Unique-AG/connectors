@@ -51,7 +51,10 @@ async def get_intentions(
     investor_id: Annotated[int | None, Field(description="Investor id, when known.")] = None,
     page: Annotated[int, Field(ge=1, description="Page number to return.")] = 1,
     limit: Annotated[
-        int, Field(ge=1, le=50, description="How many intentions to return, newest first.")
+        int,
+        Field(
+            ge=1, le=50, description="How many intentions to return, most recently updated first."
+        ),
     ] = 25,
     updated_since: Annotated[
         str | None,

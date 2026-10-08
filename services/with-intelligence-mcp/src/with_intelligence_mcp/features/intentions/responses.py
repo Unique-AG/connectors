@@ -125,7 +125,8 @@ class InvestorIntentionsResponse(OmitNoneModel):
     investor_id: int = Field(description="With Intelligence investor identifier.")
     investor_name: str | None = Field(default=None, description="Resolved investor name.")
     intentions: list[IntentionResponse] = Field(
-        default_factory=list, description="Intentions on this page, newest first."
+        default_factory=list,
+        description="Intentions on this page, most recently updated first.",
     )
     total: int = Field(
         default=0, description="How many intentions With Intelligence holds in total."
