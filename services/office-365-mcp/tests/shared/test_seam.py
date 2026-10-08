@@ -37,11 +37,13 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.seam import (
     READ_ONLY,
+    Advised,
     Confirm,
     Confirmed,
     GraphAdviceMiddleware,
     TokenExchangeFailed,
     ToolAdvice,
+    owner_refused,
     person_confirms,
 )
 
@@ -319,6 +321,62 @@ class TestEveryFailureGetsItsOwnRemedy:
         assert "larger than this connector can hold" in message
         assert "The limit is 10 bytes" in message
         assert "do not retry it" in message
+
+
+_OWNER_ADVICE = "The group that the call named refused this request."
+_OWNER_ADVISED = (
+    f"{_OWNER_ADVICE} (HTTP 403, Graph error code Authorization_RequestDenied, "
+    + "Graph request id req-7)"
+)
+
+
+def _owner_refusal(status: int) -> GraphForbidden:
+    return GraphForbidden(
+        "nope", status=status, code="Authorization_RequestDenied", request_id="req-7"
+    )
+
+
+class TestARefusalForANamedOwner:
+    def test_a_403_for_a_named_owner_raises_the_advice_of_the_tool(self) -> None:
+        refusal = _owner_refusal(403)
+
+        with pytest.raises(Advised) as raised, owner_refused(True, _OWNER_ADVICE):
+            raise refusal
+
+        assert str(raised.value) == _OWNER_ADVISED
+        assert raised.value.__cause__ is refusal
+
+    @pytest.mark.parametrize(
+        ("named", "failure"),
+        [
+            (False, _owner_refusal(403)),
+            (True, _owner_refusal(401)),
+            (True, GraphNotFound("gone", status=404, code=None, request_id=None)),
+            (True, ValueError("not a Graph failure")),
+        ],
+        ids=["403-no-owner", "401-named-owner", "404-named-owner", "not-graph-named-owner"],
+    )
+    def test_any_other_failure_passes_through_unchanged(
+        self, named: bool, failure: Exception
+    ) -> None:
+        with pytest.raises(type(failure)) as raised, owner_refused(named, _OWNER_ADVICE):
+            raise failure
+
+        assert raised.value is failure
+
+    async def test_the_middleware_hands_the_advice_to_the_caller_unchanged(self) -> None:
+        server: FastMCP[None] = FastMCP("reader", middleware=[_ADVICE])
+
+        @server.tool(name=_TOOL, annotations=READ_ONLY)
+        def refuse() -> str:
+            with owner_refused(True, _OWNER_ADVICE):
+                raise _owner_refusal(403)
+
+        async with Client(FastMCPTransport(server)) as client:
+            with pytest.raises(ToolError) as raised:
+                _ = await client.call_tool(_TOOL, {})
+
+        assert str(raised.value) == _OWNER_ADVISED
 
 
 class TestDiagnostics:

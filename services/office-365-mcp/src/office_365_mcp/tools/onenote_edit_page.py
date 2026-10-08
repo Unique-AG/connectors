@@ -5,26 +5,23 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
-from msgraph.generated.users.item.onenote.pages.item.onenote_patch_content import (
-    onenote_patch_content_post_request_body as _post_request_body,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     NotebookAudience,
     PageSummary,
     page_for_a_question,
     page_summary,
+    patch_page,
     write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
@@ -34,6 +31,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -87,16 +85,21 @@ one. For other sets, it asks before it writes into a notebook that is shared wit
 belongs to somebody else. A set in the user's own unshared notebook runs without a question.
 - Microsoft reports one result for the whole set. A failure can mean a partly applied set: read \
 the page with onenote_read_page and resend only the missing commands.
+- To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
+on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
+empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
+Graph does not support custom tags.
 """
 
 _NOT_A_PAGE_HANDLE = (
     "onenote_edit_page takes a page handle. It looks like onenote:///pages/{id}, with the id "
     + "percent-encoded, for example "
-    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A section handle "
-    + "(onenote:///sections/{id}) is not a page handle: it names a whole section, not one page "
-    + "inside it. A page title, a web address, and a bare id with no scheme are not handles "
-    + "either. Take the `uri` from a onenote_list_pages row or a onenote_create_page answer, "
-    + "and copy it word for word. This same value fails again, so do not retry it."
+    + "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF. A handle from a group or "
+    + "site notebook starts with onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A "
+    + "section handle (onenote:///sections/{id}) is not a page handle: it names a whole section, "
+    + "not one page inside it. A page title, a web address, and a bare id with no scheme are not "
+    + "handles either. Take the `uri` from a onenote_list_pages row or a onenote_create_page "
+    + "answer, and copy it word for word. This same value fails again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -171,15 +174,15 @@ async def edit_page(
 
     about = write_state_for(
         _EDIT,
-        handle.page_id,
+        handle.uri,
         json.dumps([command.model_dump() for command in commands], sort_keys=True),
     )
     destructive = any(command.action in _DESTRUCTIVE_ACTIONS for command in commands)
     summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
-        pre_read = await page_for_a_question(client, handle.page_id)
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+        pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others or destructive:
             with not_graph():
                 answer = await confirm(
@@ -192,7 +195,7 @@ async def edit_page(
             with graph_step(STEP_EDIT_CONTENT):
                 await _edit(client, handle, commands)
             try:
-                summary = await page_summary(client, handle.page_id)
+                summary = await page_summary(client, handle.page_id, owner=handle.owner)
             except GraphFailure as failure:
                 raise Advised(_WRITTEN_BUT_UNREAD) from failure
 
@@ -247,21 +250,16 @@ def a_person_agrees(ctx: Context) -> Confirm:
 async def _edit(
     client: GraphServiceClient, handle: OnenotePageHandle, commands: list[EditCommand]
 ) -> None:
-    body = _post_request_body.OnenotePatchContentPostRequestBody(
-        commands=[
-            OnenotePatchContentCommand(
-                target=command.target,
-                action=_ACTION_TYPES[command.action],
-                position=None if command.position is None else _POSITIONS[command.position],
-                content=command.content,
-            )
-            for command in commands
-        ]
-    )
-    await client.me.onenote.pages.by_onenote_page_id(handle.page_id).onenote_patch_content.post(
-        body,
-        request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
-    )
+    patch_commands = [
+        OnenotePatchContentCommand(
+            target=command.target,
+            action=_ACTION_TYPES[command.action],
+            position=None if command.position is None else _POSITIONS[command.position],
+            content=command.content,
+        )
+        for command in commands
+    ]
+    await patch_page(client, handle, patch_commands, safe_to_repeat=False)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -281,7 +279,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to change: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],

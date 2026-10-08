@@ -1,5 +1,7 @@
+import importlib
 import json
 import logging
+import pkgutil
 import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
@@ -23,6 +25,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from starlette.applications import Starlette
 
+from office_365_mcp import tools as tool_package
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
@@ -1258,6 +1261,49 @@ class TestTheToolsThisServerAdvertises:
         assert len(mentioned) > 1, (
             f"nothing names another tool any more, so this proves nothing: {mentioned}"
         )
+
+    async def test_every_description_that_spells_a_group_handle_spells_a_site_handle_too(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        group_spelling = "onenote:///groups/{group}/"
+        site_spelling = "onenote:///sites/{site}/"
+        tools = _named(await every_tool.list_tools())
+        checked = 0
+
+        for name, tool in tools.items():
+            for described in (
+                tool.description or "",
+                *_described(tool.input_schema),
+                *_described(tool.output_schema),
+            ):
+                if group_spelling in described:
+                    checked += 1
+                    assert site_spelling in described, (
+                        f"{name} spells a group handle and not a site handle: {described[:80]}"
+                    )
+
+        assert checked > 1, "no description spells a group handle any more, so this proves nothing"
+
+    def test_every_onenote_not_a_handle_text_spells_the_group_and_site_handles(self) -> None:
+        not_a_handle = re.compile(r"^_NOT_AN?_\w*HANDLE$")
+        checked = 0
+
+        for found in pkgutil.iter_modules(tool_package.__path__):
+            if not found.name.startswith("onenote_"):
+                continue
+            module = importlib.import_module(f"{tool_package.__name__}.{found.name}")
+            texts = cast("Mapping[str, object]", vars(module))
+            for constant, text in texts.items():
+                if not_a_handle.match(constant) and isinstance(text, str):
+                    checked += 1
+                    assert "onenote:///groups/{group}/" in text, (
+                        f"{found.name}.{constant} does not spell a group handle"
+                    )
+                    assert "onenote:///sites/{site}/" in text, (
+                        f"{found.name}.{constant} does not spell a site handle"
+                    )
+
+        assert checked >= 18, f"only {checked} onenote not-a-handle texts remain to compare"
 
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]
