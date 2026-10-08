@@ -9,10 +9,8 @@ resumed call neither repeats nor skips a row.
 Offsets on the wire stay multiples of `api_page_size` (Backstop rejects anything else); a cursor
 that lands mid-page re-reads that page and skips the rows before it.
 
-A record the credential cannot see can keep its position and its place in the total while being
-left out of a page (probed on `POST /entity-activities`: page 1 of 100 held 99 rows). So the end
-is where positions reach the total, not a short page, and on a short page an index is not a
-position: a result that fills there takes the rest of that page and resumes at the next one.
+A hidden record can keep its position but be left out of a page, so the end is where positions
+reach the total, and a result that fills on a short page resumes at the next page.
 """
 
 import asyncio

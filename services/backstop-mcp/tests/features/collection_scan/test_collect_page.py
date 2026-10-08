@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from typing import override
 
 from backstop_mcp.backstop_client import SinglePage
 from backstop_mcp.features.collection_scan import CollectedPage, collect_page
@@ -31,6 +32,7 @@ class HiddenRecords(FakeCollection):
         super().__init__(size, page_size=page_size)
         self.hidden: set[int] = hidden
 
+    @override
     async def read_at(self, offset: int) -> SinglePage[Record]:
         page = await super().read_at(offset)
         return SinglePage[Record](

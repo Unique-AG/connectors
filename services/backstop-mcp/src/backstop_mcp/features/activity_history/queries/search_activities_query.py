@@ -202,11 +202,9 @@ class SearchActivitiesQuery:
             collected.extend(row for index, row in projected.rows if index >= skip)
             dropped += sum(1 for index in projected.dropped if index >= skip)
             rows_received += len(page.results) - skip
-            # An activity with no `regarding` party still holds its position but is left out of
-            # `results`, so a short page is not the end: probed, page 1 of 100 came back with 99
-            # rows and page 2 began at position 100. The end is where the positions reach
-            # totalCount, which counts the omitted activity too. A totalCount on the wall is
-            # saturated, so only an empty page ends that walk.
+            # A short page is not the end: an activity with no `regarding` party keeps its
+            # position but is omitted. The end is positions reaching totalCount, or at the wall
+            # an empty page.
             if total_count is None:
                 is_last = len(page.results) < page_size
             elif total_count < max_retrievable:

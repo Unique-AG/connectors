@@ -88,8 +88,13 @@ class RunReportQuery:
                 run = self._start_run(key)
                 self._runs.add(key, run)
             # `asyncio.wait` neither cancels the run on timeout nor when this call is cancelled.
-            done, _ = await asyncio.wait({run.task}, timeout=self._wait_seconds)
-            if not done:
+            await asyncio.wait({run.task}, timeout=self._wait_seconds)
+            if run.task.cancelled():
+                # Evicted while this call waited (expired, or the cache filled): start over so
+                # the next call has a run to collect.
+                run = self._start_run(key)
+                self._runs.add(key, run)
+            if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
                 logger.info(

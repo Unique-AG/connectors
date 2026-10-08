@@ -408,6 +408,29 @@ class TestRunReportQueryColdBuild:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_a_run_evicted_while_a_call_waits_is_started_over(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.2, cache_size=1)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        await asyncio.sleep(0.05)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        evicted = await waiting
+        build.release.set()
+        await asyncio.sleep(0.05)
+
+        # The waiting call's run was cancelled by the eviction; it answers pending, not
+        # CancelledError, and starts a new run for the next call to collect.
+        assert isinstance(evicted, RunReportPendingResponse)
+        assert build.started >= 3
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_a_failed_run_raises_to_the_collector_and_is_dropped(
         self, client: BackstopClient
     ) -> None:
