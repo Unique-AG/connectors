@@ -1,14 +1,17 @@
 #!/bin/bash
 # Install skills from agentic/skills directories into .claude/skills.
-# Safe to run repeatedly. See .agents/README.md for the one-time setup and the
+# Safe to run repeatedly. See agentic/README.md for the one-time setup and the
 # security implication of executing the Skills CLI from the npm registry.
 
 set -euo pipefail
 
 SKILLS_CLI_PACKAGE="skills@1.7.1"
-STAMP_NAME=".agents-managed"
-STAMP_LINE="managed-by: .agents/scripts/install-skills.sh"
-MANIFEST_NAME=".agents-managed-manifest"
+STAMP_NAME=".skill-managed"
+STAMP_LINE="managed-by: agentic/skill-management/install-skills.sh"
+MANIFEST_NAME=".skill-managed-manifest"
+LEGACY_STAMP_NAME=".agents-managed"
+LEGACY_STAMP_LINE="managed-by: .agents/scripts/install-skills.sh"
+LEGACY_MANIFEST_NAME=".agents-managed-manifest"
 
 die() {
   printf 'install-skills: %s\n' "$1" >&2
@@ -30,11 +33,14 @@ contains_line() {
 
 stamp_matches() {
   local dest="$1"
-  local line
+  local stamp line
   [[ -L "$dest" ]] && return 1
-  [[ -f "$dest/$STAMP_NAME" ]] || return 1
-  IFS= read -r line < "$dest/$STAMP_NAME" || return 1
-  [[ "$line" == "$STAMP_LINE" ]]
+  for stamp in "$dest/$STAMP_NAME" "$dest/$LEGACY_STAMP_NAME"; do
+    [[ -f "$stamp" ]] || continue
+    IFS= read -r line < "$stamp" || continue
+    [[ "$line" == "$STAMP_LINE" || "$line" == "$LEGACY_STAMP_LINE" ]] && return 0
+  done
+  return 1
 }
 
 write_manifest() {
@@ -42,7 +48,7 @@ write_manifest() {
   local tmp
   tmp=$(mktemp "$skills_dir/.manifest.XXXXXX") || die "cannot create a temporary manifest in $skills_dir"
   if ! {
-    printf '%s\n' "# managed by .agents/scripts/install-skills.sh"
+    printf '%s\n' "# managed by agentic/skill-management/install-skills.sh"
     if [[ -s "$source" ]]; then
       sort -u "$source"
     fi
@@ -261,14 +267,19 @@ trap 'rm -rf "$tmpdir"' EXIT
 mkdir -p "$skills_dir"
 
 : > "$tmpdir/managed"
-if [[ -f "$manifest" ]]; then
+read_manifest() {
+  local file="$1"
+  local line
+  [[ -f "$file" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line=${line%$'\r'}
     [[ -z "$line" || "$line" == \#* ]] && continue
-    [[ "$line" =~ ^[a-z0-9._-]+$ ]] || die "invalid managed-skill name in $manifest: $line"
+    [[ "$line" =~ ^[a-z0-9._-]+$ ]] || die "invalid managed-skill name in $file: $line"
     printf '%s\n' "$line" >> "$tmpdir/managed"
-  done < "$manifest"
-fi
+  done < "$file"
+}
+read_manifest "$manifest"
+read_manifest "$skills_dir/$LEGACY_MANIFEST_NAME"
 
 if [[ -d "$skills_dir" ]]; then
   while IFS= read -r -d '' stamp; do
@@ -279,7 +290,7 @@ if [[ -d "$skills_dir" ]]; then
     if stamp_matches "$skill_dir"; then
       printf '%s\n' "$name" >> "$tmpdir/managed"
     fi
-  done < <(find "$skills_dir" -mindepth 2 -maxdepth 2 -name "$STAMP_NAME" -type f -print0)
+  done < <(find "$skills_dir" -mindepth 2 -maxdepth 2 \( -name "$STAMP_NAME" -o -name "$LEGACY_STAMP_NAME" \) -type f -print0)
 fi
 if [[ -s "$tmpdir/managed" ]]; then
   sort -u "$tmpdir/managed" -o "$tmpdir/managed"
@@ -298,7 +309,7 @@ done
 if [[ ${#containers[@]} -eq 0 ]]; then
   printf 'install-skills: no agentic/skills directories; removing script-managed skills only\n'
 else
-  require_cmd node "Node.js is required to read skill frontmatter. Install Node.js, then re-run bash .agents/scripts/setup.sh"
+  require_cmd node "Node.js is required to read skill frontmatter. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
   run_node plan "${containers[@]}" > "$tmpdir/planned"
 fi
 
@@ -321,7 +332,7 @@ done < "$tmpdir/planned"
 
 : > "$tmpdir/installed"
 if [[ -s "$tmpdir/install.names" ]]; then
-  require_cmd npx "npx is required to run the Skills CLI (${SKILLS_CLI_PACKAGE} from the npm registry). Install Node.js, then re-run bash .agents/scripts/setup.sh"
+  require_cmd npx "npx is required to run the Skills CLI (${SKILLS_CLI_PACKAGE} from the npm registry). Install Node.js, then re-run bash agentic/skill-management/setup.sh"
   sort -u "$tmpdir/managed" "$tmpdir/install.sanitized" > "$tmpdir/manifest.pre"
   write_manifest "$tmpdir/manifest.pre"
 
@@ -356,7 +367,7 @@ if [[ -s "$tmpdir/install.names" ]]; then
     set -e
     if [[ "$status" -ne 0 ]]; then
       printf 'install-skills: Skills CLI failed (exit %s) for %s.\n' "$status" "$source" >&2
-      printf 'install-skills: the script downloads and executes %s from the npm registry. See .agents/README.md.\n' "$SKILLS_CLI_PACKAGE" >&2
+      printf 'install-skills: the script downloads and executes %s from the npm registry. See agentic/README.md.\n' "$SKILLS_CLI_PACKAGE" >&2
       cat "$err_file" >&2 || true
       if [[ -s "$json_file" ]]; then
         printf 'install-skills: CLI output:\n' >&2
@@ -385,6 +396,7 @@ if [[ -s "$tmpdir/install.names" ]]; then
       die "Skills CLI did not create a real directory at $dest"
     fi
     printf '%s\n' "$STAMP_LINE" > "$dest/$STAMP_NAME"
+    rm -f -- "$dest/$LEGACY_STAMP_NAME"
     printf 'install-skills: installed %s\n' "$name"
   done < "$tmpdir/installed"
 fi
@@ -400,3 +412,4 @@ if [[ -s "$tmpdir/managed" ]]; then
 fi
 
 write_manifest "$tmpdir/installed"
+rm -f -- "$skills_dir/$LEGACY_MANIFEST_NAME"

@@ -1,11 +1,11 @@
 #!/bin/bash
 # Point this clone at the shared hooks and install canonical skills.
 # Git does not enable version-controlled hooks on clone or pull; run this once per clone.
-# See .agents/README.md.
+# See agentic/README.md.
 
 set -euo pipefail
 
-TARGET=".agents/hooks"
+TARGET="agentic/hooks"
 
 die() {
   printf 'setup: %s\n' "$1" >&2
@@ -26,9 +26,9 @@ confirm_or_exit() {
   if [[ ! -t 0 ]]; then
     cat >&2 <<'EOF'
 Refusing to change core.hooksPath without a terminal.
-Re-run bash .agents/scripts/setup.sh in a terminal and confirm, or set it yourself:
+Re-run bash agentic/skill-management/setup.sh in a terminal and confirm, or set it yourself:
 
-  git config --local core.hooksPath .agents/hooks
+  git config --local core.hooksPath agentic/hooks
 
 Existing hook files were not modified.
 EOF
@@ -40,7 +40,7 @@ EOF
     y | Y | yes | YES) ;;
     *)
       printf 'Left core.hooksPath unchanged. Existing hook files were not modified.\n' >&2
-      printf 'Run bash .agents/scripts/install-skills.sh to install skills without changing hooks.\n' >&2
+      printf 'Run bash agentic/skill-management/update-skills.sh to install skills without changing hooks.\n' >&2
       exit 1
       ;;
   esac
@@ -140,4 +140,4 @@ else
   printf 'core.hooksPath is already %s\n' "$TARGET"
 fi
 
-bash "$root/.agents/scripts/install-skills.sh"
+bash "$root/agentic/skill-management/install-skills.sh"
