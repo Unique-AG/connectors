@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Protocol
 
 from pydantic import TypeAdapter
 
@@ -11,7 +12,6 @@ from with_intelligence_mcp.features.intentions.responses import (
     IntentionResponse,
     InvestorIntentionsResponse,
 )
-from with_intelligence_mcp.features.investors.api_responses import InvestorExtendedAttributes
 from with_intelligence_mcp.with_intelligence_client import (
     NotEntitled,
     NotFound,
@@ -25,6 +25,11 @@ _INTENTION = TypeAdapter(IntentionExtendedAttributes)
 _INTENTIONS_PAGE = TypeAdapter(Page[IntentionListItemAttributes])
 
 
+class _Investor(Protocol):
+    id: int
+    name: str | None
+
+
 class GetIntentionsQuery:
     def __init__(self, *, client: WithIntelligenceClient) -> None:
         self._client: WithIntelligenceClient = client
@@ -32,7 +37,7 @@ class GetIntentionsQuery:
     async def run(
         self,
         *,
-        investor: InvestorExtendedAttributes,
+        investor: _Investor,
         page: int,
         limit: int,
         updated_since: str | None,
