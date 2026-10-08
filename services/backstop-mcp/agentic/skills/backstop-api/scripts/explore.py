@@ -56,18 +56,39 @@ def _env_file() -> Path:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="GET one Backstop path and print the JSON response."
+    )
+    parser.add_argument("path", help="e.g. /people or /people/12345")
+    parser.add_argument(
+        "-p", "--param", action="append", default=[], help="key=value query parameter"
+    )
+    args = parser.parse_args(namespace=_Args())
+
     here = Path(__file__).resolve().parent
     load_dotenv(_env_file())
+    missing = [
+        name
+        for name in (
+            "BACKSTOP_BASE_URL",
+            "BACKSTOP_SERVICE_USERNAME",
+            "BACKSTOP_SERVICE_API_TOKEN",
+        )
+        if not os.environ.get(name)
+    ]
+    if missing:
+        raise SystemExit(
+            "missing "
+            + ", ".join(missing)
+            + ". Copy scripts/.env.example to scripts/.env, or keep those values in "
+            + "services/backstop-mcp/agent-explore/.env."
+        )
     base_url = os.environ["BACKSTOP_BASE_URL"]
     username = os.environ["BACKSTOP_SERVICE_USERNAME"]
     token = os.environ["BACKSTOP_SERVICE_API_TOKEN"]
     auth = base64.b64encode(f"{username}:{token}".encode()).decode()
     headers = {"authorization": f"Basic {auth}", "token": "true"}
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path")
-    parser.add_argument("-p", "--param", action="append", default=[])
-    args = parser.parse_args(namespace=_Args())
     params = dict(p.split("=", 1) for p in args.param)
 
     cache_dir = here / ".probe-cache"
