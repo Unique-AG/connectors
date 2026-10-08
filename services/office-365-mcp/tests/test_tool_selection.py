@@ -259,6 +259,23 @@ _MENTION_SOURCES = (
 
 _FILE_SOURCES = ("sharepoint_search_files", "sharepoint_browse_folder")
 
+_DRIVE_ITEM_SOURCES: tuple[str, ...] = (
+    "sharepoint_search_files",
+    "sharepoint_browse_folder",
+    "sharepoint_resolve_url",
+    "sharepoint_create_folder",
+    "sharepoint_create_text_file",
+)
+
+_DRIVE_FOLDER_SOURCES: tuple[str, ...] = (
+    "sharepoint_search_files",
+    "sharepoint_browse_folder",
+    "sharepoint_resolve_url",
+    "sharepoint_list_drives",
+    "sharepoint_create_folder",
+)
+
+
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_list_chat_messages": {"chat_id": ("teams_list_chats",)},
     "teams_list_chat_members": {"chat_id": ("teams_list_chats",)},
@@ -370,6 +387,14 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_cancel_event": {"uri": ("outlook_list_events", "outlook_read_event")},
     "outlook_respond_to_invite": {"uri": ("outlook_list_events", "outlook_read_event")},
     "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
+    "sharepoint_create_folder": {"parent": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_create_text_file": {"folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_rename_item": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_move_item": {"item": _DRIVE_ITEM_SOURCES, "to_folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_copy_item": {"item": _DRIVE_ITEM_SOURCES, "to_folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_delete_item": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_create_share_link": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_invite": {"item": _DRIVE_ITEM_SOURCES},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
     "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -480,6 +505,14 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_check_availability": frozenset({"addresses", "starts_at", "ends_at", "time_zone"}),
     "outlook_suggest_meeting_times": frozenset({"attendees", "starts_at", "ends_at", "time_zone"}),
     "sharepoint_search_files": frozenset({"query"}),
+    "sharepoint_search_sites": frozenset({"query"}),
+    "sharepoint_resolve_url": frozenset({"url"}),
+    "sharepoint_create_folder": frozenset({"name"}),
+    "sharepoint_create_text_file": frozenset({"name", "content"}),
+    "sharepoint_rename_item": frozenset({"name"}),
+    "sharepoint_copy_item": frozenset({"name"}),
+    "sharepoint_create_share_link": frozenset({"access", "audience"}),
+    "sharepoint_invite": frozenset({"recipients", "role"}),
     "onenote_list_pages": frozenset({"title_contains"}),
     "onenote_create_page": frozenset({"title", "body_html"}),
     "onenote_append_to_page": frozenset({"body_html"}),
@@ -797,7 +830,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "Files.Read.All",
         ),
         1,
-        13,
+        14,
     ),
     (
         ToolsPreset.TEAMS_EDIT,
@@ -837,7 +870,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ToolsPreset.TEAMS_FILES,
         ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "Files.Read.All"),
         1,
-        6,
+        8,
     ),
     (
         ToolsPreset.OUTLOOK_READ,
@@ -912,8 +945,11 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         0,
         11,
     ),
-    (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
-    (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
+    (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 4),
+    (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 5),
+    (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
+    (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
+    (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,

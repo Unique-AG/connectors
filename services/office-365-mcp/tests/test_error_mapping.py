@@ -86,6 +86,10 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_respond_to_invite",
         "outlook_send_draft",
         "outlook_update_event",
+        "sharepoint_copy_item",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_invite",
         "teams_add_chat_member",
         "teams_create_chat",
         "teams_delete_meeting",
@@ -99,11 +103,12 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
     }
 )
 
-_CHANNEL_WRITES_IN_PRESETS_THAT_READ_NO_CHANNEL_ON_PURPOSE: frozenset[tuple[str, str]] = frozenset(
+_WRITES_THAT_NOTHING_SHOWS_IN_A_PRESET_ON_PURPOSE: frozenset[tuple[str, str]] = frozenset(
     {
         ("teams-write", "teams_send_channel_message"),
         ("teams-write-files", "teams_send_channel_message"),
         ("teams-write-files", "teams_send_channel_message_with_files"),
+        ("sharepoint-share", "sharepoint_invite"),
     }
 )
 
@@ -375,6 +380,21 @@ class TestEveryToolTranslatesItsOwnRefusal:
         assert str(after.value) == await _advice_for(
             _EVERY_TOOL["teams_search_messages"].permissions
         )
+
+    def test_a_tool_that_words_its_own_403_gets_that_wording_from_the_registry(self) -> None:
+        modules = {tool: import_module(f"office_365_mcp.tools.{tool}") for tool in TOOL_NAMES}
+        declared = {
+            tool: cast("str", module.GRAPH_FORBIDDEN)
+            for tool, module in modules.items()
+            if hasattr(module, "GRAPH_FORBIDDEN")
+        }
+
+        assert declared, "no tool words its own 403, so this check guards nothing"
+        assert declared == {
+            tool: advice.forbidden
+            for tool, advice in _EVERY_ADVICE.items()
+            if advice.forbidden is not None
+        }
 
 
 class TestWhereTheMappingSits:
@@ -733,7 +753,7 @@ class TestAWriteThatFailsCanAlreadyBeDone:
 
         assert not unregistered, f"{preset} sends the model to tools it lacks: {unregistered}"
 
-    def test_a_write_shows_its_change_in_every_preset_but_the_ones_that_read_no_channel(
+    def test_a_write_shows_its_change_in_every_preset_but_the_ones_named_on_purpose(
         self,
     ) -> None:
         shown_by_nothing = {
@@ -743,7 +763,7 @@ class TestAWriteThatFailsCanAlreadyBeDone:
             if tool in _A_REPEAT_CAN_WRITE_TWICE and not advice.shown_by
         }
 
-        assert shown_by_nothing == _CHANNEL_WRITES_IN_PRESETS_THAT_READ_NO_CHANNEL_ON_PURPOSE
+        assert shown_by_nothing == _WRITES_THAT_NOTHING_SHOWS_IN_A_PRESET_ON_PURPOSE
 
     @pytest.mark.usefixtures("obo", "retry_sleeps")
     @pytest.mark.parametrize("tool", TOOL_NAMES)

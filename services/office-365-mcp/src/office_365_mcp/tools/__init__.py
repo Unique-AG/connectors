@@ -54,8 +54,19 @@ from office_365_mcp.tools import (
     outlook_suggest_meeting_times,
     outlook_update_event,
     sharepoint_browse_folder,
+    sharepoint_copy_item,
+    sharepoint_create_folder,
+    sharepoint_create_share_link,
+    sharepoint_create_text_file,
+    sharepoint_delete_item,
+    sharepoint_invite,
+    sharepoint_list_drives,
+    sharepoint_move_item,
     sharepoint_read_file,
+    sharepoint_rename_item,
+    sharepoint_resolve_url,
     sharepoint_search_files,
+    sharepoint_search_sites,
     teams_add_chat_member,
     teams_browse_channel,
     teams_create_chat,
@@ -116,6 +127,12 @@ class ToolModule(Protocol):
 class _NarrowsItsNotFound(Protocol):
     @property
     def GRAPH_NOT_FOUND(self) -> str: ...
+
+
+@runtime_checkable
+class _NarrowsItsForbidden(Protocol):
+    @property
+    def GRAPH_FORBIDDEN(self) -> str: ...
 
 
 @runtime_checkable
@@ -187,7 +204,18 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_respond_to_invite,
     sharepoint_search_files,
     sharepoint_browse_folder,
+    sharepoint_list_drives,
     sharepoint_read_file,
+    sharepoint_resolve_url,
+    sharepoint_create_folder,
+    sharepoint_create_text_file,
+    sharepoint_rename_item,
+    sharepoint_move_item,
+    sharepoint_copy_item,
+    sharepoint_delete_item,
+    sharepoint_create_share_link,
+    sharepoint_invite,
+    sharepoint_search_sites,
     onenote_list_notebooks,
     onenote_list_pages,
     onenote_read_page,
@@ -278,6 +306,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_send_channel_message_with_files",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
     ),
     "teams-edit": (
         "teams_list_chats",
@@ -313,7 +342,9 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "teams_list_my_teams",
         "teams_list_channels",
         "teams_get_channel_files_folder",
+        "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
     ),
     "outlook-read": (
@@ -385,11 +416,51 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_respond_to_invite",
         "outlook_create_event_on_behalf",
     ),
-    "sharepoint-search": ("sharepoint_search_files", "sharepoint_browse_folder"),
+    "sharepoint-search": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_list_drives",
+    ),
     "sharepoint-read": (
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
+    ),
+    "sharepoint-write": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_list_drives",
+        "sharepoint_read_file",
+        "sharepoint_resolve_url",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
+    ),
+    "sharepoint-share": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_list_drives",
+        "sharepoint_read_file",
+        "sharepoint_resolve_url",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
+        "sharepoint_create_share_link",
+        "sharepoint_invite",
+    ),
+    "sharepoint-sites": (
+        "sharepoint_search_files",
+        "sharepoint_browse_folder",
+        "sharepoint_list_drives",
+        "sharepoint_read_file",
+        "sharepoint_search_sites",
     ),
     "onenote-read": (
         "onenote_list_notebooks",
@@ -508,6 +579,7 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
             permissions=module.GRAPH_PERMISSIONS,
             not_found=_not_found_advice(module),
             shown_by=tuple(tool for tool in _shown_by(module) if tool in selection.tools),
+            forbidden=_forbidden_advice(module),
         )
         for module in _TOOL_MODULES
         if module.TOOL_NAME in selection.tools
@@ -516,6 +588,10 @@ def graph_advice(selection: Selection) -> Mapping[str, ToolAdvice]:
 
 def _not_found_advice(module: ToolModule) -> str | None:
     return module.GRAPH_NOT_FOUND if isinstance(module, _NarrowsItsNotFound) else None
+
+
+def _forbidden_advice(module: ToolModule) -> str | None:
+    return module.GRAPH_FORBIDDEN if isinstance(module, _NarrowsItsForbidden) else None
 
 
 def _shown_by(module: ToolModule) -> tuple[str, ...]:

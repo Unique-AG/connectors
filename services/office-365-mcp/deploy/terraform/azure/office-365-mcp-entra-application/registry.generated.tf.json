@@ -386,9 +386,75 @@
           ]
         },
         {
+          "name": "sharepoint_list_drives",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
           "name": "sharepoint_read_file",
           "permissions": [
             "Files.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_resolve_url",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_folder",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_text_file",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_rename_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_move_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_copy_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_share_link",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_invite",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_search_sites",
+          "permissions": [
+            "Sites.Read.All"
           ]
         },
         {
@@ -570,7 +636,18 @@
         "outlook_respond_to_invite",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
+        "sharepoint_resolve_url",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
+        "sharepoint_create_share_link",
+        "sharepoint_invite",
+        "sharepoint_search_sites",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -662,7 +739,8 @@
           "teams_send_chat_message_with_files",
           "teams_send_channel_message_with_files",
           "sharepoint_search_files",
-          "sharepoint_browse_folder"
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives"
         ],
         "teams-edit": [
           "teams_list_chats",
@@ -698,7 +776,9 @@
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_get_channel_files_folder",
+          "sharepoint_search_files",
           "sharepoint_browse_folder",
+          "sharepoint_list_drives",
           "sharepoint_read_file"
         ],
         "outlook-read": [
@@ -775,12 +855,49 @@
         ],
         "sharepoint-search": [
           "sharepoint_search_files",
-          "sharepoint_browse_folder"
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives"
         ],
         "sharepoint-read": [
           "sharepoint_search_files",
           "sharepoint_browse_folder",
+          "sharepoint_list_drives",
           "sharepoint_read_file"
+        ],
+        "sharepoint-write": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_resolve_url",
+          "sharepoint_create_folder",
+          "sharepoint_create_text_file",
+          "sharepoint_rename_item",
+          "sharepoint_move_item",
+          "sharepoint_copy_item",
+          "sharepoint_delete_item"
+        ],
+        "sharepoint-share": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_resolve_url",
+          "sharepoint_create_folder",
+          "sharepoint_create_text_file",
+          "sharepoint_rename_item",
+          "sharepoint_move_item",
+          "sharepoint_copy_item",
+          "sharepoint_delete_item",
+          "sharepoint_create_share_link",
+          "sharepoint_invite"
+        ],
+        "sharepoint-sites": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_search_sites"
         ],
         "onenote-read": [
           "onenote_list_notebooks",
@@ -869,6 +986,8 @@
         "Calendars.ReadBasic",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
+        "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite"
@@ -906,6 +1025,8 @@
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,
+        "Files.ReadWrite.All": true,
+        "Sites.Read.All": true,
         "Notes.Read": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false

@@ -5,10 +5,11 @@ from typing import cast
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphFailure, GraphForbidden
 from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_folder_handle
 from office_365_mcp.tools import sharepoint_search_files
@@ -36,6 +37,7 @@ def _file_hit(
         "webUrl": f"{_SITE}/Shared%20Documents/{item_id}",
         "createdDateTime": "2026-02-01T08:00:00Z",
         "lastModifiedDateTime": "2026-03-04T16:12:41Z",
+        "createdBy": {"user": {"displayName": "Grace Hopper"}},
         "lastModifiedBy": {"user": {"displayName": "Ada Lovelace"}},
     }
     if is_folder:
@@ -424,6 +426,108 @@ class TestTheQueryItSends:
         assert _query_string(route) == 'budget AND filetype:"docx OR filetype:pdf"'
 
 
+class TestSortingTheMatches:
+    @pytest.mark.parametrize(
+        ("sort_by", "name", "is_descending"),
+        [
+            ("last_modified", "LastModifiedTime", True),
+            ("created", "Created", True),
+            ("name", "Filename", False),
+            ("size", "Size", True),
+        ],
+    )
+    async def test_each_sort_reaches_graph_as_one_sort_property(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        sort_by: sharepoint_search_files.SortBy,
+        name: str,
+        is_descending: bool,
+    ) -> None:
+        route = _matching(graph, _file_hit())
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", sort_by=sort_by, offset=0, limit=25
+        )
+
+        assert _request(route)["sortProperties"] == [{"name": name, "isDescending": is_descending}]
+
+    async def test_no_sort_leaves_the_order_to_relevance(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _matching(graph, _file_hit())
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=25
+        )
+
+        assert "sortProperties" not in _request(route), "relevance cannot be named as a sort"
+
+    async def test_a_sort_keeps_the_site_grouping(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _matching(graph, _file_hit())
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", sort_by="size", offset=0, limit=25
+        )
+
+        asked = cast("list[dict[str, object]]", _request(route)["aggregations"])
+        assert [a["field"] for a in asked] == ["SPSiteURL"]
+
+    async def test_a_sort_changes_neither_the_query_nor_the_page(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _matching(graph, _file_hit())
+
+        _ = await sharepoint_search_files.sharepoint_search_files(
+            client,
+            query="budget",
+            file_type="xlsx",
+            sort_by="last_modified",
+            offset=25,
+            limit=10,
+        )
+
+        request = _request(route)
+        assert _query_string(route) == "budget AND filetype:xlsx"
+        assert (request["from"], request["size"]) == (25, 10)
+        assert route.call_count == 1
+
+    async def test_the_matches_keep_the_order_graph_answered_in(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _matching(
+            graph,
+            _file_hit(item_id="01SYNTHETICITEM0003", name="Zeta.xlsx"),
+            _file_hit(item_id="01SYNTHETICITEM0001", name="Alpha.xlsx"),
+            _file_hit(item_id="01SYNTHETICITEM0002", name="Mid.xlsx"),
+        )
+
+        found = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", sort_by="name", offset=0, limit=25
+        )
+
+        assert [item.name for item in found.files] == ["Zeta.xlsx", "Alpha.xlsx", "Mid.xlsx"]
+
+    async def test_a_sort_graph_cannot_make_is_a_graph_failure(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.post("/search/query").mock(
+            return_value=httpx.Response(
+                400, json={"error": {"code": "invalidRequest", "message": "not sortable"}}
+            )
+        )
+
+        with pytest.raises(GraphFailure) as raised:
+            _ = await sharepoint_search_files.sharepoint_search_files(
+                client, query="budget", sort_by="size", offset=0, limit=25
+            )
+
+        assert raised.value.status == 400
+        assert raised.value.code == "invalidRequest"
+
+
 class TestAWindowThatHoldsNothing:
     async def test_a_backwards_window_is_refused_before_graph_is_called(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -509,10 +613,27 @@ class TestTheHandleItMints:
         item = found.files[0]
         assert item.name == "Budget 2026.xlsx"
         assert item.size == 20481
+        assert item.created_by == "Grace Hopper"
         assert item.last_modified_by == "Ada Lovelace"
         assert item.last_modified_at is not None and item.last_modified_at.year == 2026
         assert item.parent_path == "/drive/root:/Reports/2026"
         assert item.drive_type == "documentLibrary"
+
+    async def test_a_hit_that_an_application_created_names_no_creator(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        hit = _file_hit()
+        resource = {
+            **cast("dict[str, object]", hit["resource"]),
+            "createdBy": {"application": {"displayName": "Contoso Sync"}},
+        }
+        _ = _matching(graph, {**hit, "resource": resource})
+
+        found = await sharepoint_search_files.sharepoint_search_files(
+            client, query="budget", offset=0, limit=25
+        )
+
+        assert found.files[0].created_by is None
 
 
 class TestHitsThisToolCannotUse:
@@ -653,3 +774,55 @@ class TestGraphFailures:
             )
 
         assert raised.value.status == 403
+
+
+class TestHowItDeclaresItself:
+    async def test_sort_by_is_optional_and_offers_four_values(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        sharepoint_search_files.register(mcp, transport)
+
+        tool = await mcp.get_tool(sharepoint_search_files.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+
+        schema = cast("dict[str, object]", tool.parameters)
+        assert "sort_by" not in cast("list[str]", schema.get("required", []))
+        properties = cast("dict[str, dict[str, object]]", schema["properties"])
+        branches = cast("list[dict[str, object]]", properties["sort_by"]["anyOf"])
+        offered = {
+            value for branch in branches for value in cast("list[str]", branch.get("enum", []))
+        }
+        assert offered == {"last_modified", "created", "name", "size"}
+
+    async def test_the_field_names_each_direction_and_the_default(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        sharepoint_search_files.register(mcp, transport)
+
+        tool = await mcp.get_tool(sharepoint_search_files.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+
+        properties = cast("dict[str, dict[str, object]]", tool.parameters["properties"])
+        field = cast("str", properties["sort_by"]["description"])
+        assert "`last_modified` puts the newest change first" in field
+        assert "`created` puts the newest file first" in field
+        assert "`name` sorts A to Z" in field
+        assert "`size` puts the largest file first" in field
+        assert "Omit it to sort by relevance" in field
+
+    async def test_the_description_points_to_sort_by_for_the_newest_file(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        sharepoint_search_files.register(mcp, transport)
+
+        tool = await mcp.get_tool(sharepoint_search_files.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+
+        described = tool.description or ""
+        assert "To find the newest file, set `sort_by` to `last_modified`." in described
+        assert "They do not sort the matches." in described
+        assert "no sort order" not in described
+        assert "You cannot use them to find the newest" not in described

@@ -11,14 +11,14 @@
 
 office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
 clients through the Microsoft Graph API. It reaches Outlook mail and calendar, Microsoft Teams,
-SharePoint and OneDrive, OneNote, and user identity. The server has 77 tools in total. A
-deployment turns on a fixed subset of these 77 tools (never all of them, unless a preset or a
+SharePoint and OneDrive, OneNote, and user identity. The server has 88 tools in total. A
+deployment turns on a fixed subset of these 88 tools (never all of them, unless a preset or a
 list names every one). This document explains what each tool does, how a deployment picks its
 tools, and how sign-in and consent work.
 
 ## Tools
 
-office-365-mcp has 77 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
+office-365-mcp has 88 tools, across six areas: identity, Microsoft Teams, Outlook mail, Outlook
 calendar, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always on, in every
 configuration. The Kind column is a hint to the calling client about the kind of change a tool
 makes. It does not control access to the tool.
@@ -104,11 +104,28 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 ### SharePoint and OneDrive
 
+Each write tool in this table asks the user to agree before it changes anything, every time.
+
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `sharepoint_search_files` | Read | `Files.Read.All` | Yes | Searches the files and folders that the signed-in user can see, across OneDrive and SharePoint. |
-| `sharepoint_browse_folder` | Read | `Files.Read.All` | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. |
+| `sharepoint_search_files` | Read | `Files.Read.All` | Yes | Searches the files and folders that the signed-in user can see, across OneDrive and SharePoint. The default order is relevance. The `sort_by` argument sorts the matches by date, name, or size. |
+| `sharepoint_browse_folder` | Read | `Files.Read.All` | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. The `order_by` argument sorts that level by name, date, or size, and covers up to 1000 items. |
+| `sharepoint_list_drives` | Read | `Files.Read.All` | Yes | The drives of the signed-in user. Each drive has a name, a type, an owner, a web address, and a handle for `sharepoint_browse_folder`. |
 | `sharepoint_read_file` | Read | `Files.Read.All` | Yes | The answer is the content of one file, in its original format, or converted to PDF. |
+| `sharepoint_resolve_url` | Read | `Files.ReadWrite.All` | Yes | The handle of the file or folder that a sharing link opens. The tool changes nothing. Microsoft names `Files.ReadWrite` as the least privileged permission for this lookup. That permission covers only the files of the signed-in user. This connector uses `Files.ReadWrite.All`, the permission of the write tools, which covers all files that the user can open. |
+| `sharepoint_create_folder` | Write, adds | `Files.ReadWrite.All` | Yes | Creates one new, empty folder inside a folder in OneDrive or SharePoint. |
+| `sharepoint_create_text_file` | Write, adds | `Files.ReadWrite.All` | Yes | Creates one new text file in a folder in OneDrive or SharePoint. The tool cannot replace a file or upload a binary file. |
+| `sharepoint_rename_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Changes the name of one file or folder. The item stays in the same folder. |
+| `sharepoint_move_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Moves one file or folder into a different folder of the same drive. The item keeps its name. |
+| `sharepoint_copy_item` | Write, adds | `Files.ReadWrite.All` | Yes | Starts a copy of one file or folder into a folder of the same drive or of another drive. Microsoft makes the copy after the call returns. The copy has only the latest version of a file. |
+| `sharepoint_delete_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Moves one file or folder to the recycle bin. This connector never erases a file or a folder permanently. |
+| `sharepoint_create_share_link` | Write, safe to repeat | `Files.ReadWrite.All` | Yes | Creates a sharing link to one file or folder, and returns the web address of the link. The tool sends the link to nobody. |
+| `sharepoint_invite` | Write, adds | `Files.ReadWrite.All` | Yes | Gives read access or edit access to one file or folder to the people that the user names. By default, each person gets an invitation immediately. No tool here can take the access back. |
+| `sharepoint_search_sites` | Read | `Sites.Read.All` | Yes | Finds the SharePoint sites that match some text. Each row gives the web address of a site. Pass that address as `path` to `sharepoint_search_files` to search only that site. The tool does not find files. |
+
+In the answer of `sharepoint_search_files` and `sharepoint_browse_folder`, each file or folder has
+`created_by` and `last_modified_by`. Each field holds the display name of a person. The field is
+null when an application made the item or the change, or when Graph recorded no name.
 
 ### OneNote
 
@@ -154,7 +171,7 @@ model to ask the user to get access.
 
 A deployment turns tools on in one of two ways:
 
-- **A preset.** One of the 26 named bundles in the table below.
+- **A preset.** One of the 29 named bundles in the table below.
 - **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
 
 A deployment must pick exactly one way:
@@ -167,7 +184,7 @@ A deployment must pick exactly one way:
 - A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
   that no preset covers, name every wanted tool in the exact list instead.
 
-There are 26 presets. This table names each preset's tools, besides `get_me`, and gives a short
+There are 29 presets. This table names each preset's tools, besides `get_me`, and gives a short
 description.
 
 | Preset | Tools | Description |
@@ -180,11 +197,11 @@ description.
 | `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
 | `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
 | `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members` | Finds a chat or a channel, and posts a new message to either. It also adds or removes a reaction, and lists the messages and members of a chat. |
-| `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach. |
+| `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach, and lists the drives that hold it. |
 | `teams-edit` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_browse_channel`, `teams_list_message_replies`, `teams_edit_message`, `teams_delete_message` | Everything in `teams-write`. It also edits and deletes a message. It reads the posts of a channel and the replies to a post, to find a channel message to change. |
 | `teams-meetings-write` | `teams_list_chats`, `teams_list_chat_members`, `teams_read_meeting`, `teams_create_meeting`, `teams_update_meeting`, `teams_delete_meeting` | Finds a meeting chat, and reads one meeting and its attendance. It also creates a Teams online meeting, and changes or deletes one that the signed-in user organizes. It also lists the members of a chat, to find the id of an attendee. |
 | `teams-chat-admin` | `teams_list_chats`, `teams_list_chat_members`, `teams_create_chat`, `teams_add_chat_member`, `teams_remove_chat_member`, `teams_rename_chat` | Everything in `teams-chat`. It also creates a chat, adds or removes a member, and renames a group chat. |
-| `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_browse_folder`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. |
+| `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. It also searches for a file and lists the drives. |
 | `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. |
 | `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply` | Everything in `outlook-read`, plus marking, filing, and drafting mail. |
 | `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft. |
@@ -193,8 +210,11 @@ description.
 | `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times` | Names every calendar that the mailbox reaches, reads what sits on one, and checks or suggests free time. |
 | `outlook-calendar-write` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite` | Everything in `outlook-calendar`, plus creating, changing, and canceling an event, and responding to an invitation. |
 | `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
-| `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder` | Finds a file in OneDrive or on a SharePoint site, and lists one level of a folder. |
-| `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
+| `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives` | Finds a file in OneDrive or on a SharePoint site, lists one level of a folder, and lists the drives of the user. |
+| `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
+| `sharepoint-write` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_resolve_url`, `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item` | Everything in `sharepoint-read`, plus finding the item behind a sharing link and creating a folder or a text file. It also renames, moves, and copies an item, or moves it to the recycle bin. |
+| `sharepoint-share` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_resolve_url`, `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item`, `sharepoint_create_share_link`, `sharepoint_invite` | Everything in `sharepoint-write`, plus creating a sharing link to an item and giving the people that the user names access to an item. |
+| `sharepoint-sites` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_search_sites` | Everything in `sharepoint-read`, plus finding a SharePoint site by free text. This preset adds the permission `Sites.Read.All`. No other `sharepoint-` preset needs it. |
 | `onenote-read` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | Lists notebooks, sections, and pages, and reads or previews a page. |
 | `onenote-write` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation` | Everything in `onenote-read`, plus creating, editing, and copying notebooks, sections, and pages. |
 | `onenote-delete` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation`, `onenote_delete_page` | Everything in `onenote-write`, plus erasing one page outright. |
@@ -215,7 +235,8 @@ already-granted set, for the signed-in user. It does not ask again.
 ## Admin consent
 
 Some permissions need a tenant administrator to grant them, before any user in that tenant can
-sign in. The Tools section marks these.
+sign in. The Tools section marks these. The marks show the rule of this deployment. For some
+permissions, this rule differs from the default consent rule that Microsoft lists.
 [Microsoft's own overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
 explains this step in more detail.
 
@@ -266,7 +287,7 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 26 presets in the Presets table. The `enabled` key names an
+The `preset` key names one of the 29 presets in the Presets table. The `enabled` key names an
 exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
 covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
 covered in Admin consent.
