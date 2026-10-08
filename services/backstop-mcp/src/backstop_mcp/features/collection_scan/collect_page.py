@@ -79,7 +79,7 @@ async def collect_page[I, R](
             )
             # Every index is a position only when the page holds all it should: the last page of
             # a collection is short without missing anything.
-            complete = (
+            page_has_no_missing_rows = (
                 len(page.items) == min(api_page_size, total_count - offset)
                 if total_count is not None
                 else True
@@ -88,7 +88,7 @@ async def collect_page[I, R](
                 if offset + index < start_offset:
                     continue
                 rows.append(row)
-                if complete and len(rows) == output_page_size:
+                if page_has_no_missing_rows and len(rows) == output_page_size:
                     consumed = offset + index + 1
                     done = is_last and consumed >= end
                     return CollectedPage[R](
