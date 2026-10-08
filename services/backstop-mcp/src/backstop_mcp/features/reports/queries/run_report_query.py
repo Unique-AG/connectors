@@ -80,14 +80,11 @@ class RunReportQuery:
             deadline = time.monotonic() + self._wait_seconds
             run = self._join_or_start(key)
             while True:
-                # `asyncio.wait` neither cancels the run on timeout nor when this call is
-                # cancelled.
+                # `asyncio.wait` never cancels the run, on timeout or when this call is cancelled.
                 await asyncio.wait({run.task}, timeout=max(0.0, deadline - time.monotonic()))
                 if not run.task.cancelled():
                     break
-                # Evicted while this call waited (expired, or the cache filled). Join the
-                # replacement another waiter may already have started, or start it, so the next
-                # call has a run to collect even when this one is out of time.
+                # Evicted: join or start the replacement, so the next call has one to collect.
                 run = self._join_or_start(key)
                 if time.monotonic() >= deadline:
                     break
@@ -133,12 +130,7 @@ class RunReportQuery:
         return run
 
     def _drop_if_failed(self, key: ReportRunKey, run: ReportRun) -> None:
-        """Forget a failed run, so the next call starts fresh instead of re-raising it.
-
-        A caller waiting on it still gets the error through its own reference. Reading the
-        exception also keeps a run nobody waits on from logging "Task exception was never
-        retrieved"; the client already logged the failure itself.
-        """
+        """Forget a failed run so the next call starts fresh; waiters keep their own reference."""
         if not run.task.cancelled() and run.task.exception() is not None:
             self._runs.discard(key, run)
 

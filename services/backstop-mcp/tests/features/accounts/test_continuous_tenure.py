@@ -57,6 +57,16 @@ class TestContinuousTenure:
 
         assert continuous_tenure(spans, today=_TODAY).continuous_since == date(2020, 1, 1)
 
+    def test_an_account_that_has_not_started_yet_is_not_tenure(self) -> None:
+        spans = (_open(date(2027, 1, 1)),)
+
+        assert continuous_tenure(spans, today=_TODAY).continuous_since is None
+
+    def test_a_future_account_does_not_replace_the_run_covering_today(self) -> None:
+        spans = (_closed(date(2015, 1, 1), date(2026, 12, 31)), _open(date(2027, 6, 1)))
+
+        assert continuous_tenure(spans, today=_TODAY).continuous_since == date(2015, 1, 1)
+
     def test_closed_with_no_closed_date_is_undated_not_open(self) -> None:
         # Reading the missing end as "open" would stretch this owner's tenure back to 2010.
         spans = (_closed(date(2010, 1, 1), None), _open(date(2020, 1, 1)))

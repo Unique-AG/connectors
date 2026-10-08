@@ -1,10 +1,4 @@
-"""How long an owner has held without a break, from account spans — closed accounts included.
-
-An owner's tenure is not any one account's start date: private banks, platforms and nominee
-structures open a fresh account per mandate and close the old one, so the oldest open account can
-be years younger than the relationship. Spans that overlap or touch (closed on the 31st, next
-opened on the 1st) are one run; a gap of more than a day ends it.
-"""
+"""An owner's unbroken holding through today, merged across its accounts, closed ones included."""
 
 from collections.abc import Iterable
 from datetime import date, timedelta
@@ -15,15 +9,17 @@ _TOUCHING = timedelta(days=1)
 
 
 def continuous_tenure(spans: Iterable[AccountSpanDto], *, today: date) -> TenureDto:
-    """The start of the run that reaches `today`, or `None` when the owner is not held through it.
+    """The start of the run of touching or overlapping spans that covers `today`, else `None`.
 
-    An open span runs through `today`; so does one closed on or after `today`. A span with no
-    start, or closed with no closed date, cannot be placed and is counted in `undated_accounts`.
+    Spans starting after `today` are not held yet and are ignored. A span with no start, or
+    closed with no closed date, is counted in `undated_accounts`.
     """
     collected = tuple(spans)
     placed = sorted(placed_span for span in collected if (placed_span := _placed(span)))
     run: tuple[date, date] | None = None
     for start, end in placed:
+        if start > today:
+            continue
         # `start - 1 day`, not `end + 1 day`: an open run ends on `date.max`, which cannot grow.
         if run is not None and start - _TOUCHING <= run[1]:
             run = (run[0], max(run[1], end))
