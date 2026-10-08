@@ -120,13 +120,13 @@ uv run basedpyright .        # type check
 
 ## With Intelligence API
 
-Read `.claude/skills/with-intelligence-api/` before adding a feature that touches a new entity.
+Read `agentic/skills/with-intelligence-api/` before adding a feature that touches a new entity.
 Its `scripts/` directory answers the two kinds of question:
 
 ```bash
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths investor
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
-uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
+uv run python agentic/skills/with-intelligence-api/scripts/spec.py paths investor
+uv run python agentic/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
+uv run python agentic/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 ```
 
 `spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
@@ -139,7 +139,7 @@ fails the suite. The schemas it compares against are pruned into
 `tests/spec/wi_schemas.json`; refresh them, as a deliberate and readable diff, with:
 
 ```bash
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py snapshot
+uv run python agentic/skills/with-intelligence-api/scripts/spec.py snapshot
 ```
 
 Add a schema name to `SNAPSHOT_ROOTS` in that `spec.py` when a feature starts modelling
