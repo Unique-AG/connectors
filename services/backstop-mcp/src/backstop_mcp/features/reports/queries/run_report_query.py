@@ -82,18 +82,14 @@ class RunReportQuery:
                 limit=limit,
                 offset=offset,
             )
-            run = self._runs.get(key)
-            span.set_attribute("joined", run is not None)
-            if run is None:
-                run = self._start_run(key)
-                self._runs.add(key, run)
+            span.set_attribute("joined", self._runs.get(key) is not None)
+            run = self._join_or_start(key)
             # `asyncio.wait` neither cancels the run on timeout nor when this call is cancelled.
             await asyncio.wait({run.task}, timeout=self._wait_seconds)
             if run.task.cancelled():
-                # Evicted while this call waited (expired, or the cache filled): start over so
-                # the next call has a run to collect.
-                run = self._start_run(key)
-                self._runs.add(key, run)
+                # Evicted while this call waited (expired, or the cache filled). Another waiter
+                # may already have started the replacement.
+                run = self._join_or_start(key)
             if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
@@ -114,6 +110,13 @@ class RunReportQuery:
                 )
             self._runs.discard(key, run)
             return run.task.result()
+
+    def _join_or_start(self, key: ReportRunKey) -> ReportRun:
+        run = self._runs.get(key)
+        if run is None:
+            run = self._start_run(key)
+            self._runs.add(key, run)
+        return run
 
     def _start_run(self, key: ReportRunKey) -> ReportRun:
         task = asyncio.create_task(

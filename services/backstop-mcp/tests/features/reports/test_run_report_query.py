@@ -431,6 +431,30 @@ class TestRunReportQueryColdBuild:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_two_calls_waiting_on_an_evicted_run_share_one_replacement(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.2, cache_size=1)
+
+        waiting = [
+            asyncio.create_task(
+                query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            )
+            for _ in range(2)
+        ]
+        await asyncio.sleep(0.05)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        results = await asyncio.gather(*waiting)
+        build.release.set()
+        await asyncio.sleep(0.05)
+
+        # The second waiter joins the replacement the first one started instead of failing.
+        assert all(isinstance(result, RunReportPendingResponse) for result in results)
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_a_failed_run_raises_to_the_collector_and_is_dropped(
         self, client: BackstopClient
     ) -> None:
