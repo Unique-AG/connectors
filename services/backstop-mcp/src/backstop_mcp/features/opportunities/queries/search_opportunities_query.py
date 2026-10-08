@@ -362,7 +362,7 @@ class SearchOpportunitiesQuery:
             investor_representative = (
                 None
                 if investor_include is None
-                else self._represenatative_login_name(
+                else self._representative_login_name(
                     index.first(
                         investor_include,
                         "representative",
@@ -381,7 +381,7 @@ class SearchOpportunitiesQuery:
                     )
                 ),
                 investor_representative=investor_representative,
-                representative=self._represenatative_login_name(
+                representative=self._representative_login_name(
                     index.first(
                         opportunity,
                         "representative",
@@ -438,7 +438,7 @@ class SearchOpportunitiesQuery:
             params["filter[representative.name][eq]"] = representative
         return params
 
-    def _represenatative_login_name(
+    def _representative_login_name(
         self, user: IncludedResource[SystemUserAttributes] | None
     ) -> str | None:
         if user is None or user.attributes.user_name is None:
