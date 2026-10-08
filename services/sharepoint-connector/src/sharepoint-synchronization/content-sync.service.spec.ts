@@ -1,16 +1,21 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { SPC_FILE_DELETED_TOTAL, SPC_FILE_DIFF_EVENTS_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { ItemProcessingOrchestratorService } from '../processing-pipeline/item-processing-orchestrator.service';
 import { UniqueFileIngestionService } from '../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import type { UniqueFile } from '../unique-api/unique-files/unique-files.types';
+import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { FindFilesWithExpectedLocationQuery } from './find-files-with-expected-location.query';
+import { FindScopeSuccessorQuery } from './find-scope-successor.query';
+import { MoveUpdatedFilesToExpectedScopeCommand } from './move-updated-files-to-expected-scope.command';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -60,6 +65,12 @@ describe('ContentSyncService', () => {
           provide: FileMoveProcessor,
           useValue: {
             processFileMoves: vi.fn(),
+          },
+        },
+        {
+          provide: MoveUpdatedFilesToExpectedScopeCommand,
+          useValue: {
+            execute: vi.fn().mockResolvedValue(new Set()),
           },
         },
         {
@@ -722,5 +733,175 @@ describe('ContentSyncService', () => {
 
       await expect(service.syncContentForSite(items, scopes, context)).resolves.not.toThrow();
     });
+  });
+});
+
+describe('ContentSyncService with an edited file that also moved', () => {
+  const folderAScopeId = 'scope-folder-a';
+  const folderBScopeId = 'scope-folder-b';
+  const scopes: ScopeWithPath[] = [
+    { id: 'scope-root', name: 'root', parentId: null, externalId: null, path: '/root' },
+    {
+      id: 'scope-documents',
+      name: 'Documents',
+      parentId: 'scope-root',
+      externalId: null,
+      path: '/root/Documents',
+    },
+    {
+      id: folderAScopeId,
+      name: 'FolderA',
+      parentId: 'scope-documents',
+      externalId: null,
+      path: '/root/Documents/FolderA',
+    },
+    {
+      id: folderBScopeId,
+      name: 'FolderB',
+      parentId: 'scope-documents',
+      externalId: null,
+      path: '/root/Documents/FolderB',
+    },
+  ];
+  const editedFileUrl =
+    'https://example.sharepoint.com/sites/test-site/Documents/FolderB/report.docx';
+  const editedFile = {
+    siteId: defaultSiteId,
+    itemType: 'driveItem',
+    item: {
+      id: 'edited-file',
+      lastModifiedDateTime: '2023-02-01',
+      webUrl: editedFileUrl,
+    },
+  } as SharepointContentItem;
+  const newFile = {
+    siteId: defaultSiteId,
+    itemType: 'driveItem',
+    item: {
+      id: 'new-file',
+      lastModifiedDateTime: '2023-02-01',
+      webUrl: 'https://example.sharepoint.com/sites/test-site/Documents/FolderA/notes.docx',
+    },
+  } as SharepointContentItem;
+  const context: SharepointSyncContext = {
+    serviceUserId: 'user-123',
+    rootPath: new Smeared('/root', false),
+    siteName: new Smeared('test-site', false),
+    managedPath: 'sites',
+    siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope-root' } },
+    rootScopeId: 'scope-root',
+    isInitialSync: false,
+    discoveredSubsites: [],
+  };
+  const storedEditedFile = (ownerId: string): UniqueFile => ({
+    id: 'content-edited-file',
+    key: 'site-id/edited-file',
+    fileAccess: [],
+    ownerType: 'SCOPE',
+    ownerId,
+  });
+
+  let service: ContentSyncService;
+  let processItems: Mock;
+  let getFilesByKeys: Mock;
+  let moveFile: Mock;
+
+  beforeEach(async () => {
+    processItems = vi.fn();
+    getFilesByKeys = vi.fn();
+    moveFile = vi.fn();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ContentSyncService,
+        MoveUpdatedFilesToExpectedScopeCommand,
+        FindFilesWithExpectedLocationQuery,
+        ScopeManagementService,
+        FindScopeSuccessorQuery,
+        { provide: ItemProcessingOrchestratorService, useValue: { processItems } },
+        {
+          provide: UniqueFileIngestionService,
+          useValue: {
+            performFileDiff: vi.fn().mockResolvedValue({
+              newFiles: ['new-file'],
+              updatedFiles: ['edited-file'],
+              movedFiles: [],
+              deletedFiles: [],
+            }),
+          },
+        },
+        {
+          provide: UniqueFilesService,
+          useValue: {
+            getFilesByKeys,
+            moveFile,
+            deleteFile: vi.fn(),
+            getFilesCountForSite: vi.fn(),
+          },
+        },
+        { provide: UniqueScopesService, useValue: {} },
+        { provide: FileMoveProcessor, useValue: { processFileMoves: vi.fn() } },
+        { provide: SPC_FILE_DIFF_EVENTS_TOTAL, useValue: { add: vi.fn() } },
+        { provide: SPC_FILE_DELETED_TOTAL, useValue: { add: vi.fn() } },
+      ],
+    }).compile();
+
+    service = module.get(ContentSyncService);
+  });
+
+  it('moves the stored file into the scope of its new folder before ingesting it there', async () => {
+    getFilesByKeys.mockResolvedValue([storedEditedFile(folderAScopeId)]);
+
+    await service.syncContentForSite([editedFile, newFile], scopes, context);
+
+    expect(getFilesByKeys).toHaveBeenCalledWith(['site-id/edited-file']);
+    expect(moveFile).toHaveBeenCalledExactlyOnceWith(
+      'content-edited-file',
+      folderBScopeId,
+      `${editedFileUrl}?web=1`,
+    );
+    expect(processItems).toHaveBeenCalledExactlyOnceWith(
+      context,
+      [newFile],
+      [editedFile],
+      expect.any(Function),
+    );
+    expect(moveFile.mock.invocationCallOrder[0]).toBeLessThan(
+      processItems.mock.invocationCallOrder[0] ?? 0,
+    );
+
+    const getScopeIdForItem = processItems.mock.calls[0]?.[3] as (
+      item: SharepointContentItem,
+    ) => string;
+    expect(getScopeIdForItem(editedFile)).toBe(folderBScopeId);
+  });
+
+  it('does not move a stored file that is already in the scope of its folder', async () => {
+    getFilesByKeys.mockResolvedValue([storedEditedFile(folderBScopeId)]);
+
+    await service.syncContentForSite([editedFile, newFile], scopes, context);
+
+    expect(moveFile).not.toHaveBeenCalled();
+    expect(processItems).toHaveBeenCalledExactlyOnceWith(
+      context,
+      [newFile],
+      [editedFile],
+      expect.any(Function),
+    );
+  });
+
+  it('leaves the edited file out of this cycle when its move fails', async () => {
+    getFilesByKeys.mockResolvedValue([storedEditedFile(folderAScopeId)]);
+    moveFile.mockRejectedValue(new Error('move failed'));
+
+    await service.syncContentForSite([editedFile, newFile], scopes, context);
+
+    expect(moveFile).toHaveBeenCalledOnce();
+    expect(processItems).toHaveBeenCalledExactlyOnceWith(
+      context,
+      [newFile],
+      [],
+      expect.any(Function),
+    );
   });
 });

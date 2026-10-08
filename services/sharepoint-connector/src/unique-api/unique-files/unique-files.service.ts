@@ -54,7 +54,7 @@ export class UniqueFilesService {
   public async moveFile(
     contentId: string,
     newOwnerId: string,
-    newUrl: string,
+    newUrl?: string,
   ): Promise<ContentUpdateMutationResult['contentUpdate']> {
     const logPrefix = `[ContentId: ${contentId}]`;
     this.logger.debug(`${logPrefix} Moving file to owner ${newOwnerId}`);
@@ -67,7 +67,7 @@ export class UniqueFilesService {
       {
         contentId,
         ownerId: newOwnerId,
-        input: { url: newUrl },
+        input: newUrl === undefined ? {} : { url: newUrl },
       },
       { logSafeKeys: CONTENT_UPDATE_LOG_SAFE_KEYS },
     );
@@ -156,39 +156,21 @@ export class UniqueFilesService {
       return [];
     }
 
-    let skip = 0;
-    const files: UniqueFile[] = [];
+    return this.paginateContent({ key: { in: keys } });
+  }
 
-    let batchCount = 0;
-    do {
-      const batchResult = await this.ingestionClient.request<
-        PaginatedContentQueryResult,
-        PaginatedContentQueryInput
-      >(
-        PAGINATED_CONTENT_QUERY,
-        {
-          skip,
-          take: CONTENT_BATCH_SIZE,
-          where: {
-            key: {
-              in: keys,
-            },
-          },
-        },
-        { logSafeKeys: PAGINATED_CONTENT_LOG_SAFE_KEYS },
-      );
-      files.push(...batchResult.paginatedContent.nodes);
-      batchCount = batchResult.paginatedContent.nodes.length;
-      skip += CONTENT_BATCH_SIZE;
-    } while (batchCount === CONTENT_BATCH_SIZE);
-
-    return files;
+  public async getFilesByOwnerId(ownerId: string): Promise<UniqueFile[]> {
+    return this.paginateContent({ ownerId: { equals: ownerId } });
   }
 
   public async getFilesForSite(siteId: Smeared): Promise<UniqueFile[]> {
     const logPrefix = `[Site: ${siteId}]`;
     this.logger.log(`${logPrefix} Fetching files`);
 
+    return this.paginateContent({ key: { startsWith: `${siteId.value}/` } });
+  }
+
+  private async paginateContent(where: PaginatedContentQueryInput['where']): Promise<UniqueFile[]> {
     let skip = 0;
     const files: UniqueFile[] = [];
 
@@ -199,15 +181,7 @@ export class UniqueFilesService {
         PaginatedContentQueryInput
       >(
         PAGINATED_CONTENT_QUERY,
-        {
-          skip,
-          take: CONTENT_BATCH_SIZE,
-          where: {
-            key: {
-              startsWith: `${siteId.value}/`,
-            },
-          },
-        },
+        { skip, take: CONTENT_BATCH_SIZE, where },
         { logSafeKeys: PAGINATED_CONTENT_LOG_SAFE_KEYS },
       );
       files.push(...batchResult.paginatedContent.nodes);

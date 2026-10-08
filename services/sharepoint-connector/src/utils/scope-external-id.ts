@@ -190,6 +190,12 @@ export function toPendingDeleteExternalId(activeExternalId: string): Smeared {
   return createSmeared(activeExternalId.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX));
 }
 
+// Inverse of `toPendingDeleteExternalId`. Swapping the longer prefix back is enough: the marker
+// only replaces the leading `spc:` and leaves the rest of the id untouched.
+export function fromPendingDeleteExternalId(pendingDeleteExternalId: string): Smeared {
+  return createSmeared(pendingDeleteExternalId.replace(PENDING_DELETE_PREFIX, EXTERNAL_ID_PREFIX));
+}
+
 // Single source of truth for "is this scope owned by this site?". Accepts both legacy
 // (`spc:site:{id}`) and new (`spc:{id}/site`) externalId formats so the predicate keeps working
 // during the migration period. Returns false when `externalId` is null — callers that want to
