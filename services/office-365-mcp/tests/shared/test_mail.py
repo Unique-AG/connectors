@@ -50,6 +50,7 @@ _FOLDER_ID = "AQMkADAwSYNTHETIC-folder-0001"
 _ROOT_ID = "AQMkADAwSYNTHETIC-msgfolderroot"
 _SYNC_ISSUES_ID = "AQMkADAwSYNTHETIC-syncissues"
 _INBOX_ID = "AQMkADAwSYNTHETIC-inbox"
+_DELETED_ITEMS_ID = "AQMkADAwSYNTHETIC-deleteditems"
 _CONFLICTS_ID = "AQMkADAwSYNTHETIC-conflicts"
 
 _FOLDERS = "/me/mailFolders"
@@ -364,7 +365,7 @@ async def _made_by_outlook(
 
 
 class TestMadeByOutlook:
-    def test_the_names_are_the_two_parents_and_the_fourteen_children_and_the_step_is_known(
+    def test_the_names_are_the_two_parents_and_the_fifteen_children_and_the_step_is_known(
         self,
     ) -> None:
         assert STEP_OUTLOOK_FOLDER == "mail_folder"
@@ -375,6 +376,7 @@ class TestMadeByOutlook:
             "clutter",
             "conflicts",
             "conversationhistory",
+            "deleteditems",
             "drafts",
             "inbox",
             "junkemail",
@@ -404,6 +406,13 @@ class TestMadeByOutlook:
         _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "inbox": _INBOX_ID})
 
         assert await _made_by_outlook(client, _INBOX_ID, _ROOT_ID) is True
+
+    async def test_a_top_level_folder_with_the_id_of_deleted_items_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _only_these_exist(graph, {"msgfolderroot": _ROOT_ID, "deleteditems": _DELETED_ITEMS_ID})
+
+        assert await _made_by_outlook(client, _DELETED_ITEMS_ID, _ROOT_ID) is True
 
     async def test_a_child_of_sync_issues_with_the_id_of_conflicts_is_refused(
         self, client: GraphServiceClient, graph: respx.MockRouter

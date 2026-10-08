@@ -40,6 +40,7 @@ from office_365_mcp.tools.outlook_rename_folder import RenamedFolder, a_person_a
 _FOLDER_ID = "AQMkADAwSYNTHETIC-folder-0001"
 _FOLDER_REF = MailFolderHandle(_FOLDER_ID).uri
 _INBOX_ID = "AQMkADAwSYNTHETIC-inbox"
+_DELETED_ITEMS_ID = "AQMkADAwSYNTHETIC-deleteditems"
 _ROOT_ID = "AQMkADAwSYNTHETIC-msgfolderroot"
 
 _MAILBOX = "alex@example.invalid"
@@ -240,7 +241,9 @@ class TestWhatItRefuses:
         assert len(graph.calls) == 0
 
     @pytest.mark.parametrize("mailbox", [None, _MAILBOX], ids=["own-mailbox", "shared-mailbox"])
-    @pytest.mark.parametrize("name", ["inbox", "SentItems", "msgfolderroot", "syncissues"])
+    @pytest.mark.parametrize(
+        "name", ["inbox", "SentItems", "msgfolderroot", "syncissues", "deleteditems"]
+    )
     async def test_a_well_known_name_in_a_handle_is_refused_before_any_call_to_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, name: str, mailbox: str | None
     ) -> None:
@@ -284,6 +287,35 @@ class TestWhatItRefuses:
         assert str(raised.value).endswith(
             "If you call this tool again with the same arguments, the call will fail the same way."
         )
+        assert patch.call_count == 0
+
+    @pytest.mark.parametrize(
+        ("mailbox", "under"),
+        [(None, _OWN_FOLDERS), (_MAILBOX, _SHARED_FOLDERS)],
+        ids=["own-mailbox", "shared-mailbox"],
+    )
+    async def test_deleted_items_at_the_top_level_is_refused_before_anybody_is_asked(
+        self, client: GraphServiceClient, graph: respx.MockRouter, mailbox: str | None, under: str
+    ) -> None:
+        _ = graph.get(f"{under}/{_DELETED_ITEMS_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json=_stored(folder_id=_DELETED_ITEMS_ID, name="Deleted Items", parent=_ROOT_ID),
+            )
+        )
+        patch = _patches(graph, f"{under}/{_DELETED_ITEMS_ID}")
+        _exists(graph, "msgfolderroot", _ROOT_ID, under=under)
+        _exists(graph, "deleteditems", _DELETED_ITEMS_ID, under=under)
+
+        with pytest.raises(ToolError, match="Outlook creates the folder 'Deleted Items'") as raised:
+            _ = await _rename(
+                client,
+                folder_ref=MailFolderHandle(_DELETED_ITEMS_ID).uri,
+                mailbox=mailbox,
+                confirm=_never_asked,
+            )
+
+        assert "This tool does not rename it. Nothing was renamed." in str(raised.value)
         assert patch.call_count == 0
 
     async def test_a_user_folder_called_inbox_at_the_top_level_is_renamed_with_no_question(

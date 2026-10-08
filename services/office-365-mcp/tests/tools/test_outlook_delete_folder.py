@@ -50,6 +50,7 @@ _OUTLOOK_NAMES = (
     "clutter",
     "conflicts",
     "conversationhistory",
+    "deleteditems",
     "drafts",
     "inbox",
     "junkemail",
@@ -317,6 +318,16 @@ class TestWhatItRefuses:
 
         assert "Nothing was deleted." in str(raised.value)
         assert move.call_count == 0
+
+    @pytest.mark.parametrize("name", ["deleteditems", "DeletedItems"])
+    async def test_the_well_known_name_of_deleted_items_is_refused_as_deleted_items_itself(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str
+    ) -> None:
+        with pytest.raises(ToolError, match="Deleted Items itself") as raised:
+            _ = await _delete(client, folder_ref=MailFolderHandle(name).uri, confirm=_never_asked)
+
+        assert "This connector cannot erase mail or folders." in str(raised.value)
+        assert len(graph.calls) == 0
 
     @pytest.mark.parametrize("name", ["inbox", "SentItems", "msgfolderroot", "syncissues"])
     async def test_a_well_known_name_in_a_handle_is_refused_before_any_call_to_graph(
@@ -621,9 +632,10 @@ class TestThePersonBeforeTheFolderMoves:
     async def test_the_agreement_is_bound_to_the_mailbox_and_the_folder(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = graph.get(path__regex=r"/deleteditems$").mock(
-            return_value=httpx.Response(200, json={"id": _DELETED_ITEMS_ID})
-        )
+        for under in (_OWN, _SHARED):
+            _ = graph.get(f"{under}/deleteditems").mock(
+                return_value=httpx.Response(200, json={"id": _DELETED_ITEMS_ID})
+            )
         _ = graph.route(method="GET").mock(return_value=httpx.Response(200, json=_folder()))
         _ = graph.route(method="POST").mock(
             return_value=httpx.Response(200, json=_folder(folder_id=_MOVED_ID))

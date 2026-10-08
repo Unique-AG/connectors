@@ -68,6 +68,7 @@ _CHILD_NAMES: tuple[str, ...] = (
     "clutter",
     "conflicts",
     "conversationhistory",
+    "deleteditems",
     "drafts",
     "inbox",
     "junkemail",

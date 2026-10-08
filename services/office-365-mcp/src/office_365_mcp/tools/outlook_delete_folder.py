@@ -188,6 +188,8 @@ def _folder(folder_ref: str) -> MailFolderHandle:
     handle = mail_folder_handle(folder_ref)
     if handle is None:
         raise ToolError(_NOT_A_FOLDER_HANDLE)
+    if handle.folder_id.casefold() == _DELETED_ITEMS:
+        raise ToolError(_DELETED_ITEMS_ITSELF)
     if handle.folder_id.casefold() in OUTLOOK_FOLDER_NAMES:
         raise ToolError(_outlook_makes(handle.folder_id))
     return handle
