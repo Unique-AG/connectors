@@ -34,6 +34,7 @@ from backstop_mcp.features.accounts import (
     get_capital_flows_query_factory,
     get_holdings_query_factory,
     get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     get_time_series_query_factory,
     search_products_query_factory,
 )
@@ -199,6 +200,7 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_capital_flows_query_factory,
     get_holdings_query_factory,
     get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     search_products_query_factory,
     get_time_series_query_factory,
     get_build_entity_link_util_factory,

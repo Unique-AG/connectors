@@ -9,11 +9,15 @@ credential (`BackstopAuthError`), or a rate limit.
 
 The fallback cannot produce commitment, share of master, account term, or `otherId`; those are
 omitted, never zeroed, and named in `omitted_fields`. Its `funded_date` is `accountStartDate`.
+
+Tenure is measured on both paths over every owned account before the open/closed split, so
+`include_closed=false` hides closed rows without shortening the relationship.
 """
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from datetime import date
 
 from backstop_mcp.backstop_client import (
     BackstopAuthError,
@@ -34,6 +38,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    AccountSpanDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
@@ -41,7 +46,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     SeriesFigureDto,
     ShareDto,
 )
-from backstop_mcp.features.accounts.utils import fetch_series
+from backstop_mcp.features.accounts.utils import continuous_tenure, fetch_series
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +81,9 @@ class HoldingsTableShapeError(Exception):
 class GetHoldingsQuery:
     """A party's holdings with figures, from whichever path is available."""
 
-    def __init__(self, *, client: BackstopClient) -> None:
+    def __init__(self, *, client: BackstopClient, clock: Callable[[], date] = date.today) -> None:
         self._client: BackstopClient = client
+        self._clock: Callable[[], date] = clock
 
     async def run(self, *, owner_id: str, include_closed: bool = False) -> HoldingListingDto:
         """`owner_id` should be a resolved party id; an unresolved one returns "owns nothing"."""
@@ -140,12 +146,22 @@ class GetHoldingsQuery:
             open_count=table.open_count,
             all_count=table.all_count,
             closed_count=table.closed_count,
+            tenure=continuous_tenure(
+                (
+                    AccountSpanDto(
+                        start=row.funded_date, end=row.closed_date, is_open=not row.closed
+                    )
+                    for row in all_rows
+                ),
+                today=self._clock(),
+            ),
         )
 
     async def _documented_holdings(
         self, *, owner_id: str, include_closed: bool
     ) -> HoldingListingDto:
-        listing = await self._accounts_for_party(owner_id=owner_id, include_closed=include_closed)
+        owned = await self._owned_accounts_for_party(owner_id=owner_id)
+        listing = self._split_open(owned, include_closed=include_closed)
         # `return_exceptions` so one row raising does not leave its siblings unawaited; the first
         # failure is then re-raised deliberately.
         settled = await asyncio.gather(
@@ -167,11 +183,20 @@ class GetHoldingsQuery:
             ),
             source="accounts-api",
             omitted_fields=FALLBACK_OMITTED_FIELDS,
+            tenure=continuous_tenure(
+                (
+                    AccountSpanDto(
+                        start=record.account_start_date,
+                        end=record.closed_date,
+                        is_open=record.is_open,
+                    )
+                    for record in owned
+                ),
+                today=self._clock(),
+            ),
         )
 
-    async def _accounts_for_party(
-        self, *, owner_id: str, include_closed: bool
-    ) -> AccountListingDto:
+    async def _owned_accounts_for_party(self, *, owner_id: str) -> tuple[AccountRecordDto, ...]:
         page = await self._client.paginate(
             "/accounts",
             schema=AccountApiResource,
@@ -180,10 +205,7 @@ class GetHoldingsQuery:
             page_size=100,
             parallel=True,
         )
-        return self._split_open(
-            self._owned_accounts(page.items, included=page.included, owner_id=owner_id),
-            include_closed=include_closed,
-        )
+        return self._owned_accounts(page.items, included=page.included, owner_id=owner_id)
 
     def _split_open(
         self, records: Sequence[AccountRecordDto], *, include_closed: bool

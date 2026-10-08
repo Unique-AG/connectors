@@ -9,7 +9,6 @@ from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.tools.function_tool import FunctionTool, ToolMeta
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopAuthError, BackstopClient
-from backstop_mcp.config import ProductInvestorsConfig
 from backstop_mcp.features.accounts import (
     AccountRowResponse,
     ProductAmbiguousResponse,
@@ -18,15 +17,12 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools import TOOLS
-from tests.features.accounts.conftest import (
-    make_get_accounts_for_product_query,
-    make_get_latest_account_values_query,
-)
+from tests.features.accounts.conftest import make_get_product_investors_query
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params, resource
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
-_CONFIG = ProductInvestorsConfig(max_valued_accounts=50)
+_MAX_VALUED_ACCOUNTS = 50
 
 _PRODUCT_ID = "1292283"
 _OWNER_ID = "341688185"
@@ -172,9 +168,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -229,9 +225,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 exclude_custom_fields=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -266,9 +262,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -304,9 +300,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -334,9 +330,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=["NGUP"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -357,9 +353,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=["Northwind Dispersion Fund"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -378,9 +374,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=["NWOF", "Northwind Dispersion Fund"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -403,9 +399,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -434,9 +430,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_closed=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -459,9 +455,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             NotFoundResponse,
         )
@@ -498,9 +494,9 @@ class TestGetProductInvestors:
                 ctx_decline(),
                 products=["BLUC"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductAmbiguousResponse,
         )
@@ -522,9 +518,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             )
 
         assert caught.value.status_code == 500
@@ -615,9 +611,9 @@ class TestGetProductInvestors:
                 products=["NWON", "NWOF"],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -648,6 +644,72 @@ class TestGetProductInvestors:
             (42.0, 2)
         ]
         assert investor.latest_value_totals[0].oldest_as_of == date(2026, 8, 31)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_tenure_chains_closed_accounts_across_vehicles_without_include_closed(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_nwon(), _nwof()))
+
+        def accounts(request: httpx.Request) -> httpx.Response:
+            if request.url.params.get("filter[product.id][eq]") == "11":
+                return _accounts_page(
+                    _account(
+                        "a1",
+                        owner_id=_OWNER_ID,
+                        accountStartDate="2008-08-01",
+                        closedDate="2016-01-01",
+                    ),
+                    _account(
+                        "left",
+                        owner_id="555",
+                        accountStartDate="2007-08-01",
+                        closedDate="2009-06-30",
+                    ),
+                    _account("returned", owner_id="555", accountStartDate="2025-03-01"),
+                    included=[
+                        _owner(_OWNER_ID, name="Syz Capital"),
+                        _owner("555", name="BlackRock"),
+                    ],
+                )
+            return _accounts_page(
+                _account("a2", owner_id=_OWNER_ID, accountStartDate="2015-06-01"),
+                _account("a3", owner_id=_OWNER_ID),
+                included=[_owner(_OWNER_ID, name="Syz Capital")],
+            )
+
+        respx.get(_ACCOUNTS_URL).mock(side_effect=accounts)
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=["NWON", "NWOF"],
+                client=client,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        tenure = {
+            investor.name: (investor.continuous_since, investor.tenure_undated_accounts)
+            for investor in result.investors
+        }
+        assert tenure == {
+            "BlackRock": (date(2025, 3, 1), None),
+            "Syz Capital": (date(2008, 8, 1), 1),
+        }
+        syz = object_dict(
+            next(
+                entry
+                for entry in object_list(tool_payload(result)["investors"])
+                if object_dict(entry)["name"] == "Syz Capital"
+            )
+        )
+        assert syz["continuous_since"] == "2008-08-01"
+        assert syz["tenure_undated_accounts"] == 1
 
     @pytest.mark.asyncio
     @respx.mock
@@ -690,9 +752,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -744,9 +806,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -779,9 +841,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -817,9 +879,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=ProductInvestorsConfig(max_valued_accounts=limit),
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=limit
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -857,9 +919,9 @@ class TestGetProductInvestors:
                 include_latest_value=True,
                 investor_ids=[_OWNER_ID, "999", _OWNER_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=ProductInvestorsConfig(max_valued_accounts=1),
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=1
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -903,9 +965,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 investor_ids=["contact-7", "org-7", "999"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=ProductInvestorsConfig(max_valued_accounts=1),
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=1
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -930,9 +992,9 @@ class TestGetProductInvestors:
                 ctx_never_elicit(),
                 products=[_PRODUCT_ID],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -967,9 +1029,9 @@ class TestGetProductInvestors:
                 products=["NWON", "NWOF"],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=ProductInvestorsConfig(max_valued_accounts=3),
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=3
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -1008,9 +1070,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             )
 
     @pytest.mark.asyncio
@@ -1035,9 +1097,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -1081,9 +1143,9 @@ class TestGetProductInvestors:
                 ctx_accept("Blue Two (BLUC)"),
                 products=["BLUC"],
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )
@@ -1117,9 +1179,9 @@ class TestGetProductInvestors:
                 products=[_PRODUCT_ID],
                 include_latest_value=True,
                 client=client,
-                get_accounts_for_product_query=make_get_accounts_for_product_query(client),
-                get_latest_account_values_query=make_get_latest_account_values_query(client),
-                config=_CONFIG,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
             ),
             ProductInvestorsResolvedResponse,
         )

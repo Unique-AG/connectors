@@ -8,6 +8,7 @@ from backstop_mcp.features.accounts import (
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
     GetLatestAccountValuesQuery,
+    GetProductInvestorsQuery,
     GetTimeSeriesQuery,
     SearchProductsQuery,
 )
@@ -31,6 +32,16 @@ def make_get_accounts_for_product_query(client: BackstopClient) -> GetAccountsFo
 
 def make_get_latest_account_values_query(client: BackstopClient) -> GetLatestAccountValuesQuery:
     return GetLatestAccountValuesQuery(client=client)
+
+
+def make_get_product_investors_query(
+    client: BackstopClient, *, max_valued_accounts: int = 50
+) -> GetProductInvestorsQuery:
+    return GetProductInvestorsQuery(
+        get_accounts_for_product_query=make_get_accounts_for_product_query(client),
+        get_latest_account_values_query=make_get_latest_account_values_query(client),
+        max_valued_accounts=max_valued_accounts,
+    )
 
 
 def make_get_capital_flows_query(client: BackstopClient) -> GetCapitalFlowsQuery:

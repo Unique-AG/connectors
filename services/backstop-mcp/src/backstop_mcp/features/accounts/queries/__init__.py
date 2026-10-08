@@ -10,6 +10,9 @@ from backstop_mcp.features.accounts.queries.get_holdings_query import (
 from backstop_mcp.features.accounts.queries.get_latest_account_values_query import (
     GetLatestAccountValuesQuery,
 )
+from backstop_mcp.features.accounts.queries.get_product_investors_query import (
+    GetProductInvestorsQuery,
+)
 from backstop_mcp.features.accounts.queries.get_time_series_query import GetTimeSeriesQuery
 from backstop_mcp.features.accounts.queries.search_products_query import SearchProductsQuery
 from backstop_mcp.features.accounts.time_series_name import (
@@ -26,6 +29,7 @@ __all__ = [
     "GetCapitalFlowsQuery",
     "GetHoldingsQuery",
     "GetLatestAccountValuesQuery",
+    "GetProductInvestorsQuery",
     "SearchProductsQuery",
     "GetTimeSeriesQuery",
     "HoldingsTableShapeError",

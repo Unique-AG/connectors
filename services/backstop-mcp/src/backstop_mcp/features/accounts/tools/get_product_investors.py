@@ -6,7 +6,6 @@ one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never
 `get_time_series` over a fund's accounts.
 """
 
-import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Annotated
@@ -19,28 +18,15 @@ from opentelemetry import trace
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.config import ProductInvestorsConfig
-from backstop_mcp.dependencies import (
-    get_backstop_client_for_current_caller,
-    get_product_investors_config,
-)
+from backstop_mcp.dependencies import get_backstop_client_for_current_caller
 from backstop_mcp.features.accounts import (
-    GetAccountsForProductQuery,
-    GetLatestAccountValuesQuery,
+    GetProductInvestorsQuery,
     ProductAmbiguousResponse,
     ProductInvestorsResolvedResponse,
     ResolvedProductDto,
     resolve_product_family,
 )
-from backstop_mcp.features.accounts.dependencies import (
-    get_accounts_for_product_query_factory,
-    get_latest_account_values_query_factory,
-)
-from backstop_mcp.features.accounts.responses import (
-    LatestValueResponse,
-    ProductListingResponse,
-    investors_from_listings,
-)
+from backstop_mcp.features.accounts.dependencies import get_product_investors_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, input_required
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
@@ -85,7 +71,7 @@ async def get_product_investors(
         Field(
             description=(
                 "When false (default), only open accounts are returned. Pass true to include "
-                "closed accounts."
+                "closed accounts. `investors[].continuous_since` counts closed accounts either way."
             ),
         ),
     ] = False,
@@ -127,13 +113,9 @@ async def get_product_investors(
         ),
     ] = False,
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
-    get_accounts_for_product_query: GetAccountsForProductQuery = Depends(
-        get_accounts_for_product_query_factory
+    get_product_investors_query: GetProductInvestorsQuery = Depends(
+        get_product_investors_query_factory
     ),
-    get_latest_account_values_query: GetLatestAccountValuesQuery = Depends(
-        get_latest_account_values_query_factory
-    ),
-    config: ProductInvestorsConfig = Depends(get_product_investors_config),
 ) -> GetProductInvestorsResponse | InputRequiredResult:
     """The accounts in one or more products, and who owns them.
 
@@ -149,6 +131,12 @@ async def get_product_investors(
     once per account in the fund — that is one call per (account, series) and drops rows.
     Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
     under management, not one investor's balance.
+
+    Tenure ("since when", "longest-standing", "longest consecutive investor"): rank by
+    `investors[].continuous_since`, which merges every account the investor has had in these
+    products, closed ones included, into the unbroken run that reaches today. Never rank by an
+    open account's `account_start_date`: investors who rotate accounts (private banks,
+    platforms, nominees) have no single old account. It covers only the products passed.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor
@@ -167,7 +155,6 @@ async def get_product_investors(
         span.set_attribute("exclude_custom_fields", exclude_custom_fields)
         requested_investors = coerce_ids(investor_ids)
         span.set_attribute("investor_id_count", len(requested_investors))
-        owner_ids = frozenset(requested_investors) if requested_investors else None
         resolved_products = await _resolve_products(ctx, client, products=products)
         if not isinstance(resolved_products, tuple):
             return resolved_products
@@ -182,44 +169,20 @@ async def get_product_investors(
                 "investor_id_count": len(requested_investors),
             },
         )
-        # Each listing is its own `/accounts` walk with no ordering between products; `gather`
-        # keeps the input order, so the output is the same as awaiting them one by one.
-        listings = list(
-            await asyncio.gather(
-                *(
-                    get_accounts_for_product_query.run(
-                        product=resolved,
-                        include_closed=include_closed,
-                        exclude_custom_fields=exclude_custom_fields,
-                        owner_ids=owner_ids,
-                    )
-                    for resolved in resolved_products
-                )
-            )
+        result = await get_product_investors_query.run(
+            products=resolved_products,
+            include_closed=include_closed,
+            include_latest_value=include_latest_value,
+            exclude_custom_fields=exclude_custom_fields,
+            investor_ids=requested_investors,
         )
-        latest_value_hint: str | None = None
-        if include_latest_value:
-            listings, latest_value_hint = await _with_latest_values(
-                listings,
-                get_latest_account_values_query,
-                max_valued_accounts=config.max_valued_accounts,
-            )
-        investors = investors_from_listings(listings)
-        result = ProductInvestorsResolvedResponse(
-            products=tuple(listings),
-            investors=investors,
-            latest_value_hint=latest_value_hint,
-            investor_ids_not_found=(
-                _not_found(requested_investors, listings) if requested_investors else None
-            ),
-        )
-        accounts = [account for listing in listings for account in listing.accounts]
+        accounts = [account for listing in result.products for account in listing.accounts]
         logger.info(
             "accounts.product_investors.completed",
             extra={
-                "product_ids": [listing.product.id for listing in listings],
+                "product_ids": [listing.product.id for listing in result.products],
                 "returned": len(accounts),
-                "closed_omitted": sum(listing.closed_omitted for listing in listings),
+                "closed_omitted": sum(listing.closed_omitted for listing in result.products),
                 "valued": sum(
                     1
                     for account in accounts
@@ -253,82 +216,3 @@ async def _resolve_products(
         for product in family:
             collected.setdefault(product.id, product)
     return tuple(collected.values())
-
-
-async def _with_latest_values(
-    listings: list[ProductListingResponse],
-    get_latest_account_values_query: GetLatestAccountValuesQuery,
-    *,
-    max_valued_accounts: int,
-) -> tuple[list[ProductListingResponse], str | None]:
-    """Listings with `latest_value` on every account, or unchanged plus why when over the cap."""
-    account_count = sum(len(listing.accounts) for listing in listings)
-    if account_count > max_valued_accounts:
-        return listings, _over_limit_hint(
-            listings, account_count=account_count, max_valued_accounts=max_valued_accounts
-        )
-    latest = await get_latest_account_values_query.run(
-        account_ids=[account.id for listing in listings for account in listing.accounts]
-    )
-    by_account = {value.account_id: value for value in latest}
-    return [
-        listing.model_copy(
-            update={
-                "accounts": tuple(
-                    account.model_copy(
-                        update={
-                            "latest_value": LatestValueResponse.from_dto(
-                                by_account[account.id], currency=account.currency
-                            )
-                        }
-                    )
-                    for account in listing.accounts
-                )
-            }
-        )
-        for listing in listings
-    ], None
-
-
-def _over_limit_hint(
-    listings: list[ProductListingResponse], *, account_count: int, max_valued_accounts: int
-) -> str:
-    """Why no values came back, and the narrower calls that would fit — cheapest first."""
-    each_vehicle_fits = len(listings) > 1 and all(
-        len(listing.accounts) <= max_valued_accounts for listing in listings
-    )
-    per_vehicle = (
-        (
-            "or call once per vehicle (each fits the limit) and add "
-            "`investors[].latest_value_totals` up by investor `id`; "
-        )
-        if each_vehicle_fits
-        else ""
-    )
-    return (
-        f"No values fetched: {account_count} accounts is over the {max_valued_accounts}-account "
-        "limit. Narrow and call again: pass `investor_ids` with only the investors the answer "
-        f"needs (ids from `investors[]`); {per_vehicle}or drop closed accounts. If none fits, "
-        "tell the user and offer: get_accounts_for_party on each `investors[]` entry (`id` as "
-        "`party_id`, `resource_type` as `search_type`) — one request per investor, balances "
-        "carry no as-of date, and it lists the investor's other funds too, so keep only this "
-        "response's `account_ids`; or, if the firm keeps a saved Report Center report of "
-        "investor balances, run_report by its exact name (ask the user for it). Fund-level AUM "
-        "alone is get_time_series on the product's `aums`. Do not call get_time_series on every "
-        "account."
-    )
-
-
-def _not_found(
-    investor_ids: Sequence[str], listings: Sequence[ProductListingResponse]
-) -> tuple[str, ...]:
-    """Requested ids with no listed account, in the order given, each once."""
-    listed = {
-        candidate
-        for listing in listings
-        for account in listing.accounts
-        if account.owner is not None
-        for candidate in (account.owner.id, account.owner.contacts_id)
-        if candidate is not None
-    }
-    return tuple(dict.fromkeys(entry for entry in investor_ids if entry not in listed))
