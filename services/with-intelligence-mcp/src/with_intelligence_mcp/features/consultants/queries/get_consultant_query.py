@@ -13,8 +13,8 @@ from with_intelligence_mcp.features.consultants.responses import (
     ConsultantNotFoundResponse,
     ConsultantProfileResponse,
 )
+from with_intelligence_mcp.utils.resolve import resolve_by_name_or_id
 from with_intelligence_mcp.with_intelligence_client import (
-    NotEntitled,
     NotFound,
     Page,
     QueryValue,
@@ -55,59 +55,17 @@ class GetConsultantQuery:
     async def _resolve(
         self, *, name: str | None, consultant_id: int | None
     ) -> _ConsultantResolution:
-        resolved_id = consultant_id
-        if resolved_id is None:
-            if name is None:
-                return ConsultantNotFoundResponse(
-                    searched_for="", hint="Pass either name or consultant_id."
-                )
-            try:
-                matches, total = await self._search_by_name(name)
-            except NotEntitled as error:
-                return ConsultantNotEntitledResponse(
-                    searched_for=name,
-                    hint=(
-                        "With Intelligence refused the consultant search for this account "
-                        f"({error.path}) — the data is outside its licensed packages."
-                    ),
-                )
-            if not matches:
-                return ConsultantNotFoundResponse(
-                    searched_for=name,
-                    hint=(
-                        "No consultant name contains that text. Matching is partial, so a shorter "
-                        "or differently spelled fragment may find it."
-                    ),
-                )
-            if len(matches) > 1:
-                return ConsultantAmbiguousResponse(
-                    searched_for=name,
-                    candidates=[
-                        ConsultantCandidateResponse(
-                            id=match.id, name=match.name, updated_at=match.updated_at
-                        )
-                        for match in matches
-                    ],
-                    total_matches=total,
-                )
-            resolved_id = matches[0].id
-
-        try:
-            record = await self._fetch(resolved_id)
-        except NotEntitled as error:
-            return ConsultantNotEntitledResponse(
-                searched_for=name or str(resolved_id),
-                hint=(
-                    f"With Intelligence refused {error.path} for this account — "
-                    "the data is outside its licensed packages."
-                ),
-            )
-        if record is None:
-            return ConsultantNotFoundResponse(
-                searched_for=name or str(resolved_id),
-                hint=f"No consultant with id {resolved_id}.",
-            )
-        return record
+        return await resolve_by_name_or_id(
+            name=name,
+            record_id=consultant_id,
+            kind="consultant",
+            search=self._search_by_name,
+            fetch=self._fetch,
+            not_found=ConsultantNotFoundResponse,
+            not_entitled=ConsultantNotEntitledResponse,
+            ambiguous=ConsultantAmbiguousResponse,
+            candidate=ConsultantCandidateResponse,
+        )
 
     async def _search_by_name(self, name: str) -> tuple[list[ConsultantListItemAttributes], int]:
         params: dict[str, QueryValue] = {"name": [name]}

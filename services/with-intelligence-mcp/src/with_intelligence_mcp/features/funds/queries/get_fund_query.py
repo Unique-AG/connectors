@@ -13,8 +13,8 @@ from with_intelligence_mcp.features.funds.responses import (
     FundNotFoundResponse,
     FundProfileResponse,
 )
+from with_intelligence_mcp.utils.resolve import resolve_by_name_or_id
 from with_intelligence_mcp.with_intelligence_client import (
-    NotEntitled,
     NotFound,
     Page,
     QueryValue,
@@ -47,57 +47,17 @@ class GetFundQuery:
         return response
 
     async def _resolve(self, *, name: str | None, fund_id: int | None) -> _FundResolution:
-        resolved_id = fund_id
-        if resolved_id is None:
-            if name is None:
-                return FundNotFoundResponse(searched_for="", hint="Pass either name or fund_id.")
-            try:
-                matches, total = await self._search_by_name(name)
-            except NotEntitled as error:
-                return FundNotEntitledResponse(
-                    searched_for=name,
-                    hint=(
-                        "With Intelligence refused the fund search for this account "
-                        f"({error.path}) — the data is outside its licensed packages."
-                    ),
-                )
-            if not matches:
-                return FundNotFoundResponse(
-                    searched_for=name,
-                    hint=(
-                        "No fund name contains that text. Matching is partial, so a shorter or "
-                        "differently spelled fragment may find it."
-                    ),
-                )
-            if len(matches) > 1:
-                return FundAmbiguousResponse(
-                    searched_for=name,
-                    candidates=[
-                        FundCandidateResponse(
-                            id=match.id, name=match.name, updated_at=match.updated_at
-                        )
-                        for match in matches
-                    ],
-                    total_matches=total,
-                )
-            resolved_id = matches[0].id
-
-        try:
-            record = await self._fetch(resolved_id)
-        except NotEntitled as error:
-            return FundNotEntitledResponse(
-                searched_for=name or str(resolved_id),
-                hint=(
-                    f"With Intelligence refused {error.path} for this account — "
-                    "the data is outside its licensed packages."
-                ),
-            )
-        if record is None:
-            return FundNotFoundResponse(
-                searched_for=name or str(resolved_id),
-                hint=f"No fund with id {resolved_id}.",
-            )
-        return record
+        return await resolve_by_name_or_id(
+            name=name,
+            record_id=fund_id,
+            kind="fund",
+            search=self._search_by_name,
+            fetch=self._fetch,
+            not_found=FundNotFoundResponse,
+            not_entitled=FundNotEntitledResponse,
+            ambiguous=FundAmbiguousResponse,
+            candidate=FundCandidateResponse,
+        )
 
     async def _search_by_name(self, name: str) -> tuple[list[FundListItemAttributes], int]:
         params: dict[str, QueryValue] = {"name": [name]}

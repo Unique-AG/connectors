@@ -13,8 +13,8 @@ from with_intelligence_mcp.features.managers.responses import (
     ManagerNotFoundResponse,
     ManagerProfileResponse,
 )
+from with_intelligence_mcp.utils.resolve import resolve_by_name_or_id
 from with_intelligence_mcp.with_intelligence_client import (
-    NotEntitled,
     NotFound,
     Page,
     QueryValue,
@@ -53,59 +53,17 @@ class GetManagerQuery:
         return response
 
     async def _resolve(self, *, name: str | None, manager_id: int | None) -> _ManagerResolution:
-        resolved_id = manager_id
-        if resolved_id is None:
-            if name is None:
-                return ManagerNotFoundResponse(
-                    searched_for="", hint="Pass either name or manager_id."
-                )
-            try:
-                matches, total = await self._search_by_name(name)
-            except NotEntitled as error:
-                return ManagerNotEntitledResponse(
-                    searched_for=name,
-                    hint=(
-                        "With Intelligence refused the manager search for this account "
-                        f"({error.path}) — the data is outside its licensed packages."
-                    ),
-                )
-            if not matches:
-                return ManagerNotFoundResponse(
-                    searched_for=name,
-                    hint=(
-                        "No manager name contains that text. Matching is partial, so a shorter or "
-                        "differently spelled fragment may find it."
-                    ),
-                )
-            if len(matches) > 1:
-                return ManagerAmbiguousResponse(
-                    searched_for=name,
-                    candidates=[
-                        ManagerCandidateResponse(
-                            id=match.id, name=match.name, updated_at=match.updated_at
-                        )
-                        for match in matches
-                    ],
-                    total_matches=total,
-                )
-            resolved_id = matches[0].id
-
-        try:
-            record = await self._fetch(resolved_id)
-        except NotEntitled as error:
-            return ManagerNotEntitledResponse(
-                searched_for=name or str(resolved_id),
-                hint=(
-                    f"With Intelligence refused {error.path} for this account — "
-                    "the data is outside its licensed packages."
-                ),
-            )
-        if record is None:
-            return ManagerNotFoundResponse(
-                searched_for=name or str(resolved_id),
-                hint=f"No manager with id {resolved_id}.",
-            )
-        return record
+        return await resolve_by_name_or_id(
+            name=name,
+            record_id=manager_id,
+            kind="manager",
+            search=self._search_by_name,
+            fetch=self._fetch,
+            not_found=ManagerNotFoundResponse,
+            not_entitled=ManagerNotEntitledResponse,
+            ambiguous=ManagerAmbiguousResponse,
+            candidate=ManagerCandidateResponse,
+        )
 
     async def _search_by_name(self, name: str) -> tuple[list[ManagerListItemAttributes], int]:
         params: dict[str, QueryValue] = {"name": [name]}
