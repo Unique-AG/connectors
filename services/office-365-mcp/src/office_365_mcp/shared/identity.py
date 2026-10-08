@@ -24,8 +24,19 @@ ENTRA_OBJECT_ID_PATTERN = (
 # step, one request carries two names, so they share `STEP` instead.
 STEP = "signed_in_user"
 
-# /me returns 11 properties by default. This selects only the five properties get_me promises.
-PROFILE = ["id", "displayName", "mail", "userPrincipalName", "jobTitle"]
+PROFILE = [
+    "id",
+    "displayName",
+    "givenName",
+    "surname",
+    "mail",
+    "userPrincipalName",
+    "jobTitle",
+    "officeLocation",
+    "businessPhones",
+    "mobilePhone",
+    "preferredLanguage",
+]
 
 type _MeQuery = UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters
 

@@ -21,7 +21,6 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import repeated_address
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     display_name,
@@ -30,7 +29,7 @@ from office_365_mcp.shared.files import (
     item_label,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.mail import ONE_ADDRESS, repeated_address
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (

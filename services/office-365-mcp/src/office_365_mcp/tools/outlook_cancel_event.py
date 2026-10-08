@@ -9,6 +9,7 @@ from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.attendee import Attendee
 from msgraph.generated.models.event import Event
+from msgraph.generated.models.event_type import EventType
 from msgraph.generated.users.item.calendars.item.events.item.cancel.cancel_post_request_body import (  # noqa: E501
     CancelPostRequestBody,
 )
@@ -16,7 +17,13 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import EventAttendee, confirmation_id_for, event_of
+from office_365_mcp.shared.calendar import (
+    SERIES_MASTER_FIELD,
+    EventAttendee,
+    confirmation_id_for,
+    event_of,
+    series_reach,
+)
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
@@ -50,10 +57,24 @@ _AGREE = "cancel"
 _DECLINE = "do not cancel"
 _NOTHING_HAPPENED = "Nothing was cancelled."
 
-_DESCRIPTION = (
-    "Cancels one event that the signed-in user organizes, moves it to Deleted Items, and mails "
-    + "any attendees a cancellation. Refuses an event the signed-in user did not organize."
-)
+_DESCRIPTION = """\
+Cancels one event that the signed-in user organizes. Microsoft moves the event to Deleted Items \
+and mails each attendee a cancellation with the optional comment. Nothing here can recall the \
+cancellation. If this deployment exposes outlook_delete_event, that tool also sends a \
+cancellation, but it takes no comment. outlook_respond_to_invite declines an event that \
+somebody else organizes.
+
+Notes:
+- This tool asks the user to agree before it cancels an event that has an attendee. This tool \
+cancels nothing unless the user agrees. This tool cancels an event without that agreement only \
+when the event has no attendee.
+- The `uri` of a series master cancels every occurrence of the series. The `uri` of one \
+occurrence cancels only that date. The answer has `series_master` true when the cancel reached \
+the whole series.
+- This tool refuses an event that the user does not organize.
+- If a call times out, do not call this tool again first. A cancellation can already be out. \
+Before you call again, make sure that outlook_read_event still shows the event.
+"""
 
 _NOT_A_HANDLE = (
     "outlook_cancel_event takes the `uri` that outlook_list_events or outlook_read_event reported, "
@@ -89,6 +110,7 @@ class CancelledEvent(BaseModel):
     notified: bool = Field(
         description="Whether a cancellation message went out; true when `attendees` was not empty."
     )
+    series_master: bool = Field(description=SERIES_MASTER_FIELD)
 
 
 async def cancel_event(
@@ -136,9 +158,15 @@ def _question(event: Event, comment: str | None) -> str:
     invited = [_named(attendee) for attendee in event.attendees or []]
     name = event.subject or "this event"
     said = f" ({comment!r})" if comment else ""
-    return (
-        f"Cancel {name!r}? Microsoft mails a cancellation{said} to {', '.join(invited)}, and this "
-        + "connector cannot recall it."
+    return " ".join(
+        part
+        for part in (
+            f"Cancel {name!r}?",
+            series_reach(event, what="cancellation"),
+            f"Microsoft mails a cancellation{said} to {', '.join(invited)}, and this connector "
+            + "cannot recall it.",
+        )
+        if part
     )
 
 
@@ -162,6 +190,7 @@ def _answer(handle: EventHandle, event: Event, *, comment: str | None) -> Cancel
         attendees=stored,
         comment=comment,
         notified=bool(stored),
+        series_master=event.type == EventType.SeriesMaster,
     )
 
 

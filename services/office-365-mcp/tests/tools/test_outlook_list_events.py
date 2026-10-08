@@ -39,6 +39,14 @@ _MARCH_SUNDAY = date(2026, 3, 8)
 _ADA = {"name": "Ada Lovelace", "address": "ada@example.invalid"}
 _DANA = {"name": "Dana Swope", "address": "dana@example.invalid"}
 
+_SERIES_MASTER_ID = "AAMkAGI2SYNTHETIC-series-0001="
+
+_SELECTED = (
+    "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,"
+    + "showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,"
+    + "attendees,webLink,categories,importance"
+)
+
 
 def _calendar_payload(
     calendar_id: str,
@@ -74,8 +82,10 @@ def _event_payload(
     is_cancelled: bool | None = False,
     sensitivity: str | None = "normal",
     event_type: str | None = "occurrence",
-    series_master_id: str | None = "AAMkAGI2SYNTHETIC-series-0001=",
+    series_master_id: str | None = _SERIES_MASTER_ID,
     owner_response: str | None = "organizer",
+    categories: Sequence[str] = (),
+    importance: str | None = "normal",
 ) -> dict[str, object]:
     return {
         "id": event_id,
@@ -87,6 +97,8 @@ def _event_payload(
         **({} if is_cancelled is None else {"isCancelled": is_cancelled}),
         "type": event_type,
         "seriesMasterId": series_master_id,
+        "categories": list(categories),
+        "importance": importance,
         "sensitivity": sensitivity,
         "showAs": "busy",
         "location": {"displayName": "Room 3"},
@@ -201,6 +213,26 @@ class TestTheQueryItComposes:
 
         params = my_view.calls.last.request.url.params
         assert params["$select"].split(",") == list(SUMMARY_FIELDS)
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_it_asks_for_exactly_this_projection(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        _ = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
+        )
+
+        assert my_view.calls.last.request.url.params["$select"] == _SELECTED
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_it_never_asks_a_calendar_view_for_a_recurrence_rule(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        _ = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
+        )
+
+        assert "recurrence" not in my_view.calls.last.request.url.params["$select"].split(",")
 
     @pytest.mark.usefixtures("my_calendar")
     async def test_the_callers_limit_is_the_page_size_it_asks_microsoft_for(
@@ -649,6 +681,42 @@ class TestWhatItAnswers:
         assert row.owner_response == "organizer"
         assert row.owner_is_organizer is True, "Graph's `isOrganizer` is about the calendar's owner"
         assert row.join_url == "https://teams.microsoft.invalid/l/meetup-join/synthetic"
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_each_row_carries_its_categories_its_importance_and_its_series_master(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        my_view.mock(
+            return_value=_page(
+                _event_payload(_FIRST_ID, categories=["Budget", "Blue category"], importance="low")
+            )
+        )
+
+        answer = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
+        )
+
+        row = answer.events[0]
+        assert row.categories == ["Budget", "Blue category"]
+        assert row.importance == "low"
+        assert row.series_master_uri == EventHandle(_MY_CALENDAR_ID, _SERIES_MASTER_ID).uri
+
+    @pytest.mark.usefixtures("my_calendar")
+    async def test_a_single_event_row_names_no_series_master(
+        self, client: GraphServiceClient, my_view: respx.Route
+    ) -> None:
+        my_view.mock(
+            return_value=_page(
+                _event_payload(_FIRST_ID, event_type="singleInstance", series_master_id=None)
+            )
+        )
+
+        answer = await lister.list_events(
+            client, starts_on=_MARCH_MONDAY, ends_on=_MARCH_SUNDAY, limit=25
+        )
+
+        assert answer.events[0].series_master_uri is None
+        assert answer.events[0].in_series is False
 
     @pytest.mark.usefixtures("my_calendar")
     async def test_a_canceled_row_is_flagged_rather_than_dropped(

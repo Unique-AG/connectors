@@ -132,6 +132,15 @@ async def _walk_chats(client: GraphServiceClient, *, limit: int) -> None:
     _ = await collect_pages(first, client, limit=limit)
 
 
+def _a_draft(draft_id: str) -> Mapping[str, object]:
+    return {
+        "id": draft_id,
+        "isDraft": True,
+        "subject": "Invoice 4471",
+        "changeKey": "CQAAABYAAAC4SYNTHETIC-version-0001",
+    }
+
+
 def _page(chat_ids: Sequence[str], next_link: str | None = None) -> Mapping[str, object]:
     page: dict[str, object] = {"value": [{"id": chat_id} for chat_id in chat_ids]}
     if next_link is not None:
@@ -230,9 +239,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0001%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
@@ -246,7 +253,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         with pytest.raises(ToolError):
             _ = await send_draft(
-                client, confirm=declines, draft_ref=f"outlook:///messages/{draft_id}"
+                client, confirm=declines, message_ref=f"outlook:///messages/{draft_id}"
             )
 
         assert sent.call_count == 0, "a declined send reached the mailbox"
@@ -271,9 +278,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0002%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         sent = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="outlook_send_draft", status="error")
@@ -282,7 +287,7 @@ class TestAGraphCallIsCountedAndTimed:
             _ = await send_draft(
                 client,
                 confirm=a_person_agrees(cast("Context", cast("object", _CannotAsk()))),
-                draft_ref=f"outlook:///messages/{draft_id}",
+                message_ref=f"outlook:///messages/{draft_id}",
             )
 
         assert sent.call_count == 0
@@ -295,9 +300,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         draft_id = "AAMkAGI2SYNTHETIC-immutable-0003%3D"
         _ = graph.get(f"/me/messages/{draft_id}").mock(
-            return_value=httpx.Response(
-                200, json={"id": draft_id, "isDraft": True, "subject": "Invoice 4471"}
-            )
+            return_value=httpx.Response(200, json=_a_draft(draft_id))
         )
         _ = graph.post(f"/me/messages/{draft_id}/send").mock(return_value=httpx.Response(202))
         waited = 0.5
@@ -310,7 +313,7 @@ class TestAGraphCallIsCountedAndTimed:
             return None
 
         _ = await send_draft(
-            client, confirm=thinks_about_it, draft_ref=f"outlook:///messages/{draft_id}"
+            client, confirm=thinks_about_it, message_ref=f"outlook:///messages/{draft_id}"
         )
 
         timed = (
@@ -737,6 +740,9 @@ GRAPH_STEPS = frozenset(
         "mail_search",
         "mail_ids",
         "mail_message",
+        "message_attachments",
+        "message_attachment",
+        "attachment_content",
         "mail_folders",
         "people_search",
         "mail_participants",
@@ -744,34 +750,66 @@ GRAPH_STEPS = frozenset(
         "thread_messages",
         "mail_folder",
         "folder_messages",
+        "mail_tips",
+        "focused_overrides",
         "mailbox_settings",
         "mail_rules",
         "mail_categories",
         "categories",
+        "create_category",
+        "time_zones",
         "mark_message",
         "move_message",
+        "copy_message",
+        "rename_folder",
+        "move_folder",
+        "write_focused_override",
         "destination_folder",
         "create_draft",
         "create_reply",
         "fill_reply",
+        "create_reply_all",
+        "fill_reply_all",
         "read_draft",
+        "update_draft",
         "send_draft",
         "read_mailbox_settings",
         "write_automatic_reply",
         "read_mail_rule",
         "disable_mail_rule",
+        "create_mail_rule",
+        "update_mail_rule",
+        "delete_mail_rule",
+        "rule_folder",
         "transcript_attributed",
         "transcript_unattributed",
         "calendar",
         "calendars",
+        "calendar_groups",
+        "reminder_view",
         "calendar_events",
         "calendar_event",
+        "event_attachments",
+        "event_attachment",
+        "event_attachment_content",
         "create_event",
         "update_event",
         "cancel_event",
         "respond_to_invite",
+        "forward_event",
+        "delete_event",
+        "delete_calendar",
+        "calendar_permissions",
+        "share_calendar",
+        "calendar_permission",
+        "unshare_calendar",
         "get_schedule",
         "find_meeting_times",
+        "rooms",
+        "contacts",
+        "contact",
+        "create_contact",
+        "update_contact",
         "notebook",
         "notebooks",
         "section",

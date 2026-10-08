@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta, timezone
 from typing import cast
@@ -12,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphThrottled
 from office_365_mcp.shared.handles import MailMessageHandle
+from office_365_mcp.shared.mail import SUMMARY_FIELDS, MailFlag, MailImportance
 from office_365_mcp.tools import outlook_search_mail as searcher
 from office_365_mcp.tools.outlook_search_mail import (
     CRITERIA,
@@ -43,6 +45,22 @@ def _message(message_id: str, *, subject: str = "Invoice 4471") -> dict[str, obj
 
 def _translation(pairs: dict[str, str]) -> dict[str, object]:
     return {"value": [{"sourceId": source, "targetId": target} for source, target in pairs.items()]}
+
+
+def _rest_id(number: int) -> str:
+    return f"AAMkAGI2SYNTHETIC-rest-{number:04d}="
+
+
+def _stable_id(number: int) -> str:
+    return f"AAMkAGI2SYNTHETIC-immutable-{number:04d}="
+
+
+def _hit(number: int, **fields: object) -> dict[str, object]:
+    return _message(_rest_id(number)) | fields
+
+
+def _translation_of(*numbers: int) -> dict[str, object]:
+    return _translation({_rest_id(number): _stable_id(number) for number in numbers})
 
 
 @pytest.fixture
@@ -175,6 +193,18 @@ class TestWhatItAsksGraphFor:
         assert params["$top"] == "7"
         assert "bodyPreview" in params["$select"]
 
+    async def test_it_selects_every_shared_summary_field_and_never_the_headers(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(query="invoice"), limit=25)
+
+        selected = searched.calls.last.request.url.params["$select"].split(",")
+        assert [field for field in SUMMARY_FIELDS if field not in selected] == []
+        assert "internetMessageHeaders" not in selected
+
     async def test_it_never_sends_an_order_or_a_filter_beside_the_search(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
@@ -196,6 +226,260 @@ class TestWhatItAsksGraphFor:
         await search_mail(client, SearchCriteria(query="invoice"), limit=25)
 
         assert "ImmutableId" not in searched.calls.last.request.headers.get("Prefer", "")
+
+
+class TestTheNarrowingTermsItSends:
+    @pytest.mark.parametrize(
+        ("importance", "term"),
+        [
+            ("low", "importance:low"),
+            ("normal", "importance:medium"),
+            ("high", "importance:high"),
+        ],
+    )
+    async def test_importance_is_sent_with_the_value_names_microsoft_lists_for_search(
+        self,
+        client: GraphServiceClient,
+        searched: respx.Route,
+        translated: respx.Route,
+        importance: MailImportance,
+        term: str,
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(query="invoice"), importance=importance, limit=25)
+
+        assert searched.calls.last.request.url.params["$search"] == f'"invoice AND {term}"'
+
+    async def test_the_window_comes_first_then_the_importance_term(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(
+            client,
+            SearchCriteria(query="invoice", sender="bob@vance.invalid"),
+            received_after=date(2026, 9, 1),
+            received_before=date(2026, 9, 30),
+            importance="high",
+            limit=25,
+        )
+
+        params = searched.calls.last.request.url.params
+        assert params["$search"] == (
+            '"invoice from:bob@vance.invalid AND received>=2026-09-01T00:00:00Z '
+            + 'AND received<2026-10-01T00:00:00Z AND importance:high"'
+        )
+        assert "$filter" not in params
+
+    async def test_a_quoted_criterion_stays_escaped_beside_the_importance_term(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(client, SearchCriteria(sender="Bob Vance"), importance="low", limit=25)
+
+        sent = searched.calls.last.request.url.params["$search"]
+        assert sent == '"from:\\"Bob Vance\\" AND importance:low"'
+
+    async def test_flagged_has_attachments_and_category_add_no_term_to_the_search(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": []}))
+        translated.mock(return_value=httpx.Response(200, json={"value": []}))
+
+        await search_mail(
+            client,
+            SearchCriteria(query="invoice"),
+            flagged=True,
+            has_attachments=True,
+            category="Invoices",
+            limit=25,
+        )
+
+        params = searched.calls.last.request.url.params
+        assert params["$search"] == '"invoice"'
+        assert "hasattachment" not in params["$search"].casefold()
+        assert "$filter" not in params
+
+
+class TestTheNarrowingItAppliesToThePage:
+    @pytest.mark.parametrize(("flagged", "kept"), [(True, [1]), (False, [2, 3])])
+    async def test_flagged_keeps_the_mail_by_follow_up_status_and_no_flag_matches_neither(
+        self,
+        client: GraphServiceClient,
+        searched: respx.Route,
+        translated: respx.Route,
+        flagged: bool,
+        kept: list[int],
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, flag={"flagStatus": "flagged"}),
+                        _hit(2, flag={"flagStatus": "notFlagged"}),
+                        _hit(3, flag={"flagStatus": "complete"}),
+                        _hit(4),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1, 2, 3, 4)))
+
+        results = await search_mail(
+            client, SearchCriteria(query="invoice"), flagged=flagged, limit=25
+        )
+
+        assert [hit.uri for hit in results.messages] == [
+            MailMessageHandle(_stable_id(number)).uri for number in kept
+        ]
+
+    @pytest.mark.parametrize(("has_attachments", "kept"), [(True, [1]), (False, [2])])
+    async def test_has_attachments_keeps_the_mail_by_attachment_state_and_a_null_matches_neither(
+        self,
+        client: GraphServiceClient,
+        searched: respx.Route,
+        translated: respx.Route,
+        has_attachments: bool,
+        kept: list[int],
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, hasAttachments=True),
+                        _hit(2, hasAttachments=False),
+                        _hit(3, hasAttachments=None),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1, 2, 3)))
+
+        results = await search_mail(
+            client, SearchCriteria(query="invoice"), has_attachments=has_attachments, limit=25
+        )
+
+        assert [hit.uri for hit in results.messages] == [
+            MailMessageHandle(_stable_id(number)).uri for number in kept
+        ]
+
+    async def test_a_category_matches_the_whole_name_and_ignores_case(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, categories=["Invoices"]),
+                        _hit(2, categories=["Red category", "invoices"]),
+                        _hit(3, categories=["Invoices 2025"]),
+                        _hit(4),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1, 2, 3, 4)))
+
+        results = await search_mail(
+            client, SearchCriteria(query="invoice"), category="INVOICES", limit=25
+        )
+
+        assert [hit.uri for hit in results.messages] == [
+            MailMessageHandle(_stable_id(1)).uri,
+            MailMessageHandle(_stable_id(2)).uri,
+        ]
+
+    async def test_flagged_and_category_must_both_pass(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        flag = {"flagStatus": "flagged"}
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, flag=flag, categories=["Invoices"]),
+                        _hit(2, flag=flag, categories=["Receipts"]),
+                        _hit(3, flag={"flagStatus": "notFlagged"}, categories=["Invoices"]),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1, 2, 3)))
+
+        results = await search_mail(
+            client,
+            SearchCriteria(query="invoice"),
+            flagged=True,
+            category="Invoices",
+            limit=25,
+        )
+
+        assert [hit.uri for hit in results.messages] == [MailMessageHandle(_stable_id(1)).uri]
+
+    async def test_the_exchange_is_asked_to_translate_only_the_mail_that_stays(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, categories=["Invoices"]),
+                        _hit(2, categories=["Receipts"]),
+                    ]
+                },
+            )
+        )
+        translated.mock(return_value=httpx.Response(200, json=_translation_of(1)))
+
+        await search_mail(client, SearchCriteria(query="invoice"), category="Invoices", limit=25)
+
+        asked = cast("dict[str, list[str]]", json.loads(translated.calls.last.request.content))
+        assert asked["InputIds"] == [_rest_id(1)]
+
+    async def test_a_full_page_the_filter_empties_still_says_more_may_exist(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _hit(1, flag={"flagStatus": "notFlagged"}),
+                        _hit(2, flag={"flagStatus": "notFlagged"}),
+                    ]
+                },
+            )
+        )
+
+        results = await search_mail(client, SearchCriteria(query="invoice"), flagged=True, limit=2)
+
+        assert results.messages == []
+        assert results.more_may_exist is True
+        assert translated.call_count == 0
+
+    async def test_a_short_page_the_filter_empties_says_nothing_more_exists(
+        self, client: GraphServiceClient, searched: respx.Route
+    ) -> None:
+        searched.mock(
+            return_value=httpx.Response(
+                200, json={"value": [_hit(1, flag={"flagStatus": "notFlagged"})]}
+            )
+        )
+
+        results = await search_mail(client, SearchCriteria(query="invoice"), flagged=True, limit=25)
+
+        assert results.messages == []
+        assert results.more_may_exist is False
 
 
 class TestTheWindowItSends:
@@ -471,6 +755,45 @@ class TestWhatItAnswers:
         assert hit.has_attachments is True
         assert hit.web_link == "https://outlook.office365.invalid/owa/?ItemID=synthetic"
 
+    async def test_it_reports_importance_flag_categories_draft_state_and_reply_to(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        hit = _message(_REST_ID) | {
+            "importance": "high",
+            "flag": {"flagStatus": "notFlagged"},
+            "categories": ["Invoices", "Red category"],
+            "isDraft": False,
+            "sender": {"emailAddress": {"name": "Sam Assistant", "address": "sam@vance.invalid"}},
+            "replyTo": [{"emailAddress": {"name": "Billing", "address": "billing@vance.invalid"}}],
+        }
+        searched.mock(return_value=httpx.Response(200, json={"value": [hit]}))
+        translated.mock(return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID})))
+
+        row = (await search_mail(client, SearchCriteria(query="invoice"), limit=25)).messages[0]
+
+        assert row.importance == "high"
+        assert row.flag == MailFlag(status="notFlagged", start=None, due=None, completed=None)
+        assert row.categories == ["Invoices", "Red category"]
+        assert row.is_draft is False
+        assert row.sent_by is not None
+        assert row.sent_by.address == "sam@vance.invalid"
+        assert [address.address for address in row.reply_to] == ["billing@vance.invalid"]
+
+    async def test_a_hit_with_none_of_those_fields_answers_null_and_empty(
+        self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
+    ) -> None:
+        searched.mock(return_value=httpx.Response(200, json={"value": [_message(_REST_ID)]}))
+        translated.mock(return_value=httpx.Response(200, json=_translation({_REST_ID: _STABLE_ID})))
+
+        row = (await search_mail(client, SearchCriteria(query="invoice"), limit=25)).messages[0]
+
+        assert row.importance is None
+        assert row.flag is None
+        assert row.categories == []
+        assert row.is_draft is None
+        assert row.sent_by is None
+        assert row.reply_to == []
+
     async def test_a_full_window_says_more_may_exist(
         self, client: GraphServiceClient, searched: respx.Route, translated: respx.Route
     ) -> None:
@@ -563,6 +886,58 @@ class TestWhatItRefuses:
         assert "`received_after`" in message
         assert "`received_before`" in message
         assert "earlier point in `received_after`" in message
+
+    @pytest.mark.parametrize(
+        ("importance", "flagged", "has_attachments", "category"),
+        [
+            ("high", None, None, None),
+            (None, True, None, None),
+            (None, None, True, None),
+            (None, None, None, "Invoices"),
+        ],
+    )
+    async def test_a_narrowing_argument_on_its_own_is_no_criterion(
+        self,
+        client: GraphServiceClient,
+        searched: respx.Route,
+        importance: MailImportance | None,
+        flagged: bool | None,
+        has_attachments: bool | None,
+        category: str | None,
+    ) -> None:
+        with pytest.raises(ToolError, match="at least one of"):
+            await search_mail(
+                client,
+                SearchCriteria(),
+                importance=importance,
+                flagged=flagged,
+                has_attachments=has_attachments,
+                category=category,
+                limit=25,
+            )
+
+        assert searched.call_count == 0
+
+    def test_the_narrowing_arguments_are_not_among_the_criteria(self) -> None:
+        assert not {"importance", "has_attachments", "flagged", "category"} & set(CRITERIA)
+
+    async def test_the_refusal_names_every_narrowing_argument_and_the_tool_for_a_folder_listing(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refusal:
+            await search_mail(client, SearchCriteria(), importance="high", limit=25)
+
+        message = str(refusal.value)
+        for narrowing in (
+            "received_after",
+            "received_before",
+            "importance",
+            "has_attachments",
+            "flagged",
+            "category",
+        ):
+            assert f"`{narrowing}`" in message, narrowing
+        assert "outlook_list_mail" in message
 
     @pytest.mark.parametrize("limit", [0, MAX_RESULTS + 1])
     async def test_a_window_outside_the_schema_is_an_assertion(
@@ -665,3 +1040,86 @@ class TestAttachmentContentIsNotSearchable:
         await search_mail(client, SearchCriteria(attachment_name="budget.pdf"), limit=25)
 
         assert searched.calls.last.request.url.params["$search"] == '"attachment:budget.pdf"'
+
+
+class TestWhatItTellsAModel:
+    async def test_the_description_keeps_its_lead_facts_and_names_the_listing_sibling(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _, tool = await _registered(transport)
+
+        description = tool.description or ""
+        assert "`mailbox`" in description
+        assert "keyword, sender, recipient, subject, or attachment file name" in description
+        assert "outlook_list_mail" in description
+
+    async def test_the_description_is_a_lead_and_a_few_notes_of_the_house_length(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _, tool = await _registered(transport)
+
+        description = tool.description or ""
+        lead, separator, notes = description.partition("\n\nNotes:\n")
+        assert separator, "the description has no Notes section"
+        assert lead.strip() != ""
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
+        assert 45 <= len(description.split()) <= 210
+
+    async def test_the_description_says_the_narrowing_arguments_are_not_criteria(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _, tool = await _registered(transport)
+
+        description = tool.description or ""
+        for narrowing in ("importance", "has_attachments", "flagged", "category"):
+            assert f"`{narrowing}`" in description, narrowing
+        assert "not criteria" in description
+
+    async def test_the_arguments_graph_applies_say_so_and_the_ones_the_tool_applies_say_fewer(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _ = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        assert (
+            "Graph applies this filter inside the search" in properties["importance"]["description"]
+        )
+        for name in ("flagged", "has_attachments", "category"):
+            described = properties[name]["description"]
+            assert "applies this filter to the page that Graph returns" in described
+            assert "fewer than `limit` messages" in described
+
+    async def test_flagged_says_that_a_message_with_no_flag_matches_neither_value(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _ = await _registered(transport)
+
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        described = properties["flagged"]["description"]
+        assert (
+            "A message for which Microsoft 365 reports no flag matches neither value." in described
+        )
+        assert 15 <= len(described.split()) <= 60
+
+    async def test_more_may_exist_says_when_it_is_computed(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _, tool = await _registered(transport)
+
+        assert tool.output_schema is not None
+        described = cast("str", tool.output_schema["properties"]["more_may_exist"]["description"])
+        assert "before it applies `flagged`, `has_attachments`, and `category`" in described
+
+    async def test_importance_admits_the_three_values_graph_reports_and_nothing_else(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _, tool = await _registered(transport)
+
+        assert tool.parameters["$defs"]["MailImportance"]["enum"] == ["low", "normal", "high"]
+
+    async def test_a_category_cannot_be_empty(self, transport: httpx.AsyncClient) -> None:
+        _, tool = await _registered(transport)
+
+        assert {"minLength": 1, "type": "string"} in tool.parameters["properties"]["category"][
+            "anyOf"
+        ]

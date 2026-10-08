@@ -8,7 +8,8 @@ read the serialized JSON rather than the object.
 import ast
 import json
 import uuid
-from datetime import UTC, date, datetime
+from dataclasses import fields
+from datetime import UTC, date, datetime, time
 from typing import cast
 from zoneinfo import ZoneInfo
 
@@ -20,34 +21,63 @@ from msgraph.generated.models.attendee import Attendee
 from msgraph.generated.models.attendee_type import AttendeeType
 from msgraph.generated.models.calendar import Calendar
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
+from msgraph.generated.models.day_of_week import DayOfWeek
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
 from msgraph.generated.models.event_type import EventType
 from msgraph.generated.models.free_busy_status import FreeBusyStatus
+from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.location import Location
 from msgraph.generated.models.online_meeting_info import OnlineMeetingInfo
 from msgraph.generated.models.online_meeting_provider_type import OnlineMeetingProviderType
+from msgraph.generated.models.patterned_recurrence import PatternedRecurrence
 from msgraph.generated.models.recipient import Recipient
+from msgraph.generated.models.recurrence_pattern import RecurrencePattern
+from msgraph.generated.models.recurrence_pattern_type import RecurrencePatternType
+from msgraph.generated.models.recurrence_range import RecurrenceRange
+from msgraph.generated.models.recurrence_range_type import RecurrenceRangeType
 from msgraph.generated.models.response_status import ResponseStatus
 from msgraph.generated.models.response_type import ResponseType
 from msgraph.generated.models.sensitivity import Sensitivity
+from msgraph.generated.models.time_zone_base import TimeZoneBase
 from msgraph.generated.models.user import User
+from msgraph.generated.models.week_index import WeekIndex
+from msgraph.generated.models.working_hours import WorkingHours
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel, ValidationError
 
 from office_365_mcp.shared.calendar import (
     CALENDAR_FIELDS,
+    EVENT_CATEGORIES_FIELD,
+    NOBODY_INVITED_BUT_A_PLACE,
+    NOBODY_INVITED_BUT_A_ROOM,
+    ROOM_ADDRESSES_FIELD,
+    SUMMARY_FIELDS,
     CalendarSummary,
     EventAttendee,
     EventDraft,
+    EventImportance,
+    EventPatch,
+    EventSensitivity,
     EventSummary,
+    RecurrencePatternSummary,
+    RecurrenceRangeSummary,
+    RecurrenceRule,
+    RecurrenceSummary,
+    ShowAs,
+    WorkingHoursSummary,
     calendar_of,
     created_event,
     draft_details,
     event_body,
+    event_of,
+    event_patch_body,
     event_time,
     is_midnight,
+    patch_changes,
     providers_without_teams,
-    repeated_address,
+    recurrence_refusal,
+    series_reach,
     transaction_id_for,
     wall_clock,
     window_bounds,
@@ -73,6 +103,12 @@ _SIGNED_IN = User(
     id="00000000-0000-4000-8000-000000000001", mail=_MINE, user_principal_name=_MY_UPN
 )
 
+_TEN_MONDAYS = RecurrenceRule(
+    pattern_type="weekly", days_of_week=("monday",), range_type="numbered", number_of_occurrences=10
+)
+
+_FIRST_DAY = date(2026, 3, 2)
+
 
 def _draft(
     *,
@@ -86,6 +122,17 @@ def _draft(
     location: str | None = None,
     all_day: bool = False,
     online_meeting: bool = False,
+    room_addresses: tuple[str, ...] = (),
+    categories: tuple[str, ...] = (),
+    show_as: ShowAs | None = None,
+    importance: EventImportance | None = None,
+    sensitivity: EventSensitivity | None = None,
+    is_reminder_on: bool | None = None,
+    reminder_minutes_before_start: int | None = None,
+    hide_attendees: bool | None = None,
+    response_requested: bool | None = None,
+    allow_new_time_proposals: bool | None = None,
+    recurrence: RecurrenceRule | None = None,
 ) -> EventDraft:
     return EventDraft(
         subject=subject,
@@ -98,6 +145,17 @@ def _draft(
         location=location,
         all_day=all_day,
         online_meeting=online_meeting,
+        room_addresses=room_addresses,
+        categories=categories,
+        show_as=show_as,
+        importance=importance,
+        sensitivity=sensitivity,
+        is_reminder_on=is_reminder_on,
+        reminder_minutes_before_start=reminder_minutes_before_start,
+        hide_attendees=hide_attendees,
+        response_requested=response_requested,
+        allow_new_time_proposals=allow_new_time_proposals,
+        recurrence=recurrence,
     )
 
 
@@ -411,8 +469,6 @@ class TestOneCalendarRow:
         assert row.default_online_meeting_provider == "teamsForBusiness"
 
     def test_a_provider_this_sdk_cannot_name_is_left_out_of_the_row(self) -> None:
-        """kiota puts None in the list for a provider it has no member for, and `spelled` raises
-        on None, so the row reports the providers it can name and drops the rest."""
         calendar = Calendar(
             id=_CALENDAR_ID,
             allowed_online_meeting_providers=cast(
@@ -534,6 +590,66 @@ class TestOneEventRow:
 
         assert not EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC).in_series
 
+    def test_one_date_of_a_recurring_series_names_the_handle_of_its_series_master(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.Occurrence, series_master_id="AAMkSYNTHETIC-m1=")
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert row.series_master_uri == EventHandle(_CALENDAR_ID, "AAMkSYNTHETIC-m1=").uri
+
+    def test_a_single_meeting_names_no_series_master(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.SingleInstance)
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert row.series_master_uri is None
+
+    def test_a_series_master_belongs_to_its_own_series_and_names_no_master_handle(self) -> None:
+        event = Event(id=_EVENT_ID, type=EventType.SeriesMaster, series_master_id=None)
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.kind, row.in_series, row.series_master_uri) == ("seriesMaster", True, None)
+
+    def test_the_kind_names_all_four_values_that_graph_documents(self) -> None:
+        description = EventSummary.model_fields["kind"].description or ""
+
+        for value in ("`singleInstance`", "`occurrence`", "`exception`", "`seriesMaster`"):
+            assert value in description
+
+    def test_the_series_master_uri_is_null_on_the_master_itself(self) -> None:
+        description = EventSummary.model_fields["series_master_uri"].description or ""
+
+        assert "series master itself" in description
+
+    def test_it_reports_the_categories_and_the_importance_in_microsofts_spelling(self) -> None:
+        event = Event(
+            id=_EVENT_ID, categories=["Budget", "Blue category"], importance=Importance.High
+        )
+
+        row = EventSummary.from_event(event, calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.categories, row.importance) == (["Budget", "Blue category"], "high")
+
+    def test_no_category_and_no_importance_are_an_empty_list_and_null(self) -> None:
+        row = EventSummary.from_event(Event(id=_EVENT_ID), calendar_id=_CALENDAR_ID, zone=_UTC)
+
+        assert (row.categories, row.importance) == ([], None)
+
+    def test_the_categories_of_a_row_name_no_argument_because_a_read_has_none(self) -> None:
+        description = EventSummary.model_fields["categories"].description
+
+        assert description == EVENT_CATEGORIES_FIELD
+        assert "argument" not in EVENT_CATEGORIES_FIELD
+
+    @pytest.mark.parametrize(
+        "name", ["kind", "in_series", "series_master_uri", "categories", "importance"]
+    )
+    def test_the_series_and_tag_fields_say_what_they_are_in_15_to_60_words(self, name: str) -> None:
+        description = EventSummary.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
     def test_the_join_link_comes_from_the_online_meeting_and_not_the_older_property(
         self,
     ) -> None:
@@ -648,6 +764,263 @@ class TestOneAttendee:
         assert EventAttendee.each_of(None) == []
 
 
+class TestOneWorkingHoursRow:
+    def test_it_reports_the_days_the_times_and_the_zone_as_graph_holds_them(self) -> None:
+        hours = WorkingHours(
+            days_of_week=[DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Friday],
+            start_time=time(8, 0),
+            end_time=time(17, 30),
+            time_zone=TimeZoneBase(name=_WINDOWS_ZONE),
+        )
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.days == ["monday", "tuesday", "friday"]
+        assert summary.starts_at == "08:00:00"
+        assert summary.ends_at == "17:30:00"
+        assert summary.time_zone == _WINDOWS_ZONE
+
+    def test_the_zone_is_reported_by_name_and_never_resolved(self) -> None:
+        hours = WorkingHours(time_zone=TimeZoneBase(name="Customized Time Zone"))
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.time_zone == "Customized Time Zone"
+
+    def test_no_working_hours_is_no_summary(self) -> None:
+        assert WorkingHoursSummary.from_working_hours(None) is None
+
+    def test_a_working_hours_object_with_nothing_in_it_is_no_days_and_all_nulls(self) -> None:
+        summary = WorkingHoursSummary.from_working_hours(WorkingHours())
+
+        assert summary is not None
+        assert summary.days == []
+        assert (summary.starts_at, summary.ends_at, summary.time_zone) == (None, None, None)
+
+    def test_a_zone_with_no_name_is_a_null_zone(self) -> None:
+        summary = WorkingHoursSummary.from_working_hours(
+            WorkingHours(time_zone=TimeZoneBase(), start_time=time(9, 0))
+        )
+
+        assert summary is not None
+        assert summary.time_zone is None
+        assert summary.starts_at == "09:00:00"
+
+    def test_a_day_this_sdk_cannot_name_is_left_out_of_the_row(self) -> None:
+        hours = WorkingHours(days_of_week=cast("list[DayOfWeek]", [None, DayOfWeek.Saturday]))
+
+        summary = WorkingHoursSummary.from_working_hours(hours)
+
+        assert summary is not None
+        assert summary.days == ["saturday"]
+
+    @pytest.mark.parametrize("name", list(WorkingHoursSummary.model_fields))
+    def test_every_field_says_what_it_is_in_15_to_60_words(self, name: str) -> None:
+        description = WorkingHoursSummary.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+
+class TestTheListingProjection:
+    def test_it_never_names_a_recurrence_rule(self) -> None:
+        assert "recurrence" not in SUMMARY_FIELDS
+
+    def test_it_names_the_categories_the_importance_and_the_series_master(self) -> None:
+        assert {"categories", "importance", "seriesMasterId"} <= set(SUMMARY_FIELDS)
+
+
+_EVENT_PATH = "/me/calendars/AAMkSYNTHETIC-cal-0001%3D/events/AAMkAGI2SYNTHETIC-immutable-0001%3D"
+
+
+class TestOneEventRead:
+    async def test_it_selects_the_listing_fields_and_no_more_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(return_value=httpx.Response(200, json={"id": _EVENT_ID}))
+
+        _ = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID)
+
+        assert read.calls.last.request.url.params["$select"].split(",") == list(SUMMARY_FIELDS)
+
+    async def test_it_selects_the_extra_fields_a_caller_asks_for_after_the_listing_fields(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(
+            return_value=httpx.Response(200, json={"id": _EVENT_ID, "allowNewTimeProposals": False})
+        )
+
+        event = await event_of(
+            client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID, also=("allowNewTimeProposals",)
+        )
+
+        selected = read.calls.last.request.url.params["$select"].split(",")
+        assert selected == [*SUMMARY_FIELDS, "allowNewTimeProposals"]
+        assert event.allow_new_time_proposals is False
+
+    async def test_it_prefers_no_body_format_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(return_value=httpx.Response(200, json={"id": _EVENT_ID}))
+
+        _ = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID)
+
+        assert read.calls.last.request.headers["prefer"] == 'IdType="ImmutableId"'
+
+    async def test_an_html_body_read_selects_the_body_and_prefers_html(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        read = graph.get(_EVENT_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": _EVENT_ID, "body": {"contentType": "html", "content": "<p>Hi</p>"}},
+            )
+        )
+
+        event = await event_of(client, calendar_id=_CALENDAR_ID, event_id=_EVENT_ID, html_body=True)
+
+        request = read.calls.last.request
+        assert request.url.params["$select"].split(",") == [*SUMMARY_FIELDS, "body"]
+        assert 'outlook.body-content-type="html"' in request.headers["prefer"]
+        assert 'IdType="ImmutableId"' in request.headers["prefer"]
+        assert event.body is not None and event.body.content == "<p>Hi</p>"
+
+
+class TestOneRecurrenceRule:
+    def test_a_weekly_rule_until_a_date_reports_its_days_and_both_dates(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.Weekly,
+                interval=2,
+                days_of_week=[DayOfWeek.Monday, DayOfWeek.Thursday],
+                first_day_of_week=DayOfWeek.Monday,
+            ),
+            range=RecurrenceRange(
+                type=RecurrenceRangeType.EndDate,
+                start_date=date(2026, 3, 2),
+                end_date=date(2026, 6, 29),
+                recurrence_time_zone=_WINDOWS_ZONE,
+            ),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule == RecurrenceSummary(
+            pattern=RecurrencePatternSummary(
+                kind="weekly",
+                interval=2,
+                days_of_week=["monday", "thursday"],
+                day_of_month=None,
+                month=None,
+                index=None,
+                first_day_of_week="monday",
+            ),
+            range=RecurrenceRangeSummary(
+                kind="endDate",
+                start_date="2026-03-02",
+                end_date="2026-06-29",
+                number_of_occurrences=None,
+                recurrence_time_zone=_WINDOWS_ZONE,
+            ),
+        )
+
+    def test_a_relative_yearly_rule_of_a_set_count_reports_its_position_and_month(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.RelativeYearly,
+                interval=1,
+                days_of_week=[DayOfWeek.Wednesday],
+                index=WeekIndex.Last,
+                month=11,
+            ),
+            range=RecurrenceRange(
+                type=RecurrenceRangeType.Numbered,
+                start_date=date(2026, 11, 25),
+                number_of_occurrences=10,
+            ),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert (rule.pattern.kind, rule.pattern.index, rule.pattern.month) == (
+            "relativeYearly",
+            "last",
+            11,
+        )
+        assert (rule.range.kind, rule.range.number_of_occurrences, rule.range.end_date) == (
+            "numbered",
+            10,
+            None,
+        )
+
+    def test_an_absolute_monthly_rule_with_no_end_reports_its_day_of_the_month(self) -> None:
+        recurrence = PatternedRecurrence(
+            pattern=RecurrencePattern(
+                type=RecurrencePatternType.AbsoluteMonthly, interval=3, day_of_month=15
+            ),
+            range=RecurrenceRange(type=RecurrenceRangeType.NoEnd, start_date=date(2026, 3, 15)),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(recurrence)
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert (rule.pattern.kind, rule.pattern.interval, rule.pattern.day_of_month) == (
+            "absoluteMonthly",
+            3,
+            15,
+        )
+        assert rule.pattern.days_of_week == []
+        assert (rule.range.kind, rule.range.start_date) == ("noEnd", "2026-03-15")
+
+    def test_no_recurrence_is_no_rule(self) -> None:
+        assert RecurrenceSummary.from_recurrence(None) is None
+
+    def test_a_rule_with_neither_part_reports_both_as_null(self) -> None:
+        rule = RecurrenceSummary.from_recurrence(PatternedRecurrence())
+
+        assert rule == RecurrenceSummary(pattern=None, range=None)
+
+    def test_parts_graph_said_nothing_about_are_null_and_no_day(self) -> None:
+        rule = RecurrenceSummary.from_recurrence(
+            PatternedRecurrence(pattern=RecurrencePattern(), range=RecurrenceRange())
+        )
+
+        assert rule is not None and rule.pattern is not None and rule.range is not None
+        assert rule.pattern.days_of_week == []
+        assert rule.pattern.model_dump(exclude={"days_of_week"}) == dict.fromkeys(
+            set(RecurrencePatternSummary.model_fields) - {"days_of_week"}
+        )
+        assert rule.range.model_dump() == dict.fromkeys(RecurrenceRangeSummary.model_fields)
+
+    def test_a_day_this_sdk_cannot_name_is_left_out_of_the_rule(self) -> None:
+        pattern = RecurrencePattern(
+            type=RecurrencePatternType.Weekly,
+            days_of_week=cast("list[DayOfWeek]", [None, DayOfWeek.Friday]),
+        )
+
+        rule = RecurrenceSummary.from_recurrence(PatternedRecurrence(pattern=pattern))
+
+        assert rule is not None and rule.pattern is not None
+        assert rule.pattern.days_of_week == ["friday"]
+
+    @pytest.mark.parametrize(
+        ("model", "name"),
+        [
+            (model, name)
+            for model in (RecurrenceSummary, RecurrencePatternSummary, RecurrenceRangeSummary)
+            for name in model.model_fields
+        ],
+    )
+    def test_every_field_says_what_it_is_in_15_to_60_words(
+        self, model: type[BaseModel], name: str
+    ) -> None:
+        description = model.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+
 class TestTheCreateBody:
     def test_it_omits_everything_the_draft_did_not_name(self) -> None:
         """An absent key is Microsoft being told nothing. `attendees: []` would be Microsoft being
@@ -658,17 +1031,34 @@ class TestTheCreateBody:
         assert "location" not in body
         assert "attendees" not in body
 
+    def test_it_never_names_an_attachment_because_no_tool_here_offers_one(self) -> None:
+        draft = _draft(
+            attendees=(_SOMEBODY_ELSE,),
+            body_html="<p>Agenda attached.</p>",
+            location="Zurich HQ",
+            online_meeting=True,
+        )
+
+        body = _payload(event_body(draft, transaction_id="synthetic-transaction"))
+
+        assert "attachments" not in body
+
     @pytest.mark.parametrize(
         "property_name",
         [
+            "showAs",
+            "categories",
+            "importance",
+            "sensitivity",
+            "isReminderOn",
+            "reminderMinutesBeforeStart",
             "hideAttendees",
-            "recurrence",
             "responseRequested",
             "allowNewTimeProposals",
-            "attachments",
+            "recurrence",
         ],
     )
-    def test_it_never_names_a_property_no_tool_here_offers(self, property_name: str) -> None:
+    def test_it_never_names_an_option_the_draft_left_unset(self, property_name: str) -> None:
         draft = _draft(
             attendees=(_SOMEBODY_ELSE,),
             body_html="<p>Agenda attached.</p>",
@@ -679,6 +1069,62 @@ class TestTheCreateBody:
         body = _payload(event_body(draft, transaction_id="synthetic-transaction"))
 
         assert property_name not in body
+
+    @pytest.mark.parametrize(
+        ("draft", "property_name", "value"),
+        [
+            (_draft(show_as="free"), "showAs", "free"),
+            (_draft(show_as="oof"), "showAs", "oof"),
+            (
+                _draft(categories=("Budget", "Blue category")),
+                "categories",
+                ["Budget", "Blue category"],
+            ),
+            (_draft(importance="low"), "importance", "low"),
+            (_draft(sensitivity="confidential"), "sensitivity", "confidential"),
+            (_draft(is_reminder_on=True), "isReminderOn", True),
+            (_draft(reminder_minutes_before_start=45), "reminderMinutesBeforeStart", 45),
+            (_draft(hide_attendees=False), "hideAttendees", False),
+            (_draft(response_requested=True), "responseRequested", True),
+            (_draft(allow_new_time_proposals=True), "allowNewTimeProposals", True),
+        ],
+        ids=[
+            "free",
+            "out-of-office",
+            "categories",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-minutes",
+            "hide-attendees-false",
+            "response-requested",
+            "new-time-proposals",
+        ],
+    )
+    def test_each_option_the_draft_sets_is_sent_in_microsofts_spelling(
+        self, draft: EventDraft, property_name: str, value: object
+    ) -> None:
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert body[property_name] == value
+
+    def test_each_room_is_a_resource_attendee_after_the_people(self) -> None:
+        draft = _draft(attendees=(_SOMEBODY_ELSE,), room_addresses=("room-3@example.invalid",))
+
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert body["attendees"] == [
+            {
+                "emailAddress": {"address": _SOMEBODY_ELSE},
+                "@odata.type": "#microsoft.graph.attendee",
+                "type": "required",
+            },
+            {
+                "emailAddress": {"address": "room-3@example.invalid"},
+                "@odata.type": "#microsoft.graph.attendee",
+                "type": "resource",
+            },
+        ]
 
     def test_the_subject_the_bounds_and_the_transaction_id_are_always_sent(self) -> None:
         body = _payload(event_body(_draft(), transaction_id="synthetic-transaction"))
@@ -747,6 +1193,193 @@ class TestTheCreateBody:
         assert body["isAllDay"] is True
 
 
+class TestThePatchBody:
+    def test_an_empty_patch_names_nothing(self) -> None:
+        assert _payload(event_patch_body(EventPatch())) == {"@odata.type": "#microsoft.graph.event"}
+
+    @pytest.mark.parametrize(
+        ("patch", "property_name", "value"),
+        [
+            (EventPatch(show_as="tentative"), "showAs", "tentative"),
+            (EventPatch(show_as="workingElsewhere"), "showAs", "workingElsewhere"),
+            (
+                EventPatch(categories=("Budget", "Blue category")),
+                "categories",
+                ["Budget", "Blue category"],
+            ),
+            (EventPatch(categories=()), "categories", []),
+            (EventPatch(importance="high"), "importance", "high"),
+            (EventPatch(sensitivity="personal"), "sensitivity", "personal"),
+            (EventPatch(is_reminder_on=False), "isReminderOn", False),
+            (EventPatch(reminder_minutes_before_start=0), "reminderMinutesBeforeStart", 0),
+            (EventPatch(hide_attendees=True), "hideAttendees", True),
+            (EventPatch(response_requested=False), "responseRequested", False),
+            (
+                EventPatch(body_html="<p>A &amp; B</p>"),
+                "body",
+                {"content": "<p>A &amp; B</p>", "contentType": "html"},
+            ),
+        ],
+        ids=[
+            "show-as",
+            "working-elsewhere",
+            "categories",
+            "no-categories",
+            "importance",
+            "sensitivity",
+            "reminder-off",
+            "reminder-minutes",
+            "hide-attendees",
+            "no-response",
+            "body",
+        ],
+    )
+    def test_each_option_is_the_only_property_sent_in_microsofts_spelling(
+        self, patch: EventPatch, property_name: str, value: object
+    ) -> None:
+        assert _payload(event_patch_body(patch)) == {
+            property_name: value,
+            "@odata.type": "#microsoft.graph.event",
+        }
+
+    def test_an_online_meeting_is_sent_as_a_teams_meeting(self) -> None:
+        assert _payload(event_patch_body(EventPatch(online_meeting=True))) == {
+            "isOnlineMeeting": True,
+            "onlineMeetingProvider": "teamsForBusiness",
+            "@odata.type": "#microsoft.graph.event",
+        }
+
+    def test_a_patch_has_no_new_time_proposals_option(self) -> None:
+        assert "allow_new_time_proposals" not in {field.name for field in fields(EventPatch)}
+
+
+class TestWhatAPatchSays:
+    @pytest.mark.parametrize(
+        ("patch", "said"),
+        [
+            (EventPatch(subject="Renamed"), "change the subject to 'Renamed'"),
+            (
+                EventPatch(
+                    starts_at="2026-03-02T16:00", ends_at="2026-03-02T17:00", time_zone="UTC"
+                ),
+                "change the time to 2026-03-02T16:00 – 2026-03-02T17:00 UTC",
+            ),
+            (EventPatch(location="Room 9"), "change the location to 'Room 9'"),
+            (EventPatch(attendees=(), optional_attendees=()), "change the attendee list to nobody"),
+            (
+                EventPatch(attendees=(_MINE,), optional_attendees=(_SOMEBODY_ELSE,)),
+                f"change the attendee list to 2 people: {_MINE}, {_SOMEBODY_ELSE} (optional)",
+            ),
+            (EventPatch(show_as="free"), "show it as free"),
+            (EventPatch(show_as="oof"), "show it as out of office"),
+            (
+                EventPatch(categories=("Budget", "Blue category")),
+                "set the categories to 'Budget, Blue category'",
+            ),
+            (EventPatch(categories=()), "remove every category"),
+            (EventPatch(importance="low"), "set the importance to low"),
+            (EventPatch(sensitivity="confidential"), "set the sensitivity to confidential"),
+            (EventPatch(is_reminder_on=True), "set a reminder"),
+            (EventPatch(is_reminder_on=False), "remove the reminder"),
+            (
+                EventPatch(reminder_minutes_before_start=1),
+                "set the reminder time to 1 minute before the start",
+            ),
+            (
+                EventPatch(reminder_minutes_before_start=0),
+                "set the reminder time to 0 minutes before the start",
+            ),
+            (EventPatch(hide_attendees=True), "hide the attendee list"),
+            (EventPatch(hide_attendees=False), "show the attendee list to every attendee"),
+            (EventPatch(response_requested=True), "ask the attendees for a response"),
+            (EventPatch(response_requested=False), "ask the attendees for no response"),
+            (
+                EventPatch(body_html="<p>Agenda: pricing</p>"),
+                "replace the body with a body of 22 characters that starts 'Agenda: pricing'",
+            ),
+            (
+                EventPatch(online_meeting=True),
+                "add a Teams meeting that this connector cannot remove later",
+            ),
+        ],
+        ids=[
+            "subject",
+            "time",
+            "location",
+            "nobody",
+            "attendees",
+            "free",
+            "out-of-office",
+            "categories",
+            "no-categories",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-off",
+            "one-minute",
+            "zero-minutes",
+            "hide-attendees",
+            "show-attendees",
+            "response",
+            "no-response",
+            "body",
+            "online-meeting",
+        ],
+    )
+    def test_each_change_on_its_own_is_named(self, patch: EventPatch, said: str) -> None:
+        assert patch_changes(patch) == [said]
+
+    def test_an_empty_patch_names_no_change(self) -> None:
+        assert patch_changes(EventPatch()) == []
+
+    def test_every_change_is_named_in_this_order_with_the_attendee_list_last(self) -> None:
+        patch = EventPatch(
+            subject="Renamed",
+            starts_at="2026-03-02T16:00",
+            ends_at="2026-03-02T17:00",
+            time_zone="UTC",
+            location="Room 9",
+            attendees=(_MINE,),
+            optional_attendees=(),
+            show_as="busy",
+            categories=("Budget",),
+            importance="high",
+            sensitivity="private",
+            is_reminder_on=True,
+            reminder_minutes_before_start=10,
+            hide_attendees=True,
+            response_requested=False,
+            body_html="<p>Agenda</p>",
+            online_meeting=True,
+        )
+
+        assert patch_changes(patch) == [
+            "change the subject to 'Renamed'",
+            "change the time to 2026-03-02T16:00 – 2026-03-02T17:00 UTC",
+            "change the location to 'Room 9'",
+            "show it as busy",
+            "set the categories to 'Budget'",
+            "set the importance to high",
+            "set the sensitivity to private",
+            "set a reminder",
+            "set the reminder time to 10 minutes before the start",
+            "hide the attendee list",
+            "ask the attendees for no response",
+            "replace the body with a body of 13 characters that starts 'Agenda'",
+            "add a Teams meeting that this connector cannot remove later",
+            f"change the attendee list to 1 person: {_MINE}",
+        ]
+
+    def test_a_long_category_list_is_cut_and_says_so(self) -> None:
+        categories = tuple(f"Category {index}" for index in range(30))
+
+        [said] = patch_changes(EventPatch(categories=categories))
+
+        shown = cast("str", ast.literal_eval(said.removeprefix("set the categories to ")))
+        assert len(shown) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert shown.endswith("…")
+
+
 class TestWhatADraftSaysBeyondItsFirstClause:
     def test_one_whole_day_is_named_as_the_day_it_covers(self) -> None:
         details = draft_details(
@@ -800,6 +1433,113 @@ class TestWhatADraftSaysBeyondItsFirstClause:
 
     def test_a_draft_that_names_none_of_the_four_says_nothing_at_all(self) -> None:
         assert draft_details(_draft(attendees=(_SOMEBODY_ELSE,))) == ""
+
+    @pytest.mark.parametrize(
+        ("draft", "said"),
+        [
+            (
+                _draft(room_addresses=("room-3@example.invalid",)),
+                "booking the room room-3@example.invalid",
+            ),
+            (
+                _draft(room_addresses=("room-3@example.invalid", "room-4@example.invalid")),
+                "booking the rooms room-3@example.invalid, room-4@example.invalid",
+            ),
+            (_draft(show_as="free"), "shown as free"),
+            (_draft(show_as="tentative"), "shown as tentative"),
+            (_draft(show_as="busy"), "shown as busy"),
+            (_draft(show_as="oof"), "shown as out of office"),
+            (_draft(show_as="workingElsewhere"), "shown as working elsewhere"),
+            (_draft(importance="normal"), "with normal importance"),
+            (_draft(sensitivity="confidential"), "marked as confidential"),
+            (_draft(categories=("Budget", "Blue category")), "tagged 'Budget, Blue category'"),
+            (_draft(is_reminder_on=True), "with a reminder"),
+            (_draft(is_reminder_on=False), "with no reminder"),
+            (
+                _draft(reminder_minutes_before_start=15),
+                "with a reminder 15 minutes before the start",
+            ),
+            (
+                _draft(is_reminder_on=True, reminder_minutes_before_start=1),
+                "with a reminder 1 minute before the start",
+            ),
+            (
+                _draft(is_reminder_on=False, reminder_minutes_before_start=15),
+                "with no reminder, and a reminder time of 15 minutes before the start",
+            ),
+            (_draft(hide_attendees=True), "with the attendee list hidden"),
+            (_draft(hide_attendees=False), "with the attendee list visible to every attendee"),
+            (_draft(response_requested=True), "with a response requested"),
+            (_draft(response_requested=False), "with no response requested"),
+            (_draft(allow_new_time_proposals=True), "with new time proposals allowed"),
+            (_draft(allow_new_time_proposals=False), "with no new time proposals allowed"),
+        ],
+        ids=[
+            "one-room",
+            "two-rooms",
+            "free",
+            "tentative",
+            "busy",
+            "out-of-office",
+            "working-elsewhere",
+            "importance",
+            "sensitivity",
+            "categories",
+            "reminder-on",
+            "reminder-off",
+            "reminder-minutes",
+            "one-minute",
+            "reminder-off-with-minutes",
+            "attendees-hidden",
+            "attendees-visible",
+            "response-requested",
+            "no-response",
+            "proposals-allowed",
+            "no-proposals",
+        ],
+    )
+    def test_each_option_on_its_own_is_named(self, draft: EventDraft, said: str) -> None:
+        assert draft_details(draft) == said
+
+    def test_the_options_sit_between_the_place_and_the_body_in_this_order(self) -> None:
+        details = draft_details(
+            _draft(
+                location="Room 3",
+                room_addresses=("room-3@example.invalid",),
+                online_meeting=True,
+                show_as="busy",
+                importance="high",
+                sensitivity="private",
+                categories=("Budget",),
+                reminder_minutes_before_start=10,
+                hide_attendees=True,
+                response_requested=False,
+                allow_new_time_proposals=False,
+                body_html="<p>Agenda</p>",
+            )
+        )
+
+        assert details == (
+            "at 'Room 3', booking the room room-3@example.invalid, as a Teams meeting, "
+            + "shown as busy, with high importance, marked as private, tagged 'Budget', "
+            + "with a reminder 10 minutes before the start, with the attendee list hidden, "
+            + "with no response requested, with no new time proposals allowed, "
+            + "with a body of 13 characters that starts 'Agenda'"
+        )
+
+    def test_a_category_that_writes_a_question_of_its_own_arrives_as_one_token(self) -> None:
+        category = "Budget? Microsoft mails nobody"
+
+        assert draft_details(_draft(categories=(category,))) == f"tagged {category!r}"
+
+    def test_a_long_category_list_is_cut_and_says_so(self) -> None:
+        categories = tuple(f"Category {index}" for index in range(30))
+
+        details = draft_details(_draft(categories=categories))
+
+        shown = cast("str", ast.literal_eval(details.removeprefix("tagged ")))
+        assert len(shown) == 121, "the cut is 120 characters plus the mark that says it was cut"
+        assert shown.endswith("…")
 
     def test_a_body_of_nothing_but_tags_is_reported_by_its_length_alone(self) -> None:
         assert draft_details(_draft(body_html="<p><br></p>")) == "with a body of 11 characters"
@@ -899,6 +1639,17 @@ class TestWhatADraftSaysBeyondItsFirstClause:
         assert _preview_of(details) == "one two"
 
 
+class TestWhatAQuestionWithNobodyInvitedPromises:
+    def test_a_room_is_promised_the_request_and_a_place_only_the_chance(self) -> None:
+        assert "sends the meeting request to the mailbox of each room" in NOBODY_INVITED_BUT_A_ROOM
+        assert "can send" not in NOBODY_INVITED_BUT_A_ROOM
+        assert "can send the meeting request" in NOBODY_INVITED_BUT_A_PLACE
+
+    def test_the_question_for_rooms_and_the_field_that_adds_them_say_the_same_thing(self) -> None:
+        assert "the mailbox of each room gets the meeting request" in ROOM_ADDRESSES_FIELD
+        assert "the mailbox of each room" in NOBODY_INVITED_BUT_A_ROOM
+
+
 class TestTheTransactionId:
     def test_the_same_draft_to_the_same_calendar_composes_the_same_id(self) -> None:
         """Microsoft documents `transactionId` as the way a client keeps a retry from creating a
@@ -928,6 +1679,16 @@ class TestTheTransactionId:
             _draft(location="Zurich HQ, room 4"),
             _draft(body_html="<p>Agenda attached.</p>"),
             _draft(online_meeting=True),
+            _draft(room_addresses=("room-3@example.invalid",)),
+            _draft(categories=("Budget",)),
+            _draft(show_as="busy"),
+            _draft(importance="normal"),
+            _draft(sensitivity="normal"),
+            _draft(is_reminder_on=True),
+            _draft(reminder_minutes_before_start=15),
+            _draft(hide_attendees=False),
+            _draft(response_requested=True),
+            _draft(allow_new_time_proposals=True),
         ],
         ids=[
             "subject",
@@ -940,6 +1701,16 @@ class TestTheTransactionId:
             "location",
             "body",
             "online-meeting",
+            "room",
+            "category",
+            "show-as",
+            "importance",
+            "sensitivity",
+            "reminder-on",
+            "reminder-minutes",
+            "hide-attendees",
+            "response-requested",
+            "new-time-proposals",
         ],
     )
     def test_a_different_request_composes_a_different_id(self, other: EventDraft) -> None:
@@ -984,10 +1755,657 @@ class TestTheTransactionId:
     def test_the_same_draft_on_another_calendar_composes_another_id(self) -> None:
         assert transaction_id_for("me", _draft()) != transaction_id_for(_CALENDAR_ID, _draft())
 
+    def test_a_draft_that_sets_no_option_keeps_the_id_it_composed_before_the_options(self) -> None:
+        draft = _draft(attendees=(_SOMEBODY_ELSE,), location="Zurich HQ")
+
+        assert transaction_id_for("me", draft) == "8a963a07-4075-51b1-b5e9-2ba7a29e0d43"
+
+    def test_reordering_the_rooms_or_the_categories_composes_the_same_id(self) -> None:
+        one = _draft(room_addresses=("room-3@example.invalid", "room-4@example.invalid"))
+        other = _draft(room_addresses=("room-4@example.invalid", "room-3@example.invalid"))
+        tagged = _draft(categories=("Budget", "Blue category"))
+        retagged = _draft(categories=("Blue category", "Budget"))
+
+        assert transaction_id_for("me", one) == transaction_id_for("me", other)
+        assert transaction_id_for("me", tagged) == transaction_id_for("me", retagged)
+
+    def test_moving_a_room_into_the_attendee_list_composes_another_id(self) -> None:
+        booked = _draft(room_addresses=("room-3@example.invalid",))
+        invited = _draft(attendees=("room-3@example.invalid",))
+
+        assert transaction_id_for("me", booked) != transaction_id_for("me", invited)
+
+    def test_a_reminder_switched_off_and_one_left_unset_are_two_ids(self) -> None:
+        off = _draft(is_reminder_on=False)
+
+        assert transaction_id_for("me", off) != transaction_id_for("me", _draft())
+
     def test_it_is_a_uuid_string_because_that_is_what_goes_on_the_wire(self) -> None:
         composed = transaction_id_for("me", _draft())
 
         assert str(uuid.UUID(composed)) == composed
+
+    def test_a_rule_composes_another_id_than_the_same_event_with_none(self) -> None:
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) != transaction_id_for(
+            "me", _draft()
+        )
+
+    def test_the_same_rule_twice_composes_the_same_id(self) -> None:
+        again = RecurrenceRule(
+            pattern_type="weekly",
+            days_of_week=("monday",),
+            range_type="numbered",
+            number_of_occurrences=10,
+        )
+
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) == transaction_id_for(
+            "me", _draft(recurrence=again)
+        )
+
+    def test_the_same_days_in_another_order_compose_the_same_id(self) -> None:
+        one = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("monday", "friday"), range_type="noEnd"
+        )
+        other = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("friday", "monday"), range_type="noEnd"
+        )
+
+        assert transaction_id_for("me", _draft(recurrence=one)) == transaction_id_for(
+            "me", _draft(recurrence=other)
+        )
+
+    @pytest.mark.parametrize(
+        "other",
+        [
+            RecurrenceRule(
+                pattern_type="weekly",
+                interval=2,
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday", "tuesday"),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                first_day_of_week="monday",
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=11,
+            ),
+            RecurrenceRule(pattern_type="weekly", days_of_week=("monday",), range_type="noEnd"),
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                range_type="endDate",
+                end_date=date(2026, 6, 30),
+            ),
+            RecurrenceRule(
+                pattern_type="relativeMonthly",
+                days_of_week=("monday",),
+                range_type="numbered",
+                number_of_occurrences=10,
+            ),
+        ],
+        ids=["interval", "days", "first-day", "count", "no-end", "end-date", "pattern"],
+    )
+    def test_each_part_of_the_rule_is_in_the_id(self, other: RecurrenceRule) -> None:
+        assert transaction_id_for("me", _draft(recurrence=_TEN_MONDAYS)) != transaction_id_for(
+            "me", _draft(recurrence=other)
+        )
+
+
+class TestTheRuleItTakes:
+    def test_the_days_come_back_in_week_order_and_once_each(self) -> None:
+        rule = RecurrenceRule(
+            pattern_type="weekly", days_of_week=("friday", "monday", "friday"), range_type="noEnd"
+        )
+
+        assert rule.days_of_week == ("monday", "friday")
+
+    def test_the_interval_is_one_when_the_call_names_none(self) -> None:
+        assert RecurrenceRule(pattern_type="daily", range_type="noEnd").interval == 1
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"interval": 0},
+            {"day_of_month": 0},
+            {"day_of_month": 32},
+            {"month": 0},
+            {"month": 13},
+            {"number_of_occurrences": 0},
+            {"pattern_type": "monthly"},
+            {"range_type": "forever"},
+            {"days_of_week": ["Mon"]},
+            {"index": "fifth"},
+        ],
+        ids=[
+            "interval",
+            "day-0",
+            "day-32",
+            "month-0",
+            "month-13",
+            "count",
+            "pattern",
+            "range",
+            "day-name",
+            "index",
+        ],
+    )
+    def test_a_value_outside_its_vocabulary_or_bounds_never_becomes_a_rule(
+        self, fields: dict[str, object]
+    ) -> None:
+        with pytest.raises(ValidationError):
+            _ = RecurrenceRule.model_validate(
+                {"pattern_type": "daily", "range_type": "noEnd", **fields}
+            )
+
+    @pytest.mark.parametrize("key", ["week_index", "firstDayOfWeek"])
+    def test_a_key_the_rule_does_not_name_never_becomes_a_rule(self, key: str) -> None:
+        with pytest.raises(ValidationError) as raised:
+            _ = RecurrenceRule.model_validate(
+                {"pattern_type": "weekly", "range_type": "noEnd", key: "monday"}
+            )
+
+        assert [(error["type"], error["loc"]) for error in raised.value.errors()] == [
+            ("extra_forbidden", (key,))
+        ]
+
+    def test_a_rule_cannot_change_once_it_is_made(self) -> None:
+        with pytest.raises(ValidationError):
+            _TEN_MONDAYS.interval = 2
+
+    def test_the_type_of_the_pattern_and_of_the_range_are_the_two_it_requires(self) -> None:
+        assert RecurrenceRule.model_json_schema()["required"] == ["pattern_type", "range_type"]
+
+    @pytest.mark.parametrize("name", list(RecurrenceRule.model_fields))
+    def test_every_field_says_what_it_is_in_15_to_60_words(self, name: str) -> None:
+        description = RecurrenceRule.model_fields[name].description or ""
+
+        assert 15 <= len(description.split()) <= 60
+
+
+class TestWhatARuleSays:
+    @pytest.mark.parametrize(
+        ("rule", "said"),
+        [
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    interval=2,
+                    days_of_week=("wednesday", "monday"),
+                    range_type="numbered",
+                    number_of_occurrences=10,
+                ),
+                "repeating every 2 weeks on Monday and Wednesday, 10 times",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="endDate", end_date=date(2026, 6, 30)
+                ),
+                "repeating every day until 2026-06-30",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", interval=3, range_type="noEnd"),
+                "repeating every 3 days with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("friday", "monday", "wednesday"),
+                    first_day_of_week="monday",
+                    range_type="numbered",
+                    number_of_occurrences=1,
+                ),
+                "repeating every week on Monday, Wednesday, and Friday (weeks start on Monday), "
+                + "1 time",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", interval=3, day_of_month=15, range_type="noEnd"
+                ),
+                "repeating every 3 months on day 15 with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("thursday", "friday"),
+                    range_type="noEnd",
+                ),
+                "repeating every month on the first Thursday or Friday with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("tuesday",),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                "repeating every month on the second Tuesday with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteYearly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                "repeating every year on March 15 with no end",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeYearly",
+                    interval=2,
+                    days_of_week=("wednesday",),
+                    index="last",
+                    month=11,
+                    range_type="endDate",
+                    end_date=date(2030, 12, 31),
+                ),
+                "repeating every 2 years on the last Wednesday of November until 2030-12-31",
+            ),
+        ],
+        ids=[
+            "weekly-numbered",
+            "daily-until",
+            "daily-no-end",
+            "three-days-one-time",
+            "absolute-monthly",
+            "relative-monthly-default-index",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_each_rule_is_named_in_words(self, rule: RecurrenceRule, said: str) -> None:
+        assert draft_details(_draft(recurrence=rule)) == said
+
+    def test_the_rule_sits_after_the_whole_days_and_before_the_place(self) -> None:
+        details = draft_details(
+            _draft(
+                all_day=True,
+                starts_at="2026-03-02T00:00",
+                ends_at="2026-03-03T00:00",
+                recurrence=_TEN_MONDAYS,
+                location="Room 3",
+            )
+        )
+
+        assert details == (
+            "as an all-day event on 2026-03-02, repeating every week on Monday, 10 times, "
+            + "at 'Room 3'"
+        )
+
+
+class TestTheCreateBodyOfASeries:
+    @pytest.mark.parametrize(
+        ("rule", "pattern"),
+        [
+            (
+                RecurrenceRule(pattern_type="daily", interval=3, range_type="noEnd"),
+                {"type": "daily", "interval": 3},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    interval=2,
+                    days_of_week=("wednesday", "monday"),
+                    first_day_of_week="monday",
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "weekly",
+                    "interval": 2,
+                    "daysOfWeek": ["monday", "wednesday"],
+                    "firstDayOfWeek": "monday",
+                },
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("wednesday", "monday"),
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "weekly",
+                    "interval": 1,
+                    "daysOfWeek": ["monday", "wednesday"],
+                    "firstDayOfWeek": "sunday",
+                },
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", interval=3, day_of_month=15, range_type="noEnd"
+                ),
+                {"type": "absoluteMonthly", "interval": 3, "dayOfMonth": 15},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("thursday", "friday"),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "relativeMonthly",
+                    "interval": 1,
+                    "daysOfWeek": ["thursday", "friday"],
+                    "index": "second",
+                },
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteYearly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                {"type": "absoluteYearly", "interval": 1, "dayOfMonth": 15, "month": 3},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeYearly",
+                    days_of_week=("wednesday",),
+                    index="last",
+                    month=11,
+                    range_type="noEnd",
+                ),
+                {
+                    "type": "relativeYearly",
+                    "interval": 1,
+                    "daysOfWeek": ["wednesday"],
+                    "index": "last",
+                    "month": 11,
+                },
+            ),
+        ],
+        ids=[
+            "daily",
+            "weekly",
+            "weekly-without-first-day",
+            "absolute-monthly",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_each_pattern_reaches_graph_with_the_fields_it_takes_and_no_others(
+        self, rule: RecurrenceRule, pattern: dict[str, object]
+    ) -> None:
+        body = _payload(event_body(_draft(recurrence=rule), transaction_id="synthetic"))
+
+        assert cast("dict[str, object]", body["recurrence"])["pattern"] == pattern
+
+    @pytest.mark.parametrize(
+        ("rule", "dates"),
+        [
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="endDate", end_date=date(2026, 6, 30)
+                ),
+                {"type": "endDate", "startDate": "2026-03-02", "endDate": "2026-06-30"},
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="numbered", number_of_occurrences=10
+                ),
+                {"type": "numbered", "startDate": "2026-03-02", "numberOfOccurrences": 10},
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="noEnd"),
+                {"type": "noEnd", "startDate": "2026-03-02"},
+            ),
+        ],
+        ids=["end-date", "numbered", "no-end"],
+    )
+    def test_each_range_starts_on_the_date_of_the_start_and_names_no_zone_of_its_own(
+        self, rule: RecurrenceRule, dates: dict[str, object]
+    ) -> None:
+        body = _payload(event_body(_draft(recurrence=rule), transaction_id="synthetic"))
+
+        assert cast("dict[str, object]", body["recurrence"])["range"] == dates
+
+    def test_an_all_day_series_starts_on_the_date_of_its_first_midnight(self) -> None:
+        draft = _draft(
+            all_day=True,
+            starts_at="2026-03-09T00:00",
+            ends_at="2026-03-10T00:00",
+            recurrence=_TEN_MONDAYS,
+        )
+
+        body = _payload(event_body(draft, transaction_id="synthetic"))
+
+        assert cast("dict[str, dict[str, object]]", body["recurrence"])["range"]["startDate"] == (
+            "2026-03-09"
+        )
+
+
+_REFUSED = "outlook_create_event cannot send this `recurrence`."
+_RETRY = "If you call this tool again with the same arguments, the call will fail the same way."
+_NOTHING_HAPPENED = f"NO EVENT WAS CREATED and nobody was invited. {_RETRY}"
+
+
+class TestWhatARuleIsRefusedFor:
+    @pytest.mark.parametrize(
+        ("rule", "said"),
+        [
+            (
+                RecurrenceRule(pattern_type="weekly", range_type="noEnd"),
+                "The `weekly` pattern needs `days_of_week`. Add `days_of_week` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteMonthly", range_type="noEnd"),
+                "The `absoluteMonthly` pattern needs `day_of_month`. Add `day_of_month` to "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="relativeMonthly", range_type="noEnd"),
+                "The `relativeMonthly` pattern needs `days_of_week`. Add `days_of_week` to "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteYearly", range_type="noEnd"),
+                "The `absoluteYearly` pattern needs `day_of_month` and `month`. Add "
+                + "`day_of_month` and `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="absoluteYearly", day_of_month=15, range_type="noEnd"),
+                "The `absoluteYearly` pattern needs `month`. Add `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="relativeYearly", range_type="noEnd"),
+                "The `relativeYearly` pattern needs `days_of_week` and `month`. Add "
+                + "`days_of_week` and `month` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="endDate"),
+                "The `endDate` range needs `end_date`. Add `end_date` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="numbered"),
+                "The `numbered` range needs `number_of_occurrences`. Add "
+                + "`number_of_occurrences` to `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily", range_type="noEnd", end_date=date(2026, 6, 30)
+                ),
+                "The `noEnd` range takes no `end_date`. Remove `end_date` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", range_type="noEnd", number_of_occurrences=10),
+                "The `noEnd` range takes no `number_of_occurrences`. Remove "
+                + "`number_of_occurrences` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="daily",
+                    range_type="endDate",
+                    end_date=date(2026, 6, 30),
+                    number_of_occurrences=10,
+                ),
+                "The `endDate` range takes no `number_of_occurrences`. Remove "
+                + "`number_of_occurrences` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(pattern_type="daily", days_of_week=("monday",), range_type="noEnd"),
+                "The `daily` pattern takes no `days_of_week`. Remove `days_of_week` from "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="weekly",
+                    days_of_week=("monday",),
+                    index="second",
+                    range_type="noEnd",
+                ),
+                "The `weekly` pattern takes no `index`. Remove `index` from `recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="absoluteMonthly", day_of_month=15, month=3, range_type="noEnd"
+                ),
+                "The `absoluteMonthly` pattern takes no `month`. Remove `month` from "
+                + "`recurrence`.",
+            ),
+            (
+                RecurrenceRule(
+                    pattern_type="relativeMonthly",
+                    days_of_week=("monday",),
+                    first_day_of_week="monday",
+                    range_type="noEnd",
+                ),
+                "The `relativeMonthly` pattern takes no `first_day_of_week`. Remove "
+                + "`first_day_of_week` from `recurrence`.",
+            ),
+        ],
+        ids=[
+            "weekly-without-days",
+            "absolute-monthly-without-day",
+            "relative-monthly-without-days",
+            "absolute-yearly-without-either",
+            "absolute-yearly-without-month",
+            "relative-yearly-without-either",
+            "end-date-without-date",
+            "numbered-without-count",
+            "no-end-with-date",
+            "no-end-with-count",
+            "end-date-with-count",
+            "daily-with-days",
+            "weekly-with-index",
+            "absolute-monthly-with-month",
+            "relative-monthly-with-first-day",
+        ],
+    )
+    def test_each_refusal_says_what_to_add_or_remove(self, rule: RecurrenceRule, said: str) -> None:
+        refusal = recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY)
+
+        assert refusal == f"{_REFUSED} {said} {_NOTHING_HAPPENED}"
+
+    def test_an_end_date_before_the_first_day_names_both_dates(self) -> None:
+        rule = RecurrenceRule(pattern_type="daily", range_type="endDate", end_date=date(2026, 3, 1))
+
+        refusal = recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY)
+
+        assert refusal == (
+            f"{_REFUSED} The `end_date` 2026-03-01 is before 2026-03-02, the date of `starts_at`. "
+            + f"Give an `end_date` on or after 2026-03-02. {_NOTHING_HAPPENED}"
+        )
+
+    @pytest.mark.parametrize(
+        "rule",
+        [
+            RecurrenceRule(pattern_type="daily", range_type="endDate", end_date=_FIRST_DAY),
+            _TEN_MONDAYS,
+            RecurrenceRule(
+                pattern_type="weekly",
+                days_of_week=("monday",),
+                first_day_of_week="monday",
+                range_type="noEnd",
+            ),
+            RecurrenceRule(pattern_type="absoluteMonthly", day_of_month=2, range_type="noEnd"),
+            RecurrenceRule(
+                pattern_type="relativeMonthly",
+                days_of_week=("monday",),
+                index="first",
+                range_type="noEnd",
+            ),
+            RecurrenceRule(
+                pattern_type="absoluteYearly", day_of_month=2, month=3, range_type="noEnd"
+            ),
+            RecurrenceRule(
+                pattern_type="relativeYearly",
+                days_of_week=("monday",),
+                month=3,
+                range_type="noEnd",
+            ),
+        ],
+        ids=[
+            "ends-on-the-first-day",
+            "weekly-numbered",
+            "weekly-with-first-day",
+            "absolute-monthly",
+            "relative-monthly",
+            "absolute-yearly",
+            "relative-yearly",
+        ],
+    )
+    def test_a_rule_with_what_its_types_need_is_not_refused(self, rule: RecurrenceRule) -> None:
+        assert recurrence_refusal("outlook_create_event", rule, starts_on=_FIRST_DAY) is None
+
+    def test_no_rule_is_nothing_to_refuse(self) -> None:
+        assert recurrence_refusal("outlook_create_event", None, starts_on=_FIRST_DAY) is None
+
+
+class TestTheSeriesAnActionReaches:
+    @pytest.mark.parametrize(
+        ("what", "said"),
+        [
+            ("change", "The change applies to every occurrence of the series."),
+            ("cancellation", "The cancellation applies to every occurrence of the series."),
+            ("delete", "The delete applies to every occurrence of the series."),
+        ],
+    )
+    def test_a_series_master_reaches_every_occurrence(self, what: str, said: str) -> None:
+        assert series_reach(Event(type=EventType.SeriesMaster), what=what) == said
+
+    @pytest.mark.parametrize("kind", [EventType.Occurrence, EventType.Exception])
+    @pytest.mark.parametrize(
+        ("what", "said"),
+        [
+            (
+                "change",
+                "The change applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+            (
+                "cancellation",
+                "The cancellation applies only to this one date. The other occurrences of the "
+                + "series stay as they are.",
+            ),
+            (
+                "delete",
+                "The delete applies only to this one date. The other occurrences of the series "
+                + "stay as they are.",
+            ),
+        ],
+    )
+    def test_one_date_of_a_series_reaches_only_that_date(
+        self, kind: EventType, what: str, said: str
+    ) -> None:
+        assert series_reach(Event(type=kind), what=what) == said
+
+    @pytest.mark.parametrize("what", ["change", "cancellation", "delete"])
+    @pytest.mark.parametrize("kind", [EventType.SingleInstance, None])
+    def test_an_event_in_no_series_says_nothing_about_one(
+        self, kind: EventType | None, what: str
+    ) -> None:
+        assert series_reach(Event(type=kind), what=what) == ""
 
 
 class TestTheCreateResponse:
@@ -1097,24 +2515,6 @@ class TestWhichCalendarsTakeNoTeamsMeeting:
         )
 
         assert providers_without_teams(calendar) is None
-
-
-class TestOnePersonInvitedOnce:
-    def test_the_repeat_is_the_entry_that_names_an_address_already_named(self) -> None:
-        assert repeated_address([_MINE, _SOMEBODY_ELSE, _MINE]) == _MINE
-
-    def test_case_is_not_a_second_person(self) -> None:
-        """SMTP addresses are not case-sensitive, and the answer is the entry as it was written,
-        so a refusal quotes what the caller sent."""
-        assert repeated_address([_MINE, _MINE.upper()]) == _MINE.upper()
-
-    @pytest.mark.parametrize(
-        "addresses",
-        [[], [_MINE], [_MINE, _SOMEBODY_ELSE]],
-        ids=["nobody", "one-person", "two-people"],
-    )
-    def test_a_list_that_names_everybody_once_has_no_repeat(self, addresses: list[str]) -> None:
-        assert repeated_address(addresses) is None
 
 
 class TestReadingOneCalendar:

@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_categories"
@@ -54,7 +55,7 @@ class Category(BaseModel):
         )
         return cls(
             name=category.display_name,
-            color=None if category.color is None else str.__str__(category.color),
+            color=spelled(category.color),
         )
 
 

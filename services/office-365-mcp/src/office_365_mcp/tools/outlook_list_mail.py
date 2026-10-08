@@ -1,11 +1,13 @@
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta
+from functools import partial
 from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.mail_folders.item.mail_folder_item_request_builder import (
     MailFolderItemRequestBuilder,
@@ -22,8 +24,11 @@ from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     ONE_ADDRESS,
     SUMMARY_FIELDS,
+    MailImportance,
     MailSummary,
     WellKnownFolder,
+    carries_category,
+    has_flag_state,
 )
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import (
@@ -64,10 +69,16 @@ _NEWEST_FIRST = "receivedDateTime desc"
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = (
-    "Lists the newest messages of one mail folder, newest received first, in the signed-in "
-    "user's own mailbox or, with `mailbox`, a shared or delegated one."
-)
+_DESCRIPTION = """\
+Lists the newest messages of one mail folder, newest received first. It reads the signed-in \
+user's own mailbox or, with `mailbox`, a shared or delegated one. To find messages by words, \
+sender, or attachment name, use outlook_search_mail.
+
+Notes:
+- A message must pass every filter that you set.
+- If `capped` is true, more messages can match beyond this result. Before you decide that no \
+message matches, make sure that `capped` is false.
+"""
 
 _BOTH_FOLDERS = (
     "outlook_list_mail lists one folder, so `folder` and `folder_ref` are alternatives, not a "
@@ -121,7 +132,8 @@ class FolderMessages(BaseModel):
     )
     capped: bool = Field(
         description=(
-            "True if more of the folder or date window remains beyond what this call returned."
+            "True if more of the folder or date window remains beyond what this call read. More "
+            "messages can match the filters there. False means the result is complete."
         )
     )
 
@@ -135,6 +147,10 @@ async def list_mail(
     received_after: date | datetime | None = None,
     received_before: date | datetime | None = None,
     from_address: str | None = None,
+    importance: MailImportance | None = None,
+    flagged: bool | None = None,
+    has_attachments: bool | None = None,
+    category: str | None = None,
     limit: int,
     mailbox: str | None = None,
 ) -> FolderMessages:
@@ -172,7 +188,14 @@ async def list_mail(
                 first_page,
                 client,
                 limit=limit,
-                matches=_keeps(unread_only=unread_only, sender=sender),
+                matches=_keeps(
+                    unread_only=unread_only,
+                    sender=sender,
+                    importance=importance,
+                    flagged=flagged,
+                    has_attachments=has_attachments,
+                    category=category,
+                ),
                 headers=headers,
             )
 
@@ -246,12 +269,28 @@ def _wire(instant: datetime) -> str:
     return f"{instant:%Y-%m-%dT%H:%M:%SZ}"
 
 
-def _keeps(*, unread_only: bool, sender: str | None) -> Callable[[Message], bool] | None:
+def _keeps(
+    *,
+    unread_only: bool,
+    sender: str | None,
+    importance: MailImportance | None,
+    flagged: bool | None,
+    has_attachments: bool | None,
+    category: str | None,
+) -> Callable[[Message], bool] | None:
     checks: list[Callable[[Message], bool]] = []
     if unread_only:
         checks.append(_is_unread)
     if sender is not None:
         checks.append(_sent_by(sender))
+    if importance is not None:
+        checks.append(_has_importance(importance))
+    if flagged is not None:
+        checks.append(partial(has_flag_state, flagged=flagged))
+    if has_attachments is not None:
+        checks.append(_has_attachment_state(has_attachments))
+    if category is not None:
+        checks.append(partial(carries_category, category=category))
     if not checks:
         return None
     return lambda message: all(check(message) for check in checks)
@@ -269,6 +308,15 @@ def _sent_by(sender: str) -> Callable[[Message], bool]:
         return recorded is not None and (recorded.address or "").casefold() == wanted
 
     return sent_by
+
+
+def _has_importance(importance: MailImportance) -> Callable[[Message], bool]:
+    wanted = Importance(importance)
+    return lambda message: message.importance is wanted
+
+
+def _has_attachment_state(has_attachments: bool) -> Callable[[Message], bool]:
+    return lambda message: message.has_attachments is has_attachments
 
 
 def _one_address(from_address: str | None) -> str | None:
@@ -340,6 +388,46 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
+        importance: Annotated[
+            MailImportance | None,
+            Field(
+                description=(
+                    "Only messages with this importance: `low`, `normal`, or `high`. The tool "
+                    "applies this filter to the messages it reads."
+                )
+            ),
+        ] = None,
+        flagged: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "Set to true for only the messages flagged for follow-up. Set to false for "
+                    "only the messages that are not flagged. A completed follow-up counts as not "
+                    "flagged. A message for which Microsoft 365 reports no flag matches neither "
+                    "value. The tool applies this filter to the messages it reads."
+                )
+            ),
+        ] = None,
+        has_attachments: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "Set to true for only the messages that have attachments. Set to false for "
+                    "only the messages that have none. Inline attachments do not count. The tool "
+                    "applies this filter to the messages it reads."
+                )
+            ),
+        ] = None,
+        category: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Only messages with this Outlook category. The match uses the category name "
+                    "and ignores case. The tool applies this filter to the messages it reads."
+                ),
+            ),
+        ] = None,
         limit: Annotated[
             int,
             Field(
@@ -359,6 +447,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             received_after=received_after,
             received_before=received_before,
             from_address=from_address,
+            importance=importance,
+            flagged=flagged,
+            has_attachments=has_attachments,
+            category=category,
             limit=limit,
             mailbox=mailbox,
         )

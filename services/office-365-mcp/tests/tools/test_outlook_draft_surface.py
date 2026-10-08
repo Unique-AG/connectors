@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from typing import cast
 
@@ -72,6 +73,12 @@ _REPLY_ARGUMENTS: Mapping[str, object] = {
     "body_html": "Friday works.",
 }
 
+_COPIED_AND_MARKED: Mapping[str, object] = {
+    "cc": ["pam@example.invalid"],
+    "importance": "high",
+    "categories": ["Finance"],
+}
+
 _EACH_TOOL = pytest.mark.parametrize(
     ("tool", "arguments", "methods"),
     [
@@ -136,6 +143,10 @@ def _made(router: respx.MockRouter) -> Sequence[Call]:
 
 def _writes(router: respx.MockRouter) -> list[str]:
     return [call.request.method for call in _made(router) if call.request.method != "GET"]
+
+
+def _body_of(call: Call) -> Mapping[str, object]:
+    return cast("Mapping[str, object]", json.loads(call.request.content))
 
 
 def _object(value: object) -> Mapping[str, object]:
@@ -302,3 +313,28 @@ class TestTheWholeConfirmationOverARealClient:
 
         assert result.structured_content is not None, "the agreed draft answered nothing"
         assert _writes(graph) == methods, f"a handshake-era draft wrote {_writes(graph)}"
+
+    @_EACH_TOOL
+    async def test_an_agreed_draft_writes_its_copy_importance_and_categories_in_one_request(
+        self,
+        an_agreeing_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: Mapping[str, object],
+        methods: list[str],
+    ) -> None:
+        result = await an_agreeing_client.call_tool(
+            tool, {**arguments, **_COPIED_AND_MARKED, "mailbox": _SHARED_MAILBOX}
+        )
+
+        assert result.structured_content is not None, "the agreed draft answered nothing"
+        carrying = [
+            call for call in _made(graph) if "ccRecipients" in call.request.content.decode()
+        ]
+        (write,) = carrying
+        assert write.request.method == methods[-1]
+        sent = _body_of(write)
+        copied = cast("Sequence[Mapping[str, Mapping[str, object]]]", sent["ccRecipients"])
+        assert [one["emailAddress"]["address"] for one in copied] == ["pam@example.invalid"]
+        assert sent["importance"] == "high"
+        assert sent["categories"] == ["Finance"]

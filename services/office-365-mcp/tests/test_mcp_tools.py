@@ -516,6 +516,9 @@ def _object(value: object) -> dict[str, object]:
 
 
 _TOOL_MENTION = re.compile(r"\b(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b")
+_GUARDED_MENTION = re.compile(
+    r"\bIf this deployment exposes\s+(?:get|teams|outlook|onenote)_[a-z]+(?:_[a-z]+)*\b"
+)
 
 
 def _described(schema: Mapping[str, object] | None) -> list[str]:
@@ -569,6 +572,9 @@ def _optional_type(schema: object) -> dict[str, object]:
 _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_mail": ("received_after", "received_before"),
     "outlook_list_events": ("starts_on", "ends_on"),
+    "outlook_list_event_instances": ("starts_on", "ends_on"),
+    "outlook_list_reminders": ("starts_on", "ends_on"),
+    "outlook_list_group_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
     "teams_list_chat_messages": ("sent_before",),
@@ -628,16 +634,34 @@ WRITE_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_mark_mail",
         "outlook_move_mail",
+        "outlook_copy_mail",
+        "outlook_create_folder",
+        "outlook_rename_folder",
+        "outlook_delete_folder",
+        "outlook_set_focused_override",
         "outlook_draft_mail",
         "outlook_draft_reply",
+        "outlook_draft_reply_all",
+        "outlook_update_draft",
         "outlook_send_draft",
         "outlook_set_automatic_reply",
         "outlook_disable_mail_rule",
+        "outlook_create_mail_rule",
+        "outlook_update_mail_rule",
+        "outlook_delete_mail_rule",
+        "outlook_create_category",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
         "outlook_update_event",
+        "outlook_forward_event",
         "outlook_cancel_event",
+        "outlook_delete_event",
         "outlook_respond_to_invite",
+        "outlook_share_calendar",
+        "outlook_unshare_calendar",
+        "outlook_delete_calendar",
+        "outlook_create_contact",
+        "outlook_update_contact",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",
@@ -780,9 +804,15 @@ class TestTheToolsThisServerAdvertises:
         assert set(_properties(tools["get_me"].output_schema)) == {
             "user_id",
             "display_name",
+            "given_name",
+            "surname",
             "email",
             "user_principal_name",
             "job_title",
+            "office_location",
+            "business_phones",
+            "mobile_phone",
+            "preferred_language",
         }
         assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
         assert set(_properties(tools["teams_list_chat_messages"].output_schema)) == {
@@ -1291,7 +1321,7 @@ class TestTheToolsThisServerAdvertises:
                     *_described(tool.output_schema),
                 ]
             )
-            named = set(_TOOL_MENTION.findall(described))
+            named = set(_TOOL_MENTION.findall(_GUARDED_MENTION.sub("", described)))
             mentioned |= named
             assert not named - advertised, (
                 f"{name} tells a model about {sorted(named - advertised)}, which this server does "
@@ -1301,6 +1331,15 @@ class TestTheToolsThisServerAdvertises:
         assert len(mentioned) > 1, (
             f"nothing names another tool any more, so this proves nothing: {mentioned}"
         )
+
+    def test_only_a_mention_behind_the_deployment_guard_is_let_through(self) -> None:
+        guarded = "If this deployment exposes outlook_find_recipient, that tool finds an address."
+        unguarded = f"{guarded} outlook_find_recipient also needs a name."
+
+        assert not _TOOL_MENTION.findall(_GUARDED_MENTION.sub("", guarded))
+        assert _TOOL_MENTION.findall(_GUARDED_MENTION.sub("", unguarded)) == [
+            "outlook_find_recipient"
+        ]
 
     async def test_every_description_that_spells_a_group_handle_spells_a_site_handle_too(
         self, every_tool: Client[FastMCPTransport]
@@ -1344,6 +1383,38 @@ class TestTheToolsThisServerAdvertises:
                     )
 
         assert checked >= 18, f"only {checked} onenote not-a-handle texts remain to compare"
+
+    async def test_no_published_description_names_a_draft_handle(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name, tool in tools.items():
+            for described in (
+                tool.description or "",
+                *_described(tool.input_schema),
+                *_described(tool.output_schema),
+            ):
+                assert "outlook:///drafts" not in described, f"{name} spells a drafts handle"
+                assert "draft handle" not in described.casefold(), f"{name} names a draft handle"
+
+    def test_no_refusal_text_names_a_draft_handle(self) -> None:
+        checked = 0
+
+        for found in pkgutil.iter_modules(tool_package.__path__):
+            if not found.name.startswith("outlook_"):
+                continue
+            module = importlib.import_module(f"{tool_package.__name__}.{found.name}")
+            texts = cast("Mapping[str, object]", vars(module))
+            for constant, text in texts.items():
+                if constant.startswith("_") and isinstance(text, str):
+                    checked += 1
+                    assert "outlook:///drafts" not in text, f"{found.name}.{constant} spells one"
+                    assert "draft handle" not in text.casefold(), (
+                        f"{found.name}.{constant} names a draft handle"
+                    )
+
+        assert checked > 100, f"only {checked} outlook text constants were compared"
 
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]
