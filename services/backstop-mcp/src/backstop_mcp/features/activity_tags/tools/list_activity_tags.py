@@ -26,24 +26,25 @@ async def list_activity_tags(
         str | None,
         Field(
             description=(
-                "Optional case-insensitive substring of the tag name. The argument is "
-                "`search`. Filters the cached catalog in memory — the catalog walk never "
-                "sends `filter[name][like]`."
+                "Optional case-insensitive substring of the tag name. Omit to list the "
+                "whole catalog."
             ),
         ),
     ] = None,
     refresh: Annotated[
         bool,
-        Field(description="Do not pass true unless the user reports a missing field."),
+        Field(description="Do not pass true unless the user reports a missing tag."),
     ] = False,
     activity_tags: ActivityTagsService = Depends(get_activity_tags_service),
 ) -> ListActivityTagsResponse:
     """List the standard Backstop activity-tag catalog.
 
-    Use when you need tag ids, names, how many activities currently carry each tag, and whether
-    a tag is shown in the Backstop UI. Instance tag names come back as data. Pass `search` to
-    keep tags whose name contains that substring. Pass refresh=true only when the user reports
-    a missing field.
+    Search by the term and pass every matching id to search_activities `activity_tag_ids`.
+    A term mentioned in activities is this search with that substring. Use when you
+    need tag ids, names, how many activities currently carry each tag, and whether a tag is
+    shown in the Backstop UI.
+    Instance tag names come back as data. Pass `search` to keep tags whose name contains
+    that substring. Pass refresh=true only when the user reports a missing tag.
 
     Call like: {"search": "follow"}
     """

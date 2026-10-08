@@ -16,7 +16,7 @@ _ADAPTER: TypeAdapter[BackfillOpportunityStageHistoryInput] = TypeAdapter(
 def _record(opportunity_id: str = "5755101") -> dict[str, object]:
     return {
         "opportunity_id": opportunity_id,
-        "stage": "IDD",
+        "stage": "Stage B",
         "effective_date": "2026-02-01",
     }
 
@@ -25,7 +25,7 @@ def test_accepts_one_record() -> None:
     parsed = _ADAPTER.validate_python({"records": [_record()]})
 
     assert len(parsed.records) == 1
-    assert parsed.records[0].stage == "IDD"
+    assert parsed.records[0].stage == "Stage B"
 
 
 def test_over_the_cap_is_rejected_by_the_input_model() -> None:

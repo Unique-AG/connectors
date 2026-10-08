@@ -2,8 +2,8 @@
 
 `get_accounts_for_party` publishes `HoldingRowResponse`, not `AccountRowResponse`. The
 account-row tree (`AccountRowResponse` and its nested owner / investor-type refs) is the
-listing `get_product_investors` publishes — identity and owner, no figures. The product
-itself sits once on that tool's resolved response, not on every row.
+listing `get_product_investors` publishes — identity and owner, plus `latest_value` only when
+the caller opted in. The product itself sits once per product listing, not on every row.
 
 `OmitNoneModel` drops nulls: a missing figure is absent, never `0.0`. A `0.0` Backstop
 published is a real point and is kept.
@@ -13,6 +13,7 @@ from datetime import date as Date
 from typing import Self
 
 from pydantic import Field
+from pydantic.json_schema import SkipJsonSchema
 
 from backstop_mcp.backstop_client import Included, IncludedResource
 from backstop_mcp.features.accounts.api_responses import (
@@ -22,11 +23,13 @@ from backstop_mcp.features.accounts.api_responses import (
     OwnerAttributes,
 )
 from backstop_mcp.features.accounts.internal_dto import (
+    AccountLatestValueDto,
     AccountOwnerDto,
     AccountRecordDto,
     InvestorTypeDto,
     ResolvedProductDto,
 )
+from backstop_mcp.features.custom_fields import StoredCustomFieldValueResponse
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
     Candidate,
@@ -50,10 +53,7 @@ class ProductRefResponse(OmitNoneModel):
     name: str | None = Field(default=None, description="Product name as Backstop stores it.")
     short_name: str | None = Field(
         default=None,
-        description=(
-            "`productShortName` (e.g. 'NGUP'). Tenants may call this a fund, vehicle, or "
-            "share class."
-        ),
+        description=("`productShortName` (e.g. 'NGUP'). Tenants may call this a fund or vehicle."),
     )
 
     @classmethod
@@ -72,10 +72,19 @@ class OwnerResponse(OmitNoneModel):
     resource_type: str | None = Field(
         default=None,
         description=(
-            "What the owner is: `organizations`, `people`, or `contacts`. Organization owners "
-            "arrive as contacts whose type is `organizations`."
+            "What the owner is: `organizations` or `people`, or `contacts` when Backstop did "
+            "not say which. Echo it with `id`."
         ),
     )
+    contacts_id: SkipJsonSchema[str | None] = Field(
+        default=None,
+        exclude=True,
+        description="The contacts envelope id when `id` was remapped to the specific resource.",
+    )
+
+    def has_id(self, candidates: frozenset[str]) -> bool:
+        """Whether `id` or the contacts envelope id is one of `candidates`."""
+        return self.id in candidates or self.contacts_id in candidates
 
     @classmethod
     def from_owner(cls, owner: AccountOwnerDto | None) -> Self | None:
@@ -99,6 +108,7 @@ class OwnerResponse(OmitNoneModel):
                 id=specific.resource_id,
                 name=owner.attributes.name,
                 resource_type=specific.resource_type,
+                contacts_id=owner.id,
             )
         return cls(id=owner.id, name=owner.attributes.name, resource_type=owner.type)
 
@@ -107,13 +117,27 @@ class InvestorTypeResponse(OmitNoneModel):
     """The account's investor type, identity only."""
 
     id: str = Field(description="Backstop investor-type id.")
-    name: str | None = Field(default=None, description="Investor-type name, e.g. 'Fund of Funds'.")
+    name: str | None = Field(
+        default=None,
+        description="Investor-type name, e.g. 'Fund of Funds'. Blank on some tenants.",
+    )
+    classification_type: str | None = Field(
+        default=None,
+        description=(
+            "Backstop's classification of the investor type, e.g. 'Endowment/Foundation'. "
+            "Group an investor-type breakdown on this when `name` is blank."
+        ),
+    )
 
     @classmethod
     def from_investor_type(cls, investor_type: InvestorTypeDto | None) -> Self | None:
         if investor_type is None:
             return None
-        return cls(id=investor_type.id, name=investor_type.name)
+        return cls(
+            id=investor_type.id,
+            name=investor_type.name,
+            classification_type=investor_type.classification_type,
+        )
 
     @classmethod
     def from_included(
@@ -121,7 +145,11 @@ class InvestorTypeResponse(OmitNoneModel):
     ) -> Self | None:
         if investor_type is None:
             return None
-        return cls(id=investor_type.id, name=investor_type.attributes.name)
+        return cls(
+            id=investor_type.id,
+            name=investor_type.attributes.name,
+            classification_type=investor_type.attributes.classification_type,
+        )
 
 
 class InvestorQualificationResponse(OmitNoneModel):
@@ -149,8 +177,65 @@ class InvestorQualificationResponse(OmitNoneModel):
         return cls(status=qualification.status, option=qualification.option)
 
 
+class LatestValueResponse(OmitNoneModel):
+    """An account's newest `values` point that carries a number."""
+
+    available: bool = Field(
+        description=(
+            "False when there is no figure to report — Backstop publishes no valued point, or "
+            "the request failed (see `error`). Never read a missing figure as zero."
+        )
+    )
+    amount: float | None = Field(
+        default=None, description="The account's value. A published 0.0 is a real zero."
+    )
+    currency: str | None = Field(
+        default=None, description="ISO currency code of `amount`, from the account."
+    )
+    as_of: Date | None = Field(
+        default=None,
+        description=(
+            "The date `amount` is for. Accounts can differ — say so when they do, rather than "
+            "presenting one as-of date for all of them."
+        ),
+    )
+    status: str | None = Field(
+        default=None,
+        description="`ACTUAL` or `ESTIMATE` as Backstop labels the point. Omitted when unlabelled.",
+    )
+    pending_as_of: Date | None = Field(
+        default=None,
+        description=(
+            "A newer dated point Backstop has published with no number yet. With `amount`, the "
+            "amount is older than this date; without it (`available=false`), no point carries "
+            "a number yet and this is the newest date Backstop has published."
+        ),
+    )
+    error: str | None = Field(
+        default=None,
+        description="Why this account's figure could not be read. Relay it; do not guess.",
+    )
+
+    @classmethod
+    def from_dto(cls, latest: AccountLatestValueDto, *, currency: str | None) -> Self:
+        figure = latest.figure
+        if figure is None:
+            return cls(available=False, error=latest.error)
+        valued = figure.valued
+        if valued is None:
+            return cls(available=False, pending_as_of=figure.latest.date)
+        return cls(
+            available=True,
+            amount=valued.value,
+            currency=currency,
+            as_of=valued.date,
+            status=valued.value_status,
+            pending_as_of=figure.latest.date if figure.latest.date != valued.date else None,
+        )
+
+
 class AccountRowResponse(OmitNoneModel):
-    """One account: identity, owner, status, and the product when it was side-loaded."""
+    """One account: identity, owner, investor type, and open/closed status."""
 
     id: str = Field(
         description=(
@@ -166,8 +251,9 @@ class AccountRowResponse(OmitNoneModel):
     investor_type: InvestorTypeResponse | None = Field(
         default=None,
         description=(
-            "How Backstop classifies this investor (e.g. 'Fund of Funds'). Omitted when that "
-            "include was missing."
+            "The account's own investor-type pick (e.g. 'Fund of Funds'), set per account. It "
+            "can differ from how the owner organization is classified; say which one a "
+            "breakdown grouped on. Omitted when that include was missing."
         ),
     )
     currency: str | None = Field(
@@ -175,7 +261,11 @@ class AccountRowResponse(OmitNoneModel):
         description="ISO currency code the account's figures are in, e.g. 'USD'.",
     )
     account_start_date: Date | None = Field(
-        default=None, description="Day the account opened, when Backstop has one."
+        default=None,
+        description=(
+            "Day this account opened, when Backstop has one: the start of this account, not of "
+            "the owner's relationship. For tenure read `investors[].continuous_since`."
+        ),
     )
     closed_date: Date | None = Field(
         default=None,
@@ -223,10 +313,27 @@ class AccountRowResponse(OmitNoneModel):
     )
     us_domiciled: bool | None = Field(
         default=None,
-        description="True when Backstop marks the account as domiciled in the United States.",
+        description=(
+            "US/non-US flag. True when Backstop marks the account as domiciled in the United "
+            "States."
+        ),
     )
     is_open: bool = Field(
         description="True when `closedDate` was absent on the account. A present null is closed."
+    )
+    latest_value: LatestValueResponse | None = Field(
+        default=None,
+        description=(
+            "Only present when `include_latest_value=true` was passed on "
+            "`get_product_investors`. For any other date, use `get_time_series`."
+        ),
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every account custom field with a value. Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this account."
+        ),
     )
 
     @classmethod
@@ -257,6 +364,7 @@ class AccountRowResponse(OmitNoneModel):
         resource: AccountApiResource,
         *,
         included: Included,
+        custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = None,
     ) -> Self:
         attributes = resource.attributes
         return cls(
@@ -283,6 +391,7 @@ class AccountRowResponse(OmitNoneModel):
             new_issue_eligible=attributes.new_issue_eligible,
             us_domiciled=attributes.us_domiciled,
             is_open="closed_date" not in attributes.model_fields_set,
+            custom_field_values=custom_field_values,
         )
 
 
@@ -303,8 +412,9 @@ class ProductCandidateResponse(CandidateResponse):
     )
     id: str = Field(
         description=(
-            "Backstop product id. Echo it as `product_id` on `get_product_investors`, or as "
-            "`entity_id` with `entity_type='products'` on `get_time_series` — never invent one."
+            "Backstop product id. Echo it as a `products` entry on `get_product_investors`, as "
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         )
     )
     name: str | None = Field(
@@ -331,18 +441,19 @@ class ProductCandidateResponse(CandidateResponse):
 class ProductAmbiguousResponse(AmbiguousResponse[ProductCandidateResponse]):
     """Returned when more than one product matched and none was chosen.
 
-    Show each candidate's `label` to the user, then retry with that `id` as `product_id`
-    on `get_product_investors`, or as `entity_id` with `entity_type='products'` on
-    `get_time_series`. Never invent one.
+    Show each candidate's `label` to the user, then retry with that `id` as a `products`
+    entry on `get_product_investors`, as `product_ids` on `search_products`, or as `entity_id` with
+    `entity_type='products'` on `get_time_series`. Never invent one.
     """
 
     scope: str = Field(description="Collection the query was resolved against. Always 'products'.")
     candidates: list[ProductCandidateResponse] = Field(
         default_factory=list,
         description=(
-            "The matching products. Show `label` to the user, then retry with that "
-            "candidate's `id` as `product_id` on `get_product_investors`, or as `entity_id` "
-            "with `entity_type='products'` on `get_time_series` — never invent one."
+            "The matching products. Show `label` to the user, then retry with the chosen "
+            "`id`s as `products` entries on `get_product_investors` (several are fine), as "
+            "`product_ids` on `search_products`, or as `entity_id` with "
+            "`entity_type='products'` on `get_time_series` — never invent one."
         ),
     )
 

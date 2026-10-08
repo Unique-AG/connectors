@@ -13,6 +13,8 @@ from backstop_mcp.features.includes import OrganizationInclude
 from backstop_mcp.features.org_people import GetOrganizationQuery, OrganizationResolvedResponse
 from backstop_mcp.features.org_people.dependencies import get_organization_query_factory
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
     ResolvePartyQuery,
@@ -51,20 +53,13 @@ async def get_organization(
     party_id: Annotated[
         str | None,
         Field(
-            description=(
-                "Trusted Backstop organization Party ID from a prior resolve echo "
-                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
-                "`party_id` or `search` must be provided."
-            ),
+            description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search: Annotated[
         str | None,
         Field(
-            description=(
-                "Organization name or email to resolve when no trusted `party_id` is "
-                "available. Exactly one of `party_id` or `search` must be provided."
-            ),
+            description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search_type: Annotated[

@@ -102,10 +102,10 @@ class TestGetCapitalFlows:
                 _sub("s1"),
                 included=[
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -120,10 +120,10 @@ class TestGetCapitalFlows:
                         },
                     },
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -179,10 +179,10 @@ class TestGetCapitalFlows:
                         },
                     },
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -252,7 +252,7 @@ class TestGetCapitalFlows:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_account_ids_filter_applies_before_the_row_cap(self) -> None:
+    async def test_account_ids_filter_keeps_only_those_accounts(self) -> None:
         base_url = tenant("cf-acct")
         respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
             return_value=_page(
@@ -280,7 +280,6 @@ class TestGetCapitalFlows:
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
                     account_ids=["a-keep"],
-                    max_rows=1,
                     get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
@@ -290,12 +289,11 @@ class TestGetCapitalFlows:
         flows = [object_dict(item) for item in object_list(payload["flows"])]
         assert [item["id"] for item in flows] == ["s-keep"]
         assert result.total == 1
-        assert result.truncated is False
         assert result.request_count == 2
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_truncated_is_true_when_matches_exceed_max_rows(self) -> None:
+    async def test_every_matching_flow_is_returned(self) -> None:
         base_url = tenant("cf-trunc")
         respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
             return_value=_page(
@@ -303,10 +301,10 @@ class TestGetCapitalFlows:
                 _sub("s2", account_id="a1"),
                 included=[
                     {
-                        **resource("a1", "accounts", name="Koch acct"),
+                        **resource("a1", "accounts", name="Litware acct"),
                         "relationships": {"owner": {"data": {"id": "o1", "type": "contacts"}}},
                     },
-                    resource("o1", "contacts", name="Koch"),
+                    resource("o1", "contacts", name="Litware"),
                 ],
             )
         )
@@ -318,23 +316,20 @@ class TestGetCapitalFlows:
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
                     owner_id="o1",
-                    max_rows=1,
                     get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
 
         assert result.total == 2
-        assert result.truncated is True
-        assert len(object_list(tool_payload(result)["flows"])) == 1
+        assert len(object_list(tool_payload(result)["flows"])) == 2
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_undated_flows_sort_last_and_do_not_crowd_the_row_cap(self) -> None:
-        """`flows` is documented newest-first, and `max_rows` slices after the sort.
+    async def test_undated_flows_sort_last(self) -> None:
+        """`flows` is documented newest-first; undated rows go after every dated one.
 
-        Sorting `(date is None, date)` descending puts the undated group first, so an undated
-        row would take the only slot a dated one should have had.
+        Sorting `(date is None, date)` descending would put the undated group first.
         """
         base_url = tenant("cf-undated")
         respx.get(f"{base_url}/hedge-fund-account-subscriptions").mock(
@@ -350,16 +345,14 @@ class TestGetCapitalFlows:
                 await get_capital_flows(
                     start_date=date(2026, 1, 1),
                     end_date=date(2026, 12, 31),
-                    max_rows=1,
                     get_capital_flows_query=make_get_capital_flows_query(client),
                 ),
                 CapitalFlowsResolvedResponse,
             )
 
         flows = [object_dict(item) for item in object_list(tool_payload(result)["flows"])]
-        assert [item["id"] for item in flows] == ["s-dated"]
+        assert [item["id"] for item in flows] == ["s-dated", "s-undated"]
         assert result.total == 2
-        assert result.truncated is True
 
     @pytest.mark.asyncio
     @respx.mock

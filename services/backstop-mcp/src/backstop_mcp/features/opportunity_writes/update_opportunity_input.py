@@ -43,8 +43,9 @@ class _UpdateOpportunityIdentity(BaseModel):
 
     opportunity_id: NonEmptyStr = Field(
         description=(
-            "Required. Backstop opportunity id from `get_opportunities` or "
-            "`get_opportunities_by_ids`. Never invent or guess."
+            "Required. Backstop opportunity id from `search_opportunities`, "
+            "`get_opportunities`, `get_opportunities_by_ids`, or a create result. "
+            "Never invent or guess."
         )
     )
 

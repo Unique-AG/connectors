@@ -32,7 +32,7 @@ def test_missing_gender_is_rejected() -> None:
 
 
 def test_rejects_is_key_employee() -> None:
-    with pytest.raises(ValidationError, match="cannot be written"):
+    with pytest.raises(ValidationError, match="read-only"):
         _ADAPTER.validate_python(
             {"last_name": "Smith", "gender": "Female", "is_key_employee": True}
         )

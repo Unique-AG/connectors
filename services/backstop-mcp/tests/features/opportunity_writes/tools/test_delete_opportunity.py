@@ -32,7 +32,7 @@ from tests.helpers import BASE_URL, client_factory, credential
 from tests.server.tools.helpers import tool_model
 
 _ID = "5755101"
-_NAME = "Koch - CATS Select"
+_NAME = "Contoso - Harbor Select"
 
 
 @pytest.fixture

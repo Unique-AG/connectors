@@ -106,7 +106,7 @@ def _open_deal() -> dict[str, object]:
         "5755031",
         stage_id="42482",
         history=["4908995"],
-        name="Koch - CATS Select",
+        name="Contoso - Harbor Select",
         isOpen=True,
         previousStage="Client Approval",
         dateEnteredCurrentStage="2026-03-01T00:00:00.000-0500",
@@ -120,7 +120,7 @@ def _two_field_deal() -> dict[str, object]:
     return _opportunity(
         "5755031",
         stage_id="42482",
-        name="Koch - CATS Select",
+        name="Contoso - Harbor Select",
         isOpen=True,
         regularCustomFieldValues=[
             {"definitionId": "8648265", "value": 0.3},
@@ -192,7 +192,7 @@ class TestGetOpportunitiesByIdsQuery:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - Invested",
+                    name="Contoso - Invested",
                     isOpen=False,
                 ),
                 included=[_side_loaded_stage("96016")],
@@ -204,7 +204,7 @@ class TestGetOpportunitiesByIdsQuery:
         assert first.call_count == 1
         assert second.call_count == 1
         assert [row.id for row in result.opportunities] == ["5755031", "5072909"]
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
         assert result.opportunities[0].stage_history == ()
         assert result.not_found == ()
         assert result.errors == ()
@@ -222,7 +222,7 @@ class TestGetOpportunitiesByIdsQuery:
         params = [request.url.params.get("include") for request in recorded_requests(route.calls)]
         assert params == ["stage", "stage,stageHistory"]
         assert omitted.opportunities[0].stage_history == ()
-        assert [change.stage for change in included.opportunities[0].stage_history] == ["IDD"]
+        assert [change.stage for change in included.opportunities[0].stage_history] == ["Stage B"]
 
     @pytest.mark.asyncio
     @respx.mock
@@ -372,7 +372,7 @@ class TestGetOpportunitiesByIdsQuery:
         )
         respx.get(f"{BASE_URL}/opportunities/5072909").mock(
             return_value=_document(
-                _opportunity("5072909", stage_id="96016", name="Koch - Invested", isOpen=False),
+                _opportunity("5072909", stage_id="96016", name="Contoso - Invested", isOpen=False),
                 included=[_side_loaded_stage("96016")],
             )
         )

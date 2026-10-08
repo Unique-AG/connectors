@@ -48,7 +48,7 @@ async def backfill_opportunity_stage_history(
     per deal.
 
     Call like: {"backfill": {"records": [{"opportunity_id": "<id from get_opportunities>",
-    "stage": "IDD", "effective_date": "2026-02-01"}]}}
+    "stage": "<stage name from get_opportunities>", "effective_date": "2026-02-01"}]}}
     """
     logger.info(
         "opportunity_writes.backfill_stage_history.start",

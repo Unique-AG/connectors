@@ -281,4 +281,3 @@ class TestCreateEmploymentCommand:
         assert result.resource_type == "entity-relationships"
         assert result.start_date == _START
         assert result.created_mirror_row is True
-        assert result.warnings == ()

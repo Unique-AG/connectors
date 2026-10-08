@@ -23,21 +23,21 @@ from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
-    BackstopApiResource,
     BackstopApiSingleResourceDocument,
     BackstopClient,
     OptionalBackstopApiResourceDocument,
 )
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityDetailAttributes,
-    AttendeeAttributes,
     MeetingSpecificAttributes,
 )
 from backstop_mcp.features.activity_history.internal_dto import (
     ActivityDetailDto,
-    AttendeeDto,
     MeetingSpecificsDto,
     attachments_from_stored,
+)
+from backstop_mcp.features.activity_history.queries.get_meeting_attendees_query import (
+    GetMeetingAttendeesQuery,
 )
 from backstop_mcp.features.activity_history.responses import ActivityDetailResponse
 from backstop_mcp.features.ui_links import (
@@ -56,10 +56,15 @@ class GetActivityDetailQuery:
     """Full body, and meeting extras only when the handle or detail type says they apply."""
 
     def __init__(
-        self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
+        self,
+        *,
+        client: BackstopClient,
+        build_entity_link_util: BuildEntityLinkUtil,
+        get_meeting_attendees_query: GetMeetingAttendeesQuery,
     ) -> None:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
+        self._get_meeting_attendees_query: GetMeetingAttendeesQuery = get_meeting_attendees_query
 
     async def run(
         self, *, activity_id: str, handle: ParsedActivityHandle
@@ -70,7 +75,7 @@ class GetActivityDetailQuery:
             detail, specifics, attendees = await asyncio.gather(
                 self._fetch_activity_detail(resource_id),
                 self._fetch_meeting_specifics(resource_id),
-                self._attendees(resource_id),
+                self._get_meeting_attendees_query.run(resource_id=resource_id),
             )
         elif handle.resource_type is not None:
             logger.debug(
@@ -85,7 +90,7 @@ class GetActivityDetailQuery:
             if (detail.type or "").casefold() in {"meeting", "call"}:
                 specifics, attendees = await asyncio.gather(
                     self._fetch_meeting_specifics(resource_id),
-                    self._attendees(resource_id),
+                    self._get_meeting_attendees_query.run(resource_id=resource_id),
                 )
             else:
                 specifics = None
@@ -159,26 +164,3 @@ class GetActivityDetailQuery:
             },
         )
         return specifics
-
-    async def _attendees(self, resource_id: str) -> tuple[AttendeeDto, ...]:
-        logger.debug("activity_history.attendees.fetch", extra={"resource_id": resource_id})
-        page = await self._client.paginate(
-            f"/meeting-or-calls/{quote(resource_id, safe='')}/attendees",
-            params={"fields": "name,firstName,lastName"},
-            schema=BackstopApiResource[AttendeeAttributes],
-            max_records=None,
-        )
-        attendees = tuple(
-            AttendeeDto(name=resource.attributes.display_name()) for resource in page.items
-        )
-        nameless = sum(1 for attendee in attendees if not attendee.name)
-        if nameless:
-            logger.debug(
-                "activity_history.attendees.nameless",
-                extra={"resource_id": resource_id, "nameless": nameless, "total": len(attendees)},
-            )
-        logger.info(
-            "activity_history.attendees.fetched",
-            extra={"resource_id": resource_id, "count": len(attendees)},
-        )
-        return attendees

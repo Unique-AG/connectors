@@ -36,7 +36,15 @@ from backstop_mcp.features.custom_fields.responses import (
     ListCustomFieldGroupsResponse,
     ListCustomFieldsResponse,
     ResolvedCustomFieldValueResponse,
+    StoredCustomFieldValueResponse,
     UpdateCustomFieldValuesResponse,
+)
+from backstop_mcp.features.custom_fields.stored_custom_field_values import (
+    CustomFieldMatch,
+    display_text,
+    normalize_matches,
+    satisfies_every,
+    stored_custom_field_values,
 )
 from backstop_mcp.features.custom_fields.update_custom_field_values_input import (
     MAX_CUSTOM_FIELD_VALUES,
@@ -63,6 +71,7 @@ __all__ = [
     "CustomFieldGroupParentResponse",
     "CustomFieldGroupResponse",
     "CustomFieldGroupsService",
+    "CustomFieldMatch",
     "CustomFieldWriteEntityType",
     "CustomFieldsService",
     "ListCustomFieldGroupsResponse",
@@ -71,7 +80,12 @@ __all__ = [
     "RegularCustomFieldValues",
     "RegularCustomFieldValuesAttributes",
     "ResolvedCustomFieldValueResponse",
+    "StoredCustomFieldValueResponse",
     "UpdateCustomFieldValueInput",
+    "display_text",
+    "normalize_matches",
+    "satisfies_every",
+    "stored_custom_field_values",
     "UpdateCustomFieldValuesCommand",
     "UpdateCustomFieldValuesInput",
     "UpdateCustomFieldValuesResponse",

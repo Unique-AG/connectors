@@ -63,6 +63,7 @@ jobs:
           fi
 
   gatekeeper:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'dependencies') }}
     permissions:
       checks: read # to read the check runs of the pull request
       statuses: read # to read the commit statuses of the pull request

@@ -20,6 +20,7 @@ from backstop_mcp.backstop_client.credential import (
     CallerSessionProvider,
 )
 from backstop_mcp.backstop_client.errors import (
+    BATCH_ABORTING_ERRORS,
     BackstopApiError,
     BackstopAuthError,
     BackstopErrorDetail,
@@ -64,6 +65,7 @@ from backstop_mcp.backstop_client.settings import BackstopTransportSettings, Ret
 
 __all__ = [
     "AuthFailureHook",
+    "BATCH_ABORTING_ERRORS",
     "BackstopApiCollectionDocument",
     "BackstopApiError",
     "BackstopApiResource",

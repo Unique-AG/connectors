@@ -4,7 +4,7 @@ from typing import Annotated, ClassVar, cast
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResource, ResourceRef
-from backstop_mcp.dates import LenientDate
+from backstop_mcp.dates import LenientDate, LenientDatetime
 from backstop_mcp.features.custom_fields import RegularCustomFieldValues
 from backstop_mcp.lenient import LenientBool, LenientFloat, LenientInt
 from backstop_mcp.models import StrippedStr
@@ -23,6 +23,9 @@ __all__ = [
     "OwnerAttributes",
     "ProductAttributes",
     "ProductConfigurationAttributes",
+    "ProductDescriptionAttributes",
+    "ProductLocationAttributes",
+    "ProductRiskFreeRateAttributes",
     "SeriesPointAttributes",
     "TableDataMoneyAttributes",
     "TableDataProductAttributes",
@@ -47,12 +50,46 @@ class ProductConfigurationAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     product_short_name: StrippedStr | None = Field(default=None, alias="productShortName")
+    master_product_name: StrippedStr | None = Field(default=None, alias="masterProductName")
+    fiscal_year_start_month: LenientInt = Field(default=None, alias="fiscalYearStartMonth")
+
+
+class ProductLocationAttributes(BaseModel):
+    """`attributes.location` on a `products` resource."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    city: StrippedStr | None = None
+    state_or_province: StrippedStr | None = Field(default=None, alias="stateOrProvince")
+    country: StrippedStr | None = None
+
+
+class ProductDescriptionAttributes(BaseModel):
+    """`attributes.description` on a `products` resource: four free-text blurbs."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    fund_description: _CleanStr = Field(default=None, alias="fundDescription")
+    manager_bio: _CleanStr = Field(default=None, alias="managerBio")
+    thesis: _CleanStr = None
+    investment_methodology: _CleanStr = Field(default=None, alias="investmentMethodology")
+
+
+class ProductRiskFreeRateAttributes(BaseModel):
+    """`attributes.riskFreeRate` on a `products` resource."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    floating: LenientBool = None
+    floating_rate_benchmark_symbol: _CleanStr = Field(
+        default=None, alias="floatingRateBenchmarkSymbol"
+    )
 
 
 class ProductAttributes(BaseModel):
     """Wire shape of a `products` resource's `attributes`.
 
-    The catalog walk for name resolution uses `fields=name,configuration`. `get_product`
+    The catalog walk for name resolution uses `fields=name,configuration`. `search_products`
     omits that sparse fieldset so `regularCustomFieldValues` arrives.
     """
 
@@ -60,6 +97,20 @@ class ProductAttributes(BaseModel):
 
     name: StrippedStr | None = None
     configuration: ProductConfigurationAttributes | None = None
+    product_type: StrippedStr | None = Field(default=None, alias="productType")
+    is_onshore: LenientBool = Field(default=None, alias="isOnshore")
+    inception_date: LenientDate = Field(default=None, alias="inceptionDate")
+    default_product_currency: StrippedStr | None = Field(
+        default=None, alias="defaultProductCurrency"
+    )
+    return_calculation_methodology: StrippedStr | None = Field(
+        default=None, alias="returnCalculationMethodology"
+    )
+    modified_timestamp: LenientDatetime = Field(default=None, alias="modifiedTimestamp")
+    location: ProductLocationAttributes | None = None
+    description: ProductDescriptionAttributes | None = None
+    risk_free_rate: ProductRiskFreeRateAttributes | None = Field(default=None, alias="riskFreeRate")
+    service_providers: dict[str, object] = Field(default_factory=dict, alias="serviceProviders")
     regular_custom_field_values: RegularCustomFieldValues = Field(
         default_factory=list, alias="regularCustomFieldValues"
     )
@@ -92,15 +143,19 @@ class AccountAttributes(BaseModel):
     aml_check_complete: LenientBool = Field(default=None, alias="amlCheckComplete")
     new_issue_eligible: StrippedStr | None = Field(default=None, alias="newIssueEligible")
     us_domiciled: LenientBool = Field(default=None, alias="usDomiciled")
+    regular_custom_field_values: RegularCustomFieldValues = Field(
+        default_factory=list, alias="regularCustomFieldValues"
+    )
 
 
-# Exactly the attributes `AccountAttributes` reads, by wire name. Anything added there has to be
-# added here too, or it arrives as `None` on every row instead of failing loudly.
+# Exactly the attributes `AccountAttributes` reads, by wire name, except `regularCustomFieldValues`.
+# That one is appended by `get_product_investors` unless it is asked to `exclude_custom_fields`, so
+# the holdings walk stays without it. Anything else added to `AccountAttributes`
+# has to be added here too, or it arrives as `None` on every row instead of failing loudly.
 #
 # `closedDate` has to stay in this fieldset and stay meaningful: open is *the key was absent on
 # the wire*, so a `fields=` set that materialized it as null would report every account closed.
-# It does not — of 200 rows fetched this way the key was absent on 8 and null on 0, matching
-# what the same accounts return unfiltered.
+# Verified: `fields=` leaves `closedDate` absent on open accounts rather than null.
 ACCOUNT_LISTING_FIELDS = ",".join(
     (
         "name",
@@ -135,11 +190,16 @@ class OwnerAttributes(BaseModel):
 
 
 class InvestorTypeAttributes(BaseModel):
-    """Wire shape of the `investorType` side-load's `attributes`."""
+    """Wire shape of the `investorType` side-load's `attributes`.
+
+    Some tenants leave `name` empty and carry the label in `classificationType`
+    (e.g. `Endowment/Foundation`), so both are read and published separately.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: _CleanStr = None
+    classification_type: _CleanStr = Field(default=None, alias="classificationType")
 
 
 class SeriesPointAttributes(BaseModel):
@@ -160,7 +220,7 @@ class SeriesPointAttributes(BaseModel):
 def _scalar_str(value: object) -> str | None:
     """A scalar as a non-empty string, or `None`.
 
-    An id or label that arrives as `90007828` rather than `"90007828"` is the same id, so it is
+    An id or label that arrives as `12345` rather than `"12345"` is the same id, so it is
     coerced instead of failing the row. `bool` is excluded deliberately — `True` is not a label.
     """
     if isinstance(value, str):
@@ -240,7 +300,7 @@ class TableDataShareAttributes(BaseModel):
 class TableDataProductAttributes(BaseModel):
     """The `product` object on a table-data row: a `ResourceRef` plus `shortName` inline.
 
-    `shortName` is the tenant's own label (`FUND2`, `NGUP`, `Dispersion`) and is the only name on
+    `shortName` is the tenant's own label (`NGUP`) and is the only name on
     the row — there is no full product name here, so a caller who needs one resolves the id.
     """
 

@@ -1,40 +1,22 @@
 """Resolve a Backstop product from a trusted id, a short name, or a name.
 
-Do not route this through `ResolvePartyQuery`. That primitive is trusted id or `/quick-search` of a
-display name. Product callers also type `productShortName` (`NGUP`), and that path is not covered:
-
-- `GET /quick-search?filter[searchTypes][eq]=PRODUCT` for `NGUP` is empty.
-- `GET /products?filter[shortName][eq]=…` is `400`.
-- Searching the same string as `ORGANIZATION` can hit a CRM company whose id no account
-  `filter[product.id]` accepts.
-
-A trusted `product_id` is read straight from `GET /products/{id}?fields=name,configuration`, and
-a 404 is the `not_found`. That is one 300-byte request that cannot be defeated by catalog size,
-which is what an echoed id needs — from a prior resolve, or handed back by
-`get_accounts_for_party`.
-
-A name or short name has no by-id equivalent. `/products` accepts `filter[name][like]`, but
-`shortName` is not a filter field (`filter[shortName][eq]` is 400), so a LIKE on a short name
-like `NGUP` returns empty. Name search therefore tries `filter[name][like]` first (one request
-for "Dispersion"), and only walks the unfiltered catalog when that misses — which is what
-`productShortName` needs. Duplicate short names elicit once. The
-same response hydrates `short_name`.
-
-Walking the catalog to the end is what lets `not_found` mean *absent* instead of *not on this
-page*. The catalog is small enough for that: a client-obtained tenant returned 72 in one
-page, all with a `productShortName`, a few of them duplicated. Past `_LARGE_CATALOG` the
-assumption is no longer safe — re-reading the whole catalog per search starts costing real
-requests, and a TTL cache like the opportunity-stage vocabulary would be the answer. So that
-case warns rather than passing silently.
+Not `ResolvePartyQuery`: `/quick-search` misses `productShortName` (`NGUP`), and
+`filter[shortName]` is not a `/products` filter (400). A trusted id is one
+`GET /products/{id}?fields=name,configuration`; a 404 is `not_found`. A name reads the whole
+catalog once and matches in memory, so an exact short name wins over a name that merely contains
+it (`ARB` over 'Convert Arb Fund') and `not_found` means *absent*, not *not on this page*. Past
+`_LARGE_CATALOG` that per-search walk stops being cheap, so it logs a warning.
 """
 
 import logging
 from collections.abc import Sequence
 from http import HTTPStatus
+from typing import ClassVar, Literal
 from urllib.parse import quote
 
 from fastmcp import Context
 from mcp.types import InputRequiredResult
+from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -45,10 +27,14 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.accounts.api_responses import ProductAttributes
 from backstop_mcp.features.accounts.internal_dto import ProductResolution, ResolvedProductDto
 from backstop_mcp.features.resolution import (
+    Ambiguous,
     Candidate,
     NotFound,
+    Resolved,
+    Unresolved,
     elicit_if_ambiguous,
     from_candidates,
+    input_required,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,9 +43,10 @@ _PRODUCTS_PATH = "/products"
 _PRODUCT_FIELDS = "name,configuration"
 _PRODUCT_INDEX_PAGE_SIZE = 200
 
-# Two full pages. This instance returns 72, so anything past this is a different kind of tenant
-# and the "re-read the catalog every call" trade stops paying for itself.
+# Two full pages. Past this the "re-read the catalog every call" trade stops paying for itself.
 _LARGE_CATALOG = 400
+
+_FAMILY_CAP = 6
 
 _SCOPE = "products"
 
@@ -89,7 +76,14 @@ def _resolution(hits: Sequence[ResolvedProductDto], *, query: str) -> ProductRes
     )
 
 
-def _match_product(products: Sequence[ResolvedProductDto], query: str) -> ProductResolution:
+class _ProductMatch(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    resolution: ProductResolution
+    field: Literal["id", "short_name", "exact_name", "substring", "none"]
+
+
+def _match_product(products: Sequence[ResolvedProductDto], query: str) -> _ProductMatch:
     """Match `query` against a parsed product index.
 
     Order: exact id, exact short name, exact name, name substring. A caller can type an id into
@@ -97,11 +91,11 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
     """
     query = query.strip()
     if not query:
-        return NotFound(query=query, scope=_SCOPE)
+        return _ProductMatch(resolution=NotFound(query=query, scope=_SCOPE), field="none")
 
     id_hits = tuple(product for product in products if product.id == query)
     if id_hits:
-        return _resolution(id_hits, query=query)
+        return _ProductMatch(resolution=_resolution(id_hits, query=query), field="id")
 
     needle = query.casefold()
     short_hits = tuple(
@@ -110,7 +104,7 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
         if product.short_name is not None and product.short_name.casefold() == needle
     )
     if short_hits:
-        return _resolution(short_hits, query=query)
+        return _ProductMatch(resolution=_resolution(short_hits, query=query), field="short_name")
 
     exact_name_hits = tuple(
         product
@@ -118,14 +112,32 @@ def _match_product(products: Sequence[ResolvedProductDto], query: str) -> Produc
         if product.name is not None and product.name.casefold() == needle
     )
     if exact_name_hits:
-        return _resolution(exact_name_hits, query=query)
+        return _ProductMatch(
+            resolution=_resolution(exact_name_hits, query=query), field="exact_name"
+        )
 
     substring_hits = tuple(
         product
         for product in products
         if product.name is not None and needle in product.name.casefold()
     )
-    return _resolution(substring_hits, query=query)
+    return _ProductMatch(resolution=_resolution(substring_hits, query=query), field="substring")
+
+
+def _select_product_family(
+    products: Sequence[ResolvedProductDto], query: str
+) -> ProductResolution | tuple[ResolvedProductDto, ...]:
+    """Substring hits up to `_FAMILY_CAP` come back together. Anything else is today's match.
+
+    A duplicate short name or exact name stays ambiguous. More substring hits than the cap
+    falls back to that same elicitation.
+    """
+    match = _match_product(products, query)
+    if match.field == "substring" and isinstance(match.resolution, Ambiguous):
+        hits = tuple(candidate.value for candidate in match.resolution.candidates)
+        if len(hits) <= _FAMILY_CAP:
+            return hits
+    return match.resolution
 
 
 async def _fetch_product(client: BackstopClient, product_id: str) -> ProductResolution:
@@ -155,16 +167,11 @@ async def _fetch_product(client: BackstopClient, product_id: str) -> ProductReso
     )
 
 
-async def _index_products(
-    client: BackstopClient, *, name_like: str | None = None
-) -> tuple[ResolvedProductDto, ...]:
-    params: dict[str, object] = {"fields": _PRODUCT_FIELDS}
-    if name_like is not None:
-        params["filter[name][like]"] = name_like
+async def _index_products(client: BackstopClient) -> tuple[ResolvedProductDto, ...]:
     page = await client.paginate(
         _PRODUCTS_PATH,
         schema=_ProductResource,
-        params=params,
+        params={"fields": _PRODUCT_FIELDS},
         max_records=None,
         page_size=_PRODUCT_INDEX_PAGE_SIZE,
     )
@@ -194,8 +201,8 @@ async def resolve_product(
     """Resolve one product from a trusted id, a short name, or a name search.
 
     Exactly one of `product_id` or `product` must be set. A trusted id is one by-id request; a
-    name search uses `filter[name][like]` first, then the unfiltered catalog when that misses
-    (short names are not filterable). Ambiguous matches elicit once.
+    name search reads the unfiltered catalog once (short names are not filterable) and lets an
+    exact short name win before any name match. Ambiguous matches elicit once.
     """
     assert (product_id is None) != (product is None), (
         "Exactly one of product_id or product must be provided"
@@ -207,10 +214,36 @@ async def resolve_product(
     assert product is not None
     if not product.strip():
         return NotFound(query=product.strip(), scope=_SCOPE)
-    outcome = _match_product(await _index_products(client, name_like=product), product)
-    if isinstance(outcome, NotFound):
-        outcome = _match_product(await _index_products(client), product)
+    outcome = _match_product(await _index_products(client), product).resolution
     return await elicit_if_ambiguous(ctx, outcome)
+
+
+async def resolve_product_family(
+    ctx: Context,
+    client: BackstopClient,
+    *,
+    product: str,
+) -> tuple[ResolvedProductDto, ...] | Unresolved[ResolvedProductDto] | InputRequiredResult:
+    """Like `resolve_product`, except a name-substring match returns every vehicle up to the cap.
+
+    Digits are tried as a by-id GET first, the same way `resolve_product_query` does, so an
+    echoed id stays one request. A duplicate short name or exact name still elicits. More
+    substring hits than `_FAMILY_CAP` elicits too.
+    """
+    product = product.strip()
+    if not product:
+        return NotFound(query=product, scope=_SCOPE)
+    if product.isdigit():
+        by_id = await _fetch_product(client, product)
+        if isinstance(by_id, Resolved):
+            return (by_id.value,)
+    selected = _select_product_family(await _index_products(client), product)
+    if isinstance(selected, tuple):
+        return selected
+    outcome = await elicit_if_ambiguous(ctx, selected)
+    if input_required(outcome) or not isinstance(outcome, Resolved):
+        return outcome
+    return (outcome.value,)
 
 
 async def resolve_product_query(

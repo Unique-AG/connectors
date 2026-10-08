@@ -19,9 +19,11 @@ from backstop_mcp.features.party_resolver.require_exactly_one_party_selector imp
     require_path_segment,
 )
 from backstop_mcp.features.party_resolver.responses import (
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     REQUIRED_SEARCH_TYPE_DESCRIPTION,
     RESOLVED_PARTY_ECHO_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     PartyCandidateResponse,
@@ -33,6 +35,7 @@ from backstop_mcp.features.party_resolver.responses import (
 __all__ = [
     "BatchPartyResolution",
     "GetPartyNameQuery",
+    "PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION",
     "PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "PartyAmbiguousResponse",
     "PartyAttributes",
@@ -46,6 +49,7 @@ __all__ = [
     "ResolvePartyQuery",
     "ResolvedPartyDto",
     "ResolvedPartyResponse",
+    "SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION",
     "SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION",
     "SearchType",
     "blank_to_none",

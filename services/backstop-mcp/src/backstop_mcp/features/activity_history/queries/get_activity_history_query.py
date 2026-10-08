@@ -23,6 +23,7 @@ from datetime import UTC, date, datetime
 from urllib.parse import quote
 
 from backstop_mcp.backstop_client import (
+    BATCH_ABORTING_ERRORS,
     BackstopApiError,
     BackstopApiResource,
     BackstopApiSingleResourceDocument,
@@ -36,6 +37,10 @@ from backstop_mcp.features.activity_history.activity_type import (
 from backstop_mcp.features.activity_history.api_responses import (
     ActivityAttributes,
     EmailAttributes,
+)
+from backstop_mcp.features.activity_history.internal_dto import AttendeeDto
+from backstop_mcp.features.activity_history.queries.get_meeting_attendees_query import (
+    GetMeetingAttendeesQuery,
 )
 from backstop_mcp.features.activity_history.responses import (
     ActivityContinuationResponse,
@@ -51,7 +56,6 @@ from backstop_mcp.features.activity_history.responses import (
     TimelineRecord,
 )
 from backstop_mcp.features.includes import (
-    ActivityAttendeeResponse,
     ActivityIncludesResponse,
     include_plan,
 )
@@ -80,10 +84,15 @@ class GetActivityHistoryQuery:
     """Party record plus one page per requested stream, grouped for the published payload."""
 
     def __init__(
-        self, *, client: BackstopClient, build_entity_link_util: BuildEntityLinkUtil
+        self,
+        *,
+        client: BackstopClient,
+        build_entity_link_util: BuildEntityLinkUtil,
+        get_meeting_attendees_query: GetMeetingAttendeesQuery,
     ) -> None:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
+        self._get_meeting_attendees_query: GetMeetingAttendeesQuery = get_meeting_attendees_query
 
     async def run(
         self,
@@ -235,20 +244,23 @@ class GetActivityHistoryQuery:
             offset=offset,
         )
         raw_count = len(page.items)
+        resources = tuple(page.items)
+        if since is not None and until is not None:
+            resources, cutoff_hit = self._truncate_since(resources, stream=stream, since=since)
+            end_of_stream = cutoff_hit or raw_count < limit
+        else:
+            end_of_stream = raw_count < limit
+        attendees = await self._attendees(resources, stream=stream)
         items = tuple(
             self._record_from_resource(
                 resource,
                 stream=stream,
                 included=page.included,
+                attendees=row_attendees,
                 gist_max_chars=gist_max_chars,
             )
-            for resource in page.items
+            for resource, row_attendees in zip(resources, attendees, strict=True)
         )
-        if since is not None and until is not None:
-            items, cutoff_hit = self._truncate_since(items, since=since)
-            end_of_stream = cutoff_hit or raw_count < limit
-        else:
-            end_of_stream = raw_count < limit
         logger.info(
             "activity_history.activity_page.fetched",
             extra={
@@ -337,38 +349,78 @@ class GetActivityHistoryQuery:
         return {"filter[activityTagIds]": ",".join(activity_tag_ids)}
 
     def _truncate_since(
-        self, items: tuple[ActivityRecordResponse, ...], *, since: date
-    ) -> tuple[tuple[ActivityRecordResponse, ...], bool]:
-        """Drop the first item older than `since` and everything after (stream is `-effectiveDate`).
+        self,
+        resources: tuple[_ActivityResource, ...],
+        *,
+        stream: BackstopActivityType,
+        since: date,
+    ) -> tuple[tuple[_ActivityResource, ...], bool]:
+        """Drop the first row older than `since` and everything after (stream is `-effectiveDate`).
 
-        Items with a missing `occurred_at` never trip the cutoff — left intentional until we
-        confirm null-date ordering against the live Backstop API.
+        Rows with a missing `effectiveDate` never trip the cutoff — left intentional until we
+        confirm null-date ordering against the live Backstop API. Runs before the attendee
+        fetch so a truncated row costs no request.
         """
-        for index, item in enumerate(items):
-            if item.occurred_at is None:
+        for index, resource in enumerate(resources):
+            effective_date = resource.attributes.effective_date
+            if effective_date is None:
                 logger.debug(
                     "activity_history.since_truncate.null_date",
                     extra={
-                        "activity_id": item.activity_id,
-                        "stream": item.type,
+                        "activity_id": resource.id,
+                        "stream": stream,
                         "since": since.isoformat(),
                     },
                 )
                 continue
-            if item.occurred_at < since:
+            if effective_date < since:
                 logger.info(
                     "activity_history.since_truncate.cutoff",
                     extra={
-                        "activity_id": item.activity_id,
-                        "stream": item.type,
-                        "effective_date": item.occurred_at.isoformat(),
+                        "activity_id": resource.id,
+                        "stream": stream,
+                        "effective_date": effective_date.isoformat(),
                         "since": since.isoformat(),
                         "kept": index,
-                        "dropped": len(items) - index,
+                        "dropped": len(resources) - index,
                     },
                 )
-                return items[:index], True
-        return items, False
+                return resources[:index], True
+        return resources, False
+
+    async def _attendees(
+        self,
+        resources: Sequence[_ActivityResource],
+        *,
+        stream: BackstopActivityType,
+    ) -> tuple[tuple[AttendeeResponse, ...] | None, ...]:
+        """Attendees per meeting or call, aligned with `resources`. Other types stay absent.
+
+        One request per row: `/activities` rejects `include=attendees` (400). A missing id or a
+        failed lookup leaves that row's attendees absent; see `_attendee_responses` for the
+        failures that fail the page instead.
+        """
+        if stream not in {"meeting", "call"}:
+            return tuple(None for _ in resources)
+        resource_ids = tuple(
+            None
+            if resource.attributes.specific_resource is None
+            else resource.attributes.specific_resource.resource_id
+            for resource in resources
+        )
+        fetched = await asyncio.gather(
+            *(
+                self._get_meeting_attendees_query.run(resource_id=resource_id)
+                for resource_id in resource_ids
+                if resource_id is not None
+            ),
+            return_exceptions=True,
+        )
+        results = iter(fetched)
+        return tuple(
+            None if resource_id is None else self._attendee_responses(resource_id, next(results))
+            for resource_id in resource_ids
+        )
 
     def _record_from_resource(
         self,
@@ -376,6 +428,7 @@ class GetActivityHistoryQuery:
         *,
         stream: BackstopActivityType,
         included: list[dict[str, object]],
+        attendees: tuple[AttendeeResponse, ...] | None,
         gist_max_chars: int,
     ) -> ActivityRecordResponse:
         projected = _ACTIVITY_SIDE_LOADS.project(
@@ -389,7 +442,7 @@ class GetActivityHistoryQuery:
             stream,
             resource.attributes,
             tags=self._tag_chips(projected.activity_tags),
-            attendees=self._attendee_chips(projected.attendees),
+            attendees=attendees,
             gist_max_chars=gist_max_chars,
             url=self._record_url(stream, resource.attributes),
         )
@@ -425,11 +478,33 @@ class GetActivityHistoryQuery:
             chips.append(ActivityTagChipResponse(id=tag_id, name=name))
         return tuple(chips)
 
-    def _attendee_chips(
-        self, attendees: list[ActivityAttendeeResponse] | None
-    ) -> tuple[AttendeeResponse, ...]:
+    def _attendee_responses(
+        self,
+        resource_id: str,
+        fetched: tuple[AttendeeDto, ...] | BaseException,
+    ) -> tuple[AttendeeResponse, ...] | None:
+        """Map one attendee fetch onto the history row. A failure stays absent.
+
+        Cancellation and `BATCH_ABORTING_ERRORS` (auth, rate limit) are re-raised: every other
+        row's lookup would fail the same way, and the caller must see it, not empty attendees.
+        """
+        if isinstance(fetched, BaseException):
+            if not isinstance(fetched, Exception) or isinstance(fetched, BATCH_ABORTING_ERRORS):
+                raise fetched
+            logger.warning(
+                "activity_history.attendees.join_failed",
+                extra={"resource_id": resource_id},
+                exc_info=fetched,
+            )
+            return None
         return tuple(
-            AttendeeResponse(id=attendee.id, name=attendee.name) for attendee in attendees or ()
+            AttendeeResponse(
+                id=attendee.id,
+                name=attendee.name,
+                company=attendee.company_name,
+                job_title=attendee.job_title,
+            )
+            for attendee in fetched
         )
 
     def _group_page(

@@ -20,7 +20,7 @@ type ClientBuilder = Callable[[str], BackstopClient]
 LIVE_STAGES: tuple[dict[str, object], ...] = (
     {"id": "42478", "name": "Prospect", "sortOrder": 1, "closed": False, "probability": 0.05},
     {"id": "42480", "name": "Project", "sortOrder": 2, "closed": False, "probability": 0.1},
-    {"id": "42482", "name": "IDD", "sortOrder": 3, "closed": False, "probability": 0.3},
+    {"id": "42482", "name": "Stage B", "sortOrder": 3, "closed": False, "probability": 0.3},
     {
         "id": "85446",
         "name": "Client Approval",
@@ -141,7 +141,7 @@ class TestFetchingTheVocabulary:
         assert [stage.name for stage in in_order] == [
             "Prospect",
             "Project",
-            "IDD",
+            "Stage B",
             "Client Approval",
             "Execution",
             "Invested",
@@ -244,10 +244,10 @@ class TestFindByStageName:
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        stage = await _service(clients(base_url)).find_by_stage_name(name="idd")
+        stage = await _service(clients(base_url)).find_by_stage_name(name="stage b")
 
         assert stage.id == "42482"
-        assert stage.name == "IDD"
+        assert stage.name == "Stage B"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -257,7 +257,7 @@ class TestFindByStageName:
             return_value=_stages_response(*LIVE_STAGES)
         )
 
-        with pytest.raises(ToolError, match="Available stages:.*IDD"):
+        with pytest.raises(ToolError, match="Available stages:.*Stage B"):
             await _service(clients(base_url)).find_by_stage_name(name="Not A Stage")
 
     @pytest.mark.asyncio

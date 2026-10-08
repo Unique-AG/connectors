@@ -76,8 +76,8 @@ class TestBackstopConfigDefaults:
         assert config.base_url == "https://api.backstopsolutions.com"
         assert config.ui_base_url is None
         assert config.effective_ui_base_url is None
-        assert config.default_timeout_seconds == 30.0
-        assert config.reports_timeout_seconds == 120.0
+        assert config.default_timeout_seconds == 120.0
+        assert config.reports_timeout_seconds == 600.0
         assert config.max_concurrent_requests_per_user == 5
         assert config.max_retry_attempts == 5
         assert config.max_retry_wait_ms == 30_000

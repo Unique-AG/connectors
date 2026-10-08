@@ -55,7 +55,7 @@ def _stages_page() -> httpx.Response:
         200,
         json={
             "data": [
-                resource(_IDD, "opportunity-stages", name="IDD", closed=False),
+                resource(_IDD, "opportunity-stages", name="Stage B", closed=False),
                 resource(_PROJECT, "opportunity-stages", name="Project", closed=False),
             ],
             "links": {"next": None},
@@ -116,7 +116,7 @@ def _mock_stages_and_opportunities(*, entity_type_id: str | None = None) -> None
     )
 
 
-def _record(opportunity_id: str = "5755101", *, stage: str = "IDD") -> dict[str, object]:
+def _record(opportunity_id: str = "5755101", *, stage: str = "Stage B") -> dict[str, object]:
     return {
         "opportunity_id": opportunity_id,
         "stage": stage,

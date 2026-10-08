@@ -10,6 +10,7 @@ on:
         options:
           - docs/recordings-and-transcripts
           - services/confluence-connector/docs
+          - services/kb-mcp/docs
           - services/office-365-mcp/docs
           - services/outlook-semantic-mcp/docs
           - services/sharepoint-connector/docs

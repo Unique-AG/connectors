@@ -1,8 +1,7 @@
 """Wire response models for an activity-history tool payload.
 
-Standing caveats (documents excluded from the token budget concerns, same-day email-vs-activity
-ordering, the meaning of `activity_types`) belong in the tool description, not in this payload —
-see the design doc's "Token budget" section. This module carries no prose `notes` field.
+Standing caveats (same-day email-vs-activity ordering, the meaning of `activity_types`) belong
+in the tool description, not in this payload. This module carries no prose `notes` field.
 
 Neither `resource_type` nor `resource_id` is surfaced on its own on history rows:
 `activity_id` is already the composite `{resourceType}_{resourceId}` (see
@@ -42,10 +41,12 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
     MeetingSpecificsDto,
+    PartyLastActivityDto,
 )
 from backstop_mcp.features.collection_scan import (
     AggregateBucketDto,
     AggregateBucketResponse,
+    ContinuationResponse,
     ScanCoverageResponse,
     project_fields,
     scan_coverage,
@@ -63,6 +64,12 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import OmitNoneModel
 
+FILTER_IGNORED_DISCLAIMER = (
+    "Backstop paged over a different set than the filters asked for, so the kept rows "
+    "are not the full answer. Coverage is unreliable. Do not treat these rows, or an "
+    "empty list, as complete."
+)
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -78,7 +85,11 @@ __all__ = [
     "DateRangeResponse",
     "EmailRecordResponse",
     "GetActivityHistoryResponse",
+    "GetLastActivityForPartiesResponse",
     "GetSearchActivitiesResponse",
+    "LastActivityForPartiesResolvedResponse",
+    "LastActivityResponse",
+    "PartyLastActivityResponse",
     "ResolvedPartyAsOfResponse",
     "SearchActivitiesResolvedResponse",
     "SearchActivitiesRowResponse",
@@ -87,15 +98,11 @@ __all__ = [
 ]
 
 _MAX_RECIPIENTS = 3
-_FULL_BODY_MAX_CHARS = 10_000_000
+# Snippet on every search row. The full body is `description`, and only when requested.
 _SHORT_DESCRIPTION_MAX_CHARS = 400
-_DESCRIPTION_ROW_CAP_DISCLAIMER = (
-    "include_description capped row bodies at 50; raising max_rows has no effect while that "
-    "flag is set."
-)
 
 
-def _plain_text(html: str | None, *, max_chars: int) -> str | None:
+def _markdown(html: str | None, *, max_chars: int | None = None) -> str | None:
     if not html:
         return None
     text = extract_gist_from_html(html, max_chars=max_chars).text
@@ -192,6 +199,17 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
         ActivityType,
         Field(description="Which stream this group is: meeting, call, note, email, or document."),
     ]
+    next: Annotated[
+        ActivityContinuationResponse | None,
+        Field(
+            description=(
+                "Params to fetch this stream's next page. Omitted (or null) once the stream is "
+                "exhausted. To continue, copy this object exactly, field for field, into a "
+                "`type=next` request's `next` map under this `activity_type`. Never edit or "
+                "compute its values."
+            ),
+        ),
+    ] = None
     items: Annotated[
         tuple[ItemT, ...],
         Field(description="This page's records for `activity_type`, in Backstop fetch order."),
@@ -202,16 +220,6 @@ class ActivityGroupResponse[ItemT](OmitNoneModel):
             description=(
                 "Oldest and newest `occurred_at` dates among this page's dated items. Omitted "
                 "(or null) when the page is empty or every item lacks a date."
-            ),
-        ),
-    ] = None
-    next: Annotated[
-        ActivityContinuationResponse | None,
-        Field(
-            description=(
-                "Params to fetch this stream's next page. Omitted (or null) once the stream is "
-                "exhausted. To continue, copy this object into a `type=next` request's `next` "
-                "map under this `activity_type`."
             ),
         ),
     ] = None
@@ -286,11 +294,23 @@ class AttendeeResponse(OmitNoneModel):
     id: str | None = Field(
         default=None,
         description=(
-            "Backstop people id when side-loaded on the timeline. Pass it as party_id to "
-            "get_person. Omitted on get_activity_detail, which does not receive people ids."
+            "Backstop people id of an attendee. Pass it as party_id with search_type people "
+            "to get_person. Present on get_activity_detail and on get_activity_history "
+            "meeting and call rows."
         ),
     )
     name: str | None = Field(default=None, description="Display name of the attendee.")
+    company: str | None = Field(
+        default=None,
+        description=(
+            "The attendee's firm; separate our own staff from investor attendees by comparing "
+            "it to our firm's name."
+        ),
+    )
+    job_title: str | None = Field(
+        default=None,
+        description="Job title as Backstop stores it on the attendee.",
+    )
 
 
 class ActivityAttachmentResponse(OmitNoneModel):
@@ -328,8 +348,8 @@ class ActivityRecordResponse(OmitNoneModel):
     resource_id: str | None = Field(
         default=None,
         description=(
-            "Backstop resource id when present. Distinct from `activity_id`; used internally "
-            "for related fetches."
+            "Id of the underlying meeting-or-call, note, or document record, when Backstop "
+            "sends one. Not a `get_activity_detail` handle — pass `activity_id` there."
         ),
     )
     url: str | None = Field(
@@ -381,11 +401,12 @@ class ActivityRecordResponse(OmitNoneModel):
             "into activity_tag_ids; never invent one. Look up names with list_activity_tags."
         ),
     )
-    attendees: tuple[AttendeeResponse, ...] = Field(
-        default=(),
+    attendees: tuple[AttendeeResponse, ...] | None = Field(
+        default=None,
         description=(
-            "People listed on a meeting or call. Empty for a note or document, and when a "
-            "meeting has no attendees."
+            "Structured attendees on a meeting or call. Absent when this row is not a "
+            "meeting or call, or when the attendee lookup failed. Empty when the record "
+            "has no attendees. Never take attendee names from the title, gist, or description."
         ),
     )
 
@@ -397,7 +418,7 @@ class ActivityRecordResponse(OmitNoneModel):
         attributes: ActivityAttributes,
         *,
         tags: tuple[ActivityTagChipResponse, ...],
-        attendees: tuple[AttendeeResponse, ...],
+        attendees: tuple[AttendeeResponse, ...] | None,
         gist_max_chars: int,
         url: str | None,
     ) -> Self:
@@ -431,7 +452,7 @@ class EmailRecordResponse(OmitNoneModel):
             "Handle for this email on the `/emails` collection. Emails have no body on this "
             "tool — subject and addresses only. Do not pass this to `get_activity_detail`: "
             "history email ids are not `/entity-activity-details` ids. Use `search_activities` "
-            "for the body and attachment list."
+            "for the body; it reports `attachments_count`, not file names."
         ),
     )
     occurred_at: datetime | None = Field(
@@ -590,9 +611,9 @@ class ActivityDetailResponse(OmitNoneModel):
 
     `type`, `title`, `body` and `attachments` come from `entity-activity-details`; `start`/`stop`/
     `location`/`time_zone` and `attendees` come from `/meeting-or-calls/{resource_id}`, which is
-    only fetched for a meeting-or-calls handle (it 404s for a note or document — see
-    `queries/get_activity_detail_query.py`). Meeting fields are therefore absent for a note
-    or document because nobody asked, not because Backstop returned nothing. The attachment
+    fetched for a meeting-or-calls handle, or for a bare id whose detail `type` is meeting or
+    call (it 404s for a note or document — see `queries/get_activity_detail_query.py`). Meeting
+    fields are therefore absent for a note or document because nobody asked. The attachment
     list is this tool's one unique capability versus `search_activities`, which only
     publishes a count.
     """
@@ -670,7 +691,7 @@ class ActivityDetailResponse(OmitNoneModel):
         `detail.resource_id`, so what comes back is byte-identical to what went in — and stays
         a handle the model can pass straight back to this tool.
         """
-        gist = extract_gist_from_html(detail.description or "", max_chars=_FULL_BODY_MAX_CHARS)
+        gist = extract_gist_from_html(detail.description or "")
         return cls(
             activity_id=activity_id,
             type=detail.type,
@@ -680,7 +701,15 @@ class ActivityDetailResponse(OmitNoneModel):
             stop=None if specifics is None else specifics.stop,
             location=None if specifics is None else specifics.location,
             time_zone=None if specifics is None else specifics.time_zone,
-            attendees=[AttendeeResponse(name=attendee.name) for attendee in attendees],
+            attendees=[
+                AttendeeResponse(
+                    id=attendee.id,
+                    name=attendee.name,
+                    company=attendee.company_name,
+                    job_title=attendee.job_title,
+                )
+                for attendee in attendees
+            ],
             attachments=tuple(
                 ActivityAttachmentResponse(id=item.id, name=item.name)
                 for item in detail.attachments
@@ -690,15 +719,15 @@ class ActivityDetailResponse(OmitNoneModel):
 
 
 class SearchActivitiesUnavailableResponse(OmitNoneModel):
-    """The undocumented search endpoint did not answer. Not 'there is no activity'."""
+    """POST /entity-activities did not answer. Not 'there is no activity'."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     status: Literal["unavailable"] = Field(
         default="unavailable",
         description=(
-            "Always 'unavailable': POST /entity-activities failed. This is not an empty "
-            "result — the primary path is undocumented and may 404 on another tenant."
+            "Always 'unavailable': the activity search did not answer. This is not an empty "
+            "result and not 'no activity'."
         ),
     )
     fallback_tool: Literal["get_activity_history"] = Field(
@@ -727,24 +756,23 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     id: str = Field(
         description=(
             "Same value as `activity_id`. Pass either to get_activity_detail. Distinct from "
-            "the composite `meeting-or-calls_{id}` get_activity_history returns, which also "
+            "the composite `meeting-or-calls_<id>` get_activity_history returns, which also "
             "works there. History email ids do not. Never invent one."
         )
     )
     activity_id: str = Field(
         description=(
-            "Pass this to get_activity_detail. Same value as `id` — the id "
-            "`/entity-activity-details` uses. A get_activity_history `activity_id` "
-            "(`meeting-or-calls_76537547`) also works. History email ids do not."
+            "Pass this to get_activity_detail. Same value as `id`. A get_activity_history "
+            "`activity_id` (`meeting-or-calls_<id>`) also works. History email ids do not."
         )
     )
     url: str | None = Field(
         default=None,
         description=(
             "Canonical CRM UI URL for this activity. Not in the default fieldset — select "
-            "`url` to get it, since one URL per row is dead weight on a wide sweep. Omitted "
-            "when this deployment has no UI origin, or when the row's `type` has no CRM page "
-            "(a bare `meeting_call` cannot choose meetings vs calls). Echo it; never invent one."
+            "`url` to get it, since one URL per row is dead weight on a firm-wide search. Omitted "
+            "when this deployment has no UI origin, or when the row's `type` has no CRM page. "
+            "Echo it; never invent one."
         ),
     )
     type: str | None = Field(
@@ -793,31 +821,40 @@ class SearchActivitiesRowResponse(OmitNoneModel):
     short_description: str | None = Field(
         default=None,
         description=(
-            "Plain-text snippet from Backstop's shortDescription (HTML entities decoded). "
-            "Full body is `description` when include_description was set."
+            "Markdown snippet converted from Backstop's short description, cut at a word "
+            "boundary to 400 characters. Full body is `description` when include_description "
+            "was set."
         ),
     )
     description: str | None = Field(
         default=None,
         description=(
-            "Plain-text body from formattedDescription. Only present when include_description "
-            "was true. `attachments_count` is a count only — pass `activity_id` to "
-            "`get_activity_detail` for the file list."
+            "Full body converted to markdown, not truncated. Only present when "
+            "include_description was true."
         ),
     )
     attachments_count: int | None = Field(
         default=None,
         description=(
             "How many files are attached. A count only — pass `activity_id` to "
-            "`get_activity_detail` for the file list."
+            "`get_activity_detail` for the names. Do not assume what the files are."
         ),
     )
     author: AttendeeResponse | None = Field(
-        default=None, description="Who authored this activity, when Backstop publishes one."
+        default=None,
+        description=(
+            "Who authored this activity, when Backstop publishes one. The author is a CRM "
+            "user: `id` is a system-user id, not a people id — do not pass it to get_person."
+        ),
     )
     attendees: tuple[str, ...] | None = Field(
         default=None,
-        description="Attendee display names on a meeting or call. No people ids on this path.",
+        description=(
+            "Full display names from the structured Attendees field, on meeting and call rows "
+            "only. Use these for attendee columns in a table — not names read out of the title, "
+            "gist, or description. Names only: when a meeting or call row has none, or you need "
+            "a people id or firm, call get_activity_detail with this row's `activity_id`."
+        ),
     )
     tags: tuple[ActivityTagChipResponse, ...] | None = Field(
         default=None,
@@ -849,17 +886,18 @@ class SearchActivitiesRowResponse(OmitNoneModel):
         A row the caller cannot identify is no use.
 
         The two description fields are the only ones whose published shape is not their stored
-        shape: Backstop sends HTML and this publishes plain text, truncated. They are computed
-        here only when selected, since flattening a note body is the expensive part of a row.
+        shape: Backstop sends HTML and this publishes markdown (`short_description` truncated).
+        They are computed here only when selected, since converting a note body is the
+        expensive part of a row.
         """
         include = fields | {"id", "activity_id"}
         overrides: dict[str, object] = {"activity_id": row.id, "url": url}
         if "short_description" in include:
-            overrides["short_description"] = _plain_text(
+            overrides["short_description"] = _markdown(
                 row.short_description, max_chars=_SHORT_DESCRIPTION_MAX_CHARS
             )
         if "description" in include:
-            overrides["description"] = _plain_text(row.description, max_chars=_FULL_BODY_MAX_CHARS)
+            overrides["description"] = _markdown(row.description)
         return project_fields(row, fields=include, into=cls, overrides=overrides)
 
 
@@ -890,16 +928,31 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
     coverage: ScanCoverageResponse = Field(
         description="How much of the matching set was scanned, and whether it was truncated."
     )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when more rows may match than this page holds. Omitted when the rows "
+            "are complete, in aggregate mode, or at the 10000 ceiling (see `coverage`)."
+        ),
+    )
     rows: tuple[SearchActivitiesRowResponse, ...] = Field(
         default=(),
         description=(
-            "Matching activities in Backstop's newest-effectiveDate-first order. Empty in "
-            "aggregate mode."
+            "One page of matching activities in Backstop's newest-effectiveDate-first order. "
+            "Empty in aggregate mode."
         ),
     )
     aggregates: tuple[AggregateBucketResponse, ...] = Field(
         default=(),
         description="Count buckets in aggregate mode. Empty in rows mode.",
+    )
+    server_filter_ignored: tuple[str, ...] | None = Field(
+        default=None,
+        description=(
+            "Filters Backstop accepted and then did not apply: effective_date, types, "
+            "activity_tags, party, or total_count (the 10000 ceiling on a scoped search). "
+            f"{FILTER_IGNORED_DISCLAIMER}"
+        ),
     )
 
     @classmethod
@@ -913,16 +966,17 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
         ceiling: int,
         urls: Mapping[str, str | None],
         aggregates: tuple[AggregateBucketDto, ...] = (),
-        description_row_capped: bool = False,
+        continuation: ContinuationResponse | None = None,
     ) -> Self:
-        extra = (_DESCRIPTION_ROW_CAP_DISCLAIMER,) if description_row_capped else ()
+        extra: tuple[str, ...] = ()
+        if any(name != "total_count" for name in fetch.server_filter_ignored):
+            extra = (FILTER_IGNORED_DISCLAIMER,)
         coverage = scan_coverage(
             rows_scanned=fetch.rows_received,
             visible_count=fetch.total_count,
             rows_dropped=fetch.rows_dropped,
             ceiling=ceiling,
             ceiling_clamped=fetch.ceiling_clamped,
-            truncated_by_row_cap=fetch.truncated_by_row_cap,
             partial_due_to_error=fetch.partial_due_to_error,
             extra_disclaimers=extra,
         )
@@ -937,7 +991,9 @@ class SearchActivitiesResolvedResponse(OmitNoneModel):
             mode=mode,
             coverage=coverage,
             rows=rows,
+            continuation=continuation,
             aggregates=tuple(AggregateBucketResponse.from_dto(bucket) for bucket in aggregates),
+            server_filter_ignored=fetch.server_filter_ignored or None,
         )
 
 
@@ -946,4 +1002,134 @@ type GetSearchActivitiesResponse = (
     | NotFoundResponse
     | SearchActivitiesUnavailableResponse
     | SearchActivitiesResolvedResponse
+)
+
+
+class LastActivityResponse(OmitNoneModel):
+    """The newest activity found for one party in the window."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    id: str = Field(
+        description="Pass to get_activity_detail as `activity_id` for the body. Never invent one."
+    )
+    type: str | None = Field(
+        default=None, description="Activity type as Backstop labels it (meeting, call, note, ...)."
+    )
+    title: str | None = Field(default=None, description="Activity title.")
+    effective_date: date | None = Field(
+        default=None, description="Day the activity is dated. Bucket parties on this."
+    )
+
+
+class PartyLastActivityResponse(OmitNoneModel):
+    """One party's newest activity in the window, or why it cannot be told."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    party_id: str = Field(description="The `party_id` that was passed. Join back on this.")
+    search_type: SearchType = Field(description="The `search_type` that was passed.")
+    status: Literal["found", "none_in_window", "unknown"] = Field(
+        description=(
+            "`found`: `last_activity` is the newest activity in the window. `none_in_window`: "
+            "Backstop searched this party and returned nothing in the window — a definite "
+            "'no activity'. `unknown`: the search failed or Backstop ignored a filter; never "
+            "report an `unknown` party as inactive. Retry it or say it could not be checked."
+        )
+    )
+    last_activity: LastActivityResponse | None = Field(
+        default=None, description="Present when `status` is `found`."
+    )
+    days_since_last_activity: int | None = Field(
+        default=None,
+        description="Days from `last_activity.effective_date` to the window's `end_date`.",
+    )
+    activity_count: int | None = Field(
+        default=None,
+        description=(
+            "Activities of the requested types in the window that this credential can see. "
+            "Absent when `status` is `unknown`. 10000 means at least 10000: Backstop "
+            "saturates there."
+        ),
+    )
+    reason: str | None = Field(
+        default=None, description="Why `status` is `unknown`: the error or the ignored filter."
+    )
+
+    @classmethod
+    def from_dto(cls, dto: PartyLastActivityDto, *, end_date: date) -> Self:
+        fetch = dto.fetch
+        if fetch is None:
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="unknown",
+                reason=dto.error,
+            )
+        ignored = tuple(name for name in fetch.server_filter_ignored if name != "total_count")
+        if ignored:
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="unknown",
+                reason=(
+                    "Backstop ignored these filters: "
+                    + ", ".join(ignored)
+                    + ". The result is not scoped to this party and window."
+                ),
+            )
+        if not fetch.rows:
+            if fetch.partial_due_to_error or fetch.rows_dropped:
+                return cls(
+                    party_id=dto.party_id,
+                    search_type=dto.search_type,
+                    status="unknown",
+                    reason="Backstop returned rows that could not be read.",
+                )
+            return cls(
+                party_id=dto.party_id,
+                search_type=dto.search_type,
+                status="none_in_window",
+                activity_count=0,
+            )
+        row = fetch.rows[0]
+        return cls(
+            party_id=dto.party_id,
+            search_type=dto.search_type,
+            status="found",
+            last_activity=LastActivityResponse(
+                id=row.id, type=row.type, title=row.title, effective_date=row.effective_date
+            ),
+            days_since_last_activity=(
+                None if row.effective_date is None else (end_date - row.effective_date).days
+            ),
+            activity_count=fetch.total_count,
+        )
+
+
+class LastActivityForPartiesResolvedResponse(OmitNoneModel):
+    """Each requested party's newest activity in one window."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description="Always 'resolved': every party was searched. Read each party's `status`.",
+    )
+    start_date: date = Field(description="Inclusive start of the window searched.")
+    end_date: date = Field(description="Inclusive end of the window searched.")
+    types: tuple[str, ...] = Field(description="Activity types that counted as activity.")
+    parties: tuple[PartyLastActivityResponse, ...] = Field(
+        description="One entry per distinct party passed, in the order passed."
+    )
+    unknown_count: int = Field(
+        description=(
+            "Parties whose `status` is `unknown`. When non-zero, say those could not be "
+            "checked — do not fold them into the inactive list."
+        )
+    )
+
+
+type GetLastActivityForPartiesResponse = (
+    SearchActivitiesUnavailableResponse | LastActivityForPartiesResolvedResponse
 )

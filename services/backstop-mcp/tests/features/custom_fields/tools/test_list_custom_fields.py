@@ -57,6 +57,19 @@ def _investor_status(**extra: object) -> dict[str, object]:
     )
 
 
+def _organization_field(definition_id: str, name: str, **extra: object) -> dict[str, object]:
+    attributes: dict[str, object] = {
+        "entityType": "OrganizationBean",
+        "fieldType": "picklist",
+        "isTimeSeries": False,
+        "tabName": "Overview",
+        "groupName": "Status",
+        "layoutName": "Organization",
+        "resourceType": "organizations",
+    }
+    return resource(definition_id, "custom-field-definitions", name=name, **(attributes | extra))
+
+
 def _person_grade(**extra: object) -> dict[str, object]:
     return resource(
         "100",
@@ -118,6 +131,42 @@ class TestListCustomFieldsTool:
         assert organizations[0].group_name == "Status"
         assert organizations[0].layout_name == "Organization"
         assert organizations[0].resource_type == "organizations"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_search_matches_name_tab_group_or_option_in_any_case(self) -> None:
+        base_url = tenant("cf-list-search")
+        _definitions_route(
+            base_url,
+            _investor_status(),
+            _organization_field("101", "Event", groupName="GVS - September 2026"),
+            _organization_field("102", "Tier", selectOptions=["Gold", "Silver"]),
+        )
+
+        async with tool_client(base_url) as client:
+            service = custom_fields_service(client)
+            found = {
+                term: [
+                    item.id
+                    for item in tool_model(
+                        await list_custom_fields(
+                            entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                            search=term,
+                            custom_fields=service,
+                        ),
+                        ListCustomFieldsResponse,
+                    ).definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS]
+                ]
+                for term in ("gvs", "  OVERVIEW ", "silver", "IS1", "nothing")
+            }
+
+        assert found == {
+            "gvs": ["101"],
+            "  OVERVIEW ": ["99", "101", "102"],
+            "silver": ["102"],
+            "IS1": ["99"],
+            "nothing": [],
+        }
 
     @pytest.mark.asyncio
     @respx.mock

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.opportunities.api_responses import OpportunityResource
@@ -34,17 +34,35 @@ class MapOpportunityToResponseUtil:
         *,
         row: OpportunityResource,
         api_include_resources: Sequence[dict[str, object]],
-        custom_fields_filters: CustomFieldFilters,
+        custom_fields_filters: CustomFieldFilters | None,
         include_stage_history: bool = True,
         url: str | None,
+        stage_id_to_name: Mapping[str, str] | None = None,
     ) -> OpportunityResponse:
+        """Map one row.
+
+        `custom_fields_filters=None` skips the catalog join and leaves `custom_field_values`
+        empty, for a caller that publishes the stored values instead. A caller mapping many rows
+        against one `included` array passes `stage_id_to_name` from `get_stage_id_to_name_map`
+        once, rather than having every row rescan `included` for the same stages.
+        """
         stage_id = first_item(row.related_ids("stage"))
 
-        custom_field_values = await self._custom_fields_service.join_values(
-            row.attributes.regular_custom_field_values,
-            filters=custom_fields_filters,
+        custom_field_values = (
+            ()
+            if custom_fields_filters is None
+            else tuple(
+                await self._custom_fields_service.join_values(
+                    row.attributes.regular_custom_field_values,
+                    filters=custom_fields_filters,
+                )
+            )
         )
-        preloaded_opportunity_id_to_name = get_stage_id_to_name_map(api_include_resources)
+        preloaded_opportunity_id_to_name = (
+            stage_id_to_name
+            if stage_id_to_name is not None
+            else get_stage_id_to_name_map(api_include_resources)
+        )
         stage_name = await self._opportunity_stages_service.get_stage_name(
             stage_id=stage_id, preloaded_opportunity_id_to_name=preloaded_opportunity_id_to_name
         )
@@ -63,6 +81,6 @@ class MapOpportunityToResponseUtil:
             stage=stage_name,
             stage_id=stage_id,
             stage_history=stage_history,
-            custom_field_values=tuple(custom_field_values),
+            custom_field_values=custom_field_values,
             url=url,
         )

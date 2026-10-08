@@ -24,7 +24,9 @@ from mcp.types import (
     InputResponse,
 )
 from mcp.types.version import LATEST_MODERN_VERSION
+from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.message import Message
+from msgraph.generated.models.recipient import Recipient
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -35,7 +37,7 @@ from office_365_mcp.tools.outlook_send_draft import MailSent, a_person_agrees, s
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
-_DRAFT_REF = "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
+_DRAFT_REF = "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 
 _DRAFT_PATH = "/me/messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 _SEND_PATH = f"{_DRAFT_PATH}/send"
@@ -84,6 +86,32 @@ async def _agrees(draft: Message, mailbox: str | None) -> Confirmed:
     assert draft is not None
     assert mailbox is None or mailbox
     return None
+
+
+def _recipients(*addresses: str) -> list[Recipient]:
+    return [Recipient(email_address=EmailAddress(address=one)) for one in addresses]
+
+
+async def _question_about(draft: Message) -> str:
+    asked: list[str] = []
+
+    class _Client:
+        request_context: object = None
+
+        async def elicit(self, message: str, response_type: object = None) -> object:
+            asked.append(message)
+            assert response_type is not None
+            return AcceptedElicitation(data=sender.SEND)
+
+    confirm = a_person_agrees(cast("Context", cast("object", _Client())))
+    _ = await confirm(draft, None)
+
+    assert len(asked) == 1
+    return asked[0]
+
+
+async def _never_asked(draft: Message, mailbox: str | None) -> Confirmed:
+    raise AssertionError(f"a person was asked about {draft!r} as {mailbox!r}")
 
 
 async def _refuses(draft: Message, mailbox: str | None) -> Confirmed:
@@ -245,6 +273,30 @@ class TestHowTheQuestionReachesAPerson:
 
         assert len(asked) == 1
         assert "alex@example.invalid" in asked[0]
+
+    async def test_the_question_text_names_each_blind_copy_recipient_as_one(self) -> None:
+        question = await _question_about(
+            Message(
+                subject="Invoice 4471",
+                to_recipients=_recipients(_ADA),
+                cc_recipients=_recipients(_GRACE),
+                bcc_recipients=_recipients(_PAM),
+            )
+        )
+
+        assert _ADA in question
+        assert _GRACE in question
+        assert f"{_PAM} (blind copy)" in question
+
+    async def test_a_draft_with_only_a_blind_copy_recipient_is_not_described_as_going_nowhere(
+        self,
+    ) -> None:
+        question = await _question_about(
+            Message(subject="Invoice 4471", bcc_recipients=_recipients(_PAM))
+        )
+
+        assert f"{_PAM} (blind copy)" in question
+        assert "nobody" not in question
 
     async def test_the_question_text_names_no_mailbox_when_sending_as_the_signed_in_user(
         self,
@@ -476,6 +528,7 @@ class TestWhatItAsksGraphFor:
         selected = read.calls.last.request.url.params["$select"]
         assert "toRecipients" in selected
         assert "ccRecipients" in selected
+        assert "bccRecipients" in selected
         assert "subject" in selected
         assert "isDraft" in selected
 
@@ -579,37 +632,26 @@ class TestTheMessagesItRefusesToSend:
 
         assert send.call_count == 0
 
-    async def test_the_refusal_says_the_mail_may_already_have_gone(
+    async def test_the_refusal_names_both_ways_a_message_can_be_no_draft(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph, _draft(is_draft=False))
 
-        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL"):
+        with pytest.raises(ToolError, match="NOTHING WAS SENT BY THIS CALL") as refusal:
             _ = await send_draft(client, confirm=_agrees, draft_ref=_DRAFT_REF)
 
-    async def test_a_message_handle_is_refused_and_told_why(
+        assert "sent to the user" in str(refusal.value)
+        assert "already sent" in str(refusal.value)
+
+    async def test_mail_a_reader_found_is_read_refused_and_nobody_is_asked(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _ = _ready(graph)
+        send = _ready(graph, _draft(is_draft=False))
 
-        with pytest.raises(ToolError, match="COMPOSED"):
-            _ = await send_draft(
-                client,
-                confirm=_agrees,
-                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-            )
-
-        assert len(graph.calls) == 0, "a refused argument never reaches the mailbox"
-
-    async def test_the_message_refusal_points_at_the_drafting_tools(
-        self, client: GraphServiceClient
-    ) -> None:
         with pytest.raises(ToolError, match="outlook_draft_reply"):
-            _ = await send_draft(
-                client,
-                confirm=_agrees,
-                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-            )
+            _ = await send_draft(client, confirm=_never_asked, draft_ref=_DRAFT_REF)
+
+        assert send.call_count == 0
 
     @pytest.mark.parametrize(
         "draft_ref",
@@ -617,20 +659,21 @@ class TestTheMessagesItRefusesToSend:
             "outlook:///folders/AQMkADAwSYNTHETIC-folder",
             "outlook:///rules/SYNTHETIC-rule-0001",
             "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
-            "outlook:///drafts/",
-            "outlook:///drafts/%20",
+            "outlook:///messages/",
+            "outlook:///messages/%20",
+            "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D",
             "AAMkAGI2SYNTHETIC-draft-0001=",
             "https://outlook.office365.invalid/owa/?ItemID=synthetic-draft",
             _SUBJECT,
             _ADA,
         ],
     )
-    async def test_anything_that_is_not_a_draft_handle_never_reaches_graph(
+    async def test_anything_that_is_not_a_message_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, draft_ref: str
     ) -> None:
         _ = _ready(graph)
 
-        with pytest.raises(ToolError):
+        with pytest.raises(ToolError, match="outlook:///messages/"):
             _ = await send_draft(client, confirm=_agrees, draft_ref=draft_ref)
 
         assert len(graph.calls) == 0

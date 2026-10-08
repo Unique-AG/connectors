@@ -6,8 +6,8 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
     require_path_segment,
@@ -42,10 +42,10 @@ class EndEmploymentInput(BaseModel):
         default="people", description=_PERSON_SEARCH_TYPE_DESCRIPTION
     )
     party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     organization_id: NonEmptyStr | None = Field(
         default=None,

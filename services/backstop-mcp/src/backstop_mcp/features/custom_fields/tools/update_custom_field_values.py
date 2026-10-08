@@ -41,17 +41,16 @@ async def update_custom_field_values(
     """Write custom-field values on one person, organization, or opportunity.
 
     Identify each field by `definition_id` from `list_custom_fields`, never by name. An
-    opportunity has a custom field literally called Probability that is not the native
-    `probability` attribute. Time-series vs regular branching comes from the catalog: a
-    time-series field needs `effective_date`; a regular field rejects one. Picklist values
-    must match current options. Only the fields you list are touched — omit a field to leave
-    it unchanged, and send `value: null` only when you mean to clear it. Do not write custom
-    fields on `update_opportunity` — that
-    skips this validation. The entity id comes from `get_person`, `get_organization`, or
-    `get_opportunities`. A `201` is not success: read `records[].status`.
+    Time-series vs regular branching comes from the catalog: a time-series field needs
+    `effective_date`; a regular field rejects one. Picklist values must match current
+    options. Only the fields you list are touched — omit a field to leave it unchanged,
+    and send `value: null` only when you mean to clear it. `update_custom_field_values`
+    is the only writer. The entity id comes from `get_person`, `get_organization`, or
+    `get_opportunities`. Success is `applied_count == total_count` and each
+    `records[].status`.
 
     Call like: {"update": {"entity_type": "people", "entity_id": "<id from get_person>",
-    "values": [{"definition_id": 9823191, "value": "Direct"}]}}
+    "values": [{"definition_id": "<id from list_custom_fields>", "value": "Direct"}]}}
     """
     logger.info(
         "custom_fields.update_values.start",

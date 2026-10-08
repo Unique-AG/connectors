@@ -13,8 +13,8 @@ def get_list_contact_sources_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> ListContactSourcesQuery:
     # CACHING CANDIDATE, off unless `BACKSTOP_CONTACT_SOURCE_CACHE_ENABLED=true`: by default
-    # every read walks `/contact-sources`. Thirteen rows on the instance this was built
-    # against — decide from the two histograms in `caching/cached_value.py`
+    # every read walks `/contact-sources`. The collection is small — decide from the two
+    # histograms in `metrics.py`
     # (`catalog="contact-source"`) whether a TTL is worth the staleness.
     config = get_backstop_config()
     return ListContactSourcesQuery(

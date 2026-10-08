@@ -10,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.elicitation import AcceptedElicitation
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.features.activity_history import GetActivityDetailQuery
+from backstop_mcp.features.activity_history import GetActivityDetailQuery, GetMeetingAttendeesQuery
 from backstop_mcp.features.activity_writes import (
     DeleteActivityInput,
     DeletedActivityResponse,
@@ -79,6 +79,7 @@ class TestDeleteActivity:
                     get_activity_detail_query=GetActivityDetailQuery(
                         client=client,
                         build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                        get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                     ),
                     delete_activity_command=get_delete_activity_command_factory(client),
                 ),
@@ -130,6 +131,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             ),
@@ -161,6 +163,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
@@ -184,6 +187,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
@@ -207,6 +211,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
@@ -230,6 +235,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
@@ -250,6 +256,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             )
@@ -283,6 +290,7 @@ class TestDeleteActivity:
                 get_activity_detail_query=GetActivityDetailQuery(
                     client=client,
                     build_entity_link_util=BuildEntityLinkUtil(ui_base_url=None),
+                    get_meeting_attendees_query=GetMeetingAttendeesQuery(client=client),
                 ),
                 delete_activity_command=get_delete_activity_command_factory(client),
             ),

@@ -59,7 +59,7 @@ class TestBackfillOpportunityStageHistory:
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": [resource(_IDD, "opportunity-stages", name="IDD", closed=False)],
+                    "data": [resource(_IDD, "opportunity-stages", name="Stage B", closed=False)],
                     "links": {"next": None},
                 },
             )
@@ -119,7 +119,7 @@ class TestBackfillOpportunityStageHistory:
                         "records": [
                             {
                                 "opportunity_id": "5755101",
-                                "stage": "IDD",
+                                "stage": "Stage B",
                                 "effective_date": date(2026, 2, 1),
                             }
                         ]

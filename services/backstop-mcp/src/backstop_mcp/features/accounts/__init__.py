@@ -1,6 +1,7 @@
 """Product index, account listing, series latest-point, and holdings / time-series shapes.
 
-`resolve_product` matches id, `productShortName`, and name against one `GET /products` page.
+`resolve_product` matches a trusted id by one GET, and anything else over one full catalog walk
+(an exact short name first) — not one `GET /products` page.
 It does not use `ResolvePartyQuery`: that path is `/quick-search`, which misses short names.
 Account listing walks `/accounts` with `include=owner,investorType` (and `product` by party).
 Figures are `sort=-date` (first 10 rows) then `max(date)` — not a `filter[date][ge]` window —
@@ -12,13 +13,16 @@ from backstop_mcp.features.accounts.dependencies import (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
-    get_product_query_factory,
+    get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     get_time_series_query_factory,
+    search_products_query_factory,
 )
 from backstop_mcp.features.accounts.internal_dto import (
     AccountListingDto,
     AccountOwnerDto,
     AccountRecordDto,
+    AccountSpanDto,
     HoldingFigureErrorDto,
     HoldingListingDto,
     HoldingRowDto,
@@ -29,6 +33,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ProductResolution,
     ResolvedProductDto,
     ShareDto,
+    TenureDto,
 )
 from backstop_mcp.features.accounts.queries import (
     ACCOUNT_SERIES,
@@ -37,16 +42,21 @@ from backstop_mcp.features.accounts.queries import (
     GetAccountsForProductQuery,
     GetCapitalFlowsQuery,
     GetHoldingsQuery,
-    GetProductQuery,
+    GetLatestAccountValuesQuery,
+    GetProductInvestorsQuery,
     GetTimeSeriesQuery,
     HoldingsTableShapeError,
+    SearchProductsQuery,
     TimeSeriesEntityType,
     TimeSeriesName,
 )
-from backstop_mcp.features.accounts.resolve_product import resolve_product, resolve_product_query
+from backstop_mcp.features.accounts.resolve_product import (
+    resolve_product,
+    resolve_product_family,
+    resolve_product_query,
+)
 from backstop_mcp.features.accounts.responses import (
     MAX_CAPITAL_FLOW_SCAN_RECORDS,
-    MAX_PRODUCT_SCAN_RECORDS,
     AccountRowResponse,
     CapitalFlowPartyResponse,
     CapitalFlowRowResponse,
@@ -56,13 +66,15 @@ from backstop_mcp.features.accounts.responses import (
     MoneyResponse,
     PartyAccountsResolvedResponse,
     ProductAmbiguousResponse,
+    ProductDescriptionResponse,
     ProductInvestorsResolvedResponse,
     ProductRecordResponse,
     ProductResolvedResponse,
+    ProductRiskFreeRateResponse,
     ShareResponse,
     TimeSeriesResolvedResponse,
 )
-from backstop_mcp.features.accounts.utils import raise_if_invalid_series
+from backstop_mcp.features.accounts.utils import continuous_tenure, raise_if_invalid_series
 
 __all__ = [
     "ACCOUNT_SERIES",
@@ -71,6 +83,7 @@ __all__ = [
     "AccountOwnerDto",
     "AccountRecordDto",
     "AccountRowResponse",
+    "AccountSpanDto",
     "CapitalFlowPartyResponse",
     "CapitalFlowRowResponse",
     "CapitalFlowsResolvedResponse",
@@ -78,7 +91,9 @@ __all__ = [
     "GetAccountsForProductQuery",
     "GetCapitalFlowsQuery",
     "GetHoldingsQuery",
-    "GetProductQuery",
+    "GetLatestAccountValuesQuery",
+    "GetProductInvestorsQuery",
+    "SearchProductsQuery",
     "GetTimeSeriesQuery",
     "HoldingFigureErrorDto",
     "HoldingFigureErrorResponse",
@@ -88,7 +103,6 @@ __all__ = [
     "HoldingsTableShapeError",
     "InvestorTypeDto",
     "MAX_CAPITAL_FLOW_SCAN_RECORDS",
-    "MAX_PRODUCT_SCAN_RECORDS",
     "MoneyDto",
     "MoneyResponse",
     "PRODUCT_SERIES",
@@ -97,21 +111,28 @@ __all__ = [
     "ProductCatalogFetchDto",
     "ProductFetchDto",
     "ProductInvestorsResolvedResponse",
+    "ProductDescriptionResponse",
     "ProductRecordResponse",
+    "ProductRiskFreeRateResponse",
     "ProductResolution",
     "ProductResolvedResponse",
     "ResolvedProductDto",
     "ShareDto",
     "ShareResponse",
+    "TenureDto",
     "TimeSeriesEntityType",
     "TimeSeriesName",
     "TimeSeriesResolvedResponse",
     "get_accounts_for_product_query_factory",
     "get_capital_flows_query_factory",
     "get_holdings_query_factory",
-    "get_product_query_factory",
+    "get_latest_account_values_query_factory",
+    "get_product_investors_query_factory",
+    "search_products_query_factory",
     "get_time_series_query_factory",
+    "continuous_tenure",
     "raise_if_invalid_series",
     "resolve_product",
+    "resolve_product_family",
     "resolve_product_query",
 ]

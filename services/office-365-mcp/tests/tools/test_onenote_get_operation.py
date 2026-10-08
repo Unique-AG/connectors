@@ -13,21 +13,35 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
     onenote_operation_handle,
 )
-from office_365_mcp.shared.notes import OperationSummary
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary
+from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_get_operation as getter
 from office_365_mcp.tools.onenote_get_operation import get_operation
 
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
+_GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID).uri
+_GROUP_OPERATION_URI = OnenoteOperationHandle(
+    _OPERATION_ID, owner=OnenoteOwner("groups", _GROUP_ID)
+).uri
 
 _GET_PATH = f"/me/onenote/operations/{_OPERATION_ID}"
+_GROUP_GET_PATH = f"/groups/{_GROUP_ID}/onenote/operations/{_OPERATION_ID}"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_OPERATION_URI = OnenoteOperationHandle(_OPERATION_ID, owner=_SITE).uri
+_SITE_GET_PATH = f"/sites/{_SITE_ID}/onenote/operations/{_OPERATION_ID}"
 
 
 def _operation_payload(
@@ -248,6 +262,122 @@ class TestWhatItAnswers:
             _ = await _get(client)
 
 
+class TestAGroupNotebook:
+    async def test_a_group_handle_polls_the_operation_under_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_operation_payload())
+        )
+
+        _ = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert route.call_count == 1
+        assert len(graph.calls) == 1, "nothing was read from /me"
+        assert dict(route.calls.last.request.url.params) == {}
+
+    async def test_the_answer_keeps_the_group_in_its_uri(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(200, json=_operation_payload())
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert answer.uri == _GROUP_OPERATION_URI
+
+    @pytest.mark.parametrize(
+        "location",
+        [
+            "https://graph.microsoft.com/v1.0/groups/{group}/onenote/sections/{id}",
+            "https://graph.microsoft.com/v1.0/groups('{group}')/onenote/sections/{id}",
+        ],
+    )
+    async def test_a_result_location_that_names_the_group_gives_a_result_handle_under_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter, location: str
+    ) -> None:
+        section_id = "1-COPIEDSECTION00000000000000000!0-ABCDEF"
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=location.format(group=_GROUP_ID, id=section_id),
+                    resource_id=section_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert (
+            answer.result_uri
+            == OnenoteSectionHandle(section_id, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
+        assert answer.result_kind == "section"
+
+    async def test_a_result_location_that_names_no_group_gives_a_result_handle_outside_any_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_id = "1-COPIEDPAGE0000000000000000000000!0-ABCDEF"
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=(
+                        "https://graph.microsoft.com/v1.0/users/me/onenote/pages/" + page_id
+                    ),
+                    resource_id=page_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_GROUP_OPERATION_URI)
+
+        assert answer.uri == _GROUP_OPERATION_URI
+        assert answer.result_uri == OnenotePageHandle(page_id).uri
+
+    async def test_a_404_under_the_group_is_a_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_GET_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _get(client, operation=_GROUP_OPERATION_URI)
+
+
+class TestASiteNotebook:
+    async def test_a_site_handle_polls_the_operation_under_the_site(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        page_id = "1-COPIEDPAGE0000000000000000000000!0-ABCDEF"
+        route = graph.get(_SITE_GET_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=_operation_payload(
+                    status="Completed",
+                    resource_location=(
+                        f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/pages/{page_id}"
+                    ),
+                    resource_id=page_id,
+                ),
+            )
+        )
+
+        answer = await _get(client, operation=_SITE_OPERATION_URI)
+
+        assert route.call_count == 1
+        assert len(graph.calls) == 1, "nothing was read from /me"
+        assert answer.uri == _SITE_OPERATION_URI
+        assert answer.result_uri == OnenotePageHandle(page_id, owner=_SITE).uri
+
+
 class TestWhatItRefuses:
     @pytest.mark.parametrize(
         "value",
@@ -278,6 +408,15 @@ class TestWhatItRefuses:
         with pytest.raises(ToolError, match="onenote_copy_page"):
             _ = await _get(client, operation="not a handle")
 
+    async def test_the_refusal_names_the_group_and_site_handle_shapes(
+        self, client: GraphServiceClient
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _get(client, operation="not a handle")
+
+        assert "onenote:///groups/{group}/" in str(refused.value)
+        assert "onenote:///sites/{site}/" in str(refused.value)
+
 
 class TestGraphFailures:
     async def test_a_404_is_a_not_found(
@@ -303,6 +442,30 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _get(client)
+
+    @pytest.mark.parametrize(
+        ("operation", "route"),
+        [(_GROUP_OPERATION_URI, _GROUP_GET_PATH), (_SITE_OPERATION_URI, _SITE_GET_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_operation_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, operation: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _get(client, operation=operation)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
 
     async def test_the_call_example_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -347,6 +510,13 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert not [name for name in properties if word in name.casefold()]
+
+    async def test_the_operation_argument_names_the_group_handle_shape(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, _tool = await _registered(transport)
+        properties = cast("Mapping[str, Mapping[str, str]]", parameters["properties"])
+        assert "onenote:///groups/{group}/" in properties["operation"]["description"]
 
     async def test_it_announces_itself_as_read_only(self, transport: httpx.AsyncClient) -> None:
         _parameters, tool = await _registered(transport)

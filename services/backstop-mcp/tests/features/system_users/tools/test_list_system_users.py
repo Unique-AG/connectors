@@ -183,8 +183,7 @@ class TestListSystemUsersInput:
 
     def test_refresh_is_only_for_a_user_reported_missing_colleague(self) -> None:
         doc = list_system_users.__doc__ or ""
-        assert "refresh=true" in doc
-        assert "missing colleague" in doc
+        assert "catalog cache is enabled" in doc
         annotations = cast("dict[str, object]", list_system_users.__annotations__)
         field_info = next(
             item

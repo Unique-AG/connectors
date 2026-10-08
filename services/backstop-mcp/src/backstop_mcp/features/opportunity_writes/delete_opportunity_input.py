@@ -12,7 +12,8 @@ __all__ = [
 
 DELETE_OPPORTUNITY_INPUT_DESCRIPTION = (
     "Required. The opportunity to hard-delete. Needs `opportunity_id` from "
-    + "`get_opportunities` or `get_opportunities_by_ids`. Never invent an id. Deletion is "
+    + "`search_opportunities`, `get_opportunities`, `get_opportunities_by_ids`, or a "
+    + "create result. Never invent an id. Deletion is "
     + "permanent: Backstop has no recycle bin. The tool reads the record and asks the "
     + "user to confirm when the client can elicit; otherwise it deletes immediately. "
     + REFUSE_BULK_DELETE
@@ -24,7 +25,8 @@ class DeleteOpportunityInput(BaseModel):
 
     opportunity_id: NonEmptyStr = Field(
         description=(
-            "Required. Backstop opportunity id from `get_opportunities` or "
-            "`get_opportunities_by_ids`. Never invent or guess."
+            "Required. Backstop opportunity id from `search_opportunities`, "
+            "`get_opportunities`, `get_opportunities_by_ids`, or a create result. "
+            "Never invent or guess."
         )
     )

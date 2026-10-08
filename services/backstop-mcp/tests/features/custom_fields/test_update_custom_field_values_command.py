@@ -181,7 +181,7 @@ class TestUpdateCustomFieldValuesCommand:
             return_value=_bulk_document(total=1, success=1, errors=[], records=[])
         )
 
-        with pytest.raises(ToolError, match="need effectiveDate"):
+        with pytest.raises(ToolError, match="needs effective_date"):
             await make_command(client).run(update=_update(_value(_TIME_SERIES, "Direct")))
 
         assert route.call_count == 0
@@ -195,7 +195,7 @@ class TestUpdateCustomFieldValuesCommand:
             return_value=_bulk_document(total=1, success=1, errors=[], records=[])
         )
 
-        with pytest.raises(ToolError, match="does not need effectiveDate"):
+        with pytest.raises(ToolError, match="rejects effective_date"):
             await make_command(client).run(
                 update=_update(_value(_TEXT, "hello", effective_date=date(2026, 9, 14)))
             )
@@ -219,7 +219,7 @@ class TestUpdateCustomFieldValuesCommand:
             return_value=_bulk_document(total=1, success=1, errors=[], records=[])
         )
 
-        with pytest.raises(ToolError, match=r"valid options are \[Direct, Portal\]"):
+        with pytest.raises(ToolError, match=r"Options: Direct, Portal"):
             await make_command(client).run(update=_update(_value(_DROPDOWN, "NotARealOption")))
 
         assert route.call_count == 0

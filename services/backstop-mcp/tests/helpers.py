@@ -203,3 +203,22 @@ def resource(id: str, type: str, name: str | None = None, **attrs: object) -> di
 
 def collection(*resources: dict[str, object]) -> dict[str, object]:
     return {"data": list(resources)}
+
+
+def contact_location(id: str, **attrs: object) -> dict[str, object]:
+    """A `contact-locations` resource as `?include=contactLocations` side-loads it."""
+    return {"type": "contact-locations", "id": id, "attributes": {**attrs}}
+
+
+def linked_to_locations(
+    party: dict[str, object], *locations: dict[str, object]
+) -> dict[str, object]:
+    """`party` with a `contactLocations` relationship pointing at `locations`."""
+    return {
+        **party,
+        "relationships": {
+            "contactLocations": {
+                "data": [{"type": "contact-locations", "id": item["id"]} for item in locations]
+            }
+        },
+    }

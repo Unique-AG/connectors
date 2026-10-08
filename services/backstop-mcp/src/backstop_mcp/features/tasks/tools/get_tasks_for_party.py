@@ -49,10 +49,7 @@ async def get_tasks_for_party(
     search_type: Annotated[
         SearchType,
         Field(
-            description=(
-                REQUIRED_SEARCH_TYPE_DESCRIPTION
-                + " Organizations use OrganizationBean on the tasks filter; people use PersonBean."
-            )
+            description=REQUIRED_SEARCH_TYPE_DESCRIPTION,
         ),
     ],
     party_id: Annotated[
@@ -65,12 +62,7 @@ async def get_tasks_for_party(
     ] = None,
     status: Annotated[
         TaskFilter,
-        Field(
-            description=(
-                "Client-side split: open, completed, or all. filter[status] is not accepted "
-                "on /tasks."
-            )
-        ),
+        Field(description=("open, completed, or all. Applied after the server-side read.")),
     ] = "all",
     resolve_party_query: ResolvePartyQuery = Depends(get_resolve_party_query_factory),
     get_tasks_for_party_query: GetTasksForPartyQuery = Depends(get_tasks_for_party_query_factory),
@@ -83,10 +75,7 @@ async def get_tasks_for_party(
     Call like: {"search_type": "organizations",
     "party_id": "<id from prior resolve echo>", "status": "open"}
 
-    Both `filter[entityType]` and `filter[entityId]` are always sent. Either alone is
-    silently ignored and returns every task in the instance. Organizations use
-    `OrganizationBean` casing — `organizations` or `ORGANIZATION` fail closed. Status is
-    not filterable on the wire; open vs completed is split here.
+    `search_type="organizations"` works. Status is applied after the server-side read.
     """
     result = await resolve_party_query.run(
         search_type=search_type, party_id=party_id, search=search

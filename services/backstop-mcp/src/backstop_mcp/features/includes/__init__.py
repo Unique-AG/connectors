@@ -15,7 +15,6 @@ include here needs.
 
 from backstop_mcp.features.includes.include_plan import IncludePlan, include_plan
 from backstop_mcp.features.includes.responses import (
-    ActivityAttendeeResponse,
     ActivityInclude,
     ActivityIncludesResponse,
     ActivityTagChipResponse,
@@ -32,7 +31,6 @@ from backstop_mcp.features.includes.responses import (
 from backstop_mcp.features.includes.types import Include
 
 __all__ = [
-    "ActivityAttendeeResponse",
     "ActivityInclude",
     "ActivityIncludesResponse",
     "ActivityTagChipResponse",

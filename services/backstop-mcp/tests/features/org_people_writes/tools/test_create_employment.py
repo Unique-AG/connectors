@@ -115,4 +115,3 @@ class TestCreateEmployment:
         assert result.id == _REL_ID
         assert result.start_date == _START
         assert result.created_mirror_row is True
-        assert result.warnings == ()

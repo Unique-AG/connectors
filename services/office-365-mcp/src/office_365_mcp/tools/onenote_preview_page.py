@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
 from office_365_mcp.shared.handles import onenote_page_handle
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.notes import OWNED_REFUSED, onenote_root
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_preview_page"
 
@@ -34,10 +35,12 @@ Notes:
 _NOT_A_PAGE_HANDLE = (
     "onenote_preview_page takes a page handle. It looks like onenote:///pages/{id}, and it "
     + "comes from the `uri` of an onenote_list_pages row, or of what onenote_create_page just "
-    + "wrote. Copy it exactly. A section handle, which looks like onenote:///sections/{id}, is "
-    + "not a page handle: a section holds pages, and has no preview of its own. A page title, a "
-    + "web address, and a bare id are not handles either. Call onenote_list_pages and take a "
-    + "`uri` from its answer. This same value fails again, so do not retry it."
+    + "wrote. A handle from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. Copy it exactly. A section handle, which looks like "
+    + "onenote:///sections/{id}, is not a page handle: a section holds pages, and has no preview "
+    + "of its own. A page title, a web address, and a bare id are not handles either. Call "
+    + "onenote_list_pages and take a `uri` from its answer. This same value fails again, so do not "
+    + "retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -52,8 +55,9 @@ class PagePreview(BaseModel):
     page_uri: str = Field(
         description=(
             "The handle of the page this preview belongs to: onenote:///pages/{id}, echoed "
-            + "back from the `page` argument. Pass it to onenote_read_page to read the whole "
-            + "page."
+            + "back from the `page` argument. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_read_page to read the whole page."
         )
     )
     preview_text: str | None = Field(
@@ -76,8 +80,15 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
     if handle is None:
         raise ToolError(_NOT_A_PAGE_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP_PREVIEW):
-        fetched = await client.me.onenote.pages.by_onenote_page_id(handle.page_id).preview.get()
+    with (
+        owner_refused(handle.owner is not None, OWNED_REFUSED),
+        graph_errors(TOOL_NAME, step=STEP_PREVIEW),
+    ):
+        fetched = await (
+            onenote_root(client, handle.owner)
+            .pages.by_onenote_page_id(handle.page_id)
+            .preview.get()
+        )
 
     assert fetched is not None, "Graph answered a page preview with no preview"
     return PagePreview(
@@ -111,7 +122,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The page to preview: the `uri` of a onenote_list_pages row or a "
                     + "onenote_create_page answer, copied word for word. The shape is "
-                    + "onenote:///pages/{id}. A section handle is not a page handle."
+                    + "onenote:///pages/{id}. A handle from a group or site notebook starts with "
+                    + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. A section "
+                    + "handle is not a page handle."
                 ),
             ),
         ],
