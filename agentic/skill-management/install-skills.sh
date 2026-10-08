@@ -258,6 +258,7 @@ EOF
 root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run this inside the repository"
 cd "$root"
 
+# Claude reads .claude/skills. Once it understands .agentic/skills, install there instead.
 skills_dir="$root/.claude/skills"
 manifest="$skills_dir/$MANIFEST_NAME"
 

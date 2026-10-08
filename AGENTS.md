@@ -102,7 +102,8 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
   `metadata.internal: true`. They are not Skills CLI discovery containers. `agentic/skill-management/setup.sh`
   installs them with the Skills CLI into gitignored `.claude/skills/`. Run
   `bash agentic/skill-management/update-skills.sh` to refresh that install without pulling. The
-  agents we use read `.claude/skills/`.
+  agents we use read `.claude/skills/`. Claude does not understand the `.agentic/skills` standard
+  yet. Once it does, move these skills there and stop installing them into `.claude/skills/`.
 
 ## Formatting
 

@@ -2,6 +2,8 @@
 
 Server-specific skills live in `services/<svc>/agentic/skills/`. Skills that are not specific to one server live in `agentic/skills/` at the repository root. The Skills CLI installs them into `.claude/skills/`. That directory is gitignored, and it is the only agent skills directory we keep.
 
+Claude does not understand the `.agentic/skills` standard yet. Once it does, move these skills to `.agentic/skills` and stop installing them into `.claude/skills/`.
+
 Git does not turn on hooks when you clone or pull. Run this once in each clone:
 
 ```bash
