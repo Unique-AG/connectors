@@ -82,6 +82,7 @@ class GetArticlesQuery:
         params: dict[str, QueryValue] = {
             "firm_id": [investor_id],
             "firm_type": ["institutional_investor"],
+            "sort[id]": "desc",
         }
         if posted_since is not None:
             params["post_date[from]"] = posted_since

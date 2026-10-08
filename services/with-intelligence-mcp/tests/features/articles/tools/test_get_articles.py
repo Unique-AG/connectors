@@ -77,6 +77,7 @@ class TestProjection:
         assert "firm_id=2504" in query
         assert "firm_type=institutional_investor" in query
         assert "post_date%5Bfrom%5D=2026-01-01" in query
+        assert "sort%5Bid%5D=desc" in query
         article = result.articles[0]
         assert article.title == "Example portfolio update"
         assert article.excerpt == "Example RS returned 7%."
