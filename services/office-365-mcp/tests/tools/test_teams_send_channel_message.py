@@ -217,8 +217,40 @@ class TestThePersonBeforeThePost:
         _ = await _send(client, confirm=capturing, mentions=[_JANE, _ADA])
 
         assert len(asked) == 1
-        assert "It mentions 'Jane Smith', 'Ada Lovelace'." in asked[0]
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Jane Smith' is only a label from the request), the person with the "
+            + f"Microsoft Entra object id {_ADA.user_id!r} (the name 'Ada Lovelace' is only a "
+            + "label from the request)."
+        ) in asked[0]
         assert "cannot be recalled" in asked[0]
+
+    async def test_a_label_that_names_another_person_still_shows_the_id_that_teams_binds(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(
+            client,
+            confirm=capturing,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        assert len(asked) == 1
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Ada Lovelace' is only a label from the request)."
+        ) in asked[0]
+        assert _ADA.user_id not in asked[0]
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert cast("Mapping[str, object]", mentioned["user"])["id"] == _JANE.user_id
 
     async def test_the_question_names_the_subject_and_the_importance(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -502,8 +534,16 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "message B went out on an accept given for message A"
 
+    @pytest.mark.parametrize(
+        "other",
+        [
+            pytest.param(_ADA, id="another-person"),
+            pytest.param(Mention(user_id=_ADA.user_id, name=_JANE.name), id="same-label-other-id"),
+            pytest.param(Mention(user_id=_JANE.user_id, name=_ADA.name), id="same-id-other-label"),
+        ],
+    )
     async def test_an_accept_for_one_set_of_mentions_cannot_post_another(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, graph: respx.MockRouter, other: Mention
     ) -> None:
         post = _posts(graph)
         key, state, agrees_with = _the_question(
@@ -521,10 +561,10 @@ class TestTheEraWithNoBackChannel:
                         state=state,
                     )
                 ),
-                mentions=[_ADA],
+                mentions=[other],
             )
 
-        assert post.call_count == 0, "a mention of Ada went out on an accept given for Jane"
+        assert post.call_count == 0, f"{other} went out on an accept given for {_JANE}"
 
     async def test_an_accept_for_one_subject_cannot_post_under_another(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -903,6 +943,16 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         assert "nothing here can recall it" in (tool.description or "")
+
+    async def test_the_description_says_the_question_shows_the_object_id_of_a_mention(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "The question shows the Microsoft Entra object id of each person in `mentions`. The "
+            + "`name` in the question is only a label. The message shows the same label."
+        ) in " ".join((tool.description or "").split())
 
     async def test_the_retry_note_names_no_tool_and_the_outage_advice_names_the_reader(
         self, transport: httpx.AsyncClient

@@ -27,10 +27,10 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     graph_step,
 )
-from office_365_mcp.shared import files
+from office_365_mcp.shared import files, messages
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from office_365_mcp.shared.messages import Mention
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_chat_message as plain_sender
 from office_365_mcp.tools import teams_send_chat_message_with_files as sender
 from office_365_mcp.tools.teams_send_chat_message_with_files import (
@@ -42,14 +42,41 @@ from .conftest import TEAMS_SENDER, message_payload
 
 _CHAT_ID = "19:release@thread.v2"
 _SEND_PATH = "/chats/19%3Arelease%40thread.v2/messages"
+_MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
 
 _MESSAGE = "Here is the plan."
 _SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000001"
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
+_ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
 
 _NOTHING_SENT = "Nothing was sent."
+_NOBODY_MENTIONED = "Nobody was mentioned. Nothing was sent."
+
+
+def _member(user_id: str, name: str) -> Mapping[str, object]:
+    return {
+        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+        "id": f"MCMj{user_id[-12:]}",
+        "displayName": name,
+        "userId": user_id,
+        "email": None,
+        "roles": ["owner"],
+    }
+
+
+def _lists_members(graph: respx.MockRouter, *members: Mapping[str, object]) -> respx.Route:
+    return graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in members]})
+    )
+
+
+def _jane_and_ada_are_members(graph: respx.MockRouter) -> respx.Route:
+    return _lists_members(
+        graph, _member(_JANE.user_id, "Jane Smith"), _member(_ADA.user_id, "Ada Lovelace")
+    )
+
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0000"
 _BUDGET = DriveFileHandle(_DRIVE_ID, "01SYNTHETICFILE0000")
@@ -182,6 +209,7 @@ class TestThePersonBeforeTheSend:
     async def test_the_question_names_the_mentions_the_subject_and_the_importance(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _jane_and_ada_are_members(graph)
         _ = _files(graph)
         _ = _posts(graph)
         asked: list[str] = []
@@ -203,9 +231,66 @@ class TestThePersonBeforeTheSend:
 
         assert asked == [
             f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to chat "
-            + f"{_CHAT_ID!r} now? It mentions 'Jane Smith'. It attaches 'Budget.docx'. This "
-            + "cannot be recalled once sent."
+            + f"{_CHAT_ID!r} now? It mentions the person with the Microsoft Entra object id "
+            + f"{_JANE.user_id!r} (the name 'Jane Smith' comes from Microsoft 365). It attaches "
+            + "'Budget.docx'. This cannot be recalled once sent."
         ]
+
+    async def test_the_question_shows_the_name_microsoft_365_gives_and_never_the_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _files(graph)
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message_with_files(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri],
+            confirm=capturing,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        assert len(asked) == 1
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Jane Smith' comes from Microsoft 365)."
+        ) in asked[0]
+        assert _ADA.name not in asked[0], "the label of the request reached the question"
+
+    async def test_a_mention_of_a_person_who_is_not_a_member_is_refused_before_any_file_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = _lists_members(graph, _member(_ADA.user_id, "Ada Lovelace"))
+        budget, _plan = _files(graph)
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError) as raised:
+            _ = await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=capturing,
+                mentions=[_JANE],
+            )
+
+        refusal = str(raised.value)
+        assert repr(_JANE.user_id) in refusal
+        assert _NOBODY_MENTIONED in refusal
+        assert asked == [], "the user was asked to agree to a mention of a person not in the chat"
+        assert (listed.call_count, budget.call_count, post.call_count) == (1, 0, 0)
 
     async def test_every_file_is_read_before_the_question(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -307,6 +392,15 @@ def _the_question(answer: object) -> tuple[str, str, str]:
     return key, answer.request_state, choices[0]
 
 
+def _answered(key: str, state: str, agrees_with: str) -> Confirm:
+    return a_person_agrees(
+        _modern_context(
+            answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+            state=state,
+        )
+    )
+
+
 class TestTheEraWithNoBackChannel:
     async def test_no_answer_yet_asks_and_never_posts(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -389,6 +483,68 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "the plan went out on an accept given for the budget alone"
 
+    async def test_an_accept_for_one_mention_cannot_send_the_same_label_for_another_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _files(graph)
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=a_person_agrees(_modern_context()),
+                mentions=[_JANE],
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=_answered(key, state, agrees_with),
+                mentions=[Mention(user_id=_ADA.user_id, name=_JANE.name)],
+            )
+
+        assert post.call_count == 0, "a mention of Ada went out on an accept given for Jane"
+
+    async def test_an_accept_holds_for_the_same_person_under_another_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _files(graph)
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=a_person_agrees(_modern_context()),
+                mentions=[_JANE],
+            )
+        )
+
+        _ = await send_chat_message_with_files(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri],
+            confirm=_answered(key, state, agrees_with),
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        assert post.call_count == 1, "the label of the request is part of what the answer binds"
+        sent = post.calls.last.request.content.decode()
+        body = cast("Mapping[str, object]", json.loads(sent))
+        content = cast("str", cast("Mapping[str, object]", body["body"])["content"])
+        assert content.startswith('<at id="0">Jane Smith</at> ')
+        assert _ADA.name not in sent, "the label of the request reached the chat"
+
 
 class TestWhatItAsksGraphFor:
     async def test_it_reads_each_file_once_and_then_posts_once(
@@ -409,9 +565,66 @@ class TestWhatItAsksGraphFor:
         made = cast("Sequence[Call]", graph.calls)
         assert [call.request.method for call in made] == ["GET", "GET", "POST"]
 
+    async def test_a_mention_reads_the_members_once_before_the_files_and_the_post(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = _jane_and_ada_are_members(graph)
+        budget, plan = _files(graph)
+        post = _posts(graph)
+
+        _ = await send_chat_message_with_files(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri, _PLAN.uri],
+            confirm=_agrees,
+            mentions=[_JANE, _ADA],
+        )
+
+        assert (listed.call_count, budget.call_count, plan.call_count, post.call_count) == (
+            1,
+            1,
+            1,
+            1,
+        )
+        made = cast("Sequence[Call]", graph.calls)
+        assert made[0].request.url.raw_path.decode() == "/v1.0" + _MEMBERS_PATH
+        assert [call.request.method for call in made] == ["GET", "GET", "GET", "POST"]
+
+    async def test_a_mention_goes_out_under_the_name_microsoft_365_gives_and_never_the_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _files(graph)
+        post = _posts(graph)
+
+        _ = await send_chat_message_with_files(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri],
+            confirm=_agrees,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        sent = post.calls.last.request.content.decode()
+        body = cast("Mapping[str, object]", json.loads(sent))
+        content = cast("Mapping[str, object]", body["body"])["content"]
+        assert cast("str", content).startswith('<at id="0">Jane Smith</at> Here is the plan.')
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert mentions[0]["mentionText"] == "Jane Smith"
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert mentioned["user"] == {
+            "id": _JANE.user_id,
+            "displayName": "Jane Smith",
+            "userIdentityType": "aadUser",
+        }
+        assert _ADA.name not in sent, "the label of the request reached the chat"
+
     async def test_the_post_carries_each_file_as_a_reference_and_a_tag_after_the_text(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _jane_and_ada_are_members(graph)
         _ = _files(graph)
         post = _posts(graph)
 
@@ -487,6 +700,36 @@ class TestWhatItAsksGraphFor:
         )
 
         assert measured == [files.STEP_DRIVE_ITEM, sender.STEP_SEND]
+
+    async def test_the_members_read_is_measured_under_its_own_step(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _files(graph)
+        _ = _posts(graph)
+        measured: list[str] = []
+
+        def recording(step: str) -> AbstractContextManager[None]:
+            measured.append(step)
+            return graph_step(step)
+
+        monkeypatch.setattr(sender, "graph_step", recording)
+        monkeypatch.setattr(files, "graph_step", recording)
+        monkeypatch.setattr(messages, "graph_step", recording)
+
+        _ = await send_chat_message_with_files(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri],
+            confirm=_agrees,
+            mentions=[_JANE],
+        )
+
+        assert measured == [messages.STEP_CHAT_MEMBERS, files.STEP_DRIVE_ITEM, sender.STEP_SEND]
 
 
 class TestWhatItRefusesToAttach:
@@ -689,8 +932,8 @@ class TestTheFailuresItPassesOn:
 
 
 class TestHowItDeclaresItself:
-    def test_the_permissions_are_the_chat_send_and_the_file_read_and_nothing_else(self) -> None:
-        assert sender.GRAPH_PERMISSIONS == ("ChatMessage.Send", "Files.Read.All")
+    def test_the_permissions_are_the_chat_send_the_file_read_and_the_chat_read(self) -> None:
+        assert sender.GRAPH_PERMISSIONS == ("ChatMessage.Send", "Files.Read.All", "Chat.Read")
 
     def test_its_example_call_is_never_narrowed(self) -> None:
         assert not hasattr(sender, "GRAPH_CALL_NARROWS_TO")
@@ -715,6 +958,10 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it sends anything, every time. This tool "
             + "sends nothing unless the user agrees.",
             "This tool sends the message immediately, and nothing here can recall it.",
+            "The question shows the Microsoft Entra object id of each person in `mentions`. This "
+            + "tool reads the members of the chat. The question and the message show the name "
+            + "that Microsoft 365 gives each member. If a person in `mentions` is not a member of "
+            + "the chat, this tool sends nothing.",
             "If a call times out, do not call this tool again first. Before you call again, make "
             + "sure that teams_list_chat_messages does not already show the message.",
             "This tool uploads nothing and changes no sharing setting of a file.",

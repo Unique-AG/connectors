@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from typing import cast
 
 import httpx
@@ -25,9 +26,11 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphThrottled,
     GraphUnavailable,
+    graph_step,
 )
+from office_365_mcp.shared import messages
 from office_365_mcp.shared.messages import ChatImportance, Mention
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_chat_message as sender
 from office_365_mcp.tools.teams_send_chat_message import a_person_agrees, send_chat_message
 
@@ -35,6 +38,7 @@ from .conftest import TEAMS_SENDER, message_payload
 
 _CHAT_ID = "19:release@thread.v2"
 _SEND_PATH = "/chats/19%3Arelease%40thread.v2/messages"
+_MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
 
 _MESSAGE = "Ship it Friday."
 _SUBJECT = "Release plan"
@@ -44,6 +48,39 @@ _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
 
 _NOTHING_SENT = "Nothing was sent."
+_NOBODY_MENTIONED = "Nobody was mentioned. Nothing was sent."
+
+
+def _member(user_id: str, name: str | None) -> Mapping[str, object]:
+    return {
+        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+        "id": f"MCMj{user_id[-12:]}",
+        "displayName": name,
+        "userId": user_id,
+        "email": None,
+        "roles": ["owner"],
+    }
+
+
+_JANE_MEMBER = _member(_JANE.user_id, "Jane Smith")
+_ADA_MEMBER = _member(_ADA.user_id, "Ada Lovelace")
+
+
+def _lists_members(graph: respx.MockRouter, *members: Mapping[str, object]) -> respx.Route:
+    return graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in members]})
+    )
+
+
+def _jane_and_ada_are_members(graph: respx.MockRouter) -> respx.Route:
+    return _lists_members(graph, _JANE_MEMBER, _ADA_MEMBER)
+
+
+def _in_question(member: Mention) -> str:
+    return (
+        f"the person with the Microsoft Entra object id {member.user_id!r} (the name "
+        + f"{member.name!r} comes from Microsoft 365)"
+    )
 
 
 async def _agrees(question: str, about: str) -> Confirmed:
@@ -137,6 +174,7 @@ class TestThePersonBeforeTheSend:
     async def test_the_question_names_the_people_it_mentions(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _jane_and_ada_are_members(graph)
         _ = _posts(graph)
         asked: list[str] = []
 
@@ -149,8 +187,93 @@ class TestThePersonBeforeTheSend:
         )
 
         assert len(asked) == 1
-        assert "It mentions 'Jane Smith', 'Ada Lovelace'." in asked[0]
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Jane Smith' comes from Microsoft 365), the person with the Microsoft Entra "
+            + f"object id {_ADA.user_id!r} (the name 'Ada Lovelace' comes from Microsoft 365)."
+        ) in asked[0]
         assert "cannot be recalled" in asked[0]
+
+    async def test_the_question_shows_the_name_microsoft_365_gives_and_never_the_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            confirm=capturing,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        assert len(asked) == 1
+        assert f"It mentions {_in_question(_JANE)}." in asked[0]
+        assert _ADA.name not in asked[0], "the label of the request reached the question"
+        assert _ADA.user_id not in asked[0]
+
+    @pytest.mark.parametrize(
+        "members",
+        [
+            pytest.param((_ADA_MEMBER,), id="not-a-member"),
+            pytest.param((_member(_JANE.user_id, None), _ADA_MEMBER), id="member-with-no-name"),
+            pytest.param((), id="no-member"),
+        ],
+    )
+    async def test_a_mention_of_a_person_who_is_not_a_named_member_is_refused_before_the_question(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        members: Sequence[Mapping[str, object]],
+    ) -> None:
+        listed = _lists_members(graph, *members)
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        with pytest.raises(ToolError) as raised:
+            _ = await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                confirm=capturing,
+                mentions=[_ADA, _JANE],
+            )
+
+        refusal = str(raised.value)
+        assert repr(_JANE.user_id) in refusal
+        assert _NOBODY_MENTIONED in refusal
+        assert asked == [], "the user was asked to agree to a mention of a person not in the chat"
+        assert listed.call_count == 1
+        assert post.call_count == 0
+
+    async def test_the_members_are_read_once_before_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = _jane_and_ada_are_members(graph)
+        post = _posts(graph)
+        calls_when_asked: list[int] = []
+
+        async def watching(question: str, about: str) -> Confirmed:
+            assert question and about
+            calls_when_asked.append(len(graph.calls))
+            return None
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=watching, mentions=[_JANE, _ADA]
+        )
+
+        assert calls_when_asked == [1], "asked before the members were read, or after the post"
+        assert (listed.call_count, post.call_count) == (1, 1)
 
     async def test_the_question_names_the_importance(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -333,6 +456,15 @@ def _the_question(answer: object) -> tuple[str, str, str]:
     return key, answer.request_state, choices[0]
 
 
+def _answered(key: str, state: str, agrees_with: str) -> Confirm:
+    return a_person_agrees(
+        _modern_context(
+            answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
+            state=state,
+        )
+    )
+
+
 class TestTheEraWithNoBackChannel:
     async def test_the_first_round_asks_and_never_posts(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -437,9 +569,17 @@ class TestTheEraWithNoBackChannel:
 
         assert post.call_count == 0, "message B went out on an accept given for message A"
 
+    @pytest.mark.parametrize(
+        "other",
+        [
+            pytest.param(_ADA, id="another-person"),
+            pytest.param(Mention(user_id=_ADA.user_id, name=_JANE.name), id="same-label-other-id"),
+        ],
+    )
     async def test_an_accept_for_one_set_of_mentions_cannot_send_another(
-        self, client: GraphServiceClient, graph: respx.MockRouter
+        self, client: GraphServiceClient, graph: respx.MockRouter, other: Mention
     ) -> None:
+        _ = _jane_and_ada_are_members(graph)
         post = _posts(graph)
         key, state, agrees_with = _the_question(
             await send_chat_message(
@@ -456,18 +596,41 @@ class TestTheEraWithNoBackChannel:
                 client,
                 chat_id=_CHAT_ID,
                 message=_MESSAGE,
-                confirm=a_person_agrees(
-                    _modern_context(
-                        answers={
-                            key: ElicitResult(action="accept", content={"value": agrees_with})
-                        },
-                        state=state,
-                    )
-                ),
-                mentions=[_ADA],
+                confirm=_answered(key, state, agrees_with),
+                mentions=[other],
             )
 
-        assert post.call_count == 0, "a mention of Ada went out on an accept given for Jane"
+        assert post.call_count == 0, f"{other} went out on an accept given for {_JANE}"
+
+    async def test_an_accept_holds_for_the_same_person_under_another_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await send_chat_message(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                confirm=a_person_agrees(_modern_context()),
+                mentions=[_JANE],
+            )
+        )
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            confirm=_answered(key, state, agrees_with),
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        assert post.call_count == 1, "the label of the request is part of what the answer binds"
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "contentType": "html",
+        }
 
     async def test_an_accept_for_a_message_cannot_send_it_as_urgent(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -534,7 +697,7 @@ class TestTheEraWithNoBackChannel:
 
 
 class TestWhatItAsksGraphFor:
-    async def test_it_makes_exactly_one_call(
+    async def test_a_message_with_no_mention_makes_exactly_one_call(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         post = _posts(graph)
@@ -542,7 +705,9 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
 
         assert post.call_count == 1
-        assert len(graph.calls) == 1, "sending one message costs one Graph call, and nothing else"
+        assert len(graph.calls) == 1, (
+            "a message with no mention costs one Graph call, and nothing else"
+        )
         made = cast("Sequence[Call]", graph.calls)
         assert made[0].request.method == "POST"
 
@@ -595,9 +760,47 @@ class TestWhatItAsksGraphFor:
         assert "importance" not in body, "an unset importance reached Graph as a value or a null"
         assert "subject" not in body, "a chat message went out with a subject"
 
+    async def test_a_mention_costs_one_read_of_the_members_before_the_post(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = _jane_and_ada_are_members(graph)
+        post = _posts(graph)
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, mentions=[_JANE, _ADA]
+        )
+
+        assert (listed.call_count, post.call_count) == (1, 1)
+        made = cast("Sequence[Call]", graph.calls)
+        assert [call.request.method for call in made] == ["GET", "POST"]
+
+    async def test_each_call_is_measured_under_its_own_step(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        _ = _posts(graph)
+        measured: list[str] = []
+
+        def recording(step: str) -> AbstractContextManager[None]:
+            measured.append(step)
+            return graph_step(step)
+
+        monkeypatch.setattr(sender, "graph_step", recording)
+        monkeypatch.setattr(messages, "graph_step", recording)
+
+        _ = await send_chat_message(
+            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, mentions=[_JANE]
+        )
+
+        assert measured == [messages.STEP_CHAT_MEMBERS, sender.STEP_SEND]
+
     async def test_a_mention_goes_out_as_html_with_its_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
+        _ = _jane_and_ada_are_members(graph)
         post = _posts(graph)
 
         _ = await send_chat_message(
@@ -619,6 +822,36 @@ class TestWhatItAsksGraphFor:
             "displayName": "Jane Smith",
             "userIdentityType": "aadUser",
         }
+
+    async def test_a_mention_goes_out_under_the_name_microsoft_365_gives_and_never_the_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _jane_and_ada_are_members(graph)
+        post = _posts(graph)
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message=_MESSAGE,
+            confirm=_agrees,
+            mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
+        )
+
+        sent = post.calls.last.request.content.decode()
+        body = cast("Mapping[str, object]", json.loads(sent))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "contentType": "html",
+        }
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert mentions[0]["mentionText"] == "Jane Smith"
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert mentioned["user"] == {
+            "id": _JANE.user_id,
+            "displayName": "Jane Smith",
+            "userIdentityType": "aadUser",
+        }
+        assert _ADA.name not in sent, "the label of the request reached the chat"
 
     async def test_the_chat_id_is_used_verbatim_in_the_path(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -709,12 +942,38 @@ class TestTheFailuresItPassesOn:
         with pytest.raises(GraphNotFound):
             _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
 
+    async def test_a_refused_member_read_is_a_forbidden_and_asks_nobody(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_MEMBERS_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "Forbidden", "message": "denied"}}
+            )
+        )
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        with pytest.raises(GraphForbidden):
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, mentions=[_JANE]
+            )
+
+        assert asked == []
+        assert post.call_count == 0
+
 
 class TestHowItDeclaresItself:
-    def test_the_permission_is_chat_message_send_and_not_channel_message_send(self) -> None:
-        assert sender.GRAPH_PERMISSIONS == ("ChatMessage.Send",)
+    def test_the_permissions_are_the_chat_send_and_the_chat_read_for_the_members(self) -> None:
+        assert sender.GRAPH_PERMISSIONS == ("ChatMessage.Send", "Chat.Read")
 
-    def test_its_one_step_is_the_one_call_it_makes(self) -> None:
+    def test_its_example_call_is_never_narrowed(self) -> None:
+        assert not hasattr(sender, "GRAPH_CALL_NARROWS_TO")
+
+    def test_its_send_step_is_send_chat_message(self) -> None:
         assert sender.STEP_SEND == "send_chat_message"
 
     async def test_it_announces_itself_as_an_addition_rather_than_a_destructive_write(
@@ -745,6 +1004,18 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         assert "nothing here can recall it" in (tool.description or "")
+
+    async def test_the_description_says_the_question_shows_the_object_id_and_the_member_name(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "The question shows the Microsoft Entra object id of each person in `mentions`. This "
+            + "tool reads the members of the chat. The question and the message show the name "
+            + "that Microsoft 365 gives each member. If a person in `mentions` is not a member of "
+            + "the chat, this tool sends nothing."
+        ) in " ".join((tool.description or "").split())
 
     async def test_the_arguments_are_chat_id_message_and_the_optional_rest(
         self, transport: httpx.AsyncClient

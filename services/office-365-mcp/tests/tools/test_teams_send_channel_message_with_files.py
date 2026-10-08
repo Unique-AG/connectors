@@ -56,6 +56,7 @@ _SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000002"
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
+_ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
 
 _NOTHING_SENT = "Nothing was posted."
 
@@ -267,9 +268,36 @@ class TestThePersonBeforeThePost:
 
         assert asked == [
             f"Post {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to channel "
-            + f"{_CHANNEL_ID!r} in team {_TEAM_ID!r} now? It mentions 'Jane Smith'. It attaches "
-            + "'Budget.docx'. This cannot be recalled once posted."
+            + f"{_CHANNEL_ID!r} in team {_TEAM_ID!r} now? It mentions the person with the "
+            + f"Microsoft Entra object id {_JANE.user_id!r} (the name 'Jane Smith' is only a "
+            + "label from the request). It attaches 'Budget.docx'. This cannot be recalled once "
+            + "posted."
         ]
+
+    async def test_a_label_that_names_another_person_still_shows_the_id_that_teams_binds(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _files(graph)
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _send(
+            client, confirm=capturing, mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)]
+        )
+
+        assert len(asked) == 1
+        assert (
+            f"It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + "name 'Ada Lovelace' is only a label from the request)."
+        ) in asked[0]
+        body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert cast("Mapping[str, object]", mentioned["user"])["id"] == _JANE.user_id
 
     async def test_every_file_is_read_before_the_question(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -465,6 +493,30 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert post.call_count == 0, "the plan went out on an accept given for the budget alone"
+
+    @pytest.mark.parametrize(
+        "other",
+        [
+            pytest.param(
+                Mention(user_id=_ADA.user_id, name=_JANE.name),
+                id="same-label-other-id",
+            ),
+            pytest.param(Mention(user_id=_JANE.user_id, name=_ADA.name), id="same-id-other-label"),
+        ],
+    )
+    async def test_an_accept_for_one_mention_cannot_post_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter, other: Mention
+    ) -> None:
+        _ = _files(graph)
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await _send(client, confirm=a_person_agrees(_modern_context()), mentions=[_JANE])
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _send(client, confirm=_answered(key, state, agrees_with), mentions=[other])
+
+        assert post.call_count == 0, f"{other} went out on an accept given for {_JANE}"
 
     async def test_an_accept_for_a_post_cannot_send_a_reply(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -815,6 +867,8 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it posts anything, every time. This tool "
             + "posts nothing unless the user agrees.",
             "This tool posts the message immediately, and nothing here can recall it.",
+            "The question shows the Microsoft Entra object id of each person in `mentions`. The "
+            + "`name` in the question is only a label. The message shows the same label.",
             "If a call times out, do not call this tool again first. Before you call again, make "
             + "sure that the channel does not already show the message.",
             "With `reply_to_id`, this tool replies in the thread of an existing post.",

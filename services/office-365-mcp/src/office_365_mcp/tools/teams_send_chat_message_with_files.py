@@ -14,7 +14,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import attachable_files, attachment_handles
-from office_365_mcp.shared.handles import MessageHandle
+from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.messages import (
     ATTACHMENTS_FIELD,
     CHAT_ID_FIELD,
@@ -26,6 +26,7 @@ from office_365_mcp.shared.messages import (
     ChatImportance,
     Mention,
     TeamsMessage,
+    mentioned_members,
     outgoing_message,
     send_binding,
     send_question,
@@ -41,7 +42,7 @@ TOOL_NAME = "teams_send_chat_message_with_files"
 
 STEP_SEND = "send_chat_message"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send", "Files.Read.All")
+GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send", "Files.Read.All", CHAT_PERMISSION)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_messages",)
 
@@ -62,6 +63,9 @@ no file. teams_send_channel_message_with_files is the tool for a channel.
 Notes:
 - This tool asks the user to agree before it sends anything, every time. This tool sends \
 nothing unless the user agrees.
+- The question shows the Microsoft Entra object id of each person in `mentions`. This tool reads \
+the members of the chat. The question and the message show the name that Microsoft 365 gives each \
+member. If a person in `mentions` is not a member of the chat, this tool sends nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chat_messages does not already show the message.
 """
@@ -82,25 +86,28 @@ async def send_chat_message_with_files(
     handles = attachment_handles(attachments)
     if isinstance(handles, str):
         raise ToolError(f"{CHAT_SEND.nothing_sent} {handles}")
-    about = send_binding(
-        (chat_id,), message, mentions, subject=subject, importance=importance, files=handles
-    )
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors(TOOL_NAME):
-        files = await attachable_files(client, handles)
-        if isinstance(files, str):
+        members = await mentioned_members(client, chat_id, mentions)
+        files = () if isinstance(members, str) else await attachable_files(client, handles)
+        if isinstance(members, str):
+            refused = members
+        elif isinstance(files, str):
             refused = f"{CHAT_SEND.nothing_sent} {files}"
         else:
             question = send_question(
                 CHAT_SEND,
                 message,
                 f"to chat {chat_id!r}",
-                mentions,
+                members,
                 subject=subject,
                 importance=importance,
                 files=files,
+            )
+            about = send_binding(
+                (chat_id,), message, members, subject=subject, importance=importance, files=handles
             )
             with not_graph():
                 answer = await confirm(question, about)
@@ -111,7 +118,7 @@ async def send_chat_message_with_files(
                     sent = await client.chats.by_chat_id(chat_id).messages.post(
                         outgoing_message(
                             message,
-                            mentions=mentions,
+                            mentions=members,
                             importance=None
                             if importance is None
                             else ChatMessageImportance(importance),

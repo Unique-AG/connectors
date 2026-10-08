@@ -12,8 +12,8 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
-from office_365_mcp.shared.handles import MessageHandle
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.messages import (
     CHAT_ID_FIELD,
     CHAT_IMPORTANCE_FIELD,
@@ -24,6 +24,7 @@ from office_365_mcp.shared.messages import (
     ChatImportance,
     Mention,
     TeamsMessage,
+    mentioned_members,
     outgoing_message,
     send_binding,
     send_question,
@@ -39,7 +40,7 @@ TOOL_NAME = "teams_send_chat_message"
 
 STEP_SEND = "send_chat_message"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send", CHAT_PERMISSION)
 
 CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_messages",)
 
@@ -57,6 +58,9 @@ teams_send_channel_message is the tool for a channel.
 Notes:
 - This tool asks the user to agree before it sends anything, every time. This tool sends \
 nothing unless the user agrees.
+- The question shows the Microsoft Entra object id of each person in `mentions`. This tool reads \
+the members of the chat. The question and the message show the name that Microsoft 365 gives each \
+member. If a person in `mentions` is not a member of the chat, this tool sends nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chat_messages does not already show the message.
 """
@@ -72,32 +76,44 @@ async def send_chat_message(
     importance: ChatImportance | None = None,
     subject: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    question = send_question(
-        CHAT_SEND,
-        message,
-        f"to chat {chat_id!r}",
-        mentions,
-        subject=subject,
-        importance=importance,
-    )
-    about = send_binding((chat_id,), message, mentions, subject=subject, importance=importance)
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME, step=STEP_SEND):
-        with not_graph():
-            answer = await confirm(question, about)
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            sent = await client.chats.by_chat_id(chat_id).messages.post(
-                outgoing_message(
-                    message,
-                    mentions=mentions,
-                    importance=None if importance is None else ChatMessageImportance(importance),
-                    subject=subject,
-                ),
-                request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
+    refused: str | None = None
+    with graph_errors(TOOL_NAME):
+        members = await mentioned_members(client, chat_id, mentions)
+        if isinstance(members, str):
+            refused = members
+        else:
+            question = send_question(
+                CHAT_SEND,
+                message,
+                f"to chat {chat_id!r}",
+                members,
+                subject=subject,
+                importance=importance,
             )
+            about = send_binding(
+                (chat_id,), message, members, subject=subject, importance=importance
+            )
+            with not_graph():
+                answer = await confirm(question, about)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+            if refused is None and asked is None:
+                with graph_step(STEP_SEND):
+                    sent = await client.chats.by_chat_id(chat_id).messages.post(
+                        outgoing_message(
+                            message,
+                            mentions=members,
+                            importance=None
+                            if importance is None
+                            else ChatMessageImportance(importance),
+                            subject=subject,
+                        ),
+                        request_configuration=RequestConfiguration[QueryParameters](
+                            options=no_retry()
+                        ),
+                    )
 
     if asked is not None:
         return asked

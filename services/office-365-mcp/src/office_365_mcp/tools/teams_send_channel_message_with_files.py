@@ -68,6 +68,8 @@ file. teams_send_chat_message_with_files is the tool for a chat.
 Notes:
 - This tool asks the user to agree before it posts anything, every time. This tool posts \
 nothing unless the user agrees.
+- The question shows the Microsoft Entra object id of each person in `mentions`. The `name` in the \
+question is only a label. The message shows the same label.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 the channel does not already show the message.
 """
