@@ -138,6 +138,16 @@ class TestResolvingByName:
         result = await get_investor(client=client)
         assert isinstance(result, InvestorNotFoundResponse)
 
+    @respx.mock
+    async def test_a_blank_name_does_not_search(self) -> None:
+        search = respx.get(f"{BASE_URL}/v3/investors").mock(
+            return_value=httpx.Response(200, json=page_body([], total=0))
+        )
+        client, _ = build_client()
+        result = await get_investor(name=" ", client=client)
+        assert isinstance(result, InvestorNotFoundResponse)
+        assert search.call_count == 0
+
 
 class TestById:
     @respx.mock

@@ -24,7 +24,7 @@ async def resolve_by_name_or_id[RecordT, AmbiguousT, NotFoundT, NotEntitledT](
 ) -> RecordT | AmbiguousT | NotFoundT | NotEntitledT:
     resolved_id = record_id
     if resolved_id is None:
-        if name is None:
+        if name is None or not name.strip():
             return not_found(searched_for="", hint=f"Pass either name or {kind}_id.")
         try:
             matches, total = await search(name)

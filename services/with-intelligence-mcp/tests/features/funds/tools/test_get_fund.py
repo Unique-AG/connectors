@@ -86,6 +86,16 @@ class TestResolution:
         assert detail.call_count == 0
 
     @respx.mock
+    async def test_a_blank_name_does_not_search(self) -> None:
+        search = respx.get(f"{BASE_URL}/v3/funds").mock(
+            return_value=httpx.Response(200, json=page_body([], total=0))
+        )
+        client, _ = build_client()
+        result = await get_fund(name="", client=client)
+        assert isinstance(result, FundNotFoundResponse)
+        assert search.call_count == 0
+
+    @respx.mock
     async def test_a_missing_id_is_not_found(self) -> None:
         respx.get(f"{BASE_URL}/v3/funds/9").mock(return_value=httpx.Response(404))
         client, _ = build_client()
