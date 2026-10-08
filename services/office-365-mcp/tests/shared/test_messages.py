@@ -797,6 +797,22 @@ class TestMentionedMembers:
         ) in refused
         assert "Nobody was mentioned. Nothing was sent." in refused
 
+    async def test_the_caller_gives_the_outcome_that_the_refusal_states(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _lists_members(graph, _ADA_MEMBER)
+
+        refused = await mentioned_members(
+            client, _CHAT_ID, (_JANE,), nothing_happened="No message was changed."
+        )
+
+        assert isinstance(refused, str)
+        assert refused.endswith(
+            "Nobody was mentioned. No message was changed. If you call this tool again with the "
+            + "same arguments, the call will fail the same way."
+        )
+        assert CHAT_SEND.nothing_sent not in refused
+
     @pytest.mark.parametrize(
         "member",
         [

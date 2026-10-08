@@ -692,7 +692,11 @@ async def chat_in_question(
 
 
 async def mentioned_members(
-    client: GraphServiceClient, chat_id: str, mentions: Sequence[Mention]
+    client: GraphServiceClient,
+    chat_id: str,
+    mentions: Sequence[Mention],
+    *,
+    nothing_happened: str = CHAT_SEND.nothing_sent,
 ) -> tuple[MentionedMember, ...] | str:
     if not mentions:
         return ()
@@ -713,7 +717,9 @@ async def mentioned_members(
     }
     missing = [mention.user_id for mention in mentions if mention.user_id.casefold() not in named]
     if missing:
-        return _not_named_members(missing, capped=collected.capped)
+        return _not_named_members(
+            missing, capped=collected.capped, nothing_happened=nothing_happened
+        )
     return tuple(named[mention.user_id.casefold()] for mention in mentions)
 
 
@@ -731,7 +737,7 @@ def _named_member(member: ConversationMember) -> MentionedMember | None:
     return None if name is None else MentionedMember(user_id=member.user_id, name=name)
 
 
-def _not_named_members(user_ids: Sequence[str], *, capped: bool) -> str:
+def _not_named_members(user_ids: Sequence[str], *, capped: bool, nothing_happened: str) -> str:
     ids = (
         "this Microsoft Entra object id"
         if len(user_ids) == 1
@@ -742,7 +748,7 @@ def _not_named_members(user_ids: Sequence[str], *, capped: bool) -> str:
         "This tool mentions only a member of the chat, by the name that Microsoft 365 gives."
     )
     refused = (
-        f"Nobody was mentioned. {CHAT_SEND.nothing_sent} If you call this tool again with the "
+        f"Nobody was mentioned. {nothing_happened} If you call this tool again with the "
         + "same arguments, the call will fail the same way."
     )
     if capped:

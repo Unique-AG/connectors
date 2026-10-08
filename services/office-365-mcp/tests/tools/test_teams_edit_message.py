@@ -594,9 +594,10 @@ class TestThePersonBeforeTheChange:
         assert refusal.startswith("Microsoft 365 shows no named member of this chat for ")
         assert repr(_JANE.user_id) in refusal
         assert refusal.endswith(
-            "Nobody was mentioned. Nothing was sent. If you call this tool again with the same "
-            + "arguments, the call will fail the same way."
+            "Nobody was mentioned. No message was changed. If you call this tool again with the "
+            + "same arguments, the call will fail the same way."
         )
+        assert "Nothing was sent." not in refusal
         assert session.asked == []
         assert listed.call_count == 1
         assert all(route.call_count == 0 for route in routes.values())

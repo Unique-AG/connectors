@@ -179,7 +179,9 @@ async def _outgoing(
 ) -> Sequence[OutgoingMention] | str:
     if handle.chat_id is None:
         return mentions
-    return await mentioned_members(client, handle.chat_id, mentions)
+    return await mentioned_members(
+        client, handle.chat_id, mentions, nothing_happened=_NOTHING_CHANGED
+    )
 
 
 def _question(current: TeamsMessage, message: str, mentions: Sequence[OutgoingMention]) -> str:
