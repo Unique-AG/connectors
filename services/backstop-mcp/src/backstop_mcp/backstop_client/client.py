@@ -53,7 +53,8 @@ SYSTEM_INFO_PATH = "/system-info"
 
 # /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
 # slow (up to ~30s per 500 records) — they get the extended timeout and the larger
-# report-sized page default; everything else gets the ordinary CRUD profile.
+# report-sized page default; everything else gets the ordinary CRUD profile. Each slow call
+# holds a per-user slot for as long as it runs; only `run_report` collects one in the background.
 _SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
 
 

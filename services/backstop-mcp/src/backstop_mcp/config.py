@@ -217,8 +217,8 @@ class BackstopConfig(BaseSettings):
     # httpx's documented default timeout is 5s; ordinary CRUD calls get 2 minutes.
     default_timeout_seconds: float = Field(default=120.0, gt=0)
     # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records,
-    # and a cold report build sends nothing for minutes. `run_report` stops waiting long before
-    # this and lets the build finish in the background.
+    # and a cold report build sends nothing for minutes. Only /reports runs in the background
+    # (`run_report`); no tool calls /analytics yet, and one that does needs the same.
     reports_timeout_seconds: float = Field(default=600.0, gt=0)
 
     # Backstop hard-limits each user token to 5 concurrent connections.
