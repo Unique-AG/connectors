@@ -107,7 +107,7 @@ _NOT_A_MESSAGE_HANDLE = (
     + "`message_ref` is a message handle: outlook:///messages/{id}. Pass it exactly as "
     + "outlook_search_mail, outlook_list_mail or outlook_read_thread reported it in `uri`. This "
     + "value is not one. A subject line, an email address, an Outlook web link and a bare "
-    + "message id are not handles. A folder, draft or rule handle under the same scheme is not "
+    + "message id are not handles. A folder or rule handle under the same scheme is not "
     + "a message handle either. Nothing was created, so there is no half-written draft in the "
     + "mailbox. Find the message again and pass the `uri` exactly."
 )

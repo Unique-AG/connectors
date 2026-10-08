@@ -115,7 +115,7 @@ _NOT_A_MESSAGE_HANDLE = (
     + "outlook:///messages/{id}. Take it from the `uri` of an outlook_search_mail, "
     + "outlook_list_mail, or outlook_read_thread result. One value in `message_refs` is not a "
     + "message handle. A subject line, an email address, an Outlook web link, and a bare message "
-    + "id are not handles. A folder handle, a draft handle, and a rule handle are not message "
+    + "id are not handles. A folder handle and a rule handle are not message "
     + "handles either. This tool makes sure that every handle is valid before it copies a "
     + "message. No message was copied. Fix the value and call again with the whole batch."
 )

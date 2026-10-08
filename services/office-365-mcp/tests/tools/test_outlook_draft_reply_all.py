@@ -881,7 +881,7 @@ class TestWhatItAnswers:
         assert answer.body_written is True
         assert answer.failure is None
 
-    async def test_the_handle_addresses_a_draft_and_cannot_be_read_as_a_message(
+    async def test_the_handle_is_the_message_handle_of_the_draft(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph)

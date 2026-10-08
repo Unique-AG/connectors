@@ -1396,7 +1396,7 @@ class TestWhatItAnswers:
         assert answer.importance == "low"
         assert answer.categories == ["Stored"]
 
-    async def test_the_handle_addresses_a_draft_and_cannot_be_read_as_a_message(
+    async def test_the_handle_is_the_message_handle_of_the_draft(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _creates(graph)

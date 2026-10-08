@@ -1384,6 +1384,38 @@ class TestTheToolsThisServerAdvertises:
 
         assert checked >= 18, f"only {checked} onenote not-a-handle texts remain to compare"
 
+    async def test_no_published_description_names_a_draft_handle(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name, tool in tools.items():
+            for described in (
+                tool.description or "",
+                *_described(tool.input_schema),
+                *_described(tool.output_schema),
+            ):
+                assert "outlook:///drafts" not in described, f"{name} spells a drafts handle"
+                assert "draft handle" not in described.casefold(), f"{name} names a draft handle"
+
+    def test_no_refusal_text_names_a_draft_handle(self) -> None:
+        checked = 0
+
+        for found in pkgutil.iter_modules(tool_package.__path__):
+            if not found.name.startswith("outlook_"):
+                continue
+            module = importlib.import_module(f"{tool_package.__name__}.{found.name}")
+            texts = cast("Mapping[str, object]", vars(module))
+            for constant, text in texts.items():
+                if constant.startswith("_") and isinstance(text, str):
+                    checked += 1
+                    assert "outlook:///drafts" not in text, f"{found.name}.{constant} spells one"
+                    assert "draft handle" not in text.casefold(), (
+                        f"{found.name}.{constant} names a draft handle"
+                    )
+
+        assert checked > 100, f"only {checked} outlook text constants were compared"
+
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:

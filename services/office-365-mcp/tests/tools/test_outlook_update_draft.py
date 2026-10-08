@@ -316,7 +316,7 @@ class TestWhatItRefuses:
             _SUBJECT,
         ],
     )
-    async def test_anything_that_is_not_a_draft_handle_never_reaches_graph(
+    async def test_anything_that_is_not_a_message_handle_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter, draft_ref: str
     ) -> None:
         _ = _ready(graph)
@@ -326,7 +326,7 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_value_that_is_not_a_draft_handle_ends_with_the_one_retry_sentence(
+    async def test_a_value_that_is_not_a_message_handle_ends_with_the_one_retry_sentence(
         self, client: GraphServiceClient
     ) -> None:
         with pytest.raises(ToolError) as refused:
@@ -863,7 +863,7 @@ class TestWhatItAnswers:
         assert answer.categories == ["Finance"]
         assert answer.web_link == _WEB_LINK
 
-    async def test_the_handle_is_the_draft_handle_it_was_given(
+    async def test_the_handle_is_the_message_handle_it_was_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _ready(graph)
