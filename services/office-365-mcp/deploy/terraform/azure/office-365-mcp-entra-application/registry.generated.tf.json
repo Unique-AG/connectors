@@ -73,7 +73,8 @@
         {
           "name": "teams_send_chat_message",
           "permissions": [
-            "ChatMessage.Send"
+            "ChatMessage.Send",
+            "Chat.Read"
           ]
         },
         {
@@ -86,7 +87,8 @@
           "name": "teams_send_chat_message_with_files",
           "permissions": [
             "ChatMessage.Send",
-            "Files.Read.All"
+            "Files.Read.All",
+            "Chat.Read"
           ]
         },
         {
