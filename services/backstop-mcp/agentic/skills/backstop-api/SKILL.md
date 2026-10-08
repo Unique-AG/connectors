@@ -20,8 +20,8 @@ alone have been wrong every time so far — see §8.
 
 ## 0. Where the docs live
 
-This skill file lives in `.claude/skills/backstop-api/` and `.cursor/skills/backstop-api/`
-(where agents load skills). The scripts and `.env` live in
+This skill file lives in `services/backstop-mcp/agentic/skills/backstop-api/`. Setup installs it
+into `.claude/skills/backstop-api/`, which is the directory the agents read. The scripts and `.env` live in
 `services/backstop-mcp/agent-explore/`. Do not send the API token to Elevio, and do not
 POST to `BACKSTOP_BASE_URL` unless the user says so for that task (§8).
 

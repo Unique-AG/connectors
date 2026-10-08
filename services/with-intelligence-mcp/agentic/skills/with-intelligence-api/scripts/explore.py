@@ -2,11 +2,11 @@
 
 Run from services/with-intelligence-mcp so `uv run` supplies httpx:
 
-    uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
+    uv run python agentic/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 
 Signs in once, caches the access token for its hour, and caches responses under `.probe-cache/`
 so a recorded body can become a test fixture. The only POST it makes is `/v3/auth/sign-in`.
-Read `.claude/skills/with-intelligence-api/SKILL.md` first.
+Read `agentic/skills/with-intelligence-api/SKILL.md` first.
 """
 
 from __future__ import annotations

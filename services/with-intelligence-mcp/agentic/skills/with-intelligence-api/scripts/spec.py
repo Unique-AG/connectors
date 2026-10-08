@@ -2,9 +2,9 @@
 
 Run from services/with-intelligence-mcp so `uv run` supplies httpx:
 
-    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths [filter]
-    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
-    uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py snapshot
+    uv run python agentic/skills/with-intelligence-api/scripts/spec.py paths [filter]
+    uv run python agentic/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
+    uv run python agentic/skills/with-intelligence-api/scripts/spec.py snapshot
 
 Output is tab-separated. `snapshot` refreshes that service's tests/spec/wi_schemas.json.
 
