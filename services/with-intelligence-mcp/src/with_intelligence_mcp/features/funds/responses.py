@@ -158,10 +158,7 @@ class FundProfileResponse(OmitNoneModel):
             domiciles=when_either(
                 attributes,
                 ("domiciles_offshore", "domiciles_onshore"),
-                (
-                    names(attributes.domiciles_offshore) + names(attributes.domiciles_onshore)
-                    or None
-                ),
+                names(attributes.domiciles_offshore) + names(attributes.domiciles_onshore),
             ),
             inception_date=attributes.inception_date,
             currency=attributes.currency.short_name if attributes.currency else None,

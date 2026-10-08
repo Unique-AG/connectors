@@ -26,4 +26,4 @@ def test_a_recorded_fund_parses_and_projects() -> None:
     assert projected.aum_millions == 500
     assert projected.lock_up is None
     assert projected.strategy == "Trades liquid markets."
-    assert projected.domiciles is None
+    assert projected.domiciles == []
