@@ -22,8 +22,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import MessageHandle, message_handle
-from office_365_mcp.shared.messages import Mention
+from office_365_mcp.shared.messages import Mention, MentionedMember, mention_fields
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirmed
 from office_365_mcp.tools import teams_edit_message as editor
@@ -46,6 +47,7 @@ _REPLY_HANDLE = MessageHandle(
 _CHAT_PATH = f"/chats/19%3Arelease%40thread.v2/messages/{_MESSAGE_ID}"
 _CHANNEL_PATH = f"/teams/{_TEAM_ID}/channels/19%3Ageneral%40thread.tacv2/messages/{_MESSAGE_ID}"
 _REPLY_PATH = f"{_CHANNEL_PATH}/replies/{_REPLY_ID}"
+_MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
 
 _EVERY_ENDPOINT: tuple[str, ...] = (_CHAT_PATH, _CHANNEL_PATH, _REPLY_PATH)
 
@@ -59,6 +61,24 @@ _CURRENT = message_payload(content=f"<p>{_CURRENT_TEXT}</p>")
 
 _JANE = Mention(user_id="00000000-0000-4000-8000-000000000003", name="Jane Smith")
 _ADA = Mention(user_id="00000000-0000-4000-8000-000000000001", name="Ada Lovelace")
+
+_LABEL = "Mallory"
+_JANE_UNDER_A_LABEL = Mention(user_id=_JANE.user_id, name=_LABEL)
+
+
+def _member(user_id: str, name: str | None) -> Mapping[str, object]:
+    return {
+        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+        "id": f"MCMj{user_id[-12:]}",
+        "displayName": name,
+        "userId": user_id,
+        "email": None,
+        "roles": ["owner"],
+    }
+
+
+_JANE_MEMBER = _member(_JANE.user_id, "Jane Smith")
+_ADA_MEMBER = _member(_ADA.user_id, "Ada Lovelace")
 
 _NOTHING_CHANGED = "No message was changed."
 
@@ -118,10 +138,17 @@ def _me(graph: respx.MockRouter) -> respx.Route:
     return graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
 
 
+def _lists_members(graph: respx.MockRouter, *members: Mapping[str, object]) -> respx.Route:
+    return graph.get(_MEMBERS_PATH).mock(
+        return_value=httpx.Response(200, json={"value": [dict(member) for member in members]})
+    )
+
+
 def _reads(
     graph: respx.MockRouter, message: Mapping[str, object] = _CURRENT
 ) -> Mapping[str, respx.Route]:
     _ = _me(graph)
+    _ = _lists_members(graph, _JANE_MEMBER, _ADA_MEMBER)
     return {
         endpoint: graph.get(endpoint).mock(return_value=httpx.Response(200, json=message))
         for endpoint in _EVERY_ENDPOINT
@@ -145,8 +172,30 @@ def _methods(graph: respx.MockRouter) -> list[str]:
     return [call.request.method for call in cast("Sequence[Call]", graph.calls)]
 
 
+def _last_segments(graph: respx.MockRouter) -> list[str]:
+    return [
+        call.request.url.path.rsplit("/", 1)[-1] for call in cast("Sequence[Call]", graph.calls)
+    ]
+
+
 def _body(route: respx.Route) -> Mapping[str, object]:
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
+
+
+async def _binding(
+    client: GraphServiceClient, handle: MessageHandle, message: str, mentions: Sequence[Mention]
+) -> str:
+    seen: list[str] = []
+
+    async def capturing(question: str, about: str) -> Confirmed:
+        assert question
+        seen.append(about)
+        return None
+
+    _ = await edit_message(
+        client, handle=handle, message=message, confirm=capturing, mentions=mentions
+    )
+    return seen[0]
 
 
 class _ModernRequest:
@@ -301,6 +350,61 @@ class TestTheRequestItMakes:
             '<at id="0">Jane Smith</at> 1 &lt; 2 &amp; &lt;b&gt;done&lt;/b&gt;<br>next'
         )
 
+    async def test_a_chat_mention_goes_out_under_the_name_microsoft_365_gives_and_never_the_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _edits(graph)
+
+        _ = await edit_message(
+            client,
+            handle=_CHAT_HANDLE,
+            message=_TEXT,
+            confirm=_agrees,
+            mentions=[_JANE_UNDER_A_LABEL],
+        )
+
+        sent = route.calls.last.request.content.decode()
+        body = cast("Mapping[str, object]", json.loads(sent))
+        assert body["body"] == {
+            "content": '<at id="0">Jane Smith</at> Ship it Monday.',
+            "contentType": "html",
+        }
+        mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
+        assert mentions[0]["mentionText"] == "Jane Smith"
+        mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
+        assert mentioned["user"] == {
+            "id": _JANE.user_id,
+            "displayName": "Jane Smith",
+            "userIdentityType": "aadUser",
+        }
+        assert _LABEL not in sent, "the label of the request reached the chat"
+
+    @pytest.mark.parametrize(
+        ("handle", "endpoint"),
+        [
+            pytest.param(_CHANNEL_HANDLE, _CHANNEL_PATH, id="post"),
+            pytest.param(_REPLY_HANDLE, _REPLY_PATH, id="reply"),
+        ],
+    )
+    async def test_a_channel_mention_goes_out_under_the_label_and_reads_no_member(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        handle: MessageHandle,
+        endpoint: str,
+    ) -> None:
+        route = _edits(graph, endpoint)
+
+        _ = await edit_message(
+            client, handle=handle, message=_TEXT, confirm=_agrees, mentions=[_JANE_UNDER_A_LABEL]
+        )
+
+        assert _body(route)["body"] == {
+            "content": f'<at id="0">{_LABEL}</at> Ship it Monday.',
+            "contentType": "html",
+        }
+        assert _methods(graph) == ["GET", "GET", "PATCH"], "a channel edit read the chat members"
+
 
 class TestThePersonBeforeTheChange:
     async def test_a_refusal_changes_nothing(
@@ -388,10 +492,115 @@ class TestThePersonBeforeTheChange:
 
         assert asked == [
             f"Replace the text of the Teams message from {_SENDER!r} that says "
-            + f"{_CURRENT_TEXT!r} with {_TEXT!r}? It mentions 'Jane Smith', 'Ada Lovelace'. "
+            + f"{_CURRENT_TEXT!r} with {_TEXT!r}? It mentions the person with the Microsoft Entra "
+            + f"object id {_JANE.user_id!r} (the name 'Jane Smith' is only a label from the "
+            + "request), the person with the Microsoft Entra object id "
+            + f"{_ADA.user_id!r} (the name 'Ada Lovelace' is only a label from the request). "
             + "Everyone in the conversation can see this change."
         ]
         assert "teams:///" not in asked[0], "a handle means nothing to the person who agrees"
+
+    async def test_the_chat_question_shows_the_object_id_and_the_name_microsoft_365_gives(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_endpoint(graph)
+        asked: list[str] = []
+
+        _ = await edit_message(
+            client,
+            handle=_CHAT_HANDLE,
+            message=_TEXT,
+            confirm=_asking(asked),
+            mentions=[_JANE_UNDER_A_LABEL],
+        )
+
+        assert asked == [
+            f"Replace the text of the Teams message from {_SENDER!r} that says "
+            + f"{_CURRENT_TEXT!r} with {_TEXT!r}? It mentions the person with the Microsoft Entra "
+            + f"object id {_JANE.user_id!r} (the name 'Jane Smith' comes from Microsoft 365). "
+            + "Everyone in the conversation can see this change."
+        ]
+        assert _LABEL not in asked[0], "the label of the request reached the question"
+
+    @pytest.mark.parametrize("handle", [_CHANNEL_HANDLE, _REPLY_HANDLE], ids=["post", "reply"])
+    async def test_the_channel_question_shows_the_object_id_and_the_label_from_the_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter, handle: MessageHandle
+    ) -> None:
+        _ = _every_endpoint(graph)
+        asked: list[str] = []
+
+        _ = await edit_message(
+            client,
+            handle=handle,
+            message=_TEXT,
+            confirm=_asking(asked),
+            mentions=[_JANE_UNDER_A_LABEL],
+        )
+
+        assert len(asked) == 1
+        assert (
+            f"? It mentions the person with the Microsoft Entra object id {_JANE.user_id!r} (the "
+            + f"name {_LABEL!r} is only a label from the request). "
+        ) in asked[0]
+        assert "Jane Smith" not in asked[0], "a channel edit cannot know the name of a member"
+
+    async def test_a_chat_edit_reads_the_members_after_the_sender_check_and_before_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = _every_endpoint(graph)
+        calls_when_asked: list[list[str]] = []
+
+        async def watching(question: str, about: str) -> Confirmed:
+            assert question and about
+            calls_when_asked.append(_last_segments(graph))
+            return None
+
+        _ = await edit_message(
+            client, handle=_CHAT_HANDLE, message=_TEXT, confirm=watching, mentions=[_JANE, _ADA]
+        )
+
+        assert calls_when_asked == [[_MESSAGE_ID, "me", "members"]]
+        assert _methods(graph) == ["GET", "GET", "GET", "PATCH"]
+        assert routes[_CHAT_PATH].call_count == 1
+
+    @pytest.mark.parametrize(
+        "members",
+        [
+            pytest.param((_ADA_MEMBER,), id="not-a-member"),
+            pytest.param((_member(_JANE.user_id, None), _ADA_MEMBER), id="member-with-no-name"),
+            pytest.param((), id="no-member"),
+        ],
+    )
+    async def test_a_mention_of_a_person_not_in_the_chat_is_refused_before_any_question(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        members: Sequence[Mapping[str, object]],
+    ) -> None:
+        routes = _every_endpoint(graph)
+        listed = _lists_members(graph, *members)
+        session = _Session(modern=False, elicited=AcceptedElicitation(data="edit"))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await edit_message(
+                client,
+                handle=_CHAT_HANDLE,
+                message=_TEXT,
+                confirm=a_person_agrees(session.context),
+                mentions=[_ADA, _JANE],
+            )
+
+        refusal = str(refused.value)
+        assert refusal.startswith("Microsoft 365 shows no named member of this chat for ")
+        assert repr(_JANE.user_id) in refusal
+        assert refusal.endswith(
+            "Nobody was mentioned. Nothing was sent. If you call this tool again with the same "
+            + "arguments, the call will fail the same way."
+        )
+        assert session.asked == []
+        assert listed.call_count == 1
+        assert all(route.call_count == 0 for route in routes.values())
+        assert _methods(graph) == ["GET", "GET", "GET"]
 
     async def test_the_question_names_the_attachments_that_the_change_removes(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -560,28 +769,35 @@ class TestThePersonBeforeTheChange:
     ) -> None:
         _ = _every_endpoint(graph)
 
-        async def binding(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
-            seen: list[str] = []
+        bound = await _binding(client, _CHAT_HANDLE, _TEXT, (_JANE, _ADA))
 
-            async def capturing(question: str, about: str) -> Confirmed:
-                assert question
-                seen.append(about)
-                return None
+        assert bound != await _binding(client, _CHAT_HANDLE, _OTHER_TEXT, (_JANE, _ADA))
+        assert bound != await _binding(client, _CHAT_HANDLE, _TEXT, (_JANE,))
+        assert bound != await _binding(client, _CHAT_HANDLE, _TEXT, (_ADA, _JANE))
+        assert bound != await _binding(client, _CHANNEL_HANDLE, _TEXT, (_JANE, _ADA))
 
-            _ = await edit_message(
-                client, handle=handle, message=message, confirm=capturing, mentions=mentions
-            )
-            return seen[0]
+    async def test_the_binding_of_a_chat_edit_holds_the_name_microsoft_365_gives_and_no_label(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_endpoint(graph)
 
-        bound = await binding(_CHAT_HANDLE, _TEXT, (_JANE, _ADA))
+        bound = await _binding(client, _CHAT_HANDLE, _TEXT, (_JANE_UNDER_A_LABEL,))
 
-        assert bound != await binding(_CHAT_HANDLE, _OTHER_TEXT, (_JANE, _ADA))
-        assert bound != await binding(_CHAT_HANDLE, _TEXT, (_JANE,))
-        assert bound != await binding(_CHAT_HANDLE, _TEXT, (_ADA, _JANE))
-        assert bound != await binding(
-            _CHAT_HANDLE, _TEXT, (Mention(user_id=_JANE.user_id, name="Jane S"), _ADA)
+        assert bound == confirmation_id_for(
+            _CHAT_HANDLE.uri,
+            _TEXT,
+            *mention_fields((MentionedMember(user_id=_JANE.user_id, name="Jane Smith"),)),
         )
-        assert bound != await binding(_CHANNEL_HANDLE, _TEXT, (_JANE, _ADA))
+        assert bound == await _binding(client, _CHAT_HANDLE, _TEXT, (_JANE,))
+
+    async def test_the_binding_of_a_channel_edit_holds_the_label_that_the_message_shows(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _every_endpoint(graph)
+
+        assert await _binding(client, _CHANNEL_HANDLE, _TEXT, (_JANE,)) != await _binding(
+            client, _CHANNEL_HANDLE, _TEXT, (_JANE_UNDER_A_LABEL,)
+        )
 
 
 class TestTheEraWithNoBackChannel:
@@ -632,8 +848,9 @@ class TestTheEraWithNoBackChannel:
         )
 
         assert route.call_count == 1, "the agreed change did not happen exactly once"
-        assert _methods(graph) == ["GET", "GET", "GET", "GET", "PATCH"], (
-            "each round reads the message and the signed-in user, and one round writes"
+        assert _methods(graph) == ["GET", "GET", "GET", "GET", "GET", "GET", "PATCH"], (
+            "each round reads the message, the signed-in user and the chat members, and one round "
+            + "writes"
         )
         assert answer == EditedMessage(uri=_CHAT_HANDLE.uri, text=_TEXT, mentions=[_JANE])
 
@@ -874,6 +1091,20 @@ class TestHowItDeclaresItself:
         assert (
             "This tool sends no file and no card, so the change can remove a file or a card from "
             + "the message."
+        ) in description
+
+    async def test_the_description_says_what_the_question_shows_for_a_mention(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert (
+            "The question shows the Microsoft Entra object id of each person in `mentions`. For a "
+            + "chat message, this tool reads the members of the chat. The question and the message "
+            + "then show the name that Microsoft 365 gives each member. If a person in `mentions` "
+            + "is not a member of the chat, this tool changes nothing. For a channel message, the "
+            + "`name` in the question is only a label. The message shows the same label."
         ) in description
 
     async def test_the_description_names_the_tools_that_send_and_remove_a_message(

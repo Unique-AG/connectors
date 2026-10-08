@@ -430,9 +430,9 @@ class Mention(BaseModel, frozen=True):
         min_length=1,
         description=(
             "The name of the person, as a label only. Teams identifies the person only by "
-            + "`user_id`. Copy the `display_name` from the same result as `user_id`. In a new "
-            + "chat message, this tool posts the name that Microsoft 365 gives the chat member, "
-            + "not this label. In a channel message, this tool cannot read that name, so it posts "
+            + "`user_id`. Copy the `display_name` from the same result as `user_id`. In a chat "
+            + "message, this tool posts the name that Microsoft 365 gives the chat member, not "
+            + "this label. In a channel message, this tool cannot read that name, so it posts "
             + "this label."
         ),
     )
@@ -611,7 +611,7 @@ def send_question(
     importance: ChatImportance | None,
     files: Sequence[AttachableFile] = (),
 ) -> str:
-    named = ", ".join(_mention_in_question(mention) for mention in mentions)
+    named = ", ".join(mention_in_question(mention) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
     listed = ", ".join(repr(cut_for_a_question(file.name)) for file in files)
     attached = f" It attaches {listed}." if files else ""
@@ -630,7 +630,7 @@ def send_question(
     )
 
 
-def _mention_in_question(mention: OutgoingMention) -> str:
+def mention_in_question(mention: OutgoingMention) -> str:
     if isinstance(mention, MentionedMember):
         return member_in_question(mention.user_id, mention.name)
     return person_in_question(mention.user_id, mention.name)

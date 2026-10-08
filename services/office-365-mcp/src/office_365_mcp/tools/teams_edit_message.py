@@ -22,9 +22,12 @@ from office_365_mcp.shared.handles import (
 from office_365_mcp.shared.messages import (
     EVERYONE_SEES_IT,
     Mention,
+    OutgoingMention,
     TeamsMessage,
     get_message,
     mention_fields,
+    mention_in_question,
+    mentioned_members,
     message_in_question,
     not_the_sender,
     outgoing_message,
@@ -93,6 +96,11 @@ nothing unless the user agrees.
 - The new text replaces all of the old text. A mention stays in the message only if `mentions` \
 gives it again. This tool sends no file and no card, so the change can remove a file or a card \
 from the message.
+- The question shows the Microsoft Entra object id of each person in `mentions`. For a chat \
+message, this tool reads the members of the chat. The question and the message then show the name \
+that Microsoft 365 gives each member. If a person in `mentions` is not a member of the chat, this \
+tool changes nothing. For a channel message, the `name` in the question is only a label. The \
+message shows the same label.
 """
 
 GRAPH_NOT_FOUND = (
@@ -145,16 +153,19 @@ async def edit_message(
         refused = _ALREADY_DELETED if current.deleted_at is not None else None
         if refused is None and not sent_by(current, await identity.signed_in_user(client)):
             refused = _NOT_THE_SENDER
-        if refused is None:
+        outgoing = () if refused is not None else await _outgoing(client, handle, mentions)
+        if isinstance(outgoing, str):
+            refused = outgoing
+        elif refused is None:
             with not_graph():
                 answer = await confirm(
-                    _question(current, message, mentions), _about(handle, message, mentions)
+                    _question(current, message, outgoing), _about(handle, message, outgoing)
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            with graph_step(STEP_EDIT):
-                await _edit(client, handle, _new_body(message, mentions))
+            if refused is None and asked is None:
+                with graph_step(STEP_EDIT):
+                    await _edit(client, handle, _new_body(message, outgoing))
 
     if asked is not None:
         return asked
@@ -163,8 +174,16 @@ async def edit_message(
     return EditedMessage(uri=handle.uri, text=message, mentions=list(mentions))
 
 
-def _question(current: TeamsMessage, message: str, mentions: Sequence[Mention]) -> str:
-    named = ", ".join(repr(cut_for_a_question(mention.name)) for mention in mentions)
+async def _outgoing(
+    client: GraphServiceClient, handle: MessageHandle, mentions: Sequence[Mention]
+) -> Sequence[OutgoingMention] | str:
+    if handle.chat_id is None:
+        return mentions
+    return await mentioned_members(client, handle.chat_id, mentions)
+
+
+def _question(current: TeamsMessage, message: str, mentions: Sequence[OutgoingMention]) -> str:
+    named = ", ".join(mention_in_question(mention) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
     attached = ", ".join(
         repr(cut_for_a_question(attachment.name)) if attachment.name else "an attachment"
@@ -177,7 +196,7 @@ def _question(current: TeamsMessage, message: str, mentions: Sequence[Mention]) 
     )
 
 
-def _about(handle: MessageHandle, message: str, mentions: Sequence[Mention]) -> str:
+def _about(handle: MessageHandle, message: str, mentions: Sequence[OutgoingMention]) -> str:
     return confirmation_id_for(handle.uri, message, *mention_fields(mentions))
 
 
@@ -185,7 +204,7 @@ def _permissions(handle: MessageHandle) -> tuple[str, ...]:
     return _CHAT_PERMISSIONS if handle.chat_id is not None else _CHANNEL_PERMISSIONS
 
 
-def _new_body(message: str, mentions: Sequence[Mention]) -> ChatMessage:
+def _new_body(message: str, mentions: Sequence[OutgoingMention]) -> ChatMessage:
     outgoing = outgoing_message(message, mentions=mentions)
     return dataclasses.replace(outgoing, mentions=outgoing.mentions or [])
 
