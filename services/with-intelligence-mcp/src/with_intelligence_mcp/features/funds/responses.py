@@ -133,8 +133,7 @@ class FundProfileResponse(OmitNoneModel):
             strategy=html_to_markdown(attributes.strategy_description),
             strategies=when_either(
                 attributes,
-                "primary_strategies",
-                "secondary_strategies",
+                ("primary_strategies", "secondary_strategies"),
                 names(attributes.primary_strategies) + names(attributes.secondary_strategies),
             ),
             asset_classes=when_present(
@@ -158,8 +157,7 @@ class FundProfileResponse(OmitNoneModel):
             ),
             domiciles=when_either(
                 attributes,
-                "domiciles_offshore",
-                "domiciles_onshore",
+                ("domiciles_offshore", "domiciles_onshore"),
                 (
                     names(attributes.domiciles_offshore) + names(attributes.domiciles_onshore)
                     or None

@@ -24,9 +24,9 @@ class TestPresence:
     def test_an_omitted_field_stays_unknown(self) -> None:
         record = _Record.model_validate({"primary": [{"name": "Equity"}]})
         assert when_present(record, "secondary", names(record.secondary)) is None
-        assert when_either(record, "secondary", "missing", names(record.secondary)) is None
+        assert when_either(record, ("secondary", "missing"), names(record.secondary)) is None
 
     def test_a_present_field_is_returned_even_when_empty(self) -> None:
         record = _Record.model_validate({"primary": [], "secondary": [{"name": "Macro"}]})
         assert when_present(record, "primary", names(record.primary)) == []
-        assert when_either(record, "primary", "secondary", names(record.secondary)) == ["Macro"]
+        assert when_either(record, ("primary", "secondary"), names(record.secondary)) == ["Macro"]

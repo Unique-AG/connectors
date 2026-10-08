@@ -102,8 +102,7 @@ class ManagerProfileResponse(OmitNoneModel):
             ),
             strategies=when_either(
                 attributes,
-                "funds_primary_strategies",
-                "funds_secondary_strategies",
+                ("funds_primary_strategies", "funds_secondary_strategies"),
                 names(attributes.funds_primary_strategies)
                 + names(attributes.funds_secondary_strategies),
             ),
