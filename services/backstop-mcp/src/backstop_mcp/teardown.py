@@ -34,6 +34,7 @@ from backstop_mcp.features.accounts import (
     get_capital_flows_query_factory,
     get_holdings_query_factory,
     get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     get_time_series_query_factory,
     search_products_query_factory,
 )
@@ -106,7 +107,7 @@ from backstop_mcp.features.party_resolver import (
     get_party_name_query_factory,
     get_resolve_party_query_factory,
 )
-from backstop_mcp.features.reports import get_run_report_query_factory
+from backstop_mcp.features.reports import get_report_run_cache, get_run_report_query_factory
 from backstop_mcp.features.system_users import get_system_users_service
 from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 from backstop_mcp.features.time_zones import get_time_zones_service
@@ -199,10 +200,12 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_capital_flows_query_factory,
     get_holdings_query_factory,
     get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     search_products_query_factory,
     get_time_series_query_factory,
     get_build_entity_link_util_factory,
     get_parse_entity_link_util_factory,
+    get_report_run_cache,
     get_run_report_query_factory,
 )
 

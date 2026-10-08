@@ -1,5 +1,6 @@
 from collections.abc import Callable
-from typing import TypedDict, Unpack, cast, get_args
+from datetime import date
+from typing import Literal, TypedDict, Unpack, cast, get_args
 
 import httpx
 import pytest
@@ -305,6 +306,72 @@ class TestSearchOpportunities:
         rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
         assert [row["id"] for row in rows] == ["1"]
         assert "investor_representative" not in rows[0]
+
+    @pytest.mark.parametrize(
+        ("scope", "expected_ids"),
+        [("investor", ["2"]), ("either", ["1", "2"])],
+    )
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_wider_scopes_match_the_investor_representative_in_memory(
+        self, scope: Literal["investor", "either"], expected_ids: list[str]
+    ) -> None:
+        base_url = tenant(f"so-representative-scope-{scope}")
+        # Deal 1 is assigned to jdoe at an organization asmith covers; deal 2 has no deal-level
+        # representative at an organization jdoe covers; deal 3 is asmith's on both links.
+        opportunities = respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal("1", name="Assigned", stage_id="42482", representative_id="u1"),
+                _deal("2", name="Covered", stage_id="42482", investor_id="c2"),
+                _deal(
+                    "3", name="Neither", stage_id="42482", investor_id="c3", representative_id="u2"
+                ),
+                included=[
+                    resource("42482", "opportunity-stages", name="Stage B"),
+                    *(
+                        {
+                            **resource(contact_id, "contacts", name=contact_id),
+                            "relationships": {
+                                "representative": {"data": {"id": user_id, "type": "system-users"}}
+                            },
+                        }
+                        for contact_id, user_id in (("c1", "u2"), ("c2", "u1"), ("c3", "u2"))
+                    ),
+                    resource("u1", "system-users", userName="jdoe"),
+                    resource("u2", "system-users", userName="asmith"),
+                ],
+                total=3,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    representative="jdoe",
+                    representative_scope=scope,
+                    fields=["name", "representative", "investor_representative"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(opportunities.calls)[0].url.params
+        # Backstop cannot filter the organization's representative, so every deal is read.
+        assert "filter[representative.name][eq]" not in params
+        rows = [object_dict(item) for item in object_list(tool_payload(result)["rows"])]
+        assert [row["id"] for row in rows] == expected_ids
+
+    @pytest.mark.asyncio
+    async def test_a_scope_without_a_login_is_refused(self) -> None:
+        async with tool_client(tenant("so-representative-scope-no-login")) as client:
+            with pytest.raises(ValueError, match="representative_scope"):
+                await search_opportunities(
+                    representative_scope="either",
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
 
     @pytest.mark.asyncio
     @respx.mock
@@ -737,15 +804,37 @@ class TestSearchOpportunitiesCustomFields:
         assert "custom_field_values" not in rows[0]
 
     @pytest.mark.asyncio
-    async def test_exclude_custom_fields_is_refused_with_a_custom_field_filter(self) -> None:
-        async with tool_client(tenant("so-cf-refused")) as client:
-            with pytest.raises(ValueError, match="exclude_custom_fields"):
+    @respx.mock
+    async def test_exclude_custom_fields_is_ignored_with_a_custom_field_filter(self) -> None:
+        base_url = tenant("so-cf-kept")
+        route = respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                _deal(
+                    "kept",
+                    name="Fabrikam",
+                    stage_id="42478",
+                    regularCustomFieldValues=_custom_fields(("1", "Flag", "Yes")),
+                ),
+                included=_included() + [resource("42478", "opportunity-stages", name="Stage A")],
+                total=1,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
                 await search_opportunities(
                     custom_fields=[OpportunityCustomFieldFilter(definition_id="1", values=["Yes"])],
                     exclude_custom_fields=True,
                     search_opportunities_query=make_search_opportunities_query(client),
                     search_config=_CONFIG,
-                )
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert "regularCustomFieldValues" in params["fields[opportunities]"]
+        assert len(object_list(tool_payload(result)["rows"])) == 1
 
     @pytest.mark.asyncio
     @respx.mock
@@ -826,6 +915,7 @@ def _closed_except(total: int, *, open_positions: set[int]) -> list[dict[str, ob
 class _SearchArguments(TypedDict, total=False):
     is_open: bool
     stage: str
+    entered_stage_from: date
     fields: list[SearchRowField]
 
 
@@ -925,6 +1015,140 @@ class TestSearchOpportunitiesPaging:
                     mode="aggregate",
                     group_by="stage",
                     cursor="anything",
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
+
+
+def _entered(position: int, entered: str | None) -> dict[str, object]:
+    return _deal(
+        str(position),
+        name=f"deal {position}",
+        stage_id="42482",
+        is_open=position % 2 == 0,
+        investor_id=None,
+        product_id=None,
+        dateEnteredCurrentStage=entered,
+    )
+
+
+class TestSearchOpportunitiesStageWindow:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_keeps_open_and_closed_deals_inside_the_inclusive_window(self) -> None:
+        base_url = tenant("so-window")
+        respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(
+                [
+                    _entered(0, "2026-03-31T00:00:00.000-0400"),
+                    _entered(1, "2026-04-01T00:00:00.000-0400"),
+                    _entered(2, "2026-05-15T00:00:00.000-0400"),
+                    _entered(3, "2026-06-30T00:00:00.000-0400"),
+                    _entered(4, "2026-07-01T00:00:00.000-0400"),
+                    _entered(5, None),
+                ]
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    entered_stage_from=date(2026, 4, 1),
+                    entered_stage_to=date(2026, 6, 30),
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        assert _ids(result) == ["1", "2", "3"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_reads_past_the_oldest_ids_in_one_call(self) -> None:
+        """The pages are ordered by id, so recent moves sit at the end of the collection."""
+        base_url = tenant("so-window-late")
+        total = 1_232
+        deals = [_entered(position, "2024-01-01T00:00:00.000-0400") for position in range(total)]
+        deals[-2] = _entered(total - 2, "2026-09-29T00:00:00.000-0400")
+        deals[-1] = _entered(total - 1, "2026-10-01T00:00:00.000-0400")
+        route = respx.get(f"{base_url}/opportunities").mock(side_effect=_paged(deals))
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    entered_stage_from=date(2026, 4, 7),
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        assert _ids(result) == [str(total - 2), str(total - 1)]
+        assert result.continuation is None
+        assert result.coverage.rows_scanned == total
+        assert route.call_count == total // 500 + 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_aggregate_counts_only_the_window(self) -> None:
+        base_url = tenant("so-window-agg")
+        respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(
+                [
+                    _entered(0, "2025-01-01T00:00:00.000-0400"),
+                    _entered(1, "2026-05-01T00:00:00.000-0400"),
+                    _entered(2, "2026-06-01T00:00:00.000-0400"),
+                ]
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            result = tool_model(
+                await search_opportunities(
+                    entered_stage_from=date(2026, 4, 7),
+                    mode="aggregate",
+                    group_by="stage",
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                ),
+                SearchOpportunitiesResolvedResponse,
+            )
+
+        assert [(bucket.label, bucket.count) for bucket in result.aggregates] == [("Stage B", 2)]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_cursor_from_another_window_is_rejected(self) -> None:
+        base_url = tenant("so-window-cursor")
+        respx.get(f"{base_url}/opportunities").mock(
+            side_effect=_paged(
+                [_entered(position, "2026-05-01T00:00:00.000-0400") for position in range(3)]
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        first = await _search_page(base_url, result_size=1, entered_stage_from=date(2026, 4, 1))
+        assert first.continuation is not None
+
+        with pytest.raises(ToolError, match="different search"):
+            _ = await _search_page(
+                base_url,
+                result_size=1,
+                entered_stage_from=date(2026, 1, 1),
+                cursor=first.continuation.cursor,
+            )
+
+    @pytest.mark.asyncio
+    async def test_an_inverted_window_is_refused(self) -> None:
+        async with tool_client(tenant("so-window-inverted")) as client:
+            with pytest.raises(ValueError, match="entered_stage_from"):
+                await search_opportunities(
+                    entered_stage_from=date(2026, 7, 1),
+                    entered_stage_to=date(2026, 4, 1),
                     search_opportunities_query=make_search_opportunities_query(client),
                     search_config=_CONFIG,
                 )

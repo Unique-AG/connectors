@@ -261,7 +261,11 @@ class AccountRowResponse(OmitNoneModel):
         description="ISO currency code the account's figures are in, e.g. 'USD'.",
     )
     account_start_date: Date | None = Field(
-        default=None, description="Day the account opened, when Backstop has one."
+        default=None,
+        description=(
+            "Day this account opened, when Backstop has one: the start of this account, not of "
+            "the owner's relationship. For tenure read `investors[].continuous_since`."
+        ),
     )
     closed_date: Date | None = Field(
         default=None,

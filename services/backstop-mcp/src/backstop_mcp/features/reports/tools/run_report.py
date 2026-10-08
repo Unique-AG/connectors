@@ -15,6 +15,7 @@ from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.reports import (
     DEFAULT_REPORT_PAGE_SIZE,
     MAX_REPORT_PAGE_SIZE,
+    RunReportPendingResponse,
     RunReportQuery,
     RunReportResponse,
 )
@@ -25,7 +26,7 @@ from backstop_mcp.models import NonEmptyStr, published_output_schema
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
 
-type RunReportToolResponse = RunReportResponse | NotFoundResponse
+type RunReportToolResponse = RunReportResponse | RunReportPendingResponse | NotFoundResponse
 
 
 @tool(
@@ -71,8 +72,8 @@ async def run_report(
         Field(
             ge=0,
             description=(
-                "Row offset to start this page at. Defaults to 0. Echo `next_offset` from a "
-                "prior response to continue; do not invent an offset."
+                "Row offset to start this page at. Defaults to 0. To continue, copy `next_offset` "
+                "from the prior response exactly; never compute, guess, or invent an offset."
             ),
         ),
     ] = 0,
@@ -86,9 +87,10 @@ async def run_report(
     endpoint. Never invent a name. `report_name` is the exact Report Center name;
     `as_of_date` defaults to today.
 
-    The table's columns depend on the report: `columns` names the keys, `rows` are dicts
-    with values of any type. Ask what the user needs and what columns mean; don't invent a
-    schema.
+    Returns a table: `columns` is the header and each entry in `rows` is one row, cell i
+    under `columns[i]`. The rows are what the user wants. Show them as a table, or the cut
+    the user asked for. When the user wants the data in a file, write these cells into it.
+    Don't answer with a column list or a schema.
 
     The report can't be filtered by product or date. Filter on its own columns after
     following `next_offset` to the end. Resolve a short name with search_products when the
@@ -97,6 +99,11 @@ async def run_report(
     One page per call. `total` is the full row count; `next_offset` is present when more
     rows remain. Continuation must repeat the same `as_of_date`. Don't walk every page
     unless the user asked for the whole report or a cut of it.
+
+    A report Backstop has not built recently can take minutes. Then the call returns
+    `status: "running"` and no rows; the build keeps going. Call again right away with the
+    same `report_name`, `as_of_date`, `limit`, and `offset` — each call waits on the server.
+    If it is still running after a few calls, tell the user how long it has been building.
 
     Call like: {"report_name": "<exact Report Center name>"}
     Continue: {"report_name": "<same name>", "as_of_date": "<same date, or today if omitted>",

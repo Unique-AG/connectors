@@ -214,11 +214,12 @@ class BackstopConfig(BaseSettings):
     # a host from the shared `api.backstopsolutions.com` API. See `effective_ui_base_url`.
     ui_base_url: HttpUrlStr | None = None
 
-    # httpx's documented default timeout is 5s. Ordinary CRUD calls use the same 2-minute
-    # budget as /reports and analytics.
+    # httpx's documented default timeout is 5s; ordinary CRUD calls get 2 minutes.
     default_timeout_seconds: float = Field(default=120.0, gt=0)
-    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
-    reports_timeout_seconds: float = Field(default=120.0, gt=0)
+    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records,
+    # and a cold report build sends nothing for minutes. Only /reports runs in the background
+    # (`run_report`); no tool calls /analytics yet, and one that does needs the same.
+    reports_timeout_seconds: float = Field(default=600.0, gt=0)
 
     # Backstop hard-limits each user token to 5 concurrent connections.
     max_concurrent_requests_per_user: int = Field(default=5, ge=1)

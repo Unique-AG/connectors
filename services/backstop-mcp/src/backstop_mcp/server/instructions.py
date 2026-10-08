@@ -19,6 +19,12 @@ contacts or employees id is not a people id. An ambiguous name comes back as `ca
 never a guess; `not_found` names the query actually used. Account, product, opportunity, and \
 activity ids are not party ids.
 
+Text matching. Backstop matches text literally: a name, tag, or title term does not match its \
+abbreviation, synonym, or another spelling. When a search turns on text, try a few variants \
+— full name and abbreviation, singular and plural, with and without punctuation — merge the \
+results by id, and say which variants you tried and which matched. An empty first try is not \
+"none".
+
 Which tool. One organization or person: get_organization / get_person (`include` names are \
 `locations`, `email_addresses`, and the rest listed on the parameter). Firm-wide \
 organizations: search_organizations. Firm-wide people: search_people (people at the \
@@ -69,10 +75,13 @@ organization record: never search_people or search_organizations for their pipel
 not "no coverage". \
 `representative` on search_opportunities matches the deal-level representative: the deals \
 assigned to that colleague. `investor_representative` is the investor organization's \
-representative, an output field only; it can differ and is never filtered on. \
+representative and can differ; `representative_scope` `investor` matches the login there, \
+and `either` keeps deals matching on either link. \
 A stage-change question stays on \
-search_opportunities: select `previous_stage` and `date_entered_current_stage`, keep rows \
-inside the window including closed deals, and do not walk get_opportunities_by_ids. Those \
+search_opportunities: pass the window as `entered_stage_from`/`entered_stage_to`, select \
+`previous_stage` and `date_entered_current_stage`, keep closed deals, and do not walk \
+get_opportunities_by_ids. Never filter that date yourself from unfiltered pages: they are \
+ordered by id, so the first pages are the oldest deals. Those \
 two fields are the latest move only. The `product` argument is the linked fund and may be \
 blank. Country is the stored \
 full name. One party's deals: get_opportunities \
@@ -118,7 +127,12 @@ absent from the fetched record too, say Backstop does not record it.
 
 Paging. search_organizations, search_people, search_opportunities (rows), and \
 search_activities (rows) return one page per call. `continuation` means more may match: \
-pass its `cursor` back with every other argument unchanged for the next page, and relay \
-its `message` when the user asks whether that is all. Page on only when the user needs more \
-rows than one page holds; a count is aggregate mode, not a walk of every page.
+copy its `cursor` string into the next call's `cursor` exactly, character for character, \
+with every other argument unchanged. Never shorten, retype, edit, or make up a cursor, and \
+never pass a page number or offset. No `continuation` means the set is complete. A rejected \
+cursor means start over without `cursor`, not guess another. Relay its `message` when the \
+user asks whether that is all. The page size is fixed: never ask the \
+user how many rows to fetch or offer a first pass. An overview, a list of all, or any \
+question about every match follows `continuation` until it is gone, then answers from the \
+whole set. A count is aggregate mode, not a walk of every page.
 """

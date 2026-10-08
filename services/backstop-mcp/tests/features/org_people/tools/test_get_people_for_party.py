@@ -181,6 +181,39 @@ class TestGetPeopleForParty:
 
         assert result.scope == "organizations"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_non_organization_party_id_is_not_found(self, client: BackstopClient) -> None:
+        """A people id passed as `party_id` 404s on the roster walk; that is `not_found`."""
+        respx.get(_EMPLOYEES_URL).mock(
+            return_value=httpx.Response(
+                404,
+                json={
+                    "errors": [
+                        {
+                            "code": "ResourceNotFoundException",
+                            "title": f"Resource organizations not found by id {_ORG}",
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = tool_model(
+            await get_people_for_party(
+                ctx_never_elicit(),
+                party_id=_ORG,
+                resolve_party_query=make_resolve_party_query(client),
+                get_people_for_organization_query=make_get_people_for_organization_query(
+                    client, employment_index_factory=_INDEX
+                ),
+            ),
+            NotFoundResponse,
+        )
+
+        assert result.query == _ORG
+        assert result.scope == "organizations"
+
     def test_is_registered(self) -> None:
         assert get_people_for_party in TOOLS
         meta = get_fastmcp_meta(get_people_for_party)

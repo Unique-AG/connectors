@@ -91,7 +91,7 @@ async def get_accounts_for_party(
         Field(
             description=(
                 "When false (default), only open accounts are returned. Pass true to include "
-                "closed accounts."
+                "closed accounts. `continuous_since` counts closed accounts either way."
             ),
         ),
     ] = False,
@@ -111,6 +111,12 @@ async def get_accounts_for_party(
     `balance`, `commitment`, `unfunded_commitment`, share of product and of master. This answers
     "how much does X have in fund Y", "summarise X's investments", and "how long have they been
     in Y" in one call.
+
+    **Tenure:** "since when", "how long", or "longest-standing" for the party as a whole is
+    `continuous_since`, not any row's `funded_date`. A row's date is when that account started,
+    and investors who rotate accounts (private banks, platforms, nominees) have no single old
+    account. `continuous_since` merges every owned account, closed ones included, into the
+    unbroken run that reaches today.
 
     **Read `data_caveat` before quoting a figure.** Two endpoints can answer this, and they differ
     in what they know: the fast one publishes a balance with no as-of date and no

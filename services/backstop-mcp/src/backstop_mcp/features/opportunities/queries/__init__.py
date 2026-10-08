@@ -8,6 +8,7 @@ from backstop_mcp.features.opportunities.queries.get_opportunities_query import 
 )
 from backstop_mcp.features.opportunities.queries.search_opportunities_query import (
     OpportunityGroupBy,
+    RepresentativeScope,
     SearchMode,
     SearchOpportunitiesQuery,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "GetOpportunitiesQuery",
     "OpportunityGroupBy",
     "OpportunityStatus",
+    "RepresentativeScope",
     "SearchMode",
     "SearchOpportunitiesQuery",
 ]

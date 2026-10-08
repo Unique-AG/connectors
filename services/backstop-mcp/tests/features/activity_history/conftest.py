@@ -55,7 +55,9 @@ def serve_entity_activities(
 ) -> Callable[[httpx.Request], httpx.Response]:
     """A fake `POST /entity-activities`: `rows` in served order, cut to the body's effective-date
     window and paged by `pageNum`/`pageSize`. A page starting at or past `wall` is a 500, and
-    `totalCount` saturates at it, as probed."""
+    `totalCount` saturates at it, as probed. A row with `"_hidden": True` is an activity with no
+    `regarding` party: it holds its position and counts in `totalCount` but is left out of
+    `results`."""
 
     def respond(request: httpx.Request) -> httpx.Response:
         attributes = object_dict(object_dict(_json_body(request)["data"])["attributes"])
@@ -79,7 +81,11 @@ def serve_entity_activities(
                     "type": "entity-activities",
                     "attributes": {
                         "totalCount": min(len(in_window), wall),
-                        "results": in_window[offset : offset + page_size],
+                        "results": [
+                            row
+                            for row in in_window[offset : offset + page_size]
+                            if not row.get("_hidden")
+                        ],
                     },
                 }
             },

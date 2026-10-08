@@ -185,8 +185,9 @@ class ActivityHistoryNextPageInput(BaseModel):
             min_length=1,
             description=(
                 "Map of `activity_type` to that stream's prior `groups[type].next` object "
-                "(`limit`, `offset`, optional `since`/`until`/`activity_tag_ids`). Echo the "
-                "object; do not pass bare integers. Omit streams whose `groups[type].next` is "
+                "(`limit`, `offset`, optional `since`/`until`/`activity_tag_ids`), copied "
+                "exactly, field for field; never edit or compute a value, and do not pass bare "
+                "integers. Omit streams whose `groups[type].next` is "
                 "absent (or null) — those streams are exhausted. At least one entry is "
                 "required. A one-entry map deepens a single stream; several entries continue "
                 "those streams together. Never invent or guess."

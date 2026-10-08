@@ -9,6 +9,7 @@ false they are counted on `former_omitted` rather than listed.
 """
 
 import logging
+from http import HTTPStatus
 from typing import Annotated, Literal
 
 from fastmcp import Context
@@ -17,6 +18,7 @@ from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
 from pydantic import Field
 
+from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.org_people import (
     GetPeopleForOrganizationQuery,
     OrgPeopleResolvedResponse,
@@ -131,10 +133,17 @@ async def get_people_for_party(
         "org_people.start",
         extra={"entity_id": party.id, "include_former": include_former},
     )
-    listing = await get_people_for_organization_query.run(
-        organization_id=party.id,
-        include_former=include_former,
-    )
+    try:
+        listing = await get_people_for_organization_query.run(
+            organization_id=party.id,
+            include_former=include_former,
+        )
+    except BackstopApiError as exc:
+        # An unconfirmed `party_id` that is not an organization (a people id, say) 404s on the
+        # roster walk. Any other failure propagates: "could not check" is not "no such party".
+        if exc.status_code == HTTPStatus.NOT_FOUND:
+            return NotFoundResponse(query=party.id, scope="organizations")
+        raise
     logger.info(
         "org_people.completed",
         extra={

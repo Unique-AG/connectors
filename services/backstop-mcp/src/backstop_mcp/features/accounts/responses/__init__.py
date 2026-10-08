@@ -27,6 +27,7 @@ from backstop_mcp.features.accounts.responses.product import (
 from backstop_mcp.features.accounts.responses.product_investors import (
     InvestorHoldingResponse,
     InvestorResponse,
+    ProductAccountsResponse,
     ProductInvestorsResolvedResponse,
     ProductListingResponse,
     ValueTotalResponse,
@@ -67,6 +68,7 @@ __all__ = [
     "ProductAmbiguousResponse",
     "ProductCandidateResponse",
     "ProductInvestorsResolvedResponse",
+    "ProductAccountsResponse",
     "ProductListingResponse",
     "ProductDescriptionResponse",
     "ProductRecordResponse",

@@ -29,6 +29,7 @@ __all__ = [
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
+    "AccountSpanDto",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
@@ -43,6 +44,7 @@ __all__ = [
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
+    "TenureDto",
 ]
 
 _OWNER = "owner"
@@ -361,6 +363,35 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
+class AccountSpanDto(BaseModel):
+    """When one account was held. `end` is the closed date; an open account runs through today.
+
+    `is_open` is carried separately because a closed account can arrive with no closed date, and
+    reading that `None` as "still open" would stretch the owner's tenure to today.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    start: date | None
+    end: date | None
+    is_open: bool
+
+
+class TenureDto(BaseModel):
+    """An owner's unbroken holding up to today, over every account — closed ones included.
+
+    `continuous_since` is the start of the run of touching or overlapping account spans that
+    reaches today; `None` when no run does (the owner left, or every open account is undated).
+    `undated_accounts` lack a start date, or are closed with no closed date: they cannot be placed
+    on the timeline and are not in the run.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    continuous_since: date | None = None
+    undated_accounts: int = 0
+
+
 class MoneyDto(BaseModel):
     """A money figure carried with Backstop's own rendering.
 
@@ -501,6 +532,7 @@ class HoldingListingDto(BaseModel):
     open_count: int | None = None
     all_count: int | None = None
     closed_count: int | None = None
+    tenure: TenureDto = TenureDto()
 
 
 class SeriesPointDto(BaseModel):

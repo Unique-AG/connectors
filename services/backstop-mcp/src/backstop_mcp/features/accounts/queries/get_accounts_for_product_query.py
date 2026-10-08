@@ -9,16 +9,21 @@ Why `closedDate` stays meaningful under `fields=` is noted on `ACCOUNT_LISTING_F
 `regularCustomFieldValues` is requested unless `exclude_custom_fields` is set.
 `owner_ids` (a party id or its contacts envelope id) keeps only those owners' accounts,
 before the open/closed split, so `closed_omitted` counts their closed accounts only.
+`spans_by_owner` on the payload is also taken before the split, so tenure counts
+closed accounts whatever `include_closed` is.
 """
+
+from collections.abc import Sequence
 
 from backstop_mcp.backstop_client import BackstopClient, Included
 from backstop_mcp.features.accounts.api_responses import (
     ACCOUNT_LISTING_FIELDS,
     AccountApiResource,
 )
-from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto
+from backstop_mcp.features.accounts.internal_dto import AccountSpanDto, ResolvedProductDto
 from backstop_mcp.features.accounts.responses import (
     AccountRowResponse,
+    ProductAccountsResponse,
     ProductListingResponse,
     ProductRefResponse,
     closed_hint,
@@ -39,7 +44,7 @@ class GetAccountsForProductQuery:
         include_closed: bool = False,
         exclude_custom_fields: bool = False,
         owner_ids: frozenset[str] | None = None,
-    ) -> ProductListingResponse:
+    ) -> ProductAccountsResponse:
         fields = ACCOUNT_LISTING_FIELDS
         if not exclude_custom_fields:
             fields = f"{fields},regularCustomFieldValues"
@@ -73,13 +78,30 @@ class GetAccountsForProductQuery:
             )
         kept = rows if include_closed else tuple(row for row in rows if row.is_open)
         closed_omitted = 0 if include_closed else len(rows) - len(kept)
-        return ProductListingResponse(
-            product=ProductRefResponse.from_product(product),
-            accounts=kept,
-            closed_omitted=closed_omitted,
-            include_closed_hint=closed_hint(
+        return ProductAccountsResponse(
+            listing=ProductListingResponse(
+                product=ProductRefResponse.from_product(product),
+                accounts=kept,
                 closed_omitted=closed_omitted,
-                returned=len(kept),
-                subject="product",
+                include_closed_hint=closed_hint(
+                    closed_omitted=closed_omitted,
+                    returned=len(kept),
+                    subject="product",
+                ),
             ),
+            spans_by_owner=self._spans_by_owner(rows),
         )
+
+    def _spans_by_owner(
+        self, rows: Sequence[AccountRowResponse]
+    ) -> dict[str, tuple[AccountSpanDto, ...]]:
+        grouped: dict[str, list[AccountSpanDto]] = {}
+        for row in rows:
+            if row.owner is None:
+                continue
+            grouped.setdefault(row.owner.id, []).append(
+                AccountSpanDto(
+                    start=row.account_start_date, end=row.closed_date, is_open=row.is_open
+                )
+            )
+        return {owner_id: tuple(spans) for owner_id, spans in grouped.items()}

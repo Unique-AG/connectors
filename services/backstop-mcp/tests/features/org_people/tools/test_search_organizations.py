@@ -14,7 +14,7 @@ from backstop_mcp.features.org_people.tools.search_organizations import (
 )
 from backstop_mcp.server.tools import TOOLS
 from tests.features.org_people.conftest import make_search_organizations_query, serve_pages
-from tests.helpers import BASE_URL, resource, tool_client
+from tests.helpers import BASE_URL, recorded_requests, resource, tool_client
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _CONFIG = SearchConfig(result_size=100)
@@ -126,17 +126,23 @@ class TestSearchOrganizations:
         ]
 
     @pytest.mark.asyncio
-    async def test_exclude_custom_fields_is_refused_with_a_custom_field_filter(self) -> None:
-        async with tool_client(f"{BASE_URL}/org-search-refused") as client:
-            with pytest.raises(ValueError, match="exclude_custom_fields"):
-                await search_organizations(
-                    custom_fields=[
-                        OrganizationCustomFieldFilter(definition_id="1", values=["Yes"])
-                    ],
-                    exclude_custom_fields=True,
-                    search_organizations_query=make_search_organizations_query(client),
-                    search_config=_CONFIG,
-                )
+    @respx.mock
+    async def test_exclude_custom_fields_is_ignored_with_a_custom_field_filter(self) -> None:
+        base_url = f"{BASE_URL}/org-search-cf-kept"
+        route = respx.get(f"{base_url}/organizations").mock(
+            return_value=_page(resource("7", "organizations", name="Contoso"), total=1)
+        )
+
+        async with tool_client(base_url) as client:
+            await search_organizations(
+                custom_fields=[OrganizationCustomFieldFilter(definition_id="1", values=["Yes"])],
+                exclude_custom_fields=True,
+                search_organizations_query=make_search_organizations_query(client),
+                search_config=_CONFIG,
+            )
+
+        params = recorded_requests(route.calls)[0].url.params
+        assert "regularCustomFieldValues" in params["fields[organizations]"]
 
     @pytest.mark.asyncio
     @respx.mock

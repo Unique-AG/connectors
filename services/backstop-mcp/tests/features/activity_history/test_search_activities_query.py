@@ -457,6 +457,24 @@ class TestResultPages:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_a_page_short_by_a_hidden_record_is_not_the_end(
+        self, client: BackstopClient
+    ) -> None:
+        """Probed: page 1 of 100 held 99 rows and page 2 began at position 100."""
+        rows = tuple(
+            _on(row_id, "8/3/2026") | ({"_hidden": True} if row_id == 2 else {})
+            for row_id in range(1, 8)
+        )
+        route = respx.post(_URL).mock(side_effect=serve_entity_activities(rows))
+
+        pages = await _read_every_page(client, min_result_size=3, page_size=3)
+
+        assert [row.id for page in pages for row in page.rows] == ["1", "3", "4", "5", "6", "7"]
+        assert _resume_offset(pages[0]) == 6
+        assert _page_nums(route) == [1, 2, 3]
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_an_unreadable_row_still_advances_the_offset(
         self, client: BackstopClient
     ) -> None:
@@ -793,7 +811,7 @@ class TestIgnoredEntityActivityFilters:
     async def test_a_scoped_search_saturating_the_total_is_flagged(
         self, client: BackstopClient
     ) -> None:
-        respx.post(_URL).mock(return_value=_page(_meeting(1), total=10_000))
+        respx.post(_URL).mock(side_effect=[_page(_meeting(1), total=10_000), _page(total=10_000)])
 
         result = await make_search_activities_query(client).run(
             start_date=date(2026, 6, 1),
@@ -810,10 +828,13 @@ class TestIgnoredEntityActivityFilters:
         self, client: BackstopClient
     ) -> None:
         respx.post(_URL).mock(
-            return_value=_page(
-                _party_row(1, effective_date="9/22/2026", party_id="341764767"),
-                total=10_000,
-            )
+            side_effect=[
+                _page(
+                    _party_row(1, effective_date="9/22/2026", party_id="341764767"),
+                    total=10_000,
+                ),
+                _page(total=10_000),
+            ]
         )
 
         result = await make_search_activities_query(client).run(
@@ -921,7 +942,7 @@ class TestFilterIgnoredMetric:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         counter = self._counter(monkeypatch)
-        respx.post(_URL).mock(return_value=_page(_meeting(1), total=10_000))
+        respx.post(_URL).mock(side_effect=[_page(_meeting(1), total=10_000), _page(total=10_000)])
 
         with caplog.at_level(logging.INFO):
             result = await make_search_activities_query(client).run(

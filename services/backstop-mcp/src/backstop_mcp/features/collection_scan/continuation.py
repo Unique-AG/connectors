@@ -23,7 +23,9 @@ def continuation(
         cursor=SearchCursor(offsets=tuple(next_offsets), fingerprint=fingerprint).encode(),
         message=(
             f"Stopped at {rows_returned} rows, the most one search call returns. More rows may "
-            "match: call again with this cursor and the same arguments for the next page. There "
-            "is no limit argument to raise."
+            "match: call again with the same arguments and `cursor` set to this `cursor` string, "
+            "copied exactly and in full. Never shorten, edit, or invent it, and never pass a page "
+            "number. There is no limit argument to raise, so do not ask the user how many rows "
+            "to fetch."
         ),
     )

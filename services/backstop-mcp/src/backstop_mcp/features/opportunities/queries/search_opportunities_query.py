@@ -1,6 +1,8 @@
 """Firm-wide `GET /opportunities` search. `representative` is the one server-side filter
 (`filter[representative.name][eq]`, the deal's own representative, exact login); the stage,
-product and open filters are `400` server-side, so they run in memory on each page read.
+product, open and `dateEnteredCurrentStage` filters are `400` server-side, so they run in memory
+on each page read. Backstop has no filter on the investor organization's representative, so a
+`representative_scope` other than `deal` reads every deal and matches the login in memory.
 
 Rows mode returns one page of matches per call and a cursor at the next unread record.
 Aggregate mode walks the whole collection and has no cursor.
@@ -10,6 +12,7 @@ import asyncio
 import logging
 import math
 from collections.abc import Callable, Mapping, Sequence
+from datetime import date
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -56,6 +59,9 @@ _FILTERED_CONCURRENCY = 5
 
 type SearchMode = Literal["rows", "aggregate"]
 type OpportunityGroupBy = Literal["stage", "product", "period", "party"]
+# Which representative link a login matches: the deal's own, the investor organization's, or
+# either of the two.
+type RepresentativeScope = Literal["deal", "investor", "either"]
 
 
 class _ScannedOpportunity(BaseModel):
@@ -92,9 +98,12 @@ class SearchOpportunitiesQuery:
         self,
         *,
         representative: str | None = None,
+        representative_scope: RepresentativeScope = "deal",
         is_open: bool | None = None,
         stage: str | None = None,
         products: Sequence[str] = (),
+        entered_stage_from: date | None = None,
+        entered_stage_to: date | None = None,
         custom_fields: Sequence[CustomFieldMatch] = (),
         exclude_custom_fields: bool = False,
         mode: SearchMode = "rows",
@@ -114,14 +123,25 @@ class SearchOpportunitiesQuery:
         """
         predicates = normalize_matches(custom_fields)
         product_needles = tuple(item.strip().casefold() for item in products if item.strip())
+        login = (representative or "").strip()
+        # The deal-level login goes to Backstop; the other scopes match it on each row.
+        server_login = login if representative_scope == "deal" else ""
+        memory_login = "" if representative_scope == "deal" else login
 
         def keep(row: SearchOpportunityRowResponse) -> bool:
             return self._matches_filters(
-                row, is_open=is_open, stage=stage, product_needles=product_needles
+                row,
+                representative_login=memory_login,
+                representative_scope=representative_scope,
+                is_open=is_open,
+                stage=stage,
+                product_needles=product_needles,
+                entered_stage_from=entered_stage_from,
+                entered_stage_to=entered_stage_to,
             )
 
         params = self._query_params(
-            representative=representative, exclude_custom_fields=exclude_custom_fields
+            representative=server_login, exclude_custom_fields=exclude_custom_fields
         )
         if mode == "aggregate":
             assert group_by is not None
@@ -129,7 +149,15 @@ class SearchOpportunitiesQuery:
                 params=params, predicates=predicates, keep=keep, group_by=group_by
             )
         in_memory_filter = any(
-            (predicates, product_needles, is_open is not None, stage is not None)
+            (
+                predicates,
+                product_needles,
+                memory_login,
+                is_open is not None,
+                stage is not None,
+                entered_stage_from is not None,
+                entered_stage_to is not None,
+            )
         )
         return await self._fetch_page(
             params=params,
@@ -334,7 +362,7 @@ class SearchOpportunitiesQuery:
             investor_representative = (
                 None
                 if investor_include is None
-                else self._login(
+                else self._representative_login_name(
                     index.first(
                         investor_include,
                         "representative",
@@ -353,7 +381,7 @@ class SearchOpportunitiesQuery:
                     )
                 ),
                 investor_representative=investor_representative,
-                representative=self._login(
+                representative=self._representative_login_name(
                     index.first(
                         opportunity,
                         "representative",
@@ -375,7 +403,7 @@ class SearchOpportunitiesQuery:
         return _ScannedOpportunity(position=position, row=row)
 
     def _query_params(
-        self, *, representative: str | None, exclude_custom_fields: bool
+        self, *, representative: str, exclude_custom_fields: bool
     ) -> dict[str, object]:
         wire_fields = [
             "name",
@@ -405,13 +433,14 @@ class SearchOpportunitiesQuery:
             "fields[opportunity-stages]": "name",
             "fields[opportunities]": ",".join(wire_fields),
         }
-        login = (representative or "").strip()
-        if login:
+        if representative:
             # Exact and case-sensitive on the login; a display name matches nothing.
-            params["filter[representative.name][eq]"] = login
+            params["filter[representative.name][eq]"] = representative
         return params
 
-    def _login(self, user: IncludedResource[SystemUserAttributes] | None) -> str | None:
+    def _representative_login_name(
+        self, user: IncludedResource[SystemUserAttributes] | None
+    ) -> str | None:
         if user is None or user.attributes.user_name is None:
             return None
         return user.attributes.user_name.strip() or None
@@ -420,15 +449,34 @@ class SearchOpportunitiesQuery:
         self,
         opportunity: SearchOpportunityRowResponse,
         *,
+        representative_login: str,
+        representative_scope: RepresentativeScope,
         is_open: bool | None,
         stage: str | None,
         product_needles: Sequence[str],
+        entered_stage_from: date | None,
+        entered_stage_to: date | None,
     ) -> bool:
+        if representative_login:
+            # Same exact, case-sensitive match Backstop applies to the deal-level login.
+            on_deal = opportunity.representative == representative_login
+            on_investor = opportunity.investor_representative == representative_login
+            matched = {"deal": on_deal, "investor": on_investor, "either": on_deal or on_investor}
+            if not matched[representative_scope]:
+                return False
         if is_open is not None and opportunity.is_open is not is_open:
             return False
         if stage is not None:
             name = (opportunity.stage or "").casefold()
             if name != stage.strip().casefold():
+                return False
+        if entered_stage_from is not None or entered_stage_to is not None:
+            entered = opportunity.date_entered_current_stage
+            if entered is None:
+                return False
+            if entered_stage_from is not None and entered < entered_stage_from:
+                return False
+            if entered_stage_to is not None and entered > entered_stage_to:
                 return False
         return not product_needles or self._matches_product(opportunity.product, product_needles)
 

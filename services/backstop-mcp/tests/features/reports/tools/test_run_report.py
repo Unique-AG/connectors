@@ -88,11 +88,8 @@ class TestRunReportTool:
         assert tool_payload(result) == {
             "report_name": _REPORT_NAME,
             "as_of_date": "2026-08-31",
-            "columns": [
-                {"name": "Email", "title": "Email"},
-                {"name": "Company Name", "title": "Company Name"},
-            ],
-            "rows": [{"Email": "first@example.com", "Company Name": "Example Advisory"}],
+            "columns": ["Email", "Company Name"],
+            "rows": [["first@example.com", "Example Advisory"]],
             "row_count": 1,
             "total": 15,
             "offset": 0,

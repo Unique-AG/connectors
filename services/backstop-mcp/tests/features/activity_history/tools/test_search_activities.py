@@ -311,18 +311,30 @@ class TestSearchActivities:
             )
 
     @pytest.mark.asyncio
-    async def test_aggregate_on_a_firm_wide_search_is_refused(self, client: BackstopClient) -> None:
-        with pytest.raises(ValueError, match="firm-wide search"):
+    @respx.mock
+    async def test_aggregate_counts_a_firm_wide_search(self, client: BackstopClient) -> None:
+        route = respx.post(_URL).mock(
+            return_value=_page(_row(1, type="Meeting"), _row(2, type="Call"), total=2)
+        )
+
+        result = tool_model(
             await search_activities(
                 ctx_never_elicit(),
-                start_date=date(2024, 1, 1),
-                end_date=date(2026, 8, 20),
+                start_date=date(2026, 7, 1),
+                end_date=date(2026, 9, 30),
                 mode="aggregate",
                 group_by="type",
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
-            )
+            ),
+            SearchActivitiesResolvedResponse,
+        )
+
+        attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
+        assert "entityId" not in attributes
+        payload = [object_dict(item) for item in object_list(tool_payload(result)["aggregates"])]
+        assert {item["key"]: item["count"] for item in payload} == {"Meeting": 1, "Call": 1}
 
     @pytest.mark.asyncio
     @respx.mock

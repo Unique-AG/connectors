@@ -10,12 +10,13 @@ Figures appear only when the caller passed `include_latest_value`: each account'
 and totals per holding and per investor, summed by currency. Totals never mix currencies.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Literal
 
 from pydantic import Field
 
+from backstop_mcp.features.accounts.internal_dto import AccountSpanDto, TenureDto
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
     OwnerResponse,
@@ -78,6 +79,24 @@ class ProductListingResponse(OmitNoneModel):
     )
 
 
+class ProductAccountsResponse(OmitNoneModel):
+    """`GetAccountsForProductQuery`'s payload: the published listing, and the owners' spans.
+
+    Not published itself. `get_product_investors` publishes `listing` and turns
+    `spans_by_owner` into each investor's `continuous_since`.
+    """
+
+    listing: ProductListingResponse = Field(
+        description="The product's accounts after the open/closed split."
+    )
+    spans_by_owner: dict[str, tuple[AccountSpanDto, ...]] = Field(
+        description=(
+            "Every listed owner's account spans in this product, keyed by owner id and taken "
+            "before the open/closed split, so closed accounts count toward tenure."
+        )
+    )
+
+
 class InvestorHoldingResponse(OmitNoneModel):
     """What one investor holds in one product."""
 
@@ -111,6 +130,27 @@ class InvestorResponse(OmitNoneModel):
     holdings: tuple[InvestorHoldingResponse, ...] = Field(
         description="One entry per product this investor is in, in `products` order."
     )
+    continuous_since: date | None = Field(
+        default=None,
+        description=(
+            "Since when this investor has held these products without a break: the start of "
+            "the unbroken run of its accounts in them — closed ones included, whatever "
+            "`include_closed` was — that reaches today. Accounts that touch or overlap form one "
+            "run, including a move from one product here to another; a gap of more than a day "
+            "ends it. Covers only the products in this call. Rank tenure and "
+            "'longest-standing' questions by this, never by an account's "
+            "`account_start_date`. Omitted when the investor holds none of these products "
+            "today (listed only through `include_closed`), or every open account is undated."
+        ),
+    )
+    tenure_undated_accounts: int | None = Field(
+        default=None,
+        description=(
+            "This investor's accounts left out of `continuous_since` because they have no start "
+            "date, or are closed with no closed date. Say so when quoting tenure: they could "
+            "make it longer. Omitted when none."
+        ),
+    )
     latest_value_totals: tuple[ValueTotalResponse, ...] | None = Field(
         default=None,
         description=(
@@ -122,11 +162,14 @@ class InvestorResponse(OmitNoneModel):
 
 def investors_from_listings(
     listings: Sequence[ProductListingResponse],
+    *,
+    tenure: Mapping[str, TenureDto],
 ) -> tuple[InvestorResponse, ...]:
     """One entry per owner id, first-seen order. Owners are not rolled up to a parent.
 
     Accounts with no owner stay in their product listing and are not an investor here.
-    Totals are set only when the rows carry `latest_value`.
+    Totals are set only when the rows carry `latest_value`. `tenure` is keyed by owner id and
+    computed before the open/closed split, so it is not derived from these rows.
     """
     valued = any(
         account.latest_value is not None for listing in listings for account in listing.accounts
@@ -157,6 +200,8 @@ def investors_from_listings(
                 )
                 for product, accounts in holdings[owner_id]
             ),
+            continuous_since=_owner_tenure(tenure, owner_id).continuous_since,
+            tenure_undated_accounts=_owner_tenure(tenure, owner_id).undated_accounts or None,
             latest_value_totals=(
                 _totals([account for _, accounts in holdings[owner_id] for account in accounts])
                 if valued
@@ -165,6 +210,12 @@ def investors_from_listings(
         )
         for owner_id, owner in owners.items()
     )
+
+
+def _owner_tenure(tenure: Mapping[str, TenureDto], owner_id: str) -> TenureDto:
+    owner_tenure = tenure.get(owner_id)
+    assert owner_tenure is not None, f"no tenure computed for listed owner {owner_id}"
+    return owner_tenure
 
 
 def _totals(accounts: Sequence[AccountRowResponse]) -> tuple[ValueTotalResponse, ...]:
