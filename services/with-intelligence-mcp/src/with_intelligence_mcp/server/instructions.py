@@ -12,8 +12,9 @@ forward-looking allocation intent, a subscription add-on. get_articles is editor
 tagged to that investor, including the article body. get_fund, get_manager, and get_consultant \
 profile those firms directly.
 
-Name matching is partial, so a short name returns candidates to choose between. AUM is in \
-MILLIONS. Intention amounts and a fund's minimum investment are US dollars, not millions. A \
+Name matching is partial, so a short name returns candidates to choose between. AUM, mandate \
+sizes, and investment positions are in MILLIONS. Intention amounts are US dollars, not \
+millions. A fund's minimum investment is in `minimum_investment_currency`, not millions. A \
 contact whose role has ended, or a position with an exit date, is no longer current — do not \
 present either as reachable or held. Responses are filtered to what this subscription licenses, \
 so an empty result can mean "not licensed" rather than "nothing there"; say which when it \
