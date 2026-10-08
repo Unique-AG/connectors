@@ -96,7 +96,11 @@ class ManagerProfileResponse(OmitNoneModel):
             sec_number=attributes.sec_number,
             sec_registered_firm=attributes.sec_registered_firm,
             types=when_present(attributes, "types", names(attributes.types)),
-            aums=when_present(attributes, "aums", [_aum(entry) for entry in attributes.aums or []]),
+            aums=when_present(
+                attributes,
+                "aums",
+                [_assets_under_management(entry) for entry in attributes.aums or []],
+            ),
             asset_classes=when_present(
                 attributes, "fund_asset_classes", names(attributes.fund_asset_classes)
             ),
@@ -155,7 +159,7 @@ def _contact_names(values: list[ManagerContactAttributes] | None) -> list[str]:
     return [value.contact_name for value in values if value.contact_name]
 
 
-def _aum(attributes: ManagerAumAttributes) -> ManagerAumResponse:
+def _assets_under_management(attributes: ManagerAumAttributes) -> ManagerAumResponse:
     return ManagerAumResponse(
         value_millions=attributes.aum,
         as_of=attributes.as_of,
