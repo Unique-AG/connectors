@@ -14,9 +14,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
-from office_365_mcp.shared.identity import Person, user_bind
+from office_365_mcp.shared.identity import Person, person_in_question, user_bind
 from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
-from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -56,6 +55,8 @@ member.
 Notes:
 - This tool asks the user to agree before it adds a member, every time. This tool adds nobody \
 unless the user agrees.
+- The question shows the Microsoft Entra object id of the person in `member`. The `name` in the \
+question is only a label.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chat_members does not already show the member.
 - Microsoft Teams keeps the members of a `oneOnOne` chat fixed, and refuses an addition to it. \
@@ -123,8 +124,8 @@ def _member(user_id: str, *, share_history: bool) -> AadUserConversationMember:
 
 def _question(member: Person, chat: str, *, share_history: bool) -> str:
     history = _ALL_HISTORY_SHOWN if share_history else _NO_HISTORY_SHOWN
-    name = cut_for_a_question(member.name)
-    return f"Add {name!r} to {chat}? {history} {EVERYONE_SEES_IT}"
+    person = person_in_question(member.user_id, member.name)
+    return f"Add {person} to {chat}? {history} {EVERYONE_SEES_IT}"
 
 
 def _about(chat_id: str, user_id: str, *, share_history: bool) -> str:

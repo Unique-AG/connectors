@@ -50,6 +50,16 @@ _JANE_ID = "00000000-0000-4000-8000-000000000003"
 _GRACE = Person(user_id=_GRACE_ID, name="Grace Hopper")
 _JANE = Person(user_id=_JANE_ID, name="Jane Doe")
 
+
+def _shown(user_id: str, name: str) -> str:
+    return (
+        f"the person with the Microsoft Entra object id '{user_id}' "
+        + f"(the name '{name}' is only a label from the request)"
+    )
+
+
+_GRACE_SHOWN = _shown(_GRACE_ID, "Grace Hopper")
+
 _TOPIC = "Release planning"
 
 _NOTHING_ADDED = "Nobody was added."
@@ -329,7 +339,7 @@ class TestThePersonBeforeTheChange:
         )
 
         assert asked == [
-            f"Add 'Grace Hopper' to the Teams chat 'Release planning'? {history} "
+            f"Add {_GRACE_SHOWN} to the Teams chat 'Release planning'? {history} "
             + _EVERYONE_SEES_IT
         ]
 
@@ -344,7 +354,7 @@ class TestThePersonBeforeTheChange:
         asked = await _asked(client)
 
         assert asked == [
-            "Add 'Grace Hopper' to the Teams chat with 'Ada Lovelace, Jane Doe'? "
+            f"Add {_GRACE_SHOWN} to the Teams chat with 'Ada Lovelace, Jane Doe'? "
             + f"{_NO_HISTORY} {_EVERYONE_SEES_IT}"
         ]
 
@@ -356,10 +366,10 @@ class TestThePersonBeforeTheChange:
 
         (question,) = await _asked(client)
 
-        assert question.startswith(f"Add 'Grace Hopper' to the Teams chat {'R' * 120 + '…'!r}?")
+        assert question.startswith(f"Add {_GRACE_SHOWN} to the Teams chat {'R' * 120 + '…'!r}?")
 
     @pytest.mark.parametrize("topic", [_TOPIC, None], ids=["topic", "no-topic"])
-    async def test_the_question_shows_no_user_id_and_no_chat_id(
+    async def test_the_question_shows_the_object_id_of_the_person_and_no_other_id(
         self, client: GraphServiceClient, graph: respx.MockRouter, topic: str | None
     ) -> None:
         _ = _adds(graph)
@@ -368,19 +378,37 @@ class TestThePersonBeforeTheChange:
 
         (question,) = await _asked(client)
 
-        assert _GRACE_ID not in question
+        assert _GRACE_ID in question
+        assert "'Grace Hopper' is only a label from the request" in question
         assert SIGNED_IN_USER_ID not in question
         assert _JANE_ID not in question
         assert _CHAT_ID not in question
 
-    async def test_the_question_cuts_a_long_name(
+    async def test_a_name_that_does_not_match_its_id_still_shows_the_id_that_graph_binds(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = _adds(graph)
+
+        (question,) = await _asked(client, Person(user_id=_GRACE_ID, name="Jane Doe"))
+
+        assert question.startswith(f"Add {_shown(_GRACE_ID, 'Jane Doe')} to the Teams chat")
+        assert _JANE_ID not in question
+        assert route.call_count == 1
+        assert (
+            _body(route)["user@odata.bind"]
+            == f"https://graph.microsoft.com/v1.0/users('{_GRACE_ID}')"
+        )
+
+    async def test_the_question_cuts_a_long_name_and_keeps_the_object_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _adds(graph)
 
         (question,) = await _asked(client, Person(user_id=_GRACE_ID, name="G" * 200))
 
-        assert question.startswith(f"Add {'G' * 120 + '…'!r} to the Teams chat 'Release planning'?")
+        shown = _shown(_GRACE_ID, "G" * 120 + "…")
+        assert question.startswith(f"Add {shown} to the Teams chat 'Release planning'?")
+        assert "G" * 121 not in question
 
     @pytest.mark.parametrize(
         ("status", "failure"),
@@ -446,6 +474,31 @@ class TestThePersonBeforeTheChange:
         assert bound != await binding(_OTHER_CHAT_ID, _GRACE, share_history=False)
         assert bound != await binding(_CHAT_ID, _GRACE, share_history=True)
 
+    async def test_the_binding_covers_the_object_id_and_never_the_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _names_the_chat(graph)
+
+        async def binding(member: Person) -> str:
+            seen: list[str] = []
+
+            async def capturing(question: str, about: str) -> Confirmed:
+                assert question
+                seen.append(about)
+                return _NOTHING_ADDED
+
+            with pytest.raises(ToolError, match=_NOTHING_ADDED):
+                _ = await add_chat_member(
+                    client, chat_id=_CHAT_ID, member=member, share_history=False, confirm=capturing
+                )
+            return seen[0]
+
+        bound = await binding(_GRACE)
+
+        assert bound == await binding(Person(user_id=_GRACE_ID, name="grace@example.invalid"))
+        assert bound == await binding(Person(user_id=_GRACE_ID, name="Jane Doe"))
+        assert bound != await binding(Person(user_id=_JANE_ID, name="Grace Hopper"))
+
 
 class TestTheEraWithNoBackChannel:
     async def test_the_first_round_asks_and_never_posts(
@@ -463,8 +516,7 @@ class TestTheEraWithNoBackChannel:
 
         _key, _state, agrees_with, question = _the_question(answer)
         assert agrees_with == "add"
-        assert "'Grace Hopper' to the Teams chat 'Release planning'" in question
-        assert _GRACE_ID not in question
+        assert f"Add {_GRACE_SHOWN} to the Teams chat 'Release planning'" in question
         assert route.call_count == 0, "an unanswered question added the member anyway"
 
     @pytest.mark.parametrize("share_history", [False, True])
@@ -705,6 +757,17 @@ class TestHowItDeclaresItself:
         ) in description
         assert "Everyone in the conversation can see the change." in description
 
+    async def test_the_description_says_the_question_shows_the_object_id_and_the_name_as_a_label(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert (
+            "The question shows the Microsoft Entra object id of the person in `member`. The "
+            + "`name` in the question is only a label."
+        ) in description
+
     async def test_the_description_names_the_fixed_chat_and_the_limit_of_teams(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -737,6 +800,17 @@ class TestHowItDeclaresItself:
             + "an owner."
         ) in described
         assert 15 <= len(described.split()) <= 60
+
+    async def test_the_name_of_the_member_is_only_a_label_and_teams_binds_the_object_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        defs = cast("Mapping[str, object]", tool.parameters["$defs"])
+        person = cast("Mapping[str, Mapping[str, Mapping[str, str]]]", defs["Person"])
+        described = " ".join(person["properties"]["name"]["description"].split())
+        assert "as a label only. Teams identifies the person only by `user_id`." in described
+        assert "never sends it to Microsoft 365" in described
 
     async def test_a_user_given_by_email_address_never_reaches_graph(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter

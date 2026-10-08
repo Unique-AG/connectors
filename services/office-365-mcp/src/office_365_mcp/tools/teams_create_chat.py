@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.identity import Person, user_bind
+from office_365_mcp.shared.identity import Person, person_in_question, user_bind
 from office_365_mcp.shared.meetings import distinct_people, named_people
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -62,6 +62,8 @@ posts no message. teams_list_chats shows the new chat.
 Notes:
 - This tool asks the user to agree before it creates a chat, every time. This tool creates \
 nothing unless the user agrees.
+- The question shows the Microsoft Entra object id of each person in `members`. The `name` in the \
+question is only a label.
 - Only one one-to-one chat can exist between two people. If that chat exists already, Microsoft \
 returns it and creates no new chat.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
@@ -184,7 +186,10 @@ def _refusal(chat_type: NewChatKind, given: Sequence[Person], topic: str | None)
 
 def _question(chat_type: NewChatKind, others: Sequence[Person], topic: str | None) -> str:
     if chat_type == "oneOnOne":
-        return f"Create a one-to-one Teams chat with {cut_for_a_question(others[0].name)!r}?"
+        return (
+            "Create a one-to-one Teams chat with "
+            + f"{person_in_question(others[0].user_id, others[0].name)}?"
+        )
     named = "" if topic is None else f" named {cut_for_a_question(topic)!r}"
     return f"Create a group Teams chat{named} with {named_people(others)}?"
 

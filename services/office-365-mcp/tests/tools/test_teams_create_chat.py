@@ -47,6 +47,13 @@ def _bind(user_id: str) -> str:
     return f"https://graph.microsoft.com/v1.0/users('{user_id}')"
 
 
+def _shown(user_id: str, name: str) -> str:
+    return (
+        f"the person with the Microsoft Entra object id '{user_id}' "
+        + f"(the name '{name}' is only a label from the request)"
+    )
+
+
 async def _agrees(question: str, about: str) -> Confirmed:
     assert question and about
     return None
@@ -243,7 +250,8 @@ class TestWhatItAsksGraphFor:
 
         bound = [member["user@odata.bind"] for member in _members_sent(post)]
         assert bound == [_bind(SIGNED_IN_USER_ID), _bind(_LETTERED_USER_ID)]
-        assert asked == ["Create a group Teams chat with 1 person: 'Grace Hopper'?"]
+        shown = _shown(_LETTERED_USER_ID, "Grace Hopper")
+        assert asked == [f"Create a group Teams chat with 1 person: {shown}?"]
 
 
 class TestTheRefusalsBeforeAnyRequest:
@@ -385,10 +393,33 @@ class TestThePersonBeforeTheCreate:
         )
 
         assert asked == [
-            "Create a group Teams chat named 'Release' with 2 people: 'Grace Hopper', 'Bob Kelso'?"
+            "Create a group Teams chat named 'Release' with 2 people: "
+            + f"{_shown(OTHER_USER_ID, 'Grace Hopper')}, {_shown(_THIRD_USER_ID, 'Bob Kelso')}?"
         ]
-        assert OTHER_USER_ID not in asked[0]
+        assert SIGNED_IN_USER_ID not in asked[0]
+
+    async def test_a_name_that_does_not_match_its_id_still_shows_the_id_in_a_group_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            members=[Person(user_id=OTHER_USER_ID, name=_BOB.name)],
+            confirm=capturing,
+        )
+
+        assert asked == [
+            f"Create a group Teams chat with 1 person: {_shown(OTHER_USER_ID, 'Bob Kelso')}?"
+        ]
         assert _THIRD_USER_ID not in asked[0]
+        assert _bind(OTHER_USER_ID) in {member["user@odata.bind"] for member in _members_sent(post)}
 
     async def test_the_question_for_a_one_to_one_chat_names_the_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -402,7 +433,55 @@ class TestThePersonBeforeTheCreate:
 
         _ = await create_chat(client, chat_type="oneOnOne", members=[_GRACE], confirm=capturing)
 
-        assert asked == ["Create a one-to-one Teams chat with 'Grace Hopper'?"]
+        assert asked == [
+            f"Create a one-to-one Teams chat with {_shown(OTHER_USER_ID, 'Grace Hopper')}?"
+        ]
+
+    async def test_a_one_to_one_name_that_does_not_match_its_id_still_shows_the_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await create_chat(
+            client,
+            chat_type="oneOnOne",
+            members=[Person(user_id=OTHER_USER_ID, name=_BOB.name)],
+            confirm=capturing,
+        )
+
+        assert asked == [
+            f"Create a one-to-one Teams chat with {_shown(OTHER_USER_ID, 'Bob Kelso')}?"
+        ]
+        assert _THIRD_USER_ID not in asked[0]
+        assert [member["user@odata.bind"] for member in _members_sent(post)] == [
+            _bind(SIGNED_IN_USER_ID),
+            _bind(OTHER_USER_ID),
+        ]
+
+    async def test_a_long_name_is_cut_and_the_object_id_is_kept(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await create_chat(
+            client,
+            chat_type="oneOnOne",
+            members=[Person(user_id=OTHER_USER_ID, name="G" * 200)],
+            confirm=capturing,
+        )
+
+        shown = _shown(OTHER_USER_ID, "G" * 120 + "…")
+        assert asked == [f"Create a one-to-one Teams chat with {shown}?"]
 
     async def test_the_question_leaves_out_the_signed_in_user(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -421,7 +500,9 @@ class TestThePersonBeforeTheCreate:
             confirm=capturing,
         )
 
-        assert asked == ["Create a group Teams chat with 1 person: 'Grace Hopper'?"]
+        assert asked == [
+            f"Create a group Teams chat with 1 person: {_shown(OTHER_USER_ID, 'Grace Hopper')}?"
+        ]
         assert SIGNED_IN_USER_ID not in asked[0]
         assert "Ada Lovelace" not in asked[0]
 
@@ -482,6 +563,26 @@ class TestThePersonBeforeTheCreate:
         second = await _binding(client, "group", [_BOB, _GRACE])
 
         assert first == second
+
+    async def test_the_binding_covers_the_object_ids_and_never_the_names(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        bound = await _binding(client, "group", [_GRACE, _BOB])
+
+        renamed = [
+            Person(user_id=OTHER_USER_ID, name="grace@example.invalid"),
+            Person(user_id=_THIRD_USER_ID, name="Bob"),
+        ]
+        assert bound == await _binding(client, "group", renamed)
+        swapped = [
+            Person(user_id=OTHER_USER_ID, name=_BOB.name),
+            Person(user_id=_THIRD_USER_ID, name=_GRACE.name),
+        ]
+        assert bound == await _binding(client, "group", swapped)
+        elsewhere = [Person(user_id=_LETTERED_USER_ID, name=_GRACE.name), _BOB]
+        assert bound != await _binding(client, "group", elsewhere)
 
 
 class TestHowTheQuestionReachesAPerson:
@@ -846,6 +947,16 @@ class TestHowItDeclaresItself:
             + "creates nothing unless the user agrees."
         ) in " ".join((tool.description or "").split())
 
+    async def test_the_description_says_the_question_shows_the_object_id_and_the_name_as_a_label(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        assert (
+            "The question shows the Microsoft Entra object id of each person in `members`. The "
+            + "`name` in the question is only a label."
+        ) in " ".join((tool.description or "").split())
+
     async def test_the_description_says_an_existing_one_to_one_chat_comes_back(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -904,6 +1015,17 @@ class TestHowItDeclaresItself:
         assert properties["user_id"]["pattern"] == identity.ENTRA_OBJECT_ID_PATTERN
         assert properties["name"]["minLength"] == 1
         assert items["required"] == ["user_id", "name"]
+
+    async def test_the_name_of_a_member_is_only_a_label_and_teams_binds_the_object_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        members = (await _listed(transport))["members"]
+
+        items = cast("Mapping[str, object]", members["items"])
+        properties = cast("Mapping[str, Mapping[str, str]]", items["properties"])
+        described = " ".join(properties["name"]["description"].split())
+        assert "as a label only. Teams identifies the person only by `user_id`." in described
+        assert "never sends it to Microsoft 365" in described
 
     async def test_the_members_say_the_owner_role_leaves_out_an_in_tenant_guest(
         self, transport: httpx.AsyncClient
