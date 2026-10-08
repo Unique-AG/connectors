@@ -8,7 +8,7 @@ from with_intelligence_mcp.features.articles.api_responses import (
     ArticleListItemAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown
+from with_intelligence_mcp.utils import html_to_markdown, when_present
 
 
 class ArticleFirmResponse(OmitNoneModel):
@@ -75,10 +75,13 @@ class ArticleResponse(OmitNoneModel):
             author=attributes.post_author.display_name if attributes.post_author else None,
             document_url=attributes.document.url if attributes.document else None,
             document_title=attributes.document.title if attributes.document else None,
-            firms=(
-                [ArticleFirmResponse.from_attributes(entry) for entry in attributes.post_firms]
-                if "post_firms" in attributes.model_fields_set and attributes.post_firms is not None
-                else None
+            firms=when_present(
+                attributes,
+                "post_firms",
+                [
+                    ArticleFirmResponse.from_attributes(entry)
+                    for entry in attributes.post_firms or []
+                ],
             ),
         )
 
