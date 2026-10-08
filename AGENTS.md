@@ -99,10 +99,10 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
 - A skill used while working on one server, and that the server does not serve to its clients,
   lives in `services/<svc>/agentic/skills/<name>/`. A skill that is not specific to one server
   lives in `agentic/skills/<name>/` at the repository root. Both still need
-  `metadata.internal: true`. They are not Skills CLI discovery containers. `.agents/scripts/setup.sh`
+  `metadata.internal: true`. They are not Skills CLI discovery containers. `agentic/skill-management/setup.sh`
   installs them with the Skills CLI into gitignored `.claude/skills/`. Run
-  `bash .agents/scripts/update-skills.sh` to refresh that install without pulling. The agents we
-  use read that directory, so there is no `.cursor/skills/` or `.agents/skills/` tree.
+  `bash agentic/skill-management/update-skills.sh` to refresh that install without pulling. The
+  agents we use read `.claude/skills/`.
 
 ## Formatting
 

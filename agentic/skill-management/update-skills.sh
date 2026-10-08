@@ -4,4 +4,4 @@
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
-exec bash "$root/.agents/scripts/install-skills.sh"
+exec bash "$root/agentic/skill-management/install-skills.sh"
