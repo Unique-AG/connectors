@@ -66,7 +66,9 @@ to a calendar event. teams_read_meeting shows the meeting as it is now.
 
 Notes:
 - This tool asks the user to agree before it changes anything, every time. This tool changes \
-nothing unless the user agrees.
+nothing unless the user agrees. The question shows the Microsoft Entra object id of each person \
+in the new list. The name is only a label, because Teams identifies each attendee by the object \
+id.
 - Before you change `attendees`, read the current list with teams_read_meeting. The new list \
 replaces the current list. An invitee without a Microsoft Entra id cannot be in the new list, so \
 the change removes that invitee. The question to the user names each person that the change \

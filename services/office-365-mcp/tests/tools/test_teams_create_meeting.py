@@ -44,6 +44,13 @@ _BOB = Person(user_id=OTHER_USER_ID, name="Bob Kelso")
 _NOTHING_CREATED = "No meeting was created."
 
 
+def _shown(user_id: str, name: str) -> str:
+    return (
+        f"the person with the Microsoft Entra object id '{user_id}' "
+        + f"(the name '{name}' is only a label from the request)"
+    )
+
+
 async def _agrees(question: str, about: str) -> Confirmed:
     assert question and about
     return None
@@ -137,10 +144,11 @@ class TestThePersonBeforeTheCreate:
     @pytest.mark.parametrize(
         ("attendees", "named"),
         [
-            ([_GRACE], "1 person: 'Grace Hopper'"),
+            ([_GRACE], f"1 person: {_shown(_GRACE_ID, 'Grace Hopper')}"),
             (
                 [Person(user_id=_GRACE_ID.upper(), name="Grace Hopper"), _BOB],
-                "2 people: 'Bob Kelso', 'Grace Hopper'",
+                "2 people: "
+                + f"{_shown(OTHER_USER_ID, 'Bob Kelso')}, {_shown(_GRACE_ID, 'Grace Hopper')}",
             ),
         ],
         ids=["one", "two"],
@@ -166,7 +174,7 @@ class TestThePersonBeforeTheCreate:
             + f"{named}? The meeting is on no calendar, and this tool sends no invitation."
         ]
 
-    async def test_the_question_names_people_and_shows_no_id(
+    async def test_the_question_shows_the_object_id_and_the_label_of_every_attendee(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _posts(graph)
@@ -178,9 +186,30 @@ class TestThePersonBeforeTheCreate:
 
         _ = await _create(client, attendees=[_BOB, _GRACE], confirm=capturing)
 
-        assert "'Bob Kelso', 'Grace Hopper'" in asked[0]
-        assert OTHER_USER_ID not in asked[0]
+        assert _shown(OTHER_USER_ID, "Bob Kelso") in asked[0]
+        assert _shown(_GRACE_ID, "Grace Hopper") in asked[0]
+
+    async def test_a_name_that_does_not_match_its_id_still_shows_the_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _create(
+            client,
+            attendees=[Person(user_id=OTHER_USER_ID, name="Grace Hopper")],
+            confirm=capturing,
+        )
+
+        assert _shown(OTHER_USER_ID, "Grace Hopper") in asked[0]
         assert _GRACE_ID not in asked[0]
+        assert _sent_body(post)["participants"] == {
+            "attendees": [{"identity": {"user": {"id": OTHER_USER_ID}}}]
+        }
 
     async def test_the_question_says_when_the_meeting_has_no_attendee(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -665,6 +694,17 @@ class TestHowItDeclaresItself:
             + "creates nothing unless the user agrees."
         ) in " ".join((tool.description or "").split())
 
+    async def test_the_description_says_the_question_shows_the_object_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert "The question shows the Microsoft Entra object id of each attendee." in description
+        assert (
+            "The name is only a label, because Teams identifies each attendee by the object id."
+        ) in description
+
     async def test_the_description_says_the_meeting_is_on_no_calendar_and_invites_nobody(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -728,6 +768,7 @@ class TestHowItDeclaresItself:
         parameters, _tool = await _registered(transport)
 
         name = str(_person_schema(parameters)["name"]["description"])
+        assert "as a label only" in name
         assert "Copy the `display_name` from the same result as `user_id`." in name
         assert "never sends it to Microsoft 365" in name
 

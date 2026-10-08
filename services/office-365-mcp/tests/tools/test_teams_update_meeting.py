@@ -56,6 +56,13 @@ _FAILS_THE_SAME_WAY = (
 )
 
 
+def _shown(user_id: str, name: str) -> str:
+    return (
+        f"the person with the Microsoft Entra object id '{user_id}' "
+        + f"(the name '{name}' is only a label from the request)"
+    )
+
+
 def _invitee(
     user_id: str | None, *, name: str | None = None, upn: str | None = None
 ) -> dict[str, object]:
@@ -484,10 +491,8 @@ class TestThePersonBeforeTheChange:
         assert question.startswith("Change the Teams meeting 'Pricing review':")
         assert "'Pricing review (moved)'" in question
         assert "2026-03-02T15:00:00+01:00 until 2026-03-02T16:00:00+01:00" in question
-        assert "the attendee list to 1 person: 'Grace Hopper'?" in question
+        assert f"the attendee list to 1 person: {_shown(_GRACE_ID, 'Grace Hopper')}?" in question
         assert question.endswith(" The change removes 'Bob Kelso'.")
-        assert _GRACE_ID not in question
-        assert OTHER_USER_ID not in question
 
     async def test_the_question_says_when_nobody_stays_on_the_attendee_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -518,8 +523,31 @@ class TestThePersonBeforeTheChange:
 
         assert asked == [
             "Change the Teams meeting 'Pricing review': the attendee list to 2 people: "
-            + "'Bob Kelso', 'Grace Hopper'? The change removes 'carol@fabrikam.com'."
+            + f"{_shown(OTHER_USER_ID, 'Bob Kelso')}, {_shown(_GRACE_ID, 'Grace Hopper')}? "
+            + "The change removes 'carol@fabrikam.com'."
         ]
+
+    async def test_a_name_that_does_not_match_its_id_still_shows_the_id(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return None
+
+        _ = await _update(
+            client,
+            attendees=[Person(user_id=OTHER_USER_ID, name="Grace Hopper")],
+            confirm=capturing,
+        )
+
+        assert _shown(OTHER_USER_ID, "Grace Hopper") in asked[0]
+        assert _GRACE_ID not in asked[0]
+        assert _sent(patch) == {
+            "participants": {"attendees": [{"identity": {"user": {"id": OTHER_USER_ID}}}]}
+        }
 
     @pytest.mark.parametrize(
         ("invitee", "named"),
@@ -622,6 +650,16 @@ class TestThePersonBeforeTheChange:
         )
 
         assert named == renamed
+
+    async def test_the_same_name_over_another_id_binds_differently(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        shown = await _bound(client, attendees=[_GRACE])
+        swapped = await _bound(client, attendees=[Person(user_id=OTHER_USER_ID, name=_GRACE.name)])
+
+        assert shown != swapped
 
 
 class TestTheEraWithNoBackChannel:
@@ -754,8 +792,7 @@ class TestTheHandle:
         _key, _state, _agrees_with, question = _the_question(answer)
         assert "'Pricing review (moved)'" in question
         assert "2026-03-02T15:00:00+01:00 until 2026-03-02T16:00:00+01:00" in question
-        assert "'Grace Hopper'" in question
-        assert _GRACE_ID not in question
+        assert _shown(_GRACE_ID, "Grace Hopper") in question
         assert patch.call_count == 0
 
 
@@ -866,6 +903,19 @@ class TestHowItDeclaresItself:
         assert "outlook_update_event" not in description
         assert "This call is safe to repeat after a timeout." in description
 
+    async def test_the_description_says_the_question_shows_the_object_id(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        tool = await _registered(transport)
+
+        description = " ".join((tool.description or "").split())
+        assert (
+            "The question shows the Microsoft Entra object id of each person in the new list."
+        ) in description
+        assert (
+            "The name is only a label, because Teams identifies each attendee by the object id."
+        ) in description
+
     async def test_the_description_says_the_new_list_replaces_and_who_it_removes(
         self, transport: httpx.AsyncClient
     ) -> None:
@@ -929,6 +979,7 @@ class TestHowItDeclaresItself:
             "Copy it from the `user_id` of get_me, of a teams_list_chat_members row, or of a "
             + "teams_list_chats member. Never build it from a name or an email address."
         ) in str(person["user_id"]["description"])
+        assert "as a label only" in str(person["name"]["description"])
 
     async def test_the_attendees_say_what_an_empty_list_and_an_omitted_list_do(
         self, transport: httpx.AsyncClient

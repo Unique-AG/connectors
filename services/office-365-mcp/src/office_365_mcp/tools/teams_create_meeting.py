@@ -66,7 +66,8 @@ meeting, use the `join_web_url` of the answer. teams_read_meeting reads the meet
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time. This tool creates \
-nothing unless the user agrees.
+nothing unless the user agrees. The question shows the Microsoft Entra object id of each \
+attendee. The name is only a label, because Teams identifies each attendee by the object id.
 - Microsoft documents a calendar event with an online meeting as the way to read the transcript of \
 a meeting later. If the user will want a transcript or a calendar event, tell the user this before \
 you create the meeting.
