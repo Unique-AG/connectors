@@ -1,6 +1,7 @@
 """`RunReportQuery`: one GET /reports page, flattened to columns and rows."""
 
 import asyncio
+import time
 from datetime import date
 
 import httpx
@@ -8,9 +9,17 @@ import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
-from backstop_mcp.features.reports import RunReportPendingResponse, RunReportResponse
+from backstop_mcp.features.reports import (
+    ReportRun,
+    ReportRunCache,
+    ReportRunKey,
+    RunReportPendingResponse,
+    RunReportQuery,
+    RunReportResponse,
+)
+from backstop_mcp.features.reports.queries import REPORT_RUN_CACHE_SIZE, REPORT_RUN_TTL_SECONDS
 from tests.features.reports.conftest import make_run_report_query
-from tests.helpers import BASE_URL, recorded_params
+from tests.helpers import BASE_URL, client_factory, credential, recorded_params
 
 _REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
@@ -97,6 +106,22 @@ class _ColdBuild:
         self.started += 1
         await self.release.wait()
         return self._response
+
+
+def _other_key(report_name: str) -> ReportRunKey:
+    return ReportRunKey(
+        caller="someone.else", report_name=report_name, as_of_date=_AS_OF, limit=3, offset=0
+    )
+
+
+async def _never_answers() -> RunReportResponse:
+    await asyncio.Event().wait()
+    raise AssertionError("a parked run is only ever evicted")
+
+
+def _parked_run() -> ReportRun:
+    """A run of another caller's that only takes up a cache slot."""
+    return ReportRun(task=asyncio.create_task(_never_answers()), started_at=time.monotonic())
 
 
 class TestRunReportQuery:
@@ -455,18 +480,111 @@ class TestRunReportQueryColdBuild:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_a_failed_run_raises_to_the_collector_and_is_dropped(
+    async def test_a_failed_run_raises_to_the_waiting_caller_and_is_dropped(
         self, client: BackstopClient
     ) -> None:
         build = _ColdBuild(httpx.Response(400, json={"errors": [{"detail": "Report X not found"}]}))
         respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=1.0)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        await asyncio.sleep(0.02)
+        build.release.set()
+        with pytest.raises(BackstopApiError):
+            await waiting
+        with pytest.raises(BackstopApiError):
+            await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert build.started == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_run_that_fails_after_the_caller_left_is_not_served_later(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(httpx.Response(400, json={"errors": [{"detail": "Report X not found"}]}))
+        route = respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+
+        pending = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        build.release.set()
+        await asyncio.sleep(0.05)
+        route.mock(side_effect=None, return_value=_report_page({"Email": "one@example.com"}))
+        fresh = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        # Nobody was waiting when the build failed; the next call starts over rather than
+        # re-raising the old error for up to the cache's TTL.
+        assert isinstance(pending, RunReportPendingResponse)
+        assert isinstance(fresh, RunReportResponse)
+        assert fresh.rows == (("one@example.com", None),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_run_evicted_twice_while_a_call_waits_is_still_collected(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page({"Email": "one@example.com"}))
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        cache = ReportRunCache(maxsize=1, ttl_seconds=REPORT_RUN_TTL_SECONDS)
+        query = RunReportQuery(client=client, run_cache=cache, wait_seconds=1.0)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        for evictions in (1, 2):
+            await asyncio.sleep(0.02)
+            assert build.started == evictions
+            cache.add(_other_key(f"Other {evictions}"), _parked_run())
+        await asyncio.sleep(0.02)
+        build.release.set()
+        collected = await waiting
+
+        # Each eviction started a replacement, and the call kept waiting on it until its own
+        # deadline rather than answering pending after the first.
+        assert isinstance(collected, RunReportResponse)
+        assert collected.rows == (("one@example.com", None),)
+        assert build.started == 3
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_reports_are_separate_runs(self, client: BackstopClient) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
         query = make_run_report_query(client, wait_seconds=0.05)
 
         await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name="Other Report", as_of_date=_AS_OF, limit=3, offset=0)
         build.release.set()
-        with pytest.raises(BackstopApiError):
-            await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
-        with pytest.raises(BackstopApiError):
-            await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name="Other Report", as_of_date=_AS_OF, limit=3, offset=0)
 
+        assert build.started == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_callers_get_their_own_run(self) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        factory = client_factory()
+        cache = ReportRunCache(maxsize=REPORT_RUN_CACHE_SIZE, ttl_seconds=REPORT_RUN_TTL_SECONDS)
+        bob, alice = (
+            RunReportQuery(
+                client=factory.for_credential(credential(username)),
+                run_cache=cache,
+                wait_seconds=0.05,
+            )
+            for username in ("bob.smith", "alice.jones")
+        )
+        try:
+            await bob.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            await alice.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            build.release.set()
+            await bob.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            await alice.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        finally:
+            await factory.aclose()
+
+        # Backstop decides what each caller may see, so one caller never collects another's run.
         assert build.started == 2

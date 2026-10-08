@@ -10,7 +10,8 @@ from backstop_mcp.features.reports.responses import RunReportResponse
 
 logger = logging.getLogger(__name__)
 
-# How long a run is kept for a later call to collect, finished or not.
+# How long a run is kept for a later call to collect, in flight or finished. A failed run is
+# dropped as soon as it fails (`RunReportQuery`).
 REPORT_RUN_TTL_SECONDS = 60 * 60.0
 # Most runs kept at once; past it the oldest is evicted.
 REPORT_RUN_CACHE_SIZE = 1_000

@@ -13,7 +13,9 @@ from backstop_mcp.features.reports.dependencies import (
 from backstop_mcp.features.reports.queries import (
     DEFAULT_REPORT_PAGE_SIZE,
     MAX_REPORT_PAGE_SIZE,
+    ReportRun,
     ReportRunCache,
+    ReportRunKey,
     RunReportQuery,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
@@ -25,7 +27,9 @@ __all__ = [
     "ReportResource",
     "ReportResourceAttributes",
     "ReportResultAttributes",
+    "ReportRun",
     "ReportRunCache",
+    "ReportRunKey",
     "RunReportPendingResponse",
     "RunReportQuery",
     "RunReportResponse",

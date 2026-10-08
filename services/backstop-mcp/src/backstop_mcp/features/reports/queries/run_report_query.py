@@ -26,13 +26,6 @@ MAX_REPORT_PAGE_SIZE = 500
 REPORT_WAIT_SECONDS = 50.0
 
 
-def _retrieve_exception(task: asyncio.Task[RunReportResponse]) -> None:
-    # A run that fails after every caller gave up would otherwise log "Task exception was
-    # never retrieved"; the client already logged the failure itself.
-    if not task.cancelled():
-        task.exception()
-
-
 class RunReportQuery:
     """Run one saved Report Center report for a name and as-of date.
 
@@ -45,8 +38,9 @@ class RunReportQuery:
     A cold report can take Backstop minutes to build; once built, Backstop serves it in
     seconds. So every call goes through a run that waits at most `wait_seconds`; a run that
     outlives that is cached per caller, report, as-of date, and page (see `ReportRunCache`).
-    A later call for the same page collects it rather than sending another request. The query
-    and its cache are process singletons, so the runs are per replica.
+    A later call for the same page collects it rather than sending another request; a run
+    that fails is dropped at once, so the next call starts fresh. The query and its cache are
+    process singletons, so the runs are per replica.
     """
 
     def __init__(
@@ -83,13 +77,20 @@ class RunReportQuery:
                 offset=offset,
             )
             span.set_attribute("joined", self._runs.get(key) is not None)
+            deadline = time.monotonic() + self._wait_seconds
             run = self._join_or_start(key)
-            # `asyncio.wait` neither cancels the run on timeout nor when this call is cancelled.
-            await asyncio.wait({run.task}, timeout=self._wait_seconds)
-            if run.task.cancelled():
-                # Evicted while this call waited (expired, or the cache filled). Another waiter
-                # may already have started the replacement.
+            while True:
+                # `asyncio.wait` neither cancels the run on timeout nor when this call is
+                # cancelled.
+                await asyncio.wait({run.task}, timeout=max(0.0, deadline - time.monotonic()))
+                if not run.task.cancelled():
+                    break
+                # Evicted while this call waited (expired, or the cache filled). Join the
+                # replacement another waiter may already have started, or start it, so the next
+                # call has a run to collect even when this one is out of time.
                 run = self._join_or_start(key)
+                if time.monotonic() >= deadline:
+                    break
             if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
@@ -127,8 +128,19 @@ class RunReportQuery:
                 offset=key.offset,
             )
         )
-        task.add_done_callback(_retrieve_exception)
-        return ReportRun(task=task, started_at=time.monotonic())
+        run = ReportRun(task=task, started_at=time.monotonic())
+        task.add_done_callback(lambda _: self._drop_if_failed(key, run))
+        return run
+
+    def _drop_if_failed(self, key: ReportRunKey, run: ReportRun) -> None:
+        """Forget a failed run, so the next call starts fresh instead of re-raising it.
+
+        A caller waiting on it still gets the error through its own reference. Reading the
+        exception also keeps a run nobody waits on from logging "Task exception was never
+        retrieved"; the client already logged the failure itself.
+        """
+        if not run.task.cancelled() and run.task.exception() is not None:
+            self._runs.discard(key, run)
 
     async def _fetch(
         self,

@@ -1,7 +1,9 @@
 from backstop_mcp.features.reports.queries.report_run_cache import (
     REPORT_RUN_CACHE_SIZE,
     REPORT_RUN_TTL_SECONDS,
+    ReportRun,
     ReportRunCache,
+    ReportRunKey,
 )
 from backstop_mcp.features.reports.queries.run_report_query import (
     DEFAULT_REPORT_PAGE_SIZE,
@@ -14,6 +16,8 @@ __all__ = [
     "MAX_REPORT_PAGE_SIZE",
     "REPORT_RUN_CACHE_SIZE",
     "REPORT_RUN_TTL_SECONDS",
+    "ReportRun",
     "ReportRunCache",
+    "ReportRunKey",
     "RunReportQuery",
 ]
