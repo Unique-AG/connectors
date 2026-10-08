@@ -116,7 +116,7 @@ _HANDLE_OWNER = _SHARED / "handles.py"
 # became addressable without anybody deciding it should be.
 _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
     "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
-    "outlook:///": frozenset({"messages", "folders", "drafts", "rules", "calendars", "events"}),
+    "outlook:///": frozenset({"messages", "folders", "rules", "calendars", "events"}),
     "sharepoint:///": frozenset({"files", "folders"}),
     "onenote:///": frozenset({"sections", "pages", "notebooks", "sectiongroups", "operations"}),
 }
