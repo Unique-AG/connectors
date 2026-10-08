@@ -25,6 +25,14 @@ class ArticleFirmResponse(OmitNoneModel):
         default=None, description="Whether this firm is the article's primary subject."
     )
 
+    @classmethod
+    def from_attributes(cls, attributes: ArticleFirmAttributes) -> Self:
+        return cls(
+            entity_id=attributes.entity_id,
+            type=attributes.type,
+            is_primary=attributes.is_primary,
+        )
+
 
 class ArticleResponse(OmitNoneModel):
     """One article mentioning a firm."""
@@ -68,7 +76,7 @@ class ArticleResponse(OmitNoneModel):
             document_url=attributes.document.url if attributes.document else None,
             document_title=attributes.document.title if attributes.document else None,
             firms=(
-                [_firm(entry) for entry in attributes.post_firms]
+                [ArticleFirmResponse.from_attributes(entry) for entry in attributes.post_firms]
                 if "post_firms" in attributes.model_fields_set and attributes.post_firms is not None
                 else None
             ),
@@ -98,12 +106,4 @@ class InvestorArticlesResponse(OmitNoneModel):
     has_more: bool = Field(
         default=False,
         description="True when another page is available. Call again with page + 1.",
-    )
-
-
-def _firm(attributes: ArticleFirmAttributes) -> ArticleFirmResponse:
-    return ArticleFirmResponse(
-        entity_id=attributes.entity_id,
-        type=attributes.type,
-        is_primary=attributes.is_primary,
     )
