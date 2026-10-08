@@ -35,7 +35,7 @@ from office_365_mcp.graph_client import (
     not_graph,
 )
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
-from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     AddressFault,
@@ -120,7 +120,7 @@ _NOT_A_MESSAGE_HANDLE = (
     + "message handle: outlook:///messages/{id}, exactly as outlook_search_mail, "
     + "outlook_list_mail or outlook_read_thread reported it in `uri`. This is not one. A subject "
     + "line, an email address, an Outlook web link and a bare message id are not handles. "
-    + "Neither is a folder, draft or rule handle under the same scheme. Nothing was created, so "
+    + "Neither is a folder or rule handle under the same scheme. Nothing was created, so "
     + "there is no half-written draft in the mailbox. Find the message again and pass the `uri` "
     + "verbatim."
 )
@@ -193,7 +193,7 @@ def _reply_already_goes_to(address: str) -> str:
 class MailReplyDraft(BaseModel):
     uri: str = Field(
         description=(
-            "A handle for this draft, `outlook:///drafts/{id}`; present even when "
+            "A handle for this draft, `outlook:///messages/{id}`; present even when "
             + "`body_written` is false, because the draft exists either way."
         )
     )
@@ -495,7 +495,7 @@ def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyD
     stored = created if fill.message is None else fill.message
     body = None if fill.message is None or fill.message.body is None else fill.message.body.content
     return MailReplyDraft(
-        uri=MailDraftHandle(created.id).uri,
+        uri=MailMessageHandle(created.id).uri,
         mode=mode,
         web_link=created.web_link if stored.web_link is None else stored.web_link,
         to=MailAddress.each_of(stored.to_recipients),

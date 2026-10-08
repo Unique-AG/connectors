@@ -20,17 +20,10 @@ if [[ "${1:-}" == "--check" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CHART_DIRS=(
-  "services/confluence-connector/deploy/helm-charts/confluence-connector"
-  "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector"
-  "services/teams-mcp/deploy/helm-charts/teams-mcp"
-  "services/outlook-semantic-mcp/deploy/helm-charts/outlook-semantic-mcp"
-  "services/hello-mcp/deploy/helm-charts/hello-mcp"
-  "services/kb-mcp/deploy/helm-charts/kb-mcp"
-  "services/backstop-mcp/deploy/helm-charts/backstop-mcp"
-  "services/office-365-mcp/deploy/helm-charts/office-365-mcp"
-  "services/with-intelligence-mcp/deploy/helm-charts/with-intelligence-mcp"
-)
+CHART_DIRS=()
+while IFS= read -r chart_yaml; do
+  CHART_DIRS+=("$(dirname "${chart_yaml}")")
+done < <(cd "${REPO_ROOT}" && find services -mindepth 5 -maxdepth 5 -path 'services/*/deploy/helm-charts/*/Chart.yaml' | sort)
 
 had_drift=false
 

@@ -1,6 +1,6 @@
 """POST fields for `create_person`.
 
-`last_name` and `gender` are required — the measured minimal 201 body. Every other field
+`last_name` and `gender` are required. Every other field
 is optional. There is no identity input and no location block; those belong on
 `update_person`. `category_ids` is the initial set (a new record has nothing to append
 to). Custom fields go through `update_custom_field_values`.

@@ -1,7 +1,7 @@
 """POST fields for `create_opportunity`.
 
-`name`, `currency_code`, `is_erisa` and the investor identity are required — the measured
-minimal 201 body. Investor is a party (`party_id` / `search` / `search_type`), never a
+`name`, `currency_code`, `is_erisa` and the investor identity are required. Investor is a
+party (`party_id` / `search` / `search_type`), never a
 raw id. `stage` is an optional name accepted on create. There is no `opportunity_id`,
 `stage_effective_date`, notify-list, or `investor_id` field. Custom fields go through
 `update_custom_field_values`.
@@ -15,8 +15,8 @@ from backstop_mcp.features.opportunity_writes._opportunity_writable_fields impor
     _OpportunityWritableFields,
 )
 from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
 )
@@ -50,10 +50,10 @@ class _CreateOpportunityIdentity(BaseModel):
         default="contacts", description=_INVESTOR_SEARCH_TYPE_DESCRIPTION
     )
     party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
 
     @field_validator("party_id", "search", mode="before")

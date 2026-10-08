@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import cast, final
@@ -247,22 +248,120 @@ class TestRegisteringWhatWasSelected:
         assert listed == set(selection.tools)
 
 
+_MENTION_SOURCES = (
+    "get_me",
+    "teams_list_chats",
+    "teams_list_chat_messages",
+    "teams_list_chat_members",
+    "teams_read_message",
+    "teams_browse_channel",
+)
+
+_FILE_SOURCES = ("sharepoint_search_files", "sharepoint_browse_folder")
+
+_DRIVE_ITEM_SOURCES: tuple[str, ...] = (
+    "sharepoint_search_files",
+    "sharepoint_browse_folder",
+    "sharepoint_resolve_url",
+    "sharepoint_create_folder",
+    "sharepoint_create_text_file",
+)
+
+_DRIVE_FOLDER_SOURCES: tuple[str, ...] = (
+    "sharepoint_search_files",
+    "sharepoint_browse_folder",
+    "sharepoint_resolve_url",
+    "sharepoint_list_drives",
+    "sharepoint_create_folder",
+)
+
+
 _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
+    "teams_list_chat_messages": {"chat_id": ("teams_list_chats",)},
+    "teams_list_chat_members": {"chat_id": ("teams_list_chats",)},
     "teams_list_channels": {"team_id": ("teams_list_my_teams",)},
+    "teams_get_channel_files_folder": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+    },
     "teams_browse_channel": {
         "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
     },
-    "teams_read_message": {"uri": ("teams_search_messages", "teams_browse_channel")},
-    "teams_send_chat_message": {"chat_id": ("teams_list_chats",)},
+    "teams_list_message_replies": {"uri": ("teams_browse_channel", "teams_search_messages")},
+    "teams_read_message": {
+        "uri": (
+            "teams_search_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+            "teams_list_chat_messages",
+        )
+    },
+    "teams_send_chat_message": {
+        "chat_id": ("teams_list_chats",),
+        "user_id": _MENTION_SOURCES,
+    },
     "teams_send_channel_message": {
         "team_id": ("teams_list_my_teams",),
         "channel_id": ("teams_list_channels", "teams_search_messages"),
+        "user_id": _MENTION_SOURCES,
+    },
+    "teams_send_chat_message_with_files": {
+        "chat_id": ("teams_list_chats",),
+        "user_id": _MENTION_SOURCES,
+        "attachments": _FILE_SOURCES,
+    },
+    "teams_send_channel_message_with_files": {
+        "team_id": ("teams_list_my_teams",),
+        "channel_id": ("teams_list_channels", "teams_search_messages"),
+        "user_id": _MENTION_SOURCES,
+        "attachments": _FILE_SOURCES,
+    },
+    "teams_react_to_message": {"uri": ("teams_list_chat_messages",)},
+    "teams_edit_message": {
+        "uri": (
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+        ),
+        "user_id": _MENTION_SOURCES,
+    },
+    "teams_delete_message": {
+        "uri": (
+            "teams_list_chat_messages",
+            "teams_browse_channel",
+            "teams_list_message_replies",
+        )
     },
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
+    "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_create_meeting": {
+        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+        "user_id": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+    },
+    "teams_update_meeting": {
+        "meeting_uri": ("teams_list_chats", "teams_create_meeting"),
+        "attendees": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+        "user_id": ("get_me", "teams_list_chats", "teams_list_chat_members"),
+    },
+    "teams_delete_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
+    "teams_create_chat": {
+        "members": ("teams_list_chat_members", "teams_list_chats"),
+        "user_id": ("teams_list_chat_members", "teams_list_chats"),
+    },
+    "teams_add_chat_member": {
+        "chat_id": ("teams_list_chats", "teams_create_chat"),
+        "member": ("teams_list_chat_members", "teams_list_chats"),
+        "user_id": ("teams_list_chat_members", "teams_list_chats"),
+    },
+    "teams_remove_chat_member": {
+        "chat_id": ("teams_list_chats", "teams_create_chat"),
+        "membership_id": ("teams_list_chat_members",),
+    },
+    "teams_rename_chat": {"chat_id": ("teams_list_chats", "teams_create_chat")},
     "outlook_read_mail": {"uri": ("outlook_search_mail",)},
     "outlook_list_attachments": {
         "uri": ("outlook_search_mail", "outlook_list_mail", "outlook_read_thread")
@@ -326,6 +425,14 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
         "uri": ("outlook_list_contacts", "outlook_read_contact", "outlook_create_contact")
     },
     "sharepoint_read_file": {"file": ("sharepoint_search_files", "sharepoint_browse_folder")},
+    "sharepoint_create_folder": {"parent": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_create_text_file": {"folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_rename_item": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_move_item": {"item": _DRIVE_ITEM_SOURCES, "to_folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_copy_item": {"item": _DRIVE_ITEM_SOURCES, "to_folder": _DRIVE_FOLDER_SOURCES},
+    "sharepoint_delete_item": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_create_share_link": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_invite": {"item": _DRIVE_ITEM_SOURCES},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
     "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -390,8 +497,17 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
 
 
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
-    "teams_send_chat_message": frozenset({"message"}),
-    "teams_send_channel_message": frozenset({"message"}),
+    "teams_send_chat_message": frozenset({"message", "name"}),
+    "teams_send_channel_message": frozenset({"message", "name"}),
+    "teams_send_chat_message_with_files": frozenset({"message", "name"}),
+    "teams_send_channel_message_with_files": frozenset({"message", "name"}),
+    "teams_react_to_message": frozenset({"reaction"}),
+    "teams_edit_message": frozenset({"message", "name"}),
+    "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at", "name"}),
+    "teams_update_meeting": frozenset({"name"}),
+    "teams_create_chat": frozenset({"chat_type", "topic", "name"}),
+    "teams_add_chat_member": frozenset({"name"}),
+    "teams_rename_chat": frozenset({"topic"}),
     "teams_search_messages": frozenset(
         {
             "query",
@@ -441,6 +557,14 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
         {"attendees", "starts_at", "ends_at", "time_zone", "display_name"}
     ),
     "sharepoint_search_files": frozenset({"query"}),
+    "sharepoint_search_sites": frozenset({"query"}),
+    "sharepoint_resolve_url": frozenset({"url"}),
+    "sharepoint_create_folder": frozenset({"name"}),
+    "sharepoint_create_text_file": frozenset({"name", "content"}),
+    "sharepoint_rename_item": frozenset({"name"}),
+    "sharepoint_copy_item": frozenset({"name"}),
+    "sharepoint_create_share_link": frozenset({"access", "audience"}),
+    "sharepoint_invite": frozenset({"recipients", "role"}),
     "onenote_list_pages": frozenset({"title_contains"}),
     "onenote_create_page": frozenset({"title", "body_html"}),
     "onenote_append_to_page": frozenset({"body_html"}),
@@ -633,14 +757,115 @@ class TestAToolThatRemovesOrReachesOthersIsInAnOptInPreset:
         )
 
 
+_NAMES_ONLY_ITS_PRESETS_TOOLS: frozenset[str] = frozenset(
+    {
+        "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
+        "teams_read_meeting",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
+    }
+)
+
+_NAMES_ONLY_ITS_PRESETS_SCHEMAS: frozenset[str] = _NAMES_ONLY_ITS_PRESETS_TOOLS | frozenset(
+    {
+        "teams_list_chat_messages",
+        "teams_list_chat_members",
+        "teams_list_message_replies",
+        "teams_get_channel_files_folder",
+        "teams_send_chat_message",
+        "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+    }
+)
+
+
+def _descriptions(schema: Mapping[str, object]) -> list[str]:
+    found: list[str] = []
+    pending: list[object] = [schema]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, Mapping):
+            for key, value in cast("Mapping[str, object]", node).items():
+                if key == "description" and isinstance(value, str):
+                    found.append(value)
+                else:
+                    pending.append(value)
+        elif isinstance(node, list):
+            pending.extend(cast("list[object]", node))
+    return found
+
+
+def _tools_named_in(texts: list[str], *, besides: str) -> set[str]:
+    return {
+        name
+        for text in texts
+        for name in TOOL_NAMES
+        if name != besides and re.search(rf"\b{re.escape(name)}\b", text)
+    }
+
+
+class TestAToolNamesOnlyTheToolsOfItsPresets:
+    def test_every_listed_tool_is_registered_by_some_preset(self) -> None:
+        registered = {tool for tools in PRESETS.values() for tool in tools}
+
+        assert not _NAMES_ONLY_ITS_PRESETS_SCHEMAS - registered, (
+            f"no preset registers {sorted(_NAMES_ONLY_ITS_PRESETS_SCHEMAS - registered)}, so the "
+            + "checks below assert nothing about it"
+        )
+
+    @pytest.mark.parametrize("preset", list(ToolsPreset))
+    async def test_its_prose_names_no_tool_that_the_preset_leaves_out(
+        self, preset: ToolsPreset
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        mcp: FastMCP = FastMCP("preset-prose-survey", version="0")
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            listed = [
+                tool
+                for tool in await mcp.list_tools()
+                if tool.name in _NAMES_ONLY_ITS_PRESETS_SCHEMAS
+            ]
+
+        unregistered = {
+            tool.name: sorted(named)
+            for tool in listed
+            if (
+                named := _tools_named_in(
+                    [
+                        *(
+                            [tool.description or ""]
+                            if tool.name in _NAMES_ONLY_ITS_PRESETS_TOOLS
+                            else []
+                        ),
+                        *_descriptions(tool.parameters),
+                        *_descriptions(tool.output_schema or {}),
+                    ],
+                    besides=tool.name,
+                )
+                - set(selection.tools)
+            )
+        }
+
+        assert not unregistered, f"{preset} sends the model to tools it lacks: {unregistered}"
+
+
 PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
-    (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 2),
-    (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 4),
+    (ToolsPreset.TEAMS_CHAT, ("User.Read", "Chat.Read"), 0, 3),
+    (ToolsPreset.TEAMS_MESSAGES, ("User.Read", "Chat.Read", "ChannelMessage.Read.All"), 1, 6),
     (
         ToolsPreset.TEAMS_CHANNELS,
         ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All"),
         1,
-        4,
+        5,
     ),
     (
         ToolsPreset.TEAMS_TRANSCRIPTS,
@@ -679,7 +904,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "OnlineMeetingRecording.Read.All",
         ),
         3,
-        10,
+        13,
     ),
     (
         ToolsPreset.TEAMS_WRITE,
@@ -692,7 +917,61 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
             "ChannelMessage.Send",
         ),
         0,
-        6,
+        9,
+    ),
+    (
+        ToolsPreset.TEAMS_WRITE_FILES,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Files.Read.All",
+        ),
+        1,
+        14,
+    ),
+    (
+        ToolsPreset.TEAMS_EDIT,
+        (
+            "User.Read",
+            "Chat.Read",
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "ChannelMessage.Read.All",
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Chat.ReadWrite",
+            "ChannelMessage.ReadWrite",
+        ),
+        2,
+        13,
+    ),
+    (
+        ToolsPreset.TEAMS_MEETINGS_WRITE,
+        (
+            "User.Read",
+            "Chat.Read",
+            "OnlineMeetings.Read",
+            "OnlineMeetingArtifact.Read.All",
+            "OnlineMeetings.ReadWrite",
+        ),
+        0,
+        7,
+    ),
+    (
+        ToolsPreset.TEAMS_CHAT_ADMIN,
+        ("User.Read", "Chat.Read", "Chat.Create", "ChatMember.ReadWrite", "Chat.ReadWrite"),
+        1,
+        7,
+    ),
+    (
+        ToolsPreset.TEAMS_FILES,
+        ("User.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All", "Files.Read.All"),
+        1,
+        8,
     ),
     (
         ToolsPreset.OUTLOOK_READ,
@@ -824,8 +1103,11 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         0,
         5,
     ),
-    (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 3),
-    (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 4),
+    (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 4),
+    (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 5),
+    (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
+    (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
+    (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,

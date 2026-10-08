@@ -16,7 +16,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
-from office_365_mcp.shared.handles import MailMessageHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_reply as replier
@@ -1404,10 +1404,9 @@ class TestWhatItAnswers:
 
         answer = await _reply(client)
 
-        handle = mail_draft_handle(answer.uri)
+        handle = mail_message_handle(answer.uri)
         assert handle is not None
-        assert handle.draft_id == _DRAFT_ID
-        assert mail_message_handle(answer.uri) is None
+        assert handle.message_id == _DRAFT_ID
 
     async def test_it_answers_the_link_graph_returned(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -1457,9 +1456,9 @@ class TestWhenTheTextCannotBeWritten:
 
         answer = await _reply(client)
 
-        handle = mail_draft_handle(answer.uri)
+        handle = mail_message_handle(answer.uri)
         assert handle is not None
-        assert handle.draft_id == _DRAFT_ID
+        assert handle.message_id == _DRAFT_ID
         assert answer.web_link == _WEB_LINK
 
     async def test_a_refused_fill_reports_the_copy_and_the_categories_that_never_landed(

@@ -163,7 +163,7 @@ _NOT_A_MESSAGE_HANDLE = (
     + "outlook:///messages/{message_id}, with the id percent-encoded. outlook_search_mail, "
     + "outlook_list_mail and outlook_read_thread all report this value as `uri` on every result. "
     + "Copy that value. Do not assemble one yourself. A subject line, an email address, an "
-    + "Outlook web link and a bare message id are not handles. A folder, draft or rule handle "
+    + "Outlook web link and a bare message id are not handles. A folder or rule handle "
     + "under the same scheme is not a message handle either. Those address other things, and no "
     + "writer here turns one into a message. This tool refused the whole call instead of dropping "
     + "the bad entries, so nothing changed. Fix them and call again. Retrying these same values "

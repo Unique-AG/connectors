@@ -50,7 +50,10 @@ class MoneyResponse(OmitNoneModel):
 
     amount: float | None = Field(
         default=None,
-        description="The figure. A published 0.0 is a real zero, not 'unknown'.",
+        description=(
+            "The figure. Check `formatted` before reading 0.0 as zero: with `formatted` `-` "
+            "nothing is recorded."
+        ),
     )
     currency: str | None = Field(default=None, description="ISO currency code, e.g. `USD`.")
     formatted: str | None = Field(
@@ -109,8 +112,8 @@ class HoldingRowResponse(OmitNoneModel):
     product_short_name: str | None = Field(
         default=None,
         description=(
-            "The tenant's own label for the product, e.g. `FUND2`. This is what the IR team says "
-            "out loud; there is no full product name on this row."
+            "The tenant's own label for the product, e.g. `NGUP`: the label users say, not "
+            "the full product name. There is no full product name on this row."
         ),
     )
     investor_id: str | None = Field(
@@ -119,7 +122,10 @@ class HoldingRowResponse(OmitNoneModel):
     )
     investor_resource_type: str | None = Field(
         default=None,
-        description="Which collection `investor_id` belongs to: `organizations` or `people`.",
+        description=(
+            "Which collection `investor_id` belongs to: `organizations` or `people`, or "
+            "`contacts` when Backstop did not say which."
+        ),
     )
     account_term_id: str | None = Field(
         default=None,
@@ -131,8 +137,10 @@ class HoldingRowResponse(OmitNoneModel):
     funded_date: date | None = Field(
         default=None,
         description=(
-            "When the account was funded. Tenure is today minus this. Read the provenance "
-            "caveat: on the fallback path this is the account's start date instead."
+            "When this account was funded: the start of this account, not of the party's "
+            "relationship. For how long the party has been invested, read `continuous_since`. "
+            "Read the provenance caveat: on the fallback path this is the account's start date "
+            "instead."
         ),
     )
     closed_date: date | None = Field(
@@ -142,8 +150,9 @@ class HoldingRowResponse(OmitNoneModel):
     balance: MoneyResponse | None = Field(
         default=None,
         description=(
-            "Current value of this holding. Omitted, never zeroed, when no figure is available — "
-            "check `figure_errors` to tell a failed request from a genuinely unpublished number."
+            "Current value of this holding. Omitted when no figure is available — check "
+            "`figure_errors` to tell a failed request from a genuinely unpublished number. "
+            "0.0 with `formatted` `-` is also 'not recorded'."
         ),
     )
     balance_as_of: date | None = Field(
@@ -264,6 +273,25 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
             "treating an empty list as 'this party owns nothing'."
         ),
     )
+    continuous_since: date | None = Field(
+        default=None,
+        description=(
+            "Since when this party has been invested without a break, across every product: "
+            "the start of the unbroken run of its accounts — closed ones included, whatever "
+            "`include_closed` was — that reaches today. Accounts that touch or overlap form one "
+            "run; a gap of more than a day ends it. Answer tenure and 'longest-standing' "
+            "questions from this, not from a row's `funded_date`. Omitted when the party holds "
+            "nothing today, or every open account is undated."
+        ),
+    )
+    tenure_undated_accounts: int | None = Field(
+        default=None,
+        description=(
+            "Accounts left out of `continuous_since` because they have no start date, or are "
+            "closed with no closed date. Say so when quoting tenure: they could make it longer. "
+            "Omitted when none."
+        ),
+    )
     rows_dropped: int | None = Field(
         default=None,
         description=(
@@ -301,5 +329,7 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
                 returned=len(listing.rows),
                 subject="party",
             ),
+            continuous_since=listing.tenure.continuous_since,
+            tenure_undated_accounts=listing.tenure.undated_accounts or None,
             rows_dropped=listing.rows_dropped or None,
         )

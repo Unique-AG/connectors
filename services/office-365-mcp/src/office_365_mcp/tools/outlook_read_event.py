@@ -101,7 +101,7 @@ _BAD_HANDLE = (
     + "outlook:///events/AAMkSYNTHETIC-cal-0001%3D/AAMkAGI2SYNTHETIC-immutable-0001%3D. Copy the "
     + "`uri` of a tool result, rather than assembling one. Both halves are needed: an event id "
     + "addresses nothing without the calendar it was read from. A calendars handle names a "
-    + "calendar and not an event in it. A messages, drafts, folders or rules handle under the same "
+    + "calendar and not an event in it. A messages, folders or rules handle under the same "
     + "scheme addresses mail. A subject line, a Teams meeting link, an Outlook web link and a bare "
     + "event id are none of them handles. This tool serves calendars only. Retrying this value "
     + "will fail identically."
@@ -322,7 +322,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "  outlook:///events/{calendar_id}/{event_id}\n"
                     + "outlook_list_events puts this handle on every row. No other shape is "
                     + "readable. A calendars handle addresses a calendar, and not an event in "
-                    + "it. A messages, drafts, folders, or rules handle addresses mail. A "
+                    + "it. A messages, folders, or rules handle addresses mail. A "
                     + "subject line, a Teams meeting link, an Outlook web link, and an event id "
                     + "alone cannot become a handle."
                 ),

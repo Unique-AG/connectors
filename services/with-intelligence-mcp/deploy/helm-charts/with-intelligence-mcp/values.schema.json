@@ -180,6 +180,38 @@
           "examples": [
             80
           ]
+        },
+        "extra": {
+          "type": "array",
+          "description": "Extra named container ports beyond http/metrics, e.g. for a caller that must be network-scoped (L3/L4) to a single route without L7 filtering. Pair with service.extraPorts to expose one on the Service.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "port"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Port name, referenced by service.extraPorts[].name as the Service targetPort. Must be a valid IANA_SVC_NAME (Kubernetes limit): lowercase alphanumeric and '-', at most 15 characters.",
+                "maxLength": 15,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                "examples": [
+                  "protected"
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "description": "Container port.",
+                "minimum": 1,
+                "maximum": 65535,
+                "examples": [
+                  8081
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -194,6 +226,38 @@
           "examples": [
             true
           ]
+        },
+        "extraPorts": {
+          "type": "array",
+          "description": "Extra named Service ports beyond http/metrics, targeting a matching ports.extra[].name container port by name.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "port"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Port name; must match a ports.extra[].name entry (used as the Service targetPort). Must be a valid IANA_SVC_NAME (Kubernetes limit): lowercase alphanumeric and '-', at most 15 characters.",
+                "maxLength": 15,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                "examples": [
+                  "protected"
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "description": "Service port.",
+                "minimum": 1,
+                "maximum": 65535,
+                "examples": [
+                  81
+                ]
+              }
+            }
+          }
         },
         "type": {
           "type": "string",
@@ -1441,7 +1505,7 @@
                     "UDP",
                     "ANY"
                   ],
-                  "default": "TCP",
+                  "default": "ANY",
                   "description": "Protocol for the ephemeral port range."
                 }
               }
@@ -1495,6 +1559,42 @@
           "description": "Map of logical name to dependent descriptor. One entry per service that calls this chart.",
           "additionalProperties": {
             "$ref": "#/$defs/internalServiceDependent"
+          }
+        }
+      }
+    },
+    "backends": {
+      "type": "object",
+      "description": "Public gateway-fronted backend endpoints this webapp calls (e.g. via base.backends.url). Distinct from internalServices, which resolves in-cluster Service DNS names; backends resolves public hostnames.",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Default public hostname (no scheme) shared by endpoints that omit their own host, e.g. gateway.qa.unique.app."
+        },
+        "endpoints": {
+          "type": "object",
+          "description": "Map of logical endpoint name to descriptor. One entry per backend this webapp calls.",
+          "additionalProperties": {
+            "$ref": "#/$defs/backendEndpoint"
+          }
+        }
+      }
+    },
+    "frontends": {
+      "type": "object",
+      "description": "Public URLs of peer frontend web apps this webapp links to for cross-app navigation (e.g. via base.frontends.url). Distinct from backends, which resolves public backend API hostnames.",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Default public hostname (no scheme) shared by apps that omit their own host, e.g. next.qa.unique.app."
+        },
+        "apps": {
+          "type": "object",
+          "description": "Map of logical peer app name to descriptor. One entry per frontend app this webapp links to.",
+          "additionalProperties": {
+            "$ref": "#/$defs/frontendApp"
           }
         }
       }
@@ -1602,6 +1702,14 @@
               "description": "When true, one ConfigMap is created per JSON file under files/grafana/dashboards/. Defaults to false.",
               "examples": [
                 false
+              ]
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder for provisioned dashboards (ConfigMap annotation grafana_folder). Defaults to apps.",
+              "examples": [
+                "apps",
+                "connectors"
               ]
             },
             "replacements": {
@@ -2010,6 +2118,29 @@
     }
   },
   "$defs": {
+    "backendEndpoint": {
+      "type": "object",
+      "description": "A public gateway-fronted backend this webapp calls. Used to build the backend URL via base.backends.url.",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls whether this endpoint is active. Referenced by env[*].if template expressions to conditionally emit the corresponding env var."
+        },
+        "host": {
+          "type": "string",
+          "description": "Per-endpoint public hostname override (no scheme). Falls back to backends.host when omitted."
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path segment (no leading slash), tpl-evaluated. Mandatory — no fallback derivation from the endpoint's key. Use an empty string for a bare host with no path."
+        }
+      }
+    },
     "internalServiceDependency": {
       "type": "object",
       "description": "A service this chart calls (outbound dependency). Used to build the service URL and to generate pod-selector egress rules in Cilium network policies.",
@@ -2125,6 +2256,29 @@
         "enabled": {
           "type": "boolean",
           "description": "Controls whether this dependent's ingress rule is emitted. Absent means true."
+        }
+      }
+    },
+    "frontendApp": {
+      "type": "object",
+      "description": "A peer frontend web app this webapp links to. Used to build the navigation URL via base.frontends.url.",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls whether this app is active. Referenced by env[*].if template expressions to conditionally emit the corresponding env var."
+        },
+        "host": {
+          "type": "string",
+          "description": "Per-app public hostname override (no scheme). Falls back to frontends.host when omitted."
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path segment (no leading slash), tpl-evaluated. Mandatory — no fallback derivation from the app's key. Use an empty string for a bare host with no path."
         }
       }
     },

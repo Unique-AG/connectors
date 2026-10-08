@@ -75,7 +75,7 @@ _BAD_HANDLE = (
     + "with the id percent-encoded, for example "
     + "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D. Copy the `uri` of a tool result, "
     + "rather than assembling one. A subject line, an email address, an Outlook web link and a "
-    + "bare message id are none of them handles. Neither is a drafts, folders or rules handle "
+    + "bare message id are none of them handles. Neither is a folders or rules handle "
     + "under the same scheme. Those address other things, and no reader here turns one into a "
     + "message. This tool serves mail only. A teams:/// handle belongs to teams_read_message. "
     + "Retrying this value will fail identically."

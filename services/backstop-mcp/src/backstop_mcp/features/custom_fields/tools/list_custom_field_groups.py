@@ -71,13 +71,9 @@ async def list_custom_field_groups(
     custom_fields: CustomFieldsService = Depends(get_custom_fields_service),
     custom_field_groups: CustomFieldGroupsService = Depends(get_custom_field_groups_service),
 ) -> ListCustomFieldGroupsResponse:
-    """List Backstop layout groups (tabs and sections) with the fields that sit in each.
+    """Tabs and sections of the CRM layout, each with the custom fields in it.
 
-    Use when you need the standard Backstop custom-field group catalog: group ids, names,
-    full_path_name tab-to-section segments, parent {id, name, parent_id}, and field membership
-    joined by group_id from the definition catalog. Instance tab and section names come back as
-    data. Pass refresh=true only when the user reports a missing field. Takes only `refresh`.
-    Field definitions are list_custom_fields (`entity_types`).
+    Field types and options: list_custom_fields.
 
     Call like: {}
     """

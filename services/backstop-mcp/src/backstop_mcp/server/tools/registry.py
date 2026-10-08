@@ -8,11 +8,14 @@ from collections.abc import Awaitable, Callable
 
 from backstop_mcp.features.accounts.tools.get_accounts_for_party import get_accounts_for_party
 from backstop_mcp.features.accounts.tools.get_capital_flows import get_capital_flows
-from backstop_mcp.features.accounts.tools.get_product import get_product
 from backstop_mcp.features.accounts.tools.get_product_investors import get_product_investors
 from backstop_mcp.features.accounts.tools.get_time_series import get_time_series
+from backstop_mcp.features.accounts.tools.search_products import search_products
 from backstop_mcp.features.activity_history.tools.get_activity_detail import get_activity_detail
 from backstop_mcp.features.activity_history.tools.get_activity_history import get_activity_history
+from backstop_mcp.features.activity_history.tools.get_last_activity_for_parties import (
+    get_last_activity_for_parties,
+)
 from backstop_mcp.features.activity_history.tools.search_activities import search_activities
 from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_activity_tags
 from backstop_mcp.features.activity_writes.tools.attach_file import attach_file
@@ -44,6 +47,8 @@ from backstop_mcp.features.opportunity_writes.tools.update_opportunity import up
 from backstop_mcp.features.org_people.tools.get_organization import get_organization
 from backstop_mcp.features.org_people.tools.get_people_for_party import get_people_for_party
 from backstop_mcp.features.org_people.tools.get_person import get_person
+from backstop_mcp.features.org_people.tools.search_organizations import search_organizations
+from backstop_mcp.features.org_people.tools.search_people import search_people
 from backstop_mcp.features.org_people_writes.tools.create_employment import create_employment
 from backstop_mcp.features.org_people_writes.tools.create_organization import create_organization
 from backstop_mcp.features.org_people_writes.tools.create_person import create_person
@@ -62,6 +67,8 @@ type ToolFunction = Callable[..., Awaitable[object]]
 
 TOOLS: tuple[ToolFunction, ...] = (
     get_organization,
+    search_organizations,
+    search_people,
     get_person,
     list_custom_fields,
     list_custom_field_groups,
@@ -72,11 +79,12 @@ TOOLS: tuple[ToolFunction, ...] = (
     get_activity_history,
     get_activity_detail,
     search_activities,
+    get_last_activity_for_parties,
     get_opportunities,
     get_opportunities_by_ids,
     search_opportunities,
     get_time_series,
-    get_product,
+    search_products,
     get_product_investors,
     get_accounts_for_party,
     get_capital_flows,

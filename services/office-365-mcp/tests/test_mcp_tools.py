@@ -1,5 +1,7 @@
+import importlib
 import json
 import logging
+import pkgutil
 import re
 from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
@@ -23,6 +25,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from starlette.applications import Starlette
 
+from office_365_mcp import tools as tool_package
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
@@ -574,6 +577,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_group_events": ("starts_on", "ends_on"),
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
+    "teams_list_chat_messages": ("sent_before",),
     "sharepoint_search_files": ("modified_after", "modified_before"),
     "onenote_list_pages": (
         "modified_after",
@@ -588,6 +592,8 @@ _MESSAGE_TOOLS: tuple[str, ...] = (
     "teams_read_message",
     "teams_browse_channel",
     "teams_search_messages",
+    "teams_list_chat_messages",
+    "teams_list_message_replies",
 )
 
 
@@ -667,8 +673,28 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "onenote_copy_page",
         "onenote_copy_section",
         "onenote_copy_notebook",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
+        "sharepoint_create_share_link",
+        "sharepoint_invite",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+        "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
     }
 )
 
@@ -682,9 +708,12 @@ class TestTheToolsThisServerAdvertises:
         assert set(tools) == {
             "get_me",
             "teams_list_chats",
+            "teams_list_chat_messages",
+            "teams_list_chat_members",
             "teams_list_my_teams",
             "teams_list_channels",
             "teams_browse_channel",
+            "teams_list_message_replies",
             "teams_search_messages",
             "teams_read_message",
             "teams_list_meeting_transcripts",
@@ -786,12 +815,24 @@ class TestTheToolsThisServerAdvertises:
             "preferred_language",
         }
         assert set(_properties(tools["teams_list_chats"].output_schema)) == {"chats", "capped"}
+        assert set(_properties(tools["teams_list_chat_messages"].output_schema)) == {
+            "messages",
+            "more_messages",
+        }
+        assert set(_properties(tools["teams_list_chat_members"].output_schema)) == {
+            "members",
+            "more_members",
+        }
         assert set(_properties(tools["teams_list_my_teams"].output_schema)) == {"teams"}
         assert set(_properties(tools["teams_list_channels"].output_schema)) == {"channels"}
         assert set(_properties(tools["teams_browse_channel"].output_schema)) == {
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
+        }
+        assert set(_properties(tools["teams_list_message_replies"].output_schema)) == {
+            "messages",
+            "more_replies",
         }
         assert set(_properties(tools["teams_search_messages"].output_schema)) == {
             "messages",
@@ -955,6 +996,8 @@ class TestTheToolsThisServerAdvertises:
 
         assert "teams_search_messages" in described
         assert "teams_browse_channel" in described
+        assert "teams_list_message_replies" in described
+        assert "teams_list_chat_messages" in described
 
     async def test_teams_read_transcript_takes_a_handle_and_a_window_and_names_its_one_shape(
         self, mcp_client: Client[FastMCPTransport]
@@ -1297,6 +1340,49 @@ class TestTheToolsThisServerAdvertises:
         assert _TOOL_MENTION.findall(_GUARDED_MENTION.sub("", unguarded)) == [
             "outlook_find_recipient"
         ]
+
+    async def test_every_description_that_spells_a_group_handle_spells_a_site_handle_too(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        group_spelling = "onenote:///groups/{group}/"
+        site_spelling = "onenote:///sites/{site}/"
+        tools = _named(await every_tool.list_tools())
+        checked = 0
+
+        for name, tool in tools.items():
+            for described in (
+                tool.description or "",
+                *_described(tool.input_schema),
+                *_described(tool.output_schema),
+            ):
+                if group_spelling in described:
+                    checked += 1
+                    assert site_spelling in described, (
+                        f"{name} spells a group handle and not a site handle: {described[:80]}"
+                    )
+
+        assert checked > 1, "no description spells a group handle any more, so this proves nothing"
+
+    def test_every_onenote_not_a_handle_text_spells_the_group_and_site_handles(self) -> None:
+        not_a_handle = re.compile(r"^_NOT_AN?_\w*HANDLE$")
+        checked = 0
+
+        for found in pkgutil.iter_modules(tool_package.__path__):
+            if not found.name.startswith("onenote_"):
+                continue
+            module = importlib.import_module(f"{tool_package.__name__}.{found.name}")
+            texts = cast("Mapping[str, object]", vars(module))
+            for constant, text in texts.items():
+                if not_a_handle.match(constant) and isinstance(text, str):
+                    checked += 1
+                    assert "onenote:///groups/{group}/" in text, (
+                        f"{found.name}.{constant} does not spell a group handle"
+                    )
+                    assert "onenote:///sites/{site}/" in text, (
+                        f"{found.name}.{constant} does not spell a site handle"
+                    )
+
+        assert checked >= 18, f"only {checked} onenote not-a-handle texts remain to compare"
 
     async def test_only_the_tools_written_down_here_change_anything(
         self, every_tool: Client[FastMCPTransport]
@@ -2511,7 +2597,7 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert "replies of each post on the channel's first page" in message, message
+        assert "replies of the posts on the first page of the channel" in message, message
         assert "no route to its full text" in message
         assert "a second browse returns the same window" in message
         assert "stop looking" in message

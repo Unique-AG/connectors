@@ -1,4 +1,4 @@
-name: "[TEMPLATE] Cache Warming"
+name: "[Template] Cache Warming"
 
 on:
   workflow_call:
@@ -8,33 +8,27 @@ on:
         required: true
         type: string
       service-path:
-        description: "Path to the services directory (e.g., services/sharepoint-connector)"
+        description: "Path to the service directory (e.g., services/sharepoint-connector)"
         required: true
         type: string
 
 permissions:
-  contents: read
-  packages: read
-  actions: read
+  contents: read # to read the repository
+  packages: read # to log in to GHCR and read the cache image
+  actions: read # to read the GitHub Actions cache (cache-from type=gha)
 
 env:
-  SERVICE_PATH: ${{ inputs.service-path }}
-  CHART_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
+  GHCR_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
   GHA_CACHE_SCOPE: ${{ inputs.service-name }}
 
 jobs:
   warm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Skip if no changes in last 3 days under ${{ inputs.service-path }}
-        run: |
-          if ! git log --since="3 days ago" --name-only --pretty=format: | grep -q '^${{ inputs.service-path }}/'; then
-            echo "No recent changes; skipping warm."
-            exit 0
-          fi
+        with:
+          persist-credentials: false
 
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 
@@ -52,11 +46,8 @@ jobs:
           platforms: linux/amd64
           push: false
           provenance: false
-
           cache-from: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
-            type=registry,ref=${{ env.CHART_REPO }}:cache
-
+            type=registry,ref=${{ env.GHCR_REPO }}:cache
           cache-to: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
-

@@ -120,7 +120,6 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
         {
             "messages",
             "folders",
-            "drafts",
             "rules",
             "calendars",
             "events",

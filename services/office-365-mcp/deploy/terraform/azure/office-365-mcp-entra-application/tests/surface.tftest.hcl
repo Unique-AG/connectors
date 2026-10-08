@@ -22,6 +22,12 @@ mock_provider "azuread" {
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
+        "ChannelMessage.ReadWrite"         = "e3333333-3333-3333-3333-333333333333"
+        "Chat.ReadWrite"                   = "e4444444-4444-4444-4444-444444444444"
+        "Chat.Create"                      = "e5555555-5555-5555-5555-555555555555"
+        "ChatMember.ReadWrite"             = "e6666666-6666-6666-6666-666666666666"
+        "OnlineMeetings.ReadWrite"         = "e7777777-7777-7777-7777-777777777777"
+        "OnlineMeetingArtifact.Read.All"   = "e8888888-8888-8888-8888-888888888888"
         "Mail.Read"                        = "a1111111-1111-1111-1111-111111111111"
         "Mail.Read.Shared"                 = "a1111111-2222-2222-2222-222222222222"
         "People.Read"                      = "a2222222-2222-2222-2222-222222222222"
@@ -38,6 +44,8 @@ mock_provider "azuread" {
         "Calendars.ReadWrite"              = "b3333333-3333-3333-3333-333333333333"
         "Calendars.ReadWrite.Shared"       = "b4444444-4444-4444-4444-444444444444"
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
+        "Files.ReadWrite.All"              = "c2222222-2222-2222-2222-222222222222"
+        "Sites.Read.All"                   = "c3333333-3333-3333-3333-333333333333"
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
@@ -93,7 +101,7 @@ run "preset_teams_is_the_whole_surface" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 13
     error_message = "teams resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
@@ -195,13 +203,118 @@ run "preset_teams_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 6
+    condition     = length(local.tools) == 9
     error_message = "teams-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "teams-write should need no administrator, needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_teams_write_files" {
+  variables {
+    tools_preset = "teams-write-files"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChatMessage.Send,ChannelMessage.Send,Files.Read.All"
+    error_message = "teams-write-files composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 14
+    error_message = "teams-write-files resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "teams-write-files costs an administrator only for Files.Read.All, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_teams_edit" {
+  variables {
+    tools_preset = "teams-edit"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Team.ReadBasic.All,Channel.ReadBasic.All,ChannelMessage.Read.All,ChatMessage.Send,ChannelMessage.Send,Chat.ReadWrite,ChannelMessage.ReadWrite"
+    error_message = "teams-edit composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "teams-edit resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 2
+    error_message = "teams-edit needs an administrator for ChannelMessage.Read.All and ChannelMessage.ReadWrite only, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_teams_meetings_write" {
+  variables {
+    tools_preset = "teams-meetings-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingArtifact.Read.All,OnlineMeetings.ReadWrite"
+    error_message = "teams-meetings-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 7
+    error_message = "teams-meetings-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-meetings-write needs no administrator, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_teams_chat_admin" {
+  variables {
+    tools_preset = "teams-chat-admin"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Chat.Create,ChatMember.ReadWrite,Chat.ReadWrite"
+    error_message = "teams-chat-admin composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 7
+    error_message = "teams-chat-admin resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 1
+    error_message = "teams-chat-admin needs an administrator for ChatMember.ReadWrite only, and this needs ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_teams_files" {
+  variables {
+    tools_preset = "teams-files"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Channel.ReadBasic.All,Files.Read.All"
+    error_message = "teams-files composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 8
+    error_message = "teams-files resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All"]
+    error_message = "teams-files costs an administrator only for Files.Read.All, and this needs ${join(",", local.admin_consent)}"
   }
 }
 
@@ -498,6 +611,54 @@ run "preset_sharepoint_read" {
   assert {
     condition     = local.admin_consent == ["Files.Read.All"]
     error_message = "reading a file costs no permission beyond the one the search already needs; this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_write" {
+  variables {
+    tools_preset = "sharepoint-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "Files.ReadWrite.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_share" {
+  variables {
+    tools_preset = "sharepoint-share"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Files.ReadWrite.All"
+    error_message = "sharepoint-share composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Files.ReadWrite.All"]
+    error_message = "A sharing link and an invitation need no permission that sharepoint-write does not have. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_sites" {
+  variables {
+    tools_preset = "sharepoint-sites"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Files.Read.All,Sites.Read.All"
+    error_message = "sharepoint-sites composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Files.Read.All", "Sites.Read.All"]
+    error_message = "Sites.Read.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 

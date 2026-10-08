@@ -1,25 +1,44 @@
 import json
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
+from typing import cast, get_args
+from urllib.parse import unquote
 
 import httpx
 import pytest
 import respx
 from msgraph.generated.models.external_link import ExternalLink
+from msgraph.generated.models.identity import Identity
+from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.notebook import Notebook
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_operation_error import OnenoteOperationError
 from msgraph.generated.models.onenote_page import OnenotePage
+from msgraph.generated.models.onenote_patch_action_type import OnenotePatchActionType
+from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
+from msgraph.generated.models.onenote_patch_insert_position import OnenotePatchInsertPosition
 from msgraph.generated.models.onenote_section import OnenoteSection
 from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.page_links import PageLinks
+from msgraph.generated.models.section_group import SectionGroup
 from msgraph.generated.models.section_links import SectionLinks
+from msgraph.generated.users.item.onenote.sections.item import (
+    onenote_section_item_request_builder,
+)
 from msgraph.graph_service_client import GraphServiceClient
+from pydantic import BaseModel
 
-from office_365_mcp.graph_client import FetchedResponse, GraphNotFound
+from office_365_mcp.graph_client import (
+    FetchedResponse,
+    GraphNotFound,
+    GraphUnavailable,
+    graph_step,
+)
 from office_365_mcp.shared import notes
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
@@ -30,6 +49,8 @@ from .conftest import GRAPH_V1
 _PAGE_ID = "0-33333333-3333-4333-8333-333333333333!101-44444444-4444-4444-8444-444444444444"
 _SECTION_ID = "1-11111111-1111-4111-8111-111111111111!100-22222222-2222-4222-8222-222222222222"
 
+_APP_ID = "WLID-000000004C12821A"
+
 _CREATED_AT = datetime(2026, 1, 5, 9, 30, tzinfo=UTC)
 _MODIFIED_AT = datetime(2026, 3, 12, 14, 45, tzinfo=UTC)
 
@@ -39,6 +60,16 @@ _LINKS = PageLinks(
 )
 _SECTION = OnenoteSection(id=_SECTION_ID, display_name="Team Standups")
 _NOTEBOOK = Notebook(display_name="Engineering")
+
+_GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+_GROUP = OnenoteOwner("groups", _GROUP_ID)
+_GROUP_REASON = "which belongs to a Microsoft 365 group"
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_REASON = "which belongs to a SharePoint site"
 
 
 def _page(
@@ -52,6 +83,7 @@ def _page(
     notebook: Notebook | None = _NOTEBOOK,
     level: int | None = None,
     order: int | None = None,
+    created_by_app_id: str | None = _APP_ID,
 ) -> OnenotePage:
     return OnenotePage(
         id=page_id,
@@ -63,6 +95,7 @@ def _page(
         parent_notebook=notebook,
         level=level,
         order=order,
+        created_by_app_id=created_by_app_id,
     )
 
 
@@ -73,6 +106,13 @@ class TestFromPage:
         assert summary is not None
         assert summary.uri == OnenotePageHandle(_PAGE_ID).uri
         assert summary.section_uri == OnenoteSectionHandle(_SECTION_ID).uri
+
+    def test_a_group_page_mints_the_group_page_and_section_handles(self) -> None:
+        summary = notes.PageSummary.from_page(_page(), owner=_GROUP)
+
+        assert summary is not None
+        assert summary.uri == OnenotePageHandle(_PAGE_ID, owner=_GROUP).uri
+        assert summary.section_uri == OnenoteSectionHandle(_SECTION_ID, owner=_GROUP).uri
 
     def test_it_maps_every_other_field(self) -> None:
         summary = notes.PageSummary.from_page(_page())
@@ -85,6 +125,13 @@ class TestFromPage:
         assert summary.client_url == "onenote:https://onenote.invalid/client/page"
         assert summary.section_name == "Team Standups"
         assert summary.notebook_name == "Engineering"
+        assert summary.created_by_app_id == _APP_ID
+
+    def test_a_page_with_no_creating_app_answers_a_null_app_id(self) -> None:
+        summary = notes.PageSummary.from_page(_page(created_by_app_id=None))
+
+        assert summary is not None
+        assert summary.created_by_app_id is None
 
     def test_a_page_with_no_id_answers_none(self) -> None:
         assert notes.PageSummary.from_page(_page(page_id=None)) is None
@@ -133,6 +180,27 @@ class TestFromPage:
         assert summary.order == 3
 
 
+class TestTheHandleFieldsNameTheGroupShape:
+    @pytest.mark.parametrize(
+        ("model", "field"),
+        [
+            (notes.PageSummary, "uri"),
+            (notes.PageSummary, "section_uri"),
+            (notes.OperationSummary, "uri"),
+        ],
+    )
+    def test_a_handle_field_says_how_a_group_or_site_handle_starts(
+        self, model: type[BaseModel], field: str
+    ) -> None:
+        described = model.model_fields[field].description or ""
+
+        assert (
+            "A handle from a group or site notebook starts with onenote:///groups/{group}/ "
+            + "or onenote:///sites/{site}/ instead."
+            in described
+        )
+
+
 class TestTheLinksProtocol:
     def test_web_url_of_none_is_none(self) -> None:
         assert notes.web_url_of(None) is None
@@ -154,6 +222,80 @@ class TestTheLinksProtocol:
 
         assert notes.web_url_of(links) is None
         assert notes.client_url_of(links) is None
+
+
+class TestContainerOrderClauses:
+    def test_every_order_the_tools_offer_has_a_clause(self) -> None:
+        assert set(notes.CONTAINER_ORDER_CLAUSES) == set(get_args(notes.ContainerOrderBy))
+
+    @pytest.mark.parametrize(
+        ("order_by", "clause"),
+        [
+            ("name_asc", "displayName asc"),
+            ("name_desc", "displayName desc"),
+            ("created_desc", "createdDateTime desc"),
+            ("created_asc", "createdDateTime asc"),
+            ("last_modified_desc", "lastModifiedDateTime desc"),
+            ("last_modified_asc", "lastModifiedDateTime asc"),
+        ],
+    )
+    def test_an_order_maps_to_the_graph_property_and_direction(
+        self, order_by: notes.ContainerOrderBy, clause: str
+    ) -> None:
+        assert notes.CONTAINER_ORDER_CLAUSES[order_by] == clause
+
+
+def _created_by(*, user: str | None = None, application: str | None = None) -> IdentitySet:
+    return IdentitySet(
+        user=None if user is None else Identity(display_name=user),
+        application=None if application is None else Identity(display_name=application),
+    )
+
+
+class TestCreatorNameOf:
+    def test_no_identity_set_has_no_name(self) -> None:
+        assert notes.creator_name_of(None) is None
+
+    def test_it_reads_the_display_name_of_the_user(self) -> None:
+        assert notes.creator_name_of(_created_by(user="Ada Lovelace")) == "Ada Lovelace"
+
+    def test_an_identity_set_with_no_user_has_no_name(self) -> None:
+        assert notes.creator_name_of(_created_by(application="Import Bot")) is None
+
+    def test_a_user_with_no_display_name_has_no_name(self) -> None:
+        assert notes.creator_name_of(IdentitySet(user=Identity(display_name=None))) is None
+
+
+class TestCreatedByContains:
+    def test_it_matches_a_fragment_of_the_creator_name(self) -> None:
+        keeps = notes.created_by_contains("lovelace")
+
+        assert keeps(Notebook(created_by=_created_by(user="Ada Lovelace"))) is True
+
+    def test_it_compares_without_regard_to_case(self) -> None:
+        keeps = notes.created_by_contains("ADA LOVE")
+
+        assert keeps(OnenoteSection(created_by=_created_by(user="ada lovelace"))) is True
+
+    def test_it_uses_casefold_so_a_sharp_s_matches_a_double_s(self) -> None:
+        keeps = notes.created_by_contains("strasse")
+
+        assert keeps(SectionGroup(created_by=_created_by(user="Hans Straße"))) is True
+
+    def test_a_fragment_the_name_lacks_does_not_match(self) -> None:
+        keeps = notes.created_by_contains("turing")
+
+        assert keeps(Notebook(created_by=_created_by(user="Ada Lovelace"))) is False
+
+    def test_an_item_with_no_creator_never_matches(self) -> None:
+        keeps = notes.created_by_contains("a")
+
+        assert keeps(Notebook(created_by=None)) is False
+
+    def test_an_item_made_by_an_application_never_matches(self) -> None:
+        keeps = notes.created_by_contains("bot")
+
+        assert keeps(Notebook(created_by=_created_by(application="Import Bot"))) is False
 
 
 _AUDIENCE_NOTEBOOK_ID = "1-99999999-9999-4999-8999-999999999999!100"
@@ -245,6 +387,108 @@ class TestReason:
         )
 
         assert audience.reason == "whose sharing Microsoft did not report"
+
+
+class TestAGroupAudience:
+    def test_an_unshared_group_notebook_the_user_owns_still_reaches_others(self) -> None:
+        audience = notes.NotebookAudience(
+            notebook_id="a-notebook",
+            name="A notebook",
+            is_shared=False,
+            user_role="Owner",
+            owner=_GROUP,
+        )
+
+        assert audience.reaches_others is True
+        assert audience.reason == _GROUP_REASON
+
+    def test_the_group_reason_wins_over_sharing_and_the_role(self) -> None:
+        audience = notes.NotebookAudience(
+            notebook_id="a-notebook",
+            name="A notebook",
+            is_shared=True,
+            user_role="Contributor",
+            owner=_GROUP,
+        )
+
+        assert audience.reason == _GROUP_REASON
+
+    def test_a_notebook_is_not_in_a_group_by_default(self) -> None:
+        audience = notes.audience_of(Notebook(id="a-notebook", is_shared=False))
+
+        assert audience.owner is None
+
+
+class TestASiteAudience:
+    def test_an_unshared_site_notebook_the_user_owns_still_reaches_others(self) -> None:
+        audience = notes.NotebookAudience(
+            notebook_id="a-notebook",
+            name="A notebook",
+            is_shared=False,
+            user_role="Owner",
+            owner=_SITE,
+        )
+
+        assert audience.reaches_others is True
+        assert audience.reason == _SITE_REASON
+
+    def test_the_site_reason_wins_over_sharing_and_the_role(self) -> None:
+        audience = notes.NotebookAudience(
+            notebook_id="a-notebook",
+            name="A notebook",
+            is_shared=True,
+            user_role="Contributor",
+            owner=_SITE,
+        )
+
+        assert audience.reason == _SITE_REASON
+
+
+class TestOwnerNamed:
+    def test_a_group_names_a_group_owner(self) -> None:
+        assert notes.owner_named(group=_GROUP_ID, site=None) == _GROUP
+
+    def test_a_site_names_a_site_owner(self) -> None:
+        assert notes.owner_named(group=None, site=_SITE_ID) == _SITE
+
+    def test_neither_names_no_owner(self) -> None:
+        assert notes.owner_named(group=None, site=None) is None
+
+    def test_both_break_the_invariant(self) -> None:
+        with pytest.raises(AssertionError):
+            _ = notes.owner_named(group=_GROUP_ID, site=_SITE_ID)
+
+
+class TestOwnedRefused:
+    def test_it_sends_the_user_for_access_first_and_names_no_permission(self) -> None:
+        assert notes.OWNED_REFUSED == (
+            "Microsoft 365 refused this request for a notebook that a Microsoft 365 group or a "
+            + "SharePoint site owns. Most likely, the signed-in user is not a member of that group "
+            + "or site. Ask the user to get access. If the user already has access, ask a "
+            + "Microsoft 365 administrator to examine the OneNote permissions of this connector. "
+            + "This same call fails again, so do not retry it."
+        )
+
+
+class TestNamedOwnerRefused:
+    def test_it_sends_the_user_for_the_id_or_access_and_names_the_permission(self) -> None:
+        assert notes.named_owner_refused("Notes.Read") == (
+            "Microsoft 365 refused this request for the `group` or the `site` that this call "
+            + "named. Most likely, the signed-in user is not a member of that group or site, or "
+            + "the id is wrong. Ask the user for the correct id, or ask them to get access. If "
+            + "this tool also fails without `group` and `site`, ask a Microsoft 365 administrator "
+            + "to grant the delegated permission Notes.Read. If the user already has access, ask "
+            + "a Microsoft 365 administrator to examine the OneNote permissions of this connector. "
+            + "This same call fails again, so do not retry it."
+        )
+
+    def test_it_changes_only_the_permission_name(self) -> None:
+        created = notes.named_owner_refused("Notes.Create")
+
+        assert created == notes.named_owner_refused("Notes.Read").replace(
+            "Notes.Read", "Notes.Create"
+        )
+        assert "Notes.Read" not in created
 
 
 class TestNotebookAudience:
@@ -644,6 +888,338 @@ class TestPageSummaryReRead:
             await notes.page_summary(client, _PAGE_ID)
 
 
+type _Read = Callable[[GraphServiceClient, OnenoteOwner | None], Awaitable[object]]
+
+_ROUTED_READS: Mapping[str, _Read] = {
+    "page_summary": lambda client, owner: notes.page_summary(client, _PAGE_ID, owner=owner),
+    "notebook_audience": lambda client, owner: notes.notebook_audience(
+        client, _AUDIENCE_NOTEBOOK_ID, owner=owner
+    ),
+    "section_container": lambda client, owner: notes.section_container(
+        client, _AUDIENCE_SECTION_ID, owner=owner
+    ),
+    "section_group_container": lambda client, owner: notes.section_group_container(
+        client, _AUDIENCE_SECTION_GROUP_ID, owner=owner
+    ),
+    "section_audience": lambda client, owner: notes.section_audience(
+        client, _AUDIENCE_SECTION_ID, owner=owner
+    ),
+    "container_audience_of_a_notebook": lambda client, owner: notes.container_audience(
+        client, OnenoteNotebookHandle(_AUDIENCE_NOTEBOOK_ID, owner=owner)
+    ),
+    "container_audience_of_a_section_group": lambda client, owner: notes.container_audience(
+        client, OnenoteSectionGroupHandle(_AUDIENCE_SECTION_GROUP_ID, owner=owner)
+    ),
+    "page_for_a_question": lambda client, owner: notes.page_for_a_question(
+        client, _PAGE_ID, owner=owner
+    ),
+}
+
+_PARENTED = {"parentNotebook": {"id": _AUDIENCE_NOTEBOOK_ID}}
+
+
+def _reads_under(graph: respx.MockRouter, root: str) -> list[respx.Route]:
+    return [
+        graph.get(f"{root}/onenote/pages/{_PAGE_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _PAGE_ID, **_PARENTED})
+        ),
+        graph.get(f"{root}/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID, **_PARENTED})
+        ),
+        graph.get(f"{root}/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_GROUP_ID, **_PARENTED})
+        ),
+        graph.get(f"{root}/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        ),
+    ]
+
+
+def _queries(routes: list[respx.Route]) -> list[tuple[int, bytes | None]]:
+    return [
+        (route.call_count, route.calls.last.request.url.query if route.called else None)
+        for route in routes
+    ]
+
+
+class TestGroupRouting:
+    @pytest.mark.parametrize("name", list(_ROUTED_READS))
+    async def test_a_group_read_asks_the_group_what_the_same_read_asks_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str
+    ) -> None:
+        me = _reads_under(graph, "/me")
+        group = _reads_under(graph, f"/groups/{_GROUP_ID}")
+
+        _ = await _ROUTED_READS[name](client, None)
+        _ = await _ROUTED_READS[name](client, _GROUP)
+
+        assert any(route.called for route in group)
+        assert _queries(group) == _queries(me)
+
+    async def test_a_group_page_re_read_mints_group_handles(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/groups/{_GROUP_ID}/onenote/pages/{_PAGE_ID}").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": _PAGE_ID, "parentSection": {"id": _AUDIENCE_SECTION_ID}},
+            )
+        )
+
+        summary = await notes.page_summary(client, _PAGE_ID, owner=_GROUP)
+
+        assert summary.uri == OnenotePageHandle(_PAGE_ID, owner=_GROUP).uri
+        assert summary.section_uri == OnenoteSectionHandle(_AUDIENCE_SECTION_ID, owner=_GROUP).uri
+
+    async def test_a_group_notebook_reaches_others_and_gives_the_group_reason(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/groups/{_GROUP_ID}/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        )
+
+        audience = await notes.notebook_audience(client, _AUDIENCE_NOTEBOOK_ID, owner=_GROUP)
+
+        assert audience.owner == _GROUP
+        assert audience.reaches_others is True
+        assert audience.reason == _GROUP_REASON
+
+    async def test_the_same_notebook_under_me_is_not_a_group_audience(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        )
+
+        audience = await notes.notebook_audience(client, _AUDIENCE_NOTEBOOK_ID)
+
+        assert audience.owner is None
+        assert audience.reaches_others is False
+
+    async def test_a_group_section_with_no_parent_notebook_still_gives_the_group_reason(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/groups/{_GROUP_ID}/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
+        )
+
+        audience = await notes.section_audience(client, _AUDIENCE_SECTION_ID, owner=_GROUP)
+
+        assert audience.notebook_id is None
+        assert audience.reaches_others is True
+        assert audience.reason == _GROUP_REASON
+
+    async def test_a_group_section_group_handle_reads_under_its_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        section_group = graph.get(
+            f"/groups/{_GROUP_ID}/onenote/sectionGroups/{_AUDIENCE_SECTION_GROUP_ID}"
+        ).mock(
+            return_value=httpx.Response(
+                200, json={"id": _AUDIENCE_SECTION_GROUP_ID, "displayName": "Projects"}
+            )
+        )
+
+        container = await notes.container_audience(
+            client, OnenoteSectionGroupHandle(_AUDIENCE_SECTION_GROUP_ID, owner=_GROUP)
+        )
+
+        assert section_group.call_count == 1
+        assert container.name == "Projects"
+        assert container.notebook.owner == _GROUP
+
+
+class TestSiteRouting:
+    @pytest.mark.parametrize("name", list(_ROUTED_READS))
+    async def test_a_site_read_asks_the_site_what_the_same_read_asks_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter, name: str
+    ) -> None:
+        me = _reads_under(graph, "/me")
+        site = _reads_under(graph, f"/sites/{_SITE_ID}")
+
+        _ = await _ROUTED_READS[name](client, None)
+        _ = await _ROUTED_READS[name](client, _SITE)
+
+        assert any(route.called for route in site)
+        assert _queries(site) == _queries(me)
+
+    async def test_a_site_notebook_reaches_others_and_gives_the_site_reason(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/sites/{_SITE_ID}/onenote/notebooks/{_AUDIENCE_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook_payload(_AUDIENCE_NOTEBOOK_ID))
+        )
+
+        audience = await notes.notebook_audience(client, _AUDIENCE_NOTEBOOK_ID, owner=_SITE)
+
+        assert audience.owner == _SITE
+        assert audience.reaches_others is True
+        assert audience.reason == _SITE_REASON
+
+    def test_the_site_root_addresses_the_site_onenote(self, client: GraphServiceClient) -> None:
+        builder = notes.onenote_root(client, _SITE).pages.by_onenote_page_id(_PAGE_ID)
+
+        url = builder.to_get_request_information().url
+
+        assert unquote(url).endswith(f"/sites/{_SITE_ID}/onenote/pages/{_PAGE_ID}")
+
+
+_SectionItemBuilder = onenote_section_item_request_builder.OnenoteSectionItemRequestBuilder
+_SectionQuery = _SectionItemBuilder.OnenoteSectionItemRequestBuilderGetQueryParameters
+
+
+class TestGetWithQuery:
+    async def test_a_group_builder_sends_the_typed_query_of_the_user_builder(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(f"/groups/{_GROUP_ID}/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(
+                200, json={"id": _AUDIENCE_SECTION_ID, "displayName": "Team Standups"}
+            )
+        )
+        builder = notes.onenote_root(client, _GROUP).sections.by_onenote_section_id(
+            _AUDIENCE_SECTION_ID
+        )
+
+        found = await notes.get_with_query(
+            client,
+            builder,
+            _SectionQuery(select=["id", "displayName"], expand=["parentNotebook"]),
+            OnenoteSection,
+        )
+
+        assert found is not None
+        assert found.display_name == "Team Standups"
+        params = route.calls.last.request.url.params
+        assert params["$select"] == "id,displayName"
+        assert params["$expand"] == "parentNotebook"
+
+    async def test_no_group_reads_under_me(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
+        )
+
+        _ = await notes.get_with_query(
+            client,
+            notes.onenote_root(client, None).sections.by_onenote_section_id(_AUDIENCE_SECTION_ID),
+            _SectionQuery(select=["id"]),
+            OnenoteSection,
+        )
+
+        assert route.call_count == 1
+
+    async def test_a_raw_query_option_reaches_the_wire_beside_the_typed_ones(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(f"/me/onenote/sections/{_AUDIENCE_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _AUDIENCE_SECTION_ID})
+        )
+
+        _ = await notes.get_with_query(
+            client,
+            notes.onenote_root(client, None).sections.by_onenote_section_id(_AUDIENCE_SECTION_ID),
+            _SectionQuery(select=["id"]),
+            OnenoteSection,
+            query={"pagelevel": "true"},
+        )
+
+        params = route.calls.last.request.url.params
+        assert params["pagelevel"] == "true"
+        assert params["$select"] == "id"
+
+
+_APPEND_TO_BODY = OnenotePatchContentCommand(
+    target="body",
+    action=OnenotePatchActionType.Append,
+    position=OnenotePatchInsertPosition.After,
+    content="<p>Synthetic.</p>",
+)
+_REPLACE_TITLE = OnenotePatchContentCommand(
+    target="title", action=OnenotePatchActionType.Replace, content="Synthetic title"
+)
+_PATCH_PATH = f"/me/onenote/pages/{_PAGE_ID}/onenotePatchContent"
+
+
+class TestPatchPage:
+    @pytest.mark.parametrize(
+        ("owner", "root"),
+        [(None, "/me"), (_GROUP, f"/groups/{_GROUP_ID}"), (_SITE, f"/sites/{_SITE_ID}")],
+        ids=["me", "group", "site"],
+    )
+    async def test_it_posts_the_commands_once_under_the_owner_of_the_handle(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        owner: OnenoteOwner | None,
+        root: str,
+    ) -> None:
+        route = graph.post(f"{root}/onenote/pages/{_PAGE_ID}/onenotePatchContent").mock(
+            return_value=httpx.Response(204)
+        )
+
+        await notes.patch_page(
+            client, OnenotePageHandle(_PAGE_ID, owner=owner), [_APPEND_TO_BODY], safe_to_repeat=True
+        )
+
+        assert route.call_count == 1
+        request = route.calls.last.request
+        assert request.headers["Accept"] == "application/json"
+        assert json.loads(request.content) == {
+            "commands": [
+                {
+                    "target": "body",
+                    "action": "Append",
+                    "position": "After",
+                    "content": "<p>Synthetic.</p>",
+                }
+            ]
+        }
+
+    async def test_it_sends_a_sequence_of_commands_in_the_order_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(204))
+
+        await notes.patch_page(
+            client,
+            OnenotePageHandle(_PAGE_ID),
+            (_REPLACE_TITLE, _APPEND_TO_BODY),
+            safe_to_repeat=True,
+        )
+
+        sent = cast(
+            "list[dict[str, object]]", json.loads(route.calls.last.request.content)["commands"]
+        )
+        assert [command["target"] for command in sent] == ["title", "body"]
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_patch_that_is_not_safe_to_repeat_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable), graph_step("patch_page"):
+            await notes.patch_page(
+                client, OnenotePageHandle(_PAGE_ID), [_APPEND_TO_BODY], safe_to_repeat=False
+            )
+
+        assert route.call_count == 1
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_patch_that_is_safe_to_repeat_is_sent_again_after_a_503(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(_PATCH_PATH).mock(side_effect=[httpx.Response(503), httpx.Response(204)])
+
+        await notes.patch_page(
+            client, OnenotePageHandle(_PAGE_ID), [_REPLACE_TITLE], safe_to_repeat=True
+        )
+
+        assert route.call_count == 2
+
+
 _RESULT_PAGE_ID = "0-55555555-5555-4555-8555-555555555555!101-66666666-6666-4666-8666-666666666666"
 _RESULT_SECTION_ID = (
     "1-77777777-7777-4777-8777-777777777777!100-88888888-8888-4888-8888-888888888888"
@@ -721,6 +1297,115 @@ class TestResourceHandleOf:
 
     def test_an_unrecognised_location_answers_none(self) -> None:
         assert notes.resource_handle_of("https://example.invalid/nothing/here", None) is None
+
+    def test_a_group_page_location_mints_a_group_page_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/pages/{_RESULT_PAGE_ID}",
+            None,
+        )
+
+        assert result == (OnenotePageHandle(_RESULT_PAGE_ID, owner=_GROUP).uri, "page")
+
+    def test_a_group_section_location_in_key_syntax_mints_a_group_section_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/groups('{_GROUP_ID}')/onenote/sections/"
+            + _RESULT_SECTION_ID,
+            None,
+        )
+
+        assert result == (
+            OnenoteSectionHandle(_RESULT_SECTION_ID, owner=_GROUP).uri,
+            "section",
+        )
+
+    def test_a_group_notebook_location_mints_a_group_notebook_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/notebooks/"
+            + f"{_RESULT_NOTEBOOK_ID}?$select=id",
+            _RESULT_NOTEBOOK_ID,
+        )
+
+        assert result == (
+            OnenoteNotebookHandle(_RESULT_NOTEBOOK_ID, owner=_GROUP).uri,
+            "notebook",
+        )
+
+    def test_a_site_page_location_mints_a_site_page_handle(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/pages/{_RESULT_PAGE_ID}",
+            None,
+        )
+
+        assert result == (OnenotePageHandle(_RESULT_PAGE_ID, owner=_SITE).uri, "page")
+
+    def test_a_user_location_mints_a_handle_with_no_group(self) -> None:
+        result = notes.resource_handle_of(
+            f"https://graph.microsoft.com/v1.0/users('u')/onenote/pages/{_RESULT_PAGE_ID}", None
+        )
+
+        assert result is not None
+        assert result[0] == f"onenote:///pages/{_RESULT_PAGE_ID.replace('!', '%21')}"
+
+
+class TestOwnerOfGraphUrl:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/resources/res-1/$value",
+            f"https://graph.microsoft.com/v1.0/groups('{_GROUP_ID}')/onenote/resources/res-1/content",
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/pages/p-1?$select=id",
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/operations/op-1#frag",
+        ],
+    )
+    def test_it_reads_the_group_before_onenote(self, url: str) -> None:
+        assert notes.owner_of_graph_url(url) == _GROUP
+
+    def test_it_decodes_a_percent_encoded_group(self) -> None:
+        url = "https://graph.microsoft.com/v1.0/groups/a%3Ab/onenote/resources/res-1/$value"
+
+        assert notes.owner_of_graph_url(url) == OnenoteOwner("groups", "a:b")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/resources/res-1/$value",
+            f"https://graph.microsoft.com/v1.0/sites('{_SITE_ID}')/onenote/resources/res-1/content",
+            f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/pages/p-1?$select=id",
+            f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/operations/op-1#frag",
+        ],
+    )
+    def test_it_reads_the_site_before_onenote(self, url: str) -> None:
+        assert notes.owner_of_graph_url(url) == _SITE
+
+    def test_a_site_resource_address_answers_a_site_owner(self) -> None:
+        url = "https://graph.microsoft.com/v1.0/sites/s-1/onenote/resources/res-1/$value"
+
+        assert notes.owner_of_graph_url(url) == OnenoteOwner("sites", "s-1")
+
+    def test_it_decodes_a_percent_encoded_site(self) -> None:
+        url = "https://graph.microsoft.com/v1.0/sites/a%2Cb%2Cc/onenote/resources/res-1/$value"
+
+        assert notes.owner_of_graph_url(url) == OnenoteOwner("sites", "a,b,c")
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://graph.microsoft.com/v1.0/me/onenote/resources/res-1/$value",
+            "https://graph.microsoft.com/v1.0/users('u')/onenote/resources/res-1/$value",
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/drive/items/item-1",
+            "https://graph.microsoft.com/v1.0/sites/s-1/drive/items/item-1",
+            "https://graph.microsoft.com/v1.0/sites/%20/onenote/pages/p-1",
+            "https://graph.microsoft.com/v1.0/sites//onenote/pages/p-1",
+            "https://graph.microsoft.com/v1.0/teams/t-1/onenote/pages/p-1",
+            f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/team/onenote/pages/p-1",
+            "https://graph.microsoft.com/v1.0/groups/%20/onenote/pages/p-1",
+            "https://graph.microsoft.com/v1.0/groups//onenote/pages/p-1",
+            "not a url at all",
+            "",
+        ],
+    )
+    def test_it_answers_none_without_a_group_or_a_site_before_onenote(self, url: str) -> None:
+        assert notes.owner_of_graph_url(url) is None
 
 
 class TestResourceIdInUrl:
@@ -852,6 +1537,28 @@ class TestOperationSummaryFromOperation:
         with pytest.raises(AssertionError):
             notes.OperationSummary.from_operation(op)
 
+    def test_a_group_operation_mints_a_group_operation_handle(self) -> None:
+        op = OnenoteOperation(id="op-3", status=OperationStatus.Running)
+
+        summary = notes.OperationSummary.from_operation(op, owner=_GROUP)
+
+        assert summary.uri == OnenoteOperationHandle("op-3", owner=_GROUP).uri
+
+    def test_the_result_handle_takes_its_group_from_the_resource_location(self) -> None:
+        op = OnenoteOperation(
+            id="op-4",
+            status=OperationStatus.Completed,
+            resource_location=(
+                f"https://graph.microsoft.com/v1.0/groups/{_GROUP_ID}/onenote/pages/"
+                + _RESULT_PAGE_ID
+            ),
+        )
+
+        summary = notes.OperationSummary.from_operation(op)
+
+        assert summary.uri == OnenoteOperationHandle("op-4").uri
+        assert summary.result_uri == OnenotePageHandle(_RESULT_PAGE_ID, owner=_GROUP).uri
+
 
 class TestOperationSummaryAccepted:
     def test_it_mints_the_handle_with_every_other_field_null(self) -> None:
@@ -866,6 +1573,11 @@ class TestOperationSummaryAccepted:
         assert summary.result_kind is None
         assert summary.error_code is None
         assert summary.error_message is None
+
+    def test_a_group_copy_mints_a_group_operation_handle(self) -> None:
+        summary = notes.OperationSummary.accepted("op-9", owner=_GROUP)
+
+        assert summary.uri == OnenoteOperationHandle("op-9", owner=_GROUP).uri
 
 
 _ACCEPTED_OPERATION_LOCATION = (
@@ -938,6 +1650,29 @@ class TestAcceptedOperation:
         fetched = FetchedResponse(status_code=202, headers={}, content=b"")
 
         assert notes.accepted_operation(fetched) is None
+
+    def test_a_group_copy_header_mints_a_group_operation_handle(self) -> None:
+        fetched = FetchedResponse(
+            status_code=202,
+            headers={"operation-location": _ACCEPTED_OPERATION_LOCATION},
+            content=b"",
+        )
+
+        summary = notes.accepted_operation(fetched, owner=_GROUP)
+
+        assert summary is not None
+        assert summary.uri == OnenoteOperationHandle("op-header", owner=_GROUP).uri
+
+    def test_a_group_copy_body_mints_a_group_operation_handle(self) -> None:
+        body = json.dumps({"id": "op-body", "status": "Running"}).encode()
+        fetched = FetchedResponse(
+            status_code=202, headers={"content-type": "application/json"}, content=body
+        )
+
+        summary = notes.accepted_operation(fetched, owner=_GROUP)
+
+        assert summary is not None
+        assert summary.uri == OnenoteOperationHandle("op-body", owner=_GROUP).uri
 
 
 class TestWriteStateFor:

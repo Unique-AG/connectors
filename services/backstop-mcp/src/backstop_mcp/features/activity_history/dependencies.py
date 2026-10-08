@@ -10,6 +10,8 @@ from backstop_mcp.dependencies import (
 from backstop_mcp.features.activity_history.queries import (
     GetActivityDetailQuery,
     GetActivityHistoryQuery,
+    GetLastActivityForPartiesQuery,
+    GetMeetingAttendeesQuery,
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.activity_history.settings import ActivityHistorySettings
@@ -29,19 +31,40 @@ def get_activity_history_settings() -> ActivityHistorySettings:
 
 
 @lru_cache(maxsize=1)
+def get_meeting_attendees_query_factory(
+    client: BackstopClient = Depends(get_backstop_client_for_current_caller),
+) -> GetMeetingAttendeesQuery:
+    return GetMeetingAttendeesQuery(client=client)
+
+
+@lru_cache(maxsize=1)
 def get_activity_detail_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
+    get_meeting_attendees_query: GetMeetingAttendeesQuery = Depends(
+        get_meeting_attendees_query_factory
+    ),
 ) -> GetActivityDetailQuery:
-    return GetActivityDetailQuery(client=client, build_entity_link_util=build_entity_link_util)
+    return GetActivityDetailQuery(
+        client=client,
+        build_entity_link_util=build_entity_link_util,
+        get_meeting_attendees_query=get_meeting_attendees_query,
+    )
 
 
 @lru_cache(maxsize=1)
 def get_activity_history_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
     build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
+    get_meeting_attendees_query: GetMeetingAttendeesQuery = Depends(
+        get_meeting_attendees_query_factory
+    ),
 ) -> GetActivityHistoryQuery:
-    return GetActivityHistoryQuery(client=client, build_entity_link_util=build_entity_link_util)
+    return GetActivityHistoryQuery(
+        client=client,
+        build_entity_link_util=build_entity_link_util,
+        get_meeting_attendees_query=get_meeting_attendees_query,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -49,3 +72,10 @@ def get_search_activities_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> SearchActivitiesQuery:
     return SearchActivitiesQuery(client=client)
+
+
+@lru_cache(maxsize=1)
+def get_last_activity_for_parties_query_factory(
+    search_activities_query: SearchActivitiesQuery = Depends(get_search_activities_query_factory),
+) -> GetLastActivityForPartiesQuery:
+    return GetLastActivityForPartiesQuery(search_activities_query=search_activities_query)

@@ -78,7 +78,7 @@ def _document(*, status: int = 200, stage_id: str = "42478") -> httpx.Response:
             "data": {
                 "id": _ID,
                 "type": "opportunities",
-                "attributes": {"name": "Koch - CATS Select"},
+                "attributes": {"name": "Contoso - Harbor Select"},
                 "relationships": {
                     "stage": {"data": {"id": stage_id, "type": "opportunity-stages"}}
                 },
@@ -113,7 +113,7 @@ class TestCreateOpportunity:
                 ctx_never_elicit(),
                 opportunity=_OPPORTUNITY.validate_python(
                     {
-                        "name": "Koch - CATS Select",
+                        "name": "Contoso - Harbor Select",
                         "currency_code": "USD",
                         "is_erisa": False,
                         "party_id": _INVESTOR_ID,

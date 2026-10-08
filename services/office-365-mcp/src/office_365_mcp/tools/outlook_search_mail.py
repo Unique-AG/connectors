@@ -50,9 +50,10 @@ _KQL_IMPORTANCE: Mapping[MailImportance, str] = {"low": "low", "normal": "medium
 _DESCRIPTION = """\
 Searches the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one, by \
 keyword, sender, recipient, subject, or attachment file name. To list the newest mail of one \
-folder, use outlook_list_mail.
+folder, or only unread mail, use outlook_list_mail.
 
 Notes:
+- This tool has no `folder` or `unread_only` argument.
 - `received_after`, `received_before`, `importance`, `has_attachments`, `flagged`, and \
 `category` narrow a search with AND. They are not criteria, so they cannot start a search alone.
 """

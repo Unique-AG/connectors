@@ -114,6 +114,16 @@ A permission id means something only under its calendar, so the handle names bot
 `outlook_list_calendar_shares` and `outlook_share_calendar` mint it. The tool
 `outlook_unshare_calendar` parses it.
 
+A OneNote handle starts with `onenote:///groups/{group}/` when Graph addresses its item under
+`/groups/{id}/onenote`. Graph documents that root for a notebook that a Microsoft 365 group owns.
+A team id is a group id. A handle of an item under `/me/onenote` has no group segment. The group
+segment is not a handle family. It comes before one of the five OneNote families.
+
+A OneNote handle starts with `onenote:///sites/{site}/` when Graph addresses its item under
+`/sites/{id}/onenote`. Graph documents that root for a notebook that a SharePoint site owns. Graph
+documents no copy from or into a site notebook. As a result, the three copy tools refuse a site
+handle before they send a request to Graph.
+
 This layout follows seven layering rules:
 
 1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the

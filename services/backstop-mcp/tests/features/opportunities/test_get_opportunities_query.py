@@ -198,7 +198,9 @@ class TestProjection:
         """With an empty vocabulary, so only `included` can be answering."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
-                _opportunity("5072909", stage_id="42482", name="Koch - CATS Select", isOpen=True),
+                _opportunity(
+                    "5072909", stage_id="42482", name="Contoso - Harbor Select", isOpen=True
+                ),
                 included=[_side_loaded_stage("42482")],
             )
         )
@@ -206,7 +208,7 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
-        assert deal.stage == "IDD"
+        assert deal.stage == "Stage B"
         assert deal.stage_id == "42482"
 
     @pytest.mark.asyncio
@@ -282,7 +284,7 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         deal = result.opportunities[0]
-        assert deal.stage == "IDD"
+        assert deal.stage == "Stage B"
         assert deal.stage_id == "42482"
 
     @pytest.mark.asyncio
@@ -305,8 +307,8 @@ class TestProjection:
         result = await _run(client, vocabulary={})
 
         assert {deal.id: deal.stage for deal in result.opportunities} == {
-            "page-1": "IDD",
-            "page-2": "IDD",
+            "page-1": "Stage B",
+            "page-2": "Stage B",
         }
 
     @pytest.mark.asyncio
@@ -314,7 +316,7 @@ class TestProjection:
     async def test_previous_stage_is_carried_from_the_attribute(
         self, client: BackstopClient
     ) -> None:
-        """It names the stage the deal LEFT — 'Client Approval' while it sits in 'IDD'."""
+        """It names the stage the deal LEFT — 'Client Approval' while it sits in 'Stage B'."""
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity(
@@ -327,7 +329,7 @@ class TestProjection:
         result = await _run(client)
 
         assert result.opportunities[0].previous_stage == "Client Approval"
-        assert result.opportunities[0].stage == "IDD"
+        assert result.opportunities[0].stage == "Stage B"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -357,7 +359,7 @@ class TestProjection:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=False,
                     probability=1.0,
                     requestedAmount=100000000.0,
@@ -376,7 +378,7 @@ class TestProjection:
         result = await _run(client)
 
         deal = result.opportunities[0]
-        assert deal.name == "Koch - CATS Select"
+        assert deal.name == "Contoso - Harbor Select"
         assert deal.is_open is False
         assert deal.probability == 1.0
         assert deal.requested_amount == 100000000.0
@@ -400,7 +402,7 @@ class TestProjection:
                 _opportunity(
                     "5072909",
                     stage_id="96016",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     waitlistId=2,
                     isErisa=False,
                     weightedValue=100000000.0,
@@ -534,7 +536,7 @@ class TestStageHistory:
 
         by_id = {deal.id: deal for deal in result.opportunities}
         assert [change.stage for change in by_id["5072909"].stage_history] == ["Invested"]
-        assert [change.stage for change in by_id["5755031"].stage_history] == ["IDD"]
+        assert [change.stage for change in by_id["5755031"].stage_history] == ["Stage B"]
 
 
 class TestStatusFiltering:
@@ -740,7 +742,9 @@ class TestMalformedRecords:
         respx.get(_OPPORTUNITIES_URL).mock(
             return_value=_page(
                 _opportunity("malformed", stage_id="42482", probability=["not-a-number"]),
-                _opportunity("intact", stage_id="42482", name="Koch - CATS Select", isOpen=True),
+                _opportunity(
+                    "intact", stage_id="42482", name="Contoso - Harbor Select", isOpen=True
+                ),
                 included=[_side_loaded_stage("42482")],
             )
         )
@@ -750,7 +754,7 @@ class TestMalformedRecords:
         by_id = {deal.id: deal for deal in result.opportunities}
         assert set(by_id) == {"malformed", "intact"}
         assert by_id["malformed"].probability is None
-        assert by_id["intact"].name == "Koch - CATS Select"
+        assert by_id["intact"].name == "Contoso - Harbor Select"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -766,7 +770,7 @@ class TestMalformedRecords:
                 _opportunity(
                     "kept",
                     stage_id="42482",
-                    name="Koch - CATS Select",
+                    name="Contoso - Harbor Select",
                     isOpen=True,
                     regularCustomFieldValues=stored,
                 ),

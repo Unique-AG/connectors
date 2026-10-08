@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
-from office_365_mcp.shared.handles import MailDraftHandle
+from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     AddressFault,
@@ -109,7 +109,7 @@ def _in_to_and_cc(address: str) -> str:
 class MailDraft(BaseModel):
     uri: str = Field(
         description=(
-            "A handle for this draft, `outlook:///drafts/{id}`; pass it to outlook_send_draft "
+            "A handle for this draft, `outlook:///messages/{id}`; pass it to outlook_send_draft "
             + "to send it."
         )
     )
@@ -265,7 +265,7 @@ def _about(
 def _answer(draft: Message) -> MailDraft:
     assert draft.id is not None, "Graph created a draft it gave no id, which cannot be addressed"
     return MailDraft(
-        uri=MailDraftHandle(draft.id).uri,
+        uri=MailMessageHandle(draft.id).uri,
         web_link=draft.web_link,
         to=MailAddress.each_of(draft.to_recipients),
         cc=MailAddress.each_of(draft.cc_recipients),

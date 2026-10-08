@@ -40,9 +40,11 @@ class UpdateCustomFieldValueInput(BaseModel):
     )
     value: object = Field(
         description=(
-            "Value to store, in the shape the definition expects. `null` clears the field "
-            "and is rejected on a required one. To leave a field as it is, omit its row "
-            "from `values` — never send `null` for a field you mean to keep."
+            "JSON value matching `field_type` from list_custom_fields: a string for text "
+            "and single-select (one option's text), a list of option texts for multi-select, "
+            "a number for money, an ISO date for date. `null` clears the field and is "
+            "rejected on a required one. To leave a field as it is, omit its row from "
+            "`values`."
         )
     )
     effective_date: date | None = Field(

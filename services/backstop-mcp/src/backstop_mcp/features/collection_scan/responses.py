@@ -5,7 +5,7 @@ from pydantic import ConfigDict, Field
 from backstop_mcp.features.collection_scan.internal_dto import AggregateBucketDto
 from backstop_mcp.models import OmitNoneModel
 
-__all__ = ["AggregateBucketResponse", "ScanCoverageResponse"]
+__all__ = ["AggregateBucketResponse", "ContinuationResponse", "ScanCoverageResponse"]
 
 
 class ScanCoverageResponse(OmitNoneModel):
@@ -35,8 +35,9 @@ class ScanCoverageResponse(OmitNoneModel):
     )
     truncated: bool = Field(
         description=(
-            "True when this payload is not the full visible set: the row cap fired, the "
-            "ceiling was hit, or a later page failed."
+            "True when the read stopped short of the full visible set in a way the next page "
+            "cannot fix: the ceiling was hit or a later page failed. A page that ends with a "
+            "`continuation` is not truncated; the next page follows the cursor."
         )
     )
     ceiling_hit: bool = Field(
@@ -85,3 +86,18 @@ class AggregateBucketResponse(OmitNoneModel):
     @classmethod
     def from_dto(cls, bucket: AggregateBucketDto) -> Self:
         return cls(key=bucket.key, label=bucket.label, count=bucket.count)
+
+
+class ContinuationResponse(OmitNoneModel):
+    """Present when this page stopped before the result set ended: how to read the next one."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    cursor: str = Field(
+        description=(
+            "Pass back as `cursor`, with every other argument unchanged, to read the next page. "
+            "Opaque: copy it exactly and in full; never shorten, edit, or build one, and never "
+            "pass a page number instead."
+        )
+    )
+    message: str = Field(description="Why this call stopped and what the next call does.")

@@ -25,16 +25,21 @@ __all__ = [
 
 UPDATE_ACTIVITY_INPUT_DESCRIPTION = (
     "Required. The activity to patch. Discriminated by `kind`: `note`, `meeting`, `call`, "
-    "`task`, `email`, or `document`. Needs `activity_id` (create echo, search row, or "
-    "history handle) and at least one field to change. Never invent an id. Email PATCH "
+    "`task`, `email`, or `document`. Needs `activity_id` and at least one field to change. "
+    "Note, meeting, call, and document ids come from a create echo, a `search_activities` "
+    "row, or a history handle. Email ids come from `attach_file` or a history email "
+    "`activity_id`. Task ids come from the create echo or `get_tasks_for_party` — tasks "
+    "are not search rows. Never invent an id. Email PATCH "
     "accepts only `display_subject` and `activity_tag_ids`."
 )
 
 _IDENTITY_FIELDS = frozenset({"kind", "activity_id"})
 
 _ACTIVITY_ID_DESCRIPTION = (
-    "Required. Backstop id from a create echo, a `search_activities` row, or a "
-    "`get_activity_history` handle (`notes_123`, `meeting-or-calls_123`). Never invent or guess."
+    "Required. For a note, meeting, call, or document: a create echo, a `search_activities` "
+    "row `id`, or a history handle. For email: an `attach_file` id or a history email "
+    "`activity_id`. For a task: the create echo or a `get_tasks_for_party` id — tasks are "
+    "not search rows. Never a `meeting-or-calls_…` handle for email. Never invent or guess."
 )
 
 
@@ -76,8 +81,8 @@ class _UpdateMeetingOrCallFields(_ActivityIdInput):
     time_zone: NonEmptyStr | None = Field(
         default=None,
         description=(
-            "Replacement `/time-zones` shortName (e.g. US/Eastern), not the catalog id and "
-            "not the display name. Omit to leave the zone unchanged."
+            "Replacement Backstop time-zone short name (for example `US/Eastern`). A unique "
+            "display name also resolves. Omit to leave the zone unchanged."
         ),
     )
     start: datetime | None = Field(
@@ -131,9 +136,7 @@ class UpdateTaskInput(_ActivityIdInput):
     """PATCH a CRM task."""
 
     kind: Literal["task"] = Field(description="Update a CRM task.")
-    title: NonEmptyStr | None = Field(
-        default=None, description="Replacement task title. Mapped to Backstop `name`."
-    )
+    title: NonEmptyStr | None = Field(default=None, description="Replacement task title.")
     assigned_user: NonEmptyStr | None = Field(
         default=None,
         description=(
@@ -141,9 +144,7 @@ class UpdateTaskInput(_ActivityIdInput):
             "leave the assignee unchanged."
         ),
     )
-    description: NonEmptyStr | None = Field(
-        default=None, description="Replacement task body, mapped to wire `details`."
-    )
+    description: NonEmptyStr | None = Field(default=None, description="Replacement task body.")
     due_date: date | datetime | None = Field(
         default=None, description="Replacement due day or timestamp."
     )

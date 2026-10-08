@@ -1,0 +1,266 @@
+# Python services are not part of the pnpm and turbo workspace, so ci-services.yaml does not cover them.
+# Each service job runs for a changed service and for every service that uses a changed shared package.
+name: "[CI] Python"
+
+on:
+  # No `branches` filter. Stacked pull requests target their parent branch, not `main`.
+  # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
+  # Only `paths` decides when the workflow runs.
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "packages/mcp-credential-auth/**"
+      - "services/**"
+      - ".github/workflows/ci-python.yaml"
+      - ".github/workflows/_template-containerize.yaml"
+      - ".github/workflows/_template-helm.yaml"
+      - ".github/workflows/_template-terraform.yaml"
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: 'Python packages to run CI for (comma-separated, e.g., "hello-mcp" or "all")'
+        required: true
+        default: "all"
+
+permissions:
+  contents: read # to read the repository
+  packages: read # to let the called workflows pull the base chart and the cache image from GHCR
+
+concurrency:
+  group: ci-python-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect changes (Python)
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      packages: ${{ steps.build-matrix.outputs.packages }}
+      shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
+      workflow-changed: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            services:
+              - 'services/**'
+            shared_auth:
+              - 'packages/mcp-credential-auth/**'
+            workflow:
+              - '.github/workflows/ci-python.yaml'
+              - '.github/workflows/_template-containerize.yaml'
+              - '.github/workflows/_template-helm.yaml'
+              - '.github/workflows/_template-terraform.yaml'
+
+      # This step builds the list of Python services for the matrix jobs.
+      # A change to a workflow file lists every service. A manual run lists the services that the input names.
+      # Node services (package.json only) are never listed. ci-services.yaml covers them.
+      - name: Build package matrix
+        id: build-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PACKAGES: ${{ github.event.inputs.packages }}
+          SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
+          SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
+          WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
+        run: |
+          list_python_services() {
+            find services -mindepth 2 -maxdepth 2 -type f -name pyproject.toml | cut -d/ -f2 | sort
+          }
+
+          list_changed_python_services() {
+            echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
+              [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
+            done | jq -R -s -c 'split("\n") | map(select(length > 0))'
+          }
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            available=$(list_python_services)
+
+            if [ "$INPUT_PACKAGES" = "all" ]; then
+              packages=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              IFS=',' read -ra requested <<< "$INPUT_PACKAGES"
+              valid=()
+              for pkg in "${requested[@]}"; do
+                pkg=$(echo "$pkg" | xargs)
+                if echo "$available" | grep -qx "$pkg"; then
+                  valid+=("$pkg")
+                else
+                  echo "::error::Unknown python package: $pkg"
+                  echo "Available python packages: $available"
+                  exit 1
+                fi
+              done
+              packages=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+          elif [ "$WORKFLOW_CHANGED" = "true" ]; then
+            packages=$(list_python_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            packages='[]'
+            if [ "$SERVICES_CHANGED" = "true" ]; then
+              packages=$(list_changed_python_services)
+            fi
+            if [ "$SHARED_AUTH_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-credential-auth' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
+          fi
+
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "Python packages to validate: $packages"
+
+  test:
+    name: Test ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      # This step runs here and not in the Terraform template.
+      # The generator imports the Python code of the service and needs no terraform binary.
+      # The test for the file, not a matrix entry, selects the services. A second service with a generator needs no edit here.
+      - name: Check generated Terraform registry drift
+        run: |
+          if [ -f scripts/render-terraform-registry.py ]; then
+            uv run python scripts/render-terraform-registry.py --check
+          fi
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          run_install: false
+
+      - name: Install Node dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting of the files ruff does not own
+        run: pnpm exec biome check . --no-errors-on-unmatched
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-shared-auth:
+    name: Test mcp-credential-auth
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.shared-auth-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-credential-auth
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  validate-helm:
+    name: Helm ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    permissions:
+      contents: read # to let the called workflow read the repository
+      packages: read # to let the called workflow pull the base chart from GHCR
+    uses: ./.github/workflows/_template-helm.yaml
+    with:
+      service-name: ${{ matrix.package }}
+      service-path: services/${{ matrix.package }}
+
+  validate-terraform:
+    name: Terraform ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    permissions:
+      contents: read # to let the called workflow read the repository
+    uses: ./.github/workflows/_template-terraform.yaml
+    with:
+      service-path: services/${{ matrix.package }}
+
+  containerize:
+    name: Containerize ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    uses: ./.github/workflows/_template-containerize.yaml
+    with:
+      service-name: ${{ matrix.package }}
+      service-path: services/${{ matrix.package }}

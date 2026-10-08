@@ -4,12 +4,16 @@ Two collection walks: `/hedge-fund-account-subscriptions?include=fundAccount.own
 `/hedge-fund-account-redemptions?include=originalSubscription.fundAccount.owner`. A redemption
 has no `fundAccount` of its own — it reaches an account only through
 `originalSubscription`. Missing that chain is reported as `unattributed`, not dropped.
-`filter[transactionDate]` is mandatory; an unfiltered read is 400. Actuals only
+`filter[transactionDate]` is required. Actuals only
 (`status=COMPLETED`), and how many rows that excluded is reported rather than swallowed.
 
 Neither collection takes a product or account filter, so a walk is the whole window. Each is
-capped at `MAX_CAPITAL_FLOW_SCAN_RECORDS` — the measured size is ~1,244 subscriptions since
-2020, so the cap is headroom on this instance and a wall on a tenant where it is not.
+capped at `MAX_CAPITAL_FLOW_SCAN_RECORDS`, and hitting the cap is reported as `scan_truncated`.
+
+Not cursor-paged like the search tools: Backstop sorts on one field and flows sharing a
+transaction date reorder between requests, so offset paging on `-transactionDate` repeats and
+skips rows, and a correct page would still re-read the whole window. The volume is small:
+measured about 450 flows a year (peak 734) and about 5,400 in total, so every match is returned.
 """
 
 import asyncio
@@ -65,7 +69,6 @@ class GetCapitalFlowsQuery:
         *,
         start_date: date,
         end_date: date,
-        max_rows: int,
         owner_id: str | None = None,
         account_ids: Sequence[str] | None = None,
     ) -> CapitalFlowsResolvedResponse:
@@ -96,13 +99,12 @@ class GetCapitalFlowsQuery:
         )
         return CapitalFlowsResolvedResponse(
             request_count=subscriptions.request_count + redemptions.request_count,
-            flows=matched[:max_rows],
+            flows=matched,
             total=len(matched),
             subscription_count=sum(1 for row in matched if row.kind == "subscription"),
             redemption_count=sum(1 for row in matched if row.kind == "redemption"),
             unattributed_count=sum(1 for row in matched if row.unattributed),
             non_actual_count=subscriptions.non_actuals_dropped + redemptions.non_actuals_dropped,
-            truncated=len(matched) > max_rows,
             scan_truncated=subscriptions.scan_truncated or redemptions.scan_truncated,
         )
 
@@ -212,7 +214,7 @@ class GetCapitalFlowsQuery:
 
         Sorting on `(date is None, date)` descending puts the undated group *first* — `True` sorts
         above `False` and `reverse=True` inverts the guard along with the date — so undated rows
-        crowd real ones out at the row cap. Sorting undated rows as `date.min` descending lands
+        would lead the list. Sorting undated rows as `date.min` descending lands
         them where they belong: after every dated row.
         """
         return tuple(

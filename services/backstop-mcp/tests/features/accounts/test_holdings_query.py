@@ -22,7 +22,7 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     BackstopRateLimitError,
 )
-from backstop_mcp.features.accounts import FALLBACK_OMITTED_FIELDS, HoldingListingDto
+from backstop_mcp.features.accounts import FALLBACK_OMITTED_FIELDS, HoldingListingDto, TenureDto
 from tests.features.accounts.conftest import make_get_holdings_query
 from tests.helpers import BASE_URL, client_factory, credential, recorded_params, resource
 
@@ -685,6 +685,28 @@ class TestClosedFiltering:
         assert result.closed_omitted == 0
         assert result.rows[1].closed_date == date(2022, 2, 1)
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_tenure_runs_through_the_closed_rows_it_drops(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_TABLE_URL).mock(
+            return_value=_table(
+                _row(
+                    "old",
+                    closed=True,
+                    fundedDate="2008-08-01T00:00:00.000-0400",
+                    closedDate="2016-01-01T00:00:00.000-0500",
+                ),
+                _row("new", fundedDate="2015-06-01T00:00:00.000-0400"),
+            )
+        )
+
+        result = await _fetch(client)
+
+        assert [row.account_id for row in result.rows] == ["new"]
+        assert result.tenure == TenureDto(continuous_since=date(2008, 8, 1))
+
 
 class TestDegradation:
     """An undocumented endpoint changing shape must cost a field, not the whole answer."""
@@ -977,10 +999,10 @@ class TestDocumentedWalk:
                     "1",
                     owner_id=_OWNER_ID,
                     product_id=_PRODUCT_ID,
-                    name="PSP NGUP",
+                    name="Tailspin NGUP",
                 ),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     resource(
                         _PRODUCT_ID,
                         "products",
@@ -1016,10 +1038,10 @@ class TestDocumentedWalk:
                 _account(
                     "2",
                     owner_id=_OTHER_OWNER_ID,
-                    name="PSP Investments",
+                    name="Tailspin Investments",
                 ),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )
@@ -1029,6 +1051,31 @@ class TestDocumentedWalk:
         listing = await _documented_holdings(client, owner_id=_OWNER_ID)
 
         assert [row.account_id for row in listing.rows] == ["1"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_tenure_runs_through_the_closed_rows_it_drops(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account(
+                    "old",
+                    owner_id=_OWNER_ID,
+                    accountStartDate="2008-08-01",
+                    closedDate="2016-01-01",
+                ),
+                _account("new", owner_id=_OWNER_ID, accountStartDate="2015-06-01"),
+                _account("undated", owner_id=_OWNER_ID),
+                included=[_owner(_OWNER_ID, name="Tailspin Investments")],
+            )
+        )
+
+        _empty_series("new", "undated")
+        listing = await _documented_holdings(client, owner_id=_OWNER_ID)
+
+        assert [row.account_id for row in listing.rows] == ["new", "undated"]
+        assert listing.tenure == TenureDto(continuous_since=date(2008, 8, 1), undated_accounts=1)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -1044,7 +1091,7 @@ class TestDocumentedWalk:
                 ),
                 _account("other-closed", owner_id=_OTHER_OWNER_ID, closedDate="2019-01-01"),
                 included=[
-                    _owner(_OWNER_ID, name="PSP Investments"),
+                    _owner(_OWNER_ID, name="Tailspin Investments"),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )
@@ -1066,7 +1113,7 @@ class TestDocumentedWalk:
                 _account("1", owner_id="contact-1", name="Vehicle A"),
                 _account("2", owner_id=_OTHER_OWNER_ID, name="Not Theirs"),
                 included=[
-                    _owner("contact-1", name="PSP Investments", specific_id=_OWNER_ID),
+                    _owner("contact-1", name="Tailspin Investments", specific_id=_OWNER_ID),
                     _owner(_OTHER_OWNER_ID, name="Someone Else"),
                 ],
             )

@@ -1,7 +1,8 @@
 import hashlib
 import json
 import re
-from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
 from typing import cast, override
@@ -86,6 +87,12 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
+        "ChannelMessage.ReadWrite",
+        "Chat.ReadWrite",
+        "Chat.Create",
+        "ChatMember.ReadWrite",
+        "OnlineMeetings.ReadWrite",
+        "OnlineMeetingArtifact.Read.All",
         "Mail.Read",
         "Mail.Read.Shared",
         "People.Read",
@@ -102,6 +109,8 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
         "Files.Read.All",
+        "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite",
@@ -294,11 +303,25 @@ class Advised(ToolError):
     pass
 
 
+_FORBIDDEN = 403
+
+
+@contextmanager
+def owner_refused(named: bool, advice: str) -> Generator[None]:
+    try:
+        yield
+    except GraphForbidden as refusal:
+        if not named or refusal.status != _FORBIDDEN:
+            raise
+        raise Advised(advice + _diagnostics(refusal)) from refusal
+
+
 @dataclass(frozen=True, slots=True)
 class ToolAdvice:
     permissions: tuple[str, ...]
     not_found: str | None = None
     shown_by: tuple[str, ...] = ()
+    forbidden: str | None = None
 
 
 _NARROWED_PERMISSIONS = "office_365_mcp.narrowed_permissions"
@@ -360,6 +383,7 @@ class GraphAdviceMiddleware(Middleware):
                         known.not_found,
                         repeatable=repeatable,
                         shown_by=known.shown_by,
+                        forbidden=known.forbidden,
                     )
                 )
         return None
@@ -453,9 +477,15 @@ def _advice(
     *,
     repeatable: bool,
     shown_by: tuple[str, ...] = (),
+    forbidden: str | None = None,
 ) -> str:
     return _remedy(
-        failure, permissions, not_found, repeatable=repeatable, shown_by=shown_by
+        failure,
+        permissions,
+        not_found,
+        repeatable=repeatable,
+        shown_by=shown_by,
+        forbidden=forbidden,
     ) + _diagnostics(failure)
 
 
@@ -466,6 +496,7 @@ def _remedy(
     *,
     repeatable: bool,
     shown_by: tuple[str, ...],
+    forbidden: str | None,
 ) -> str:
     if isinstance(failure, GraphThrottled):
         advice = failure.retry_after_seconds
@@ -494,6 +525,8 @@ def _remedy(
             )
         if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
             return _TRANSCRIPTS_SWITCHED_OFF
+        if forbidden is not None:
+            return forbidden
         named = _named(permissions)
         noun = "permissions" if len(permissions) > 1 else "permission"
         return (

@@ -5,24 +5,36 @@ from collections.abc import Mapping, Sequence
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphThrottled
 from office_365_mcp.shared import handles
+from office_365_mcp.shared.messages import MessageSender
 from office_365_mcp.tools import teams_list_chats as chats
 
 from .conftest import GRAPH_V1
 
 _GUEST_MEMBER = "#microsoft.graph.anonymousGuestConversationMember"
 
+ADA_USER_ID = "00000000-0000-4000-8000-0000000000a1"
+BOT_APPLICATION_ID = "00000000-0000-4000-8000-0000000000b1"
+SENT_AT = "2026-02-11T09:15:22.31Z"
+READ_AT = "2026-02-11T09:15:30Z"
 
-def aad_member(display_name: str, *, email: str | None = None) -> dict[str, object]:
-    return {
+
+def aad_member(
+    display_name: str, *, email: str | None = None, user_id: str | None = None
+) -> dict[str, object]:
+    member: dict[str, object] = {
         "@odata.type": "#microsoft.graph.aadUserConversationMember",
         "id": f"member-{display_name.replace(' ', '-').lower()}",
         "displayName": display_name,
         "email": email or f"{display_name.split()[0].lower()}@example.invalid",
     }
+    if user_id is not None:
+        member["userId"] = user_id
+    return member
 
 
 def chat_payload(
@@ -33,6 +45,8 @@ def chat_payload(
     last_message_at: str | None = "2026-02-11T09:15:22.31Z",
     members: Sequence[Mapping[str, object]] | None = None,
     online_meeting_info: Mapping[str, object] | None = None,
+    preview: Mapping[str, object] | None = None,
+    last_read_at: str | None = None,
 ) -> dict[str, object]:
     """`onlineMeetingInfo` is in this collection's default projection and null for every chat that
     is not a meeting's, so it is always present and only sometimes populated."""
@@ -50,7 +64,10 @@ def chat_payload(
             "id": "1770000000000",
             "createdDateTime": last_message_at,
             "body": {"contentType": "text", "content": "synthetic preview"},
+            **(preview or {}),
         }
+    if last_read_at is not None:
+        payload["viewpoint"] = {"isHidden": False, "lastMessageReadDateTime": last_read_at}
     return payload
 
 
@@ -79,6 +96,13 @@ def online_meeting_info(join_web_url: str | None = JOIN_WEB_URL) -> dict[str, ob
     }
 
 
+async def _listed(
+    graph: respx.MockRouter, client: GraphServiceClient, *payloads: dict[str, object]
+) -> chats.ChatList:
+    graph.get("/me/chats").mock(return_value=httpx.Response(200, json={"value": list(payloads)}))
+    return await chats.list_recent_chats(client, limit=25, include_member_emails=False)
+
+
 class TestTheQueryItSends:
     async def test_it_asks_graph_for_recency_ordering_and_both_expansions(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -96,6 +120,7 @@ class TestTheQueryItSends:
         assert params["$expand"] == "members,lastMessagePreview"
         assert params["$top"] == "7"
         assert "$select" not in params, "$select is rejected on this collection"
+        assert set(params) == {"$orderby", "$expand", "$top"}
 
     async def test_a_limit_above_graphs_ceiling_is_a_programming_error(
         self, client: GraphServiceClient
@@ -362,6 +387,301 @@ class TestWhatTheCallerIsTold:
         listed = await chats.list_recent_chats(client, limit=25, include_member_emails=False)
 
         assert listed.chats[0].chat_type == "unknown"
+
+
+class TestWhoIsInTheChat:
+    async def test_an_entra_member_reports_its_user_id_and_another_kind_reports_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:unnamed@unq.gbl.spaces",
+                topic=None,
+                members=[
+                    aad_member("Ada Lovelace", user_id=ADA_USER_ID),
+                    {
+                        "@odata.type": _GUEST_MEMBER,
+                        "id": "member-room",
+                        "displayName": "Room 3",
+                    },
+                ],
+            ),
+        )
+
+        members = listed.chats[0].members
+        assert members is not None
+        assert [(m.display_name, m.user_id) for m in members] == [
+            ("Ada Lovelace", ADA_USER_ID),
+            ("Room 3", None),
+        ]
+
+    def test_the_members_field_offers_user_id_as_a_way_to_match(self) -> None:
+        description = chats.ChatSummary.model_fields["members"].description
+
+        assert description is not None
+        assert "No member here carries" not in description
+        assert "by `user_id` against the `user_id` from get_me" in description
+
+    def test_the_member_id_field_names_the_ids_it_equals(self) -> None:
+        description = chats.ChatMember.model_fields["user_id"].description
+
+        assert description is not None
+        assert "`user_id` in get_me" in description
+        assert "not a Microsoft Entra user" in description
+
+
+class TestTheLastMessage:
+    async def test_a_text_preview_is_the_message_trimmed(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2",
+                preview={"body": {"contentType": "text", "content": "  See you at ten \n"}},
+            ),
+        )
+
+        assert listed.chats[0].last_message_preview == "See you at ten"
+
+    async def test_an_html_preview_loses_its_tags_and_its_entities(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2",
+                preview={
+                    "body": {
+                        "contentType": "html",
+                        "content": "<p>Ship it &amp; <b>go</b> home&nbsp;now</p><p>&lt;ok&gt;</p>",
+                    }
+                },
+            ),
+        )
+
+        assert listed.chats[0].last_message_preview == "Ship it & go home now <ok>"
+
+    async def test_a_preview_over_120_characters_is_cut_and_marked(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:text@thread.v2",
+                preview={"body": {"contentType": "text", "content": "a" * 200}},
+            ),
+            chat_payload(
+                "19:html@thread.v2",
+                preview={"body": {"contentType": "html", "content": f"<p>{'b' * 200}</p>"}},
+            ),
+        )
+
+        assert [chat.last_message_preview for chat in listed.chats] == [
+            "a" * 120 + "…",
+            "b" * 120 + "…",
+        ]
+
+    async def test_a_deleted_message_has_no_preview_even_when_its_body_survives(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2",
+                preview={
+                    "isDeleted": True,
+                    "body": {"contentType": "text", "content": "words that were deleted"},
+                },
+            ),
+        )
+
+        assert listed.chats[0].last_message_preview is None
+
+    async def test_a_system_event_and_an_empty_body_have_no_preview_and_a_system_event_no_sender(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:event@thread.v2",
+                preview={
+                    "messageType": "systemEventMessage",
+                    "from": None,
+                    "body": {"contentType": "html", "content": "<systemEventMessage/>"},
+                },
+            ),
+            chat_payload(
+                "19:blank@thread.v2",
+                preview={"body": {"contentType": "text", "content": "   "}},
+            ),
+            chat_payload(
+                "19:card@thread.v2",
+                preview={
+                    "body": {
+                        "contentType": "html",
+                        "content": '<attachment id="ee8d34acd36d4dfe"></attachment>',
+                    }
+                },
+            ),
+        )
+
+        assert [chat.last_message_preview for chat in listed.chats] == [None, None, None]
+        assert listed.chats[0].last_message_sender is None
+
+    async def test_a_chat_nobody_posted_in_has_no_last_message_fields(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload("19:a@thread.v2", last_message_at=None, last_read_at=READ_AT),
+        )
+
+        chat = listed.chats[0]
+        assert (chat.last_message_preview, chat.last_message_sender, chat.unread) == (
+            None,
+            None,
+            None,
+        )
+
+    async def test_the_sender_is_the_one_every_message_tool_reports(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:person@thread.v2",
+                preview={
+                    "from": {
+                        "user": {
+                            "id": ADA_USER_ID,
+                            "displayName": "Ada Lovelace",
+                            "userIdentityType": "aadUser",
+                        },
+                        "application": None,
+                    }
+                },
+            ),
+            chat_payload(
+                "19:bot@thread.v2",
+                preview={
+                    "from": {
+                        "user": None,
+                        "application": {
+                            "id": BOT_APPLICATION_ID,
+                            "displayName": "Standup bot",
+                            "applicationIdentityType": "bot",
+                        },
+                    }
+                },
+            ),
+        )
+
+        person, bot = (chat.last_message_sender for chat in listed.chats)
+        assert person == MessageSender(
+            display_name="Ada Lovelace", email=None, user_id=ADA_USER_ID, application_id=None
+        )
+        assert bot == MessageSender(
+            display_name="Standup bot",
+            email=None,
+            user_id=None,
+            application_id=BOT_APPLICATION_ID,
+        )
+
+
+class TestWhetherTheUserReadIt:
+    async def test_a_message_sent_after_the_last_read_is_unread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2", last_message_at=SENT_AT, last_read_at="2026-02-11T09:15:22.30Z"
+            ),
+        )
+
+        assert listed.chats[0].unread is True
+
+    async def test_a_message_sent_before_or_at_the_last_read_is_read(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload("19:later@thread.v2", last_message_at=SENT_AT, last_read_at=READ_AT),
+            chat_payload("19:same@thread.v2", last_message_at=SENT_AT, last_read_at=SENT_AT),
+        )
+
+        assert [chat.unread for chat in listed.chats] == [False, False]
+
+    async def test_a_read_time_of_year_one_leaves_every_message_unread(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2", last_message_at=SENT_AT, last_read_at="0001-01-01T00:00:00Z"
+            ),
+        )
+
+        assert listed.chats[0].unread is True
+
+    async def test_an_offset_moment_is_compared_as_the_instant_it_names(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload(
+                "19:a@thread.v2", last_message_at=SENT_AT, last_read_at="2026-02-11T10:00:00+02:00"
+            ),
+        )
+
+        assert listed.chats[0].unread is True
+
+    async def test_the_answer_is_unknown_when_either_time_is_missing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        no_read_time = chat_payload("19:blank@thread.v2", last_message_at=SENT_AT)
+        no_read_time["viewpoint"] = {"isHidden": False}
+        listed = await _listed(
+            graph,
+            client,
+            chat_payload("19:no-viewpoint@thread.v2", last_message_at=SENT_AT),
+            no_read_time,
+            chat_payload("19:no-preview@thread.v2", last_message_at=None, last_read_at=READ_AT),
+        )
+
+        assert [chat.unread for chat in listed.chats] == [None, None, None]
+
+    def test_the_unread_field_says_when_it_is_true(self) -> None:
+        description = chats.ChatSummary.model_fields["unread"].description
+
+        assert description is not None
+        assert "True when the last message is newer than the time the user last read" in description
+
+    async def test_the_tool_description_names_the_last_message_and_the_read_state(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        chats.register(mcp, transport)
+        tool = await mcp.get_tool(chats.TOOL_NAME)
+
+        assert tool is not None, "register left the tool off the server"
+        assert "the last message, its sender, and whether the user read it" in (
+            tool.description or ""
+        )
 
 
 class TestTheWindowAndItsHonesty:

@@ -1,8 +1,8 @@
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from typing import ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
@@ -29,18 +29,22 @@ __all__ = [
     "AccountListingDto",
     "AccountOwnerDto",
     "AccountRecordDto",
+    "AccountSpanDto",
     "HoldingFigureErrorDto",
     "HoldingListingDto",
     "HoldingRowDto",
     "InvestorTypeDto",
     "MoneyDto",
     "ProductCatalogFetchDto",
+    "ProductDescriptionDto",
     "ProductFetchDto",
     "ProductResolution",
+    "ProductRiskFreeRateDto",
     "ResolvedProductDto",
     "SeriesFigureDto",
     "SeriesPointDto",
     "ShareDto",
+    "TenureDto",
 ]
 
 _OWNER = "owner"
@@ -99,18 +103,85 @@ class ResolvedProductDto(BaseModel):
 type ProductResolution = Resolution[ResolvedProductDto]
 
 
+class ProductDescriptionDto(BaseModel):
+    """The four free-text blurbs on a product. Blank ones are absent."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    fund_description: str | None = None
+    manager_bio: str | None = None
+    thesis: str | None = None
+    investment_methodology: str | None = None
+
+
+class ProductRiskFreeRateDto(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    floating: bool | None = None
+    floating_rate_benchmark_symbol: str | None = None
+
+
 class ProductFetchDto(BaseModel):
-    """A product identity plus the custom-field dump `get_product` joins to the catalog."""
+    """A product identity, its filterable attributes, and the custom-field dump `search_products`
+    joins to the catalog."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     product: ResolvedProductDto
+    product_type: str | None = None
+    is_onshore: bool | None = None
+    inception_date: date | None = None
+    currency: str | None = None
+    master_product_name: str | None = None
+    fiscal_year_start_month: int | None = None
+    return_calculation_methodology: str | None = None
+    modified_timestamp: datetime | None = None
+    city: str | None = None
+    state_or_province: str | None = None
+    country: str | None = None
+    description: ProductDescriptionDto | None = None
+    risk_free_rate: ProductRiskFreeRateDto | None = None
+    service_providers: dict[str, str] = Field(default_factory=dict)
     stored_custom_field_values: tuple[CustomFieldValueAttributes, ...] = ()
 
     @classmethod
     def from_resource(cls, resource: BackstopApiResource[ProductAttributes]) -> Self:
+        configuration = resource.attributes.configuration
+        location = resource.attributes.location
+        description = resource.attributes.description
+        risk_free_rate = resource.attributes.risk_free_rate
         return cls(
             product=ResolvedProductDto.from_attributes(resource.id, resource.attributes),
+            product_type=resource.attributes.product_type,
+            is_onshore=resource.attributes.is_onshore,
+            inception_date=resource.attributes.inception_date,
+            currency=resource.attributes.default_product_currency,
+            master_product_name=None
+            if configuration is None
+            else configuration.master_product_name,
+            fiscal_year_start_month=(
+                None if configuration is None else configuration.fiscal_year_start_month
+            ),
+            return_calculation_methodology=resource.attributes.return_calculation_methodology,
+            modified_timestamp=resource.attributes.modified_timestamp,
+            city=None if location is None else location.city,
+            state_or_province=None if location is None else location.state_or_province,
+            country=None if location is None else location.country,
+            description=(
+                None
+                if description is None or not description.model_dump(exclude_none=True)
+                else ProductDescriptionDto.model_validate(description, from_attributes=True)
+            ),
+            risk_free_rate=(
+                None
+                if risk_free_rate is None or not risk_free_rate.model_dump(exclude_none=True)
+                else ProductRiskFreeRateDto.model_validate(risk_free_rate, from_attributes=True)
+            ),
+            service_providers={
+                role: name.strip()
+                for role, name in resource.attributes.service_providers.items()
+                if isinstance(name, str) and name.strip()
+            },
             stored_custom_field_values=tuple(resource.attributes.regular_custom_field_values),
         )
 
@@ -132,8 +203,8 @@ class AccountOwnerDto(BaseModel):
         `contacts` resource, and `organizations` is the answer a caller can act on. The id is taken
         from the *same* reference as the type, never mixed — `resourceId` is what exists in the
         collection `resourceType` names, and every description tells the model to echo this id back
-        as a `party_id`. On this instance the two happen to be equal; a projection that assumed so
-        would hand back an unusable id the day they are not.
+        as a `party_id`. The envelope id and `resourceId` are not guaranteed equal; mixing them
+        would hand back an unusable id.
         """
         parsed = (
             owner
@@ -160,6 +231,7 @@ class InvestorTypeDto(BaseModel):
 
     id: str
     name: str | None = None
+    classification_type: str | None = None
 
     @classmethod
     def from_included(
@@ -172,7 +244,11 @@ class InvestorTypeDto(BaseModel):
         )
         if parsed is None:
             return None
-        return cls(id=parsed.id, name=parsed.attributes.name)
+        return cls(
+            id=parsed.id,
+            name=parsed.attributes.name,
+            classification_type=parsed.attributes.classification_type,
+        )
 
 
 class AccountRecordDto(BaseModel):
@@ -287,6 +363,35 @@ class AccountListingDto(BaseModel):
     closed_omitted: int = 0
 
 
+class AccountSpanDto(BaseModel):
+    """When one account was held. `end` is the closed date; an open account runs through today.
+
+    `is_open` is carried separately because a closed account can arrive with no closed date, and
+    reading that `None` as "still open" would stretch the owner's tenure to today.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    start: date | None
+    end: date | None
+    is_open: bool
+
+
+class TenureDto(BaseModel):
+    """An owner's unbroken holding up to today, over every account — closed ones included.
+
+    `continuous_since` is the start of the run of touching or overlapping account spans that
+    reaches today; `None` when no run does (the owner left, or every open account is undated).
+    `undated_accounts` lack a start date, or are closed with no closed date: they cannot be placed
+    on the timeline and are not in the run.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    continuous_since: date | None = None
+    undated_accounts: int = 0
+
+
 class MoneyDto(BaseModel):
     """A money figure carried with Backstop's own rendering.
 
@@ -349,12 +454,11 @@ class HoldingRowDto(BaseModel):
 
     `balance_as_of` and `balance_status` are the difference between the two source endpoints, and
     the reason they are published rather than smoothed over. On `table-api` both are `None`: the
-    balance matched the **newest** `/accounts/{id}/values` point exactly on a measured account,
-    including when that point was an `ESTIMATE`, and the endpoint does not say which. On
-    `accounts-api` the balance is the newest point that carries a **number**, which can be months
-    older than the newest point — so the same field means "current" on one path and "last known"
-    on the other, and only the date says which. `figure_errors` separates "the request failed"
-    from "Backstop publishes no number", which are otherwise the same `None`.
+    endpoint does not say which values point the balance came from. On `accounts-api` the balance
+    is the newest point that carries a number, which can be older than the newest point — so the
+    same field means "current" on one path and "last known" on the other, and only the date says
+    which. `figure_errors` separates "the request failed" from "Backstop publishes no number",
+    which are otherwise the same `None`.
 
     `account_id` is the id every follow-up call needs. A table row without an account is skipped
     by the query, not projected as a hollow row.
@@ -428,6 +532,7 @@ class HoldingListingDto(BaseModel):
     open_count: int | None = None
     all_count: int | None = None
     closed_count: int | None = None
+    tenure: TenureDto = TenureDto()
 
 
 class SeriesPointDto(BaseModel):
@@ -475,15 +580,22 @@ class SeriesFigureDto(BaseModel):
     valued: SeriesPointDto | None = None
 
 
-class ProductCatalogFetchDto(BaseModel):
-    """The product catalog walk, and whether it read all of it.
+class AccountLatestValueDto(BaseModel):
+    """One account's latest `values` figure, or why it could not be read.
 
-    `scan_truncated` is the walk's scan ceiling firing, which turns "the catalog" into "the
-    first N products" — the difference between "no product has this Strategy" and "none of the
-    ones I looked at did".
+    `figure` is `None` with no `error` when Backstop publishes no dated point for the account.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+    account_id: str
+    figure: SeriesFigureDto | None = None
+    error: str | None = None
+
+
+class ProductCatalogFetchDto(BaseModel):
+    """Every product the catalog walk read."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     products: tuple[ProductFetchDto, ...]
-    scan_truncated: bool = False

@@ -27,9 +27,9 @@ async def parse_backstop_link(
         str,
         Field(
             description=(
-                "A pasted Backstop CRM UI URL. On success, call `suggested_tool` with the "
-                "echoed `entity_id` when one is present. Read `suggested_note` first — an "
-                "account id is not a party id."
+                "A pasted Backstop CRM UI URL. On success, read `suggested_note` before calling "
+                "`suggested_tool`. An account has no tool that loads it by id. A person or "
+                "organization needs `search_type` with the id, or pass the name as `search`."
             ),
         ),
     ],

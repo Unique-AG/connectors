@@ -15,7 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
-from office_365_mcp.shared.handles import mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.handles import mail_message_handle
 from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import outlook_draft_mail as drafter
@@ -592,9 +592,9 @@ class TestMailboxTargeting:
         answer = await _draft(client, confirm=_agrees, mailbox="alex@example.invalid")
 
         assert route.called
-        handle = mail_draft_handle(answer.uri)
+        handle = mail_message_handle(answer.uri)
         assert handle is not None
-        assert handle.draft_id == _DRAFT_ID
+        assert handle.message_id == _DRAFT_ID
 
 
 class TestThePersonBeforeTheDraftIsCreated:
@@ -909,10 +909,9 @@ class TestWhatItAnswers:
 
         answer = await _draft(client)
 
-        handle = mail_draft_handle(answer.uri)
+        handle = mail_message_handle(answer.uri)
         assert handle is not None
-        assert handle.draft_id == _DRAFT_ID
-        assert mail_message_handle(answer.uri) is None
+        assert handle.message_id == _DRAFT_ID
 
     async def test_an_empty_cc_comes_back_empty_rather_than_absent(
         self, client: GraphServiceClient, graph: respx.MockRouter

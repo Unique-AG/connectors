@@ -1,0 +1,52 @@
+name: "[Template] Terraform"
+
+on:
+  workflow_call:
+    inputs:
+      service-path:
+        description: "Path to the service directory (e.g., services/sharepoint-connector)"
+        required: true
+        type: string
+
+jobs:
+  validate:
+    permissions:
+      contents: read # to read the repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: ${{ inputs.service-path }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check if Terraform exists
+        id: check-terraform
+        run: |
+          if [ -d "$SERVICE_PATH/deploy/terraform" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: steps.check-terraform.outputs.exists == 'true'
+        with:
+          terraform_version: 1.13.4
+
+      # `terraform validate` alone passes some invalid modules.
+      # It accepts a self-referential `identifier_uris`. It also skips the variable validations of variables that have a default value.
+      # `terraform test` with `mock_provider` finds both faults and needs no credentials.
+      - name: Validate Terraform modules
+        if: steps.check-terraform.outputs.exists == 'true'
+        run: |
+          # Modules sit at deploy/terraform/<cloud>/<module>, which is depth 2.
+          # This depth keeps the tests directory of a module (depth 3) out of the list of root modules.
+          while IFS= read -r -d '' dir; do
+            echo "Validating: $dir"
+            terraform fmt -check -recursive "$dir"
+            terraform -chdir="$dir" init -backend=false
+            terraform -chdir="$dir" validate
+            terraform -chdir="$dir" test
+          done < <(find "$SERVICE_PATH/deploy/terraform" -mindepth 2 -maxdepth 2 -type d -print0)

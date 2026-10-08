@@ -53,7 +53,8 @@ SYSTEM_INFO_PATH = "/system-info"
 
 # /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
 # slow (up to ~30s per 500 records) — they get the extended timeout and the larger
-# report-sized page default; everything else gets the ordinary CRUD profile.
+# report-sized page default; everything else gets the ordinary CRUD profile. Each slow call
+# holds a per-user slot for as long as it runs; only `run_report` collects one in the background.
 _SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
 
 
@@ -105,6 +106,10 @@ class BackstopClient:
         self._http_client: HttpClientProvider = http_client
         self._gate: RequestGate = gate
         self._retry_policy: RetryPolicy = retry_policy
+
+    async def caller_username(self) -> str:
+        """Backstop username of whoever this client's next request authenticates as."""
+        return (await self._session()).credential.username
 
     async def get(
         self, path: str, *, schema: type[T], params: dict[str, object] | None = None
@@ -255,7 +260,7 @@ class BackstopClient:
         """Issue a request without deserializing the body.
 
         Same transport stack as the typed verbs (auth, gate, timeouts, retries, error mapping),
-        but returns the raw `httpx.Response`.         Do **not** use this for tool/feature code that
+        but returns the raw `httpx.Response`. Do **not** use this for tool/feature code that
         should be type-safe — pass a `schema` to `.get`/`.post`/`.patch`/`.paginate`, or call
         `.delete` without one when the body is empty. Intended for status-only checks such as
         credential verification.
@@ -412,7 +417,7 @@ class BackstopClient:
         if not confirmed_rejection(outcomes):
             self._raise_transient_auth(session, trigger_path, clock, attempts=len(outcomes))
         try:
-            # Notify the auth failed an that we need to revoke credentials
+            # Confirmed rejection: revoke the stored credential.
             await on_auth_failure()
         except Exception:
             logger.exception("backstop.auth_failure_hook.failed")

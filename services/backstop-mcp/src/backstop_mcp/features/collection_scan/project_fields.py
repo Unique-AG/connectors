@@ -1,14 +1,8 @@
-"""Build a sparse response row: only the fields the caller asked for, once.
+"""Build a sparse response row: only the fields the caller asked for.
 
-Both collection-scanning tools publish "only the fields you named" rows, and both had written
-the same projection out by hand — nineteen `if "x" in fields` branches in one, twenty-one inline
-`x if "x" in include else None` kwargs in the other. Both are the same operation: intersect the
-response model's fields with the caller's selection, read the rest off the DTO.
-
-A field whose response shape is not its DTO shape (plain text out of HTML, say) is passed in
-`overrides`, computed by the caller only when that field is selected. Everything else is carried
-by name: a nested DTO dumps to a mapping and the nested response model validates it, which is
-what both call sites were already doing by hand for their chips.
+Intersect the response model's fields with the caller's selection and read the rest off the
+DTO. A field whose response shape is not its DTO shape is passed in `overrides`, computed
+only when that field is selected.
 """
 
 from collections.abc import Container, Mapping

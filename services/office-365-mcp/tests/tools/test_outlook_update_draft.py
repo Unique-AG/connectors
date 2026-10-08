@@ -15,7 +15,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
-from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import MailImportance
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
 from office_365_mcp.tools import outlook_update_draft as updater
@@ -23,7 +23,7 @@ from office_365_mcp.tools.outlook_update_draft import DraftChange, UpdatedDraft
 
 _DRAFT_ID = "AAMkAGI2SYNTHETIC-draft-0001="
 
-_DRAFT_REF = MailDraftHandle(_DRAFT_ID).uri
+_DRAFT_REF = MailMessageHandle(_DRAFT_ID).uri
 
 _DRAFT_PATH = "/me/messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 _SEND_PATH = f"{_DRAFT_PATH}/send"
@@ -304,20 +304,6 @@ class TestWhatItRefuses:
 
         assert len(graph.calls) == 0
 
-    async def test_a_message_handle_is_refused_and_told_why(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _ready(graph)
-
-        with pytest.raises(ToolError, match="That is a message handle"):
-            _ = await _update(
-                client,
-                draft_ref="outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-                subject="Invoice 4471 (final)",
-            )
-
-        assert len(graph.calls) == 0
-
     @pytest.mark.parametrize(
         "draft_ref",
         [
@@ -335,7 +321,7 @@ class TestWhatItRefuses:
     ) -> None:
         _ = _ready(graph)
 
-        with pytest.raises(ToolError, match="outlook:///drafts/"):
+        with pytest.raises(ToolError, match="outlook:///messages/"):
             _ = await _update(client, draft_ref=draft_ref, subject="Invoice 4471 (final)")
 
         assert len(graph.calls) == 0
@@ -884,10 +870,9 @@ class TestWhatItAnswers:
 
         answer = await _update(client, subject="Invoice 4471 (final)")
 
-        handle = mail_draft_handle(answer.uri)
+        handle = mail_message_handle(answer.uri)
         assert handle is not None
-        assert handle.draft_id == _DRAFT_ID
-        assert mail_message_handle(answer.uri) is None
+        assert handle.message_id == _DRAFT_ID
 
     async def test_a_draft_graph_gave_no_link_and_no_category_answers_null_and_empty(
         self, client: GraphServiceClient, graph: respx.MockRouter

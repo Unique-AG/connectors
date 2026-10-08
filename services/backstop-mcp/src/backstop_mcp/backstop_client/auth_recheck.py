@@ -1,8 +1,8 @@
 """Mid-session 401 re-check: probe `/system-info` inside a shared time budget.
 
-A single-shot probe is not enough — `/system-info` itself returned spurious 401s on roughly
-half of production login attempts. Sleeps, gate wait, and the probe HTTP timeout all share
-this window so a hung probe cannot run to the ordinary CRUD timeout.
+A single-shot probe is not enough — `/system-info` can return a spurious 401. Sleeps, gate
+wait, and the probe HTTP timeout all share this window so a hung probe cannot run to the
+ordinary CRUD timeout.
 """
 
 import time

@@ -21,7 +21,7 @@ VOCABULARY: dict[str, OpportunityStageResponse] = {
     for stage in (
         OpportunityStageResponse(id="42478", name="Prospect", closed=False, sort_order=1),
         OpportunityStageResponse(id="42480", name="Project", closed=False, sort_order=2),
-        OpportunityStageResponse(id="42482", name="IDD", closed=False, sort_order=3),
+        OpportunityStageResponse(id="42482", name="Stage B", closed=False, sort_order=3),
         OpportunityStageResponse(id="85446", name="Client Approval", closed=False, sort_order=4),
         OpportunityStageResponse(id="85444", name="Execution", closed=False, sort_order=5),
         OpportunityStageResponse(id="96016", name="Invested", closed=True, sort_order=6),

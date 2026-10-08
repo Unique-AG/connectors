@@ -369,8 +369,7 @@ class TestGetTimeSeries:
         assert "assets under management" in doc
         assert "not one investor's balance" in doc
         assert "not in yet" in doc
-        assert "analytics" in doc
-        assert "fan-out" in doc
+        assert "Do not loop this over every account" in doc
         series_help = ""
         annotation = cast(object, signature(get_time_series).parameters["series"].annotation)
         for extra in cast("tuple[object, ...]", get_args(annotation)):

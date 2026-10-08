@@ -121,7 +121,7 @@ class TestTheProfileItReturns:
 
 
 class TestWhatItPublishes:
-    async def test_the_description_names_the_recipient_lookup_behind_the_preset_guard(
+    async def test_the_description_names_no_tool_that_a_deployment_may_lack(
         self, transport: httpx.AsyncClient
     ) -> None:
         mcp: FastMCP = FastMCP(name="schema-under-test")
@@ -131,11 +131,8 @@ class TestWhatItPublishes:
 
         assert tool is not None, "register left the tool off the server"
         description = tool.description or ""
-        assert (
-            "If this deployment exposes outlook_find_recipient, that tool finds the address of "
-            "somebody else"
-        ) in description
-        assert "directory or contacts lookup" not in description
+        assert "directory or contacts lookup" in description
+        assert not [word for word in description.split() if word.startswith(("outlook_", "teams_"))]
 
 
 class TestGraphFailures:

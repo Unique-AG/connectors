@@ -25,7 +25,7 @@ MCP_TOOLS = frozenset(
         "get_opportunities_by_ids",
         "search_opportunities",
         "get_time_series",
-        "get_product",
+        "search_products",
         "get_product_investors",
         "get_accounts_for_party",
         "get_capital_flows",

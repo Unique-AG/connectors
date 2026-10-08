@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class ListContactCategoriesQuery:
     """Walk `GET /contact-categories` and project the instance vocabulary.
 
-    A few hundred rows on the instance this was built against. Caching is off unless the
-    factory turns it on — the walk is small enough that a TTL is not the default.
+    The collection is small. Caching is off unless the factory turns it on — the walk is
+    small enough that a TTL is not the default.
     `CachedValue` still coalesces concurrent callers onto one fetch.
     """
 

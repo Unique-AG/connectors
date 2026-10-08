@@ -32,7 +32,7 @@ from office_365_mcp.graph_client import (
     not_graph,
 )
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
-from office_365_mcp.shared.handles import MailDraftHandle, MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
 from office_365_mcp.shared.odata import spelled
@@ -137,7 +137,7 @@ def _copied_twice(address: str) -> str:
 class MailReplyAllDraft(BaseModel):
     uri: str = Field(
         description=(
-            "A handle for this draft, `outlook:///drafts/{id}`. Pass it to outlook_send_draft to "
+            "A handle for this draft, `outlook:///messages/{id}`. Pass it to outlook_send_draft to "
             + "send the draft. The handle is present even when `body_written` is false."
         )
     )
@@ -420,7 +420,7 @@ def _answer(*, created: Message, fill: _Fill) -> MailReplyAllDraft:
     to = MailAddress.each_of(stored.to_recipients)
     cc = MailAddress.each_of(stored.cc_recipients)
     return MailReplyAllDraft(
-        uri=MailDraftHandle(created.id).uri,
+        uri=MailMessageHandle(created.id).uri,
         web_link=created.web_link if stored.web_link is None else stored.web_link,
         to=to,
         cc=cc,

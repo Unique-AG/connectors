@@ -52,13 +52,10 @@ async def update_organization(
     `get_organization`. `name` cannot be cleared and is at most 50 characters. Custom
     fields go through `update_custom_field_values`. Email corrections go through `email` /
     `email2` / `email3`; `contact-emails` has no write endpoint. Category ids come from
-    `list_contact_categories`. Location ids come from
-    `get_organization` with `include=contactLocations`, not `include=locations`.
-    `locations` creates or patches each address; `delete_location_ids` removes them.
-    Creating an address is folded into this tool: `destructive_hint` is already true, which
-    over-warns rather than under-warns. The response `organization` is the record READ
-    BACK — same top-level fields as `get_organization`. Omit a field to leave it
-    unchanged. Never invent an id.
+    `list_contact_categories`. Location ids are `included.locations[].id` from
+    `get_organization` with `include=["locations"]`. `locations` creates or patches
+    each address; `delete_location_ids` removes them. The response `organization` is
+    the record read back. Omit a field to leave it unchanged. Never invent an id.
 
     Call like: {"organization": {"search_type": "organizations",
     "party_id": "<id from get_organization>", "website": "https://example.com"}}

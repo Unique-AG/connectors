@@ -26,7 +26,7 @@ EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
 
 # Same sparse fieldsets as the LIKE fallback. `/contacts` rejects firstName/lastName (400);
 # people/employees accept them. Without this, an unfiltered `/people` row drags custom fields
-# and the three-way email fan-out can hit the 30s read timeout.
+# and the three-way email fan-out can hit the read timeout.
 PARTY_SPARSE_FIELDS: Mapping[SearchType, str] = {
     "organizations": "name",
     "contacts": "name",

@@ -21,7 +21,14 @@ fetches for a composite. A search id waits on the detail record's `type`. See
 `queries/get_activity_detail_query.py`. `ActivityDetailResponse`/`AttendeeResponse`: that
 tool's wire shape and the pure conversion into it. See `responses.py`.
 
-`SearchActivitiesQuery`: `POST /entity-activities` pageNum loop for `search_activities`.
+`SearchActivitiesQuery`: `POST /entity-activities` pageNum loop for `search_activities`: the
+whole set for aggregates, or whole pages from a cursor until at least `min_result_size` rows.
+Rows that show Backstop ignored an accepted filter are dropped and flagged in the same pass
+that projects them (`server_filter_ignored`).
+`GetMeetingAttendeesQuery`: `GET /meeting-or-calls/{id}/attendees`. Detail and history both
+use it.
+`GetLastActivityForPartiesQuery`: one page-size-1 party search per party, gathered — the newest
+activity and in-window count per party for `get_last_activity_for_parties`.
 `EntityActivityType`: search-path stream names shared by the tool and the query.
 `aggregate_entity_activities`: counts grouped by type, tag, party, or period.
 
@@ -48,6 +55,8 @@ from backstop_mcp.features.activity_history.dependencies import (
     get_activity_detail_query_factory,
     get_activity_history_query_factory,
     get_activity_history_settings,
+    get_last_activity_for_parties_query_factory,
+    get_meeting_attendees_query_factory,
     get_search_activities_query_factory,
 )
 from backstop_mcp.features.activity_history.entity_activity_type import (
@@ -67,6 +76,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
     EntityActivitiesFetchDto,
     EntityActivityDto,
     MeetingSpecificsDto,
+    PartyLastActivityDto,
 )
 from backstop_mcp.features.activity_history.parse_activity_detail_handle import (
     parse_activity_detail_handle,
@@ -75,6 +85,8 @@ from backstop_mcp.features.activity_history.queries import (
     MAX_RETRIEVABLE,
     GetActivityDetailQuery,
     GetActivityHistoryQuery,
+    GetLastActivityForPartiesQuery,
+    GetMeetingAttendeesQuery,
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.activity_history.responses import (
@@ -89,7 +101,10 @@ from backstop_mcp.features.activity_history.responses import (
     DateRangeResponse,
     EmailRecordResponse,
     GetActivityHistoryResponse,
+    GetLastActivityForPartiesResponse,
     GetSearchActivitiesResponse,
+    LastActivityForPartiesResolvedResponse,
+    PartyLastActivityResponse,
     ResolvedPartyAsOfResponse,
     SearchActivitiesResolvedResponse,
     SearchActivitiesRowResponse,
@@ -130,14 +145,20 @@ __all__ = [
     "EntityActivitiesFetchDto",
     "EntityActivityDto",
     "EntityActivityType",
+    "GetMeetingAttendeesQuery",
     "GetActivityDetailQuery",
     "GetActivityHistoryQuery",
     "GetActivityHistoryResponse",
+    "GetLastActivityForPartiesQuery",
+    "GetLastActivityForPartiesResponse",
     "GetSearchActivitiesResponse",
+    "LastActivityForPartiesResolvedResponse",
     "Gist",
     "MAX_RETRIEVABLE",
     "MeetingSpecificsDto",
     "ParsedActivityHandle",
+    "PartyLastActivityDto",
+    "PartyLastActivityResponse",
     "ResolvedPartyAsOfResponse",
     "ScanCoverageResponse",
     "SearchActivitiesQuery",
@@ -151,6 +172,8 @@ __all__ = [
     "get_activity_detail_query_factory",
     "get_activity_history_query_factory",
     "get_activity_history_settings",
+    "get_last_activity_for_parties_query_factory",
+    "get_meeting_attendees_query_factory",
     "get_search_activities_query_factory",
     "parse_activity_detail_handle",
 ]

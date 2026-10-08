@@ -253,7 +253,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         with pytest.raises(ToolError):
             _ = await send_draft(
-                client, confirm=declines, draft_ref=f"outlook:///drafts/{draft_id}"
+                client, confirm=declines, draft_ref=f"outlook:///messages/{draft_id}"
             )
 
         assert sent.call_count == 0, "a declined send reached the mailbox"
@@ -287,7 +287,7 @@ class TestAGraphCallIsCountedAndTimed:
             _ = await send_draft(
                 client,
                 confirm=a_person_agrees(cast("Context", cast("object", _CannotAsk()))),
-                draft_ref=f"outlook:///drafts/{draft_id}",
+                draft_ref=f"outlook:///messages/{draft_id}",
             )
 
         assert sent.call_count == 0
@@ -313,7 +313,7 @@ class TestAGraphCallIsCountedAndTimed:
             return None
 
         _ = await send_draft(
-            client, confirm=thinks_about_it, draft_ref=f"outlook:///drafts/{draft_id}"
+            client, confirm=thinks_about_it, draft_ref=f"outlook:///messages/{draft_id}"
         )
 
         timed = (
@@ -688,23 +688,55 @@ GRAPH_STEPS = frozenset(
     {
         "signed_in_user",
         "file_search",
+        "site_search",
         "my_drive",
+        "my_drives",
         "folder_children",
         "drive_item",
         "drive_content",
+        "shared_item",
+        "create_folder",
+        "create_text_file",
+        "rename_item",
+        "move_item",
+        "copy_item",
+        "delete_item",
+        "create_link",
+        "invite",
         "chats",
+        "chat",
+        "chat_messages",
+        "chat_members",
         "joined_teams",
+        "team",
         "channels",
+        "channel",
         "channel_messages",
         "chat_message",
         "channel_message",
         "channel_reply",
+        "channel_replies",
+        "channel_files_folder",
         "send_chat_message",
         "send_channel_message",
+        "reply_channel_message",
+        "react_to_message",
+        "edit_message",
+        "delete_message",
         "search_query",
         "resolve_meeting",
         "transcripts",
         "recordings",
+        "attendance_reports",
+        "attendance_records",
+        "create_meeting",
+        "update_meeting",
+        "delete_meeting",
+        "create_chat",
+        "add_chat_member",
+        "chat_member",
+        "remove_chat_member",
+        "rename_chat",
         "mail_search",
         "mail_ids",
         "mail_message",
@@ -729,7 +761,6 @@ GRAPH_STEPS = frozenset(
         "mark_message",
         "move_message",
         "copy_message",
-        "create_folder",
         "rename_folder",
         "move_folder",
         "write_focused_override",

@@ -15,8 +15,8 @@ __all__ = [
 ]
 
 _INCLUDE_HINT = (
-    "The location id comes from `get_person` / `get_organization` with "
-    "`include=contactLocations` — not `include=locations`, which is a hard 400."
+    "Location ids are `included.locations[].id` from `get_person` / `get_organization` "
+    'with `include=["locations"]`.'
 )
 _CHANGE_FIELDS = frozenset(
     {

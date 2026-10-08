@@ -50,7 +50,8 @@ class _OpportunityWritableFields(BaseModel):
     stage: NonEmptyStr | None = Field(
         default=None,
         description=(
-            "Stage **name** (e.g. IDD), resolved against this instance's vocabulary. "
+            'Stage **name** (e.g. "<stage name from get_opportunities>"), resolved against '
+            "this instance's vocabulary. "
             "A `closed` stage closes the deal automatically. On an existing deal this "
             "is how you move the stage."
         ),

@@ -4,31 +4,49 @@ from typing import cast
 import httpx
 import pytest
 import respx
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
+from office_365_mcp.shared.notes import OWNED_REFUSED, PAGE_EXPANSIONS, PAGE_FIELDS, STEP_PAGE
+from office_365_mcp.shared.seam import READ_ONLY, Advised, GraphAdviceMiddleware
+from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_read_page as reader
 
 from .conftest import GRAPH_V1
 
 PAGE_ID = "0-SYNTHETICPAGE0000!0001"
 SECTION_ID = "0-SYNTHETICSECTION00!0001"
+GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
 
 _PAGE_PATH = "/me/onenote/pages/0-SYNTHETICPAGE0000%210001"
 _CONTENT_PATH = f"{_PAGE_PATH}/content"
+_GROUP_PAGE_PATH = f"/groups/{GROUP_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001"
+_GROUP_CONTENT_PATH = f"{_GROUP_PAGE_PATH}/content"
 
 _PAGE = OnenotePageHandle(PAGE_ID).uri
+_GROUP_PAGE = OnenotePageHandle(PAGE_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_PAGE = OnenotePageHandle(PAGE_ID, owner=_SITE).uri
+_SITE_PAGE_PATH = f"/sites/{_SITE_ID}/onenote/pages/0-SYNTHETICPAGE0000%210001"
 _SECTION = OnenoteSectionHandle(SECTION_ID).uri
 
 _WEB_URL = "https://onenote.example.invalid/pages/sprint-notes"
 _CLIENT_URL = "onenote:https://onenote.example.invalid/pages/sprint-notes"
+_APP_ID = "WLID-000000004C12821A"
 
 _HTML = b"<html><head><title>Sprint notes</title></head><body><div>hi</div></body></html>"
 
@@ -45,12 +63,14 @@ def _page_payload(
     section_name: str | None = "Engineering",
     notebook_name: str | None = "Team Notebook",
     links: bool = True,
+    created_by_app_id: str | None = _APP_ID,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": page_id,
         "title": title,
         "createdDateTime": created,
         "lastModifiedDateTime": modified,
+        "createdByAppId": created_by_app_id,
     }
     if links:
         payload["links"] = {
@@ -105,6 +125,7 @@ class TestWhatItAsks:
             "createdDateTime",
             "lastModifiedDateTime",
             "links",
+            "createdByAppId",
         ]
         assert params["$expand"].split(",") == ["parentSection", "parentNotebook"]
 
@@ -154,6 +175,7 @@ class TestWhatItAnswers:
         assert summary.section_uri == OnenoteSectionHandle(SECTION_ID).uri
         assert summary.section_name == "Engineering"
         assert summary.notebook_name == "Team Notebook"
+        assert summary.created_by_app_id == _APP_ID
         assert (page.call_count, content.call_count) == (1, 1)
 
     async def test_the_html_comes_back_decoded_exactly_as_graph_sent_it(
@@ -190,6 +212,117 @@ class TestWhatItAnswers:
         assert answer.page.web_url is None
         assert answer.page.client_url is None
         assert content.call_count == 1
+
+
+class TestAGroupNotebook:
+    @pytest.fixture
+    def group_page(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_PAGE_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload())
+        )
+
+    @pytest.fixture
+    def group_content(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
+        )
+
+    async def test_a_group_handle_reads_the_page_and_its_content_under_the_group(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        group_page: respx.Route,
+        group_content: respx.Route,
+    ) -> None:
+        answer = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert (group_page.call_count, group_content.call_count) == (1, 1)
+        assert graph.calls.call_count == 2, "nothing was read from /me"
+        assert answer.html == _HTML.decode("utf-8")
+
+    @pytest.mark.usefixtures("group_content")
+    async def test_the_group_page_read_selects_and_expands_the_same_fields_as_the_me_read(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_page: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE)
+
+        params = group_page.calls.last.request.url.params
+        assert params["$select"].split(",") == list(PAGE_FIELDS)
+        assert params["$expand"].split(",") == list(PAGE_EXPANSIONS)
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_the_group_content_read_carries_no_query_parameters_by_default(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert group_content.calls.last.request.url.params == httpx.QueryParams()
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_include_ids_reaches_the_group_content_read(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, page=_GROUP_PAGE, include_ids=True)
+
+        assert group_content.calls.last.request.url.params["includeIDs"] == "true"
+
+    @pytest.mark.usefixtures("group_page", "group_content")
+    async def test_the_page_summary_keeps_the_group_in_its_handles(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient
+    ) -> None:
+        answer = await _read(client, transport, page=_GROUP_PAGE)
+
+        assert answer.page.uri == _GROUP_PAGE
+        assert (
+            answer.page.section_uri
+            == OnenoteSectionHandle(SECTION_ID, owner=OnenoteOwner("groups", GROUP_ID)).uri
+        )
+
+    @pytest.mark.usefixtures("group_content")
+    async def test_a_404_on_the_group_page_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, page=_GROUP_PAGE)
+
+    @pytest.mark.usefixtures("group_page")
+    async def test_a_404_on_the_group_content_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, page=_GROUP_PAGE)
+
+
+class TestASiteNotebook:
+    async def test_a_site_handle_reads_the_page_and_its_content_under_the_site(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        site_page = graph.get(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(200, json=_page_payload())
+        )
+        site_content = graph.get(f"{_SITE_PAGE_PATH}/content").mock(
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
+        )
+
+        answer = await _read(client, transport, page=_SITE_PAGE)
+
+        assert (site_page.call_count, site_content.call_count) == (1, 1)
+        assert graph.calls.call_count == 2, "nothing was read from /me"
+        assert answer.page.uri == _SITE_PAGE
+        assert answer.page.section_uri == OnenoteSectionHandle(SECTION_ID, owner=_SITE).uri
 
 
 class TestTheSizeCap:
@@ -319,6 +452,8 @@ class TestWhatItRefuses:
             _ = await _read(client, transport, page=_SECTION)
 
         assert "onenote:///sections/{id}" in str(refused.value)
+        assert "onenote:///groups/{group}/" in str(refused.value)
+        assert "onenote:///sites/{site}/" in str(refused.value)
 
 
 class TestGraphFailures:
@@ -345,6 +480,60 @@ class TestGraphFailures:
 
         with pytest.raises(GraphForbidden):
             _ = await _read(client, transport)
+
+    @pytest.mark.parametrize(
+        ("page", "route"),
+        [(_GROUP_PAGE, _GROUP_PAGE_PATH), (_SITE_PAGE, _SITE_PAGE_PATH)],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_page_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        page: str,
+        route: str,
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _read(client, transport, page=page)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
+    async def test_a_403_on_a_site_page_reaches_the_client_as_the_owned_advice(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        site_page = graph.get(_SITE_PAGE_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        advice = GraphAdviceMiddleware(
+            graph_advice(resolve(preset=None, enabled=[reader.TOOL_NAME]))
+        )
+        server: FastMCP[None] = FastMCP("reader", middleware=[advice])
+
+        @server.tool(name=reader.TOOL_NAME, annotations=READ_ONLY)
+        async def read() -> str:
+            return (await _read(client, transport, page=_SITE_PAGE)).html
+
+        async with Client(FastMCPTransport(server)) as mcp_client:
+            with pytest.raises(ToolError) as raised:
+                _ = await mcp_client.call_tool(reader.TOOL_NAME, {})
+
+        assert str(raised.value).startswith(OWNED_REFUSED)
+        assert "grant the delegated" not in str(raised.value)
+        assert site_page.call_count == 1
 
     @pytest.mark.usefixtures("page")
     async def test_a_404_on_the_content_is_a_graph_not_found(
@@ -387,7 +576,7 @@ class TestHowItDeclaresItself:
         assert reader.GRAPH_PERMISSIONS == ("Notes.Read",)
 
     def test_each_graph_call_has_a_step_of_its_own(self) -> None:
-        assert (reader.STEP_PAGE, reader.STEP_PAGE_CONTENT) == ("page", "page_content")
+        assert (STEP_PAGE, reader.STEP_PAGE_CONTENT) == ("page", "page_content")
 
     def test_the_refusable_call_is_a_handle_this_tool_accepts(self) -> None:
         assert set(reader.GRAPH_CALL_EXAMPLE) == {"page"}
@@ -426,6 +615,7 @@ class TestHowItDeclaresItself:
 
         assert "onenote_list_pages" in page_described
         assert "onenote_create_page" in page_described
+        assert "onenote:///groups/{group}/" in page_described
         assert "onenote_append_to_page" in described
         assert "1 MB" in described
         assert "opens only with this connector's own sign-in token" in described

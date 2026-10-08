@@ -1,11 +1,36 @@
+import re
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
+from urllib.parse import unquote
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
+    DriveItemItemRequestBuilder,
+)
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.identity_set import IdentitySet
+from msgraph.generated.models.item_reference import ItemReference
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
+from office_365_mcp.graph_client import GraphFailure, graph_step
+from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
+from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.seam import Advised
+
+STEP_DRIVE_ITEM = "drive_item"
+
+ATTACHMENT_FIELDS: tuple[str, ...] = (
+    "id",
+    "name",
+    "eTag",
+    "webDavUrl",
+    "file",
+    "folder",
+    "parentReference",
+)
 
 ITEM_FIELDS: tuple[str, ...] = (
     "id",
@@ -13,12 +38,37 @@ ITEM_FIELDS: tuple[str, ...] = (
     "size",
     "webUrl",
     "createdDateTime",
+    "createdBy",
     "lastModifiedDateTime",
     "lastModifiedBy",
     "file",
     "folder",
     "parentReference",
 )
+
+STEP_ITEM = "drive_item"
+
+FAIL_ON_CONFLICT: Mapping[str, str] = {"@microsoft.graph.conflictBehavior": "fail"}
+
+TOP_FOLDER_LABEL = "the top folder of the drive"
+DRIVE_ROOT_ITEM_ID = "root"
+UNNAMED_FOLDER_LABEL = "an unnamed folder"
+UNNAMED_ITEM_LABEL = "an unnamed item"
+
+ITEM_HANDLE_SOURCES = (
+    "Take the `uri` of a sharepoint_search_files hit, a sharepoint_browse_folder row or a "
+    + "sharepoint_resolve_url answer, and copy it word for word."
+)
+
+FOLDER_HANDLE_SOURCES = (
+    "Take the `uri` of a folder from sharepoint_browse_folder, sharepoint_search_files or "
+    + "sharepoint_resolve_url, or a `parent_uri` from an earlier result. The `root_uri` of a "
+    + "drive from sharepoint_list_drives is a folder handle too. Copy it word for word."
+)
+
+_ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
+
+_ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
 
 class DriveItemSummary(BaseModel):
@@ -67,10 +117,16 @@ class DriveItemSummary(BaseModel):
             "When the item was created, as Graph reported it. Null when Graph recorded none."
         )
     )
+    created_by: str | None = Field(
+        description=(
+            "The display name of the person who created the item. Null when an application "
+            + "created the item rather than a person, or when Graph recorded no name."
+        )
+    )
     last_modified_at: datetime | None = Field(
         description=(
-            "When the item last changed, as Graph reported it. This is the field the date "
-            + "arguments of sharepoint_search_files bound."
+            "When the item last changed, as Graph reported it. The date limits of a SharePoint "
+            + "file search apply to this field."
         )
     )
     last_modified_by: str | None = Field(
@@ -140,8 +196,9 @@ class DriveItemSummary(BaseModel):
             size=item.size,
             web_url=item.web_url,
             created_at=item.created_date_time,
+            created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,
-            last_modified_by=_display_name(item.last_modified_by),
+            last_modified_by=display_name(item.last_modified_by),
             mime_type=item.file.mime_type if item.file is not None else None,
             child_count=item.folder.child_count if item.folder is not None else None,
             parent_path=parent.path if parent is not None else None,
@@ -149,7 +206,246 @@ class DriveItemSummary(BaseModel):
         )
 
 
-def _display_name(identity: IdentitySet | None) -> str | None:
+def display_name(identity: IdentitySet | None) -> str | None:
     if identity is None or identity.user is None:
         return None
     return identity.user.display_name
+
+
+@dataclass(frozen=True, slots=True)
+class AttachableFile:
+    attachment_id: str
+    web_dav_url: str
+    name: str
+
+
+_ETAG_GUID = re.compile(
+    r"\{([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\}"
+)
+
+_PERSONAL_DRIVE = "personal"
+
+_AttachmentQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
+
+_SAME_FAILURE = (
+    "If you call this tool again with the same arguments, the call will fail the same way."
+)
+
+_A_FILE_HANDLE = (
+    "A file handle looks like sharepoint:///files/{drive_id}/{item_id}, with both ids "
+    + "percent-encoded. A folder handle, a web address and a file name are not file handles. "
+    + "Copy the `uri` of a sharepoint_search_files hit or of a sharepoint_browse_folder row, word "
+    + "for word. "
+    + _SAME_FAILURE
+)
+
+
+def attachment_handles(uris: Sequence[str]) -> tuple[DriveFileHandle, ...] | str:
+    handles: list[DriveFileHandle] = []
+    for uri in uris:
+        handle = drive_file_handle(uri)
+        if handle is None:
+            return f"The attachment {uri!r} is not a file handle. {_A_FILE_HANDLE}"
+        handles.append(handle)
+    return tuple(handles)
+
+
+async def attachable_files(
+    client: GraphServiceClient, handles: Sequence[DriveFileHandle]
+) -> tuple[AttachableFile, ...] | str:
+    files: list[AttachableFile] = []
+    for handle in handles:
+        with graph_step(STEP_DRIVE_ITEM):
+            item = await (
+                client.drives.by_drive_id(handle.drive_id)
+                .items.by_drive_item_id(handle.item_id)
+                .get(
+                    request_configuration=RequestConfiguration[_AttachmentQuery](
+                        query_parameters=_AttachmentQuery(select=list(ATTACHMENT_FIELDS))
+                    )
+                )
+            )
+        assert item is not None, "Graph answered a drive item read with no item"
+        attachable = _attachable(item, handle)
+        if isinstance(attachable, str):
+            return attachable
+        files.append(attachable)
+    return tuple(files)
+
+
+def _attachable(item: DriveItem, handle: DriveFileHandle) -> AttachableFile | str:
+    if item.folder is not None:
+        return (
+            f"The attachment {handle.uri} names a folder, and this tool attaches files only. "
+            + "To find a file in this folder, give this handle to sharepoint_browse_folder: "
+            + DriveFolderHandle(handle.drive_id, handle.item_id).uri
+            + ". Then attach the `uri` of one file. "
+            + _SAME_FAILURE
+        )
+    if item.file is None:
+        return (
+            f"The attachment {handle.uri} is not a plain file in Microsoft 365. A OneNote "
+            + "notebook is an example of such an item. This tool attaches files only. "
+            + _SAME_FAILURE
+        )
+    parent = item.parent_reference
+    if parent is not None and parent.drive_type == _PERSONAL_DRIVE:
+        return (
+            f"The attachment {handle.uri} is in a personal OneDrive. Microsoft Teams can attach "
+            + "a file only when the file is already in SharePoint. A personal OneDrive is not in "
+            + f"SharePoint. {_SAME_FAILURE}"
+        )
+    guid = None if item.e_tag is None else _ETAG_GUID.search(item.e_tag)
+    if guid is None or item.web_dav_url is None or item.name is None:
+        return (
+            f"Microsoft 365 did not send all the details of the attachment {handle.uri}. This "
+            + "tool needs the name, the eTag and the WebDAV address of a file to attach it. This "
+            + "is a gap in what Microsoft reported, and not a bad argument. Tell the user to "
+            + f"attach the file in Microsoft Teams instead. {_SAME_FAILURE}"
+        )
+    return AttachableFile(
+        attachment_id=guid.group(1).lower(), web_dav_url=item.web_dav_url, name=item.name
+    )
+
+
+def folder_label(folder: DriveItem) -> str:
+    if folder.root is not None:
+        return TOP_FOLDER_LABEL
+    if not folder.name:
+        return UNNAMED_FOLDER_LABEL
+    crumb = _breadcrumb(folder.parent_reference)
+    return the_folder(folder.name if crumb is None else f"{crumb}/{folder.name}")
+
+
+def item_label(item: DriveItem) -> str:
+    if item.root is not None:
+        return TOP_FOLDER_LABEL
+    return repr(cut_for_a_question(item.name)) if item.name else UNNAMED_ITEM_LABEL
+
+
+def parent_folder_label(item: DriveItem) -> str:
+    reference = item.parent_reference
+    crumb = _breadcrumb(reference)
+    if crumb is not None:
+        return the_folder(crumb) if crumb else TOP_FOLDER_LABEL
+    if reference is not None and reference.name:
+        return the_folder(reference.name)
+    return UNNAMED_FOLDER_LABEL
+
+
+def _breadcrumb(reference: ItemReference | None) -> str | None:
+    path = None if reference is None else reference.path
+    if path is None or ":" not in path:
+        return None
+    return unquote(path.split(":", 1)[1]).rstrip("/")
+
+
+def the_folder(where: str) -> str:
+    return f"the folder {cut_for_a_question(where)!r}"
+
+
+def the_file(name: str) -> str:
+    return f"the file {cut_for_a_question(name)!r}"
+
+
+async def item_for_a_question(client: GraphServiceClient, drive_id: str, item_id: str) -> DriveItem:
+    with graph_step(STEP_ITEM):
+        found = await (
+            client.drives.by_drive_id(drive_id)
+            .items.by_drive_item_id(item_id)
+            .get(
+                request_configuration=RequestConfiguration[_ItemQuery](
+                    query_parameters=_ItemQuery(select=list(_ITEM_FOR_A_QUESTION_FIELDS))
+                )
+            )
+        )
+    assert found is not None, "Graph answered a drive item read with no item"
+    return found
+
+
+async def summary_after_write(
+    client: GraphServiceClient,
+    drive_id: str,
+    answered: DriveItem | None,
+    *,
+    item_id: str | None,
+    unread: str,
+) -> DriveItemSummary:
+    summary = None if answered is None else DriveItemSummary.from_item(answered)
+    if summary is not None:
+        return summary
+    if item_id is None:
+        raise Advised(unread)
+    try:
+        reread = await item_for_a_question(client, drive_id, item_id)
+    except GraphFailure as failure:
+        raise Advised(unread) from failure
+    summary = DriveItemSummary.from_item(reread)
+    if summary is None:
+        raise Advised(unread)
+    return summary
+
+
+def item_access_refused(nothing_happened: str) -> str:
+    return (
+        "Microsoft 365 refused this request for the signed-in user. "
+        + f"{nothing_happened} The user can lack the necessary access to an item that this "
+        + "request uses. A policy of the organization can also refuse the request. Tell the "
+        + "user about the refusal. The owner of the item can give the user more access. If you "
+        + "call this tool again with the same arguments, the call will fail the same way."
+    )
+
+
+_RESERVED_CHARACTERS = '"*:<>?/\\|'
+
+_RESERVED_PREFIX = "~$"
+
+_EVERY_RESERVED_CHARACTER = " ".join(f"`{character}`" for character in _RESERVED_CHARACTERS)
+
+NAME_RULES = (
+    f"The name must not contain any of these characters: {' '.join(_RESERVED_CHARACTERS)}. It "
+    + f"must not start with `{_RESERVED_PREFIX}`."
+)
+
+_NAME_NOT_ALLOWED = (
+    "Nothing was changed, because Microsoft does not allow this name in OneDrive and SharePoint."
+)
+
+_BLANK_NAME = (
+    "The name is empty or has only spaces in it. Use a name with at least one other character."
+)
+
+_STARTS_WITH_THE_RESERVED_PREFIX = (
+    f"The name starts with `{_RESERVED_PREFIX}`. A file or folder name must not start with "
+    + f"`{_RESERVED_PREFIX}`. Remove the `{_RESERVED_PREFIX}` at the start."
+)
+
+_SAME_NAME_FAILS = "This same value fails again, so do not retry it."
+
+
+def unusable_name(name: str) -> str | None:
+    if not name.strip():
+        return _name_refusal(_BLANK_NAME)
+    reserved = [
+        f"`{character}`" for character in dict.fromkeys(name) if character in _RESERVED_CHARACTERS
+    ]
+    problems = [
+        problem
+        for problem, applies in (
+            (_reserved(reserved), bool(reserved)),
+            (_STARTS_WITH_THE_RESERVED_PREFIX, name.startswith(_RESERVED_PREFIX)),
+        )
+        if applies
+    ]
+    return _name_refusal(*problems) if problems else None
+
+
+def _reserved(found: list[str]) -> str:
+    return (
+        f"The name contains {' and '.join(found)}. A file or folder name must not contain any of "
+        + f"these characters: {_EVERY_RESERVED_CHARACTER}. Remove or replace these characters."
+    )
+
+
+def _name_refusal(*problems: str) -> str:
+    return " ".join((_NAME_NOT_ALLOWED, *problems, _SAME_NAME_FAILS))

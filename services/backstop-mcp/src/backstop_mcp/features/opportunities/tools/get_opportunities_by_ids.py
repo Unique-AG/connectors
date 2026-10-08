@@ -40,8 +40,8 @@ async def get_opportunities_by_ids(
             max_length=MAX_OPPORTUNITY_IDS,
             description=(
                 f"Trusted opportunity ids from search_opportunities or get_opportunities. "
-                f"At most {MAX_OPPORTUNITY_IDS} per call — a full batch is ~37,000 tokens "
-                "with custom fields and without stage history. Batch further yourself."
+                f"At most {MAX_OPPORTUNITY_IDS} per call. "
+                "A full batch with custom fields is large; batch further yourself."
             ),
         ),
     ],
@@ -49,9 +49,8 @@ async def get_opportunities_by_ids(
         bool,
         Field(
             description=(
-                "When true, each record includes stage_history. Off by default: history is "
-                "31% of the record and a caller asking for custom fields usually did not ask "
-                "for how the deal got here. get_opportunities always returns it."
+                "When true, each record includes stage_history. Off by default — turn it on "
+                "when the question is how the deal got here. get_opportunities always returns it."
             ),
         ),
     ] = False,
@@ -82,17 +81,17 @@ async def get_opportunities_by_ids(
     """Fetch up to 50 opportunities by id, with resolved custom fields.
 
     Use after search_opportunities when the question needs a field that is not on the search
-    row (Master Pipeline custom fields, amounts not in the sparse fieldset). Ids are trusted
-    handles — never invent them. A missing id is named in `not_found`; a non-404 failure is
-    named in `errors`. The rest of the batch is still returned. When
+    row (custom fields, stage history). Amounts are selectable on the search row. Ids are
+    trusted handles — never invent them. A missing id is named in `not_found`; a non-404
+    failure is named in `errors`. The rest of the batch is still returned. When
     `custom_fields_unavailable` is true, an empty `custom_field_values` list means the
     catalog could not be loaded, not that the deal has none.
 
-    Stage history is omitted unless `include_stage_history` is true. A full 50-id batch without
-    history is ~37,000 tokens; further batching is the caller's job.
+    Stage history is omitted unless `include_stage_history` is true. A full batch is large;
+    further batching is the caller's job.
 
     Call like: {"ids": ["<id from a search_opportunities row>"],
-    "custom_field_names": ["Master Pipeline Status"]}
+    "custom_field_names": ["<name from list_custom_fields>"]}
     """
     opportunity_ids = coerce_ids(ids)
     logger.info(

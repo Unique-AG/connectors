@@ -29,14 +29,38 @@ pnpm style:fix        # auto-fix
 pnpm check-types      # type checking
 pnpm check-all        # style + types + tests + syncpack
 pnpm fix-all          # auto-fix style + syncpack
-pnpm quality          # Helm chart linting
 ```
+
+## Helm Chart Tests
+
+Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suites in a `tests/` directory. CI runs `helm lint . --strict` and `helm unittest .` in the chart directory, after `helm dependency update`. If the chart has a `ci-values.yaml` file, the lint command also gets `--values ci-values.yaml`.
+
+To run the same commands on your machine, use Helm v3.19.0. This is the version that CI uses, and a newer version can report more problems. Install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the commands in the chart directory, as CI does.
+
+## Release Workflows
+
+release-please opens one release pull request for each service. Merge it to start `[Release] Please`. The workflow handles each released service that has a Helm chart. It builds the image from the release tag and signs it. It also pushes the chart, scans the image, and publishes the docs in `services/<service>/docs` to Confluence.
+
+If a release stops halfway, do not use "Re-run failed jobs" on the `release-please` job. That job finds no release the second time. Run `[Release] Manual Re-Run` instead. Start it from `main`, choose the service, and type the version without a leading v.
+
+The re-run builds from the release tag. It reuses an image that exists only if the revision label of the image names the commit of that tag. Otherwise it stops. If only one registry has the image, it copies the image to the other registry. It never overwrites a released tag. It does not publish docs. Use it as a last resort.
+
+To publish docs before a release, run `[Docs] Publish to Confluence` from `main` and choose the docs directory. Use it also when the docs job of a release failed.
+
+Both manual workflows list the services in a dropdown. When you add a service, add it to `release-rerun.yaml`, and to `docs-confluence.yaml` if it has docs.
+
+## Runners
+
+Jobs run on `ubuntu-24.04`, not on `ubuntu-latest`. A change of the default image by GitHub cannot change a build.
+
+Short jobs that need no Docker run on `ubuntu-slim`. This runner has one vCPU and stops a job after 15 minutes. It has no Docker daemon. GitHub gives it no version label, so GitHub can update its image.
+
+Jobs that build images, scan images, or run Docker stay on `ubuntu-24.04`.
 
 ## Python Services
 
 Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
-workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, `Python
-CI` runs:
+workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the `[CI] Python` workflow runs:
 
 ```bash
 pnpm install --frozen-lockfile          # from the repo root, for biome
@@ -61,11 +85,13 @@ the one `pnpm-lock.yaml` pins. `--frozen-lockfile` also fails if `package.json` 
 disagree on the version, which a runtime `npx` fetch would silently ignore. It is the same
 acquisition path the TypeScript CI uses, so there is one mechanism to understand rather than two.
 
-There is deliberately no `actions/cache` on the pnpm store here. No workflow in this repo runs on
+No workflow caches the pnpm store with `actions/cache`. No workflow that installs packages runs on
 `main`, so a store cache can never land on `refs/heads/main`, which means every PR misses on its
 first job and then writes a 177 MB entry of its own. The repo's Actions cache already sits above its
 10 GB limit, so those entries evict the `setup-uv` caches this same job depends on. A cold
 `pnpm install` costs about 8s; the restore-plus-save round trip cost 13s and made things worse.
+The Node workflow had the same cache until it was removed. It hit in 7 of 67 jobs and saved under one
+second.
 
 ### Trap: basedpyright in a git worktree
 

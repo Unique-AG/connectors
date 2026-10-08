@@ -23,20 +23,27 @@ from backstop_mcp.dependencies import (
     get_encryption_config,
     get_encryption_key,
     get_engine,
+    get_product_investors_config,
     get_resolution_config,
+    get_search_config,
     get_session_factory,
+    get_tenant_guidance_config,
 )
 from backstop_mcp.features.accounts import (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
-    get_product_query_factory,
+    get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
     get_time_series_query_factory,
+    search_products_query_factory,
 )
 from backstop_mcp.features.activity_history import (
     get_activity_detail_query_factory,
     get_activity_history_query_factory,
     get_activity_history_settings,
+    get_last_activity_for_parties_query_factory,
+    get_meeting_attendees_query_factory,
     get_search_activities_query_factory,
 )
 from backstop_mcp.features.activity_tags import get_activity_tags_service
@@ -82,6 +89,8 @@ from backstop_mcp.features.org_people import (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_person_query_factory,
+    get_search_organizations_query_factory,
+    get_search_people_query_factory,
 )
 from backstop_mcp.features.org_people_writes import (
     get_create_employment_command_factory,
@@ -98,7 +107,7 @@ from backstop_mcp.features.party_resolver import (
     get_party_name_query_factory,
     get_resolve_party_query_factory,
 )
-from backstop_mcp.features.reports import get_run_report_query_factory
+from backstop_mcp.features.reports import get_report_run_cache, get_run_report_query_factory
 from backstop_mcp.features.system_users import get_system_users_service
 from backstop_mcp.features.tasks import get_tasks_for_party_query_factory
 from backstop_mcp.features.time_zones import get_time_zones_service
@@ -122,6 +131,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_auth_config,
     get_activity_history_config,
     get_resolution_config,
+    get_search_config,
+    get_product_investors_config,
+    get_tenant_guidance_config,
     get_engine,
     get_session_factory,
     get_encryption_key,
@@ -130,7 +142,9 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_activity_history_settings,
     get_activity_detail_query_factory,
     get_activity_history_query_factory,
+    get_meeting_attendees_query_factory,
     get_search_activities_query_factory,
+    get_last_activity_for_parties_query_factory,
     get_log_activity_command_factory,
     get_log_note_command_factory,
     get_log_meeting_or_call_command_factory,
@@ -169,6 +183,8 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_person_query_factory,
     get_organization_query_factory,
     get_people_for_organization_query_factory,
+    get_search_organizations_query_factory,
+    get_search_people_query_factory,
     get_party_name_query_factory,
     get_resolve_party_query_factory,
     get_modify_contact_location_command_factory,
@@ -183,10 +199,13 @@ PROVIDERS: tuple[CachedProvider, ...] = (
     get_accounts_for_product_query_factory,
     get_capital_flows_query_factory,
     get_holdings_query_factory,
-    get_product_query_factory,
+    get_latest_account_values_query_factory,
+    get_product_investors_query_factory,
+    search_products_query_factory,
     get_time_series_query_factory,
     get_build_entity_link_util_factory,
     get_parse_entity_link_util_factory,
+    get_report_run_cache,
     get_run_report_query_factory,
 )
 

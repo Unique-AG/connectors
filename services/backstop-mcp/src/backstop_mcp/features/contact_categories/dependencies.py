@@ -13,8 +13,8 @@ def get_list_contact_categories_query_factory(
     client: BackstopClient = Depends(get_backstop_client_for_current_caller),
 ) -> ListContactCategoriesQuery:
     # CACHING CANDIDATE, off unless `BACKSTOP_CONTACT_CATEGORY_CACHE_ENABLED=true`: by default
-    # every read walks `/contact-categories`. A few hundred rows on the instance this was
-    # built against — decide from the two histograms in `caching/cached_value.py`
+    # every read walks `/contact-categories`. The collection is small — decide from the two
+    # histograms in `metrics.py`
     # (`catalog="contact-category"`) whether a TTL is worth the staleness.
     config = get_backstop_config()
     return ListContactCategoriesQuery(

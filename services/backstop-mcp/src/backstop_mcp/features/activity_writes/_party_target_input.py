@@ -21,8 +21,8 @@ _SECONDARY_SEARCH_TYPE_DESCRIPTION = (
     "secondary party."
 )
 _SECONDARY_PARTY_ID_DESCRIPTION = (
-    "Trusted Backstop id of a second party to link (linkedResources / secondaryRegarding), "
-    "for a person-at-organisation case. Pass together with `secondary_search_type`. "
+    "Trusted Backstop id of a second party to link, for a person-at-organisation case. "
+    "Pass together with `secondary_search_type`. "
     "Do not repeat the parent party. Never invent or guess."
 )
 
@@ -50,7 +50,7 @@ class PartyTargetInput(BaseModel):
 
 
 class SecondaryPartyInput(BaseModel):
-    """Optional second party for linkedResources / secondaryRegarding (parent excluded later)."""
+    """Optional second party. The parent party is not linked again."""
 
     secondary_search_type: SearchType | None = Field(
         default=None, description=_SECONDARY_SEARCH_TYPE_DESCRIPTION

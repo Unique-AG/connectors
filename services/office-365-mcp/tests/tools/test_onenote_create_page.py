@@ -24,12 +24,13 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import (
+    OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
-from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
+from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_create_page as creator
 from office_365_mcp.tools.onenote_create_page import CreatedPage, a_person_agrees, create_page
 
@@ -49,6 +50,32 @@ _NOTEBOOKS_ROUTE = "/me/onenote/notebooks"
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK000000000000000000!100"
 _NOTEBOOK_NAME = "Engineering"
 _NOTEBOOK_ROUTE = f"/me/onenote/notebooks/{quote(_NOTEBOOK_ID, safe='')}"
+
+_GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
+_OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000bb"
+_GROUP_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+
+
+def _group_section_route(group_id: str = _GROUP_ID) -> str:
+    return f"/groups/{group_id}/onenote/sections/{quote(_SECTION_ID, safe='')}"
+
+
+_GROUP_SECTION_ROUTE = f"{_group_section_route()}/pages"
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE = OnenoteOwner("sites", _SITE_ID)
+_SITE_SECTION_URI = OnenoteSectionHandle(_SECTION_ID, owner=_SITE).uri
+_SITE_SECTION_ROUTE = f"/sites/{_SITE_ID}/onenote/sections/{quote(_SECTION_ID, safe='')}"
+_SITE_NOTEBOOK_ROUTE = f"/sites/{_SITE_ID}/onenote/notebooks/{quote(_NOTEBOOK_ID, safe='')}"
+
+_OWNED_SECTIONS = pytest.mark.parametrize(
+    ("section", "route"),
+    [(_GROUP_SECTION_URI, _group_section_route()), (_SITE_SECTION_URI, _SITE_SECTION_ROUTE)],
+    ids=["group", "site"],
+)
 
 _TITLE = "Q4 planning"
 _BODY_HTML = "<p>Ship the plan.</p>"
@@ -134,6 +161,16 @@ def _no_default_notebook(graph: respx.MockRouter) -> respx.Route:
 def _own_unshared_section(graph: respx.MockRouter) -> None:
     _ = _reads_section_parent(graph, _NOTEBOOK_ID)
     _ = _reads_notebook(graph, is_shared=False, user_role="Owner")
+
+
+def _own_unshared_group_section(graph: respx.MockRouter, group_id: str = _GROUP_ID) -> respx.Route:
+    section = {"id": _SECTION_ID, "parentNotebook": {"id": _NOTEBOOK_ID}}
+    notebook = _notebook_payload(is_shared=False, user_role="Owner")
+    notebook_route = f"/groups/{group_id}/onenote/notebooks/{quote(_NOTEBOOK_ID, safe='')}"
+    _ = graph.get(notebook_route).mock(return_value=httpx.Response(200, json=notebook))
+    return graph.get(_group_section_route(group_id)).mock(
+        return_value=httpx.Response(200, json=section)
+    )
 
 
 async def _agrees(question: str, about: str) -> str | None:
@@ -535,6 +572,61 @@ class TestTheFailuresItPassesOn:
         with pytest.raises(GraphForbidden):
             _ = await _create(client)
 
+    async def test_a_refused_create_in_a_section_of_the_users_own_notebook_is_a_forbidden(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_section_parent(graph, None)
+        _ = graph.post(_SECTION_ROUTE).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _create(client, section=_SECTION_URI)
+
+    @_OWNED_SECTIONS
+    async def test_a_403_on_an_owned_create_arrives_as_the_owned_advice_with_the_diagnostics(
+        self, client: GraphServiceClient, graph: respx.MockRouter, section: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(200, json={"id": _SECTION_ID, "parentNotebook": None})
+        )
+        create = graph.post(f"{route}/pages").mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _create(client, section=section)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert create.call_count == 1
+
+    @_OWNED_SECTIONS
+    async def test_a_403_on_an_owned_section_read_arrives_as_the_owned_advice_and_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter, section: str, route: str
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+        create = graph.post(f"{route}/pages").mock(return_value=httpx.Response(201))
+
+        with pytest.raises(Advised) as refused:
+            _ = await _create(client, section=section)
+
+        assert str(refused.value).startswith(OWNED_REFUSED)
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+        assert create.call_count == 0
+
     async def test_a_missing_section_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -651,6 +743,32 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         assert "shared with other people or belongs to somebody else" in description
         assert "written without a question" in description
+
+    async def test_the_description_shows_how_to_set_a_note_tag(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        _parameters, tool = await _registered(transport)
+
+        assert (
+            "To show a check box, a star or another built-in note tag, use the `data-tag` "
+            + "attribute. Put it on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, "
+            + '`<p data-tag="to-do">` shows an empty check box, and '
+            + '`data-tag="to-do:completed"` shows a check box with a check mark. Microsoft '
+            + "Graph does not support custom tags."
+        ) in (tool.description or "")
+
+    async def test_the_description_and_the_section_argument_name_group_and_site_notebooks(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        section = cast("Mapping[str, object]", properties["section"])
+        assert "a notebook that a Microsoft 365 group or a SharePoint site owns" in (
+            tool.description or ""
+        )
+        assert "onenote:///groups/{group}/" in cast("str", section["description"])
+        assert "onenote:///sites/{site}/" in cast("str", section["description"])
 
     async def test_the_description_covers_section_name(self, transport: httpx.AsyncClient) -> None:
         _parameters, tool = await _registered(transport)
@@ -1198,3 +1316,232 @@ class TestHowRegisterWiresThePendingAnswer:
 
         assert create.call_count == 0
         assert notebook_route.call_count == 2
+
+
+class TestAGroupSection:
+    async def test_it_asks_and_then_posts_html_once_to_the_group_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        group_read = _own_unshared_group_section(graph)
+        me_read = graph.get(_SECTION_AUDIENCE_ROUTE).mock(return_value=httpx.Response(200))
+        me_create = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+        route = _creates(graph, _GROUP_SECTION_ROUTE, _page_payload())
+        asked: list[str] = []
+
+        async def counting(question: str, about: str) -> str | None:
+            assert about
+            assert route.call_count == 0, "the page was written before the person was asked"
+            asked.append(question)
+            return None
+
+        _ = await _create(client, section=_GROUP_SECTION_URI, confirm=counting)
+
+        assert len(asked) == 1, "a group notebook the user owns unshared was written unasked"
+        assert "which belongs to a Microsoft 365 group" in asked[0]
+        assert group_read.call_count == 1
+        assert (me_read.call_count, me_create.call_count) == (0, 0)
+        assert route.call_count == 1
+        assert route.calls.last.request.headers["Content-Type"] == "text/html"
+        assert route.calls.last.request.url.params == httpx.QueryParams()
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_group_create_graph_declines_is_never_sent_a_second_time(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        route = graph.post(_GROUP_SECTION_ROUTE).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(GraphUnavailable):
+            _ = await _create(client, section=_GROUP_SECTION_URI)
+
+        assert route.call_count == 1
+
+    async def test_a_decline_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        route = graph.post(_GROUP_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+
+        with pytest.raises(ToolError, match="No page was created"):
+            _ = await create_page(
+                client,
+                title=_TITLE,
+                body_html=_BODY_HTML,
+                section=_GROUP_SECTION_URI,
+                confirm=_refuses,
+            )
+
+        assert route.call_count == 0, "a declined create still reached the group notebook"
+
+    async def test_the_answer_handles_carry_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        _ = _creates(graph, _GROUP_SECTION_ROUTE, _page_payload())
+
+        answer = await _create(client, section=_GROUP_SECTION_URI)
+
+        assert (
+            answer.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
+        assert answer.section_uri == _GROUP_SECTION_URI
+        handle = onenote_page_handle(answer.uri)
+        assert handle is not None
+        assert (handle.page_id, handle.owner) == (_PAGE_ID, OnenoteOwner("groups", _GROUP_ID))
+
+    async def test_a_parent_section_graph_names_carries_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        _ = _creates(
+            graph, _GROUP_SECTION_ROUTE, _page_payload(parent_section_id=_OTHER_SECTION_ID)
+        )
+
+        answer = await _create(client, section=_GROUP_SECTION_URI)
+
+        assert (
+            answer.section_uri
+            == OnenoteSectionHandle(_OTHER_SECTION_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
+
+    async def test_the_about_digest_names_the_group(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        _ = _creates(graph, _GROUP_SECTION_ROUTE, _page_payload())
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _create(client, section=_GROUP_SECTION_URI, confirm=capturing)
+
+        assert bound == [
+            write_state_for(
+                "create", "groups", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+            )
+        ]
+        assert bound[0] != write_state_for("create", "section", _SECTION_ID, _TITLE, _BODY_HTML)
+
+    async def test_the_second_round_creates_the_page_in_the_group_it_was_agreed_for(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        create = _creates(graph, _GROUP_SECTION_ROUTE, _page_payload())
+        key, state, agree = _the_question(
+            await _round(
+                client, section=_GROUP_SECTION_URI, confirm=a_person_agrees(_modern_context())
+            )
+        )
+        assert create.call_count == 0, "an unanswered question created the page anyway"
+        assert state == write_state_for(
+            "create", "groups", _GROUP_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+        )
+
+        answer = await _round(
+            client,
+            section=_GROUP_SECTION_URI,
+            confirm=a_person_agrees(
+                _modern_context(
+                    answers={key: ElicitResult(action="accept", content={"value": agree})},
+                    state=state,
+                )
+            ),
+            answer_pending=True,
+        )
+
+        assert isinstance(answer, CreatedPage)
+        assert (
+            answer.uri == OnenotePageHandle(_PAGE_ID, owner=OnenoteOwner("groups", _GROUP_ID)).uri
+        )
+        assert create.call_count == 1
+
+    async def test_an_agreement_for_one_group_creates_nothing_in_another(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _own_unshared_group_section(graph)
+        _ = _own_unshared_group_section(graph, _OTHER_GROUP_ID)
+        create = graph.post(_GROUP_SECTION_ROUTE).mock(return_value=httpx.Response(201))
+        other_create = graph.post(f"{_group_section_route(_OTHER_GROUP_ID)}/pages").mock(
+            return_value=httpx.Response(201)
+        )
+        key, state, agree = _the_question(
+            await _round(
+                client, section=_GROUP_SECTION_URI, confirm=a_person_agrees(_modern_context())
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await _round(
+                client,
+                section=OnenoteSectionHandle(
+                    _SECTION_ID, owner=OnenoteOwner("groups", _OTHER_GROUP_ID)
+                ).uri,
+                confirm=a_person_agrees(
+                    _modern_context(
+                        answers={key: ElicitResult(action="accept", content={"value": agree})},
+                        state=state,
+                    )
+                ),
+                answer_pending=True,
+            )
+
+        assert (create.call_count, other_create.call_count) == (0, 0)
+
+    async def test_a_section_of_the_users_own_notebook_never_reaches_a_group_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _own_unshared_section(graph)
+        route = _creates(graph, _SECTION_ROUTE, _page_payload(parent_section_id=_SECTION_ID))
+
+        answer = await _create(client, section=_SECTION_URI)
+
+        assert route.call_count == 1
+        assert len(_calls(graph)) == 3
+        assert [
+            str(call.request.url) for call in _calls(graph) if "/groups" in call.request.url.path
+        ] == []
+        assert "/groups/" not in answer.uri
+        assert "/groups/" not in (answer.section_uri or "")
+
+
+class TestASiteSection:
+    async def test_it_asks_and_then_posts_html_once_to_the_site_route(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        section_read = graph.get(_SITE_SECTION_ROUTE).mock(
+            return_value=httpx.Response(
+                200, json={"id": _SECTION_ID, "parentNotebook": {"id": _NOTEBOOK_ID}}
+            )
+        )
+        notebook_read = graph.get(_SITE_NOTEBOOK_ROUTE).mock(
+            return_value=httpx.Response(
+                200, json=_notebook_payload(is_shared=False, user_role="Owner")
+            )
+        )
+        create = _creates(graph, f"{_SITE_SECTION_ROUTE}/pages", _page_payload())
+        asked: list[str] = []
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert create.call_count == 0, "the page was written before the person was asked"
+            asked.append(question)
+            bound.append(about)
+            return None
+
+        answer = await _create(client, section=_SITE_SECTION_URI, confirm=capturing)
+
+        assert len(asked) == 1, "a site notebook the user owns unshared was written unasked"
+        assert "which belongs to a SharePoint site" in asked[0]
+        assert (section_read.call_count, notebook_read.call_count, create.call_count) == (1, 1, 1)
+        assert len(_calls(graph)) == 3, "nothing was read from or written to /me"
+        assert answer.uri == OnenotePageHandle(_PAGE_ID, owner=_SITE).uri
+        assert answer.section_uri == _SITE_SECTION_URI
+        assert bound == [
+            write_state_for("create", "sites", _SITE_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML)
+        ]
+        assert bound[0] != write_state_for(
+            "create", "groups", _SITE_ID, "section", _SECTION_ID, _TITLE, _BODY_HTML
+        )

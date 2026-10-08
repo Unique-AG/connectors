@@ -54,17 +54,20 @@ async def get_activity_detail(
         str,
         Field(
             description=(
-                "The argument is `activity_id`. The `activity_id` from get_activity_history "
-                "(`meeting-or-calls_76537547`) or the `id` from a search_activities row "
-                "(`1659094659`). Both resolve on `/entity-activity-details`. Do not pass a "
-                "history email handle — those are `/emails` ids. Never invent or guess one — "
-                "an unknown id raises rather than returning a not-found response."
+                "The `activity_id` from get_activity_history (`meeting-or-calls_<id>`) or the "
+                "`id` from a search_activities row. Do not pass a history email handle — "
+                "those are `/emails` ids. Never invent or guess one — an unknown id raises "
+                "rather than returning a not-found response."
             ),
         ),
     ],
     get_activity_detail_query: GetActivityDetailQuery = Depends(get_activity_detail_query_factory),
 ) -> ActivityDetailResponse:
     """Fetch one activity's full body, meeting specifics, attendees, and attachment list.
+
+    When the answer depends on what was sent or attached, list the attachments returned
+    here. Do not infer attachment contents from titles. An empty list means nothing was
+    attached.
 
     Documented fallback, with `get_activity_history`, when `search_activities` is unavailable.
     While the primary is up, prefer `search_activities` with `include_description` for note

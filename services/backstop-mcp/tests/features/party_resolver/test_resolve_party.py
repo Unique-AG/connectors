@@ -480,9 +480,9 @@ class TestCandidateLabel:
             return_value=httpx.Response(
                 200,
                 json=collection(
-                    resource("o1", "organizations", name="Koch"),
-                    resource("p1", "people", name="Voss, Kent"),
-                    resource("c1", "contacts", name="Voss, Kent"),
+                    resource("o1", "organizations", name="Contoso"),
+                    resource("p1", "people", name="Ada, North"),
+                    resource("c1", "contacts", name="Ada, North"),
                     resource("e1", "employees", name="Lucas, Margaret"),
                 ),
             )
@@ -490,15 +490,15 @@ class TestCandidateLabel:
 
         result = await make_resolve_party_query(client).run(
             search_type="organizations",
-            search="Koch",
+            search="Contoso",
             quick_search_options=QuickSearchOptionsDto(enhance_search_types=True),
         )
 
         assert isinstance(result, Ambiguous)
         assert [candidate.label for candidate in result.candidates] == [
-            "Koch (organization)",
-            "Voss, Kent (person)",
-            "Voss, Kent (contact)",
+            "Contoso (organization)",
+            "Ada, North (person)",
+            "Ada, North (contact)",
             "Lucas, Margaret (employee)",
         ]
 
@@ -813,19 +813,19 @@ class TestLikeFallback:
         like = respx.get(f"{BASE_URL}/people").mock(
             return_value=httpx.Response(
                 200,
-                json=collection(resource("p1", "people", name="Glenn, Phil", lastName="Glenn")),
+                json=collection(resource("p1", "people", name="Ben, West", lastName="West")),
             )
         )
 
         result = await make_resolve_party_query(client).run(
             search_type="people",
-            search="Glenn",
+            search="West",
         )
 
         assert isinstance(result, Resolved)
         assert result.value.id == "p1"
         params = like.calls.last.request.url.params
-        assert params["filter[lastName][like]"] == "Glenn"
+        assert params["filter[lastName][like]"] == "West"
         assert "filter[name][like]" not in params
         assert params["page[limit]"] == "200"
         assert params["fields[people]"] == "name,firstName,lastName"
@@ -1397,9 +1397,8 @@ class TestElicitTimeout:
         with pytest.raises(asyncio.CancelledError):
             await task
 
-    def test_default_timeout_leaves_room_under_the_client_deadline(self) -> None:
-        """Regression guard: the point of the deadline is to beat the client's 60s cancel."""
-        assert 0 < ResolutionConfig().elicit_timeout_seconds < 60
+    def test_default_timeout_is_two_minutes(self) -> None:
+        assert ResolutionConfig().elicit_timeout_seconds == 120
 
     @pytest.mark.asyncio
     async def test_timeout_comes_from_the_environment(

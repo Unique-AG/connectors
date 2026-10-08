@@ -16,9 +16,6 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_capital_flows_query_factory
 from backstop_mcp.models import published_output_schema
 
-_DEFAULT_MAX_ROWS = 200
-_MAX_ROWS = 1_000
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -32,31 +29,21 @@ _MAX_ROWS = 1_000
 async def get_capital_flows(
     start_date: Annotated[
         date,
-        Field(
-            description=(
-                "Inclusive start of filter[transactionDate]. Required — an unfiltered read is 400."
-            )
-        ),
+        Field(description=("Inclusive start of the transaction-date window. Required.")),
     ],
     end_date: Annotated[
         date,
-        Field(description="Inclusive end of filter[transactionDate]. Required."),
+        Field(description="Inclusive end of the transaction-date window. Required."),
     ],
-    max_rows: Annotated[
-        int,
-        Field(
-            ge=1,
-            le=_MAX_ROWS,
-            description="Row cap applied after owner/account filters. Counts are over the match.",
-        ),
-    ] = _DEFAULT_MAX_ROWS,
     owner_id: Annotated[
         str | None,
         Field(
             default=None,
             description=(
-                "Keep flows whose included owner id matches. Echo from get_accounts_for_party "
-                "or a prior resolve. Unattributed rows have no owner and drop out."
+                "Keep flows whose `owner.id` matches. That id is the contacts envelope id on a "
+                "capital-flows row — pass `owner.id` from a prior capital-flows row. It is "
+                "not necessarily the party id from `get_accounts_for_party`. Unattributed "
+                "rows have no owner and drop out."
             ),
         ),
     ] = None,
@@ -84,9 +71,8 @@ async def get_capital_flows(
 
     Rows carry no product. For "which share class is X in within Fund Y", take that party's
     account ids from `get_accounts_for_party` (or `get_product_investors`) and pass them as
-    `account_ids` **before** `max_rows` cuts the list. Share class lives on the original
-    subscription, so the window must include that subscription's `transaction_date`, not only
-    the period you are asking about.
+    `account_ids`. Share class lives on the original subscription, so the window must include
+    that subscription's `transaction_date`, not only the period you are asking about.
 
     Call like: {"start_date": "2020-01-01", "end_date": "2026-09-17",
     "account_ids": ["<id from get_accounts_for_party>"]}
@@ -96,7 +82,6 @@ async def get_capital_flows(
     return await get_capital_flows_query.run(
         start_date=start_date,
         end_date=end_date,
-        max_rows=max_rows,
         owner_id=owner_id,
         account_ids=account_ids,
     )

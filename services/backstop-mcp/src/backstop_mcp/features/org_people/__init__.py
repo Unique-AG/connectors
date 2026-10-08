@@ -1,6 +1,6 @@
 """People linked to an organization, with employment status from `EmploymentIndex`.
 
-Also fetches a person or organization record by id.
+Also fetches a person or organization record by id, and searches each collection firm-wide.
 
 `numberOfEmployees` on the organization record is not a roster. Current staff come from one
 paginated walk of `GET /organizations/{id}/employees` with
@@ -21,12 +21,17 @@ from backstop_mcp.features.org_people.dependencies import (
     get_organization_query_factory,
     get_people_for_organization_query_factory,
     get_person_query_factory,
+    get_search_organizations_query_factory,
+    get_search_people_query_factory,
 )
+from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.features.org_people.queries import (
     MAX_ORG_PEOPLE,
     GetOrganizationQuery,
     GetPeopleForOrganizationQuery,
     GetPersonQuery,
+    SearchOrganizationsQuery,
+    SearchPeopleQuery,
 )
 from backstop_mcp.features.org_people.responses import (
     OrganizationRecordResponse,
@@ -38,6 +43,10 @@ from backstop_mcp.features.org_people.responses import (
     PersonAtOrganizationResponse,
     PersonRecordResponse,
     PersonResolvedResponse,
+    SearchOrganizationRowResponse,
+    SearchOrganizationsResolvedResponse,
+    SearchPeopleResolvedResponse,
+    SearchPersonRowResponse,
 )
 
 __all__ = [
@@ -46,6 +55,7 @@ __all__ = [
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
+    "LocationFilter",
     "OrgPeopleResolvedResponse",
     "OrganizationAttributes",
     "OrganizationRecordResponse",
@@ -57,7 +67,15 @@ __all__ = [
     "PersonAttributes",
     "PersonRecordResponse",
     "PersonResolvedResponse",
+    "SearchOrganizationRowResponse",
+    "SearchOrganizationsQuery",
+    "SearchOrganizationsResolvedResponse",
+    "SearchPeopleQuery",
+    "SearchPeopleResolvedResponse",
+    "SearchPersonRowResponse",
     "get_organization_query_factory",
     "get_people_for_organization_query_factory",
     "get_person_query_factory",
+    "get_search_organizations_query_factory",
+    "get_search_people_query_factory",
 ]

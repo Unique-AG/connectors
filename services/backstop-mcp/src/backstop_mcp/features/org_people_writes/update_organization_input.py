@@ -26,8 +26,8 @@ from backstop_mcp.features.org_people_writes.contact_location_input import (
     reject_location_write_conflicts,
 )
 from backstop_mcp.features.party_resolver import (
-    PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION,
-    SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION,
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     blank_to_none,
     require_exactly_one_party_selector,
 )
@@ -42,8 +42,8 @@ UPDATE_ORGANIZATION_INPUT_DESCRIPTION = (
     "Required. The organization to patch. Needs exactly one of `party_id` or `search`, "
     "plus `search_type` (defaults to organizations), and at least one field to change. "
     "`name` cannot be cleared and is at most 50 characters. Custom fields go through "
-    "`update_custom_field_values`. Location ids come from `get_organization` with "
-    "`include=contactLocations`, not `include=locations`. Omit a field to leave it "
+    "`update_custom_field_values`. Location ids are `included.locations[].id` from "
+    '`get_organization` with `include=["locations"]`. Omit a field to leave it '
     "unchanged. Never invent an id."
 )
 
@@ -51,9 +51,6 @@ _IDENTITY_FIELDS = frozenset({"party_id", "search", "search_type"})
 _ORG_SEARCH_TYPE_DESCRIPTION = (
     "Echo `search_type` from a prior resolve. This tool only writes organizations; omit "
     "it or pass `organizations`."
-)
-_LOCATION_ID_HINT = (
-    "Ids come from `get_organization` with `include=contactLocations`, not `include=locations`."
 )
 
 
@@ -64,10 +61,10 @@ class _UpdateOrganizationIdentity(BaseModel):
         default="organizations", description=_ORG_SEARCH_TYPE_DESCRIPTION
     )
     party_id: NonEmptyStr | None = Field(
-        default=None, description=PARTY_ID_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
     search: NonEmptyStr | None = Field(
-        default=None, description=SEARCH_REQUIRES_SEARCH_TYPE_DESCRIPTION
+        default=None, description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION
     )
 
     @field_validator("party_id", "search", mode="before")

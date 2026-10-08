@@ -6,16 +6,26 @@ from typing import ClassVar, Literal, Self
 from pydantic import ConfigDict, Field
 from pydantic.json_schema import SkipJsonSchema
 
+from backstop_mcp.features.collection_scan import (
+    ContinuationResponse,
+    ScanCoverageResponse,
+    project_fields,
+)
 from backstop_mcp.features.custom_fields import (
     RegularCustomFieldValues,
     ResolvedCustomFieldValueResponse,
+    StoredCustomFieldValueResponse,
 )
 from backstop_mcp.features.data_hygiene import (
     AsOfResponse,
     EmploymentLinkResponse,
     ProvenanceAttributes,
 )
-from backstop_mcp.features.includes import OrganizationIncludesResponse, PersonIncludesResponse
+from backstop_mcp.features.includes import (
+    ContactLocationResponse,
+    OrganizationIncludesResponse,
+    PersonIncludesResponse,
+)
 from backstop_mcp.features.org_people.api_responses import (
     EmployeeResource,
     OrganizationAttributes,
@@ -31,6 +41,10 @@ __all__ = [
     "OrgPeopleResolvedResponse",
     "OrganizationRecordResponse",
     "OrganizationResolvedResponse",
+    "SearchOrganizationRowResponse",
+    "SearchOrganizationsResolvedResponse",
+    "SearchPeopleResolvedResponse",
+    "SearchPersonRowResponse",
     "PartyOrgPeopleResponse",
     "PartyOrganizationResponse",
     "PartyPersonResponse",
@@ -79,7 +93,10 @@ class _PartyRecordFields(OmitNoneModel):
     )
     categories: tuple[str, ...] | None = Field(
         default=None,
-        description="CRM categories on this record — investor type, role, or similar labels.",
+        description=(
+            "Category names. Writes need ids from `list_contact_categories`. "
+            "`replace_category_ids` replaces the set and can drop a category."
+        ),
     )
     categories_as_string: str | None = Field(
         default=None,
@@ -147,11 +164,8 @@ class PersonRecordResponse(_PartyRecordFields, ProvenanceAttributes):
     is_key_employee: bool | None = Field(
         default=None,
         description=(
-            "Unreliable on this record: `GET /people` omits `isKeyEmployee` even when "
-            "the organization roster is true. Read it on `get_people_for_party`. "
-            "Cannot be written through these tools — personal API tokens do not persist "
-            "`isKeyRelationship`; set Key employee in the CRM UI. Distinct from "
-            "`is_employee`, which means employee of our firm."
+            "Present here but unreliable. The roster (`get_people_for_party`) is the source. "
+            "Read-only: set Key employee in the CRM UI. Distinct from `is_employee`."
         ),
     )
     job_title: str | None = Field(default=None, description="Job title.")
@@ -245,11 +259,8 @@ class PersonAtOrganizationResponse(OmitNoneModel):
     is_key_employee: bool | None = Field(
         default=None,
         description=(
-            "Key employee at *this* organization, from "
-            "`GET /organizations/{id}/employees`. Not a person attribute, custom "
-            "field, or category. Absent when the row has no `/employees` card. "
-            "Cannot be written through these tools — personal API tokens do not persist "
-            "`isKeyRelationship`; set Key employee in the CRM UI."
+            "Key employee at this organization. This roster is the source. Absent when the "
+            "row has no employee card. Read-only; set it in the CRM UI."
         ),
     )
     employment: EmploymentLinkResponse = Field(
@@ -476,7 +487,7 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     people: tuple[PersonAtOrganizationResponse, ...] = Field(
         description=(
             "People the CRM links to this organization through employment relationships. "
-            "`numberOfEmployees` on the organization record is not this list and is often 0 "
+            "`numberOfEmployees` on the organization record is not this list and may be 0 "
             "while people are still on file. Each row's `employment` is the status at this "
             "organization. Call `get_person` for the full record."
         )
@@ -490,8 +501,8 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
     people_omitted: int = Field(
         default=0,
         description=(
-            "How many matching people were listed but dropped because this organization "
-            "exceeds the per-call cap. Greater than zero means `people` is a partial list."
+            "How many matching people were dropped because this organization exceeds the "
+            "per-call cap of 500. Greater than zero means `people` is a partial list."
         ),
     )
     include_former_hint: str | None = Field(
@@ -531,3 +542,239 @@ class OrgPeopleResolvedResponse(OmitNoneModel):
             people_omitted=people_omitted,
             include_former_hint=hint,
         )
+
+
+class SearchOrganizationRowResponse(OmitNoneModel):
+    """One organization from a firm-wide search, limited to the fields the caller asked for."""
+
+    id: str = Field(
+        description=(
+            "Backstop organization id. Always present. Pass it to get_organization as "
+            "`party_id` with `search_type` `organizations`. Never invent one."
+        )
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "CRM link for this organization. Omitted unless `fields` includes `url`. "
+            "Absent when this deployment has no UI origin."
+        ),
+    )
+    name: str | None = Field(default=None, description="Organization name.")
+    legal_name: str | None = Field(default=None, description="Legal name, when Backstop has one.")
+    email: str | None = Field(default=None, description="Primary email. Not email2 or email3.")
+    city: str | None = Field(default=None, description="City of the primary contact location.")
+    country: str | None = Field(
+        default=None, description="Country of the primary contact location."
+    )
+    state: str | None = Field(
+        default=None, description="State or region of the primary contact location."
+    )
+    postal_code: str | None = Field(
+        default=None, description="Postal code of the primary contact location."
+    )
+    street_address: str | None = Field(
+        default=None, description="Street address of the primary contact location."
+    )
+    location_title: str | None = Field(
+        default=None,
+        description="Title of the primary contact location, such as 'Business' or 'London'.",
+    )
+    website: str | None = Field(default=None, description="Website on the organization record.")
+    locations: tuple[ContactLocationResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every address on file for this organization, primary first, each with "
+            "`is_primary`. The `city`, `country`, and other location fields above are the "
+            "primary one only. Absent for an organization with no address."
+        ),
+    )
+    other_id: str | None = Field(
+        default=None, description="Backstop `otherId`, when the organization has one."
+    )
+    matching_domains: tuple[str, ...] | None = Field(
+        default=None,
+        description="Email domains Backstop matches to this organization.",
+    )
+    ria: bool | None = Field(
+        default=None, description="True when Backstop marks the organization as an RIA."
+    )
+    internal_organization: bool | None = Field(
+        default=None, description="True when Backstop marks this as an internal organization."
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every custom field with a value on this organization — group or label rows "
+            "by these (the fields a table is grouped or labelled by). Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this "
+            "organization: group it as blank, do not look it up again."
+        ),
+    )
+
+    def project(self, *, fields: frozenset[str], url: str | None) -> Self:
+        overrides: dict[str, object] = {"url": url} if "url" in fields else {}
+        return project_fields(self, fields=fields, into=type(self), overrides=overrides)
+
+
+class SearchOrganizationsResolvedResponse(OmitNoneModel):
+    """One page of a firm-wide organization search: matching rows plus how much was read."""
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description=(
+            "Always 'resolved': the read ran. An empty `rows` list means nothing matched."
+        ),
+    )
+    coverage: ScanCoverageResponse = Field(
+        description=(
+            "How much of the Backstop result this call read. `visible_count` is Backstop's "
+            "total for the server-side filters (including a location `city` and "
+            "`street_address`), before the location filter's country, state, postal code, and "
+            "title, legal name, website, RIA, internal organization, and custom-field "
+            "predicates. A call with only the in-memory predicates reports the whole "
+            "collection here. `rows_scanned` is this call's records only."
+        )
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match."
+        ),
+    )
+    rows: tuple[SearchOrganizationRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "This page of organizations matching every filter, in Backstop id order (not by "
+            "name). `id` is always present so the next call is get_organization. Default "
+            "fields are id, name, legal_name, email, city, country, and locations."
+        ),
+    )
+
+
+class SearchPersonRowResponse(OmitNoneModel):
+    """One person from a firm-wide search, limited to the fields the caller asked for."""
+
+    id: str = Field(
+        description=(
+            "Backstop people id. Always present. Pass it to get_person as `party_id` with "
+            "`search_type` `people`. Never invent one. A contacts or employees id is not "
+            "this id."
+        )
+    )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "CRM link for this person. Omitted unless `fields` includes `url`. Absent when "
+            "this deployment has no UI origin."
+        ),
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name as Backstop stores it, usually 'Last, First'.",
+    )
+    first_name: str | None = Field(default=None, description="First name.")
+    last_name: str | None = Field(default=None, description="Last name.")
+    email: str | None = Field(default=None, description="Primary email. Not email2 or email3.")
+    email2: str | None = Field(default=None, description="Second email.")
+    email3: str | None = Field(default=None, description="Third email.")
+    job_title: str | None = Field(default=None, description="Job title on the person record.")
+    company_name: str | None = Field(
+        default=None,
+        description="Company-name text on the person record. Not the employer's roster.",
+    )
+    department: str | None = Field(default=None, description="Department on the person record.")
+    city: str | None = Field(default=None, description="City of the primary contact location.")
+    country: str | None = Field(
+        default=None, description="Country of the primary contact location."
+    )
+    state: str | None = Field(
+        default=None, description="State or region of the primary contact location."
+    )
+    postal_code: str | None = Field(
+        default=None, description="Postal code of the primary contact location."
+    )
+    street_address: str | None = Field(
+        default=None, description="Street address of the primary contact location."
+    )
+    location_title: str | None = Field(
+        default=None,
+        description="Title of the primary contact location, such as 'Business' or 'London'.",
+    )
+    website: str | None = Field(default=None, description="Website on the person record.")
+    locations: tuple[ContactLocationResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every address on file for this person, primary first, each with "
+            "`is_primary`. The `city`, `country`, and other location fields above are the "
+            "primary one only. Absent for a person with no address."
+        ),
+    )
+    other_id: str | None = Field(
+        default=None, description="Backstop `otherId`, when the person has one."
+    )
+    custom_field_values: tuple[StoredCustomFieldValueResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every custom field with a value on this person — group or label rows by these "
+            "(the fields a table is grouped or labelled by). Absent when the call set "
+            "`exclude_custom_fields`. A field missing here has no value on this person: "
+            "group it as blank, do not look it up again."
+        ),
+    )
+    employments: tuple[EmploymentLinkResponse, ...] | None = Field(
+        default=None,
+        description=(
+            "Every organization this person is linked to by employment, `current` or "
+            "`former`, with `organization_id`. Omitted unless `fields` includes "
+            "`employments` or the call set `min_current_organizations`. Absent when "
+            "the person has no employment link. Organization names are not here: "
+            "get_organization with that id."
+        ),
+    )
+
+    def project(self, *, fields: frozenset[str], url: str | None) -> Self:
+        overrides: dict[str, object] = {"url": url} if "url" in fields else {}
+        return project_fields(self, fields=fields, into=type(self), overrides=overrides)
+
+
+class SearchPeopleResolvedResponse(OmitNoneModel):
+    """One page of a firm-wide people search: matching rows plus how much was read."""
+
+    status: Literal["resolved"] = Field(
+        default="resolved",
+        description=(
+            "Always 'resolved': the read ran. An empty `rows` list means nothing matched."
+        ),
+    )
+    coverage: ScanCoverageResponse = Field(
+        description=(
+            "How much of the Backstop result this call read. `visible_count` is Backstop's "
+            "total for the server-side filters, before first name, job title, company name, "
+            "department, the location filter's country, state, postal code, and title, "
+            "website, and custom-field predicates. A location `city` and `street_address` "
+            "are server-side filters. An "
+            "`email` filter is three lookups (`email`, `email2`, `email3`) and "
+            "`visible_count` is the sum of those totals, so one person stored on two of "
+            "those fields can be counted twice. A custom-field-only call reports the "
+            "whole collection here. `rows_scanned` is this call's records only."
+        )
+    )
+    continuation: ContinuationResponse | None = Field(
+        default=None,
+        description=(
+            "Present when this page stopped before the end of the result: more rows may "
+            "match. Absent means these rows are every match. An `email` search is never "
+            "paged."
+        ),
+    )
+    rows: tuple[SearchPersonRowResponse, ...] = Field(
+        default=(),
+        description=(
+            "This page of people matching every filter, in Backstop id order (not by name). "
+            "`id` is always present so the next call is get_person with `search_type` "
+            "`people`. Default fields are id, name, email, job_title, company_name, city, "
+            "country, and locations."
+        ),
+    )

@@ -15,6 +15,18 @@
           ]
         },
         {
+          "name": "teams_list_chat_messages",
+          "permissions": [
+            "Chat.Read"
+          ]
+        },
+        {
+          "name": "teams_list_chat_members",
+          "permissions": [
+            "Chat.Read"
+          ]
+        },
+        {
           "name": "teams_list_my_teams",
           "permissions": [
             "Team.ReadBasic.All"
@@ -27,7 +39,19 @@
           ]
         },
         {
+          "name": "teams_get_channel_files_folder",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
           "name": "teams_browse_channel",
+          "permissions": [
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "teams_list_message_replies",
           "permissions": [
             "ChannelMessage.Read.All"
           ]
@@ -49,13 +73,57 @@
         {
           "name": "teams_send_chat_message",
           "permissions": [
-            "ChatMessage.Send"
+            "ChatMessage.Send",
+            "Chat.Read"
           ]
         },
         {
           "name": "teams_send_channel_message",
           "permissions": [
             "ChannelMessage.Send"
+          ]
+        },
+        {
+          "name": "teams_send_chat_message_with_files",
+          "permissions": [
+            "ChatMessage.Send",
+            "Files.Read.All",
+            "Chat.Read"
+          ]
+        },
+        {
+          "name": "teams_send_channel_message_with_files",
+          "permissions": [
+            "ChannelMessage.Send",
+            "Files.Read.All"
+          ]
+        },
+        {
+          "name": "teams_react_to_message",
+          "permissions": [
+            "ChatMessage.Send",
+            "ChannelMessage.Send",
+            "Chat.Read",
+            "Channel.ReadBasic.All",
+            "Team.ReadBasic.All"
+          ]
+        },
+        {
+          "name": "teams_edit_message",
+          "permissions": [
+            "Chat.ReadWrite",
+            "ChannelMessage.ReadWrite",
+            "User.Read",
+            "ChannelMessage.Read.All"
+          ]
+        },
+        {
+          "name": "teams_delete_message",
+          "permissions": [
+            "Chat.ReadWrite",
+            "ChannelMessage.ReadWrite",
+            "User.Read",
+            "ChannelMessage.Read.All"
           ]
         },
         {
@@ -77,6 +145,61 @@
             "OnlineMeetings.Read",
             "OnlineMeetingRecording.Read.All",
             "User.Read"
+          ]
+        },
+        {
+          "name": "teams_read_meeting",
+          "permissions": [
+            "OnlineMeetings.Read",
+            "OnlineMeetingArtifact.Read.All",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_create_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite"
+          ]
+        },
+        {
+          "name": "teams_update_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_delete_meeting",
+          "permissions": [
+            "OnlineMeetings.ReadWrite",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_create_chat",
+          "permissions": [
+            "Chat.Create",
+            "User.Read"
+          ]
+        },
+        {
+          "name": "teams_add_chat_member",
+          "permissions": [
+            "ChatMember.ReadWrite",
+            "Chat.Read"
+          ]
+        },
+        {
+          "name": "teams_remove_chat_member",
+          "permissions": [
+            "ChatMember.ReadWrite",
+            "Chat.Read"
+          ]
+        },
+        {
+          "name": "teams_rename_chat",
+          "permissions": [
+            "Chat.ReadWrite"
           ]
         },
         {
@@ -476,9 +599,75 @@
           ]
         },
         {
+          "name": "sharepoint_list_drives",
+          "permissions": [
+            "Files.Read.All"
+          ]
+        },
+        {
           "name": "sharepoint_read_file",
           "permissions": [
             "Files.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_resolve_url",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_folder",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_text_file",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_rename_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_move_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_copy_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_item",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_share_link",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_invite",
+          "permissions": [
+            "Files.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_search_sites",
+          "permissions": [
+            "Sites.Read.All"
           ]
         },
         {
@@ -606,16 +795,33 @@
       "tool_names": [
         "get_me",
         "teams_list_chats",
+        "teams_list_chat_messages",
+        "teams_list_chat_members",
         "teams_list_my_teams",
         "teams_list_channels",
+        "teams_get_channel_files_folder",
         "teams_browse_channel",
+        "teams_list_message_replies",
         "teams_search_messages",
         "teams_read_message",
         "teams_send_chat_message",
         "teams_send_channel_message",
+        "teams_send_chat_message_with_files",
+        "teams_send_channel_message_with_files",
+        "teams_react_to_message",
+        "teams_edit_message",
+        "teams_delete_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
         "teams_list_meeting_recordings",
+        "teams_read_meeting",
+        "teams_create_meeting",
+        "teams_update_meeting",
+        "teams_delete_meeting",
+        "teams_create_chat",
+        "teams_add_chat_member",
+        "teams_remove_chat_member",
+        "teams_rename_chat",
         "outlook_search_mail",
         "outlook_read_mail",
         "outlook_list_attachments",
@@ -676,7 +882,18 @@
         "outlook_update_contact",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
+        "sharepoint_list_drives",
         "sharepoint_read_file",
+        "sharepoint_resolve_url",
+        "sharepoint_create_folder",
+        "sharepoint_create_text_file",
+        "sharepoint_rename_item",
+        "sharepoint_move_item",
+        "sharepoint_copy_item",
+        "sharepoint_delete_item",
+        "sharepoint_create_share_link",
+        "sharepoint_invite",
+        "sharepoint_search_sites",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -702,9 +919,12 @@
       "presets": {
         "teams": [
           "teams_list_chats",
+          "teams_list_chat_messages",
+          "teams_list_chat_members",
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_browse_channel",
+          "teams_list_message_replies",
           "teams_search_messages",
           "teams_read_message",
           "teams_list_meeting_transcripts",
@@ -712,17 +932,21 @@
           "teams_list_meeting_recordings"
         ],
         "teams-chat": [
-          "teams_list_chats"
+          "teams_list_chats",
+          "teams_list_chat_members"
         ],
         "teams-messages": [
           "teams_list_chats",
+          "teams_list_chat_messages",
           "teams_search_messages",
-          "teams_read_message"
+          "teams_read_message",
+          "teams_list_message_replies"
         ],
         "teams-channels": [
           "teams_list_my_teams",
           "teams_list_channels",
-          "teams_browse_channel"
+          "teams_browse_channel",
+          "teams_list_message_replies"
         ],
         "teams-transcripts": [
           "teams_list_chats",
@@ -744,7 +968,64 @@
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_send_chat_message",
-          "teams_send_channel_message"
+          "teams_send_channel_message",
+          "teams_list_chat_messages",
+          "teams_react_to_message",
+          "teams_list_chat_members"
+        ],
+        "teams-write-files": [
+          "teams_list_chats",
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_send_chat_message",
+          "teams_send_channel_message",
+          "teams_list_chat_messages",
+          "teams_react_to_message",
+          "teams_list_chat_members",
+          "teams_send_chat_message_with_files",
+          "teams_send_channel_message_with_files",
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives"
+        ],
+        "teams-edit": [
+          "teams_list_chats",
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_send_chat_message",
+          "teams_send_channel_message",
+          "teams_list_chat_messages",
+          "teams_react_to_message",
+          "teams_list_chat_members",
+          "teams_browse_channel",
+          "teams_list_message_replies",
+          "teams_edit_message",
+          "teams_delete_message"
+        ],
+        "teams-meetings-write": [
+          "teams_list_chats",
+          "teams_list_chat_members",
+          "teams_read_meeting",
+          "teams_create_meeting",
+          "teams_update_meeting",
+          "teams_delete_meeting"
+        ],
+        "teams-chat-admin": [
+          "teams_list_chats",
+          "teams_list_chat_members",
+          "teams_create_chat",
+          "teams_add_chat_member",
+          "teams_remove_chat_member",
+          "teams_rename_chat"
+        ],
+        "teams-files": [
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_get_channel_files_folder",
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file"
         ],
         "outlook-read": [
           "outlook_search_mail",
@@ -959,12 +1240,49 @@
         ],
         "sharepoint-search": [
           "sharepoint_search_files",
-          "sharepoint_browse_folder"
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives"
         ],
         "sharepoint-read": [
           "sharepoint_search_files",
           "sharepoint_browse_folder",
+          "sharepoint_list_drives",
           "sharepoint_read_file"
+        ],
+        "sharepoint-write": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_resolve_url",
+          "sharepoint_create_folder",
+          "sharepoint_create_text_file",
+          "sharepoint_rename_item",
+          "sharepoint_move_item",
+          "sharepoint_copy_item",
+          "sharepoint_delete_item"
+        ],
+        "sharepoint-share": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_resolve_url",
+          "sharepoint_create_folder",
+          "sharepoint_create_text_file",
+          "sharepoint_rename_item",
+          "sharepoint_move_item",
+          "sharepoint_copy_item",
+          "sharepoint_delete_item",
+          "sharepoint_create_share_link",
+          "sharepoint_invite"
+        ],
+        "sharepoint-sites": [
+          "sharepoint_search_files",
+          "sharepoint_browse_folder",
+          "sharepoint_list_drives",
+          "sharepoint_read_file",
+          "sharepoint_search_sites"
         ],
         "onenote-read": [
           "onenote_list_notebooks",
@@ -1025,12 +1343,19 @@
         "Chat.Read",
         "Team.ReadBasic.All",
         "Channel.ReadBasic.All",
+        "Files.Read.All",
         "ChannelMessage.Read.All",
         "ChatMessage.Send",
         "ChannelMessage.Send",
+        "Chat.ReadWrite",
+        "ChannelMessage.ReadWrite",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
         "OnlineMeetingRecording.Read.All",
+        "OnlineMeetingArtifact.Read.All",
+        "OnlineMeetings.ReadWrite",
+        "Chat.Create",
+        "ChatMember.ReadWrite",
         "Mail.Read",
         "Mail.Read.Shared",
         "People.Read",
@@ -1049,7 +1374,8 @@
         "Calendars.ReadWrite.Shared",
         "Contacts.Read",
         "Contacts.ReadWrite",
-        "Files.Read.All",
+        "Files.ReadWrite.All",
+        "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite"
@@ -1065,6 +1391,12 @@
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
+        "ChannelMessage.ReadWrite": true,
+        "Chat.ReadWrite": false,
+        "Chat.Create": false,
+        "ChatMember.ReadWrite": true,
+        "OnlineMeetings.ReadWrite": false,
+        "OnlineMeetingArtifact.Read.All": false,
         "Mail.Read": false,
         "Mail.Read.Shared": false,
         "People.Read": false,
@@ -1081,6 +1413,8 @@
         "Calendars.ReadWrite": false,
         "Calendars.ReadWrite.Shared": false,
         "Files.Read.All": true,
+        "Files.ReadWrite.All": true,
+        "Sites.Read.All": true,
         "Notes.Read": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,

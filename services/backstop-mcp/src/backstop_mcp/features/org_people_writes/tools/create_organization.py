@@ -42,8 +42,7 @@ async def create_organization(
     `name` is required and at most 50 characters. A repeated call creates a second
     record. Custom fields go through `update_custom_field_values`. Category ids come
     from `list_contact_categories`. To change an existing organization, use
-    `update_organization`. `destructive_hint` is true because this writes a new CRM
-    record.
+    `update_organization`.
 
     Call like: {"organization": {"name": "Acme Advisors",
     "category_ids": ["<id from list_contact_categories>"]}}

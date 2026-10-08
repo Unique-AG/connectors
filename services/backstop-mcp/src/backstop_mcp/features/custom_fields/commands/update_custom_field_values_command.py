@@ -126,11 +126,13 @@ class UpdateCustomFieldValuesCommand:
             )
         if definition.is_time_series and requested_row.effective_date is None:
             raise ToolError(
-                f"TimeSeriesCustomField({requested_row.definition_id}) need effectiveDate"
+                f"Custom field {requested_row.definition_id} is a time series and needs "
+                + "effective_date."
             )
         if not definition.is_time_series and requested_row.effective_date is not None:
             raise ToolError(
-                f"RegularCustomField({requested_row.definition_id}) does not need effectiveDate"
+                f"Custom field {requested_row.definition_id} is not a time series and rejects "
+                + "effective_date."
             )
         if definition.required and _is_blank(requested_row.value):
             raise ToolError(f"Custom field {requested_row.definition_id} is required.")
@@ -148,8 +150,8 @@ class UpdateCustomFieldValuesCommand:
         ):
             allowed = self._custom_fields_service.current_option_texts(definition.select_options)
             raise ToolError(
-                f"Invalid value for {requested_row.value}, valid options are "
-                + f"[{', '.join(allowed)}]"
+                f"Invalid value for custom field {requested_row.definition_id}. "
+                + f"Options: {', '.join(allowed)}."
             )
 
     def _outcomes(

@@ -10,20 +10,38 @@ from fastmcp.tools import Tool
 from fastmcp.utilities.types import File
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphNotFound
+from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandle
-from office_365_mcp.shared.notes import resource_id_in
-from office_365_mcp.shared.seam import READ_ONLY
+from office_365_mcp.shared.notes import OWNED_REFUSED, resource_id_in
+from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_read_resource as reader
 
 RESOURCE_ID = "1-SYNTHETICRESOURCE0000"
 
+GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
+
 _CONTENT_PATH = f"/me/onenote/resources/{RESOURCE_ID}/content"
+_GROUP_CONTENT_PATH = f"/groups/{GROUP_ID}/onenote/resources/{RESOURCE_ID}/content"
 
 _VALUE_ADDRESS = (
     f"https://graph.microsoft.com/v1.0/users('synthetic')/onenote/resources/{RESOURCE_ID}/$value"
 )
 _CONTENT_ADDRESS = f"https://graph.microsoft.com/v1.0/me/onenote/resources/{RESOURCE_ID}/content"
+
+_GROUP_ADDRESSES = [
+    f"https://graph.microsoft.com/v1.0/groups/{GROUP_ID}/onenote/resources/{RESOURCE_ID}/$value",
+    f"https://graph.microsoft.com/v1.0/groups('{GROUP_ID}')/onenote/resources/{RESOURCE_ID}/content",
+]
+
+_SITE_ID = (
+    "contoso.sharepoint.invalid,0d1e2f3a-0000-4000-8000-000000000001,"
+    + "4b5c6d7e-0000-4000-8000-000000000002"
+)
+_SITE_CONTENT_PATH = f"/sites/{_SITE_ID}/onenote/resources/{RESOURCE_ID}/content"
+_SITE_ADDRESSES = [
+    f"https://graph.microsoft.com/v1.0/sites/{_SITE_ID}/onenote/resources/{RESOURCE_ID}/$value",
+    f"https://graph.microsoft.com/v1.0/sites('{_SITE_ID}')/onenote/resources/{RESOURCE_ID}/content",
+]
 
 _BYTES = b"\x89PNG\r\nsynthetic-image-bytes"
 
@@ -72,6 +90,84 @@ class TestWhatItAsks:
         _ = await _read(client, transport, resource=_CONTENT_ADDRESS)
 
         assert content.call_count == 1
+
+
+class TestAGroupNotebook:
+    @pytest.fixture
+    def group_content(self, graph: respx.MockRouter) -> respx.Route:
+        return graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_BYTES, headers={"Content-Type": "image/png"})
+        )
+
+    @pytest.mark.parametrize("address", _GROUP_ADDRESSES)
+    async def test_a_group_address_fetches_the_content_under_the_group(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        group_content: respx.Route,
+        address: str,
+    ) -> None:
+        answer = await _read(client, transport, resource=address)
+
+        assert group_content.call_count == 1
+        assert graph.calls.call_count == 1, "nothing was read from /me"
+        assert answer.data == _BYTES
+
+    async def test_the_group_request_asks_the_same_way_as_the_me_request(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, group_content: respx.Route
+    ) -> None:
+        _ = await _read(client, transport, resource=_GROUP_ADDRESSES[0])
+
+        request = group_content.calls.last.request
+        assert request.headers["accept"] == "application/octet-stream, application/json"
+        assert request.url.params == httpx.QueryParams()
+
+    @pytest.mark.parametrize("address", [_VALUE_ADDRESS, _CONTENT_ADDRESS])
+    async def test_a_me_address_keeps_the_me_route(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        group_content: respx.Route,
+        content: respx.Route,
+        address: str,
+    ) -> None:
+        _ = await _read(client, transport, resource=address)
+
+        assert content.call_count == 1
+        assert group_content.call_count == 0
+
+    async def test_a_404_under_the_group_is_a_graph_not_found(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_GROUP_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "itemNotFound", "message": "Not Found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await _read(client, transport, resource=_GROUP_ADDRESSES[0])
+
+
+class TestASiteNotebook:
+    @pytest.mark.parametrize("address", _SITE_ADDRESSES)
+    async def test_a_site_address_fetches_the_content_under_the_site(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        address: str,
+    ) -> None:
+        site_content = graph.get(_SITE_CONTENT_PATH).mock(
+            return_value=httpx.Response(200, content=_BYTES, headers={"Content-Type": "image/png"})
+        )
+
+        answer = await _read(client, transport, resource=address)
+
+        assert site_content.call_count == 1
+        assert graph.calls.call_count == 1, "nothing was read from /me"
+        assert answer.data == _BYTES
 
 
 class TestWhatComesBack:
@@ -215,9 +311,57 @@ class TestGraphFailures:
         with pytest.raises(GraphNotFound):
             _ = await _read(client, transport)
 
+    async def test_a_403_on_a_me_address_is_a_graph_forbidden(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(
+            return_value=httpx.Response(
+                403, json={"error": {"code": "accessDenied", "message": "denied"}}
+            )
+        )
+
+        with pytest.raises(GraphForbidden):
+            _ = await _read(client, transport)
+
+    @pytest.mark.parametrize(
+        ("address", "route"),
+        [
+            (_GROUP_ADDRESSES[0], _GROUP_CONTENT_PATH),
+            (_SITE_ADDRESSES[0], _SITE_CONTENT_PATH),
+        ],
+        ids=["group", "site"],
+    )
+    async def test_a_403_on_an_owned_address_arrives_as_the_owned_advice_with_the_diagnostics(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        graph: respx.MockRouter,
+        address: str,
+        route: str,
+    ) -> None:
+        _ = graph.get(route).mock(
+            return_value=httpx.Response(
+                403,
+                headers={"request-id": "req-7"},
+                json={"error": {"code": "accessDenied", "message": "denied"}},
+            )
+        )
+
+        with pytest.raises(Advised) as refused:
+            _ = await _read(client, transport, resource=address)
+
+        assert str(refused.value) == (
+            OWNED_REFUSED + " (HTTP 403, Graph error code accessDenied, Graph request id req-7)"
+        )
+        assert isinstance(refused.value.__cause__, GraphForbidden)
+
     def test_the_not_found_advice_names_onenote_read_page_and_a_fresh_address(self) -> None:
         assert "onenote_read_page" in reader.GRAPH_NOT_FOUND
         assert "fails again" in reader.GRAPH_NOT_FOUND
+
+    def test_the_not_found_advice_names_the_notebooks_this_sign_in_can_miss(self) -> None:
+        assert "group, team or site notebook" in reader.GRAPH_NOT_FOUND
+        assert "out of reach through the sign-in of this connector" in reader.GRAPH_NOT_FOUND
 
 
 async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object], Tool]:

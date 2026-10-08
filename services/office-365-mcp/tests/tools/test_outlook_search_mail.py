@@ -1008,6 +1008,18 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
     return cast("Mapping[str, object]", tool.parameters), tool
 
 
+class TestAModelThatWantsOneFolderOrOnlyUnreadMail:
+    async def test_the_description_sends_it_to_the_listing_tool_while_neither_parameter_exists(
+        self, transport: httpx.AsyncClient
+    ) -> None:
+        parameters, tool = await _registered(transport)
+
+        properties = cast("Mapping[str, object]", parameters["properties"])
+        assert "folder" not in properties
+        assert "unread_only" not in properties
+        assert "outlook_list_mail" in (tool.description or "")
+
+
 class TestAttachmentContentIsNotSearchable:
     async def test_the_query_field_does_not_claim_to_reach_attachment_text(
         self, transport: httpx.AsyncClient

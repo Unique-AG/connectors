@@ -24,6 +24,8 @@ _VERSION = "9.9.9"
 _SECOND = "second_tool"
 _THIRD = "third_tool"
 
+_NO_VERDICT = "Synthetic.NoVerdict.All"
+
 
 @pytest.fixture
 def registry_of_three(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
@@ -192,7 +194,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
         assert f"{_SECOND}'s description mentions {_THIRD}" in _flat(manifest)
 
-    async def test_a_teams_deployment_is_told_only_about_the_lookup_get_me_names(self) -> None:
+    async def test_a_deployment_that_exposes_everything_is_told_nothing(self) -> None:
         """The real registry, because a note here would be a note in production."""
         selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
@@ -201,11 +203,25 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
             register_tools(mcp, transport, selection)
             manifest = await surface_manifest(mcp, selection, version=_VERSION)
 
-        assert _flat(manifest).count("does not expose") == 1
-        assert (
-            f"{ALWAYS_ON}'s description mentions outlook_find_recipient, which this deployment "
-            "does not expose"
-        ) in _flat(manifest)
+        assert "does not expose" not in _flat(manifest)
+
+    @pytest.mark.parametrize(
+        "preset",
+        [ToolsPreset.ONENOTE_READ, ToolsPreset.ONENOTE_WRITE, ToolsPreset.ONENOTE_DELETE],
+    )
+    async def test_a_onenote_deployment_is_told_nothing_about_teams_tools(
+        self, preset: ToolsPreset
+    ) -> None:
+        selection = resolve(preset=preset, enabled=None)
+        mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
+
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            manifest = await surface_manifest(mcp, selection, version=_VERSION)
+
+        assert "teams_" not in _flat(manifest)
+        if preset is not ToolsPreset.ONENOTE_READ:
+            assert "does not expose" not in _flat(manifest)
 
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
@@ -232,9 +248,13 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
 class TestTheManifestRefusesToGuess:
     async def test_a_permission_with_no_verdict_is_an_assertion_and_not_a_shrug(self) -> None:
+        assert _NO_VERDICT not in NEEDS_ADMIN_CONSENT
+        assert _NO_VERDICT not in REQUESTABLE_PERMISSIONS
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON,), permissions=("Sites.Read.All",), graph_scopes=()
+            preset=None, tools=(ALWAYS_ON,), permissions=(_NO_VERDICT,), graph_scopes=()
         )
 
-        with pytest.raises(AssertionError, match="no admin-consent verdict for Sites.Read.All"):
+        with pytest.raises(
+            AssertionError, match=f"no admin-consent verdict for {re.escape(_NO_VERDICT)}"
+        ):
             await _manifest_of(selection)

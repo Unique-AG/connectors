@@ -64,7 +64,7 @@ def _field_descriptions(model: type[BaseModel]) -> set[str]:
 _LOCATION: dict[str, object] = {
     "country": "United States of America",
     "countryResolvedName": "United States of America",
-    "address": "18867 North Thompson Peak Parkway, Suite 250",
+    "address": "1 Contoso Way",
     "city": "Scottsdale",
     "postalCode": "85255",
     "createdTimestamp": "2019-01-01T00:00:00Z",
@@ -73,7 +73,7 @@ _LOCATION: dict[str, object] = {
     "secondaryPhoneNumber": "",
     "cityResolvedName": "Scottsdale",
     "stateResolvedName": "AZ",
-    "phoneNumber": "(480) 419-3625",
+    "phoneNumber": "(555) 010-0000",
     "countryCode": "US",
     "primaryLocation": True,
     "modifiedTimestamp": "2020-01-01T00:00:00Z",
@@ -83,33 +83,33 @@ _LOCATION: dict[str, object] = {
 
 _PERSON: dict[str, object] = {
     "country": "United States",
-    "lastName": "Voss",
+    "lastName": "North",
     "gender": "UNSPECIFIED",
     "city": "Scottsdale",
     "prefix": "",
     "jobTitle": "Managing Director, Research",
-    "companyName": "Koch Industries Employees' Pension Plan",
+    "companyName": "Contoso Pension",
     "postalCode": "85255",
     "suffix": "",
     "email3": "",
-    "legalName": "Kent Voss",
+    "legalName": "Ada North",
     "email2": "",
     "state": "AZ",
     "fax": "",
     "syncDisabled": False,
-    "email": "vossk@kochinvests.com",
+    "email": "ada@contoso.example",
     "isEmployee": False,
     "otherId": "59DB5FF3D01344A6806CF3BA99FD4FE2",
     "nickName": "",
     "createdTimestamp": "2013-06-12T20:15:35.000-0400",
     "locationTitle": "Business",
-    "primaryPhoneNumber": "(480) 419-3625",
+    "primaryPhoneNumber": "(555) 010-0000",
     "firstName": "Kent",
     "mobilePhone": "(480) 205-2506",
     "investableAssets": 0.0,
-    "phone": "(480) 419-3625",
-    "streetAddress": "18867 North Thompson Peak Parkway, Suite 250",
-    "name": "Voss, Kent",
+    "phone": "(555) 010-0000",
+    "streetAddress": "1 Contoso Way",
+    "name": "Ada, North",
     "modifiedTimestamp": "2026-08-06T11:07:37.852-0400",
     "middleName": "",
     "regularCustomFieldValues": [],
@@ -142,20 +142,18 @@ _ORGANIZATION: dict[str, object] = {
     "fax": "",
     "syncDisabled": False,
     "email": "",
-    "website": "www.kbslp.com",
+    "website": "www.contoso.example",
     "createdTimestamp": "2013-06-17T08:53:24.000-0400",
     "locationTitle": "Business",
-    "primaryPhoneNumber": "(480) 419-3625",
+    "primaryPhoneNumber": "(555) 010-0000",
     "numberOfEmployees": 0,
     "investableAssets": 9660000000.0,
-    "phone": "(480) 419-3625",
-    "streetAddress": "18867 North Thompson Peak Parkway, Suite 250",
-    "name": "Koch Industries Employees' Pension Plan",
+    "phone": "(555) 010-0000",
+    "streetAddress": "1 Contoso Way",
+    "name": "Contoso Pension",
     "modifiedTimestamp": "2026-08-03T16:36:17.820-0400",
     "hasRecommendationViewed": True,
-    "contactDescription": (
-        "Koch Industries (~$11bn AUM) is a Wichita, Kansas-based multinational conglomerate."
-    ),
+    "contactDescription": ("Contoso Pension is a synthetic organization used in fixtures."),
     "groupEntities": [],
     "matchingDomains": [],
     "regularCustomFieldValues": [],
@@ -183,12 +181,12 @@ class TestContactLocation:
 
         assert location.model_dump() == {
             "location_title": "Business",
-            "address": "18867 North Thompson Peak Parkway, Suite 250",
+            "address": "1 Contoso Way",
             "city": "Scottsdale",
             "state": "AZ",
             "country": "United States of America",
             "postal_code": "85255",
-            "phone": "(480) 419-3625",
+            "phone": "(555) 010-0000",
             "is_primary": True,
         }
 
@@ -219,7 +217,7 @@ class TestContactEmail:
 
     def test_a_live_address_is_distinguishable_from_a_retired_one(self) -> None:
         live = ContactEmailResponse.model_validate(
-            {"sortOrder": 0, "retired": False, "email": "vossk@kochinvests.com"}
+            {"sortOrder": 0, "retired": False, "email": "ada@contoso.example"}
         )
 
         assert live.retired is False
@@ -227,7 +225,7 @@ class TestContactEmail:
     def test_an_address_with_no_retired_flag_is_rejected(self) -> None:
         """Unlabelled is worse than missing: a wrong address must not read as usable."""
         with pytest.raises(ValidationError):
-            ContactEmailResponse.model_validate({"email": "kent.voss@kochind.com"})
+            ContactEmailResponse.model_validate({"email": "ben@northwind.example"})
 
     def test_the_retired_description_says_not_to_use_the_address(self) -> None:
         description = ContactEmailResponse.model_fields["retired"].description
@@ -241,20 +239,20 @@ class TestContactCard:
         card = ContactCardResponse.model_validate(_PERSON)
 
         assert card.model_dump() == {
-            "name": "Voss, Kent",
+            "name": "Ada, North",
             "job_title": "Managing Director, Research",
-            "email": "vossk@kochinvests.com",
-            "phone": "(480) 419-3625",
-            "company_name": "Koch Industries Employees' Pension Plan",
+            "email": "ada@contoso.example",
+            "phone": "(555) 010-0000",
+            "company_name": "Contoso Pension",
         }
 
     def test_projects_categories_from_names_or_name_objects(self) -> None:
         from_strings = ContactCardResponse.model_validate(
-            {"name": "Glenn, Phil", "categories": ["Investor", "Decision Maker"]}
+            {"name": "Ben, West", "categories": ["Investor", "Decision Maker"]}
         )
         from_objects = ContactCardResponse.model_validate(
             {
-                "name": "Glenn, Phil",
+                "name": "Ben, West",
                 "categories": [{"name": "Investor"}, {"name": "  Decision Maker  "}, {"name": ""}],
             }
         )
@@ -269,8 +267,8 @@ class TestCompanyRef:
         company = CompanyRefResponse.model_validate(_ORGANIZATION)
 
         assert company.model_dump() == {
-            "name": "Koch Industries Employees' Pension Plan",
-            "website": "www.kbslp.com",
+            "name": "Contoso Pension",
+            "website": "www.contoso.example",
             "city": "Scottsdale",
             "state": "AZ",
             "country": "United States of America",
@@ -339,7 +337,6 @@ class TestTheIncludesModelsAreTheAllowlist:
             for name, include in _includes(ActivityIncludesResponse).items()
         } == {
             "activity_tags": ("activityTags", "activity-tags"),
-            "attendees": ("attendees", "people"),
         }
 
     def test_every_organization_field_asks_backstop_for_one_named_relationship(self) -> None:

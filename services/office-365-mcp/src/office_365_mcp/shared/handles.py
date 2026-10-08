@@ -15,8 +15,7 @@ Three of the five shapes are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a
 search cannot mint. Graph addresses a reply *under* its parent post, and the search projection
 carries no `replyToId`. So a channel hit that is really a reply becomes the plain channel shape
-instead, and Graph answers 404 to that. Only `teams_browse_channel` walks a channel post by post
-and knows each reply's parent.
+instead, and Graph answers 404 to that.
 
 A meeting is addressed by join URL, because that is the only route Graph gives a delegated
 caller from chat to meeting. No chat id, topic, or date turns into one. A transcript is addressed
@@ -34,10 +33,10 @@ handle comes back as "not a handle" rather than as a truncated URL Graph ignores
 
 Each mail `outlook:///` family is one segment, because Outlook addresses each of these by a single
 opaque id. The exception is an attachment. It adds `attachments/{attachment_id}` under its message
-or its event, because every Graph route to an attachment goes through that parent. There are four
-mail families rather than one. Graph gives them all one id space, but this connector keeps them
-apart: a draft is a message with `isDraft` set. Splitting them into four families keeps a message
-that a reader found from being spelled as a draft and handed to the tool that sends.
+or its event, because every Graph route to an attachment goes through that parent. There are three
+other mail families: messages, folders and rules. A draft is a message with `isDraft` set, and Graph
+gives it the same id space as any other message, so it has no family of its own. Whether a message
+is a draft is a fact that Graph reports. `outlook_send_draft` reads it before every send.
 
 A calendar is one segment: Graph says container types such as `calendar` support no immutable id,
 "but their regular IDs were already constant"
@@ -51,6 +50,7 @@ mailbox returns an error
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import quote, unquote
 
 # One per surface, and which surface a handle addresses is the whole of what picks between them.
@@ -146,23 +146,6 @@ class MailFolderHandle:
 
 
 @dataclass(frozen=True, slots=True)
-class MailDraftHandle:
-    """This identifies a draft that this connector composed. It is the only thing the sending
-    tool accepts.
-
-    Graph gives a draft the same id space as any other message. Keeping the families apart stops
-    a message that a reader found from being spelled as a draft. This is what makes "send the
-    mail you just wrote" expressible, and "send that mail I found" unspellable.
-    """
-
-    draft_id: str
-
-    @property
-    def uri(self) -> str:
-        return f"outlook:///drafts/{_segment(self.draft_id)}"
-
-
-@dataclass(frozen=True, slots=True)
 class MailRuleHandle:
     rule_id: str
 
@@ -248,48 +231,59 @@ class DriveFolderHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class OnenoteOwner:
+    kind: Literal["groups", "sites"]
+    owner_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class OnenoteSectionHandle:
     section_id: str
+    owner: OnenoteOwner | None = None
 
     @property
     def uri(self) -> str:
-        return f"onenote:///sections/{_segment(self.section_id)}"
+        return _owned_by(self.owner, f"onenote:///sections/{_segment(self.section_id)}")
 
 
 @dataclass(frozen=True, slots=True)
 class OnenotePageHandle:
     page_id: str
+    owner: OnenoteOwner | None = None
 
     @property
     def uri(self) -> str:
-        return f"onenote:///pages/{_segment(self.page_id)}"
+        return _owned_by(self.owner, f"onenote:///pages/{_segment(self.page_id)}")
 
 
 @dataclass(frozen=True, slots=True)
 class OnenoteNotebookHandle:
     notebook_id: str
+    owner: OnenoteOwner | None = None
 
     @property
     def uri(self) -> str:
-        return f"onenote:///notebooks/{_segment(self.notebook_id)}"
+        return _owned_by(self.owner, f"onenote:///notebooks/{_segment(self.notebook_id)}")
 
 
 @dataclass(frozen=True, slots=True)
 class OnenoteSectionGroupHandle:
     section_group_id: str
+    owner: OnenoteOwner | None = None
 
     @property
     def uri(self) -> str:
-        return f"onenote:///sectiongroups/{_segment(self.section_group_id)}"
+        return _owned_by(self.owner, f"onenote:///sectiongroups/{_segment(self.section_group_id)}")
 
 
 @dataclass(frozen=True, slots=True)
 class OnenoteOperationHandle:
     operation_id: str
+    owner: OnenoteOwner | None = None
 
     @property
     def uri(self) -> str:
-        return f"onenote:///operations/{_segment(self.operation_id)}"
+        return _owned_by(self.owner, f"onenote:///operations/{_segment(self.operation_id)}")
 
 
 # Ids are matched as "anything but a separator", because the spellers above percent-encode each one.
@@ -303,7 +297,6 @@ _TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
 _MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
 _MAIL_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)/attachments/([^/]+)\Z")
 _MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
-_MAIL_DRAFT_HANDLE = re.compile(r"\Aoutlook:///drafts/([^/]+)\Z")
 _MAIL_RULE_HANDLE = re.compile(r"\Aoutlook:///rules/([^/]+)\Z")
 _CALENDAR_HANDLE = re.compile(r"\Aoutlook:///calendars/([^/]+)\Z")
 _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
@@ -312,17 +305,31 @@ _CALENDAR_PERMISSION_HANDLE = re.compile(r"\Aoutlook:///calendarpermissions/([^/
 _CONTACT_HANDLE = re.compile(r"\Aoutlook:///contacts/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
-_ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///sections/([^/]+)\Z")
-_ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///pages/([^/]+)\Z")
-_ONENOTE_NOTEBOOK_HANDLE = re.compile(r"\Aonenote:///notebooks/([^/]+)\Z")
-_ONENOTE_SECTION_GROUP_HANDLE = re.compile(r"\Aonenote:///sectiongroups/([^/]+)\Z")
-_ONENOTE_OPERATION_HANDLE = re.compile(r"\Aonenote:///operations/([^/]+)\Z")
+_ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?sections/([^/]+)\Z")
+_ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?pages/([^/]+)\Z")
+_ONENOTE_NOTEBOOK_HANDLE = re.compile(
+    r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?notebooks/([^/]+)\Z"
+)
+_ONENOTE_SECTION_GROUP_HANDLE = re.compile(
+    r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?sectiongroups/([^/]+)\Z"
+)
+_ONENOTE_OPERATION_HANDLE = re.compile(
+    r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?operations/([^/]+)\Z"
+)
+_ONENOTE_ROOT = "onenote:///"
+
+
+_MESSAGE_HANDLE_SHAPES = """\
+A message handle has one of exactly three shapes:
+  teams:///chats/{chat_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{message_id}
+  teams:///teams/{team_id}/channels/{channel_id}/messages/{root_id}/replies/{reply_id}
+The ids are percent-encoded, for example \
+teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000. Copy the `uri` of a tool result \
+word for word."""
 
 
 def message_handle(uri: str) -> MessageHandle | None:
-    """`uri` as a message handle, or None if it is not one this connector can read. None rather than
-    an exception carrying advice: what to tell a caller about a malformed handle is each reader
-    tool's own wording."""
     chat = _CHAT_HANDLE.match(uri)
     if chat is not None:
         chat_id, message_id = (unquote(part) for part in chat.groups())
@@ -345,6 +352,20 @@ def message_handle(uri: str) -> MessageHandle | None:
             MessageHandle(message_id=message_id, team_id=team_id, channel_id=channel_id)
         )
     return None
+
+
+def not_a_message_handle(tool: str, outcome: str) -> str:
+    return " ".join(
+        part
+        for part in (
+            f"{tool} takes the `uri` handle of a Teams message from another Teams tool, and this "
+            + "value is not one.",
+            _MESSAGE_HANDLE_SHAPES,
+            outcome,
+            "If you call this tool again with the same arguments, the call will fail the same way.",
+        )
+        if part
+    )
 
 
 def meeting_handle(uri: str) -> MeetingHandle | None:
@@ -378,11 +399,6 @@ def mail_attachment_handle(uri: str) -> MailAttachmentHandle | None:
 def mail_folder_handle(uri: str) -> MailFolderHandle | None:
     folder_id = _single_id(_MAIL_FOLDER_HANDLE, uri)
     return None if folder_id is None else MailFolderHandle(folder_id)
-
-
-def mail_draft_handle(uri: str) -> MailDraftHandle | None:
-    draft_id = _single_id(_MAIL_DRAFT_HANDLE, uri)
-    return None if draft_id is None else MailDraftHandle(draft_id)
 
 
 def mail_rule_handle(uri: str) -> MailRuleHandle | None:
@@ -430,29 +446,36 @@ def drive_folder_handle(uri: str) -> DriveFolderHandle | None:
     return None if ids is None else DriveFolderHandle(*ids)
 
 
+def drive_item_handle(uri: str) -> DriveFileHandle | DriveFolderHandle | None:
+    file = drive_file_handle(uri)
+    if file is not None:
+        return file
+    return drive_folder_handle(uri)
+
+
 def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
-    section_id = _single_id(_ONENOTE_SECTION_HANDLE, uri)
-    return None if section_id is None else OnenoteSectionHandle(section_id)
+    owned = _owned_id(_ONENOTE_SECTION_HANDLE, uri)
+    return None if owned is None else OnenoteSectionHandle(owned[1], owner=owned[0])
 
 
 def onenote_page_handle(uri: str) -> OnenotePageHandle | None:
-    page_id = _single_id(_ONENOTE_PAGE_HANDLE, uri)
-    return None if page_id is None else OnenotePageHandle(page_id)
+    owned = _owned_id(_ONENOTE_PAGE_HANDLE, uri)
+    return None if owned is None else OnenotePageHandle(owned[1], owner=owned[0])
 
 
 def onenote_notebook_handle(uri: str) -> OnenoteNotebookHandle | None:
-    notebook_id = _single_id(_ONENOTE_NOTEBOOK_HANDLE, uri)
-    return None if notebook_id is None else OnenoteNotebookHandle(notebook_id)
+    owned = _owned_id(_ONENOTE_NOTEBOOK_HANDLE, uri)
+    return None if owned is None else OnenoteNotebookHandle(owned[1], owner=owned[0])
 
 
 def onenote_section_group_handle(uri: str) -> OnenoteSectionGroupHandle | None:
-    section_group_id = _single_id(_ONENOTE_SECTION_GROUP_HANDLE, uri)
-    return None if section_group_id is None else OnenoteSectionGroupHandle(section_group_id)
+    owned = _owned_id(_ONENOTE_SECTION_GROUP_HANDLE, uri)
+    return None if owned is None else OnenoteSectionGroupHandle(owned[1], owner=owned[0])
 
 
 def onenote_operation_handle(uri: str) -> OnenoteOperationHandle | None:
-    operation_id = _single_id(_ONENOTE_OPERATION_HANDLE, uri)
-    return None if operation_id is None else OnenoteOperationHandle(operation_id)
+    owned = _owned_id(_ONENOTE_OPERATION_HANDLE, uri)
+    return None if owned is None else OnenoteOperationHandle(owned[1], owner=owned[0])
 
 
 def onenote_container_handle(uri: str) -> OnenoteNotebookHandle | OnenoteSectionGroupHandle | None:
@@ -514,6 +537,27 @@ def _single_id(pattern: re.Pattern[str], uri: str) -> str | None:
         return None
     value = unquote(match.group(1))
     return value if value.strip() else None
+
+
+def _owned_id(pattern: re.Pattern[str], uri: str) -> tuple[OnenoteOwner | None, str] | None:
+    match = pattern.match(uri)
+    if match is None:
+        return None
+    kind, encoded_owner, encoded_id = match.groups()
+    owner_id = None if encoded_owner is None else unquote(encoded_owner)
+    value = unquote(encoded_id)
+    if not value.strip() or (owner_id is not None and not owner_id.strip()):
+        return None
+    if owner_id is None:
+        return None, value
+    return OnenoteOwner("groups" if kind == "groups" else "sites", owner_id), value
+
+
+def _owned_by(owner: OnenoteOwner | None, uri: str) -> str:
+    if owner is None:
+        return uri
+    family = uri.removeprefix(_ONENOTE_ROOT)
+    return f"{_ONENOTE_ROOT}{owner.kind}/{_segment(owner.owner_id)}/{family}"
 
 
 def _segment(value: str) -> str:

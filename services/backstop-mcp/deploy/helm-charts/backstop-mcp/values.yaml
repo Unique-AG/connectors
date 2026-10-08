@@ -6,6 +6,12 @@ nameOverride: backstop-mcp
 fullnameOverride: backstop-mcp
 selectorComponentLabel: server
 
+# Tenant guidance overlay: text appended to the server instructions and to individual tool
+# and parameter descriptions. Set per deployment in the overlay, never here — the chart ships
+# tenant-neutral. Shape: `TenantGuidance` in the server code and values.schema.json.
+# Empty means the shipped descriptions only.
+tenantGuidance: {}
+
 # Loki scrapes use this label to parse stderr as pino-json
 # (unique_mcp.configure_logging).
 podLabels:
@@ -57,10 +63,21 @@ env:
   BACKSTOP_TIME_ZONE_CACHE_ENABLED: "false"
 
   # Bounds how long a tool waits for the user to choose between ambiguous matches before
-  # returning the candidate list instead. A property of the *client*, not of this server: it
-  # must stay under that client's tool-call deadline, with margin for the upstream search that
-  # precedes the prompt. Lower it in an overlay whose client cancels sooner than 60s.
-  RESOLUTION_ELICIT_TIMEOUT_SECONDS: "45"
+  # returning the candidate list instead. The server waits 2 minutes. The Unique chat client
+  # can still cancel a tool call at 60s, and then the candidates are discarded.
+  RESOLUTION_ELICIT_TIMEOUT_SECONDS: "120"
+
+  # Most accounts get_product_investors values in one call. Each is one Backstop request
+  # (about 0.14s warm, so 150 is about 21s); keep it well inside the chat client's 60s
+  # tool-call limit.
+  PRODUCT_INVESTORS_MAX_VALUED_ACCOUNTS: "150"
+
+  # Rows one search call returns before it stops and hands back a cursor to the next page.
+  SEARCH_RESULT_SIZE: "100"
+
+  BACKSTOP_MCP_TENANT_GUIDANCE:
+    value: '{{ toJson .Values.tenantGuidance }}'
+    if: '{{ not (empty .Values.tenantGuidance) }}'
 
 envVars: []
 # Required secrets (provide via envVars in overlay):
@@ -70,7 +87,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/backstop-mcp
-  tag: 0.0.7 # x-release-please-version
+  tag: 0.0.8 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -168,3 +185,17 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+
+# Alert when Backstop ignores a filter we sent (search_activities row check).
+prometheus:
+  additionalAlerts:
+    BackstopFilterIgnored:
+      alert: BackstopFilterIgnored
+      annotations:
+        summary: "Backstop ignored a filter the connector sent"
+        description: "backstop_filter_ignored_total increased. A scoped activity search may be paging the wrong set. Increase over 15m: {{ $value }}."
+      expr: increase(backstop_filter_ignored_total[15m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        alertGroup: backstop-mcp

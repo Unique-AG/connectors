@@ -39,7 +39,7 @@ VOCABULARY: dict[str, OpportunityStageResponse] = {
     for stage in (
         OpportunityStageResponse(id="42478", name="Prospect", closed=False, sort_order=1),
         OpportunityStageResponse(id="42480", name="Project", closed=False, sort_order=2),
-        OpportunityStageResponse(id="42482", name="IDD", closed=False, sort_order=3),
+        OpportunityStageResponse(id="42482", name="Stage B", closed=False, sort_order=3),
         OpportunityStageResponse(id="85446", name="Client Approval", closed=False, sort_order=4),
         OpportunityStageResponse(id="85444", name="Execution", closed=False, sort_order=5),
         OpportunityStageResponse(id="96016", name="Invested", closed=True, sort_order=6),
@@ -200,11 +200,11 @@ class TestUpdateOpportunityCommand:
         )
 
         result = await make_command(client).run(
-            new_opportunity=_update(opportunity_id=_ID, stage="IDD")
+            new_opportunity=_update(opportunity_id=_ID, stage="Stage B")
         )
 
         assert isinstance(result, UpdatedOpportunityResponse)
-        assert result.stage == "IDD"
+        assert result.stage == "Stage B"
         assert result.stage_id == "42482"
         assert result.warnings == ()
         stage = object_dict(_relationships(recorded_json_bodies(route)[0])["stage"])
@@ -232,7 +232,7 @@ class TestUpdateOpportunityCommand:
     async def test_only_supplied_fields_appear_in_the_payload(self, client: BackstopClient) -> None:
         _mock_catalogs()
         respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
-            return_value=_opportunity_document(_ID, name="Koch", requestedAmount=1_000_000)
+            return_value=_opportunity_document(_ID, name="Contoso", requestedAmount=1_000_000)
         )
         route = respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
             return_value=_opportunity_document(_ID, requestedAmount=2_000_000)
@@ -276,7 +276,7 @@ class TestUpdateOpportunityCommand:
 
         await make_command(client).run(
             new_opportunity=_update(
-                opportunity_id=_ID, stage="IDD", stage_effective_date="2099-01-15"
+                opportunity_id=_ID, stage="Stage B", stage_effective_date="2099-01-15"
             )
         )
 
@@ -334,7 +334,7 @@ class TestUpdateOpportunityCommand:
             return_value=_opportunity_document(_ID)
         )
 
-        with pytest.raises(ToolError, match="Available stages:.*IDD"):
+        with pytest.raises(ToolError, match="Available stages:.*Stage B"):
             await make_command(client).run(
                 new_opportunity=_update(opportunity_id=_ID, stage="Not A Stage")
             )
@@ -357,7 +357,7 @@ class TestUpdateOpportunityCommand:
             await make_command(client).run(
                 new_opportunity=_update(
                     opportunity_id=_ID,
-                    stage="IDD",
+                    stage="Stage B",
                     stage_effective_date=date(2026, 6, 1),
                 )
             )
@@ -377,13 +377,13 @@ class TestUpdateOpportunityCommand:
         )
 
         result = await make_command(client).run(
-            new_opportunity=_update(opportunity_id=_ID, stage="IDD")
+            new_opportunity=_update(opportunity_id=_ID, stage="Stage B")
         )
 
         assert result.stage == "Prospect"
         assert result.stage_id == "42478"
         assert result.warnings
-        assert "IDD" in result.warnings[0]
+        assert "Stage B" in result.warnings[0]
         assert "not applied" in result.warnings[0]
 
     @respx.mock
@@ -579,7 +579,7 @@ class TestUpdateOpportunityCommand:
         )
 
         result = await make_command(client).run(
-            new_opportunity=_update(opportunity_id=_ID, stage="IDD")
+            new_opportunity=_update(opportunity_id=_ID, stage="Stage B")
         )
 
         assert result.warnings == ()

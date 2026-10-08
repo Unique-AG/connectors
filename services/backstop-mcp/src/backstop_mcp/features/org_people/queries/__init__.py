@@ -4,10 +4,18 @@ from backstop_mcp.features.org_people.queries.get_people_for_organization_query 
     GetPeopleForOrganizationQuery,
 )
 from backstop_mcp.features.org_people.queries.get_person_query import GetPersonQuery
+from backstop_mcp.features.org_people.queries.search_organizations_query import (
+    SearchOrganizationsQuery,
+)
+from backstop_mcp.features.org_people.queries.search_people_query import (
+    SearchPeopleQuery,
+)
 
 __all__ = [
     "MAX_ORG_PEOPLE",
     "GetOrganizationQuery",
     "GetPeopleForOrganizationQuery",
     "GetPersonQuery",
+    "SearchOrganizationsQuery",
+    "SearchPeopleQuery",
 ]

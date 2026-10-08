@@ -20,9 +20,11 @@ from office_365_mcp.shared.handles import (
     onenote_container_handle,
 )
 from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
     ContainerAudience,
     client_url_of,
     container_audience,
+    onenote_root,
     web_url_of,
     write_state_for,
 )
@@ -31,6 +33,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     answer_pending,
     graph_client_for_caller,
+    owner_refused,
     person_confirms,
 )
 
@@ -57,8 +60,9 @@ _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
 _DESCRIPTION = """\
-Creates a new, empty section directly under `parent`, a notebook or a section group. OneNote can \
-show the change to everyone who opens the notebook.
+Creates a new, empty section directly under `parent`, a notebook or a section group. The notebook \
+can be the signed-in user's own, or one that a Microsoft 365 group or a SharePoint site owns. \
+OneNote can show the change to everyone who opens the notebook.
 
 Notes:
 - This tool asks the user to agree before it writes into a notebook that is shared with other \
@@ -76,9 +80,11 @@ _NOT_A_PARENT_HANDLE = (
     + "notebook in an onenote_list_notebooks result, from a onenote_find_notebook_from_url "
     + "answer, or from a onenote_create_notebook answer. A section group handle looks like "
     + "onenote:///sectiongroups/{id} and comes from the `uri` of a section group in an "
-    + "onenote_list_sections result, or from a onenote_create_section_group answer. A section "
-    + "handle (onenote:///sections/{id}), a page handle, a plain name and a web address are none "
-    + "of them one of these. This same value fails again, so do not retry it."
+    + "onenote_list_sections result, or from a onenote_create_section_group answer. A handle "
+    + "from a group or site notebook starts with onenote:///groups/{group}/ or "
+    + "onenote:///sites/{site}/ instead. A section handle (onenote:///sections/{id}), a page "
+    + "handle, a plain name and a web address are none of them one of these. This same value fails "
+    + "again, so do not retry it."
 )
 
 GRAPH_NOT_FOUND = (
@@ -94,8 +100,10 @@ class CreatedSection(BaseModel):
     uri: str = Field(
         description=(
             "This new section's handle: onenote:///sections/{id}, with the id "
-            + "percent-encoded. Pass it to onenote_create_page to write the first page into it, "
-            + "or to onenote_list_pages to see what it holds."
+            + "percent-encoded. A handle from a group or site notebook starts with "
+            + "onenote:///groups/{group}/ or onenote:///sites/{site}/ instead. Pass it to "
+            + "onenote_create_page to write the first page into it, or to onenote_list_pages to "
+            + "see what it holds."
         )
     )
     name: str | None = Field(
@@ -153,7 +161,8 @@ async def create_section(
     created: OnenoteSection | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
         container = await container_audience(client, handle)
         if answer_pending or container.notebook.reaches_others:
             with not_graph():
@@ -193,15 +202,16 @@ async def _post_section(
     *,
     name: str,
 ) -> OnenoteSection | None:
+    root = onenote_root(client, handle.owner)
     section = OnenoteSection(display_name=name)
     request_configuration = RequestConfiguration[QueryParameters](options=no_retry())
     if isinstance(handle, OnenoteNotebookHandle):
-        return await client.me.onenote.notebooks.by_notebook_id(handle.notebook_id).sections.post(
+        return await root.notebooks.by_notebook_id(handle.notebook_id).sections.post(
             section, request_configuration=request_configuration
         )
-    return await client.me.onenote.section_groups.by_section_group_id(
-        handle.section_group_id
-    ).sections.post(section, request_configuration=request_configuration)
+    return await root.section_groups.by_section_group_id(handle.section_group_id).sections.post(
+        section, request_configuration=request_configuration
+    )
 
 
 def _answer(
@@ -211,7 +221,7 @@ def _answer(
         "Graph created a section it gave no id, which cannot be addressed"
     )
     return CreatedSection(
-        uri=OnenoteSectionHandle(section.id).uri,
+        uri=OnenoteSectionHandle(section.id, owner=handle.owner).uri,
         name=section.display_name,
         is_default=section.is_default,
         web_url=web_url_of(section.links),
@@ -236,12 +246,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "Where the new section is created, as a `uri`. A notebook's `uri` comes from "
-                    + "onenote_list_notebooks, onenote_find_notebook_from_url, or "
-                    + "onenote_create_notebook. A section group's `uri` comes from "
-                    + "onenote_list_sections or onenote_create_section_group. A section group "
-                    + "nests at any depth, so pass a group's own `uri` to nest a new section "
-                    + "under it."
+                    "Where the new section is created, as a `uri`. A notebook's handle, "
+                    + "onenote:///notebooks/{id}, comes from onenote_list_notebooks, "
+                    + "onenote_find_notebook_from_url, or onenote_create_notebook. A section "
+                    + "group's handle, onenote:///sectiongroups/{id}, comes from "
+                    + "onenote_list_sections or onenote_create_section_group. A handle from a "
+                    + "group or site notebook starts with onenote:///groups/{group}/ or "
+                    + "onenote:///sites/{site}/ instead. A section group at any depth can be the "
+                    + "parent."
                 ),
             ),
         ],

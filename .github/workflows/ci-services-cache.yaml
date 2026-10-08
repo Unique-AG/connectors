@@ -1,0 +1,69 @@
+name: "[CI] Services Cache Warming"
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # Every day at 5 AM UTC
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to warm cache for (comma-separated or "all")'
+        required: true
+        default: "all"
+
+permissions:
+  contents: read # to read the repository
+  packages: read # to let the called workflow log in to GHCR and read the cache image
+  actions: read # to let the called workflow read the GitHub Actions cache
+
+jobs:
+  build-matrix:
+    name: Build matrix
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The list contains a service only if it has the file services/<name>/deploy/Dockerfile.
+      # A service without a Dockerfile fails the build.
+      - name: Build service matrix
+        id: matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          available=$(find services -mindepth 3 -maxdepth 3 -type f -path 'services/*/deploy/Dockerfile' | cut -d/ -f2 | sort)
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_SERVICES" != "all" ]; then
+            IFS=',' read -ra requested <<< "$INPUT_SERVICES"
+            valid=()
+            for service in "${requested[@]}"; do
+              service=$(echo "$service" | xargs)
+              if echo "$available" | grep -qx "$service"; then
+                valid+=("$service")
+              else
+                echo "::error::Unknown service: $service"
+                echo "Available services: $available"
+                exit 1
+              fi
+            done
+            services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            services=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+
+  cache:
+    name: ${{ matrix.service }}
+    needs: build-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.build-matrix.outputs.services) }}
+    uses: ./.github/workflows/_template-cache.yaml
+    with:
+      service-name: ${{ matrix.service }}
+      service-path: services/${{ matrix.service }}

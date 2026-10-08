@@ -13,6 +13,8 @@ from backstop_mcp.features.includes import PersonInclude
 from backstop_mcp.features.org_people import GetPersonQuery, PersonResolvedResponse
 from backstop_mcp.features.org_people.dependencies import get_person_query_factory
 from backstop_mcp.features.party_resolver import (
+    PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
+    SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
     PartyAmbiguousResponse,
     ResolvedPartyResponse,
     ResolvePartyQuery,
@@ -49,20 +51,13 @@ async def get_person(
     party_id: Annotated[
         str | None,
         Field(
-            description=(
-                "Trusted Backstop person Party ID from a prior resolve echo "
-                "(`id` / `search_type` / `name`). Never invent or guess. Exactly one of "
-                "`party_id` or `search` must be provided."
-            ),
+            description=PARTY_ID_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search: Annotated[
         str | None,
         Field(
-            description=(
-                "Person name or email to resolve when no trusted `party_id` is available. "
-                "Exactly one of `party_id` or `search` must be provided."
-            ),
+            description=SEARCH_DEFAULT_SEARCH_TYPE_DESCRIPTION,
         ),
     ] = None,
     search_type: Annotated[
@@ -152,16 +147,18 @@ async def get_person(
     email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
 
+    Title, department, location, and email are `job_title`, `department`, the `locations`
+    include, and `email`. Do not ask the user for standard field names such as `job_title`
+    or `department`. get_people_for_party leaves department off; call this when the prompt
+    asks for it.
+
     Call like: {"party_id": "<id from prior resolve echo>", "include": ["locations", "company"]}
 
     Side-loads entityRelationships and their relationship types on the same GET (no extra round
     trip). `employments` lists every current and former organization link — always relay those
     entries; do not present a person as a current contact at an organization whose link has
-    `status="former"` unless they explicitly asked for historical contacts. Key employee
-    is not on this record: `GET /people` omits `isKeyEmployee` even when the organization
-    roster is true. Read it on `get_people_for_party`. It cannot be written through these
-    tools — personal API tokens do not persist `isKeyRelationship`; set Key employee in
-    the CRM UI.
+    `status="former"` unless they explicitly asked for historical contacts. `is_key_employee`
+    is present but unreliable; `get_people_for_party` is the source.
 
     Pass `include` to side-load related records on that same GET — addresses, the email address
     book, their organization, the representative. They come back under `included`, where a

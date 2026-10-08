@@ -20,8 +20,6 @@
     "check-all": "pnpm style && pnpm check-types && pnpm test && syncpack lint",
     "fix-all": "pnpm style:fix && syncpack fix-mismatches",
     "syncpack": "syncpack",
-    "quality": "./scripts/lint.sh",
-    "ct:install": "ct install --config .github/configs/ct-install.yaml",
     "helm-docs:sharepoint": "services/sharepoint-connector/deploy/helm-charts/helm-docs.sh",
     "helm-docs:confluence": "services/confluence-connector/deploy/helm-charts/helm-docs.sh",
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
@@ -30,7 +28,7 @@
     "@biomejs/biome": "2.5.14",
     "rimraf": "6.1.3",
     "syncpack": "15.3.3",
-    "turbo": "2.11.2",
+    "turbo": "2.11.7",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
     "vite": "catalog:",

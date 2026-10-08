@@ -17,7 +17,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.handles import MailDraftHandle, mail_draft_handle, mail_message_handle
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
@@ -45,20 +45,29 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (
 CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
-    "draft_ref": "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D"
+    "draft_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D"
 }
 
-_DRAFT_FIELDS: tuple[str, ...] = ("toRecipients", "ccRecipients", "subject", "isDraft", "changeKey")
+_DRAFT_FIELDS: tuple[str, ...] = (
+    "toRecipients",
+    "ccRecipients",
+    "bccRecipients",
+    "subject",
+    "isDraft",
+    "changeKey",
+)
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
-Sends one draft that this connector composed, from the signed-in user's own mailbox or, with \
-`mailbox`, a shared or delegated one. The draft handle comes from outlook_draft_mail, \
-outlook_draft_reply, outlook_draft_reply_all or outlook_update_draft. These four tools and this \
-tool are in the outlook-send preset. This connector cannot undo a send or recall the message.
+Sends one mail draft, from the signed-in user's own mailbox or, with `mailbox`, a shared or \
+delegated one. The handle comes from outlook_draft_mail, outlook_draft_reply, \
+outlook_draft_reply_all or outlook_update_draft. These four tools and this tool are in the \
+outlook-send preset. This connector cannot undo a send or recall the message.
 
 Notes:
+- This tool reads the message first. It sends nothing unless Microsoft holds the message as a \
+draft.
 - This tool asks the user to agree before it sends anything, every time. This tool sends nothing \
 unless the user agrees.
 - If the draft changes after this tool asks the user, this tool sends nothing. A new call asks the \
@@ -67,42 +76,31 @@ user about the draft as it is now.
 call again, make sure that outlook_list_mail does not show the message in `sentitems`.
 """
 
-_NOT_A_DRAFT_HANDLE = (
-    "outlook_send_draft takes the `draft_ref` handle that outlook_draft_mail, "
-    + "outlook_draft_reply or outlook_draft_reply_all answered with, and this is not one. "
-    + "A sendable handle has exactly one shape:\n"
-    + "  outlook:///drafts/{draft_id}\n"
+_NOT_A_MESSAGE_HANDLE = (
+    "outlook_send_draft takes the `draft_ref` handle of the draft to send, and this is not one. "
+    + "Use the `uri` that outlook_draft_mail or outlook_draft_reply answered with. A handle has "
+    + "exactly one shape:\n"
+    + "  outlook:///messages/{message_id}\n"
     + "with the id percent-encoded, for example "
-    + "outlook:///drafts/AAMkAGI2SYNTHETIC-draft-0001%3D. Only a handle of the drafts family is "
-    + "accepted, and only the drafting tools mint one. A subject line, an email address, a "
-    + "message id and an Outlook web link are not handles. Neither is a folder or rule handle "
-    + "under the same scheme, which addresses something that is not a draft. Nothing was sent. "
-    + "If the mail still needs writing, call outlook_draft_mail and send the handle it answers "
-    + "with. Retrying this value will fail identically."
+    + "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0001%3D. A subject line, an email address, a "
+    + "bare message id and an Outlook web link are not handles. Neither is a folder or rule "
+    + "handle under the same scheme, which addresses something that is not a message. Nothing "
+    + "was sent. If the mail still needs writing, call outlook_draft_mail and send the handle it "
+    + "answers with. Retrying this value will fail identically."
 )
 
-_A_MESSAGE_IS_NOT_A_DRAFT = (
-    "That is a message handle (outlook:///messages/{id}), and outlook_send_draft will not send "
-    + "it. Nothing was sent. Only a draft THIS CONNECTOR COMPOSED can be sent. That is why a "
-    + "draft has a handle family of its own: outlook:///drafts/{id}, minted by outlook_draft_mail, "
-    + "outlook_draft_reply and outlook_draft_reply_all, and by nothing else. "
-    + "A message handle comes from reading the "
-    + "mailbox: a search hit, a folder listing, a thread. So it addresses mail somebody else "
-    + "wrote, or mail that was already sent. Neither one has a route here to an outbound "
-    + "message. If the user wants to reply to that message, draft the reply first with "
-    + "outlook_draft_reply. Show it to them. Then send the draft handle it answers with."
-)
-
-_ALREADY_SENT = (
-    "That draft handle addresses a message Microsoft does not hold as a draft any more. So "
-    + "outlook_send_draft refused it, and NOTHING WAS SENT BY THIS CALL. Overwhelmingly, the "
-    + "likeliest reason is that the message was already sent: by an earlier call in this "
-    + "conversation, or by the user in Outlook. In that case it is already on its way, and "
-    + "sending it again delivers a duplicate. Microsoft documents this route as sending an "
-    + "existing draft, and does not say what it does to a message that already went out. An "
-    + "action that cannot be undone is not worth finding out. Do not retry this handle: it will "
-    + "be refused the same way. Tell the user the mail was probably already sent. If they "
-    + "want a fresh message, compose a new draft with outlook_draft_mail."
+_NOT_A_DRAFT = (
+    "That handle addresses a message that Microsoft does not hold as a draft, so "
+    + "outlook_send_draft refused it. NOTHING WAS SENT BY THIS CALL. The message can be mail that "
+    + "somebody sent to the user. It can also be a draft that somebody already sent: by an "
+    + "earlier call in this conversation, or by the user in Outlook. In that case it is already "
+    + "on its way, and sending it again delivers a duplicate. Microsoft documents this route as "
+    + "sending an existing draft, and does not say what it does to a message that already went "
+    + "out. An action that cannot be undone is not worth finding out. Do not retry this handle: "
+    + "it will be refused the same way. If you drafted this mail in this conversation, tell the "
+    + "user it was probably already sent. If the user wants to reply to this message, draft the "
+    + "reply with outlook_draft_reply and send the handle it answers with. If they want a fresh "
+    + "message, compose a new draft with outlook_draft_mail."
 )
 
 _CHANGED_AFTER_ASKING = (
@@ -132,6 +130,7 @@ class MailSent(BaseModel):
 SEND = "send"
 _DO_NOT_SEND = "do not send"
 _NOTHING_SENT = "Nothing was sent, and the draft is untouched and still in Drafts."
+_NO_ADDRESS = "an address Microsoft did not record"
 
 type _Confirm = Callable[[Message, str | None], Awaitable[Confirmed]]
 
@@ -141,9 +140,12 @@ def a_person_agrees(ctx: Context) -> _Confirm:
 
     async def asked(draft: Message, mailbox: str | None) -> Confirmed:
         everyone = [
-            one.address or one.name or "an address Microsoft did not record"
+            one.address or one.name or _NO_ADDRESS
             for one in MailAddress.each_of(draft.to_recipients)
             + MailAddress.each_of(draft.cc_recipients)
+        ] + [
+            f"{one.address or one.name or _NO_ADDRESS} (blind copy)"
+            for one in MailAddress.each_of(draft.bcc_recipients)
         ]
         identity = f" as {mailbox}" if mailbox is not None else ""
         question = (
@@ -169,7 +171,7 @@ async def send_draft(
     asked: InputRequiredResult | None = None
     with graph_errors(TOOL_NAME):
         draft = await _read(reached, handle)
-        refused: str | None = _ALREADY_SENT
+        refused: str | None = _NOT_A_DRAFT
         if draft is not None and draft.is_draft is True:
             with not_graph():
                 answer = await confirm(draft, mailbox)
@@ -188,33 +190,31 @@ async def send_draft(
     return _answer(draft, sent_at=sent_at)
 
 
-def _handle_for(draft_ref: str) -> MailDraftHandle:
-    handle = mail_draft_handle(draft_ref)
-    if handle is not None:
-        return handle
-    if mail_message_handle(draft_ref) is not None:
-        raise ToolError(_A_MESSAGE_IS_NOT_A_DRAFT)
-    raise ToolError(_NOT_A_DRAFT_HANDLE)
+def _handle_for(draft_ref: str) -> MailMessageHandle:
+    handle = mail_message_handle(draft_ref)
+    if handle is None:
+        raise ToolError(_NOT_A_MESSAGE_HANDLE)
+    return handle
 
 
-async def _read(reached: UserItemRequestBuilder, handle: MailDraftHandle) -> Message | None:
+async def _read(reached: UserItemRequestBuilder, handle: MailMessageHandle) -> Message | None:
     with graph_step(STEP_READ_DRAFT):
-        return await reached.messages.by_message_id(handle.draft_id).get(
+        return await reached.messages.by_message_id(handle.message_id).get(
             request_configuration=_read_request()
         )
 
 
 def _refusal_after(asked_about: Message, latest: Message | None) -> str | None:
     if latest is None or latest.is_draft is not True:
-        return _ALREADY_SENT
+        return _NOT_A_DRAFT
     if latest.change_key != asked_about.change_key:
         return _CHANGED_AFTER_ASKING
     return None
 
 
-async def _send(reached: UserItemRequestBuilder, handle: MailDraftHandle) -> datetime:
+async def _send(reached: UserItemRequestBuilder, handle: MailMessageHandle) -> datetime:
     with graph_step(STEP_SEND_DRAFT):
-        await reached.messages.by_message_id(handle.draft_id).send.post(
+        await reached.messages.by_message_id(handle.message_id).send.post(
             request_configuration=_send_request()
         )
     return datetime.now(UTC)

@@ -22,7 +22,10 @@ from backstop_mcp.config import (
     BackstopConfig,
     DatabaseConfig,
     EncryptionConfig,
+    ProductInvestorsConfig,
     ResolutionConfig,
+    SearchConfig,
+    TenantGuidanceConfig,
 )
 from backstop_mcp.db import create_engine, create_session_factory
 from backstop_mcp.features.auth import (
@@ -66,6 +69,21 @@ def get_activity_history_config() -> ActivityHistoryConfig:
 @lru_cache(maxsize=1)
 def get_resolution_config() -> ResolutionConfig:
     return ResolutionConfig()
+
+
+@lru_cache(maxsize=1)
+def get_product_investors_config() -> ProductInvestorsConfig:
+    return ProductInvestorsConfig()
+
+
+@lru_cache(maxsize=1)
+def get_search_config() -> SearchConfig:
+    return SearchConfig()
+
+
+@lru_cache(maxsize=1)
+def get_tenant_guidance_config() -> TenantGuidanceConfig:
+    return TenantGuidanceConfig()
 
 
 @lru_cache(maxsize=1)

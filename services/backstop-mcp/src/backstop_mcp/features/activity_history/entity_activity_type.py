@@ -1,7 +1,8 @@
 """Search-path activity types shared by the search tool and `SearchActivitiesQuery`.
 
 These cannot live on the query — the tool names them on its published parameter, and the
-query file is the undocumented POST walker, not the vocabulary.
+query file is the `POST /entity-activities` walker, not the vocabulary. Each token is also
+the `newFilters.types` search value Backstop matches.
 """
 
 from typing import Literal

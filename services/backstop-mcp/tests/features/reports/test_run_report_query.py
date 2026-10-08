@@ -1,15 +1,25 @@
 """`RunReportQuery`: one GET /reports page, flattened to columns and rows."""
 
+import asyncio
+import time
 from datetime import date
 
 import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.features.reports import RunReportResponse
+from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
+from backstop_mcp.features.reports import (
+    ReportRun,
+    ReportRunCache,
+    ReportRunKey,
+    RunReportPendingResponse,
+    RunReportQuery,
+    RunReportResponse,
+)
+from backstop_mcp.features.reports.queries import REPORT_RUN_CACHE_SIZE, REPORT_RUN_TTL_SECONDS
 from tests.features.reports.conftest import make_run_report_query
-from tests.helpers import BASE_URL, recorded_params
+from tests.helpers import BASE_URL, client_factory, credential, recorded_params
 
 _REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
@@ -70,12 +80,48 @@ async def _run(
     as_of_date: date = _AS_OF,
     report_name: str = _REPORT_NAME,
 ) -> RunReportResponse:
-    return await make_run_report_query(client).run(
+    result = await make_run_report_query(client).run(
         report_name=report_name,
         as_of_date=as_of_date,
         limit=limit,
         offset=offset,
     )
+    assert isinstance(result, RunReportResponse)
+    return result
+
+
+class _ColdBuild:
+    """A respx side effect that answers only once released — a cold report build.
+
+    Counts requests as they start: respx records a call only after its side effect returns,
+    so a build that is cancelled while held never shows up in `route.call_count`.
+    """
+
+    def __init__(self, response: httpx.Response) -> None:
+        self.release: asyncio.Event = asyncio.Event()
+        self.started: int = 0
+        self._response: httpx.Response = response
+
+    async def __call__(self, _request: httpx.Request) -> httpx.Response:
+        self.started += 1
+        await self.release.wait()
+        return self._response
+
+
+def _other_key(report_name: str) -> ReportRunKey:
+    return ReportRunKey(
+        caller="someone.else", report_name=report_name, as_of_date=_AS_OF, limit=3, offset=0
+    )
+
+
+async def _never_answers() -> RunReportResponse:
+    await asyncio.Event().wait()
+    raise AssertionError("a parked run is only ever evicted")
+
+
+def _parked_run() -> ReportRun:
+    """A run of another caller's that only takes up a cache slot."""
+    return ReportRun(task=asyncio.create_task(_never_answers()), started_at=time.monotonic())
 
 
 class TestRunReportQuery:
@@ -108,13 +154,10 @@ class TestRunReportQuery:
         assert "filter[showHiddenColumns][eq]" not in params
         assert result.report_name == _REPORT_NAME
         assert result.as_of_date == _AS_OF
-        assert [(column.name, column.title) for column in result.columns] == [
-            ("Email", "Email"),
-            ("Company Name", "Company Name"),
-        ]
+        assert result.columns == ("Email", "Company Name")
         assert result.rows == (
-            {"Email": "first@example.com", "Company Name": "Example Advisory"},
-            {"Email": "second@example.com", "Company Name": "Example Super"},
+            ("first@example.com", "Example Advisory"),
+            ("second@example.com", "Example Super"),
         )
         assert result.row_count == 2
         assert result.total == 15
@@ -164,7 +207,7 @@ class TestRunReportQuery:
         result = await _run(client)
 
         assert result.row_count == 1
-        assert result.rows == ({"Email": "ok@example.com", "Company Name": "Ok"},)
+        assert result.rows == (("ok@example.com", "Ok"),)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -198,7 +241,47 @@ class TestRunReportQuery:
 
         result = await _run(client)
 
-        assert [column.name for column in result.columns] == ["Email"]
+        assert result.columns == ("Email",)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_publishes_titles_and_places_cells_by_header_key(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Company Name": "Example Advisory", "email_key": "first@example.com"},
+                header=[_column("email_key", "Email"), _column("Company Name")],
+            )
+        )
+
+        result = await _run(client)
+
+        assert result.columns == ("Email", "Company Name")
+        assert result.rows == (("first@example.com", "Example Advisory"),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_missing_cell_is_null(self, client: BackstopClient) -> None:
+        respx.get(_REPORTS_URL).mock(return_value=_report_page({"Email": "ok@example.com"}))
+
+        result = await _run(client)
+
+        assert result.rows == (("ok@example.com", None),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_keeps_a_cell_the_header_did_not_list(self, client: BackstopClient) -> None:
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": "ok@example.com", "Company Name": "Ok", "Region": "EMEA"},
+            )
+        )
+
+        result = await _run(client)
+
+        assert result.columns == ("Email", "Company Name", "Region")
+        assert result.rows == (("ok@example.com", "Ok", "EMEA"),)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -222,7 +305,7 @@ class TestRunReportQuery:
 
         result = await _run(client)
 
-        assert [row["Email"] for row in result.rows] == [
+        assert [row[0] for row in result.rows] == [
             "first@example.com",
             "second@example.com",
         ]
@@ -237,3 +320,271 @@ class TestRunReportQuery:
         await _run(client)
 
         assert route.call_count == 1
+
+
+class TestRunReportQueryColdBuild:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_slow_build_is_pending_then_collected_without_a_second_request(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page({"Email": "one@example.com"}))
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+
+        pending = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        build.release.set()
+        collected = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert pending == RunReportPendingResponse(
+            report_name=_REPORT_NAME,
+            as_of_date=_AS_OF,
+            limit=3,
+            offset=0,
+            running_seconds=0,
+        )
+        assert isinstance(collected, RunReportResponse)
+        assert collected.rows == (("one@example.com", None),)
+        assert build.started == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_collected_run_is_not_served_again(self, client: BackstopClient) -> None:
+        route = respx.get(_REPORTS_URL).mock(return_value=_report_page())
+        query = make_run_report_query(client)
+
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_pages_are_separate_runs(self, client: BackstopClient) -> None:
+        build = _ColdBuild(_report_page({"Email": "one@example.com"}))
+        route = respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+
+        first = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        second = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        build.release.set()
+        page = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert isinstance(first, RunReportPendingResponse)
+        assert isinstance(second, RunReportPendingResponse)
+        assert isinstance(page, RunReportResponse)
+        assert page.offset == 3
+        assert build.started == 2
+        assert sorted(params["page[offset]"] for params in recorded_params(route)) == ["0", "3"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_dates_are_separate_runs(self, client: BackstopClient) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+        other_date = date(2026, 9, 30)
+
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=other_date, limit=3, offset=0)
+        build.release.set()
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=other_date, limit=3, offset=0)
+
+        assert build.started == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_expired_run_is_cancelled_and_started_again(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        route = respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05, ttl_seconds=0)
+
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        build.release.set()
+        await asyncio.sleep(0.05)
+
+        assert build.started == 2
+        # The expired build was cancelled, so only the second one ever answered.
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_full_cache_cancels_the_oldest_run(self, client: BackstopClient) -> None:
+        build = _ColdBuild(_report_page())
+        route = respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05, cache_size=1)
+
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        build.release.set()
+        collected = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        restarted = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert isinstance(collected, RunReportResponse)
+        assert isinstance(restarted, RunReportResponse)
+        # Offset 0 was evicted while held, so it never answered and had to be sent again.
+        assert build.started == 3
+        assert route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_run_evicted_while_a_call_waits_is_started_over(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.2, cache_size=1)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        await asyncio.sleep(0.05)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        evicted = await waiting
+        build.release.set()
+        await asyncio.sleep(0.05)
+
+        # The waiting call's run was cancelled by the eviction; it answers pending, not
+        # CancelledError, and starts a new run for the next call to collect.
+        assert isinstance(evicted, RunReportPendingResponse)
+        assert build.started >= 3
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_two_calls_waiting_on_an_evicted_run_share_one_replacement(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.2, cache_size=1)
+
+        waiting = [
+            asyncio.create_task(
+                query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            )
+            for _ in range(2)
+        ]
+        await asyncio.sleep(0.05)
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+        results = await asyncio.gather(*waiting)
+        build.release.set()
+        await asyncio.sleep(0.05)
+
+        # The second waiter joins the replacement the first one started instead of failing.
+        assert all(isinstance(result, RunReportPendingResponse) for result in results)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_failed_run_raises_to_the_waiting_caller_and_is_dropped(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(httpx.Response(400, json={"errors": [{"detail": "Report X not found"}]}))
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=1.0)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        await asyncio.sleep(0.02)
+        build.release.set()
+        with pytest.raises(BackstopApiError):
+            await waiting
+        with pytest.raises(BackstopApiError):
+            await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert build.started == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_run_that_fails_after_the_caller_left_is_not_served_later(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(httpx.Response(400, json={"errors": [{"detail": "Report X not found"}]}))
+        route = respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+
+        pending = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        build.release.set()
+        await asyncio.sleep(0.05)
+        route.mock(side_effect=None, return_value=_report_page({"Email": "one@example.com"}))
+        fresh = await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+
+        # Nobody was waiting when the build failed; the next call starts over rather than
+        # re-raising the old error for up to the cache's TTL.
+        assert isinstance(pending, RunReportPendingResponse)
+        assert isinstance(fresh, RunReportResponse)
+        assert fresh.rows == (("one@example.com", None),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_run_evicted_twice_while_a_call_waits_is_still_collected(
+        self, client: BackstopClient
+    ) -> None:
+        build = _ColdBuild(_report_page({"Email": "one@example.com"}))
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        cache = ReportRunCache(maxsize=1, ttl_seconds=REPORT_RUN_TTL_SECONDS)
+        query = RunReportQuery(client=client, run_cache=cache, wait_seconds=1.0)
+
+        waiting = asyncio.create_task(
+            query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        )
+        for evictions in (1, 2):
+            await asyncio.sleep(0.02)
+            assert build.started == evictions
+            cache.add(_other_key(f"Other {evictions}"), _parked_run())
+        await asyncio.sleep(0.02)
+        build.release.set()
+        collected = await waiting
+
+        # Each eviction started a replacement, and the call kept waiting on it until its own
+        # deadline rather than answering pending after the first.
+        assert isinstance(collected, RunReportResponse)
+        assert collected.rows == (("one@example.com", None),)
+        assert build.started == 3
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_reports_are_separate_runs(self, client: BackstopClient) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05)
+
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name="Other Report", as_of_date=_AS_OF, limit=3, offset=0)
+        build.release.set()
+        await query.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        await query.run(report_name="Other Report", as_of_date=_AS_OF, limit=3, offset=0)
+
+        assert build.started == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_other_callers_get_their_own_run(self) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        factory = client_factory()
+        cache = ReportRunCache(maxsize=REPORT_RUN_CACHE_SIZE, ttl_seconds=REPORT_RUN_TTL_SECONDS)
+        bob, alice = (
+            RunReportQuery(
+                client=factory.for_credential(credential(username)),
+                run_cache=cache,
+                wait_seconds=0.05,
+            )
+            for username in ("bob.smith", "alice.jones")
+        )
+        try:
+            await bob.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            await alice.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            build.release.set()
+            await bob.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+            await alice.run(report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0)
+        finally:
+            await factory.aclose()
+
+        # Backstop decides what each caller may see, so one caller never collects another's run.
+        assert build.started == 2
