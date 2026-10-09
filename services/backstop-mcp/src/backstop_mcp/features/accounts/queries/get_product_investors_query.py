@@ -24,6 +24,8 @@ from backstop_mcp.features.accounts.responses import (
     ProductInvestorsResolvedResponse,
     ProductListingResponse,
     investors_from_listings,
+    longest_held_today,
+    longest_tenure_runs,
 )
 from backstop_mcp.features.accounts.utils import tenure_runs
 
@@ -75,9 +77,12 @@ class GetProductInvestorsQuery:
         latest_value_hint: str | None = None
         if include_latest_value:
             listings, latest_value_hint = await self._with_latest_values(listings)
+        investors = self._investors(listings, per_product)
         return ProductInvestorsResolvedResponse(
             products=tuple(listings),
-            investors=self._investors(listings, per_product),
+            investors=investors,
+            longest_tenure_runs=longest_tenure_runs(investors),
+            longest_held_today=longest_held_today(investors),
             latest_value_hint=latest_value_hint,
             investor_ids_not_found=(
                 self._not_found(investor_ids, per_product) if investor_ids else None

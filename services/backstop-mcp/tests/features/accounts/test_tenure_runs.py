@@ -28,7 +28,7 @@ class TestTenureRuns:
         )
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
-            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18),)
+            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18, held_today=True),)
         )
 
     def test_a_gap_starts_a_new_run_and_both_are_kept(self) -> None:
@@ -40,8 +40,10 @@ class TestTenureRuns:
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
             runs=(
-                TenureRunDto(start=date(2007, 8, 1), end=date(2009, 6, 30), years=1.91),
-                TenureRunDto(start=date(2025, 3, 1), end=None, years=1.6),
+                TenureRunDto(
+                    start=date(2007, 8, 1), end=date(2009, 6, 30), years=1.91, held_today=False
+                ),
+                TenureRunDto(start=date(2025, 3, 1), end=None, years=1.6, held_today=True),
             )
         )
 
@@ -75,7 +77,11 @@ class TestTenureRuns:
         spans = (_closed(date(2012, 3, 1), date(2025, 3, 31)),)
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
-            runs=(TenureRunDto(start=date(2012, 3, 1), end=date(2025, 3, 31), years=13.08),)
+            runs=(
+                TenureRunDto(
+                    start=date(2012, 3, 1), end=date(2025, 3, 31), years=13.08, held_today=False
+                ),
+            )
         )
 
     def test_overlapping_closed_accounts_merge_without_an_open_one(self) -> None:
@@ -92,7 +98,11 @@ class TestTenureRuns:
         spans = (_closed(date(2020, 1, 1), date(2026, 12, 31)),)
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
-            runs=(TenureRunDto(start=date(2020, 1, 1), end=date(2026, 12, 31), years=6.77),)
+            runs=(
+                TenureRunDto(
+                    start=date(2020, 1, 1), end=date(2026, 12, 31), years=6.77, held_today=True
+                ),
+            )
         )
 
     def test_an_account_that_has_not_started_yet_is_not_tenure(self) -> None:
@@ -110,7 +120,7 @@ class TestTenureRuns:
         spans = (_closed(date(2015, 1, 1), date(2026, 12, 31)), _open(date(2027, 1, 1)))
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
-            runs=(TenureRunDto(start=date(2015, 1, 1), end=None, years=11.77),)
+            runs=(TenureRunDto(start=date(2015, 1, 1), end=None, years=11.77, held_today=True),)
         )
 
     def test_equal_length_runs_put_the_more_recent_first(self) -> None:
@@ -130,7 +140,7 @@ class TestTenureRuns:
         spans = (_closed(date(2010, 1, 1), None), _open(date(2020, 1, 1)))
 
         assert tenure_runs(spans, today=_TODAY) == TenureDto(
-            runs=(TenureRunDto(start=date(2020, 1, 1), end=None, years=6.77),),
+            runs=(TenureRunDto(start=date(2020, 1, 1), end=None, years=6.77, held_today=True),),
             undated_accounts=1,
         )
 

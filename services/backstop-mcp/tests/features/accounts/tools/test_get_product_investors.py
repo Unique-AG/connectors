@@ -545,7 +545,8 @@ class TestGetProductInvestors:
         assert schema["required"] == ["products"]
         products = object_dict(properties["products"])
         assert products["minItems"] == 1
-        assert products["maxItems"] == 10
+        assert products["maxItems"] == 25
+        assert "in one call" in str(products["description"])
         latest = object_dict(properties["include_latest_value"])
         assert latest["default"] is False
         assert "Pass true when the answer needs balances" in str(latest["description"])
@@ -573,6 +574,9 @@ class TestGetProductInvestors:
         assert "ask whether to pull latest" not in doc
         assert "include_latest_value=true" in doc
         assert "latest_value_totals" in doc
+        assert "longest_tenure_runs" in doc
+        assert "longest_held_today" in doc
+        assert "Count only `has_open_account: true`" in doc
         assert "Investor Location" not in doc
         assert "geographical" not in doc
         assert "us_domiciled" not in doc
@@ -714,7 +718,9 @@ class TestGetProductInvestors:
                 if object_dict(entry)["name"] == "Contoso Private Bank"
             )
         )
-        assert private_bank["tenure_runs"] == [{"start": "2008-08-01", "years": 18.18}]
+        assert private_bank["tenure_runs"] == [
+            {"start": "2008-08-01", "years": 18.18, "held_today": True}
+        ]
         assert private_bank["tenure_undated_accounts"] == 1
 
     @pytest.mark.asyncio
@@ -798,6 +804,97 @@ class TestGetProductInvestors:
             ("Fabrikam Endowment", False, ("gone",)),
             ("Contoso Private Bank", True, ("rotated", "live")),
         ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_longest_tenure_ranks_leavers_and_names_the_longest_still_held(
+        self, client: BackstopClient
+    ) -> None:
+        # The longest run ended; the longest one held today belongs to someone else.
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account(
+                    "gone",
+                    owner_id="1",
+                    accountStartDate="2012-03-01",
+                    closedDate="2025-03-31",
+                ),
+                _account("held", owner_id="2", accountStartDate="2018-09-01"),
+                _account(
+                    "closing",
+                    owner_id="3",
+                    accountStartDate="2016-01-01",
+                    closedDate="2026-12-31",
+                ),
+                _account("back", owner_id="4", accountStartDate="2024-01-01"),
+                _account(
+                    "before",
+                    owner_id="4",
+                    accountStartDate="2005-01-01",
+                    closedDate="2010-12-31",
+                ),
+                included=[
+                    _owner("1", name="Fabrikam Endowment"),
+                    _owner("2", name="Contoso Pension"),
+                    _owner("3", name="Woodgrove Trust"),
+                    _owner("4", name="Tailspin Family Office"),
+                ],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        assert result.longest_tenure_runs is not None
+        assert [
+            (run.investor_name, run.years, run.held_today) for run in result.longest_tenure_runs
+        ] == [
+            ("Fabrikam Endowment", 13.08, False),
+            ("Woodgrove Trust", 10.77, True),
+            ("Contoso Pension", 8.1, True),
+            ("Tailspin Family Office", 6.0, False),
+        ]
+        assert result.longest_held_today is not None
+        assert (
+            result.longest_held_today.investor_id,
+            result.longest_held_today.end,
+            result.longest_held_today.years,
+        ) == ("3", date(2026, 12, 31), 10.77)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_dated_run_omits_the_tenure_ranking(self, client: BackstopClient) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account("undated", owner_id=_OWNER_ID),
+                included=[_owner(_OWNER_ID, name="Contoso Pension")],
+            )
+        )
+
+        payload = tool_payload(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_product_investors_query=make_get_product_investors_query(
+                    client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                ),
+            )
+        )
+
+        assert "longest_tenure_runs" not in payload
+        assert "longest_held_today" not in payload
 
     @pytest.mark.asyncio
     @respx.mock

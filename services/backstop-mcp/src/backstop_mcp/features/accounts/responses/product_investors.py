@@ -6,13 +6,16 @@ Two views of the same rows, so nothing has to be joined by the reader:
   products are the same shape.
 - `investors` — one entry per owner, with a holding per vehicle they are in.
 
+`longest_tenure_runs` and `longest_held_today` rank the investors' runs here, so a tenure
+question is read off the response rather than sorted by the reader.
+
 Figures appear only when the caller passed `include_latest_value`: each account's latest value,
 and totals per holding and per investor, summed by currency. Totals never mix currencies.
 """
 
 from collections.abc import Mapping, Sequence
 from datetime import date
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field
 
@@ -236,6 +239,53 @@ def investors_from_listings(
     )
 
 
+class InvestorTenureRunResponse(TenureRunResponse):
+    """One investor's run, ranked against the other investors' runs in this response."""
+
+    investor_id: str = Field(description="The investor, as in `investors[].id`.")
+    investor_name: str | None = Field(
+        default=None, description="That investor's name. Omitted when unknown."
+    )
+
+    @classmethod
+    def from_run(cls, investor: InvestorResponse, run: TenureRunResponse) -> Self:
+        return cls(
+            investor_id=investor.id,
+            investor_name=investor.name,
+            start=run.start,
+            end=run.end,
+            years=run.years,
+            held_today=run.held_today,
+        )
+
+
+_LONGEST_TENURE_COUNT = 5
+
+
+def longest_tenure_runs(
+    investors: Sequence[InvestorResponse],
+) -> tuple[InvestorTenureRunResponse, ...] | None:
+    """Each investor's longest run, leavers included, longest first; the more recent on a tie."""
+    runs = [
+        InvestorTenureRunResponse.from_run(investor, investor.tenure_runs[0])
+        for investor in investors
+        if investor.tenure_runs
+    ]
+    ranked = sorted(runs, key=lambda run: (run.years, run.start), reverse=True)
+    return tuple(ranked[:_LONGEST_TENURE_COUNT]) or None
+
+
+def longest_held_today(investors: Sequence[InvestorResponse]) -> InvestorTenureRunResponse | None:
+    """The longest run still held today, across every investor; the more recent on a tie."""
+    held = [
+        InvestorTenureRunResponse.from_run(investor, run)
+        for investor in investors
+        for run in investor.tenure_runs or ()
+        if run.held_today
+    ]
+    return max(held, key=lambda run: (run.years, run.start), default=None)
+
+
 def _owner_tenure(tenure: Mapping[str, TenureDto], owner_id: str) -> TenureDto:
     owner_tenure = tenure.get(owner_id)
     assert owner_tenure is not None, f"no tenure computed for listed owner {owner_id}"
@@ -283,8 +333,26 @@ class ProductInvestorsResolvedResponse(OmitNoneModel):
             "One entry per investor across every product here — use this to organize by "
             "investor rather than by account. An investor in two vehicles appears once, with a "
             "holding per vehicle. Investors who have left are listed too, with "
-            "`has_open_account: false`: leave them out of a count of who holds these products."
+            "`has_open_account: false`: leave them out of a count of who holds these products "
+            "today, but not out of tenure — see `longest_tenure_runs`."
         )
+    )
+    longest_tenure_runs: tuple[InvestorTenureRunResponse, ...] | None = Field(
+        default=None,
+        description=(
+            f"Up to {_LONGEST_TENURE_COUNT} investors ranked by their longest unbroken run in "
+            "these products, longest first. Investors who have left are ranked too: read "
+            "`held_today`. Runs are already merged across closed and reopened accounts. Omitted "
+            "when no investor has a dated run."
+        ),
+    )
+    longest_held_today: InvestorTenureRunResponse | None = Field(
+        default=None,
+        description=(
+            "The longest run still held today, across every investor here — the longest-standing "
+            "current investor. Can differ from `longest_tenure_runs[0]` when that investor has "
+            "left. Omitted when no run is held today."
+        ),
     )
     latest_value_hint: str | None = Field(
         default=None,

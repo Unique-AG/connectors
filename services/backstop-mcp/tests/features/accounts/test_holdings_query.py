@@ -711,7 +711,7 @@ class TestClosedFiltering:
 
         assert [row.account_id for row in result.rows] == ["new"]
         assert result.tenure == TenureDto(
-            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18),)
+            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18, held_today=True),)
         )
 
 
@@ -1083,7 +1083,7 @@ class TestDocumentedWalk:
 
         assert [row.account_id for row in listing.rows] == ["new", "undated"]
         assert listing.tenure == TenureDto(
-            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18),),
+            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18, held_today=True),),
             undated_accounts=1,
         )
 

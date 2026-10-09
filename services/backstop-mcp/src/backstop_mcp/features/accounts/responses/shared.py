@@ -65,8 +65,8 @@ class ProductRefResponse(OmitNoneModel):
 TENURE_RUNS_DESCRIPTION = (
     "Accounts merge into one run where they touch or overlap; a gap of more than a day starts a "
     "new run. Closed accounts count whatever `include_closed` was. Longest first, the more "
-    "recent first on a tie. A run is held today when it has no `end` or an `end` after today; a "
-    "run that ended is listed alongside it."
+    "recent first on a tie. `held_today` says whether a run is still held; a run that ended is "
+    "listed alongside it."
 )
 
 
@@ -88,10 +88,16 @@ class TenureRunResponse(OmitNoneModel):
             "this rather than working the dates out."
         )
     )
+    held_today: bool = Field(
+        description=(
+            "True when the run is still held today: no `end`, or an `end` after today. False "
+            "when it ended — the investor left, or came back later in another run."
+        )
+    )
 
     @classmethod
     def from_dto(cls, run: TenureRunDto) -> Self:
-        return cls(start=run.start, end=run.end, years=run.years)
+        return cls(start=run.start, end=run.end, years=run.years, held_today=run.held_today)
 
 
 class OwnerResponse(OmitNoneModel):

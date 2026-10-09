@@ -32,6 +32,8 @@ from backstop_mcp.features.accounts.responses.product_investors import (
     ProductListingResponse,
     ValueTotalResponse,
     investors_from_listings,
+    longest_held_today,
+    longest_tenure_runs,
 )
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
@@ -83,4 +85,6 @@ __all__ = [
     "closed_hint",
     "ValueTotalResponse",
     "investors_from_listings",
+    "longest_held_today",
+    "longest_tenure_runs",
 ]

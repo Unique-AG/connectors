@@ -429,8 +429,8 @@ class TestClosedFiltering:
 
         payload = object_dict(tool_payload(result))
         assert payload["tenure_runs"] == [
-            {"start": "2008-08-01", "end": "2012-12-31", "years": 4.42},
-            {"start": "2016-01-01", "end": "2018-06-30", "years": 2.49},
+            {"start": "2008-08-01", "end": "2012-12-31", "years": 4.42, "held_today": False},
+            {"start": "2016-01-01", "end": "2018-06-30", "years": 2.49, "held_today": False},
         ]
         assert payload["holdings"] == []
 

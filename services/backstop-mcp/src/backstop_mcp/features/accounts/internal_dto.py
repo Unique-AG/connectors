@@ -384,7 +384,8 @@ class TenureRunDto(BaseModel):
 
     `end` is `None` while the run is still held through an open account. A run held today through
     an account that closes later keeps that future `end`. `years` is the length held so far, from
-    `start` to `end` or today, whichever is earlier.
+    `start` to `end` or today, whichever is earlier. `held_today` is whether the run reaches past
+    today, so a reader never compares `end` to the date itself.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -392,6 +393,7 @@ class TenureRunDto(BaseModel):
     start: date
     end: date | None
     years: float
+    held_today: bool
 
     @classmethod
     def from_bounds(cls, start: date, end: date, *, today: date) -> Self:
@@ -400,6 +402,7 @@ class TenureRunDto(BaseModel):
             start=start,
             end=None if end == date.max else end,
             years=round((min(end, today) - start).days / _DAYS_PER_YEAR, 2),
+            held_today=end > today,
         )
 
 
