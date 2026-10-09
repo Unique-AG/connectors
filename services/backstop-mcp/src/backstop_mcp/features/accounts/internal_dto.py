@@ -45,11 +45,13 @@ __all__ = [
     "SeriesPointDto",
     "ShareDto",
     "TenureDto",
+    "TenureRunDto",
 ]
 
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
+_DAYS_PER_YEAR = 365.25
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -377,18 +379,45 @@ class AccountSpanDto(BaseModel):
     is_open: bool
 
 
-class TenureDto(BaseModel):
-    """An owner's unbroken holding up to today, over every account — closed ones included.
+class TenureRunDto(BaseModel):
+    """One unbroken stretch of holding: touching or overlapping account spans merged.
 
-    `continuous_since` is the start of the run of touching or overlapping account spans that
-    reaches today; `None` when no run does (the owner left, or every open account is undated).
-    `undated_accounts` lack a start date, or are closed with no closed date: they cannot be placed
-    on the timeline and are not in the run.
+    `end` is `None` while the run is still held through an open account. A run held today through
+    an account that closes later keeps that future `end`. `years` is the length held so far, from
+    `start` to `end` or today, whichever is earlier. `held_today` is whether the run reaches past
+    today, so a reader never compares `end` to the date itself.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    continuous_since: date | None = None
+    start: date
+    end: date | None
+    years: float
+    held_today: bool
+
+    @classmethod
+    def from_bounds(cls, start: date, end: date, *, today: date) -> Self:
+        """A merged run on the timeline; `end` is `date.max` while held through an open account."""
+        return cls(
+            start=start,
+            end=None if end == date.max else end,
+            years=round((min(end, today) - start).days / _DAYS_PER_YEAR, 2),
+            held_today=end > today,
+        )
+
+
+class TenureDto(BaseModel):
+    """An owner's unbroken holding runs over every account — closed ones included.
+
+    `runs` are longest first, the more recent run first on a tie. A run that ended counts as much as
+    one still held: which of them answers a tenure question is the caller's reading, not this
+    model's. `undated_accounts` lack a start date, are closed with no closed date, or closed before
+    they started: they cannot be placed on the timeline and are in no run.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    runs: tuple[TenureRunDto, ...] = ()
     undated_accounts: int = 0
 
 
