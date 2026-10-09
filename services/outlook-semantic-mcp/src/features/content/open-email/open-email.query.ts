@@ -9,7 +9,7 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { Nullish } from '~/utils/nullish';
-import { SearchBackend } from '../search/semantic-search-emails.query';
+import { SearchBackend } from '../search/search-results.types';
 
 const recipientSchema = z.object({
   emailAddress: z.object({ address: z.string() }).optional(),

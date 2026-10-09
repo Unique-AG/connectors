@@ -96,7 +96,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 
 | Category | Tools |
 |----------|-------|
-| Email Search | `search_emails`, `open_email` |
+| Email Search | `search_emails`, `fetch_next_search_pages`, `open_email` |
 | Draft Creation | `create_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
@@ -384,7 +384,9 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 ### How does `search_emails` search?
 
-**Mode A (`microsoft_graph_and_unique_api`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–10 entries) and `msGraphKeywordSearchQueries` (KQL, 1–10 entries), both addressing the same user question from different angles. A `limit` parameter on each entry (100–200 for semantic, 1–100 for KQL) controls the maximum per-query results. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
+**Mode A (`microsoft_graph_and_unique_api`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–3 entries) and `msGraphKeywordSearchQueries` (KQL, 1–3 entries), both addressing the same user question. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
+
+**Both modes:** results carry matched passages and/or a short body preview, never full bodies — the agent reads an email in full with `open_email`. Results are paged: each backend request returns at most `limit` emails (default 25, max 50) and a cursor id, and the agent fetches further pages with `fetch_next_search_pages`. A page Microsoft throttled is returned with status `throttled` and can be retried with the same cursor id.
 
 **Mode B (`microsoft_graph`):** `search_emails` queries Microsoft Graph directly using KQL keyword search only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering via the `directories` field is supported for your own mailbox and for mailboxes where you have Full Access delegation. Search is **not supported at all** for mailboxes where you only have folder-level (partial) access — Microsoft Graph rejects any search request against such mailboxes. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 

@@ -20,7 +20,7 @@ import { SuggestMeetingTimesTool } from './calendar/suggest-meeting-times.tool';
 import { UpdateEventTool } from './calendar/update-event.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
-import { SearchEmailsTool, SearchModule } from './content';
+import { FetchNextSearchPagesTool, SearchEmailsTool, SearchModule } from './content';
 import { OpenEmailModule } from './content/open-email/open-email.module';
 import { OpenEmailTool } from './content/open-email/open-email.tool';
 import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
@@ -79,6 +79,7 @@ export function registerBackendModule(): DynamicModule {
     CreateDraftEmailTool,
     LookupContactsTool,
     SearchEmailsTool,
+    FetchNextSearchPagesTool,
     OpenEmailTool,
   ];
 

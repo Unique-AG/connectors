@@ -1,4 +1,17 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
+import { SEARCH_CONFIG } from './search.config';
+
+const { pageSize, maxQueriesPerBackend, maxResultsPerChain } = SEARCH_CONFIG;
+
+const READING_EMAILS = `## Reading emails
+  Results carry only partial content in \`text\` — never the full email. Answer from \`text\` only when it clearly contains the answer. Otherwise call \`open_email\` with the result's \`openEmailParams\` object, passed directly as the tool input, for every email whose content you need. Also call it when the user asks to open, read, or see an email. Do NOT tell the user you cannot access the email or that you lack mailbox access.`;
+
+const PAGING = `## Pages and cursors
+  Every backend request returns at most \`limit\` emails (default ${pageSize.default}, max ${pageSize.max}) and one entry in \`pages\` with a \`status\` and, when it can continue, a \`cursorId\`.
+  - To get more results call \`fetch_next_search_pages\` with the \`cursorId\`s. Never re-run the same search to page.
+  - \`throttled\`: Microsoft rate-limited the request. Wait \`retryAfterSeconds\`, then retry with the same \`cursorId\` via \`fetch_next_search_pages\`.
+  - \`ceilingReached\`: results stop at ${maxResultsPerChain} per request. Tell the user the results are capped and offer to narrow (e.g. split the date range).
+  - Before answering, tell the user when results are incomplete: \`hasMore\` still true, or any page \`throttled\`, \`failed\`, or \`ceilingReached\`.`;
 
 const TOOL_FORMAT_INFORMATION = `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
@@ -40,9 +53,17 @@ const TOOL_FORMAT_INFORMATION = `## Email Display Rules
 
 export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   icon: 'search',
-  systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
+  systemPrompt: `Searches ingested Outlook emails semantically, combined with Microsoft Graph KQL keyword search. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns pages of results with matched passages or body previews and metadata.
 
-  ## Step 1 — Reason about structured filters in the user's question (do this FIRST)
+  ## Choose the strategy first
+  - **Targeted question** (a specific fact, email, or thread): run up to ${maxQueriesPerBackend} semantic entries and up to ${maxQueriesPerBackend} KQL entries from different angles. Follow cursors with \`fetch_next_search_pages\` only if the answer is not found yet.
+  - **Overview or wide question** (listing, summarising, "everything from last week", "my conversation with Alice"): run exactly ONE semantic entry and ONE KQL entry with precise filters, then call \`fetch_next_search_pages\` until \`hasMore\` is false before answering.
+
+  ${PAGING}
+
+  ${READING_EMAILS}
+
+  ## Reason about structured filters before drafting queries
   Before drafting any queries, read the user's question and try to identify signals that map cleanly to a structured filter:
   - Specific sender, sender name, or sender domain (e.g. "from Alice", "emails from @acme.com") → \`fromSenders\`
   - Specific recipient or recipient domain ("to Bob", "to anyone @client.com") → \`toRecipients\` / \`ccRecipients\`
@@ -62,48 +83,49 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   The \`search\` field and the \`conditions\` array work together — always try to use both:
   - \`search\`: natural-language relevance query (e.g. "budget report"). Keep it focused on the topic, not the filters — the filters belong in \`conditions\`.
   - \`conditions\`: structured filters (sender, date range, folder, attachments, etc.) applied on top of the semantic search.
-  - \`limit\`: increase toward 300 when the query is fuzzy or broad, or when you expect a large result set.
+  - \`limit\`: emails per page. Keep the default unless you need fewer.
 
   ## Multi-angle semantic search
-  You can pass up to 10 entries in \`uniqueSemanticSearchQueries\` — they all run in parallel and results are merged and deduplicated.
-  Use this to approach the same question from multiple angles and ensure full coverage:
+  For targeted questions you can pass up to ${maxQueriesPerBackend} entries in \`uniqueSemanticSearchQueries\` — they run in parallel and results are merged and deduplicated.
+  Use this to approach the same question from multiple angles:
   - **Different phrasings / synonyms**: e.g. "project kick-off" and "project launch" and "project start".
   - **Narrower vs. broader scope**: e.g. one entry with tight conditions (specific sender + date range) and another with no conditions but a more descriptive search term.
   - **Different condition combinations**: e.g. one entry filtering by folder "Inbox", another filtering by folder "Sent Items", to capture both sides of a conversation.
   - **Perspective shift**: e.g. "emails I sent about the merger" alongside "emails I received about the merger".
-  A single search with a single phrasing will often miss relevant emails — when full coverage matters, always compose 2–4 parallel entries.
+  A single search with a single phrasing will often miss relevant emails — for targeted questions, compose 2–${maxQueriesPerBackend} parallel entries.
 
   ## Strategy for broad or unfocused queries
   If the user's question is too broad for semantic search to be meaningful on its own (e.g. "show me all emails from last week", "list everything from alice@example.com"):
-  1. Keep a broad or descriptive \`search\` term, OR use the most relevant keyword you can derive.
+  1. Use ONE semantic entry with a broad or descriptive \`search\` term, OR the most relevant keyword you can derive.
   2. Add precise \`conditions\` (e.g. dateFrom/dateTo, fromSenders) to narrow the candidate set.
-  3. Set \`limit\` to 300 to capture as many matching emails as possible.
+  3. Add ONE matching KQL entry with the same filters (e.g. \`from:\`, \`received>=\`).
+  4. Call \`fetch_next_search_pages\` with the returned cursors until \`hasMore\` is false.
   This combination is more reliable than relying on semantic relevance alone for listing or enumeration tasks.
 
   ## Complementing semantic search with KQL (msGraphKeywordSearchQueries)
   ALWAYS include at least one entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\`. A single backend alone will miss results: semantic search may miss exact keyword hits; KQL will miss conceptual matches and attachment content.
 
-  The two backends cover different ground and their results are merged — semantic results are ranked first, then enriched with the KQL body excerpt when the same email was matched by both:
+  The two backends cover different ground and their results are merged — semantic results are ranked first, then enriched with the KQL body preview when the same email was matched by both:
   - **Semantic** excels at: conceptual relevance, synonyms, natural-language intent, content inside attachments.
-  - **KQL** excels at: exact keyword matches, precise property filters, full body text excerpts.
+  - **KQL** excels at: exact keyword matches and precise property filters. KQL results are sorted by sent date, newest first.
 
   **How to translate a semantic query into complementary KQL:**
   1. Extract the most specific keywords from the semantic query and express them as \`subject:\` and/or \`body:\` filters.
   2. Mirror any structured conditions as KQL property filters (e.g. \`fromSenders\` → \`from:\`, date range → \`received>=\`/\`received<=\`, attachments → \`hasAttachment:true\`).
-  3. Run multiple KQL queries in parallel for different angles: synonyms, subject-focus vs. body-focus, alternative keyword combinations.
+  3. For targeted questions, run up to ${maxQueriesPerBackend} KQL queries in parallel for different angles: synonyms, subject-focus vs. body-focus, alternative keyword combinations.
 
   ## Scoping to a specific mailbox
   To search within a specific mailbox (own or delegated), set the top-level \`mailbox\` field on each query object — do NOT encode the mailbox in the \`search\` text, in \`conditions\`, or as \`mailbox:\` inside a KQL string (it is not a KQL property). Set \`mailbox\` on EVERY entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\` when scoping to a delegated inbox.
   Always call \`list_mailboxes_and_directories\` first if you are unsure of the exact mailbox address.
 
   Example — user asks "list all emails in the shared bug-bash mailbox":
-  - Semantic entry 1: \`{ mailbox: "bug-bash@example.com", search: "email", limit: 300 }\`
-  - KQL query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email", limit: 50 }\`
-  The \`mailbox\` field is set on both entries — the search is scoped to that inbox on both backends.
+  - Semantic entry 1: \`{ mailbox: "bug-bash@example.com", search: "email" }\`
+  - KQL query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email" }\`
+  The \`mailbox\` field is set on both entries — the search is scoped to that inbox on both backends. This is a listing question, so follow the cursors with \`fetch_next_search_pages\` until \`hasMore\` is false.
 
   Example — user asks "emails about the Q2 budget in the shared finance mailbox":
-  - Semantic entry 1: \`{ mailbox: "finance@example.com", search: "Q2 budget report", limit: 300 }\`
-  - Semantic entry 2: \`{ mailbox: "finance@example.com", search: "quarterly financial summary", limit: 300 }\`
+  - Semantic entry 1: \`{ mailbox: "finance@example.com", search: "Q2 budget report" }\`
+  - Semantic entry 2: \`{ mailbox: "finance@example.com", search: "quarterly financial summary" }\`
   - KQL query 1: \`{ mailbox: "finance@example.com", kqlQuery: "subject:\\"Q2 budget\\"" }\`
   - KQL query 2: \`{ mailbox: "finance@example.com", kqlQuery: "body:\\"budget\\" received>=2024-04-01 received<=2024-06-30" }\`
   Both the \`mailbox\` scoping and structured filters are expressed on every entry.
@@ -130,16 +152,22 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   For custom user-defined folders, call \`list_mailboxes_and_directories\` first to get the folder ID.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.
-  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
-
-  ## Opening an email after search
-  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
+  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, throttled or partially unavailable mailboxes).`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });
 
 export const META_MS_GRAPH = createMeta({
   icon: 'search',
-  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata and full body content in the \`text\` field — answer questions about email content directly from \`text\` without calling \`open_email\` unless the user explicitly asks to open an email.
+  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns pages of matched emails with metadata and a short body preview in \`text\`, sorted by sent date, newest first.
+
+  ## Choose the strategy first
+  - **Targeted question** (a specific fact, email, or thread): run up to ${maxQueriesPerBackend} KQL queries from different angles. Follow cursors with \`fetch_next_search_pages\` only if the answer is not found yet.
+  - **Overview or wide question** (listing, summarising, "everything from last week", "my conversation with Alice"): run exactly ONE KQL query with precise filters (\`from:\`, \`received>=\`, …), then call \`fetch_next_search_pages\` until \`hasMore\` is false before answering.
+  Each query runs once per mailbox (and per folder in \`directories\`), so a single query can return several \`pages\` entries.
+
+  ${PAGING}
+
+  ${READING_EMAILS}
 
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   To restrict a search to specific folders, use the \`directories\` field on the query object — do NOT put \`folder:\` inside the \`kqlQuery\` string (it is not a supported KQL property and is silently stripped).
@@ -150,7 +178,7 @@ export const META_MS_GRAPH = createMeta({
 
   Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:, participants:. Do NOT put folder: inside kqlQuery — it is not a supported KQL property and is silently stripped. Use the directories field instead.
   For entity/name mentions that may appear anywhere in the email (e.g. "emails mentioning UBS", "where Zach Greenwald appears"), always include a body: entry — e.g. body:UBS or body:"Zach Greenwald". Use participants: when the name may appear in any address field.
-  Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 10) for broader coverage.
+  Combine clauses with AND/OR for complex searches. For targeted questions you can run up to ${maxQueriesPerBackend} KQL queries in parallel for broader coverage.
   If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
 
   ## Scoping to a specific mailbox
@@ -160,7 +188,8 @@ export const META_MS_GRAPH = createMeta({
   ## Examples
 
   **User asks "list all emails in the shared bug-bash mailbox":**
-  - Query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email", limit: 50 }\`
+  - Query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email" }\`
+  This is a listing question — follow the cursors with \`fetch_next_search_pages\` until \`hasMore\` is false.
 
   **User asks "emails from Alice about the Q2 budget":**
   - Query 1: \`{ kqlQuery: "from:alice@example.com subject:\\"Q2 budget\\"" }\`
@@ -182,9 +211,6 @@ export const META_MS_GRAPH = createMeta({
   Use body: for mentions in the email text and participants: for appearances in address fields.
 
   **User asks "emails about the Q2 budget in my Inbox":**
-  - Query: \`{ kqlQuery: "subject:\\"Q2 budget\\"", directories: ["Inbox"] }\`
-
-  ## Opening an email after search
-  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
+  - Query: \`{ kqlQuery: "subject:\\"Q2 budget\\"", directories: ["Inbox"] }\``,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

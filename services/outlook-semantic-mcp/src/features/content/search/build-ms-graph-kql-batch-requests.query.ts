@@ -10,6 +10,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { resolveDirectoryIds } from './resolve-directory-ids.util';
+import { SEARCH_CONFIG } from './search.config';
 
 export interface QueryInput {
   kqlQuery: string;
@@ -31,6 +32,7 @@ export interface GraphBatchRequest {
   kqlQuery: string;
   limit: number;
   folderId?: string;
+  folderName?: string;
 }
 
 interface MailboxAccessInfo {
@@ -147,7 +149,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       skippedFolders: { mailbox: string; folder: string }[];
     };
   }): void {
-    const limit = query.limit ?? 100;
+    const limit = query.limit ?? SEARCH_CONFIG.pageSize.default;
     if (isNullish(mailboxAccessInfo)) {
       return;
     }
@@ -177,6 +179,9 @@ export class BuildMsGraphKqlBatchRequestsQuery {
         kqlQuery: query.kqlQuery,
         limit,
         folderId,
+        folderName: mailboxAccessInfo.directories.find(
+          ({ providerDirectoryId }) => providerDirectoryId === folderId,
+        )?.displayName,
       });
     }
     for (const folder of resolved.unrecognized) {

@@ -1,10 +1,17 @@
 import { isCalendarEnabled, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 
+const EMAIL_SEARCH_INSTRUCTIONS = `
+## Email search
+- \`search_emails\` returns pages of results with partial content in \`text\` (matched passages and/or a short body preview), never full bodies. Call \`open_email\` with a result's \`openEmailParams\` to read an email in full.
+- Targeted questions: up to 3 queries per backend from different angles. Overview or listing questions: one query per backend, then call \`fetch_next_search_pages\` with the returned cursor ids until \`hasMore\` is false before answering.
+- Microsoft can throttle searches (\`throttled\` pages). Retry them with \`fetch_next_search_pages\` after \`retryAfterSeconds\`, or tell the user the results are incomplete.
+`;
+
 const MICROSOFT_GRAPH_INSTRUCTIONS = `
 Emails are searched directly via Microsoft Graph KQL —
 no ingestion, sync, or knowledge base is involved.
 All tools operate directly against the live mailbox.
-`;
+${EMAIL_SEARCH_INSTRUCTIONS}`;
 
 const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 ## Tool Selection Guidelines for Outlook MCP
@@ -14,7 +21,7 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 
 ### Search Results and Incomplete Ingestion
 - When \`search_emails\` returns a \`syncWarning\` field, relay that warning message to the user so they know results may not reflect all emails.
-`;
+${EMAIL_SEARCH_INSTRUCTIONS}`;
 
 export const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar

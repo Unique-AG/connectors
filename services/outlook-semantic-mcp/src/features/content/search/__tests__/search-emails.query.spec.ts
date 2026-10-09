@@ -4,13 +4,11 @@ import {
   convertUserProfileIdToTypeId,
   type UserProfileTypeID,
 } from '~/utils/convert-user-profile-id-to-type-id';
+import type { SearchCursorRepository } from '../cursors/search-cursor.repository';
 import type { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from '../search-emails.query';
-import {
-  SearchBackend,
-  SearchEmailResult,
-  SemanticSearchEmailsQuery,
-} from '../semantic-search-emails.query';
+import { SearchBackend, SearchEmailResult, SearchPageStatus } from '../search-results.types';
+import type { SemanticSearchEmailsQuery } from '../semantic-search-emails.query';
 
 const testUserId: UserProfileTypeID = convertUserProfileIdToTypeId(
   `user_profile_01kqcg8m7teh6sh8tehd2k0byb`,
@@ -59,24 +57,38 @@ function makeUniqueResult(
 }
 
 describe('SearchEmailsQuery', () => {
-  let semanticSearchQuery: { run: Mock };
-  let msGraphKqlQuery: { run: Mock };
+  let semanticSearchQuery: { run: Mock; fetchNextPages: Mock };
+  let msGraphKqlQuery: { run: Mock; fetchNextPages: Mock };
+  let searchCursorRepository: { create: Mock; findForUser: Mock };
   let instance: SearchEmailsQuery;
 
   beforeEach(() => {
-    semanticSearchQuery = { run: vi.fn() };
-    msGraphKqlQuery = { run: vi.fn() };
+    semanticSearchQuery = { run: vi.fn(), fetchNextPages: vi.fn() };
+    msGraphKqlQuery = { run: vi.fn(), fetchNextPages: vi.fn() };
+    searchCursorRepository = {
+      create: vi
+        .fn()
+        .mockImplementation((_userProfileId: string, payloads: unknown[]) =>
+          Promise.resolve(payloads.map((_, i) => `search_cursor_new_${i}`)),
+        ),
+      findForUser: vi.fn().mockResolvedValue(new Map()),
+    };
     instance = new SearchEmailsQuery(
       semanticSearchQuery as unknown as SemanticSearchEmailsQuery,
       msGraphKqlQuery as unknown as MsGraphKqlSearchEmailsQuery,
       { run: vi.fn().mockResolvedValue(undefined) } as unknown as GetMailboxTimezoneQuery,
+      searchCursorRepository as unknown as SearchCursorRepository,
     );
   });
 
   it('returns only graph results when uniqueSemanticSearchQueries is absent', async () => {
     const graphA = makeGraphResult('email-1');
     const graphB = makeGraphResult('email-2');
-    msGraphKqlQuery.run.mockResolvedValue({ results: [graphA, graphB], searchSummary: undefined });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphA, graphB],
+      searchSummary: undefined,
+      pages: [],
+    });
 
     const result = await instance.run(testUserId, {
       msGraphKeywordSearchQueries: [{ kqlQuery: 'subject:test' }],
@@ -97,8 +109,8 @@ describe('SearchEmailsQuery', () => {
   });
 
   it('returns empty array when both backends return no results', async () => {
-    semanticSearchQuery.run.mockResolvedValue({ results: [], searchSummary: undefined });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({ results: [], searchSummary: undefined, pages: [] });
+    msGraphKqlQuery.run.mockResolvedValue({ results: [], searchSummary: undefined, pages: [] });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
@@ -126,10 +138,12 @@ describe('SearchEmailsQuery', () => {
     semanticSearchQuery.run.mockResolvedValue({
       results: semanticResults,
       searchSummary: undefined,
+      pages: [],
     });
     msGraphKqlQuery.run.mockResolvedValue({
       results: [...graphMatches, graphOnly],
       searchSummary: undefined,
+      pages: [],
     });
 
     const result = await instance.run(testUserId, {
@@ -159,8 +173,13 @@ describe('SearchEmailsQuery', () => {
     semanticSearchQuery.run.mockResolvedValue({
       results: semanticResults,
       searchSummary: undefined,
+      pages: [],
     });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [graphOnly], searchSummary: undefined });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphOnly],
+      searchSummary: undefined,
+      pages: [],
+    });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 25 }],
@@ -184,8 +203,13 @@ describe('SearchEmailsQuery', () => {
     semanticSearchQuery.run.mockResolvedValue({
       results: [semanticResult],
       searchSummary: undefined,
+      pages: [],
     });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [graphResult], searchSummary: undefined });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphResult],
+      searchSummary: undefined,
+      pages: [],
+    });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
@@ -193,7 +217,7 @@ describe('SearchEmailsQuery', () => {
     });
 
     expect(result.results[0]?.text).toBe(
-      '## Semantically Matched Content\nSemantic content\n\n## Full Email Content Without Attachments\nGraph content',
+      '## Semantically Matched Content\nSemantic content\n\n## Preview\nGraph content',
     );
   });
 
@@ -203,8 +227,9 @@ describe('SearchEmailsQuery', () => {
     semanticSearchQuery.run.mockResolvedValue({
       results: [semanticResult],
       searchSummary: undefined,
+      pages: [],
     });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [], searchSummary: undefined });
+    msGraphKqlQuery.run.mockResolvedValue({ results: [], searchSummary: undefined, pages: [] });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
@@ -217,15 +242,19 @@ describe('SearchEmailsQuery', () => {
   it('sets formatted graph section text for graph-only result', async () => {
     const graphResult = makeGraphResult('email-1', { text: 'Graph body' });
 
-    semanticSearchQuery.run.mockResolvedValue({ results: [], searchSummary: undefined });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [graphResult], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({ results: [], searchSummary: undefined, pages: [] });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphResult],
+      searchSummary: undefined,
+      pages: [],
+    });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
-    expect(result.results[0]?.text).toBe('## Full Email Content Without Attachments\nGraph body');
+    expect(result.results[0]?.text).toBe('## Preview\nGraph body');
   });
 
   it('email matched by both backends appears exactly once in output', async () => {
@@ -235,8 +264,13 @@ describe('SearchEmailsQuery', () => {
     semanticSearchQuery.run.mockResolvedValue({
       results: [semanticResult],
       searchSummary: undefined,
+      pages: [],
     });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [graphResult], searchSummary: undefined });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphResult],
+      searchSummary: undefined,
+      pages: [],
+    });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
@@ -245,5 +279,136 @@ describe('SearchEmailsQuery', () => {
 
     expect(result.results).toHaveLength(1);
     expect(result.results[0]?.backend).toBe(SearchBackend.Unique);
+  });
+
+  describe('pages and cursors', () => {
+    const graphContinuation = {
+      backend: SearchBackend.MsGraph as const,
+      kqlQuery: 'test',
+      mailbox: 'own@example.com',
+      isDelegated: false,
+      url: '/users/own@example.com/messages?$skip=25',
+      delivered: 25,
+    };
+    const graphPage = {
+      backend: SearchBackend.MsGraph,
+      query: 'test',
+      mailbox: 'own@example.com',
+    };
+
+    it('stores each continuation as a new cursor and returns its id', async () => {
+      msGraphKqlQuery.run.mockResolvedValue({
+        results: [],
+        searchSummary: undefined,
+        pages: [
+          { ...graphPage, status: SearchPageStatus.HasMore, continuation: graphContinuation },
+          { ...graphPage, mailbox: 'other@example.com', status: SearchPageStatus.Complete },
+        ],
+      });
+
+      const result = await instance.run(testUserId, {
+        msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
+      });
+
+      expect(searchCursorRepository.create).toHaveBeenCalledWith(testUserId.toString(), [
+        graphContinuation,
+      ]);
+      expect(result.pages).toEqual([
+        { ...graphPage, status: SearchPageStatus.HasMore, cursorId: 'search_cursor_new_0' },
+        {
+          ...graphPage,
+          mailbox: 'other@example.com',
+          status: SearchPageStatus.Complete,
+          cursorId: undefined,
+        },
+      ]);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('returns hasMore false when no page can be continued', async () => {
+      msGraphKqlQuery.run.mockResolvedValue({
+        results: [],
+        searchSummary: undefined,
+        pages: [{ ...graphPage, status: SearchPageStatus.CeilingReached }],
+      });
+
+      const result = await instance.run(testUserId, {
+        msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('returns the existing cursor id for a page that must be retried, without storing a new one', async () => {
+      searchCursorRepository.findForUser.mockResolvedValue(
+        new Map([['search_cursor_old', graphContinuation]]),
+      );
+      msGraphKqlQuery.fetchNextPages.mockResolvedValue({
+        results: [],
+        searchSummary: undefined,
+        pages: [
+          {
+            ...graphPage,
+            status: SearchPageStatus.Throttled,
+            retryAfterSeconds: 7,
+            continuation: graphContinuation,
+            retryCursorId: 'search_cursor_old',
+          },
+        ],
+      });
+
+      const result = await instance.fetchNextPages(testUserId, ['search_cursor_old']);
+
+      expect(searchCursorRepository.create).toHaveBeenCalledWith(testUserId.toString(), []);
+      expect(result.pages).toEqual([
+        {
+          ...graphPage,
+          status: SearchPageStatus.Throttled,
+          retryAfterSeconds: 7,
+          cursorId: 'search_cursor_old',
+        },
+      ]);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it('dispatches stored cursors to their backend', async () => {
+      const uniqueContinuation = {
+        backend: SearchBackend.Unique as const,
+        input: { search: 'q', limit: 25 },
+        page: 1,
+        seenContentIds: [],
+      };
+      searchCursorRepository.findForUser.mockResolvedValue(
+        new Map<string, unknown>([
+          ['search_cursor_graph', graphContinuation],
+          ['search_cursor_unique', uniqueContinuation],
+        ]),
+      );
+      const emptyOutput = { results: [], searchSummary: undefined, pages: [] };
+      msGraphKqlQuery.fetchNextPages.mockResolvedValue(emptyOutput);
+      semanticSearchQuery.fetchNextPages.mockResolvedValue(emptyOutput);
+
+      await instance.fetchNextPages(testUserId, ['search_cursor_graph', 'search_cursor_unique']);
+
+      expect(msGraphKqlQuery.fetchNextPages).toHaveBeenCalledWith(
+        testUserId,
+        [{ id: 'search_cursor_graph', payload: graphContinuation }],
+        undefined,
+      );
+      expect(semanticSearchQuery.fetchNextPages).toHaveBeenCalledWith(
+        testUserId,
+        [{ id: 'search_cursor_unique', payload: uniqueContinuation }],
+        undefined,
+      );
+    });
+
+    it('reports unknown cursor ids in the search notes', async () => {
+      const result = await instance.fetchNextPages(testUserId, ['search_cursor_missing']);
+
+      expect(msGraphKqlQuery.fetchNextPages).not.toHaveBeenCalled();
+      expect(semanticSearchQuery.fetchNextPages).not.toHaveBeenCalled();
+      expect(result.searchSummary).toContain('search_cursor_missing');
+      expect(result.hasMore).toBe(false);
+    });
   });
 });

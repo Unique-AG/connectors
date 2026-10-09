@@ -7,8 +7,7 @@ import {
 } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
-import * as z from 'zod';
+import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy, unique } from 'remeda';
 import { UserProfile } from '~/db';
 import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
 import {
@@ -30,43 +29,14 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
-import { SemanticSearchConfig } from './search.config';
-import { SearchEmailsInputSchema } from './search-conditions.dto';
-
-export enum SearchBackend {
-  Unique = 'Unique',
-  MsGraph = 'MsGraph',
-}
-
-export interface OpenEmailParams {
-  id: string;
-  idType: SearchBackend;
-  mailbox?: string;
-  parentFolderId?: string;
-  idIsImmutable?: boolean;
-}
-
-export interface ReplyToParams {
-  inReplyToMessageId?: string;
-  idIsImmutable?: boolean;
-  isReplyable: boolean;
-}
-
-export interface SearchEmailResult {
-  uniqueContentId?: string;
-  msGraphMessageId?: string;
-  folderId: string;
-  title: string;
-  from: string;
-  sourceMailbox: Nullish<string>;
-  outlookWebLink: string;
-  receivedDateTime: string | null;
-  text: string;
-  uniqueContentUrl: string | undefined;
-  backend: SearchBackend;
-  openEmailParams: OpenEmailParams;
-  replyToParams: ReplyToParams;
-}
+import {
+  BackendPage,
+  StoredSearchCursor,
+  UniqueSearchCursorPayload,
+} from './cursors/search-cursor.payload';
+import { SEARCH_CONFIG } from './search.config';
+import { SearchEmailsInput } from './search-conditions.dto';
+import { SearchBackend, SearchEmailResult, SearchPageStatus } from './search-results.types';
 
 interface DelegatedAccess {
   ownerUserEmail: string;
@@ -88,13 +58,32 @@ interface AccessContext {
 
 interface ValidSearchJobInput {
   search: string;
-  limit: number | undefined;
   filter: MetadataFilter;
   isScoped: true;
   searchSummary: string | undefined;
 }
 
 type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
+
+// One semantic search page: the first page of a search, or the page a cursor points at.
+interface SemanticPageJob {
+  input: SearchEmailsInput;
+  page: number;
+  seenContentIds: string[];
+  sourceCursorId?: string;
+}
+
+export interface SemanticSearchOutput {
+  results: SearchEmailResult[];
+  pages: BackendPage[];
+  searchSummary: string | undefined;
+}
+
+interface AccumulatedContent {
+  index: number;
+  content: Pick<SearchResultItem, 'metadata' | 'id' | 'title' | 'url'>;
+  chunks: Map<string, SearchResultItem>;
+}
 
 @Injectable()
 export class SemanticSearchEmailsQuery {
@@ -109,58 +98,157 @@ export class SemanticSearchEmailsQuery {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    inputs: z.infer<typeof SearchEmailsInputSchema>[],
-    searchConfig: SemanticSearchConfig,
+    inputs: SearchEmailsInput[],
     outputTimeZone?: string,
-  ): Promise<{
-    results: SearchEmailResult[];
-    searchSummary: string | undefined;
-  }> {
-    assert.ok(searchConfig, `searchConfig cannot be nullish`);
+  ): Promise<SemanticSearchOutput> {
+    return this.executePages(
+      userProfileId,
+      inputs.map((input) => ({ input, page: 0, seenContentIds: [] })),
+      outputTimeZone,
+    );
+  }
+
+  @Span()
+  public async fetchNextPages(
+    userProfileId: UserProfileTypeID,
+    cursors: StoredSearchCursor<UniqueSearchCursorPayload>[],
+    outputTimeZone?: string,
+  ): Promise<SemanticSearchOutput> {
+    return this.executePages(
+      userProfileId,
+      cursors.map(({ id, payload }) => ({
+        input: payload.input,
+        page: payload.page,
+        seenContentIds: payload.seenContentIds,
+        sourceCursorId: id,
+      })),
+      outputTimeZone,
+    );
+  }
+
+  private async executePages(
+    userProfileId: UserProfileTypeID,
+    jobs: SemanticPageJob[],
+    outputTimeZone: string | undefined,
+  ): Promise<SemanticSearchOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
-    const searchJobsInputs = await Promise.all(
-      inputs.map((input) => this.buildUniqueQlSearchInput(input, userProfile, context)),
+    // The filter is rebuilt on every page so access revoked since the first page is honoured.
+    const searchJobInputs = await Promise.all(
+      jobs.map((job) => this.buildUniqueQlSearchInput(job.input, userProfile, context)),
     );
-    const searchJobs = searchJobsInputs.filter((job): job is ValidSearchJobInput => job.isScoped);
 
-    const uniqueQlSearchResults = await Promise.allSettled(
-      searchJobs.map((job) =>
-        this.uniqueApi.content.search({
-          prompt: job.search,
-          metaDataFilter: job.filter,
-          limit: job.limit,
+    const settledSearches = await Promise.allSettled(
+      jobs.map((job, i) => {
+        const searchJobInput = searchJobInputs[i];
+        if (!searchJobInput?.isScoped) {
+          return Promise.resolve(null);
+        }
+        return this.uniqueApi.content.search({
+          prompt: searchJobInput.search,
+          metaDataFilter: searchJobInput.filter,
+          limit: this.getPageSize(job),
+          page: job.page,
           scoreThreshold: 0,
-        }),
-      ),
+        });
+      }),
     );
 
-    const accumulated = new Map<
-      string,
-      {
-        index: number;
-        content: Pick<SearchResultItem, 'metadata' | 'id' | 'title' | 'url'>;
-        chunks: Map<string, SearchResultItem>;
-      }
-    >();
+    const chunkLists: SearchResultItem[][] = [];
+    const pages: BackendPage[] = [];
     const summaries: string[] = [];
 
-    for (const [i, settledItem] of uniqueQlSearchResults.entries()) {
-      const job = searchJobs[i];
-      if (isNullish(job)) {
+    for (const [i, job] of jobs.entries()) {
+      const searchJobInput = searchJobInputs[i];
+      const settled = settledSearches[i];
+      if (isNullish(searchJobInput) || isNullish(settled)) {
+        continue;
+      }
+      const page = {
+        backend: SearchBackend.Unique,
+        query: job.input.search,
+        mailbox: job.input.mailbox ?? undefined,
+      };
+
+      if (!searchJobInput.isScoped) {
+        pages.push({
+          ...page,
+          status: job.sourceCursorId ? SearchPageStatus.AccessRevoked : SearchPageStatus.Complete,
+        });
+        continue;
+      }
+      if (searchJobInput.searchSummary) {
+        summaries.push(searchJobInput.searchSummary);
+      }
+
+      if (settled.status === 'rejected') {
+        traceError(settled.reason);
+        pages.push({
+          ...page,
+          status: SearchPageStatus.Failed,
+          continuation: this.toContinuation(job, job.page, job.seenContentIds),
+          retryCursorId: job.sourceCursorId,
+        });
         continue;
       }
 
-      if (job.searchSummary) {
-        summaries.push(job.searchSummary);
-      }
+      const chunks = settled.value ?? [];
+      const seen = new Set(job.seenContentIds);
+      const newChunks = chunks.filter((chunk) => !seen.has(chunk.id));
+      chunkLists.push(newChunks);
+      pages.push({ ...page, ...this.getNextPosition(job, chunks.length, newChunks) });
+    }
 
-      if (settledItem.status === 'rejected') {
-        traceError(settledItem.reason);
-        continue;
-      }
-      settledItem.value.forEach((item, index) => {
+    return {
+      results: await this.buildResults(
+        this.groupChunksByContent(chunkLists),
+        context,
+        userProfile,
+        outputTimeZone,
+      ),
+      pages,
+      searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
+    };
+  }
+
+  private getPageSize(job: SemanticPageJob): number {
+    return job.input.limit ?? SEARCH_CONFIG.pageSize.default;
+  }
+
+  private getNextPosition(
+    job: SemanticPageJob,
+    fetchedChunkCount: number,
+    newChunks: SearchResultItem[],
+  ): Pick<BackendPage, 'status' | 'continuation'> {
+    const pageSize = this.getPageSize(job);
+    if (fetchedChunkCount < pageSize) {
+      return { status: SearchPageStatus.Complete };
+    }
+    if ((job.page + 1) * pageSize >= SEARCH_CONFIG.maxResultsPerChain) {
+      return { status: SearchPageStatus.CeilingReached };
+    }
+    const seenContentIds = unique([...job.seenContentIds, ...newChunks.map(({ id }) => id)]);
+    return {
+      status: SearchPageStatus.HasMore,
+      continuation: this.toContinuation(job, job.page + 1, seenContentIds),
+    };
+  }
+
+  private toContinuation(
+    job: SemanticPageJob,
+    page: number,
+    seenContentIds: string[],
+  ): UniqueSearchCursorPayload {
+    return { backend: SearchBackend.Unique, input: job.input, page, seenContentIds };
+  }
+
+  // Merges the chunk lists of all searches by content. An email ranks by its best position in any
+  // list.
+  private groupChunksByContent(chunkLists: SearchResultItem[][]): AccumulatedContent[] {
+    const accumulated = new Map<string, AccumulatedContent>();
+    for (const chunks of chunkLists) {
+      chunks.forEach((item, index) => {
         const itemRef = accumulated.get(item.id);
         if (itemRef) {
           itemRef.index = Math.min(itemRef.index, index);
@@ -176,9 +264,17 @@ export class SemanticSearchEmailsQuery {
         });
       });
     }
+    return Array.from(accumulated.values());
+  }
 
+  private async buildResults(
+    contents: AccumulatedContent[],
+    context: AccessContext,
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+    outputTimeZone: string | undefined,
+  ): Promise<SearchEmailResult[]> {
     const rawResults = pipe(
-      Array.from(accumulated.values()),
+      contents,
       sortBy((item) => item.index),
       map((item): SearchEmailResult => {
         const metadata = item.content?.metadata as
@@ -254,10 +350,7 @@ export class SemanticSearchEmailsQuery {
       };
     });
 
-    return {
-      results: results.slice(0, searchConfig.maxEmailsLimit),
-      searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
-    };
+    return results;
   }
 
   private async loadAccessContext(
@@ -328,7 +421,7 @@ export class SemanticSearchEmailsQuery {
   }
 
   private async buildUniqueQlSearchInput(
-    input: z.infer<typeof SearchEmailsInputSchema>,
+    input: SearchEmailsInput,
     userProfile: NonNullishProps<UserProfile, 'email'>,
     context: AccessContext,
   ): Promise<SearchJobInput> {
@@ -399,7 +492,6 @@ export class SemanticSearchEmailsQuery {
 
     return {
       search: input.search,
-      limit: input.limit,
       filter: finalFilters,
       isScoped: true,
       searchSummary: searchSummaryParts.length > 0 ? searchSummaryParts.join('\r\n') : undefined,
@@ -414,7 +506,7 @@ export class SemanticSearchEmailsQuery {
   }: {
     userProfileId: string;
     scopeIdsFromRoot: string[];
-    conditions: z.infer<typeof SearchEmailsInputSchema>['conditions'];
+    conditions: SearchEmailsInput['conditions'];
     delegatedAccessFilters?: {
       msGraphDirectoryIds: string[];
     };
