@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.1](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.0...with-intelligence-mcp@0.1.1) (2026-10-09)
+
+
+### Features
+
+* **with-intelligence-mcp:** add the remaining WI tools ([#1153](https://github.com/Unique-AG/connectors/issues/1153)) ([e980460](https://github.com/Unique-AG/connectors/commit/e98046065d1807cda6094a5134892664a0beaf8e))
+
+
+### Bug Fixes
+
+* **with-intelligence-mcp:** block metrics without gateway JWT ([#1157](https://github.com/Unique-AG/connectors/issues/1157)) ([046e55c](https://github.com/Unique-AG/connectors/commit/046e55c6e516904a0111d35408da30f4944bc9ac))
+
+
+### Dependencies
+
+* bump fastmcp in /* ([#1144](https://github.com/Unique-AG/connectors/issues/1144)) ([10ce668](https://github.com/Unique-AG/connectors/commit/10ce668ea5ff78da123896db216975cc4f60b513))
+* bump mako from 1.4.1 to 1.4.2 in /services/with-intelligence-mcp ([#1166](https://github.com/Unique-AG/connectors/issues/1166)) ([5b3f2ec](https://github.com/Unique-AG/connectors/commit/5b3f2ec47b45fbcbb3c54c999ccc55cdb2853935))
+* bump multidict from 6.7.1 to 6.9.1 in /services/with-intelligence-mcp ([#1176](https://github.com/Unique-AG/connectors/issues/1176)) ([dea1921](https://github.com/Unique-AG/connectors/commit/dea19216db7a72afc0ea1d4368dc53b8626c358a))
+* bump python in /services/*/deploy ([#1140](https://github.com/Unique-AG/connectors/issues/1140)) ([ecc36dc](https://github.com/Unique-AG/connectors/commit/ecc36dc232dfbfbaba7dd093cf2aa587cacb2297))
+* bump ruff in /* ([#1151](https://github.com/Unique-AG/connectors/issues/1151)) ([daf766a](https://github.com/Unique-AG/connectors/commit/daf766a00884e17a13b5277e80a7ce24657212f8))
+* bump sqlalchemy[asyncio] in /services/* ([#1148](https://github.com/Unique-AG/connectors/issues/1148)) ([f9632ce](https://github.com/Unique-AG/connectors/commit/f9632cebd8a12fdd0c13e4fc9a3751ffd04f1c34))
+* bump starlette in /* ([#1150](https://github.com/Unique-AG/connectors/issues/1150)) ([0ad00a1](https://github.com/Unique-AG/connectors/commit/0ad00a11bba43d2953d7900253b29409eb85b5d6))
+* bump urllib3 from 2.7.0 to 2.8.0 in /services/with-intelligence-mcp ([#1138](https://github.com/Unique-AG/connectors/issues/1138)) ([8fe2dbd](https://github.com/Unique-AG/connectors/commit/8fe2dbde07f0d1a6fb1bb2e25d3647e075ccaba8))
+
 ## 0.1.0 (2026-09-30)
 
 
