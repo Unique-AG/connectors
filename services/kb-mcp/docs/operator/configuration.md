@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2744582189 -->
 <!-- confluence-space-key: PUBDOC -->
 
-## Configuration
-
 `kb-mcp` reads its deployment configuration from environment variables. In Helm deployments most map
 onto typed values under `mcpConfig`. See `values.schema.json` for field-level descriptions and
 [Minimal Values](./deployment.md#Minimal-Values).
@@ -11,24 +9,24 @@ Tool behavior is configured separately: per-tool environment variables are docum
 tools they affect in [Tools](../technical/tools.md). Business rules per tool are configured
 differently, see Admin Configuration below.
 
-### Admin Configuration
+## Admin Configuration
 
 Business rules per tool, a `metadata_filter`, a folder allowlist, a result `limit`, live in one of
 two places depending on who's calling.
 
-#### Unique AI
+### Unique AI
 
 Injected into every call automatically from the admin's settings in the Unique AI app. Nothing to
 set here; changes take effect immediately, no restart.
 
-#### Other Clients
+### Other Clients
 
 A standalone deployment, Claude Desktop, Cursor: no app to inject settings, so each tool falls back
 to an environment variable instead, a JSON object shaped like that tool's config. Only the fields
 you set need to appear; anything left out keeps its own class default, and the variable left unset
 keeps all of them.
 
-##### `search`
+#### `search`
 
 `UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/search/config.py))
@@ -40,7 +38,7 @@ omitted here; it's disabled by default):
 {"service_config": {"search": {"search_type": "COMBINED", "search_language": "english", "max_search_strings": 10}, "filtering": {"score_threshold": 0.0, "limit": 200}, "scope_ids": null, "metadata_filter": {"operator": "isNotNull", "value": "", "path": ["folderId"]}, "reranker_config": null}, "post_processing": {"chunk_relevancy_sort_config": {"enabled": false}, "max_tokens_for_sources": 30000, "percentage_of_input_tokens_for_sources": 0.4, "chunked_sources": true, "metadata_chunk_sections": {}}}
 ```
 
-##### `content_tree`
+#### `content_tree`
 
 `UNIQUE_MCP_TOOL_CONTENT_TREE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_tree/config.py))
@@ -53,7 +51,7 @@ Defaults:
 
 A `null` `metadata_filter` falls back to excluding `user-memory` folders.
 
-##### `content_metadata`
+#### `content_metadata`
 
 `UNIQUE_MCP_TOOL_CONTENT_METADATA_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/content_metadata/config.py))
@@ -69,7 +67,7 @@ A `null` `metadata_filter` falls back to excluding `user-memory` folders.
 `excluded_fields` replaces this list rather than adding to it: repeat the entries above alongside
 any of your own, or the catalog narrows to just what you passed.
 
-##### `read_file`
+#### `read_file`
 
 `UNIQUE_MCP_TOOL_READ_FILE_TOOL_CONFIG`
 ([`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/kb-mcp/src/kb_mcp/tools/read_file/config.py))
@@ -80,7 +78,7 @@ Default:
 {"max_tokens_per_call": 8000}
 ```
 
-### Required
+## Required
 
 | Variable | Description |
 |---|---|
@@ -110,7 +108,7 @@ The chart neither creates nor owns that secret either way. See
     Either one forces every connected client to reconnect and sign in again; neither has a
     migration path.
 
-### Optional
+## Optional
 
 | Variable | Default | Description |
 |---|---|---|
@@ -127,7 +125,7 @@ The chart neither creates nor owns that secret either way. See
     Set `FASTMCP_CHECK_FOR_UPDATES: "off"`. FastMCP otherwise pings `pypi.org` on startup and hangs
     when egress is blocked.
 
-### Never Set in Production
+## Never Set in Production
 
 | Variable | Why |
 |---|---|
