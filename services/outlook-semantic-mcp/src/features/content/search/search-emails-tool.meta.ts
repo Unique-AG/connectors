@@ -1,8 +1,14 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
 import { SEARCH_CONFIG } from './search.config';
 
-const { pageSize, maxQueriesPerBackend, maxResultsPerChain, minFirstPageSize, maxCursorsPerFetch } =
-  SEARCH_CONFIG;
+const {
+  pageSize,
+  maxQueriesPerBackend,
+  maxResultsPerChain,
+  minFirstPageSize,
+  maxCursorsPerFetch,
+  semanticSearch,
+} = SEARCH_CONFIG;
 
 const READING_EMAILS = `## Reading emails
   Results carry only partial content in \`text\` — never the full email. Answer from \`text\` only when it clearly contains the answer. Otherwise call \`open_email\` with the result's \`openEmailParams\` object, passed directly as the tool input, for every email whose content you need. Also call it when the user asks to open, read, or see an email. Do NOT tell the user you cannot access the email or that you lack mailbox access.`;
@@ -12,7 +18,8 @@ const PAGING = `## Pages and cursors: how to get all results out
   Every request has one entry in \`pages\`: its \`query\`, \`mailbox\`, \`folder\`, a \`status\`, and a \`cursorId\` when it can continue. \`results\` holds the emails of all requests merged; use \`sourceMailbox\` to tell which mailbox an email came from.
 
   Page sizes:
-  - A page holds at most \`limit\` emails (default ${pageSize.default}, max ${pageSize.max}). Semantic pages often hold fewer even when more exist.
+  - A KQL page holds at most \`limit\` emails (default ${pageSize.default}, max ${pageSize.max}).
+  - A semantic page holds at most \`limit\` matched passages (default ${semanticSearch.defaultPageSize}, max ${pageSize.max}), ranked by relevance: the first page holds the most relevant ones, each next page less relevant ones. A semantic search stops after ${semanticSearch.maxPages} pages, because later matches are noise. Its pages often hold fewer passages even when more exist, and a later page can add passages of an email already returned.
   - When one call fans out to many KQL requests (several queries × mailboxes × folders), their first pages are smaller, at least ${minFirstPageSize} each, so the response stays readable. Their next pages keep that smaller size: follow the cursor again to get more.
   - A short first page does NOT mean that mailbox or folder has few matches. Its \`status\` tells you whether more exist.
 

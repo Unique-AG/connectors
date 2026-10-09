@@ -70,16 +70,16 @@ const emailConditionsSchema = (label: string) =>
     )
     .optional();
 
-const { pageSize, maxQueriesPerBackend, maxResultsPerChain } = SEARCH_CONFIG;
+const { pageSize, maxQueriesPerBackend, maxResultsPerChain, semanticSearch } = SEARCH_CONFIG;
 
-const pageSizeSchema = (description: string) =>
+const pageSizeSchema = (description: string, defaultSize: number) =>
   z
     .number()
     .int()
     .min(pageSize.min)
     .max(pageSize.max)
     .optional()
-    .prefault(pageSize.default)
+    .prefault(defaultSize)
     .describe(description);
 
 const clampedDatetime = z.preprocess(
@@ -172,8 +172,10 @@ export const SearchEmailsInputSchema = z.object({
       `Structured filters applied on top of the semantic search. Prefer populating this when the user clearly names a specific sender, recipient, date, folder, attachment requirement, or category — these signals tend to produce sharper results when expressed structurally rather than only in the natural-language \`search\` text. Omit a condition rather than guess if the signal is ambiguous. Each entry in this array is OR-ed with the others; fields within a single entry are AND-ed. Example: user says "from alice@x.com" → [{ fromSenders: { value: "alice@x.com", operator: "equals" } }].`,
     ),
   limit: pageSizeSchema(
-    `Maximum number of emails in each page of this search, between ${pageSize.min} and ${pageSize.max}. Default ${pageSize.default}. ` +
-      'Pages often hold fewer emails even when more exist; only the page `status` tells whether more exist. Further pages are fetched with `fetch_next_search_pages`.',
+    `Maximum number of matched passages in each page of this search, between ${pageSize.min} and ${pageSize.max}. Default ${semanticSearch.defaultPageSize}. ` +
+      `Results are ranked by relevance: the first page holds the most relevant passages, each next page less relevant ones, up to ${semanticSearch.maxPages} pages. ` +
+      'Pages often hold fewer passages even when more exist; only the page `status` tells whether more exist. Further pages are fetched with `fetch_next_search_pages`.',
+    semanticSearch.defaultPageSize,
   ),
 });
 
@@ -252,6 +254,7 @@ export const MsGraphKqlQuerySchema = z.object({
     `Maximum number of emails in each page, between ${pageSize.min} and ${pageSize.max}. Default ${pageSize.default}. ` +
       'The query runs once per searched mailbox (and per folder in `directories`); each of those returns its own page of up to this many emails and its own cursor. ' +
       `When one call fans out to many mailboxes and folders, their first pages are smaller (at least ${SEARCH_CONFIG.minFirstPageSize}) so the response stays readable, and their next pages keep that smaller size.`,
+    pageSize.default,
   ),
 });
 

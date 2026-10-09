@@ -9,7 +9,6 @@ import {
 } from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
-import { ProbeSearchPagingTool } from './admin/probe-search-paging.tool';
 import { CalendarModule } from './calendar/calendar.module';
 import { CancelEventTool } from './calendar/cancel-event.tool';
 import { CheckAvailabilityTool } from './calendar/check-availability.tool';
@@ -82,7 +81,6 @@ export function registerBackendModule(): DynamicModule {
     SearchEmailsTool,
     FetchNextSearchPagesTool,
     OpenEmailTool,
-    ...(isDebug ? [ProbeSearchPagingTool] : []),
   ];
 
   const uniqueOnlyTools = isGraph

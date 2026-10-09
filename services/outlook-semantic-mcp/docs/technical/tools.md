@@ -73,7 +73,7 @@ Search emails and return pages of results with partial content. The tool behavio
 
 Results never contain full email bodies. Each result's `text` holds the semantically matched passages and/or the first ~255 characters of the body (`bodyPreview`). Call [`open_email`](#open_email) with a result's `openEmailParams` to read an email in full.
 
-Results are paged. Each backend request — one per semantic search, and one per KQL query × mailbox (× folder in `directories`) — returns at most `limit` emails (default 25, max 50) and one entry in `pages`. Further pages are fetched with [`fetch_next_search_pages`](#fetch_next_search_pages).
+Results are paged. Each backend request — one per semantic search, and one per KQL query × mailbox (× folder in `directories`) — returns one entry in `pages`. A KQL page holds at most `limit` emails (default 25, max 50); a semantic page holds at most `limit` matched passages (default 50, max 50), ranked by relevance, for up to 4 pages. Further pages are fetched with [`fetch_next_search_pages`](#fetch_next_search_pages).
 
 ---
 
@@ -95,7 +95,7 @@ Each entry in `uniqueSemanticSearchQueries`:
 | `search` | string | Yes | Natural-language search query |
 | `mailbox` | email | No | Scope to one mailbox. When omitted all accessible mailboxes are searched. |
 | `conditions` | array | No | Structured filters. Multiple condition objects are OR-combined; fields within one object are AND-combined. |
-| `limit` | integer (1–50) | No | Emails per page. Default: 25. |
+| `limit` | integer (1–50) | No | Matched passages per page. Default: 50. |
 
 Each entry in `msGraphKeywordSearchQueries`:
 
@@ -258,8 +258,8 @@ Syntax rules:
 | Status | Meaning | Agent action |
 |--------|---------|--------------|
 | `hasMore` | Page delivered, more results exist | Call `fetch_next_search_pages` with `cursorId` |
-| `complete` | The request returned everything it matched | — |
-| `ceilingReached` | Stopped at 1,000 results (the Microsoft Graph `$search` limit; semantic searches stop at the same depth) | Tell the user results are capped; narrow the search |
+| `complete` | The request returned everything it matched. A semantic search is also `complete` after its 4th page | — |
+| `ceilingReached` | Stopped at 1,000 results (the Microsoft Graph `$search` limit) | Tell the user results are capped; narrow the search |
 | `throttled` | Microsoft returned HTTP 429 after one automatic retry | Retry once with the same `cursorId` after `retryAfterSeconds`, then report partial results |
 | `failed` | Temporary error (5xx, network), or a nextLink that cannot be followed. Without `cursorId` it cannot be retried | Retry once with the same `cursorId`, then report partial results |
 | `expired` | Microsoft Graph no longer accepts the stored continuation, or served the first page again instead of the next one | Run the search again |
@@ -271,7 +271,9 @@ The results are complete only when every page is `complete`. `hasMore: false` al
 
 Each semantic entry is one request. Each KQL query runs once per full-access mailbox, and once per folder when `directories` is set, so one call can start dozens of Graph requests. Every one of them runs on the first call and gets its own entry in `pages`; none is dropped.
 
-- A page holds at most `limit` emails (1–50, default 25). A semantic page often holds fewer while more exist: Unique splits `limit` between a vector and a full-text search, pages each on its own and merges them without duplicates. A semantic request is `complete` only when a page comes back empty, which costs one extra fetch at the end.
+- A KQL page holds at most `limit` emails (1–50, default 25).
+- A semantic page holds at most `limit` matched passages (1–50, default 50). Semantic search ranks every passage in scope, so page 1 holds the most relevant passages and each next page less relevant ones; it never runs out on a real mailbox. A semantic request is therefore `complete` after 4 pages (200 passages, the old single-call maximum), or earlier when a page comes back empty.
+- A semantic page often holds fewer passages while more exist: Unique splits `limit` between a vector and a full-text search, pages each on its own and merges them. The same passage can come back on a later page from the other search; it is dropped there. A later page can still add new passages of an email returned earlier.
 - The first pages of the Graph requests of one call share a budget of 200 results: each gets `min(limit, max(5, floor(200 / requests)))`. One query over three mailboxes keeps the full `limit`; three queries over three mailboxes and three folders (27 requests) get 7 each.
 - Graph copies `$top` into the `@odata.nextLink`, and the nextLink is stored and followed exactly as Graph returned it. A shrunk first page therefore keeps its smaller size on later pages; the agent follows the cursor more times to get the rest.
 - The agent picks the cursors to follow from `pages` (by `mailbox` and `folder`), or follows all of them when it cannot tell where the answer is.

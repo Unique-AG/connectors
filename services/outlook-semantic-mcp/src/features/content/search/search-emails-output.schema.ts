@@ -7,7 +7,7 @@ const SearchEmailResultSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Semantic-backend content ID. Pass as `id` with `idType: "Unique"` to `open_email`. Present only for semantic-backend results.',
+      'Semantic-backend content ID. Pass as `id` with `idType: "Unique"` to `open_email`. Present only for semantic-backend results. Use it to recognise the same email returned again on a later semantic page with further passages.',
     ),
   msGraphMessageId: z
     .string()
@@ -96,7 +96,7 @@ const SearchEmailResultSchema = z.object({
 export const SEARCH_PAGE_STATUS_DESCRIPTION = [
   'What to do next with this request:',
   '- `hasMore`: more results exist. Call `fetch_next_search_pages` with `cursorId`.',
-  '- `complete`: this request returned everything it matched.',
+  `- \`complete\`: this request returned everything it matched. For a semantic search: it returned its most relevant passages, which stop after ${SEARCH_CONFIG.semanticSearch.maxPages} pages.`,
   `- \`ceilingReached\`: results stopped at the ${SEARCH_CONFIG.maxResultsPerChain}-result limit, more emails match. Tell the user the results are capped and narrow the search (e.g. split the date range into smaller windows).`,
   '- `throttled`: Microsoft rate-limited this request (HTTP 429). Wait `retryAfterSeconds`, then retry ONCE with the same `cursorId` via `fetch_next_search_pages`. If it is still throttled, stop retrying and tell the user the results are incomplete.',
   '- `failed`: a temporary error. Retry ONCE with the same `cursorId`; if it fails again, stop retrying. Without a `cursorId` it cannot be retried — check the query syntax. Either way, tell the user the results may be incomplete.',

@@ -27,9 +27,9 @@ export const UniqueSearchCursorPayloadSchema = z.object({
   input: SearchEmailsInputSchema,
   // Unique search pages start at 1.
   page: z.number().int().positive(),
-  // Emails already returned on this chain. Later pages carry further chunks of the same emails,
-  // which are dropped.
-  seenContentIds: z.array(z.string()),
+  // Chunks already returned on this chain. Unique pages its vector and full-text searches
+  // separately, so a chunk can come back on a later page; it is dropped there.
+  seenChunkIds: z.array(z.string()),
 });
 
 export type UniqueSearchCursorPayload = z.infer<typeof UniqueSearchCursorPayloadSchema>;

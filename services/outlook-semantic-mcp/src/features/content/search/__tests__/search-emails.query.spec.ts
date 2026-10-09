@@ -407,7 +407,7 @@ describe('SearchEmailsQuery', () => {
         backend: SearchBackend.Unique as const,
         input: { search: 'semantic question', limit: 25 },
         page: 1,
-        seenContentIds: [],
+        seenChunkIds: [],
       };
       searchCursorRepository.findForUser.mockResolvedValue(
         new Map<string, unknown>([
@@ -473,9 +473,9 @@ describe('SearchEmailsQuery', () => {
     it('reports unknown cursor ids in the search notes', async () => {
       const result = await instance.fetchNextPages(testUserId, ['search_cursor_missing']);
 
-      expect(msGraphKqlQuery.fetchNextPages).not.toHaveBeenCalled();
-      expect(semanticSearchQuery.fetchNextPages).not.toHaveBeenCalled();
       expect(result.searchSummary).toContain('search_cursor_missing');
+      expect(result.pages).toEqual([]);
+      expect(result.results).toEqual([]);
       expect(result.hasMore).toBe(false);
     });
   });

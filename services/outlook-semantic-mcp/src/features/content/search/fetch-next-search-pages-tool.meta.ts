@@ -15,7 +15,8 @@ export const META = createMeta({
   ## How to call it
   - Pass up to ${SEARCH_CONFIG.maxCursorsPerFetch} \`cursorIds\` per call, exactly as returned — never edit, shorten, or invent them. With more cursors, call again with the rest.
   - Each response returns new \`cursorId\`s. Use those for the next call, not the ones you already followed.
-  - The same email can appear on pages of different requests. Treat results with the same \`msGraphMessageId\` as one email.
+  - Semantic pages are ranked by relevance: each next page holds less relevant passages than the one before, and a semantic search stops after ${SEARCH_CONFIG.semanticSearch.maxPages} pages.
+  - The same email can appear on several pages: on pages of different requests, and on later semantic pages with further passages. Treat results with the same \`msGraphMessageId\` or \`uniqueContentId\` as one email.
 
   ## Statuses
   ${SEARCH_PAGE_STATUS_DESCRIPTION}

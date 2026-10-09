@@ -10,9 +10,12 @@ export const SEARCH_CONFIG = {
   maxQueriesPerBackend: 3,
   // One Microsoft Graph $batch.
   maxCursorsPerFetch: 20,
-  // Microsoft Graph returns at most 1,000 results for one $search chain. Semantic chains stop at
-  // the same depth so an unfiltered semantic search cannot page through a whole mailbox.
+  // Microsoft Graph returns at most 1,000 results for one $search chain.
   maxResultsPerChain: 1000,
+  // Semantic search ranks every chunk in scope, so its pages go from the most relevant chunks to
+  // noise and never run out on a real mailbox. A chain stops after `maxPages` full pages (200
+  // chunks, the old single-call maximum).
+  semanticSearch: { defaultPageSize: 50, maxPages: 4 },
   // A 403 or 404 on a followed nextLink younger than this is trusted as lost mailbox access. An
   // older link may simply have stopped working, so it is reported `expired` and access is kept.
   // Graph does not document how long a nextLink lives.

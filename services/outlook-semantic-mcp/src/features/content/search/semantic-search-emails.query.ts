@@ -70,7 +70,7 @@ interface SemanticPageJob {
   input: SearchEmailsInput;
   // Unique search pages start at 1; page 0 returns the same results as page 1.
   page: number;
-  seenContentIds: string[];
+  seenChunkIds: string[];
   sourceCursorId?: string;
 }
 
@@ -104,7 +104,7 @@ export class SemanticSearchEmailsQuery {
   ): Promise<SemanticSearchOutput> {
     return this.executePages(
       userProfileId,
-      inputs.map((input) => ({ input, page: 1, seenContentIds: [] })),
+      inputs.map((input) => ({ input, page: 1, seenChunkIds: [] })),
       outputTimeZone,
     );
   }
@@ -120,7 +120,7 @@ export class SemanticSearchEmailsQuery {
       cursors.map(({ id, payload }) => ({
         input: payload.input,
         page: payload.page,
-        seenContentIds: payload.seenContentIds,
+        seenChunkIds: payload.seenChunkIds,
         sourceCursorId: id,
       })),
       outputTimeZone,
@@ -191,15 +191,15 @@ export class SemanticSearchEmailsQuery {
         pages.push({
           ...page,
           status: SearchPageStatus.Failed,
-          continuation: this.toContinuation(job, job.page, job.seenContentIds),
+          continuation: this.toContinuation(job, job.page, job.seenChunkIds),
           retryCursorId: job.sourceCursorId,
         });
         continue;
       }
 
       const chunks = settled.value ?? [];
-      const seen = new Set(job.seenContentIds);
-      const newChunks = chunks.filter((chunk) => !seen.has(chunk.id));
+      const seen = new Set(job.seenChunkIds);
+      const newChunks = chunks.filter((chunk) => !seen.has(chunk.chunkId));
       chunkLists.push(newChunks);
       pages.push({ ...page, ...this.getNextPosition(job, chunks.length === 0, newChunks) });
     }
@@ -217,36 +217,33 @@ export class SemanticSearchEmailsQuery {
   }
 
   private getPageSize(job: SemanticPageJob): number {
-    return job.input.limit ?? SEARCH_CONFIG.pageSize.default;
+    return job.input.limit ?? SEARCH_CONFIG.semanticSearch.defaultPageSize;
   }
 
   // Unique splits `limit` between a vector and a full-text search, pages each on its own and merges
   // them without duplicates, so a page usually holds fewer chunks than `limit` while more exist.
-  // Only an empty page means both searches are exhausted.
+  // A chain ends on an empty page, or after `maxPages`: later pages only hold less relevant chunks.
   private getNextPosition(
     job: SemanticPageJob,
     isEmptyPage: boolean,
     newChunks: SearchResultItem[],
   ): Pick<BackendPage, 'status' | 'continuation'> {
-    if (isEmptyPage) {
+    if (isEmptyPage || job.page >= SEARCH_CONFIG.semanticSearch.maxPages) {
       return { status: SearchPageStatus.Complete };
     }
-    if (job.page * this.getPageSize(job) >= SEARCH_CONFIG.maxResultsPerChain) {
-      return { status: SearchPageStatus.CeilingReached };
-    }
-    const seenContentIds = unique([...job.seenContentIds, ...newChunks.map(({ id }) => id)]);
+    const seenChunkIds = unique([...job.seenChunkIds, ...newChunks.map(({ chunkId }) => chunkId)]);
     return {
       status: SearchPageStatus.HasMore,
-      continuation: this.toContinuation(job, job.page + 1, seenContentIds),
+      continuation: this.toContinuation(job, job.page + 1, seenChunkIds),
     };
   }
 
   private toContinuation(
     job: SemanticPageJob,
     page: number,
-    seenContentIds: string[],
+    seenChunkIds: string[],
   ): UniqueSearchCursorPayload {
-    return { backend: SearchBackend.Unique, input: job.input, page, seenContentIds };
+    return { backend: SearchBackend.Unique, input: job.input, page, seenChunkIds };
   }
 
   // Merges the chunk lists of all searches by content. An email ranks by its best position in any
