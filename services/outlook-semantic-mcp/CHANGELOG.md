@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.6.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.2...outlook-semantic-mcp@3.6.3) (2026-10-09)
+
+
+### Bug Fixes
+
+* **mcp-server-module,outlook-semantic-mcp,teams-mcp,deps:** close idle MCP sessions and fix token cache TTL units ([#1169](https://github.com/Unique-AG/connectors/issues/1169)) ([c9a4289](https://github.com/Unique-AG/connectors/commit/c9a4289d9b4b5357bc60b8f54e7e09760074a910))
+* **teams-mcp,outlook-semantic-mcp:** accept a null latestSupportedTlsVersion from Graph ([#1170](https://github.com/Unique-AG/connectors/issues/1170)) ([ad519eb](https://github.com/Unique-AG/connectors/commit/ad519eb44ce76f3ddc7dc8d592dcd56b939fa472))
+
+
+### Dependencies
+
+* bump lru-cache in /  ([#1103](https://github.com/Unique-AG/connectors/issues/1103)) ([ba5d168](https://github.com/Unique-AG/connectors/commit/ba5d16814d5ea26cac5e918da9c9328e13178431))
+* bump node in /services/*/deploy ([#1142](https://github.com/Unique-AG/connectors/issues/1142)) ([336dd69](https://github.com/Unique-AG/connectors/commit/336dd694053576d07366c6f0adbf30f45ed95988))
+
 ## [3.6.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.1...outlook-semantic-mcp@3.6.2) (2026-09-25)
 
 
