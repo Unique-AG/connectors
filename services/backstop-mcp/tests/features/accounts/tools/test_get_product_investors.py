@@ -669,14 +669,14 @@ class TestGetProductInvestors:
                     ),
                     _account("returned", owner_id="555", accountStartDate="2025-03-01"),
                     included=[
-                        _owner(_OWNER_ID, name="Syz Capital"),
-                        _owner("555", name="BlackRock"),
+                        _owner(_OWNER_ID, name="Contoso Private Bank"),
+                        _owner("555", name="Woodgrove Pension"),
                     ],
                 )
             return _accounts_page(
                 _account("a2", owner_id=_OWNER_ID, accountStartDate="2015-06-01"),
                 _account("a3", owner_id=_OWNER_ID),
-                included=[_owner(_OWNER_ID, name="Syz Capital")],
+                included=[_owner(_OWNER_ID, name="Contoso Private Bank")],
             )
 
         respx.get(_ACCOUNTS_URL).mock(side_effect=accounts)
@@ -701,18 +701,21 @@ class TestGetProductInvestors:
             for investor in result.investors
         }
         assert tenure == {
-            "BlackRock": ([(date(2007, 8, 1), date(2009, 6, 30)), (date(2025, 3, 1), None)], None),
-            "Syz Capital": ([(date(2008, 8, 1), None)], 1),
+            "Woodgrove Pension": (
+                [(date(2007, 8, 1), date(2009, 6, 30)), (date(2025, 3, 1), None)],
+                None,
+            ),
+            "Contoso Private Bank": ([(date(2008, 8, 1), None)], 1),
         }
-        syz = object_dict(
+        private_bank = object_dict(
             next(
                 entry
                 for entry in object_list(tool_payload(result)["investors"])
-                if object_dict(entry)["name"] == "Syz Capital"
+                if object_dict(entry)["name"] == "Contoso Private Bank"
             )
         )
-        assert syz["tenure_runs"] == [{"start": "2008-08-01", "years": 18.18}]
-        assert syz["tenure_undated_accounts"] == 1
+        assert private_bank["tenure_runs"] == [{"start": "2008-08-01", "years": 18.18}]
+        assert private_bank["tenure_undated_accounts"] == 1
 
     @pytest.mark.asyncio
     @respx.mock
@@ -736,8 +739,8 @@ class TestGetProductInvestors:
                 ),
                 _account("live", owner_id="555", accountStartDate="2016-01-01"),
                 included=[
-                    _owner(_OWNER_ID, name="University of Chicago"),
-                    _owner("555", name="Syz Capital"),
+                    _owner(_OWNER_ID, name="Fabrikam Endowment"),
+                    _owner("555", name="Contoso Private Bank"),
                 ],
             )
         )
@@ -776,24 +779,24 @@ class TestGetProductInvestors:
         default = await call()
         assert [account.id for account in default.products[0].accounts] == ["live"]
         assert listed(default) == [
-            ("Syz Capital", True, ("live",)),
-            ("University of Chicago", False, ()),
+            ("Contoso Private Bank", True, ("live",)),
+            ("Fabrikam Endowment", False, ()),
         ]
-        chicago = default.investors[1]
-        assert (chicago.id, chicago.resource_type) == (_OWNER_ID, "organizations")
-        assert chicago.tenure_runs is not None
-        assert [(run.start, run.end, run.years) for run in chicago.tenure_runs] == [
+        endowment = default.investors[1]
+        assert (endowment.id, endowment.resource_type) == (_OWNER_ID, "organizations")
+        assert endowment.tenure_runs is not None
+        assert [(run.start, run.end, run.years) for run in endowment.tenure_runs] == [
             (date(2008, 8, 1), date(2019, 6, 30), 10.91)
         ]
 
         asked = await call(investor_ids=[_OWNER_ID, "999"])
-        assert listed(asked) == [("University of Chicago", False, ())]
+        assert listed(asked) == [("Fabrikam Endowment", False, ())]
         assert asked.investor_ids_not_found == ("999",)
 
         with_closed = await call(include_closed=True)
         assert listed(with_closed) == [
-            ("University of Chicago", False, ("gone",)),
-            ("Syz Capital", True, ("rotated", "live")),
+            ("Fabrikam Endowment", False, ("gone",)),
+            ("Contoso Private Bank", True, ("rotated", "live")),
         ]
 
     @pytest.mark.asyncio

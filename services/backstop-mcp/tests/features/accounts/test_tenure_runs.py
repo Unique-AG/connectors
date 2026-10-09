@@ -18,7 +18,7 @@ def _bounds(tenure: TenureDto) -> list[tuple[date, date | None]]:
 
 class TestTenureRuns:
     def test_rotating_accounts_chain_back_past_every_open_account(self) -> None:
-        # The live Syz Capital shape: no open account is older than 2019, the run is from 2008.
+        # A rotating private bank: no open account is older than 2019, the run is from 2008.
         spans = (
             _closed(date(2008, 8, 1), date(2016, 1, 1)),
             _closed(date(2014, 6, 1), date(2021, 4, 1)),
@@ -32,7 +32,7 @@ class TestTenureRuns:
         )
 
     def test_a_gap_starts_a_new_run_and_both_are_kept(self) -> None:
-        # The live BlackRock shape: in 2007-2009, out, back in 2025. The older run is longer.
+        # In 2007-2009, out, back in 2025. The older run is longer.
         spans = (
             _closed(date(2007, 8, 1), date(2009, 6, 30)),
             _open(date(2025, 3, 1)),
