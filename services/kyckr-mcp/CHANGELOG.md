@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1-alpha.1](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.1-alpha...kyckr-mcp@0.1.1-alpha.1) (2026-10-09)
+
+
+### Dependencies
+
+* bump node in /services/*/deploy ([#1142](https://github.com/Unique-AG/connectors/issues/1142)) ([336dd69](https://github.com/Unique-AG/connectors/commit/336dd694053576d07366c6f0adbf30f45ed95988))
+
 ## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.0...kyckr-mcp@0.1.1-alpha) (2026-09-21)
 
 
