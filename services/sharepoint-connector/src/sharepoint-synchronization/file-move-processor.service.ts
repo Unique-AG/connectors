@@ -35,12 +35,12 @@ export class FileMoveProcessor {
     let files: FileWithExpectedLocation[] = [];
 
     try {
-      files = await this.findFilesWithExpectedLocationQuery.execute({
+      ({ files } = await this.findFilesWithExpectedLocationQuery.execute({
         diffKeys: movedFileKeys,
         items: sharepointItems,
         scopes,
         context,
-      });
+      }));
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to get ingested files by keys from unique`,

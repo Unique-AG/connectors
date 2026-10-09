@@ -904,4 +904,34 @@ describe('ContentSyncService with an edited file that also moved', () => {
       expect.any(Function),
     );
   });
+
+  it('leaves the edited file out of this cycle when no scope matches its folder', async () => {
+    getFilesByKeys.mockResolvedValue([storedEditedFile(folderAScopeId)]);
+    const scopesWithoutFolderB = scopes.filter((scope) => scope.id !== folderBScopeId);
+
+    await service.syncContentForSite([editedFile, newFile], scopesWithoutFolderB, context);
+
+    expect(moveFile).not.toHaveBeenCalled();
+    expect(processItems).toHaveBeenCalledExactlyOnceWith(
+      context,
+      [newFile],
+      [],
+      expect.any(Function),
+    );
+  });
+
+  it('ingests an edited file that is not stored in Unique even when no scope matches it', async () => {
+    getFilesByKeys.mockResolvedValue([]);
+    const scopesWithoutFolderB = scopes.filter((scope) => scope.id !== folderBScopeId);
+
+    await service.syncContentForSite([editedFile, newFile], scopesWithoutFolderB, context);
+
+    expect(moveFile).not.toHaveBeenCalled();
+    expect(processItems).toHaveBeenCalledExactlyOnceWith(
+      context,
+      [newFile],
+      [editedFile],
+      expect.any(Function),
+    );
+  });
 });

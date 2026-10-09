@@ -106,7 +106,7 @@ export class ContentSyncService {
     }
 
     // A file that was edited and moved is reported only as updated. Move it into the scope for
-    // its new path before upsert, and leave failed moves out of this cycle.
+    // its new path before upsert, and leave files that could not be moved out of this cycle.
     const keysToLeaveOut = await this.moveUpdatedFilesToExpectedScopeCommand.execute({
       updatedFileKeys: Array.from(updatedFileKeys),
       items,

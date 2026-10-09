@@ -23,10 +23,11 @@ export class MoveUpdatedFilesToExpectedScopeCommand {
     private readonly findFilesWithExpectedLocationQuery: FindFilesWithExpectedLocationQuery,
   ) {}
 
-  // Returns the file-diff keys whose move failed. Commands normally return nothing; this one
-  // returns those keys so the caller can leave the items out of the cycle. Upserting them would
-  // create a second content record in the new scope while the original stays in the old one.
-  // Their updatedAt is still newer than the stored copy, so the next sync retries the move.
+  // Returns the file-diff keys of stored files that could not be moved, because the move failed
+  // or no scope could be resolved for them. Commands normally return nothing; this one returns
+  // those keys so the caller can leave the items out of the cycle. Upserting them would create a
+  // second content record in another scope while the original stays in the old one. Their
+  // updatedAt is still newer than the stored copy, so the next sync retries the move.
   public async execute(input: Input): Promise<ReadonlySet<string>> {
     const { updatedFileKeys, items, scopes, context } = input;
 
@@ -35,13 +36,13 @@ export class MoveUpdatedFilesToExpectedScopeCommand {
     }
 
     const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
-    const files = await this.findFilesWithExpectedLocationQuery.execute({
+    const { files, unresolvedDiffKeys } = await this.findFilesWithExpectedLocationQuery.execute({
       diffKeys: updatedFileKeys,
       items,
       scopes,
       context,
     });
-    const keysToLeaveOut = new Set<string>();
+    const keysToLeaveOut = new Set<string>(unresolvedDiffKeys);
 
     for (const file of files) {
       if (file.currentScopeId === file.expectedScopeId) {

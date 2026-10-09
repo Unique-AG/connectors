@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { filter, isNonNullish, isNullish, map, pipe } from 'remeda';
+import { isNullish, map, partition, pipe, prop } from 'remeda';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { UniqueFile } from '../unique-api/unique-files/unique-files.types';
@@ -24,6 +24,12 @@ export interface FileWithExpectedLocation {
   expectedUrl: string;
 }
 
+interface Result {
+  files: FileWithExpectedLocation[];
+  // Stored in Unique, but without a matching SharePoint item or scope to place them in.
+  unresolvedDiffKeys: string[];
+}
+
 @Injectable()
 export class FindFilesWithExpectedLocationQuery {
   private readonly logger = new Logger(this.constructor.name);
@@ -34,22 +40,23 @@ export class FindFilesWithExpectedLocationQuery {
   ) {}
 
   // Loads the files stored in Unique for the given file-diff keys and pairs each with the scope
-  // and URL its current SharePoint item maps to. Files without a matching item or scope are left
-  // out.
-  public async execute(input: Input): Promise<FileWithExpectedLocation[]> {
+  // and URL its current SharePoint item maps to. Keys with no file stored in Unique are in neither
+  // list.
+  public async execute(input: Input): Promise<Result> {
     const { diffKeys, items, scopes, context } = input;
     const { siteId } = context.siteConfig;
 
-    const files = await this.uniqueFilesService.getFilesByKeys(
+    const storedFiles = await this.uniqueFilesService.getFilesByKeys(
       diffKeys.map((key) => `${siteId.value}/${key}`),
     );
     const itemsByKey = new Map(items.map((item) => [buildFileDiffKey(item), item]));
 
-    return pipe(
-      files,
+    const [files, unresolved] = pipe(
+      storedFiles,
       map((file) => this.withExpectedLocation(file, itemsByKey, scopes, context)),
-      filter(isNonNullish),
+      partition((located): located is FileWithExpectedLocation => 'expectedScopeId' in located),
     );
+    return { files, unresolvedDiffKeys: unresolved.map(prop('diffKey')) };
   }
 
   private withExpectedLocation(
@@ -57,7 +64,7 @@ export class FindFilesWithExpectedLocationQuery {
     itemsByKey: ReadonlyMap<string, SharepointContentItem>,
     scopes: ScopeWithPath[] | null,
     context: SharepointSyncContext,
-  ): FileWithExpectedLocation | null {
+  ): FileWithExpectedLocation | { diffKey: string } {
     const { siteId } = context.siteConfig;
     const logPrefix = `[Site: ${siteId}]`;
     const diffKey = file.key.replace(`${siteId.value}/`, '');
@@ -67,7 +74,7 @@ export class FindFilesWithExpectedLocationQuery {
       this.logger.warn(
         `${logPrefix} Could not find SharePoint item for file with key: ${file.key}`,
       );
-      return null;
+      return { diffKey };
     }
 
     const expectedScopeId = this.scopeManagementService.determineScopeForItem(
@@ -77,7 +84,7 @@ export class FindFilesWithExpectedLocationQuery {
     );
     if (isNullish(expectedScopeId)) {
       this.logger.warn(`${logPrefix} Could not determine scope for file with key: ${file.key}`);
-      return null;
+      return { diffKey };
     }
 
     return {
