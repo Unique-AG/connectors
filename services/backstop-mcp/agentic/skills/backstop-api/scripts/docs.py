@@ -359,8 +359,7 @@ def _fetch_html(client: httpx.Client, path: str) -> str:
     response = client.get(f"{KB_ORIGIN}{path}")
     if response.status_code == 401 or _still_login_form(response.text):
         raise SystemExit(
-            "Elevio session expired; delete "
-            + f"{_cache_dir() / 'session.json'} and retry."
+            "Elevio session expired; delete " + f"{_cache_dir() / 'session.json'} and retry."
         )
     if response.status_code != 200:
         raise SystemExit(f"GET {path} failed: HTTP {response.status_code}")
