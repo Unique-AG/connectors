@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.6...kb-mcp@0.1.7) (2026-10-09)
+
+
+### Dependencies
+
+* bump python in /services/*/deploy ([#1140](https://github.com/Unique-AG/connectors/issues/1140)) ([ecc36dc](https://github.com/Unique-AG/connectors/commit/ecc36dc232dfbfbaba7dd093cf2aa587cacb2297))
+* **with-intelligence-mcp,backstop-mcp,hello-mcp,kb-mcp,office-365-mcp,ci,scripts,deps:** add deployment and release ([#988](https://github.com/Unique-AG/connectors/issues/988)) ([55f48cd](https://github.com/Unique-AG/connectors/commit/55f48cd2e2676601c5f3d6590a8990c6986c5132))
+
 ## [0.1.6](https://github.com/Unique-AG/connectors/compare/kb-mcp@0.1.5...kb-mcp@0.1.6) (2026-09-29)
 
 
