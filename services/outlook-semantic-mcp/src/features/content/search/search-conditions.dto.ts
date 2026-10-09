@@ -70,6 +70,18 @@ const emailConditionsSchema = (label: string) =>
     )
     .optional();
 
+const { pageSize, maxQueriesPerBackend, maxResultsPerChain, semanticSearch } = SEARCH_CONFIG;
+
+const pageSizeSchema = (description: string, defaultSize: number) =>
+  z
+    .number()
+    .int()
+    .min(pageSize.min)
+    .max(pageSize.max)
+    .optional()
+    .prefault(defaultSize)
+    .describe(description);
+
 const clampedDatetime = z.preprocess(
   clampToValidDate,
   z.iso.datetime({ message: 'Must be UTC ISO 8601 format, e.g. "2024-01-01T00:00:00Z"' }),
@@ -159,14 +171,12 @@ export const SearchEmailsInputSchema = z.object({
     .describe(
       `Structured filters applied on top of the semantic search. Prefer populating this when the user clearly names a specific sender, recipient, date, folder, attachment requirement, or category — these signals tend to produce sharper results when expressed structurally rather than only in the natural-language \`search\` text. Omit a condition rather than guess if the signal is ambiguous. Each entry in this array is OR-ed with the others; fields within a single entry are AND-ed. Example: user says "from alice@x.com" → [{ fromSenders: { value: "alice@x.com", operator: "equals" } }].`,
     ),
-  limit: z
-    .number()
-    .int()
-    .min(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.min ?? 0)
-    .max(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.max ?? 0)
-    .optional()
-    .prefault(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.default ?? 0)
-    .describe(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.description ?? ''),
+  limit: pageSizeSchema(
+    `Maximum number of matched passages in each page of this search, between ${pageSize.min} and ${pageSize.max}. Default ${semanticSearch.defaultPageSize}. ` +
+      `Results are ranked by relevance: the first page holds the most relevant passages, each next page less relevant ones, up to ${semanticSearch.maxPages} pages. ` +
+      'Pages often hold fewer passages even when more exist; only the page `status` tells whether more exist. Further pages are fetched with `fetch_next_search_pages`.',
+    semanticSearch.defaultPageSize,
+  ),
 });
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
@@ -185,9 +195,9 @@ export const MsGraphKqlQuerySchema = z.object({
     .nonempty()
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
-        'SEARCH BEHAVIOUR: Results are relevance-ranked by Exchange, not strictly boolean-filtered.\n' +
-        '  OR/NOT are hints to the relevance engine — the engine may still return emails that\n' +
-        '  satisfy only some of the terms. Use narrow, specific queries for best precision.\n' +
+        'SEARCH BEHAVIOUR: Results are sorted by sent date, newest first — not by relevance.\n' +
+        `  Microsoft returns at most ${maxResultsPerChain} results for one query in one mailbox, across all pages.\n` +
+        '  Use narrow, specific queries (sender, date range) so the emails you need fall inside that window.\n' +
         'FORMAT: Provide plain KQL — do NOT add outer double quotes or pre-escape inner quotes.\n' +
         '  The system automatically wraps the query in outer quotes and escapes phrase values.\n' +
         '  Space between clauses is the implicit AND — do NOT write AND (it is silently removed).\n' +
@@ -240,21 +250,19 @@ export const MsGraphKqlQuerySchema = z.object({
         'NEVER encode folder filtering inside the kqlQuery string — `folder:` is not a supported KQL property and is silently stripped. ' +
         'Use this field instead.',
     ),
-  limit: z
-    .number()
-    .int()
-    .min(SEARCH_CONFIG.msGraph.subQueryLimits.min)
-    .max(SEARCH_CONFIG.msGraph.subQueryLimits.max)
-    .optional()
-    .prefault(SEARCH_CONFIG.msGraph.subQueryLimits.default)
-    .describe(SEARCH_CONFIG.msGraph.subQueryLimits.description),
+  limit: pageSizeSchema(
+    `Maximum number of emails in each page, between ${pageSize.min} and ${pageSize.max}. Default ${pageSize.default}. ` +
+      'The query runs once per searched mailbox (and per folder in `directories`); each of those returns its own page of up to this many emails and its own cursor. ' +
+      `When one call fans out to many mailboxes and folders, their first pages are smaller (at least ${SEARCH_CONFIG.minFirstPageSize}) so the response stays readable, and their next pages keep that smaller size.`,
+    pageSize.default,
+  ),
 });
 
 export const MsGraphSearchParamsSchema = z
   .array(MsGraphKqlQuerySchema)
   .min(1)
-  .max(10)
-  .describe('List of KQL queries to execute in parallel. Maximum 10.');
+  .max(maxQueriesPerBackend)
+  .describe(`List of KQL queries to execute in parallel. Maximum ${maxQueriesPerBackend}.`);
 
 export const SearchEmailsMsGraphInputSchema = z.object({
   msGraphKeywordSearchQueries: MsGraphSearchParamsSchema,
@@ -265,22 +273,23 @@ export const SearchEmailsUnifiedInputSchema = z
     uniqueSemanticSearchQueries: z
       .array(SearchEmailsInputSchema)
       .min(1)
-      .max(10)
+      .max(maxQueriesPerBackend)
       .describe(
-        'List of semantic searches to execute in parallel (at most 10). ALL entries must address the SAME single user question — do NOT pack unrelated questions into this array. ' +
-          'A single phrasing often misses relevant emails — always compose 2–4 parallel entries that approach the question from different angles: ' +
+        `List of semantic searches to execute in parallel (at most ${maxQueriesPerBackend}). ALL entries must address the SAME single user question — do NOT pack unrelated questions into this array. ` +
+          'For a targeted question, compose up to 3 entries that approach it from different angles, for example: ' +
           '(1) different phrasings or synonyms (e.g. "project kick-off" vs "project launch"); ' +
           '(2) narrower vs. broader scope — one with tight conditions, one with a broader search term; ' +
           '(3) different condition combinations (e.g. one entry scoped to folder "Inbox", another to "Sent Items" to capture both sides of a conversation); ' +
           '(4) perspective shift (e.g. "emails I sent about the merger" vs "emails I received about the merger"). ' +
+          'For an overview or listing question ("everything from last week", "summarise my emails with Alice"), use exactly ONE entry with precise `conditions` and page through it with `fetch_next_search_pages`. ' +
           'Reason about the user\'s question first: when they clearly name a specific sender, recipient, date range, folder, attachment requirement, or category, prefer expressing it via `conditions` on every entry that targets the same intent rather than encoding it only in the natural-language `search` text. If a signal is ambiguous, it is fine to omit the condition — but generally lean toward populating them when the intent is clear. Example: user asks "emails from alice@x.com about the budget" → every entry should include `conditions: [{ fromSenders: { value: "alice@x.com", operator: "equals" } }]`, with `search` carrying only the topic ("budget"). ' +
           'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
     msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.describe(
       'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
-        'Use multiple entries to approach the same question from different angles (e.g. different keyword combinations, subject vs. body focus). ' +
-        'Results from both backends are merged: semantic results are anchored first and enriched with the Graph body excerpt when the same email was matched by both. ' +
+        'For a targeted question, use up to 3 entries from different angles (e.g. different keyword combinations, subject vs. body focus). For an overview or listing question, use exactly ONE entry and page through it. ' +
+        'Results from both backends are merged: semantic results are anchored first and enriched with the Graph body preview when the same email was matched by both. ' +
         'A single backend alone will miss results: semantic may miss exact keyword hits; KQL will miss conceptual matches and attachment content.',
     ),
   })
@@ -290,5 +299,5 @@ export const SearchEmailsUnifiedInputSchema = z
       'Do NOT spread multiple unrelated user questions across the two fields. ' +
       'The two searches run in parallel and their results are merged to provide a broader and more reliable overview: ' +
       'semantic search covers natural-language relevance and attachment content; ' +
-      'KQL covers lexical precision and full email-body excerpts.',
+      'KQL covers lexical precision and exact property filters.',
   );

@@ -14,6 +14,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | Tool | Category | Mutating | Mode |
 |------|----------|----------|------|
 | [`search_emails`](#search_emails) | Email Search | No | Both |
+| [`fetch_next_search_pages`](#fetch_next_search_pages) | Email Search | No | Both |
 | [`open_email`](#open_email) | Email Search | No | Both |
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
@@ -66,9 +67,13 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 
 ### `search_emails`
 
-Search emails and return matched passages. The tool behaviour and input schema differ by deployment mode.
+Search emails and return pages of results with partial content. The tool behaviour and input schema differ by deployment mode.
 
 **Available in:** Both modes
+
+Results never contain full email bodies. Each result's `text` holds the semantically matched passages and/or the first ~255 characters of the body (`bodyPreview`). Call [`open_email`](#open_email) with a result's `openEmailParams` to read an email in full.
+
+Results are paged. Each backend request — one per semantic search, and one per KQL query × mailbox (× folder in `directories`) — returns one entry in `pages`. A KQL page holds at most `limit` emails (default 25, max 50); a semantic page holds at most `limit` matched passages (default 50, max 50), ranked by relevance, for up to 4 pages. Further pages are fetched with [`fetch_next_search_pages`](#fetch_next_search_pages).
 
 ---
 
@@ -80,8 +85,8 @@ Runs two searches in parallel — semantic search against the Unique knowledge b
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `uniqueSemanticSearchQueries` | array (1–10) | Yes | Semantic searches. Compose 2–4 parallel entries that approach the question from different angles. |
-| `msGraphKeywordSearchQueries` | array (1–10) | Yes | KQL keyword searches addressing the same question. |
+| `uniqueSemanticSearchQueries` | array (1–3) | Yes | Semantic searches. Up to 3 entries from different angles for a targeted question; exactly one for an overview or listing question. |
+| `msGraphKeywordSearchQueries` | array (1–3) | Yes | KQL keyword searches addressing the same question. |
 
 Each entry in `uniqueSemanticSearchQueries`:
 
@@ -90,15 +95,16 @@ Each entry in `uniqueSemanticSearchQueries`:
 | `search` | string | Yes | Natural-language search query |
 | `mailbox` | email | No | Scope to one mailbox. When omitted all accessible mailboxes are searched. |
 | `conditions` | array | No | Structured filters. Multiple condition objects are OR-combined; fields within one object are AND-combined. |
-| `limit` | integer (100–200) | No | Maximum results for this query. Default: 100. Use 200 for broad queries. |
+| `limit` | integer (1–50) | No | Matched passages per page. Default: 50. |
 
 Each entry in `msGraphKeywordSearchQueries`:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `kqlQuery` | string | Yes | KQL query string. See [KQL reference](#KQL-reference) below. |
-| `mailbox` | email | No | Scope to one mailbox. |
-| `limit` | integer (1–100) | No | Maximum results for this query. Default: 100. |
+| `mailbox` | email | No | Scope to one mailbox. When omitted, the query runs once per accessible mailbox. |
+| `directories` | string[] | No | Folder names or IDs. The query runs once per resolved folder. |
+| `limit` | integer (1–50) | No | Emails per page of each mailbox (and folder) request. Default: 25. |
 
 Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries only) may include:
 
@@ -130,8 +136,7 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
           "fromSenders": { "value": "alice@example.com", "operator": "equals" },
           "dateFrom": { "value": "2024-01-01T00:00:00Z", "operator": "greaterThanOrEqual" }
         }
-      ],
-      "limit": 100
+      ]
     },
     {
       "search": "Q1 budget summary",
@@ -139,14 +144,12 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
         {
           "fromSenders": { "value": "alice@example.com", "operator": "equals" }
         }
-      ],
-      "limit": 100
+      ]
     }
   ],
   "msGraphKeywordSearchQueries": [
     {
-      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01",
-      "limit": 100
+      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01"
     }
   ]
 }
@@ -156,17 +159,15 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
 
 #### Mode B: `microsoft_graph`
 
-Calls the Microsoft Graph Search API directly with KQL queries. No semantic search is performed. Only `msGraphKeywordSearchQueries` is accepted.
+Searches the mailboxes directly through Microsoft Graph `$search` with KQL queries. No semantic search is performed. Only `msGraphKeywordSearchQueries` is accepted.
 
 **Input parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `msGraphKeywordSearchQueries` | array (1–10) | Yes | KQL keyword searches. |
+| `msGraphKeywordSearchQueries` | array (1–3) | Yes | KQL keyword searches. |
 
-Each entry uses the same `kqlQuery`, `mailbox`, and `limit` fields as described in Mode A above.
-
-**Note:** Folder filtering via `directories` conditions is not supported in Mode B. The Microsoft Graph Search API does not expose a folder-scoped KQL predicate.
+Each entry uses the same `kqlQuery`, `mailbox`, `directories`, and `limit` fields as described in Mode A above.
 
 **Example (Mode B):**
 
@@ -174,8 +175,7 @@ Each entry uses the same `kqlQuery`, `mailbox`, and `limit` fields as described 
 {
   "msGraphKeywordSearchQueries": [
     {
-      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01",
-      "limit": 100
+      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01"
     }
   ]
 }
@@ -184,6 +184,8 @@ Each entry uses the same `kqlQuery`, `mailbox`, and `limit` fields as described 
 ---
 
 #### KQL reference
+
+Microsoft Graph sorts `$search` results by sent date, newest first — not by relevance — and returns at most 1,000 results per query and mailbox across all pages.
 
 Supported KQL property filters for `kqlQuery`:
 
@@ -206,19 +208,29 @@ Syntax rules:
 - Boolean operators must be uppercase: `AND`, `OR`, `NOT`
 - Suffix wildcards only: `report*`, not `*report`
 - Phrases in double quotes: `subject:"quarterly report"`
-- Do NOT use `folder:` — it is not supported and causes a request error
+- Do NOT use `folder:` — it is not supported; use `directories` instead
 
 ---
 
-#### Return shape (both modes)
+#### Return shape (`search_emails` and `fetch_next_search_pages`)
 
 ```typescript
 {
   success: boolean;
   message?: string;           // error description when success is false
   status?: string;            // informational subscription/backend status
-  syncWarning?: string;       // Mode A only — present when ingestion is incomplete or in error state. Always display to the user before showing results.
-  searchNotes?: string;       // informational notes about the search run (e.g. unrecognised folders excluded). Display to the user after results.
+  syncWarning?: string;       // search_emails in Mode A only — present when ingestion is incomplete or in error state. Always display to the user before showing results.
+  searchNotes?: string;       // informational notes (e.g. unrecognised folders excluded, throttled mailboxes, unknown cursors). Display to the user after results.
+  hasMore?: boolean;          // true when at least one page has status "hasMore"; throttled and failed pages do not count
+  pages?: Array<{
+    backend: "Unique" | "MsGraph";
+    query: string;            // KQL query or semantic search text
+    mailbox?: string;
+    folder?: string;
+    status: "hasMore" | "complete" | "ceilingReached" | "throttled" | "failed" | "expired" | "accessRevoked";
+    cursorId?: string;        // pass to fetch_next_search_pages: next page (hasMore) or retry (throttled, failed)
+    retryAfterSeconds?: number; // throttled only
+  }>;
   results?: Array<{
     uniqueContentId?: string;     // Unique KB content ID. Present for semantic-backend results only.
     msGraphMessageId?: string;    // Microsoft Graph message ID. Present for Graph-backend results; also present for semantic results when both backends matched the same email.
@@ -227,7 +239,7 @@ Syntax rules:
     title: string;                 // email subject
     from: string;                  // sender email address
     receivedDateTime?: string | null; // ISO 8601
-    text: string;                  // matched passage or excerpt — not the full body
+    text: string;                  // "## Semantically Matched Content" and/or "## Preview" — never the full body
     outlookWebLink: string;        // direct URL to open in Outlook Web — use as link target when non-empty
     sourceMailbox?: string | null; // mailbox this email belongs to
     openEmailParams: {             // pass directly to open_email without modification
@@ -241,20 +253,67 @@ Syntax rules:
 }
 ```
 
+**Page statuses:**
+
+| Status | Meaning | Agent action |
+|--------|---------|--------------|
+| `hasMore` | Page delivered, more results exist | Call `fetch_next_search_pages` with `cursorId` |
+| `complete` | The request returned everything it matched. A semantic search is also `complete` after its 4th page | — |
+| `ceilingReached` | Stopped at 1,000 results (the Microsoft Graph `$search` limit) | Tell the user results are capped; narrow the search |
+| `throttled` | Microsoft returned HTTP 429 after one automatic retry | Retry once with the same `cursorId` after `retryAfterSeconds`, then report partial results |
+| `failed` | Temporary error (5xx, network), or a nextLink that cannot be followed. Without `cursorId` it cannot be retried | Retry once with the same `cursorId`, then report partial results |
+| `expired` | Microsoft Graph no longer accepts the stored continuation, or served the first page again instead of the next one | Run the search again |
+| `accessRevoked` | Access to the mailbox was lost since the search started | Do not retry |
+
+The results are complete only when every page is `complete`. `hasMore: false` alone does not mean complete.
+
+**Page sizes and fan-out:**
+
+Each semantic entry is one request. Each KQL query runs once per full-access mailbox, and once per folder when `directories` is set, so one call can start dozens of Graph requests. Every one of them runs on the first call and gets its own entry in `pages`; none is dropped.
+
+- A KQL page holds at most `limit` emails (1–50, default 25).
+- A semantic page holds at most `limit` matched passages (1–50, default 50). Semantic search ranks every passage in scope, so page 1 holds the most relevant passages and each next page less relevant ones; it never runs out on a real mailbox. A semantic request is therefore `complete` after 4 pages (200 passages, the old single-call maximum), or earlier when a page comes back empty.
+- A semantic page often holds fewer passages while more exist: Unique splits `limit` between a vector and a full-text search, pages each on its own and merges them. The same passage can come back on a later page from the other search; it is dropped there. A later page can still add new passages of an email returned earlier.
+- The first pages of the Graph requests of one call share a budget of 200 results: each gets `min(limit, max(5, floor(200 / requests)))`. One query over three mailboxes keeps the full `limit`; three queries over three mailboxes and three folders (27 requests) get 7 each.
+- Graph copies `$top` into the `@odata.nextLink`, and the nextLink is stored and followed exactly as Graph returned it. A shrunk first page therefore keeps its smaller size on later pages; the agent follows the cursor more times to get the rest.
+- The agent picks the cursors to follow from `pages` (by `mailbox` and `folder`), or follows all of them when it cannot tell where the answer is.
+
 **Usage notes:**
 
 - Pass the `openEmailParams` object from a result directly to `open_email` to retrieve the full email body.
+- Targeted questions: up to 3 queries per backend, follow cursors only when the answer is not found yet. Overview or listing questions: one query per backend, then follow every cursor until `hasMore` is false.
 - If `syncWarning` is present (Mode A only), display it to the user and call `sync_progress` to check ingestion status — results may be incomplete.
 - If `searchNotes` is present, display it to the user after showing results.
-- Folder filtering via `conditions[].directories` is supported in Mode A only.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`) can be used directly in `directories` — no need to call `list_mailboxes_and_directories` for those.
 - For custom folders, call `list_mailboxes_and_directories` first to obtain folder IDs.
 
 ---
 
+### `fetch_next_search_pages`
+
+Fetch the next page of results, or retry a throttled or failed page, for searches started with `search_emails`.
+
+**Available in:** Both modes
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `cursorIds` | string[] (1–20) | Yes | `cursorId` values copied from `pages` of a previous `search_emails` or `fetch_next_search_pages` response. |
+
+**Return shape:** same as [`search_emails`](#return-shape-search_emails-and-fetch_next_search_pages).
+
+**Usage notes:**
+
+- Cursors are stored server-side (`search_cursors` table) and scoped to the user. The agent only sees the id. Unknown ids, ids of another user, and ids older than 30 days are reported in `searchNotes`.
+- Cursor rows are immutable: each page gets a new id, and following an id again returns the same page. A throttled or failed page keeps its id so it can be retried without skipping results.
+- The same email can appear on pages of different requests; `msGraphMessageId` identifies it.
+
+---
+
 ### `open_email`
 
-Retrieve the full content of an email by its ID returned from `search_emails`.
+Retrieve the full content of an email by its ID returned from `search_emails` or `fetch_next_search_pages`. Search results only carry passages and previews, so this is how the agent reads an email's body.
 
 **Input parameters:**
 
@@ -285,7 +344,8 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
 **Usage notes:**
 
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually.
-- The `text` field in `emailData` contains the full email body. This is distinct from the `text` field in `search_emails` results, which contains only a matched passage or excerpt.
+- The `text` field in `emailData` contains the full email body. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
+- The response is not capped: an email ingested with large attachments (Mode A) returns all of its text.
 
 ---
 

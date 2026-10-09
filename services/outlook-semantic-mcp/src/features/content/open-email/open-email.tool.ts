@@ -7,7 +7,7 @@ import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscri
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { SearchBackend } from '../search/semantic-search-emails.query';
+import { SearchBackend } from '../search/search-results.types';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
@@ -74,7 +74,7 @@ export class OpenEmailTool {
     name: 'open_email',
     title: 'Open Email',
     description:
-      'Retrieve the full body of an email. Pass the `openEmailParams` object from a `search_emails` result directly as the tool input.',
+      "Retrieve the full body of an email. Search results only carry partial content, so call this whenever a result's `text` does not clearly answer the question, or when the user asks to open or read an email. Pass the `openEmailParams` object from a `search_emails` or `fetch_next_search_pages` result directly as the tool input.",
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {

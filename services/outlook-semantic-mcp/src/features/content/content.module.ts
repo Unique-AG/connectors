@@ -8,6 +8,8 @@ import { FullSyncModule } from '../sync/full-sync';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
 import { BuildMsGraphKqlBatchRequestsQuery } from './search/build-ms-graph-kql-batch-requests.query';
 import { CleanupSearchConditionsForUserQuery } from './search/cleanup-search-conditions-for-user.query';
+import { SearchCursorRepository } from './search/cursors/search-cursor.repository';
+import { SearchCursorCleanupSchedulerService } from './search/cursors/search-cursor-cleanup-scheduler.service';
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
 import { SemanticSearchEmailsQuery } from './search/semantic-search-emails.query';
@@ -18,6 +20,7 @@ const QUERIES = [
   SearchEmailsQuery,
   CleanupSearchConditionsForUserQuery,
   BuildMsGraphKqlBatchRequestsQuery,
+  SearchCursorRepository,
 ];
 
 @Module({
@@ -30,7 +33,7 @@ const QUERIES = [
     UserUtilsModule,
     DelegatedAccessUtilsModule,
   ],
-  providers: [...QUERIES],
+  providers: [...QUERIES, SearchCursorCleanupSchedulerService],
   exports: [...QUERIES],
 })
 export class ContentModule {}
