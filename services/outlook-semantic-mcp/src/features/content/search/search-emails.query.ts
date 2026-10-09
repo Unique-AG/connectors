@@ -180,21 +180,8 @@ export class SearchEmailsQuery {
     return sections.join('\n\n');
   }
 
-  // We trust our semantic search more than KQL, so the top 20 semantic results are
-  // anchored first. When Graph returned the same email, we enrich the semantic result
-  // with the KQL body preview.
-  //
-  // Beyond position 20 we treat a match in both backends as a stronger signal than a
-  // semantic-only match, so common results are ranked above semantic-only stragglers.
-  // Graph-only results come last as the weakest signal.
-  //
-  // Tier ordering (strongest → weakest confidence):
-  //   1. Top-20 semantic results — anchored first, enriched with Graph preview if available.
-  //   2. Common remainder — matched by both backends but outside top-20.
-  //   3. Semantic-only remainder — semantic match beyond top-20 with no Graph hit.
-  //   4. Graph-only — lexical match with no semantic counterpart.
-  //
-  // Nothing is dropped: the response size is bounded by the page size of each backend request.
+  // Order: top-20 semantic (enriched with the Graph preview when both matched), then other matches
+  // of both backends, then semantic-only, then Graph-only. Nothing is dropped.
   private mergeResults(
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
