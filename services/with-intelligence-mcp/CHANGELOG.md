@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.1...with-intelligence-mcp@0.1.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **with-intelligence-mcp:** raise memory above the steady working set ([#1196](https://github.com/Unique-AG/connectors/issues/1196)) ([0e77bc0](https://github.com/Unique-AG/connectors/commit/0e77bc0ad2a376bd7abb125c7d8c19963e181ad8))
+
 ## [0.1.1](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.0...with-intelligence-mcp@0.1.1) (2026-10-09)
 
 
