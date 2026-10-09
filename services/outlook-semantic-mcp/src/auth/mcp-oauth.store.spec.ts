@@ -400,8 +400,36 @@ describe('McpOAuthStore', () => {
       expect(mockCache.set).toHaveBeenCalledWith(
         'access_token:test-token',
         mockAccessTokenMetadata,
-        expect.any(Number), // TTL in milliseconds
+        expect.any(Number),
       );
+      // TTL in ms, capped at 5 minutes
+      expect(mockCache.set.mock.calls[0]?.[2]).toBe(5 * 60 * 1000);
+    });
+
+    it('caches a token expiring sooner than the cap for its remaining lifetime', async () => {
+      mockDrizzle.__nextSelectRows = [
+        {
+          id: 'profile-123',
+          provider: 'microsoft',
+          providerUserId: 'user-123',
+        },
+      ];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.storeAccessToken('test-token', {
+        ...mockAccessTokenMetadata,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+
+      const ttl = mockCache.set.mock.calls[0]?.[2];
+      expect(ttl).toBeGreaterThan(55_000);
+      expect(ttl).toBeLessThanOrEqual(60_000);
     });
 
     it('gets access token from cache first', async () => {

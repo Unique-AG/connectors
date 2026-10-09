@@ -39,6 +39,8 @@ export interface McpOptions {
      * @experimental: The current implementation does not fully comply with the MCP Specification.
      */
     statelessMode?: boolean;
+    /** Stateful mode only: close sessions with no open request for this long. Defaults to 30 min. */
+    sessionIdleTimeoutMs?: number;
   };
 }
 

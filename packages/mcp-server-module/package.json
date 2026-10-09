@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc",
     "test": "echo 'No test specified'",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:watch": "vitest watch --config vitest.e2e.config.ts",
     "style": "biome check .",
     "style:fix": "biome check . --write",
     "check-types": "tsc --noEmit"
@@ -20,11 +22,17 @@
   "devDependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/testing": "catalog:",
     "@opentelemetry/api": "catalog:",
+    "@swc/core": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "nestjs-otel": "catalog:",
-    "typescript": "catalog:"
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",
