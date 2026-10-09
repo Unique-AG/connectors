@@ -22,7 +22,12 @@ from backstop_mcp.backstop_client import (
     BackstopClient,
     BackstopRateLimitError,
 )
-from backstop_mcp.features.accounts import FALLBACK_OMITTED_FIELDS, HoldingListingDto, TenureDto
+from backstop_mcp.features.accounts import (
+    FALLBACK_OMITTED_FIELDS,
+    HoldingListingDto,
+    TenureDto,
+    TenureRunDto,
+)
 from tests.features.accounts.conftest import make_get_holdings_query
 from tests.helpers import BASE_URL, client_factory, credential, recorded_params, resource
 
@@ -705,7 +710,9 @@ class TestClosedFiltering:
         result = await _fetch(client)
 
         assert [row.account_id for row in result.rows] == ["new"]
-        assert result.tenure == TenureDto(continuous_since=date(2008, 8, 1))
+        assert result.tenure == TenureDto(
+            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18),)
+        )
 
 
 class TestDegradation:
@@ -1075,7 +1082,10 @@ class TestDocumentedWalk:
         listing = await _documented_holdings(client, owner_id=_OWNER_ID)
 
         assert [row.account_id for row in listing.rows] == ["new", "undated"]
-        assert listing.tenure == TenureDto(continuous_since=date(2008, 8, 1), undated_accounts=1)
+        assert listing.tenure == TenureDto(
+            runs=(TenureRunDto(start=date(2008, 8, 1), end=None, years=18.18),),
+            undated_accounts=1,
+        )
 
     @pytest.mark.asyncio
     @respx.mock

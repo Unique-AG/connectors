@@ -42,6 +42,7 @@ from backstop_mcp.features.accounts.responses.shared import (
     ProductAmbiguousResponse,
     ProductCandidateResponse,
     ProductRefResponse,
+    TenureRunResponse,
     closed_hint,
 )
 from backstop_mcp.features.accounts.responses.time_series import (
@@ -76,6 +77,7 @@ __all__ = [
     "ProductResolvedResponse",
     "ProductRefResponse",
     "ShareResponse",
+    "TenureRunResponse",
     "TimeSeriesPointResponse",
     "TimeSeriesResolvedResponse",
     "closed_hint",

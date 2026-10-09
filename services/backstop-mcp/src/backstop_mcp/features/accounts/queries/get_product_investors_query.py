@@ -1,7 +1,7 @@
 """Who holds a set of resolved products: one listing per product, one entry per investor.
 
 `get_product_investors` is the consumer; it resolves the products and hands them here. Each
-investor's `continuous_since` comes from every account it has had in these products, closed ones
+investor's `tenure_runs` come from every account it has had in these products, closed ones
 included, so `include_closed` hides rows without shortening tenure. Latest values are fetched
 only when asked, one request per account, and refused past `max_valued_accounts`.
 """
@@ -18,13 +18,14 @@ from backstop_mcp.features.accounts.queries.get_latest_account_values_query impo
     GetLatestAccountValuesQuery,
 )
 from backstop_mcp.features.accounts.responses import (
+    InvestorResponse,
     LatestValueResponse,
     ProductAccountsResponse,
     ProductInvestorsResolvedResponse,
     ProductListingResponse,
     investors_from_listings,
 )
-from backstop_mcp.features.accounts.utils import continuous_tenure
+from backstop_mcp.features.accounts.utils import tenure_runs
 
 
 class GetProductInvestorsQuery:
@@ -76,10 +77,10 @@ class GetProductInvestorsQuery:
             listings, latest_value_hint = await self._with_latest_values(listings)
         return ProductInvestorsResolvedResponse(
             products=tuple(listings),
-            investors=investors_from_listings(listings, tenure=self._tenure_by_owner(per_product)),
+            investors=self._investors(listings, per_product),
             latest_value_hint=latest_value_hint,
             investor_ids_not_found=(
-                self._not_found(investor_ids, listings) if investor_ids else None
+                self._not_found(investor_ids, per_product) if investor_ids else None
             ),
         )
 
@@ -141,6 +142,31 @@ class GetProductInvestorsQuery:
             "on every account."
         )
 
+    def _investors(
+        self,
+        listings: Sequence[ProductListingResponse],
+        per_product: Sequence[ProductAccountsResponse],
+    ) -> tuple[InvestorResponse, ...]:
+        """Owners of the listed rows, then owners with no open account, which have no rows here."""
+        open_owner_ids = frozenset(
+            owner_id
+            for accounts in per_product
+            for owner_id, spans in accounts.spans_by_owner.items()
+            if any(span.is_open for span in spans)
+        )
+        owners_without_rows = {
+            owner_id: owner
+            for accounts in per_product
+            for owner_id, owner in accounts.owners.items()
+            if owner_id not in open_owner_ids
+        }
+        return investors_from_listings(
+            listings,
+            tenure=self._tenure_by_owner(per_product),
+            open_owner_ids=open_owner_ids,
+            owners_without_rows=owners_without_rows,
+        )
+
     def _tenure_by_owner(
         self, per_product: Sequence[ProductAccountsResponse]
     ) -> dict[str, TenureDto]:
@@ -150,7 +176,7 @@ class GetProductInvestorsQuery:
             owner_id for accounts in per_product for owner_id in accounts.spans_by_owner
         )
         return {
-            owner_id: continuous_tenure(
+            owner_id: tenure_runs(
                 (
                     span
                     for accounts in per_product
@@ -162,15 +188,14 @@ class GetProductInvestorsQuery:
         }
 
     def _not_found(
-        self, investor_ids: Sequence[str], listings: Sequence[ProductListingResponse]
+        self, investor_ids: Sequence[str], per_product: Sequence[ProductAccountsResponse]
     ) -> tuple[str, ...]:
-        """Requested ids with no listed account, in the order given, each once."""
+        """Requested ids owning no account here, open or closed, in the order given, each once."""
         listed = {
             candidate
-            for listing in listings
-            for account in listing.accounts
-            if account.owner is not None
-            for candidate in (account.owner.id, account.owner.contacts_id)
+            for accounts in per_product
+            for owner in accounts.owners.values()
+            for candidate in (owner.id, owner.contacts_id)
             if candidate is not None
         }
         return tuple(dict.fromkeys(entry for entry in investor_ids if entry not in listed))

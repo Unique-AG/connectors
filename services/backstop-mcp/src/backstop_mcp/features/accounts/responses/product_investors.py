@@ -18,9 +18,11 @@ from pydantic import Field
 
 from backstop_mcp.features.accounts.internal_dto import AccountSpanDto, TenureDto
 from backstop_mcp.features.accounts.responses.shared import (
+    TENURE_RUNS_DESCRIPTION,
     AccountRowResponse,
     OwnerResponse,
     ProductRefResponse,
+    TenureRunResponse,
 )
 from backstop_mcp.models import OmitNoneModel
 
@@ -83,7 +85,7 @@ class ProductAccountsResponse(OmitNoneModel):
     """`GetAccountsForProductQuery`'s payload: the published listing, and the owners' spans.
 
     Not published itself. `get_product_investors` publishes `listing` and turns
-    `spans_by_owner` into each investor's `continuous_since`.
+    `spans_by_owner` into each investor's `tenure_runs`.
     """
 
     listing: ProductListingResponse = Field(
@@ -93,6 +95,12 @@ class ProductAccountsResponse(OmitNoneModel):
         description=(
             "Every listed owner's account spans in this product, keyed by owner id and taken "
             "before the open/closed split, so closed accounts count toward tenure."
+        )
+    )
+    owners: dict[str, OwnerResponse] = Field(
+        description=(
+            "Every owner of this product's accounts, keyed by owner id and taken before the "
+            "open/closed split, so an owner whose accounts are all closed is still named."
         )
     )
 
@@ -127,28 +135,37 @@ class InvestorResponse(OmitNoneModel):
             "on a later party resolve."
         ),
     )
-    holdings: tuple[InvestorHoldingResponse, ...] = Field(
-        description="One entry per product this investor is in, in `products` order."
+    has_open_account: bool = Field(
+        description=(
+            "Whether this investor has an open account in these products. False for an investor "
+            "that has left: every account here is closed. An account with a "
+            "closed date after today counts as closed here although its run is held today: "
+            "read `tenure_runs` for that."
+        )
     )
-    continuous_since: date | None = Field(
+    holdings: tuple[InvestorHoldingResponse, ...] = Field(
+        description=(
+            "One entry per product this investor has listed accounts in, in `products` order. "
+            "Empty for an investor with no open account here unless `include_closed=true`: its "
+            "closed rows are omitted — read `has_open_account` and `tenure_runs`, not 'never "
+            "held'."
+        )
+    )
+    tenure_runs: tuple[TenureRunResponse, ...] | None = Field(
         default=None,
         description=(
-            "Since when this investor has held these products without a break: the start of "
-            "the unbroken run of its accounts in them — closed ones included, whatever "
-            "`include_closed` was — that reaches today. Accounts that touch or overlap form one "
-            "run, including a move from one product here to another; a gap of more than a day "
-            "ends it. Covers only the products in this call. Rank tenure and "
-            "'longest-standing' questions by this, never by an account's "
-            "`account_start_date`. Omitted when the investor holds none of these products "
-            "today (listed only through `include_closed`), or every open account is undated."
+            "Every unbroken stretch this investor held these products, from all its accounts in "
+            "them — including a move from one product here to another. Covers only the products "
+            f"in this call. {TENURE_RUNS_DESCRIPTION} One entry per Backstop owner: related "
+            "parties are not merged. Omitted when no dated account has started."
         ),
     )
     tenure_undated_accounts: int | None = Field(
         default=None,
         description=(
-            "This investor's accounts left out of `continuous_since` because they have no start "
-            "date, or are closed with no closed date. Say so when quoting tenure: they could "
-            "make it longer. Omitted when none."
+            "This investor's accounts left out of `tenure_runs` because they have no start "
+            "date, are closed with no closed date, or closed before they started. Say so when "
+            "quoting tenure: they could make it longer. Omitted when none."
         ),
     )
     latest_value_totals: tuple[ValueTotalResponse, ...] | None = Field(
@@ -164,12 +181,15 @@ def investors_from_listings(
     listings: Sequence[ProductListingResponse],
     *,
     tenure: Mapping[str, TenureDto],
+    open_owner_ids: frozenset[str],
+    owners_without_rows: Mapping[str, OwnerResponse],
 ) -> tuple[InvestorResponse, ...]:
     """One entry per owner id, first-seen order. Owners are not rolled up to a parent.
 
     Accounts with no owner stay in their product listing and are not an investor here.
-    Totals are set only when the rows carry `latest_value`. `tenure` is keyed by owner id and
-    computed before the open/closed split, so it is not derived from these rows.
+    `owners_without_rows` are appended with no holdings unless their rows already listed them.
+    Totals are set only when the rows carry `latest_value`. `tenure` and `open_owner_ids` are
+    taken before the open/closed split, so they are not derived from these rows.
     """
     valued = any(
         account.latest_value is not None for listing in listings for account in listing.accounts
@@ -186,11 +206,15 @@ def investors_from_listings(
             if not held or held[-1][0].id != listing.product.id:
                 held.append((listing.product, []))
             held[-1][1].append(account)
+    for owner_id, owner in owners_without_rows.items():
+        owners.setdefault(owner_id, owner)
+        holdings.setdefault(owner_id, [])
     return tuple(
         InvestorResponse(
             id=owner_id,
             name=owner.name,
             resource_type=owner.resource_type,
+            has_open_account=owner_id in open_owner_ids,
             holdings=tuple(
                 InvestorHoldingResponse(
                     product_id=product.id,
@@ -200,7 +224,7 @@ def investors_from_listings(
                 )
                 for product, accounts in holdings[owner_id]
             ),
-            continuous_since=_owner_tenure(tenure, owner_id).continuous_since,
+            tenure_runs=_tenure_runs(_owner_tenure(tenure, owner_id)),
             tenure_undated_accounts=_owner_tenure(tenure, owner_id).undated_accounts or None,
             latest_value_totals=(
                 _totals([account for _, accounts in holdings[owner_id] for account in accounts])
@@ -216,6 +240,10 @@ def _owner_tenure(tenure: Mapping[str, TenureDto], owner_id: str) -> TenureDto:
     owner_tenure = tenure.get(owner_id)
     assert owner_tenure is not None, f"no tenure computed for listed owner {owner_id}"
     return owner_tenure
+
+
+def _tenure_runs(tenure: TenureDto) -> tuple[TenureRunResponse, ...] | None:
+    return tuple(TenureRunResponse.from_dto(run) for run in tenure.runs) or None
 
 
 def _totals(accounts: Sequence[AccountRowResponse]) -> tuple[ValueTotalResponse, ...]:
@@ -254,7 +282,8 @@ class ProductInvestorsResolvedResponse(OmitNoneModel):
         description=(
             "One entry per investor across every product here — use this to organize by "
             "investor rather than by account. An investor in two vehicles appears once, with a "
-            "holding per vehicle."
+            "holding per vehicle. Investors who have left are listed too, with "
+            "`has_open_account: false`: leave them out of a count of who holds these products."
         )
     )
     latest_value_hint: str | None = Field(
@@ -268,8 +297,9 @@ class ProductInvestorsResolvedResponse(OmitNoneModel):
     investor_ids_not_found: tuple[str, ...] | None = Field(
         default=None,
         description=(
-            "Ids passed in `investor_ids` with no account listed here: they hold none of these "
-            "products, only closed accounts (see `closed_omitted`), or hold them under another "
-            "party record. Not a zero balance. Omitted when `investor_ids` was not passed."
+            "Ids passed in `investor_ids` with no account here, open or closed: they never held "
+            "these products, or hold them under another party record. One with only closed "
+            "accounts is in `investors` with `has_open_account: false`. Omitted when "
+            "`investor_ids` was not passed."
         ),
     )

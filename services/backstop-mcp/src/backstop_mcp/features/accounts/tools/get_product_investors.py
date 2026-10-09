@@ -71,7 +71,8 @@ async def get_product_investors(
         Field(
             description=(
                 "When false (default), only open accounts are returned. Pass true to include "
-                "closed accounts. `investors[].continuous_since` counts closed accounts either way."
+                "closed account rows. Investors whose accounts are all closed, and their "
+                "`tenure_runs`, are in `investors` either way; only the rows are omitted."
             ),
         ),
     ] = False,
@@ -132,11 +133,13 @@ async def get_product_investors(
     Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
     under management, not one investor's balance.
 
-    Tenure ("since when", "longest-standing", "longest consecutive investor"): rank by
-    `investors[].continuous_since`, which merges every account the investor has had in these
-    products, closed ones included, into the unbroken run that reaches today. Never rank by an
-    open account's `account_start_date`: investors who rotate accounts (private banks,
-    platforms, nominees) have no single old account. It covers only the products passed.
+    Tenure (how long an investor has held these products): `investors[].tenure_runs` is every
+    unbroken stretch the investor held them, closed accounts included, longest first, each with
+    `years`. A run with no `end`, or an `end` after today, is held today. Investors who have left
+    are listed too, with `has_open_account: false`; their closed rows need `include_closed=true`.
+    Read tenure from the runs, not an account's `account_start_date`: investors who rotate
+    accounts (private banks, platforms, nominees) have no single old account. It covers only the
+    products passed.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor

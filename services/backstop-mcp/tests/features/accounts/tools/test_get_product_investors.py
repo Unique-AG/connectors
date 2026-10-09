@@ -647,7 +647,7 @@ class TestGetProductInvestors:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_tenure_chains_closed_accounts_across_vehicles_without_include_closed(
+    async def test_tenure_runs_chain_closed_accounts_across_vehicles_without_include_closed(
         self, client: BackstopClient
     ) -> None:
         respx.get(_PRODUCTS_URL).mock(return_value=_product_page(_nwon(), _nwof()))
@@ -694,12 +694,15 @@ class TestGetProductInvestors:
         )
 
         tenure = {
-            investor.name: (investor.continuous_since, investor.tenure_undated_accounts)
+            investor.name: (
+                [(run.start, run.end) for run in investor.tenure_runs or ()],
+                investor.tenure_undated_accounts,
+            )
             for investor in result.investors
         }
         assert tenure == {
-            "BlackRock": (date(2025, 3, 1), None),
-            "Syz Capital": (date(2008, 8, 1), 1),
+            "BlackRock": ([(date(2007, 8, 1), date(2009, 6, 30)), (date(2025, 3, 1), None)], None),
+            "Syz Capital": ([(date(2008, 8, 1), None)], 1),
         }
         syz = object_dict(
             next(
@@ -708,8 +711,90 @@ class TestGetProductInvestors:
                 if object_dict(entry)["name"] == "Syz Capital"
             )
         )
-        assert syz["continuous_since"] == "2008-08-01"
+        assert syz["tenure_runs"] == [{"start": "2008-08-01", "years": 18.18}]
         assert syz["tenure_undated_accounts"] == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_former_investor_is_listed_with_its_tenure_and_no_closed_rows(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account(
+                    "gone",
+                    owner_id=_OWNER_ID,
+                    accountStartDate="2008-08-01",
+                    closedDate="2019-06-30",
+                ),
+                _account(
+                    "rotated",
+                    owner_id="555",
+                    accountStartDate="2010-01-01",
+                    closedDate="2015-12-31",
+                ),
+                _account("live", owner_id="555", accountStartDate="2016-01-01"),
+                included=[
+                    _owner(_OWNER_ID, name="University of Chicago"),
+                    _owner("555", name="Syz Capital"),
+                ],
+            )
+        )
+
+        async def call(
+            *, include_closed: bool = False, investor_ids: Sequence[str] = ()
+        ) -> ProductInvestorsResolvedResponse:
+            return tool_model(
+                await get_product_investors(
+                    ctx_never_elicit(),
+                    products=[_PRODUCT_ID],
+                    include_closed=include_closed,
+                    investor_ids=investor_ids,
+                    client=client,
+                    get_product_investors_query=make_get_product_investors_query(
+                        client, max_valued_accounts=_MAX_VALUED_ACCOUNTS
+                    ),
+                ),
+                ProductInvestorsResolvedResponse,
+            )
+
+        def listed(
+            result: ProductInvestorsResolvedResponse,
+        ) -> list[tuple[str | None, bool, tuple[str, ...]]]:
+            return [
+                (
+                    investor.name,
+                    investor.has_open_account,
+                    tuple(
+                        account_id for held in investor.holdings for account_id in held.account_ids
+                    ),
+                )
+                for investor in result.investors
+            ]
+
+        default = await call()
+        assert [account.id for account in default.products[0].accounts] == ["live"]
+        assert listed(default) == [
+            ("Syz Capital", True, ("live",)),
+            ("University of Chicago", False, ()),
+        ]
+        chicago = default.investors[1]
+        assert (chicago.id, chicago.resource_type) == (_OWNER_ID, "organizations")
+        assert chicago.tenure_runs is not None
+        assert [(run.start, run.end, run.years) for run in chicago.tenure_runs] == [
+            (date(2008, 8, 1), date(2019, 6, 30), 10.91)
+        ]
+
+        asked = await call(investor_ids=[_OWNER_ID, "999"])
+        assert listed(asked) == [("University of Chicago", False, ())]
+        assert asked.investor_ids_not_found == ("999",)
+
+        with_closed = await call(include_closed=True)
+        assert listed(with_closed) == [
+            ("University of Chicago", False, ("gone",)),
+            ("Syz Capital", True, ("rotated", "live")),
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
