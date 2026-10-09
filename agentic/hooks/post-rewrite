@@ -1,0 +1,15 @@
+#!/bin/bash
+# git pull --rebase runs this when rebase rewrites commits. Amend does not install skills.
+# A fast-forward rebase does not rewrite commits; Git runs post-merge for that update.
+set -euo pipefail
+
+if [[ ! -t 0 ]]; then
+  cat >/dev/null
+fi
+
+if [[ "${1:-}" != "rebase" ]]; then
+  exit 0
+fi
+
+root=$(git rev-parse --show-toplevel)
+exec bash "$root/agentic/skill-management/install-skills.sh"

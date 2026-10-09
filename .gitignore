@@ -52,11 +52,10 @@ lerna-debug.log*
 # Editors
 .vscode/
 .idea/
-# Local Cursor/Claude config stays ignored; shared project skills are tracked.
+# Local Cursor/Claude config stays ignored.
+# .claude/skills/ is installed by agentic/skill-management/install-skills.sh via the Skills CLI.
 .cursor/*
-!.cursor/skills/
 .claude/*
-!.claude/skills/
 # We do not use .zed/ because we want to ignore symlinks
 .zed
 *.code-workspace
@@ -96,6 +95,9 @@ __snapshot__
 # Sensitive / local files
 *.pem
 factset-auth.json
+
+# Written by the Skills CLI when agentic/skill-management/install-skills.sh runs.
+/skills-lock.json
 
 # Local scripts and tenant configs
 **/local-scripts/**

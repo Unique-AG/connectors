@@ -24,12 +24,13 @@ believing an empty result.
 ## 1. Tooling, and the public spec
 
 `scripts/spec.py` and `scripts/explore.py` sit next to this file, with `.env.example`.
-Run them through the service virtualenv; the system interpreter has no httpx.
+Run them from this skill's directory — the folder that contains `SKILL.md`. `npx skills`
+installs that folder as a unit, so these paths are the same after installation. `uv run`
+reads each script's inline dependencies; the service virtualenv is not required.
 
 ```bash
-cd services/with-intelligence-mcp
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths investor
-uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
+uv run scripts/spec.py paths investor
+uv run scripts/explore.py /v3/investors/2504
 ```
 
 The spec is public and needs no auth — `GET https://api.withintelligence.com/v3/docs/json`,
@@ -37,10 +38,10 @@ OpenAPI 3.0, 143 paths, 267 schemas. Too big to read whole, which is what `spec.
 
 | Question | Command |
 | --- | --- |
-| What paths exist? | `spec.py paths [filter]` |
-| What can I filter a listing by? | `spec.py params /v3/investors` |
-| What fields does a record have? | `spec.py schema InvestorExtended` |
-| What does a path return? | `spec.py response '/v3/investors/{id}'` |
+| What paths exist? | `uv run scripts/spec.py paths [filter]` |
+| What can I filter a listing by? | `uv run scripts/spec.py params /v3/investors` |
+| What fields does a record have? | `uv run scripts/spec.py schema InvestorExtended` |
+| What does a path return? | `uv run scripts/spec.py response '/v3/investors/{id}'` |
 
 `spec.py` caches to `.spec-cache/`, `explore.py` to `.probe-cache/` (both gitignored). Never
 print credentials, and never POST anywhere except `/v3/auth/sign-in` and `/v3/auth/refresh`.

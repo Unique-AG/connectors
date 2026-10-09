@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#   "httpx==0.28.1",
+#   "pydantic==2.13.5",
+#   "python-dotenv==1.2.3",
+# ]
+# ///
 """GET-only CLI for the live Backstop REST API. Not part of the shipped MCP server.
 
-Loads `.env` from this directory. Writes each response to `.probe-cache/` (gitignored).
+Run from this skill's directory (the folder that contains SKILL.md):
+
+    uv run scripts/explore.py /people -p "page[limit]=5"
+
+Loads `.env` from this directory, or from services/backstop-mcp/agent-explore/.env when
+this directory has none. Writes each response to `.probe-cache/` (gitignored).
 """
 
 from __future__ import annotations
@@ -28,19 +41,54 @@ class _Args(argparse.Namespace):
         self.param = []
 
 
+def _env_file() -> Path:
+    local = Path(__file__).resolve().parent / ".env"
+    if local.is_file():
+        return local
+    for directory in local.parent.parents:
+        candidate = directory / "services" / "backstop-mcp" / "agent-explore" / ".env"
+        if candidate.is_file():
+            return candidate
+        sibling = directory / "agent-explore" / ".env"
+        if sibling.is_file() and (directory / "pyproject.toml").is_file():
+            return sibling
+    return local
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="GET one Backstop path and print the JSON response."
+    )
+    parser.add_argument("path", help="e.g. /people or /people/12345")
+    parser.add_argument(
+        "-p", "--param", action="append", default=[], help="key=value query parameter"
+    )
+    args = parser.parse_args(namespace=_Args())
+
     here = Path(__file__).resolve().parent
-    load_dotenv(here / ".env")
+    load_dotenv(_env_file())
+    missing = [
+        name
+        for name in (
+            "BACKSTOP_BASE_URL",
+            "BACKSTOP_SERVICE_USERNAME",
+            "BACKSTOP_SERVICE_API_TOKEN",
+        )
+        if not os.environ.get(name)
+    ]
+    if missing:
+        raise SystemExit(
+            "missing "
+            + ", ".join(missing)
+            + ". Copy scripts/.env.example to scripts/.env, or keep those values in "
+            + "services/backstop-mcp/agent-explore/.env."
+        )
     base_url = os.environ["BACKSTOP_BASE_URL"]
     username = os.environ["BACKSTOP_SERVICE_USERNAME"]
     token = os.environ["BACKSTOP_SERVICE_API_TOKEN"]
     auth = base64.b64encode(f"{username}:{token}".encode()).decode()
     headers = {"authorization": f"Basic {auth}", "token": "true"}
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path")
-    parser.add_argument("-p", "--param", action="append", default=[])
-    args = parser.parse_args(namespace=_Args())
     params = dict(p.split("=", 1) for p in args.param)
 
     cache_dir = here / ".probe-cache"
