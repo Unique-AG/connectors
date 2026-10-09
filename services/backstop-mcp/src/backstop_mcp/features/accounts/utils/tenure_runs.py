@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from backstop_mcp.features.accounts.internal_dto import AccountSpanDto, TenureDto, TenureRunDto
 
 _TOUCHING = timedelta(days=1)
-_DAYS_PER_YEAR = 365.25
 
 
 def tenure_runs(spans: Iterable[AccountSpanDto], *, today: date) -> TenureDto:
@@ -30,7 +29,9 @@ def tenure_runs(spans: Iterable[AccountSpanDto], *, today: date) -> TenureDto:
         started, key=lambda run: (_held_days(*run, today=today), run[0]), reverse=True
     )
     return TenureDto(
-        runs=tuple(_run(start, end, today=today) for start, end in longest_first),
+        runs=tuple(
+            TenureRunDto.from_bounds(start, end, today=today) for start, end in longest_first
+        ),
         undated_accounts=len(collected) - len(placed),
     )
 
@@ -49,11 +50,3 @@ def _placed(span: AccountSpanDto) -> tuple[date, date] | None:
 def _held_days(start: date, end: date, *, today: date) -> int:
     """Days held so far: a run closing after `today` has only been held through `today`."""
     return (min(end, today) - start).days
-
-
-def _run(start: date, end: date, *, today: date) -> TenureRunDto:
-    return TenureRunDto(
-        start=start,
-        end=None if end == date.max else end,
-        years=round(_held_days(start, end, today=today) / _DAYS_PER_YEAR, 2),
-    )

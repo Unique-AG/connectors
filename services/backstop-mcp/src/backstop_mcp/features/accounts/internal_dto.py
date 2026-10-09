@@ -51,6 +51,7 @@ __all__ = [
 _OWNER = "owner"
 _INVESTOR_TYPE = "investorType"
 _PRODUCT = "product"
+_DAYS_PER_YEAR = 365.25
 
 # Plain assignments — `schema=` needs a real class object; a PEP 695 alias is not `type[T]`.
 _OwnerInclude = IncludedResource[OwnerAttributes]
@@ -391,6 +392,15 @@ class TenureRunDto(BaseModel):
     start: date
     end: date | None
     years: float
+
+    @classmethod
+    def from_bounds(cls, start: date, end: date, *, today: date) -> Self:
+        """A merged run on the timeline; `end` is `date.max` while held through an open account."""
+        return cls(
+            start=start,
+            end=None if end == date.max else end,
+            years=round((min(end, today) - start).days / _DAYS_PER_YEAR, 2),
+        )
 
 
 class TenureDto(BaseModel):
