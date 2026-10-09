@@ -221,7 +221,7 @@ Syntax rules:
   status?: string;            // informational subscription/backend status
   syncWarning?: string;       // search_emails in Mode A only — present when ingestion is incomplete or in error state. Always display to the user before showing results.
   searchNotes?: string;       // informational notes (e.g. unrecognised folders excluded, throttled mailboxes, unknown cursors). Display to the user after results.
-  hasMore?: boolean;          // true when at least one page can be continued or retried
+  hasMore?: boolean;          // true when at least one page has status "hasMore"; throttled and failed pages do not count
   pages?: Array<{
     backend: "Unique" | "MsGraph";
     query: string;            // KQL query or semantic search text
@@ -260,10 +260,21 @@ Syntax rules:
 | `hasMore` | Page delivered, more results exist | Call `fetch_next_search_pages` with `cursorId` |
 | `complete` | The request returned everything it matched | — |
 | `ceilingReached` | Stopped at 1,000 results (the Microsoft Graph `$search` limit; semantic searches stop at the same depth) | Tell the user results are capped; narrow the search |
-| `throttled` | Microsoft returned HTTP 429 after one automatic retry | Retry with the same `cursorId` after `retryAfterSeconds`, or report partial results |
-| `failed` | Temporary error (5xx, network). Without `cursorId` the query itself could not be run | Retry once with the same `cursorId` |
-| `expired` | Microsoft Graph no longer accepts the stored continuation | Run the search again |
+| `throttled` | Microsoft returned HTTP 429 after one automatic retry | Retry once with the same `cursorId` after `retryAfterSeconds`, then report partial results |
+| `failed` | Temporary error (5xx, network), or a nextLink that cannot be followed. Without `cursorId` it cannot be retried | Retry once with the same `cursorId`, then report partial results |
+| `expired` | Microsoft Graph no longer accepts the stored continuation, or served the first page again instead of the next one | Run the search again |
 | `accessRevoked` | Access to the mailbox was lost since the search started | Do not retry |
+
+The results are complete only when every page is `complete`. `hasMore: false` alone does not mean complete.
+
+**Page sizes and fan-out:**
+
+Each semantic entry is one request. Each KQL query runs once per full-access mailbox, and once per folder when `directories` is set, so one call can start dozens of Graph requests. Every one of them runs on the first call and gets its own entry in `pages`; none is dropped.
+
+- A page holds at most `limit` emails (1–50, default 25). A semantic page often holds fewer while more exist: Unique splits `limit` between a vector and a full-text search, pages each on its own and merges them without duplicates. A semantic request is `complete` only when a page comes back empty, which costs one extra fetch at the end.
+- The first pages of the Graph requests of one call share a budget of 200 results: each gets `min(limit, max(5, floor(200 / requests)))`. One query over three mailboxes keeps the full `limit`; three queries over three mailboxes and three folders (27 requests) get 7 each.
+- Graph copies `$top` into the `@odata.nextLink`, and the nextLink is stored and followed exactly as Graph returned it. A shrunk first page therefore keeps its smaller size on later pages; the agent follows the cursor more times to get the rest.
+- The agent picks the cursors to follow from `pages` (by `mailbox` and `folder`), or follows all of them when it cannot tell where the answer is.
 
 **Usage notes:**
 
@@ -286,7 +297,7 @@ Fetch the next page of results, or retry a throttled or failed page, for searche
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `cursorIds` | string[] (1–10) | Yes | `cursorId` values copied from `pages` of a previous `search_emails` or `fetch_next_search_pages` response. |
+| `cursorIds` | string[] (1–20) | Yes | `cursorId` values copied from `pages` of a previous `search_emails` or `fetch_next_search_pages` response. |
 
 **Return shape:** same as [`search_emails`](#return-shape-search_emails-and-fetch_next_search_pages).
 

@@ -14,6 +14,10 @@ export const MsGraphSearchCursorPayloadSchema = z.object({
   url: z.string(),
   // Results already returned on this chain, used to detect the 1,000-result $search ceiling.
   delivered: z.number().int().nonnegative(),
+  // Newest result of the chain's first page. Graph answers a nextLink it can no longer use with
+  // the first page again instead of an error, so a later page holding this or a newer email means
+  // the chain restarted. Absent until the first page has been delivered.
+  chainHead: z.object({ id: z.string(), sentDateTime: z.string() }).optional(),
 });
 
 export type MsGraphSearchCursorPayload = z.infer<typeof MsGraphSearchCursorPayloadSchema>;
@@ -21,7 +25,8 @@ export type MsGraphSearchCursorPayload = z.infer<typeof MsGraphSearchCursorPaylo
 export const UniqueSearchCursorPayloadSchema = z.object({
   backend: z.literal(SearchBackend.Unique),
   input: SearchEmailsInputSchema,
-  page: z.number().int().nonnegative(),
+  // Unique search pages start at 1.
+  page: z.number().int().positive(),
   // Emails already returned on this chain. Later pages carry further chunks of the same emails,
   // which are dropped.
   seenContentIds: z.array(z.string()),
@@ -39,6 +44,7 @@ export type SearchCursorPayload = z.infer<typeof SearchCursorPayloadSchema>;
 export interface StoredSearchCursor<T extends SearchCursorPayload = SearchCursorPayload> {
   id: string;
   payload: T;
+  createdAt: Date;
 }
 
 // A page outcome produced by a backend, before its continuation is stored as a cursor.

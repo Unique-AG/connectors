@@ -1,17 +1,35 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
 import { SEARCH_CONFIG } from './search.config';
 
-const { pageSize, maxQueriesPerBackend, maxResultsPerChain } = SEARCH_CONFIG;
+const { pageSize, maxQueriesPerBackend, maxResultsPerChain, minFirstPageSize, maxCursorsPerFetch } =
+  SEARCH_CONFIG;
 
 const READING_EMAILS = `## Reading emails
   Results carry only partial content in \`text\` — never the full email. Answer from \`text\` only when it clearly contains the answer. Otherwise call \`open_email\` with the result's \`openEmailParams\` object, passed directly as the tool input, for every email whose content you need. Also call it when the user asks to open, read, or see an email. Do NOT tell the user you cannot access the email or that you lack mailbox access.`;
 
-const PAGING = `## Pages and cursors
-  Every backend request returns at most \`limit\` emails (default ${pageSize.default}, max ${pageSize.max}) and one entry in \`pages\` with a \`status\` and, when it can continue, a \`cursorId\`.
-  - To get more results call \`fetch_next_search_pages\` with the \`cursorId\`s. Never re-run the same search to page.
-  - \`throttled\`: Microsoft rate-limited the request. Wait \`retryAfterSeconds\`, then retry with the same \`cursorId\` via \`fetch_next_search_pages\`.
+const PAGING = `## Pages and cursors: how to get all results out
+  One call runs several backend requests. Each semantic entry is one request. Each KQL query runs once per mailbox, and once per folder when \`directories\` is set. Every mailbox and folder is searched on the first call, nothing is skipped.
+  Every request has one entry in \`pages\`: its \`query\`, \`mailbox\`, \`folder\`, a \`status\`, and a \`cursorId\` when it can continue. \`results\` holds the emails of all requests merged; use \`sourceMailbox\` to tell which mailbox an email came from.
+
+  Page sizes:
+  - A page holds at most \`limit\` emails (default ${pageSize.default}, max ${pageSize.max}). Semantic pages often hold fewer even when more exist.
+  - When one call fans out to many KQL requests (several queries × mailboxes × folders), their first pages are smaller, at least ${minFirstPageSize} each, so the response stays readable. Their next pages keep that smaller size: follow the cursor again to get more.
+  - A short first page does NOT mean that mailbox or folder has few matches. Its \`status\` tells you whether more exist.
+
+  Getting more results:
+  1. Look at \`pages\`. Every entry with status \`hasMore\` has more emails behind its \`cursorId\`.
+  2. Call \`fetch_next_search_pages\` with those \`cursorId\`s, up to ${maxCursorsPerFetch} per call. Never re-run the same search to page: that returns the first pages again.
+  3. Each response has new \`cursorId\`s. Repeat with those.
+  Which cursors to follow:
+  - Overview or listing question: follow every \`hasMore\` cursor until \`hasMore\` is false.
+  - Targeted question: follow the cursors of the mailboxes and folders likely to hold the answer, e.g. the mailbox the user named or the requests whose results came closest. If you cannot tell where the answer is, follow all of them.
+  - When the user names a mailbox or folder, set \`mailbox\` or \`directories\` in the search itself. Fewer requests means full-size first pages and fewer cursors to follow.
+
+  Statuses that need action:
+  - \`throttled\` or \`failed\`: retry ONCE with the same \`cursorId\` via \`fetch_next_search_pages\` (wait \`retryAfterSeconds\` first for \`throttled\`). If it is still not delivered, stop retrying it.
   - \`ceilingReached\`: results stop at ${maxResultsPerChain} per request. Tell the user the results are capped and offer to narrow (e.g. split the date range).
-  - Before answering, tell the user when results are incomplete: \`hasMore\` still true, or any page \`throttled\`, \`failed\`, or \`ceilingReached\`.`;
+  - \`expired\`: the request can no longer be continued. Run the search again.
+  - \`hasMore\` only counts pages with status \`hasMore\`. The results are complete only when every entry in \`pages\` is \`complete\`. Before answering, tell the user when they are not.`;
 
 const TOOL_FORMAT_INFORMATION = `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
@@ -163,7 +181,6 @@ export const META_MS_GRAPH = createMeta({
   ## Choose the strategy first
   - **Targeted question** (a specific fact, email, or thread): run up to ${maxQueriesPerBackend} KQL queries from different angles. Follow cursors with \`fetch_next_search_pages\` only if the answer is not found yet.
   - **Overview or wide question** (listing, summarising, "everything from last week", "my conversation with Alice"): run exactly ONE KQL query with precise filters (\`from:\`, \`received>=\`, …), then call \`fetch_next_search_pages\` until \`hasMore\` is false before answering.
-  Each query runs once per mailbox (and per folder in \`directories\`), so a single query can return several \`pages\` entries.
 
   ${PAGING}
 

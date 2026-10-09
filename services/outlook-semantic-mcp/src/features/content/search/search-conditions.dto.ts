@@ -173,7 +173,7 @@ export const SearchEmailsInputSchema = z.object({
     ),
   limit: pageSizeSchema(
     `Maximum number of emails in each page of this search, between ${pageSize.min} and ${pageSize.max}. Default ${pageSize.default}. ` +
-      'Further pages are fetched with `fetch_next_search_pages`.',
+      'Pages often hold fewer emails even when more exist; only the page `status` tells whether more exist. Further pages are fetched with `fetch_next_search_pages`.',
   ),
 });
 
@@ -251,7 +251,7 @@ export const MsGraphKqlQuerySchema = z.object({
   limit: pageSizeSchema(
     `Maximum number of emails in each page, between ${pageSize.min} and ${pageSize.max}. Default ${pageSize.default}. ` +
       'The query runs once per searched mailbox (and per folder in `directories`); each of those returns its own page of up to this many emails and its own cursor. ' +
-      'Further pages are fetched with `fetch_next_search_pages`.',
+      `When one call fans out to many mailboxes and folders, their first pages are smaller (at least ${SEARCH_CONFIG.minFirstPageSize}) so the response stays readable, and their next pages keep that smaller size.`,
   ),
 });
 

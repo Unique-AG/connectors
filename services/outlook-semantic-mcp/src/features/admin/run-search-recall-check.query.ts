@@ -5,14 +5,40 @@ import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pick, pipe } from 'remeda';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
-import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
+import {
+  BackendPage,
+  UniqueSearchCursorPayload,
+} from '~/features/content/search/cursors/search-cursor.payload';
+import {
+  SearchEmailsInput,
+  SearchEmailsInputSchema,
+} from '~/features/content/search/search-conditions.dto';
+import {
+  SearchBackend,
+  SearchEmailResult,
+  SearchPageStatus,
+} from '~/features/content/search/search-results.types';
 import { SemanticSearchEmailsQuery } from '~/features/content/search/semantic-search-emails.query';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import {
+  convertUserProfileIdToTypeId,
+  UserProfileTypeID,
+} from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
+
+// Continuations are followed in memory and never stored, so the id is only a label.
+const RECALL_CHECK_CURSOR_ID = 'recall_check';
+
+const getNextContinuation = (pages: BackendPage[]): UniqueSearchCursorPayload | undefined => {
+  const page = pages[0];
+  return page?.status === SearchPageStatus.HasMore &&
+    page.continuation?.backend === SearchBackend.Unique
+    ? page.continuation
+    : undefined;
+};
 
 export interface SearchRecallCheckCase {
   id: string;
@@ -104,9 +130,9 @@ export class RunSearchRecallCheckQuery {
         });
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
-        const { results } = await this.searchEmailsQuery.run(
+        const results = await this.searchAllPages(
           convertUserProfileIdToTypeId(userProfileId),
-          [checkCase.search],
+          checkCase.search,
         );
         const returnedEmailIds = new Set(
           pipe(
@@ -179,5 +205,24 @@ export class RunSearchRecallCheckQuery {
         };
       }),
     );
+  }
+
+  // Recall is measured over the whole result set, so every page of the search is fetched until it
+  // is complete, fails, or reaches the result ceiling.
+  private async searchAllPages(
+    userProfileId: UserProfileTypeID,
+    search: SearchEmailsInput,
+  ): Promise<SearchEmailResult[]> {
+    const firstPage = await this.searchEmailsQuery.run(userProfileId, [search]);
+    let results = firstPage.results;
+    let continuation = getNextContinuation(firstPage.pages);
+    while (continuation) {
+      const page = await this.searchEmailsQuery.fetchNextPages(userProfileId, [
+        { id: RECALL_CHECK_CURSOR_ID, payload: continuation, createdAt: new Date() },
+      ]);
+      results = [...results, ...page.results];
+      continuation = getNextContinuation(page.pages);
+    }
+    return results;
   }
 }

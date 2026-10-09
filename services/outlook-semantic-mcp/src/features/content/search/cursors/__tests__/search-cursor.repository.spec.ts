@@ -1,3 +1,5 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import { createMockDrizzleDatabase } from '~/__mocks__';
 import type { DrizzleDatabase } from '~/db';
@@ -47,9 +49,10 @@ describe(SearchCursorRepository.name, () => {
 
   it('returns stored payloads by id and drops rows that no longer match the schema', async () => {
     const { db, repository } = createRepository();
+    const createdAt = new Date('2026-10-09T10:00:00Z');
     db.__nextSelectRows = [
-      { id: 'search_cursor_valid', payload: graphPayload },
-      { id: 'search_cursor_invalid', payload: { backend: 'Unknown' } },
+      { id: 'search_cursor_valid', payload: graphPayload, createdAt },
+      { id: 'search_cursor_invalid', payload: { backend: 'Unknown' }, createdAt },
     ];
 
     const cursors = await repository.findForUser(USER_PROFILE_ID, [
@@ -58,6 +61,23 @@ describe(SearchCursorRepository.name, () => {
     ]);
 
     expect(Array.from(cursors.keys())).toEqual(['search_cursor_valid']);
-    expect(cursors.get('search_cursor_valid')).toEqual(graphPayload);
+    expect(cursors.get('search_cursor_valid')).toEqual({
+      id: 'search_cursor_valid',
+      payload: graphPayload,
+      createdAt,
+    });
+  });
+
+  it('only reads cursors that belong to the requesting user', async () => {
+    const { db, repository } = createRepository();
+
+    await repository.findForUser(USER_PROFILE_ID, ['search_cursor_a', 'search_cursor_b']);
+
+    const where = db.select.mock.results[0]?.value.where.mock.calls[0]?.[0] as SQL;
+    const { sql: query, params } = new PgDialect().sqlToQuery(where);
+    expect(query).toBe(
+      '("search_cursors"."user_profile_id" = $1 and "search_cursors"."id" in ($2, $3))',
+    );
+    expect(params).toEqual([USER_PROFILE_ID, 'search_cursor_a', 'search_cursor_b']);
   });
 });

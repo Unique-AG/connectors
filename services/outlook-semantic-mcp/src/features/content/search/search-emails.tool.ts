@@ -20,7 +20,8 @@ const SearchEmailsToolInputSchema = isMicrosoftGraphBackend()
   : SearchEmailsUnifiedInputSchema;
 
 const PAGING_DESCRIPTION =
-  'Results come in pages. Every entry in `pages` is one backend request with its own status and `cursorId`. ' +
+  'Results come in pages. Every entry in `pages` is one backend request (named by its query, mailbox and folder) with its own status and `cursorId`. ' +
+  'Every mailbox and folder is searched on the first call. When a call fans out to many of them, each first page is smaller and the rest is reached through its `cursorId`. ' +
   'When `hasMore` is true, call `fetch_next_search_pages` with the `cursorId`s to get the next pages — never re-run the same search to get more results.';
 
 const OPEN_EMAIL_DESCRIPTION =

@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
 import { DRIZZLE, DrizzleDatabase, searchCursors } from '~/db';
-import { SearchCursorPayload, SearchCursorPayloadSchema } from './search-cursor.payload';
+import {
+  SearchCursorPayload,
+  SearchCursorPayloadSchema,
+  StoredSearchCursor,
+} from './search-cursor.payload';
 
 @Injectable()
 export class SearchCursorRepository {
@@ -29,23 +33,27 @@ export class SearchCursorRepository {
   public async findForUser(
     userProfileId: string,
     ids: string[],
-  ): Promise<Map<string, SearchCursorPayload>> {
+  ): Promise<Map<string, StoredSearchCursor>> {
     if (!ids.length) {
       return new Map();
     }
     const rows = await this.db
-      .select({ id: searchCursors.id, payload: searchCursors.payload })
+      .select({
+        id: searchCursors.id,
+        payload: searchCursors.payload,
+        createdAt: searchCursors.createdAt,
+      })
       .from(searchCursors)
       .where(and(eq(searchCursors.userProfileId, userProfileId), inArray(searchCursors.id, ids)));
 
     return new Map(
-      rows.flatMap(({ id, payload }): [string, SearchCursorPayload][] => {
+      rows.flatMap(({ id, payload, createdAt }): [string, StoredSearchCursor][] => {
         const parsed = SearchCursorPayloadSchema.safeParse(payload);
         if (!parsed.success) {
           this.logger.warn({ msg: 'Stored search cursor failed schema validation', id });
           return [];
         }
-        return [[id, parsed.data]];
+        return [[id, { id, payload: parsed.data, createdAt }]];
       }),
     );
   }

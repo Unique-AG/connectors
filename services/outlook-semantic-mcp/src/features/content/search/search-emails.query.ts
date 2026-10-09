@@ -46,12 +46,6 @@ interface BackendOutput {
 
 const EMPTY_BACKEND_OUTPUT: BackendOutput = { results: [], pages: [], searchSummary: undefined };
 
-const CONTINUABLE_STATUSES = new Set([
-  SearchPageStatus.HasMore,
-  SearchPageStatus.Throttled,
-  SearchPageStatus.Failed,
-]);
-
 const isUniqueCursor = (
   cursor: StoredSearchCursor,
 ): cursor is StoredSearchCursor<UniqueSearchCursorPayload> =>
@@ -100,10 +94,7 @@ export class SearchEmailsQuery {
       userProfileId.toString(),
       requestedIds,
     );
-    const cursors = Array.from(
-      storedCursors,
-      ([id, payload]): StoredSearchCursor => ({ id, payload }),
-    );
+    const cursors = Array.from(storedCursors.values());
     const semanticCursors = cursors.filter(isUniqueCursor);
     const graphCursors = cursors.filter(isMsGraphCursor);
     const missingIds = requestedIds.filter((id) => !storedCursors.has(id));
@@ -140,8 +131,10 @@ export class SearchEmailsQuery {
     return {
       results: this.mergeResults(semantic.results, graph.results),
       pages,
+      // Throttled and failed pages keep a cursor for a retry, but do not count: an agent that pages
+      // until `hasMore` is false must not loop on a page that keeps failing.
       hasMore: pages.some(
-        ({ status, cursorId }) => cursorId !== undefined && CONTINUABLE_STATUSES.has(status),
+        ({ status, cursorId }) => cursorId !== undefined && status === SearchPageStatus.HasMore,
       ),
       searchSummary: summaries.length > 0 ? summaries.join('\n\n') : undefined,
     };

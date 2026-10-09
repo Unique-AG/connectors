@@ -98,10 +98,11 @@ export const SEARCH_PAGE_STATUS_DESCRIPTION = [
   '- `hasMore`: more results exist. Call `fetch_next_search_pages` with `cursorId`.',
   '- `complete`: this request returned everything it matched.',
   `- \`ceilingReached\`: results stopped at the ${SEARCH_CONFIG.maxResultsPerChain}-result limit, more emails match. Tell the user the results are capped and narrow the search (e.g. split the date range into smaller windows).`,
-  '- `throttled`: Microsoft rate-limited this request (HTTP 429). Wait `retryAfterSeconds`, then call `fetch_next_search_pages` with the same `cursorId`. If you answer without retrying, tell the user the results are incomplete.',
-  '- `failed`: a temporary error. Retry once with the same `cursorId`. Without a `cursorId` the query itself could not be run — check its syntax.',
+  '- `throttled`: Microsoft rate-limited this request (HTTP 429). Wait `retryAfterSeconds`, then retry ONCE with the same `cursorId` via `fetch_next_search_pages`. If it is still throttled, stop retrying and tell the user the results are incomplete.',
+  '- `failed`: a temporary error. Retry ONCE with the same `cursorId`; if it fails again, stop retrying. Without a `cursorId` it cannot be retried — check the query syntax. Either way, tell the user the results may be incomplete.',
   '- `expired`: this position can no longer be continued. Run the search again.',
   '- `accessRevoked`: access to this mailbox was lost. Do not retry.',
+  'The results are complete only when every entry in `pages` is `complete`. Any other status means some results are missing — tell the user.',
 ].join('\n');
 
 const SearchPageSchema = z.object({
@@ -145,13 +146,13 @@ export const SearchEmailsOutputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      '`true` when at least one entry in `pages` can be continued or retried with `fetch_next_search_pages`. `false` together with no `ceilingReached` entry means the results are complete.',
+      '`true` when at least one entry in `pages` has status `hasMore`. Throttled and failed pages are not counted. `false` does not mean the results are complete: they are complete only when every entry in `pages` is `complete`.',
     ),
   pages: z
     .array(SearchPageSchema)
     .optional()
     .describe(
-      'One entry per backend request: per semantic search, and per KQL query × mailbox (× folder). Tells you whether each request is complete and how to continue it.',
+      'One entry per backend request: per semantic search, and per KQL query × mailbox (× folder). Tells you whether each request is complete and how to continue it. Use `mailbox` and `folder` to decide which cursors to follow; a short first page does not mean the request is exhausted, only its `status` tells.',
     ),
   status: z
     .string()

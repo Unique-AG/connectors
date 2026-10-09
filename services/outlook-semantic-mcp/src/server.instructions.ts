@@ -4,7 +4,8 @@ const EMAIL_SEARCH_INSTRUCTIONS = `
 ## Email search
 - \`search_emails\` returns pages of results with partial content in \`text\` (matched passages and/or a short body preview), never full bodies. Call \`open_email\` with a result's \`openEmailParams\` to read an email in full.
 - Targeted questions: up to 3 queries per backend from different angles. Overview or listing questions: one query per backend, then call \`fetch_next_search_pages\` with the returned cursor ids until \`hasMore\` is false before answering.
-- Microsoft can throttle searches (\`throttled\` pages). Retry them with \`fetch_next_search_pages\` after \`retryAfterSeconds\`, or tell the user the results are incomplete.
+- Every mailbox and folder is searched on the first call, each as its own entry in \`pages\`. When a search fans out widely, first pages are smaller; follow the \`cursorId\`s of the mailboxes and folders you need (all of them if unsure) to get the rest.
+- Microsoft can throttle searches (\`throttled\` pages). Retry them once with \`fetch_next_search_pages\` after \`retryAfterSeconds\`. The results are complete only when every entry in \`pages\` is \`complete\`; otherwise tell the user they are incomplete.
 `;
 
 const MICROSOFT_GRAPH_INSTRUCTIONS = `

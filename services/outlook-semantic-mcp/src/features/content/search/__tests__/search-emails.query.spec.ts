@@ -339,9 +339,14 @@ describe('SearchEmailsQuery', () => {
       expect(result.hasMore).toBe(false);
     });
 
-    it('returns the existing cursor id for a page that must be retried, without storing a new one', async () => {
+    it('returns the existing cursor id for a page that must be retried, without counting it as hasMore', async () => {
       searchCursorRepository.findForUser.mockResolvedValue(
-        new Map([['search_cursor_old', graphContinuation]]),
+        new Map([
+          [
+            'search_cursor_old',
+            { id: 'search_cursor_old', payload: graphContinuation, createdAt: new Date() },
+          ],
+        ]),
       );
       msGraphKqlQuery.fetchNextPages.mockResolvedValue({
         results: [],
@@ -359,7 +364,6 @@ describe('SearchEmailsQuery', () => {
 
       const result = await instance.fetchNextPages(testUserId, ['search_cursor_old']);
 
-      expect(searchCursorRepository.create).toHaveBeenCalledWith(testUserId.toString(), []);
       expect(result.pages).toEqual([
         {
           ...graphPage,
@@ -368,38 +372,102 @@ describe('SearchEmailsQuery', () => {
           cursorId: 'search_cursor_old',
         },
       ]);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('returns hasMore true when a page can continue next to a throttled page', async () => {
+      msGraphKqlQuery.run.mockResolvedValue({
+        results: [],
+        searchSummary: undefined,
+        pages: [
+          { ...graphPage, status: SearchPageStatus.HasMore, continuation: graphContinuation },
+          {
+            ...graphPage,
+            mailbox: 'other@example.com',
+            status: SearchPageStatus.Throttled,
+            retryAfterSeconds: 7,
+            continuation: { ...graphContinuation, mailbox: 'other@example.com' },
+          },
+        ],
+      });
+
+      const result = await instance.run(testUserId, {
+        msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
+      });
+
+      expect(result.pages.map(({ status, cursorId }) => ({ status, cursorId }))).toEqual([
+        { status: SearchPageStatus.HasMore, cursorId: 'search_cursor_new_0' },
+        { status: SearchPageStatus.Throttled, cursorId: 'search_cursor_new_1' },
+      ]);
       expect(result.hasMore).toBe(true);
     });
 
-    it('dispatches stored cursors to their backend', async () => {
+    it('continues each stored cursor on its own backend', async () => {
       const uniqueContinuation = {
         backend: SearchBackend.Unique as const,
-        input: { search: 'q', limit: 25 },
+        input: { search: 'semantic question', limit: 25 },
         page: 1,
         seenContentIds: [],
       };
       searchCursorRepository.findForUser.mockResolvedValue(
         new Map<string, unknown>([
-          ['search_cursor_graph', graphContinuation],
-          ['search_cursor_unique', uniqueContinuation],
+          [
+            'search_cursor_graph',
+            { id: 'search_cursor_graph', payload: graphContinuation, createdAt: new Date() },
+          ],
+          [
+            'search_cursor_unique',
+            { id: 'search_cursor_unique', payload: uniqueContinuation, createdAt: new Date() },
+          ],
         ]),
       );
-      const emptyOutput = { results: [], searchSummary: undefined, pages: [] };
-      msGraphKqlQuery.fetchNextPages.mockResolvedValue(emptyOutput);
-      semanticSearchQuery.fetchNextPages.mockResolvedValue(emptyOutput);
-
-      await instance.fetchNextPages(testUserId, ['search_cursor_graph', 'search_cursor_unique']);
-
-      expect(msGraphKqlQuery.fetchNextPages).toHaveBeenCalledWith(
-        testUserId,
-        [{ id: 'search_cursor_graph', payload: graphContinuation }],
-        undefined,
+      // Each backend answers only for the cursors it was given, so a cursor sent to the wrong
+      // backend would show up as a missing or misattributed page.
+      msGraphKqlQuery.fetchNextPages.mockImplementation(
+        async (_userId: unknown, cursors: { payload: typeof graphContinuation }[]) => ({
+          results: [],
+          searchSummary: undefined,
+          pages: cursors.map(({ payload }) => ({
+            backend: SearchBackend.MsGraph,
+            query: payload.kqlQuery,
+            mailbox: payload.mailbox,
+            status: SearchPageStatus.Complete,
+          })),
+        }),
       );
-      expect(semanticSearchQuery.fetchNextPages).toHaveBeenCalledWith(
-        testUserId,
-        [{ id: 'search_cursor_unique', payload: uniqueContinuation }],
-        undefined,
+      semanticSearchQuery.fetchNextPages.mockImplementation(
+        async (_userId: unknown, cursors: { payload: typeof uniqueContinuation }[]) => ({
+          results: [],
+          searchSummary: undefined,
+          pages: cursors.map(({ payload }) => ({
+            backend: SearchBackend.Unique,
+            query: payload.input.search,
+            status: SearchPageStatus.Complete,
+          })),
+        }),
       );
+
+      const result = await instance.fetchNextPages(testUserId, [
+        'search_cursor_graph',
+        'search_cursor_unique',
+      ]);
+
+      expect(result.pages).toEqual([
+        {
+          backend: SearchBackend.Unique,
+          query: 'semantic question',
+          status: SearchPageStatus.Complete,
+          cursorId: undefined,
+        },
+        {
+          backend: SearchBackend.MsGraph,
+          query: graphContinuation.kqlQuery,
+          mailbox: graphContinuation.mailbox,
+          status: SearchPageStatus.Complete,
+          cursorId: undefined,
+        },
+      ]);
+      expect(result.searchSummary).toBeUndefined();
     });
 
     it('reports unknown cursor ids in the search notes', async () => {

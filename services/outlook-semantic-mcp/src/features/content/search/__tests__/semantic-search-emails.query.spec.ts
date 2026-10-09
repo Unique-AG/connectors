@@ -215,6 +215,19 @@ describe('SemanticSearchEmailsQuery', () => {
       expect(contentSearch).not.toHaveBeenCalled();
       expect(results).toEqual([]);
     });
+
+    it('returns no page and explains why when the mailbox is not accessible', async () => {
+      const { instance } = createMockQuery({ delegatedAccesses: [delegatedAccess] });
+
+      const { pages, searchSummary } = await instance.run(testUserId, [
+        { ...baseInput, mailbox: 'unknown@example.com' },
+      ]);
+
+      expect(pages).toEqual([]);
+      expect(searchSummary).toBe(
+        'Semantic search "test query" did not run: unknown@example.com is not a mailbox you can access.',
+      );
+    });
   });
 
   describe('multi-input execution', () => {
@@ -285,16 +298,27 @@ describe('SemanticSearchEmailsQuery', () => {
     const fullPage = (prefix: string, size: number) =>
       Array.from({ length: size }, (_, i) => makeSearchItem(`${prefix}-${i}`));
 
-    it('requests the first page with the page size as chunk limit', async () => {
+    it('requests the first page, page 1, with the page size as chunk limit', async () => {
       const { instance, contentSearch } = createMockQuery();
 
       await instance.run(testUserId, [{ search: 'q', limit: 25 }]);
 
-      expect(contentSearch.mock.calls[0]?.[0]).toMatchObject({ limit: 25, page: 0 });
+      expect(contentSearch.mock.calls[0]?.[0]).toMatchObject({ limit: 25, page: 1 });
     });
 
-    it('returns a complete page when the search returns fewer chunks than the page size', async () => {
+    it('keeps paging when a page holds fewer chunks than the page size', async () => {
       const { instance } = createMockQuery({ searchResults: [fullPage('a', 3)] });
+
+      const { pages } = await instance.run(testUserId, [{ search: 'q', limit: 25 }]);
+
+      expect(pages[0]).toMatchObject({
+        status: SearchPageStatus.HasMore,
+        continuation: { page: 2, seenContentIds: ['a-0', 'a-1', 'a-2'] },
+      });
+    });
+
+    it('returns a complete page when the search returns no chunks', async () => {
+      const { instance } = createMockQuery({ searchResults: [[]] });
 
       const { pages } = await instance.run(testUserId, [{ search: 'q', limit: 25 }]);
 
@@ -318,7 +342,7 @@ describe('SemanticSearchEmailsQuery', () => {
         continuation: {
           backend: SearchBackend.Unique,
           input: { search: 'q', limit: 2 },
-          page: 1,
+          page: 2,
           seenContentIds: ['a-0', 'a-1'],
         },
       });
@@ -331,7 +355,7 @@ describe('SemanticSearchEmailsQuery', () => {
 
       expect(pages[0]).toMatchObject({
         status: SearchPageStatus.Failed,
-        continuation: { page: 0, seenContentIds: [] },
+        continuation: { page: 1, seenContentIds: [] },
         retryCursorId: undefined,
       });
     });
@@ -339,10 +363,11 @@ describe('SemanticSearchEmailsQuery', () => {
     describe('fetchNextPages', () => {
       const storedCursor = (overrides: Record<string, unknown> = {}) => ({
         id: 'search_cursor_1',
+        createdAt: new Date(),
         payload: {
           backend: SearchBackend.Unique as const,
           input: { search: 'q', limit: 2 },
-          page: 1,
+          page: 2,
           seenContentIds: ['a-0', 'a-1'],
           ...overrides,
         },
@@ -355,11 +380,25 @@ describe('SemanticSearchEmailsQuery', () => {
 
         const { results, pages } = await instance.fetchNextPages(testUserId, [storedCursor()]);
 
-        expect(contentSearch.mock.calls[0]?.[0]).toMatchObject({ limit: 2, page: 1 });
+        expect(contentSearch.mock.calls[0]?.[0]).toMatchObject({ limit: 2, page: 2 });
         expect(results.map((r) => r.uniqueContentId)).toEqual(['b-0']);
         expect(pages[0]).toMatchObject({
           status: SearchPageStatus.HasMore,
-          continuation: { page: 2, seenContentIds: ['a-0', 'a-1', 'b-0'] },
+          continuation: { page: 3, seenContentIds: ['a-0', 'a-1', 'b-0'] },
+        });
+      });
+
+      it('keeps paging when every chunk of a page belongs to an email already returned', async () => {
+        const { instance } = createMockQuery({
+          searchResults: [[makeSearchItem('a-0', 'chunk-a-0-second')]],
+        });
+
+        const { results, pages } = await instance.fetchNextPages(testUserId, [storedCursor()]);
+
+        expect(results).toEqual([]);
+        expect(pages[0]).toMatchObject({
+          status: SearchPageStatus.HasMore,
+          continuation: { page: 3, seenContentIds: ['a-0', 'a-1'] },
         });
       });
 
@@ -371,7 +410,7 @@ describe('SemanticSearchEmailsQuery', () => {
         expect(pages[0]).toMatchObject({
           status: SearchPageStatus.Failed,
           retryCursorId: 'search_cursor_1',
-          continuation: { page: 1 },
+          continuation: { page: 2 },
         });
       });
 
@@ -390,7 +429,7 @@ describe('SemanticSearchEmailsQuery', () => {
         const { instance } = createMockQuery({ searchResults: [fullPage('z', 25)] });
 
         const { pages } = await instance.fetchNextPages(testUserId, [
-          storedCursor({ input: { search: 'q', limit: 25 }, page: 39, seenContentIds: [] }),
+          storedCursor({ input: { search: 'q', limit: 25 }, page: 40, seenContentIds: [] }),
         ]);
 
         expect(pages[0]?.status).toBe(SearchPageStatus.CeilingReached);

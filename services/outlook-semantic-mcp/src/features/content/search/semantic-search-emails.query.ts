@@ -68,6 +68,7 @@ type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
 // One semantic search page: the first page of a search, or the page a cursor points at.
 interface SemanticPageJob {
   input: SearchEmailsInput;
+  // Unique search pages start at 1; page 0 returns the same results as page 1.
   page: number;
   seenContentIds: string[];
   sourceCursorId?: string;
@@ -103,7 +104,7 @@ export class SemanticSearchEmailsQuery {
   ): Promise<SemanticSearchOutput> {
     return this.executePages(
       userProfileId,
-      inputs.map((input) => ({ input, page: 0, seenContentIds: [] })),
+      inputs.map((input) => ({ input, page: 1, seenContentIds: [] })),
       outputTimeZone,
     );
   }
@@ -172,10 +173,13 @@ export class SemanticSearchEmailsQuery {
       };
 
       if (!searchJobInput.isScoped) {
-        pages.push({
-          ...page,
-          status: job.sourceCursorId ? SearchPageStatus.AccessRevoked : SearchPageStatus.Complete,
-        });
+        if (job.sourceCursorId) {
+          pages.push({ ...page, status: SearchPageStatus.AccessRevoked });
+        } else {
+          summaries.push(
+            `Semantic search "${job.input.search}" did not run: ${job.input.mailbox ?? 'the mailbox'} is not a mailbox you can access.`,
+          );
+        }
         continue;
       }
       if (searchJobInput.searchSummary) {
@@ -197,7 +201,7 @@ export class SemanticSearchEmailsQuery {
       const seen = new Set(job.seenContentIds);
       const newChunks = chunks.filter((chunk) => !seen.has(chunk.id));
       chunkLists.push(newChunks);
-      pages.push({ ...page, ...this.getNextPosition(job, chunks.length, newChunks) });
+      pages.push({ ...page, ...this.getNextPosition(job, chunks.length === 0, newChunks) });
     }
 
     return {
@@ -216,16 +220,18 @@ export class SemanticSearchEmailsQuery {
     return job.input.limit ?? SEARCH_CONFIG.pageSize.default;
   }
 
+  // Unique splits `limit` between a vector and a full-text search, pages each on its own and merges
+  // them without duplicates, so a page usually holds fewer chunks than `limit` while more exist.
+  // Only an empty page means both searches are exhausted.
   private getNextPosition(
     job: SemanticPageJob,
-    fetchedChunkCount: number,
+    isEmptyPage: boolean,
     newChunks: SearchResultItem[],
   ): Pick<BackendPage, 'status' | 'continuation'> {
-    const pageSize = this.getPageSize(job);
-    if (fetchedChunkCount < pageSize) {
+    if (isEmptyPage) {
       return { status: SearchPageStatus.Complete };
     }
-    if ((job.page + 1) * pageSize >= SEARCH_CONFIG.maxResultsPerChain) {
+    if (job.page * this.getPageSize(job) >= SEARCH_CONFIG.maxResultsPerChain) {
       return { status: SearchPageStatus.CeilingReached };
     }
     const seenContentIds = unique([...job.seenContentIds, ...newChunks.map(({ id }) => id)]);

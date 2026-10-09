@@ -1,4 +1,3 @@
-import assert from 'node:assert';
 import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
@@ -32,7 +31,7 @@ import { SearchBackend, SearchEmailResult, SearchPageStatus } from './search-res
 
 const GRAPH_API_VERSION_PREFIX = '/v1.0';
 const MESSAGE_SELECT_FIELDS =
-  'subject,from,receivedDateTime,parentFolderId,webLink,bodyPreview,isDraft';
+  'subject,from,sentDateTime,receivedDateTime,parentFolderId,webLink,bodyPreview,isDraft';
 const DEFAULT_RETRY_AFTER_MS = 500;
 const DEFAULT_RETRY_AFTER_SECONDS_FOR_AGENT = 30;
 const BATCH_SIZE = 20;
@@ -57,6 +56,7 @@ const messagePageSchema = z.object({
         .object({ emailAddress: z.object({ address: z.string() }) })
         .optional()
         .nullish(),
+      sentDateTime: z.string().optional().nullish(),
       receivedDateTime: z.string().optional().nullish(),
       parentFolderId: z.string().optional().nullish(),
       webLink: z.string().optional().nullish(),
@@ -73,6 +73,7 @@ interface Hit {
   isDelegated: boolean;
   subject: string;
   from: string;
+  rawSentDateTime: string;
   rawReceivedDateTime: string;
   receivedDateTime: string | null;
   parentFolderId: string;
@@ -92,11 +93,20 @@ interface PageRequest {
   // Relative to the API version root.
   url: string;
   delivered: number;
+  chainHead?: ChainHead;
   sourceCursorId?: string;
+  // When the followed cursor was stored, i.e. how old its nextLink is.
+  sourceCursorCreatedAt?: Date;
 }
 
+type ChainHead = NonNullable<MsGraphSearchCursorPayload['chainHead']>;
+
 type RequestOutcome =
-  | { type: 'ok'; request: PageRequest; hits: Hit[]; nextLink: string | undefined }
+  | { type: 'ok'; request: PageRequest; hits: Hit[]; nextUrl: string | undefined }
+  // The page was delivered, but Graph returned an @odata.nextLink that cannot be followed.
+  | { type: 'unfollowable'; request: PageRequest; hits: Hit[] }
+  // Graph served the chain's first page again for a nextLink it could no longer use.
+  | { type: 'restarted'; request: PageRequest }
   | { type: 'retryable'; request: PageRequest; status: number | undefined; retryAfterMs?: number }
   | { type: 'lostAccess'; request: PageRequest }
   | { type: 'rejected'; request: PageRequest };
@@ -109,22 +119,43 @@ export interface MsGraphKqlSearchOutput {
 
 const getRequestId = () => typeid('batch_request').toString();
 
-const buildFirstPageUrl = (request: GraphBatchRequest): string => {
+const MINUTE_MS = 60 * 1000;
+
+const buildFirstPageUrl = (request: GraphBatchRequest, top: number): string => {
   const base = request.folderId
     ? `/users/${request.mailbox}/mailFolders/${request.folderId}/messages`
     : `/users/${request.mailbox}/messages`;
   const search = encodeURIComponent(sanitizeKqlQuery(request.kqlQuery));
-  return `${base}?$search=${search}&$select=${MESSAGE_SELECT_FIELDS}&$top=${request.limit}`;
+  return `${base}?$search=${search}&$select=${MESSAGE_SELECT_FIELDS}&$top=${top}`;
 };
 
-// $batch sub-requests take URLs relative to the API version root, @odata.nextLink is absolute.
-const toRelativeGraphUrl = (nextLink: string): string => {
-  const url = new URL(nextLink);
-  assert.ok(
-    url.pathname.startsWith(`${GRAPH_API_VERSION_PREFIX}/`),
-    'Microsoft Graph returned an @odata.nextLink outside the v1.0 API',
+const getFirstPageSize = (limit: number, requestCount: number): number =>
+  Math.min(
+    limit,
+    Math.max(
+      SEARCH_CONFIG.minFirstPageSize,
+      Math.floor(SEARCH_CONFIG.firstCallGraphResultBudget / requestCount),
+    ),
   );
+
+// $batch sub-requests take URLs relative to the API version root, @odata.nextLink is absolute.
+export const toRelativeGraphUrl = (nextLink: string): string | undefined => {
+  const url = URL.parse(nextLink);
+  if (!url?.pathname.startsWith(`${GRAPH_API_VERSION_PREFIX}/`)) {
+    return undefined;
+  }
   return `${url.pathname.slice(GRAPH_API_VERSION_PREFIX.length)}${url.search}`;
+};
+
+const toChainHead = (hit: Hit | undefined): ChainHead | undefined =>
+  hit?.rawSentDateTime ? { id: hit.restId, sentDateTime: hit.rawSentDateTime } : undefined;
+
+// Graph pages by offset, newest sent first, so a genuine later page only holds emails sent no later
+// than the head. Enough new mail arriving between two fetches also trips this, and expiring the
+// chain is the right answer then too, because the page would repeat results.
+const isRestartedChain = (head: ChainHead, hits: Hit[]): boolean => {
+  const headSentAt = Date.parse(head.sentDateTime);
+  return hits.some((hit) => hit.restId === head.id || Date.parse(hit.rawSentDateTime) > headSentAt);
 };
 
 @Injectable()
@@ -171,7 +202,7 @@ export class MsGraphKqlSearchEmailsQuery {
         isDelegated: request.isDelegated,
         folderId: request.folderId,
         folderName: request.folderName,
-        url: buildFirstPageUrl(request),
+        url: buildFirstPageUrl(request, getFirstPageSize(request.limit, requests.length)),
         delivered: 0,
       }),
     );
@@ -190,7 +221,7 @@ export class MsGraphKqlSearchEmailsQuery {
   ): Promise<MsGraphKqlSearchOutput> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const pageRequests = cursors.map(
-      ({ id, payload }): PageRequest => ({
+      ({ id, payload, createdAt }): PageRequest => ({
         requestId: getRequestId(),
         kqlQuery: payload.kqlQuery,
         mailbox: payload.mailbox,
@@ -199,7 +230,9 @@ export class MsGraphKqlSearchEmailsQuery {
         folderName: payload.folderName,
         url: payload.url,
         delivered: payload.delivered,
+        chainHead: payload.chainHead,
         sourceCursorId: id,
+        sourceCursorCreatedAt: createdAt,
       }),
     );
 
@@ -256,7 +289,9 @@ export class MsGraphKqlSearchEmailsQuery {
     );
 
     const hits = outcomes
-      .flatMap((outcome) => (outcome.type === 'ok' ? outcome.hits : []))
+      .flatMap((outcome) =>
+        outcome.type === 'ok' || outcome.type === 'unfollowable' ? outcome.hits : [],
+      )
       .filter((hit) => !lostAccessMailboxes.has(hit.mailbox));
 
     return {
@@ -353,15 +388,24 @@ export class MsGraphKqlSearchEmailsQuery {
         if (delivered >= SEARCH_CONFIG.maxResultsPerChain) {
           return { ...page, status: SearchPageStatus.CeilingReached };
         }
-        if (!outcome.nextLink) {
+        if (!outcome.nextUrl) {
           return { ...page, status: SearchPageStatus.Complete };
         }
         return {
           ...page,
           status: SearchPageStatus.HasMore,
-          continuation: { ...position, url: toRelativeGraphUrl(outcome.nextLink), delivered },
+          continuation: {
+            ...position,
+            url: outcome.nextUrl,
+            delivered,
+            chainHead: request.chainHead ?? toChainHead(outcome.hits[0]),
+          },
         };
       }
+      case 'unfollowable':
+        return { ...page, status: SearchPageStatus.Failed };
+      case 'restarted':
+        return { ...page, status: SearchPageStatus.Expired };
       case 'retryable': {
         const isThrottled = outcome.status === 429;
         return {
@@ -372,7 +416,12 @@ export class MsGraphKqlSearchEmailsQuery {
               ? Math.ceil(outcome.retryAfterMs / 1000)
               : DEFAULT_RETRY_AFTER_SECONDS_FOR_AGENT
             : undefined,
-          continuation: { ...position, url: request.url, delivered: request.delivered },
+          continuation: {
+            ...position,
+            url: request.url,
+            delivered: request.delivered,
+            chainHead: request.chainHead,
+          },
           retryCursorId: request.sourceCursorId,
         };
       }
@@ -476,6 +525,9 @@ export class MsGraphKqlSearchEmailsQuery {
     }
 
     if (request.isDelegated && (status === 403 || status === 404)) {
+      if (this.isOldNextLink(request)) {
+        return { type: 'rejected', request };
+      }
       await this.removeDelegatedAccessCommand.run({
         delegateUserId: userProfile.id,
         ownerEmail: request.mailbox,
@@ -505,31 +557,60 @@ export class MsGraphKqlSearchEmailsQuery {
       return { type: 'rejected', request };
     }
 
-    return {
-      type: 'ok',
-      request,
-      nextLink: parsed.data['@odata.nextLink'],
-      // The $search parameter causes Graph to return webLinks in the classic OWA format
-      // (outlook.office365.com/owa/?ItemID={restId}&…) rather than the new
-      // outlook.cloud.microsoft format that regular GET/POST endpoints return on migrated
-      // tenants. The classic format embeds a RestId, which OWA accepts — so these webLinks
-      // work as-is without any ID translation, even for delegated mailboxes.
-      hits: parsed.data.value.map(
-        (msg): Hit => ({
-          restId: msg.id,
-          mailbox: request.mailbox,
-          isDelegated: request.isDelegated,
-          subject: msg.subject ?? '',
-          from: msg.from?.emailAddress.address ?? '',
-          rawReceivedDateTime: msg.receivedDateTime ?? '',
-          receivedDateTime: convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
-          parentFolderId: msg.parentFolderId ?? '',
-          webLink: msg.webLink ?? '',
-          bodyPreview: msg.bodyPreview ?? '',
-          isDraft: msg.isDraft === true,
-        }),
-      ),
-    };
+    // The $search parameter causes Graph to return webLinks in the classic OWA format
+    // (outlook.office365.com/owa/?ItemID={restId}&…) rather than the new
+    // outlook.cloud.microsoft format that regular GET/POST endpoints return on migrated
+    // tenants. The classic format embeds a RestId, which OWA accepts — so these webLinks
+    // work as-is without any ID translation, even for delegated mailboxes.
+    const hits = parsed.data.value.map(
+      (msg): Hit => ({
+        restId: msg.id,
+        mailbox: request.mailbox,
+        isDelegated: request.isDelegated,
+        subject: msg.subject ?? '',
+        from: msg.from?.emailAddress.address ?? '',
+        rawSentDateTime: msg.sentDateTime ?? '',
+        rawReceivedDateTime: msg.receivedDateTime ?? '',
+        receivedDateTime: convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
+        parentFolderId: msg.parentFolderId ?? '',
+        webLink: msg.webLink ?? '',
+        bodyPreview: msg.bodyPreview ?? '',
+        isDraft: msg.isDraft === true,
+      }),
+    );
+
+    if (request.chainHead && isRestartedChain(request.chainHead, hits)) {
+      this.logger.warn({
+        mailbox: details.mailbox,
+        kqlQuery: details.kqlQuery,
+        msg: 'MS Graph restarted a search chain from its first page',
+      });
+      return { type: 'restarted', request };
+    }
+
+    const nextLink = parsed.data['@odata.nextLink'];
+    if (nextLink === undefined) {
+      return { type: 'ok', request, hits, nextUrl: undefined };
+    }
+    const nextUrl = toRelativeGraphUrl(nextLink);
+    if (!nextUrl) {
+      this.logger.error({
+        mailbox: details.mailbox,
+        kqlQuery: details.kqlQuery,
+        nextLink: createSmeared(nextLink),
+        msg: 'MS Graph returned an @odata.nextLink outside the v1.0 API',
+      });
+      return { type: 'unfollowable', request, hits };
+    }
+    return { type: 'ok', request, hits, nextUrl };
+  }
+
+  private isOldNextLink({ sourceCursorCreatedAt }: PageRequest): boolean {
+    return (
+      sourceCursorCreatedAt !== undefined &&
+      Date.now() - sourceCursorCreatedAt.getTime() >
+        SEARCH_CONFIG.maxNextLinkAgeForAccessRevocationMinutes * MINUTE_MS
+    );
   }
 
   private buildSearchSummary({

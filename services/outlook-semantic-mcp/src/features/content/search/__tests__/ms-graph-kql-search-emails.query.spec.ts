@@ -21,6 +21,7 @@ function makeMessage(id: string, overrides: Record<string, unknown> = {}) {
     id,
     subject: `Subject ${id}`,
     from: { emailAddress: { address: `sender-${id}@example.com` } },
+    sentDateTime: '2024-01-01T00:00:00Z',
     receivedDateTime: '2024-01-01T00:00:00Z',
     parentFolderId: `folder-${id}`,
     webLink: `https://outlook.com/msg/${id}`,
@@ -518,6 +519,73 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('first-call result budget', () => {
+    const fanOut = (count: number, limit: number) => ({
+      requests: Array.from({ length: count }, (_, i) =>
+        makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', folderId: `folder-${i}`, limit }),
+      ),
+      skippedFolders: [],
+    });
+    const requestedTops = (mockPost: Mock): string[] =>
+      mockPost.mock.calls.flatMap((call) =>
+        (call[0] as { requests: { url: string }[] }).requests.map(
+          ({ url }) => new URLSearchParams(url.split('?')[1]).get('$top') ?? '',
+        ),
+      );
+
+    it('shares the budget between the first pages of a wide fan-out', async () => {
+      const mockPost = makeSuccessPost({});
+      const { instance } = createQuery({ mockBuildResult: fanOut(10, 50), mockPost });
+
+      await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(requestedTops(mockPost)).toEqual(Array(10).fill('20'));
+    });
+
+    it('never shrinks a first page below the minimum page size', async () => {
+      const mockPost = makeSuccessPost({});
+      const { instance } = createQuery({ mockBuildResult: fanOut(60, 50), mockPost });
+
+      await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(requestedTops(mockPost)).toEqual(Array(60).fill('5'));
+    });
+
+    it('keeps the requested limit when the fan-out fits the budget', async () => {
+      const mockPost = makeSuccessPost({});
+      const { instance } = createQuery({ mockBuildResult: fanOut(3, 50), mockPost });
+
+      await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(requestedTops(mockPost)).toEqual(['50', '50', '50']);
+    });
+
+    it('stores the nextLink of a shrunk first page exactly as Graph returned it', async () => {
+      const mockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) =>
+          Promise.resolve({
+            responses: requests.map((req) => ({
+              id: req.id,
+              status: 200,
+              body: {
+                value: [makeMessage(`msg-${req.id}`)],
+                '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?%24search=%22test%22&%24top=20&%24skiptoken=abc`,
+              },
+            })),
+          }),
+        );
+      const { instance } = createQuery({ mockBuildResult: fanOut(10, 50), mockPost });
+
+      const { pages } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(pages[0]?.continuation).toMatchObject({
+        url: `/users/${OWN_EMAIL}/messages?%24search=%22test%22&%24top=20&%24skiptoken=abc`,
+        delivered: 1,
+      });
+    });
+  });
+
   describe('folder-scoped requests', () => {
     // Case 3: directory-only delegated access — buildMsGraphKqlBatchRequestsQuery returns per-folder requests
     it('uses /mailFolders/{folderId}/messages URL when folderId is set', async () => {
@@ -899,6 +967,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
             folderName: undefined,
             url: `/users/${OWN_EMAIL}/messages?$search=%22test%22&$top=25&$skip=25`,
             delivered: 1,
+            chainHead: { id: 'msg-1', sentDateTime: '2024-01-01T00:00:00Z' },
           },
         },
       ]);
@@ -927,6 +996,40 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       expect(pages[0]?.status).toBe(SearchPageStatus.Complete);
       expect(pages[0]?.continuation).toBeUndefined();
+    });
+
+    it('keeps the hits of a page whose nextLink cannot be followed and continues the other pages', async () => {
+      const mockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) =>
+          Promise.resolve({
+            responses: requests.map((req) => {
+              const isOwn = req.url.includes(OWN_EMAIL);
+              return {
+                id: req.id,
+                status: 200,
+                body: {
+                  value: [makeMessage(isOwn ? 'own-1' : 'del-1')],
+                  '@odata.nextLink': isOwn
+                    ? 'https://graph.microsoft.com/beta/users/own@example.com/messages?$skip=25'
+                    : `${GRAPH_ROOT}/users/${DELEGATED_EMAIL}/messages?$skip=25`,
+                },
+              };
+            }),
+          }),
+        );
+      const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL], mockPost });
+
+      const { results, pages } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(results.map((r) => r.msGraphMessageId).sort()).toEqual(['del-1', 'own-1']);
+      const ownPage = pages.find((page) => page.mailbox === OWN_EMAIL);
+      expect(ownPage?.status).toBe(SearchPageStatus.Failed);
+      expect(ownPage?.continuation).toBeUndefined();
+      expect(pages.find((page) => page.mailbox === DELEGATED_EMAIL)).toMatchObject({
+        status: SearchPageStatus.HasMore,
+        continuation: { url: `/users/${DELEGATED_EMAIL}/messages?$skip=25` },
+      });
     });
 
     it('labels folder-scoped pages with the folder name', async () => {
@@ -995,8 +1098,12 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
 
     describe('fetchNextPages', () => {
-      const storedCursor = (overrides: Record<string, unknown> = {}) => ({
+      const CHAIN_HEAD = { id: 'msg-1', sentDateTime: '2024-03-01T00:00:00Z' };
+      const olderMessage = (id: string) =>
+        makeMessage(id, { sentDateTime: '2024-02-01T00:00:00Z' });
+      const storedCursor = (overrides: Record<string, unknown> = {}, createdAt = new Date()) => ({
         id: 'search_cursor_1',
+        createdAt,
         payload: {
           backend: SearchBackend.MsGraph as const,
           kqlQuery: 'subject:test',
@@ -1004,6 +1111,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           isDelegated: false,
           url: `/users/${OWN_EMAIL}/messages?$skip=25`,
           delivered: 25,
+          chainHead: CHAIN_HEAD,
           ...overrides,
         },
       });
@@ -1012,7 +1120,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         const mockPost = respondWith({
           status: 200,
           body: {
-            value: [makeMessage('msg-26')],
+            value: [olderMessage('msg-26')],
             '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$skip=50`,
           },
         });
@@ -1026,7 +1134,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-26']);
         expect(pages[0]).toMatchObject({
           status: SearchPageStatus.HasMore,
-          continuation: { url: `/users/${OWN_EMAIL}/messages?$skip=50`, delivered: 26 },
+          continuation: {
+            url: `/users/${OWN_EMAIL}/messages?$skip=50`,
+            delivered: 26,
+            chainHead: CHAIN_HEAD,
+          },
         });
       });
 
@@ -1039,7 +1151,80 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         expect(pages[0]).toMatchObject({
           status: SearchPageStatus.Throttled,
           retryCursorId: 'search_cursor_1',
-          continuation: { url: `/users/${OWN_EMAIL}/messages?$skip=25`, delivered: 25 },
+          continuation: {
+            url: `/users/${OWN_EMAIL}/messages?$skip=25`,
+            delivered: 25,
+            chainHead: CHAIN_HEAD,
+          },
+        });
+      });
+
+      it('reports expired without results when Graph serves the first page again', async () => {
+        const mockPost = respondWith({
+          status: 200,
+          body: {
+            value: [makeMessage('msg-1', { sentDateTime: CHAIN_HEAD.sentDateTime })],
+            '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$skip=50`,
+          },
+        });
+        const { instance } = createQuery({ mockPost });
+
+        const { results, pages } = await instance.fetchNextPages(testUserId, [storedCursor()]);
+
+        expect(results).toEqual([]);
+        expect(pages[0]?.status).toBe(SearchPageStatus.Expired);
+        expect(pages[0]?.continuation).toBeUndefined();
+      });
+
+      it('reports expired when the page holds an email sent after the chain head', async () => {
+        const mockPost = respondWith({
+          status: 200,
+          body: {
+            value: [
+              makeMessage('newer', { sentDateTime: '2024-04-01T00:00:00Z' }),
+              olderMessage('msg-26'),
+            ],
+          },
+        });
+        const { instance } = createQuery({ mockPost });
+
+        const { results, pages } = await instance.fetchNextPages(testUserId, [storedCursor()]);
+
+        expect(results).toEqual([]);
+        expect(pages[0]?.status).toBe(SearchPageStatus.Expired);
+      });
+
+      it('keeps results that share the chain head sent time but are other emails', async () => {
+        const mockPost = respondWith({
+          status: 200,
+          body: { value: [makeMessage('msg-2', { sentDateTime: CHAIN_HEAD.sentDateTime })] },
+        });
+        const { instance } = createQuery({ mockPost });
+
+        const { results, pages } = await instance.fetchNextPages(testUserId, [storedCursor()]);
+
+        expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-2']);
+        expect(pages[0]?.status).toBe(SearchPageStatus.Complete);
+      });
+
+      it('takes the chain head from a retried first page', async () => {
+        const mockPost = respondWith({
+          status: 200,
+          body: {
+            value: [makeMessage('msg-1', { sentDateTime: CHAIN_HEAD.sentDateTime })],
+            '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$skip=25`,
+          },
+        });
+        const { instance } = createQuery({ mockPost });
+
+        const { results, pages } = await instance.fetchNextPages(testUserId, [
+          storedCursor({ url: `/users/${OWN_EMAIL}/messages`, delivered: 0, chainHead: undefined }),
+        ]);
+
+        expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-1']);
+        expect(pages[0]).toMatchObject({
+          status: SearchPageStatus.HasMore,
+          continuation: { delivered: 1, chainHead: CHAIN_HEAD },
         });
       });
 
@@ -1057,7 +1242,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         const mockPost = respondWith({
           status: 200,
           body: {
-            value: Array.from({ length: 10 }, (_, i) => makeMessage(`msg-${i}`)),
+            value: Array.from({ length: 10 }, (_, i) => olderMessage(`msg-${991 + i}`)),
             '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$skip=1000`,
           },
         });
@@ -1069,6 +1254,38 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
         expect(pages[0]?.status).toBe(SearchPageStatus.CeilingReached);
         expect(pages[0]?.continuation).toBeUndefined();
+      });
+
+      it('removes delegated access on a 404 for a recently stored cursor', async () => {
+        const mockPost = respondWith({ status: 404 });
+        const { instance, removeDelegatedAccessCommand } = createQuery({ mockPost });
+
+        const { pages } = await instance.fetchNextPages(testUserId, [
+          storedCursor({ mailbox: DELEGATED_EMAIL, isDelegated: true }),
+        ]);
+
+        expect(pages[0]?.status).toBe(SearchPageStatus.AccessRevoked);
+        expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
+          delegateUserId: OWN_USER_ID,
+          ownerEmail: DELEGATED_EMAIL,
+          where: { fullAccess: true },
+        });
+      });
+
+      it('reports a 404 for a cursor older than 30 minutes as expired and keeps delegated access', async () => {
+        const mockPost = respondWith({ status: 404 });
+        const { instance, removeDelegatedAccessCommand } = createQuery({ mockPost });
+
+        const { pages } = await instance.fetchNextPages(testUserId, [
+          storedCursor(
+            { mailbox: DELEGATED_EMAIL, isDelegated: true },
+            new Date(Date.now() - 31 * 60 * 1000),
+          ),
+        ]);
+
+        expect(pages[0]?.status).toBe(SearchPageStatus.Expired);
+        expect(pages[0]?.continuation).toBeUndefined();
+        expect(removeDelegatedAccessCommand.run).not.toHaveBeenCalled();
       });
     });
   });
