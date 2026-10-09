@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.12](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.11...teams-mcp@0.4.12) (2026-10-09)
+
+
+### Bug Fixes
+
+* **mcp-server-module,outlook-semantic-mcp,teams-mcp,deps:** close idle MCP sessions and fix token cache TTL units ([#1169](https://github.com/Unique-AG/connectors/issues/1169)) ([c9a4289](https://github.com/Unique-AG/connectors/commit/c9a4289d9b4b5357bc60b8f54e7e09760074a910))
+
+
+### Dependencies
+
+* bump node in /services/*/deploy ([#1142](https://github.com/Unique-AG/connectors/issues/1142)) ([336dd69](https://github.com/Unique-AG/connectors/commit/336dd694053576d07366c6f0adbf30f45ed95988))
+
 ## [0.4.11](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.10...teams-mcp@0.4.11) (2026-10-07)
 
 
