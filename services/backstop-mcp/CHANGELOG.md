@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.9](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.8...backstop-mcp@0.0.9) (2026-10-09)
+
+
+### Dependencies
+
+* bump fastmcp in /* ([#1144](https://github.com/Unique-AG/connectors/issues/1144)) ([10ce668](https://github.com/Unique-AG/connectors/commit/10ce668ea5ff78da123896db216975cc4f60b513))
+* bump mako from 1.3.12 to 1.4.2 in /services/backstop-mcp ([#1183](https://github.com/Unique-AG/connectors/issues/1183)) ([9c7327d](https://github.com/Unique-AG/connectors/commit/9c7327de1b1b86f750bf93bc6aec739206e212a4))
+* bump multidict from 6.7.1 to 6.9.1 in /services/backstop-mcp ([#1184](https://github.com/Unique-AG/connectors/issues/1184)) ([02687ea](https://github.com/Unique-AG/connectors/commit/02687ea2243d32157fc2c523b7e36e403c091ff5))
+* bump python in /services/*/deploy ([#1140](https://github.com/Unique-AG/connectors/issues/1140)) ([ecc36dc](https://github.com/Unique-AG/connectors/commit/ecc36dc232dfbfbaba7dd093cf2aa587cacb2297))
+* bump ruff in /* ([#1151](https://github.com/Unique-AG/connectors/issues/1151)) ([daf766a](https://github.com/Unique-AG/connectors/commit/daf766a00884e17a13b5277e80a7ce24657212f8))
+* bump sqlalchemy[asyncio] in /services/* ([#1148](https://github.com/Unique-AG/connectors/issues/1148)) ([f9632ce](https://github.com/Unique-AG/connectors/commit/f9632cebd8a12fdd0c13e4fc9a3751ffd04f1c34))
+* bump starlette in /* ([#1150](https://github.com/Unique-AG/connectors/issues/1150)) ([0ad00a1](https://github.com/Unique-AG/connectors/commit/0ad00a11bba43d2953d7900253b29409eb85b5d6))
+
 ## [0.0.8](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.7...backstop-mcp@0.0.8) (2026-10-08)
 
 
