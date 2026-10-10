@@ -9,6 +9,9 @@ import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { FindFilesWithExpectedLocationQuery } from './find-files-with-expected-location.query';
+import { FindScopeSuccessorQuery } from './find-scope-successor.query';
+import { MoveUpdatedFilesToExpectedScopeCommand } from './move-updated-files-to-expected-scope.command';
 import { CreateRootScopeCommand } from './root-scope/create-root-scope.command';
 import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
@@ -34,7 +37,10 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
     CreateRootScopeCommand,
     DeduplicateSitesQuery,
     FileMoveProcessor,
+    FindFilesWithExpectedLocationQuery,
     FindRootScopeQuery,
+    FindScopeSuccessorQuery,
+    MoveUpdatedFilesToExpectedScopeCommand,
     InitializeRootScopeCommand,
     ResolveScopePathCommand,
     RootScopeMigrationService,

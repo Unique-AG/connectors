@@ -1,12 +1,14 @@
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish, isNullish, sortBy, unique } from 'remeda';
+import { filter, indexBy, isNonNullish, isNullish, prop, sortBy, unique } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import type { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
@@ -23,13 +25,18 @@ import {
 } from '../utils/scope-external-id';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
+import { FindScopeSuccessorQuery } from './find-scope-successor.query';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
 
-  public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
+  public constructor(
+    private readonly uniqueScopesService: UniqueScopesService,
+    private readonly uniqueFilesService: UniqueFilesService,
+    private readonly findScopeSuccessorQuery: FindScopeSuccessorQuery,
+  ) {}
 
   // Finalises a root scope at the end of a site's lifecycle. The two modes differ in what happens
   // to the scope itself after its children are gone:
@@ -146,7 +153,17 @@ export class ScopeManagementService {
       `${logPrefix} Deleting ${staleScopes.length} stale scopes marked with pending-delete prefix`,
     );
 
+    const activeScopesByExternalId = await this.loadActiveScopesByExternalId(siteId, logPrefix);
+
     for (const scope of sortedStaleScopes) {
+      const successor = this.findScopeSuccessorQuery.execute(scope, activeScopesByExternalId);
+      if (successor) {
+        const moved = await this.moveFilesToSuccessor(scope, successor, logPrefix);
+        if (!moved) {
+          continue;
+        }
+      }
+
       try {
         const result = await this.uniqueScopesService.deleteScope(scope.id);
         if (result.failedFolders.length > 0) {
@@ -165,6 +182,63 @@ export class ScopeManagementService {
         });
       }
     }
+  }
+
+  private async loadActiveScopesByExternalId(
+    siteId: Smeared,
+    logPrefix: string,
+  ): Promise<Record<string, Scope>> {
+    try {
+      const activeScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
+        siteId.transform((value) => buildActiveScopesPrefix(value).value),
+      );
+      const scopesWithExternalId = filter(
+        activeScopes,
+        (scope): scope is Scope & { externalId: string } => isNonNullish(scope.externalId),
+      );
+      return indexBy(scopesWithExternalId, prop('externalId'));
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to query active scopes, deleting stale scopes without moving leftover files`,
+        error: sanitizeError(error),
+      });
+      return {};
+    }
+  }
+
+  // Moves files left in a stale scope to the active scope for the same SharePoint object.
+  // Child scopes are left alone; each of them is visited on its own turn. Returns false when
+  // the listing or a move fails so the caller keeps the scope for the next cycle.
+  private async moveFilesToSuccessor(
+    staleScope: Scope,
+    successor: Scope,
+    logPrefix: string,
+  ): Promise<boolean> {
+    let files: UniqueFile[];
+    try {
+      files = await this.uniqueFilesService.getFilesByOwnerId(staleScope.id);
+    } catch (error) {
+      this.logger.warn({
+        msg: `${logPrefix} Failed to list files in stale scope ${staleScope.id}, skipping deletion`,
+        error: sanitizeError(error),
+      });
+      return false;
+    }
+
+    let allMoved = true;
+    for (const file of files) {
+      try {
+        await this.uniqueFilesService.moveFile(file.id, successor.id);
+      } catch (error) {
+        allMoved = false;
+        this.logger.warn({
+          msg: `${logPrefix} Failed to move file ${file.id} from stale scope ${staleScope.id} to successor ${successor.id}`,
+          error: sanitizeError(error),
+        });
+      }
+    }
+
+    return allMoved;
   }
 
   /**
