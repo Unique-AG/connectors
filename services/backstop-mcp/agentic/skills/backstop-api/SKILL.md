@@ -20,9 +20,11 @@ alone have been wrong every time so far — see §8.
 
 ## 0. Where the docs live
 
-This skill file lives in `.claude/skills/backstop-api/` and `.cursor/skills/backstop-api/`
-(where agents load skills). The scripts and `.env` live in
-`services/backstop-mcp/agent-explore/`. Do not send the API token to Elevio, and do not
+This skill file lives in `services/backstop-mcp/agentic/skills/backstop-api/`. Setup installs that
+folder into `.claude/skills/backstop-api/`, which is the directory the agents read.
+`scripts/explore.py` and `scripts/docs.py` sit next to this file. Run them from this skill's
+directory; `npx skills` installs that folder as a unit, so these paths are the same afterwards.
+`uv run` reads each script's inline dependencies. Do not send the API token to Elevio, and do not
 POST to `BACKSTOP_BASE_URL` unless the user says so for that task (§8).
 
 **A. Instance swagger — `explore.py`, API token.** Same host as the CRM:
@@ -33,7 +35,7 @@ GET {BACKSTOP_BASE_URL}/backstop-api-swagger.json
 
 `Authorization: Basic` username + API token, plus `token: true`. Swagger 2.0, ~1.4 MB,
 ~1167 paths. Endpoints, filter fields, and sort enums for *this* instance. Far too big to
-read whole: cache under `.probe-cache/` and `grep`/`jq` one path. Do not dump it into the
+read whole: cache under `scripts/.probe-cache/` and `grep`/`jq` one path. Do not dump it into the
 conversation. Skip `/backstop/api-docs/` (HTML UI, web session); the UI itself just GETs
 that JSON file.
 
@@ -42,22 +44,22 @@ that JSON file.
 `https://help-prod.backstopsolutions.com/backstop/sso/elevioStart.jsp`). Anonymous GETs
 are 401 shells; after SSO the HTML carries `window.initialData`. The API token cannot
 read this. `docs.py` may POST `j_username`/`j_password` to help-prod `j_security_check`
-only. Set `BACKSTOP_DOCS_USERNAME` and `BACKSTOP_DOCS_PASSWORD` in
-`services/backstop-mcp/agent-explore/.env` (copy `.env.example`; username may fall back
-to `BACKSTOP_SERVICE_USERNAME`). Cache is `agent-explore/.docs-cache/` (gitignored).
+only. Set `BACKSTOP_DOCS_USERNAME` and `BACKSTOP_DOCS_PASSWORD` in `scripts/.env`
+(copy `scripts/.env.example`; username may fall back to `BACKSTOP_SERVICE_USERNAME`).
+If that file is absent, the script also reads `services/backstop-mcp/agent-explore/.env`.
+Cache is `scripts/.docs-cache/` (gitignored).
 
 If either web credential is missing, **stop and ask the user to put them in
-`services/backstop-mcp/agent-explore/.env` before running `docs.py` or fetching any
+`scripts/.env` before running `docs.py` or fetching any
 Elevio page.** Do not guess, do not try the API token, and do not start a docs request
 hoping it works. After they are set, then `tree` / `category` / `article`.
 
-```
-cd services/backstop-mcp
-uv run python agent-explore/docs.py tree
-uv run python agent-explore/docs.py category 21          # REST API
-uv run python agent-explore/docs.py category 40          # Backstop Fundamentals
-uv run python agent-explore/docs.py article 941
-uv run python agent-explore/docs.py article 757 --refresh
+```bash
+uv run scripts/docs.py tree
+uv run scripts/docs.py category 21          # REST API
+uv run scripts/docs.py category 40          # Backstop Fundamentals
+uv run scripts/docs.py article 941
+uv run scripts/docs.py article 757 --refresh
 ```
 
 `tree` then `category` then `article`. Category pages list children; they do not inline
@@ -197,7 +199,7 @@ What's genuinely per-endpoint and worth checking before assuming a field sorts:
 
 **This is the default way to answer "how does entity X work".** Don't reason from the swagger
 alone — its `parameters` are often empty/uninformative (see e.g. the `/people` GET entry), so real
-responses are more reliable. The loop, using `services/backstop-mcp/agent-explore/explore.py` for every request:
+responses are more reliable. The loop, using `scripts/explore.py` for every request:
 
 1. **Fetch a small page of the entity.** `GET /{type}` with `page[limit]=5` (never unbounded —
    §4). That one response already tells you the attribute set, which `relationships` the type
@@ -226,7 +228,7 @@ Build **one** small reusable CLI script and drive it repeatedly for however many
 exploration needs, rather than writing a fresh throwaway script per request.
 
 Credentials for this live instance are a service account, not a per-user OAuth credential, and
-they live in `services/backstop-mcp/agent-explore/.env` (copy `.env.example` there; do not
+they live in `scripts/.env` (copy `scripts/.env.example` there; do not
 export that file into your shell):
 
 ```
@@ -243,23 +245,23 @@ it). Do not print credentials. Write-payload rules that only a live `400` taught
 in §8.
 
 Auth is `Authorization: Basic base64(username:token)` plus a `token: true` header. The script
-is `services/backstop-mcp/agent-explore/explore.py`: always `GET`s, loads that folder's `.env`,
-writes every response to `agent-explore/.probe-cache/` (gitignored), and prints the JSON
+is `scripts/explore.py`: always `GET`s, loads `scripts/.env`,
+writes every response to `scripts/.probe-cache/` (gitignored), and prints the JSON
 body. Do not `raise_for_status` — 400s are part of the cache. Reuse cached files before
 hitting the API again. Do not rewrite this script.
 
-Run from `services/backstop-mcp` so `uv run` picks up the service venv:
+Run from this skill's directory:
 
-```
+```bash
 # 0. instance swagger (large — write to cache / grep, do not print)
-uv run python agent-explore/explore.py /backstop-api-swagger.json
+uv run scripts/explore.py /backstop-api-swagger.json
 # 1. small page of the entity
-uv run python agent-explore/explore.py /people -p "page[limit]=5" -p "page[offset]=0"
+uv run scripts/explore.py /people -p "page[limit]=5" -p "page[offset]=0"
 # 3. dive into a few of the ids that came back, then follow their relationships
-uv run python agent-explore/explore.py /people/12345
-uv run python agent-explore/explore.py /people/12345/activities -p "page[limit]=5"
+uv run scripts/explore.py /people/12345
+uv run scripts/explore.py /people/12345/activities -p "page[limit]=5"
 # 4. confirm the query surface
-uv run python agent-explore/explore.py /custom-field-definitions -p "include=lovSet"
+uv run scripts/explore.py /custom-field-definitions -p "include=lovSet"
 ```
 
 ## 7. Building a new backstop-mcp feature: explore before you design
@@ -300,7 +302,7 @@ implementation is `features/activity_writes/`.
 The live tenant stays read-only until the user says otherwise for that task. When they
 do: create, confirm the record appears on the parent's `/activities` feed, then
 hard-delete and verify the follow-up `GET` 404s. Write every response to
-`.probe-cache/`. `explore.py` is GET-only — do not add a method flag.
+`scripts/.probe-cache/`. `explore.py` is GET-only — do not add a method flag.
 
 Four payload rules, each learned from a `400` on this instance. The swagger is wrong or
 silent about all four.

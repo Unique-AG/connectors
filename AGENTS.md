@@ -1,5 +1,9 @@
 # Project Instructions
 
+## PR titles
+
+Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. The pattern is `scope = last path segment` (e.g. `packages/logger` → `logger`), with one exception: `pnpm-lock.yaml` and root `package.json` require scope `deps`.
+
 ## Environment
 - Python services (any `services/*/pyproject.toml`) are driven by `uv`, not pnpm/turbo, and their
   commands live in `DEVELOP.md` under "Python Services". Read the git-worktree trap there before you
@@ -23,9 +27,44 @@
   // biome-ignore lint/suspicious/noExplicitAny: Mock override private method
   vi.spyOn(service as any, 'validatePKCE').mockReturnValue(true);
   ```
-- When writing code focuse on consistency and follow DRY principles
+- When writing code focus on consistency and follow DRY principles
 - Add export only when what you are exporting is actually used in another file
-- Never mutate function arguments. Don't push into, reassign, or otherwise modify a value the caller passed in, and don't use out-parameters. Return new data instead.
+
+### No argument mutation
+
+Never mutate function arguments. Do not push into, assign to, or otherwise modify a value the caller passed in. Return new data instead of using out-parameters.
+
+```ts
+// Bad — mutates the caller's array via an out-parameter
+function collectImageNodes(parent: ParentNode, out: Element[]): void {
+  for (const child of parent.children) {
+    out.push(child);
+  }
+}
+
+// Good — returns its own result
+function collectImageNodes(parent: ParentNode): Element[] {
+  return parent.children.filter(isTag);
+}
+```
+
+### Error assertions
+
+Use `assert` from `node:assert` instead of `if` + `throw` for internal invariant checks.
+
+```ts
+// Bad
+if (result.status === 'failed') {
+  throw new Error(`Operation failed: ${result.error}`);
+}
+
+// Good
+assert.ok(result.status !== 'failed', `Operation failed: ${result.error}`);
+// or
+assert.strictEqual(result.status, 'ok', `Operation failed: ${result.error}`);
+```
+
+This applies to internal preconditions, postconditions, and unreachable-state guards. Use regular `throw` only at system boundaries (user input, external API errors) where you need a specific error type or HTTP status code.
 
 ## Import Ordering
 - Follow this import order:
@@ -57,10 +96,14 @@
 - Frontmatter `name` must equal the directory name. The server names a skill after its directory
   while the CLI reads frontmatter, and the CLI falls back to the directory name in places, so the
   two only agree if you keep them identical. A test enforces this.
-- A skill that is only a build aid for this repo, and that no service serves, stays in
-  `.claude/skills/`. That is a discovery container, so it still needs `metadata.internal: true`.
-  `.cursor/skills/` is not a discovery container, so a copy there is for Cursor itself and the
-  CLI never sees it.
+- A skill used while working on one server, and that the server does not serve to its clients,
+  lives in `services/<svc>/agentic/skills/<name>/`. A skill that is not specific to one server
+  lives in `agentic/skills/<name>/` at the repository root. Both still need
+  `metadata.internal: true`. They are not Skills CLI discovery containers. `agentic/skill-management/setup.sh`
+  installs them with the Skills CLI into gitignored `.claude/skills/`. Run
+  `bash agentic/skill-management/update-skills.sh` to refresh that install without pulling. The
+  agents we use read `.claude/skills/`. Claude does not understand the `.agentic/skills` standard
+  yet. Once it does, move these skills there and stop installing them into `.claude/skills/`.
 
 ## Formatting
 

@@ -120,14 +120,17 @@ uv run basedpyright .        # type check
 
 ## With Intelligence API
 
-Read `.claude/skills/with-intelligence-api/` before adding a feature that touches a new entity.
-Its `scripts/` directory answers the two kinds of question:
+Read `agentic/skills/with-intelligence-api/` before adding a feature that touches a new entity.
+Its `scripts/` directory answers the two kinds of question. From this service directory:
 
 ```bash
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py paths investor
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
-uv run python ../../.claude/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
+uv run agentic/skills/with-intelligence-api/scripts/spec.py paths investor
+uv run agentic/skills/with-intelligence-api/scripts/spec.py schema InvestorExtended
+uv run agentic/skills/with-intelligence-api/scripts/explore.py /v3/investors/2504
 ```
+
+The installed skill runs them from its own directory, as `uv run scripts/spec.py` and
+`uv run scripts/explore.py`. Those paths are relative to the folder that contains `SKILL.md`.
 
 `spec.py` needs no credentials — the spec is public. `explore.py` signs in with the username and
 password from the skill's `scripts/.env`, caches the token and every response, and only ever GETs.
@@ -139,7 +142,7 @@ fails the suite. The schemas it compares against are pruned into
 `tests/spec/wi_schemas.json`; refresh them, as a deliberate and readable diff, with:
 
 ```bash
-uv run python ../../.claude/skills/with-intelligence-api/scripts/spec.py snapshot
+uv run agentic/skills/with-intelligence-api/scripts/spec.py snapshot
 ```
 
 Add a schema name to `SNAPSHOT_ROOTS` in that `spec.py` when a feature starts modelling

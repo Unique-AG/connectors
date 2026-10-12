@@ -1,0 +1,6 @@
+#!/bin/bash
+# git pull runs this after a merge, including a fast-forward.
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+exec bash "$root/agentic/skill-management/install-skills.sh"
