@@ -4,9 +4,10 @@ Server-specific skills live in `services/<svc>/agentic/skills/`. Skills that are
 
 Claude does not understand the `.agentic/skills` standard yet. Once it does, move these skills to `.agentic/skills` and stop installing them into `.claude/skills/`.
 
-Git does not turn on hooks when you clone or pull. Run this once in each clone:
+Git does not turn on hooks when you clone or pull. Install the pinned Skills CLI, then run setup once in each clone:
 
 ```bash
+npm ci --ignore-scripts --prefix agentic/skill-management
 bash agentic/skill-management/setup.sh
 ```
 
@@ -27,7 +28,7 @@ Both hooks call `agentic/skill-management/install-skills.sh`. Running it again r
 
 ## Security
 
-The hooks run the [Skills CLI](https://skills.sh/) pinned in `agentic/skill-management/package-lock.json` (`skills@1.7.1` and its dependency tarballs, including `tar` and `yaml`). `install-skills.sh` installs that tree with `npm ci --ignore-scripts` when `node_modules` is missing or the lockfile hash no longer matches a stamp next to it. npm checks each tarball against the integrity hash in the lockfile and installs those exact versions. A later pull reuses the stamped install. The first install needs network access to download the pinned tarballs. The CLI requires Node.js 22.20 or newer.
+The hooks run the [Skills CLI](https://skills.sh/) at `agentic/skill-management/node_modules/skills/bin/cli.mjs`. That tree is `skills@1.7.1` and its dependency tarballs, including `tar` and `yaml`, as pinned in `agentic/skill-management/package-lock.json`. The script expects the binary to be there already. When the file is missing, it exits with an error. `npm ci --ignore-scripts --prefix agentic/skill-management` installs those exact tarballs and checks each integrity hash. The CLI requires Node.js 22.20 or newer. Pulls do not download it again.
 
 The script sets `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. It also sets `INSTALL_INTERNAL_SKILLS=1`, so skills marked `metadata.internal: true` are installed with the rest. The CLI writes `skills-lock.json` at the repository root. That file is gitignored, as is `agentic/skill-management/node_modules/`.
 

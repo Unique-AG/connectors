@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install skills from agentic/skills directories into .claude/skills.
-# Safe to run repeatedly. See agentic/README.md. The Skills CLI is the copy
-# installed from agentic/skill-management/package-lock.json.
+# Safe to run repeatedly. See agentic/README.md. Expects the Skills CLI at
+# agentic/skill-management/node_modules/skills/bin/cli.mjs and exits if it is missing.
 
 set -euo pipefail
 
@@ -24,32 +24,8 @@ require_cmd() {
   fi
 }
 
-lockfile_sha256() {
-  node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$1"
-}
-
-# Install skills@1.7.1 from the committed lockfile. npm ci installs the tarballs
-# named there and checks every integrity hash. Skip that install when the tree
-# is already present and stamped with this lockfile.
-ensure_skills_cli() {
-  local lockfile entry stamp current hash
-  lockfile="$script_dir/package-lock.json"
-  entry="$script_dir/node_modules/skills/bin/cli.mjs"
-  stamp="$script_dir/node_modules/.skills-cli-lock"
-  [[ -f "$lockfile" ]] || die "missing $lockfile"
-  hash=$(lockfile_sha256 "$lockfile")
-  if [[ -f "$entry" && -f "$stamp" ]]; then
-    current=$(tr -d '[:space:]' < "$stamp")
-    if [[ "$current" == "$hash" ]]; then
-      return 0
-    fi
-  fi
-  printf 'install-skills: installing Skills CLI %s from %s\n' "$SKILLS_CLI_VERSION" "$lockfile"
-  if ! (cd "$script_dir" && npm ci --ignore-scripts --no-audit --no-fund); then
-    die "could not install the pinned Skills CLI. See agentic/README.md."
-  fi
-  [[ -f "$entry" ]] || die "pinned Skills CLI is missing at $entry"
-  printf '%s\n' "$hash" > "$stamp"
+require_skills_cli() {
+  [[ -f "$script_dir/node_modules/skills/bin/cli.mjs" ]] || die "Skills CLI is missing at agentic/skill-management/node_modules/skills/bin/cli.mjs. Install it with: npm ci --ignore-scripts --prefix agentic/skill-management"
 }
 
 contains_line() {
@@ -362,9 +338,8 @@ done < "$tmpdir/planned"
 
 : > "$tmpdir/installed"
 if [[ -s "$tmpdir/install.names" ]]; then
-  require_cmd node "Node.js is required to run the pinned Skills CLI. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
-  require_cmd npm "npm is required to install the pinned Skills CLI. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
-  ensure_skills_cli
+  require_cmd node "Node.js is required to run the Skills CLI. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
+  require_skills_cli
   sort -u "$tmpdir/managed" "$tmpdir/install.sanitized" > "$tmpdir/manifest.pre"
   write_manifest "$tmpdir/manifest.pre"
 
