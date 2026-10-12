@@ -19,7 +19,6 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.chat import Chat
-from msgraph.generated.models.chat_message_info import ChatMessageInfo
 from msgraph.generated.models.chat_type import ChatType
 from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.generated.users.item.chats.chats_request_builder import ChatsRequestBuilder
@@ -29,7 +28,6 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import collect_pages, graph_errors
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
 from office_365_mcp.shared.messages import MessageSender
-from office_365_mcp.shared.prose import PREVIEW_CHARACTERS, body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
@@ -130,11 +128,17 @@ class ChatSummary(BaseModel):
             + "this field."
         )
     )
-    last_message_preview: str | None = Field(
+    last_message_body: str | None = Field(
         description=(
-            f"The first {PREVIEW_CHARACTERS} characters of the last message as plain text. A "
-            + "longer text ends with an ellipsis. Null when no one posted yet, the message was "
-            + "deleted, or it has no text, as with a system event."
+            "The body of the last message, as Microsoft 365 sends it. Null when no one posted "
+            + "yet, or when the message was deleted. A system event has the body "
+            + "`<systemEventMessage/>`."
+        )
+    )
+    last_message_body_is_plain_text: bool = Field(
+        description=(
+            "True when `last_message_body` is plain text. False means that `last_message_body` "
+            + "is HTML markup, or that it is null. In HTML markup, each link keeps its `href` URL."
         )
     )
     last_message_sender: MessageSender | None = Field(
@@ -172,6 +176,7 @@ class ChatSummary(BaseModel):
     def from_chat(cls, chat: Chat, *, include_member_emails: bool) -> Self:
         assert chat.id is not None, "Graph returned a chat with no id"
         preview = chat.last_message_preview
+        last_body = None if preview is None or preview.is_deleted else preview.body
         # Graph documents `topic` as absent when unnamed. A blank one survives the SDK as `""`.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
@@ -184,7 +189,10 @@ class ChatSummary(BaseModel):
             topic=topic,
             meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
             last_message_at=preview.created_date_time if preview is not None else None,
-            last_message_preview=_preview_text(preview),
+            last_message_body=last_body.content if last_body is not None else None,
+            last_message_body_is_plain_text=last_body is not None
+            and last_body.content is not None
+            and last_body.content_type == BodyType.Text,
             last_message_sender=MessageSender.from_identity(
                 preview.from_ if preview is not None else None
             ),
@@ -285,17 +293,6 @@ def _members(chat: Chat, include_emails: bool) -> list[ChatMember]:
         ChatMember.from_conversation_member(member, include_email=include_emails)
         for member in chat.members or []
     ]
-
-
-def _preview_text(preview: ChatMessageInfo | None) -> str | None:
-    if preview is None or preview.is_deleted or preview.body is None:
-        return None
-    content = preview.body.content
-    if content is None:
-        return None
-    if preview.body.content_type == BodyType.Html:
-        return body_opening(content) or None
-    return cut_for_a_question(content.strip()) or None
 
 
 def _unread(chat: Chat) -> bool | None:

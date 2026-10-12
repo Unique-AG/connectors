@@ -38,7 +38,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 
 | Tool | Kind | Permission | Admin consent | What it does |
 | --- | --- | --- | --- | --- |
-| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. Each chat shows a preview of its last message, the sender, and whether the user read it. An unnamed chat also shows its members, each with a user id. |
+| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. Each chat shows a body of its last message, as Microsoft 365 sends it, the sender, and whether the user read it. An unnamed chat also shows its members, each with a user id. |
 | `teams_list_chat_messages` | Read | `Chat.Read` | No | The newest messages of one Teams chat, newest first, by the `chat_id` that `teams_list_chats` reported. Each message has a handle that `teams_read_message` accepts. |
 | `teams_list_chat_members` | Read | `Chat.Read` | No | The members of one Teams chat, by the `chat_id` that `teams_list_chats` reported. Each member has a user id, a display name, an email address, and roles. The tool reads one page, and `more_members` is true when the chat has more. |
 | `teams_list_my_teams` | Read | `Team.ReadBasic.All` | No | The teams that the signed-in user is a member of. |
