@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.0...backstop-mcp@1.0.1) (2026-10-12)
+
+
+### Dependencies
+
+* **deps:** refresh all transitive dependencies ([#1201](https://github.com/Unique-AG/connectors/issues/1201)) ([68a747d](https://github.com/Unique-AG/connectors/commit/68a747dc8df80f05ba8a5dc5a5caacf111af446f))
+
 ## [1.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.8...backstop-mcp@1.0.0) (2026-10-12)
 
 
