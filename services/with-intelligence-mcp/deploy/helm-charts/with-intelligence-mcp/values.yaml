@@ -96,6 +96,9 @@ hooks:
     enabled: true
     command: |
       alembic upgrade head
+    argocd:
+      hook: Sync
+      syncWave: -1
 
 networkPolicy:
   enabled: false

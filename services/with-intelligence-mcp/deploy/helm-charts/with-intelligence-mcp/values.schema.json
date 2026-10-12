@@ -1068,6 +1068,29 @@
                 "items": {
                   "type": "object"
                 }
+              },
+              "argocd": {
+                "type": "object",
+                "description": "Argo CD sync options for this hook Job. When hook is set, Argo CD ignores this Job's helm.sh/hook annotations; other hook Jobs keep their Helm hook mapping.",
+                "additionalProperties": false,
+                "properties": {
+                  "hook": {
+                    "type": "string",
+                    "description": "Rendered as argocd.argoproj.io/hook",
+                    "enum": [
+                      "PreSync",
+                      "Sync",
+                      "PostSync",
+                      "SyncFail",
+                      "PostDelete",
+                      "Skip"
+                    ]
+                  },
+                  "syncWave": {
+                    "type": "integer",
+                    "description": "Rendered as argocd.argoproj.io/sync-wave"
+                  }
+                }
               }
             }
           }
