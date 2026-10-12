@@ -81,7 +81,7 @@ _NOTHING_TO_SEARCH_FOR = (
 class SiteMatches(BaseModel):
     """One site, and how many of the matches sit on it."""
 
-    url: str = Field(
+    web_url: str = Field(
         description=(
             "The site's web address. Pass it back as `path` to search only this site. It is "
             + "already in the shape that `path` expects. Always give it to the user when you "
@@ -207,7 +207,7 @@ def _sites(container: SearchHitsContainer | None) -> list[SiteMatches]:
         if aggregation.field != _SITE_FIELD:
             continue
         return [
-            SiteMatches(url=bucket.key, match_count=bucket.count)
+            SiteMatches(web_url=bucket.key, match_count=bucket.count)
             for bucket in aggregation.buckets or []
             if bucket.key is not None and bucket.count is not None
         ]

@@ -131,7 +131,7 @@ class TestWhichSitesHoldTheMatches:
             client, query="report", offset=0, limit=25
         )
 
-        assert [(s.url, s.match_count) for s in answer.sites] == [
+        assert [(s.web_url, s.match_count) for s in answer.sites] == [
             (_SITE, 209),
             ("https://contoso.sharepoint.invalid/sites/BugBash", 20),
         ]

@@ -339,6 +339,7 @@ class TestWhatItAnswers:
 
         assert answer == CopyStarted(
             source_uri=_FILE_URI,
+            source_web_url=None,
             destination_uri=_DESTINATION_URI,
             destination_web_url=None,
             name="Plan.docx",
@@ -1087,5 +1088,11 @@ class TestHowItDeclaresItself:
             for name, field in CopyStarted.model_fields.items()
         }
 
-        assert set(counts) == {"source_uri", "destination_uri", "destination_web_url", "name"}
+        assert set(counts) == {
+            "source_uri",
+            "source_web_url",
+            "destination_uri",
+            "destination_web_url",
+            "name",
+        }
         assert all(15 <= count <= 60 for count in counts.values()), counts

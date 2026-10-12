@@ -61,11 +61,11 @@ Notes:
 back as a Word file. Set `convert_to` to `pdf` for text you can read.
 - This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
 message.
-- After the file, the answer has a line of text with the web address of the file. Always give \
-that address to the user when you answer from the file.
+- After the file, the answer has a line of text that starts with `web_url:` and gives the web \
+address of the file. Always give that address to the user when you answer from the file.
 """
 
-_WEB_ADDRESS = "Web address of this file: "
+_WEB_ADDRESS = "web_url: "
 
 _NOT_A_FILE_HANDLE = (
     "sharepoint_read_file did not get a file handle. A file handle looks like "

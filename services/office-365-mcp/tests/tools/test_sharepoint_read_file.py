@@ -169,7 +169,7 @@ class TestTheWebAddress:
 
         assert len(answer) == 2
         assert isinstance(answer[0], File)
-        assert answer[1] == f"Web address of this file: {_WEB_URL}"
+        assert answer[1] == f"web_url: {_WEB_URL}"
 
     @pytest.mark.usefixtures("item")
     async def test_it_follows_a_converted_file_too(
@@ -179,7 +179,7 @@ class TestTheWebAddress:
 
         answer = await _answer(client, transport, convert_to="pdf")
 
-        assert answer[1] == f"Web address of this file: {_WEB_URL}"
+        assert answer[1] == f"web_url: {_WEB_URL}"
 
     @pytest.mark.usefixtures("content")
     async def test_a_file_with_no_web_address_comes_back_alone(

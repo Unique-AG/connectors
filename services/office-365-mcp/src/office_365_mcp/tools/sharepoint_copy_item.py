@@ -134,6 +134,12 @@ class CopyStarted(BaseModel):
             + "handle. The original stays where it is, and this tool does not change it."
         )
     )
+    source_web_url: str | None = Field(
+        description=(
+            "The web address that opens the original item in a browser. Always give it to the "
+            + "user when you report this copy."
+        )
+    )
     destination_uri: str = Field(
         description=(
             "The handle of the folder that gets the copy, in the shape "
@@ -207,6 +213,7 @@ async def copy_item(
                 )
             started = CopyStarted(
                 source_uri=source.uri,
+                source_web_url=original.web_url,
                 destination_uri=DriveFolderHandle(destination.drive_id, target.id).uri,
                 destination_web_url=target.web_url,
                 name=name if name is not None else original.name,

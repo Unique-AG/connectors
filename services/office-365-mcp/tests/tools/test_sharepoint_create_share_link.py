@@ -229,7 +229,7 @@ class TestWhatItAnswers:
         answer = await _share(client)
 
         assert answer == SharingLink(
-            item_uri=_FILE, web_url=_LINK_URL, access="view", audience="organization"
+            item_uri=_FILE, share_url=_LINK_URL, access="view", audience="organization"
         )
 
     async def test_a_200_that_returns_an_existing_link_maps_the_same_way_as_a_201(
