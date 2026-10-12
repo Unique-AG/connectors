@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.8...backstop-mcp@1.0.0) (2026-10-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backstop-mcp:** `continuous_since` is removed in favour of `tenure_runs`. Default get_product_investors responses now include investors who have left.
+
+### Features
+
+* **backstop-mcp:** publish every tenure run and list investors who have left ([2eaad1f](https://github.com/Unique-AG/connectors/commit/2eaad1fe5486784fa3aac46f76caaf50a40d3d1e))
+
+
+### Dependencies
+
+* bump basedpyright in /* ([#1192](https://github.com/Unique-AG/connectors/issues/1192)) ([5c0cf09](https://github.com/Unique-AG/connectors/commit/5c0cf0965c6d476057e2f63373b753385b81d218))
+* bump cryptography in /* ([#1189](https://github.com/Unique-AG/connectors/issues/1189)) ([b2f3689](https://github.com/Unique-AG/connectors/commit/b2f3689c6f4c342bc2e05b4795bf9f552196e572))
+* bump fastmcp in /* ([#1144](https://github.com/Unique-AG/connectors/issues/1144)) ([10ce668](https://github.com/Unique-AG/connectors/commit/10ce668ea5ff78da123896db216975cc4f60b513))
+* bump fastmcp in /* ([#1198](https://github.com/Unique-AG/connectors/issues/1198)) ([9108152](https://github.com/Unique-AG/connectors/commit/9108152e00405dcb49e1ccf4d17a703a7e4acb79))
+* bump mako from 1.3.12 to 1.4.2 in /services/backstop-mcp ([#1183](https://github.com/Unique-AG/connectors/issues/1183)) ([9c7327d](https://github.com/Unique-AG/connectors/commit/9c7327de1b1b86f750bf93bc6aec739206e212a4))
+* bump mcp in /* ([#1191](https://github.com/Unique-AG/connectors/issues/1191)) ([576fcad](https://github.com/Unique-AG/connectors/commit/576fcad8912cef078f6241f78d13620377e0d159))
+* bump multidict from 6.7.1 to 6.9.1 in /services/backstop-mcp ([#1184](https://github.com/Unique-AG/connectors/issues/1184)) ([02687ea](https://github.com/Unique-AG/connectors/commit/02687ea2243d32157fc2c523b7e36e403c091ff5))
+* bump python in /services/*/deploy ([#1140](https://github.com/Unique-AG/connectors/issues/1140)) ([ecc36dc](https://github.com/Unique-AG/connectors/commit/ecc36dc232dfbfbaba7dd093cf2aa587cacb2297))
+* bump ruff in /* ([#1151](https://github.com/Unique-AG/connectors/issues/1151)) ([daf766a](https://github.com/Unique-AG/connectors/commit/daf766a00884e17a13b5277e80a7ce24657212f8))
+* bump ruff in /* ([#1193](https://github.com/Unique-AG/connectors/issues/1193)) ([ac0d4c2](https://github.com/Unique-AG/connectors/commit/ac0d4c21318fe86aec8317a8215fd823250f6fe7))
+* bump sqlalchemy[asyncio] in /services/* ([#1148](https://github.com/Unique-AG/connectors/issues/1148)) ([f9632ce](https://github.com/Unique-AG/connectors/commit/f9632cebd8a12fdd0c13e4fc9a3751ffd04f1c34))
+* bump starlette in /* ([#1150](https://github.com/Unique-AG/connectors/issues/1150)) ([0ad00a1](https://github.com/Unique-AG/connectors/commit/0ad00a11bba43d2953d7900253b29409eb85b5d6))
+* **deps:** move pinned vulnerable dependencies to patched versions ([#1200](https://github.com/Unique-AG/connectors/issues/1200)) ([531d6e0](https://github.com/Unique-AG/connectors/commit/531d6e0d8625cd25014ea8b056475f550af27902))
+
 ## [0.0.8](https://github.com/Unique-AG/connectors/compare/backstop-mcp@0.0.7...backstop-mcp@0.0.8) (2026-10-08)
 
 
