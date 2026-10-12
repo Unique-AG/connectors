@@ -13,7 +13,6 @@ import { resolveDirectoryIds } from './resolve-directory-ids.util';
 
 export interface QueryInput {
   kqlQuery: string;
-  limit?: number;
   mailbox?: string | null | undefined;
   directories?: string[];
 }
@@ -29,8 +28,8 @@ export interface GraphBatchRequest {
   mailbox: string;
   isDelegated: boolean;
   kqlQuery: string;
-  limit: number;
   folderId?: string;
+  folderName?: string;
 }
 
 interface MailboxAccessInfo {
@@ -147,7 +146,6 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       skippedFolders: { mailbox: string; folder: string }[];
     };
   }): void {
-    const limit = query.limit ?? 100;
     if (isNullish(mailboxAccessInfo)) {
       return;
     }
@@ -161,7 +159,6 @@ export class BuildMsGraphKqlBatchRequestsQuery {
         mailbox: mailboxAccessInfo.ownerEmail,
         isDelegated,
         kqlQuery: query.kqlQuery,
-        limit,
       });
       return;
     }
@@ -175,8 +172,10 @@ export class BuildMsGraphKqlBatchRequestsQuery {
         mailbox: mailboxAccessInfo.ownerEmail,
         isDelegated,
         kqlQuery: query.kqlQuery,
-        limit,
         folderId,
+        folderName: mailboxAccessInfo.directories.find(
+          ({ providerDirectoryId }) => providerDirectoryId === folderId,
+        )?.displayName,
       });
     }
     for (const folder of resolved.unrecognized) {

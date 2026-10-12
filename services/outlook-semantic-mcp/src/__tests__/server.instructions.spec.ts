@@ -36,3 +36,26 @@ describe(buildServerInstructions.name, () => {
     expect(buildServerInstructions()).toContain('cancel_event');
   });
 });
+
+describe('email search instructions', () => {
+  const original = process.env.MCP_BACKEND;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.MCP_BACKEND;
+    } else {
+      process.env.MCP_BACKEND = original;
+    }
+  });
+
+  it.each(['microsoft_graph', 'microsoft_graph_and_unique_api'])(
+    'explains previews, open_email and cursor paging for the %s backend',
+    (backend) => {
+      process.env.MCP_BACKEND = backend;
+      const instructions = buildServerInstructions();
+      expect(instructions).toContain('open_email');
+      expect(instructions).toContain('fetch_next_search_pages');
+      expect(instructions).toContain('retryAfterSeconds');
+    },
+  );
+});

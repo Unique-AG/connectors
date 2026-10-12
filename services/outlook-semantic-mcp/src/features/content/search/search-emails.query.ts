@@ -1,109 +1,209 @@
 import { Injectable } from '@nestjs/common';
-import { isNullish } from 'remeda';
-import * as z from 'zod';
+import { omit, sum, unique } from 'remeda';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
+import {
+  BackendPage,
+  MsGraphSearchCursorPayload,
+  StoredSearchCursor,
+  UniqueSearchCursorPayload,
+} from './cursors/search-cursor.payload';
+import { SearchCursorRepository } from './cursors/search-cursor.repository';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SEARCH_CONFIG } from './search.config';
-import { SearchEmailsInputSchema } from './search-conditions.dto';
+import { SearchEmailsInput } from './search-conditions.dto';
 import {
   SearchBackend,
   SearchEmailResult,
-  SemanticSearchEmailsQuery,
-} from './semantic-search-emails.query';
-
-export interface SearchEmailsToolInput {
-  uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
-  msGraphKeywordSearchQueries?: {
-    mailbox?: Nullish<string>;
-    kqlQuery: string;
-    limit?: number;
-  }[];
-}
-
-type BackendExecutor = (
-  userProfileId: UserProfileTypeID,
-  input: SearchEmailsToolInput,
-  outputTimeZone: string | undefined,
-) => Promise<{
-  results: SearchEmailResult[];
-  searchSummary: string | undefined;
-}>;
+  SearchPage,
+  SearchPageStatus,
+} from './search-results.types';
+import { SemanticSearchEmailsQuery } from './semantic-search-emails.query';
 
 @Injectable()
 export class SearchEmailsQuery {
+  private readonly EMPTY_BACKEND_OUTPUT: BackendOutput = {
+    results: [],
+    pages: [],
+    searchSummary: undefined,
+  };
+
   public constructor(
     private readonly semanticSearchQuery: SemanticSearchEmailsQuery,
     private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
     private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
+    private readonly searchCursorRepository: SearchCursorRepository,
   ) {}
-
-  private readonly executors: Record<SearchBackend, BackendExecutor> = {
-    [SearchBackend.Unique]: (
-      userProfileId: UserProfileTypeID,
-      input: SearchEmailsToolInput,
-      outputTimeZone: string | undefined,
-    ): Promise<{
-      results: SearchEmailResult[];
-      searchSummary: string | undefined;
-    }> => {
-      if (isNullish(SEARCH_CONFIG.semanticSearch) || !input.uniqueSemanticSearchQueries?.length) {
-        return Promise.resolve({ results: [], searchSummary: undefined });
-      }
-      return this.semanticSearchQuery
-        .run(
-          userProfileId,
-          input.uniqueSemanticSearchQueries,
-          SEARCH_CONFIG.semanticSearch,
-          outputTimeZone,
-        )
-        .then(({ results, searchSummary }) => ({ results, searchSummary }));
-    },
-    [SearchBackend.MsGraph]: (
-      userProfileId: UserProfileTypeID,
-      input: SearchEmailsToolInput,
-      outputTimeZone: string | undefined,
-    ): Promise<{
-      results: SearchEmailResult[];
-      searchSummary: string | undefined;
-    }> => {
-      if (!input.msGraphKeywordSearchQueries) {
-        return Promise.resolve({ results: [], searchSummary: undefined });
-      }
-      return this.msGraphKqlQuery.run(
-        userProfileId,
-        input.msGraphKeywordSearchQueries,
-        SEARCH_CONFIG.msGraph,
-        outputTimeZone,
-      );
-    },
-  };
 
   public async run(
     userProfileId: UserProfileTypeID,
     input: SearchEmailsToolInput,
-  ): Promise<{
-    results: SearchEmailResult[];
-    searchSummary: string | undefined;
-  }> {
+  ): Promise<SearchEmailsOutput> {
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
+    const semanticQueries = isMicrosoftGraphBackend()
+      ? []
+      : (input.uniqueSemanticSearchQueries ?? []);
+    const kqlQueries = input.msGraphKeywordSearchQueries ?? [];
 
-    const [
-      { results: semanticResults, searchSummary: semanticSummary },
-      { results: graphResults, searchSummary: graphSummary },
-    ] = await Promise.all([
-      this.executors[SearchBackend.Unique](userProfileId, input, outputTimeZone),
-      this.executors[SearchBackend.MsGraph](userProfileId, input, outputTimeZone),
+    // Every query gets an equal share of the response budget. A semantic search uses its share as
+    // its page size. The KQL queries pool what the semantic searches leave and split it across
+    // their mailboxes and folders.
+    const { maxResultsPerResponse, maxPageSize } = SEARCH_CONFIG;
+    const share = Math.floor(
+      maxResultsPerResponse / Math.max(1, semanticQueries.length + kqlQueries.length),
+    );
+    const semanticPageSize = Math.min(maxPageSize, share);
+    const graphBudget = maxResultsPerResponse - semanticQueries.length * semanticPageSize;
+
+    const [semantic, graph] = await Promise.all([
+      semanticQueries.length
+        ? this.semanticSearchQuery.run(
+            userProfileId,
+            semanticQueries,
+            outputTimeZone,
+            semanticPageSize,
+          )
+        : this.EMPTY_BACKEND_OUTPUT,
+      kqlQueries.length
+        ? this.msGraphKqlQuery.run(userProfileId, kqlQueries, outputTimeZone, graphBudget)
+        : this.EMPTY_BACKEND_OUTPUT,
     ]);
 
-    const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);
-    const searchSummary = summaries.length > 0 ? summaries.join('\n\n') : undefined;
+    return this.buildOutput(userProfileId, semantic, graph, [], []);
+  }
+
+  public async fetchNextPages(
+    userProfileId: UserProfileTypeID,
+    cursorIds: string[],
+  ): Promise<SearchEmailsOutput> {
+    const requestedIds = unique(cursorIds);
+    const storedCursors = await this.searchCursorRepository.findForUser(
+      userProfileId.toString(),
+      requestedIds,
+    );
+    const cursors = requestedIds.flatMap((id) => storedCursors.get(id) ?? []);
+    const fetchedCount = this.countCursorsWithinBudget(cursors);
+    const fetchedCursors = cursors.slice(0, fetchedCount);
+    const semanticCursors = fetchedCursors.filter((cursor) => this.isUniqueCursor(cursor));
+    const graphCursors = fetchedCursors.filter((cursor) => this.isMsGraphCursor(cursor));
+    const missingIds = requestedIds.filter((id) => !storedCursors.has(id));
+
+    const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
+    const [semantic, graph] = await Promise.all([
+      semanticCursors.length
+        ? this.semanticSearchQuery.fetchNextPages(userProfileId, semanticCursors, outputTimeZone)
+        : this.EMPTY_BACKEND_OUTPUT,
+      graphCursors.length
+        ? this.msGraphKqlQuery.fetchNextPages(userProfileId, graphCursors, outputTimeZone)
+        : this.EMPTY_BACKEND_OUTPUT,
+    ]);
+
+    const notes = missingIds.length
+      ? [
+          `The following cursors are unknown or expired: ${missingIds.join(', ')}. Run the search again to continue.`,
+        ]
+      : [];
+    return this.buildOutput(
+      userProfileId,
+      semantic,
+      graph,
+      notes,
+      cursors.slice(fetchedCount).map((cursor) => this.toDeferredPage(cursor)),
+    );
+  }
+
+  private isUniqueCursor(
+    cursor: StoredSearchCursor,
+  ): cursor is StoredSearchCursor<UniqueSearchCursorPayload> {
+    return cursor.payload.backend === SearchBackend.Unique;
+  }
+
+  private isMsGraphCursor(
+    cursor: StoredSearchCursor,
+  ): cursor is StoredSearchCursor<MsGraphSearchCursorPayload> {
+    return cursor.payload.backend === SearchBackend.MsGraph;
+  }
+
+  // How many of the cursors, in the order requested, fit the response budget.
+  private countCursorsWithinBudget(cursors: StoredSearchCursor[]): number {
+    const pageSizes = cursors.map(({ payload }) => payload.pageSize);
+    return pageSizes.filter(
+      (_, i) => sum(pageSizes.slice(0, i + 1)) <= SEARCH_CONFIG.maxResultsPerResponse,
+    ).length;
+  }
+
+  private toDeferredPage({ id, payload }: StoredSearchCursor): BackendPage {
+    return {
+      ...(payload.backend === SearchBackend.MsGraph
+        ? {
+            backend: payload.backend,
+            query: payload.kqlQuery,
+            mailbox: payload.mailbox,
+            folder: payload.folderName,
+          }
+        : {
+            backend: payload.backend,
+            query: payload.input.search,
+            mailbox: payload.input.mailbox ?? undefined,
+          }),
+      status: SearchPageStatus.Deferred,
+      retryCursorId: id,
+    };
+  }
+
+  private async buildOutput(
+    userProfileId: UserProfileTypeID,
+    semantic: BackendOutput,
+    graph: BackendOutput,
+    additionalNotes: string[],
+    deferredPages: BackendPage[],
+  ): Promise<SearchEmailsOutput> {
+    const pages = await this.storeContinuations(userProfileId, [
+      ...semantic.pages,
+      ...graph.pages,
+      ...deferredPages,
+    ]);
+    const summaries = [semantic.searchSummary, graph.searchSummary, ...additionalNotes].filter(
+      (summary): summary is string => summary !== undefined,
+    );
 
     return {
-      results: this.mergeResults(semanticResults, graphResults),
-      searchSummary,
+      results: this.mergeResults(semantic.results, graph.results),
+      pages,
+      // Throttled and failed pages keep a cursor for a retry, but do not count: an agent that pages
+      // until `hasMore` is false must not loop on a page that keeps failing.
+      hasMore: pages.some(
+        ({ status, cursorId }) =>
+          cursorId !== undefined &&
+          (status === SearchPageStatus.HasMore || status === SearchPageStatus.Deferred),
+      ),
+      searchSummary: summaries.length > 0 ? summaries.join('\n\n') : undefined,
     };
+  }
+
+  // Pages fetched from a cursor that must be retried keep that cursor's id. Every other
+  // continuation becomes a new immutable cursor row.
+  private async storeContinuations(
+    userProfileId: UserProfileTypeID,
+    backendPages: BackendPage[],
+  ): Promise<SearchPage[]> {
+    const toStore = backendPages.flatMap((page, pageIndex) =>
+      page.continuation && !page.retryCursorId
+        ? [{ pageIndex, continuation: page.continuation }]
+        : [],
+    );
+    const newIds = await this.searchCursorRepository.create(
+      userProfileId.toString(),
+      toStore.map(({ continuation }) => continuation),
+    );
+    const newIdByPageIndex = new Map(toStore.map(({ pageIndex }, i) => [pageIndex, newIds[i]]));
+
+    return backendPages.map((page, pageIndex) => ({
+      ...omit(page, ['continuation', 'retryCursorId']),
+      cursorId: page.retryCursorId ?? newIdByPageIndex.get(pageIndex),
+    }));
   }
 
   private formatText({
@@ -118,27 +218,13 @@ export class SearchEmailsQuery {
       sections.push(`## Semantically Matched Content\n${semanticText}`);
     }
     if (graphText) {
-      sections.push(`## Full Email Content Without Attachments\n${graphText}`);
+      sections.push(`## Preview\n${graphText}`);
     }
     return sections.join('\n\n');
   }
 
-  // We trust our semantic search more than KQL, so the top 20 semantic results are
-  // anchored first. When Graph returned the same email, we enrich the semantic result
-  // with the KQL body excerpt so the LLM sees both the attachment chunks and the full
-  // email body.
-  //
-  // Beyond position 20 we treat a match in both backends as a stronger signal than a
-  // semantic-only match, so common results are ranked above semantic-only stragglers.
-  // Graph-only results come last as the weakest signal.
-  //
-  // Tier ordering (strongest → weakest confidence):
-  //   1. Top-20 semantic results — anchored first, enriched with Graph body if available.
-  //   2. Common remainder — matched by both backends but outside top-20.
-  //   3. Semantic-only remainder — semantic match beyond top-20 with no Graph hit.
-  //   4. Graph-only — lexical match with no semantic counterpart.
-  //
-  // Output is capped at 500 results to keep LLM context small.
+  // Order: top-20 semantic (enriched with the Graph preview when both matched), then other matches
+  // of both backends, then semantic-only, then Graph-only. Nothing is dropped.
   private mergeResults(
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
@@ -189,9 +275,28 @@ export class SearchEmailsQuery {
       text: this.formatText({ graphText: graphResult.text }),
     }));
 
-    return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
-      0,
-      SEARCH_CONFIG.maxOutputEmails,
-    );
+    return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph];
   }
+}
+
+export interface SearchEmailsToolInput {
+  uniqueSemanticSearchQueries?: SearchEmailsInput[];
+  msGraphKeywordSearchQueries?: {
+    mailbox?: Nullish<string>;
+    kqlQuery: string;
+    directories?: string[];
+  }[];
+}
+
+export interface SearchEmailsOutput {
+  results: SearchEmailResult[];
+  pages: SearchPage[];
+  hasMore: boolean;
+  searchSummary: string | undefined;
+}
+
+interface BackendOutput {
+  results: SearchEmailResult[];
+  pages: BackendPage[];
+  searchSummary: string | undefined;
 }

@@ -232,6 +232,13 @@
       "when": 1788784257714,
       "tag": "0032_sloppy_morbius",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791537475787,
+      "tag": "0033_search_cursors",
+      "breakpoints": true
     }
   ]
 }
