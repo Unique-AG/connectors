@@ -61,11 +61,7 @@ Notes:
 back as a Word file. Set `convert_to` to `pdf` for text you can read.
 - This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
 message.
-- After the file, the answer has a line of text that starts with `web_url:` and gives the web \
-address of the file. Always give that address to the user when you answer from the file.
 """
-
-_WEB_ADDRESS = "web_url: "
 
 _NOT_A_FILE_HANDLE = (
     "sharepoint_read_file did not get a file handle. A file handle looks like "
@@ -131,7 +127,7 @@ async def sharepoint_read_file(
     *,
     file: str,
     convert_to: ConvertTo | None = None,
-) -> list[File | str]:
+) -> File:
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
@@ -148,7 +144,7 @@ async def _fetched(
     handle: DriveFileHandle,
     *,
     convert_to: ConvertTo | None,
-) -> list[File | str] | str:
+) -> File | str:
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_ITEM):
             item = await _item(client, handle)
@@ -183,10 +179,8 @@ async def _fetched(
         if body == b"" and item.size > 0:
             return _NOTHING_CAME_BACK
         if convert_to is None:
-            read = FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
-        else:
-            read = FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
-        return [read] if item.web_url is None else [read, _WEB_ADDRESS + item.web_url]
+            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
+        return FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
@@ -313,5 +307,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         client: GraphServiceClient = graph,
-    ) -> list[File | str]:
+    ) -> File:
         return await sharepoint_read_file(client, transport, file=file, convert_to=convert_to)
