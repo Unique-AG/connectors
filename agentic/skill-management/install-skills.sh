@@ -1,11 +1,11 @@
 #!/bin/bash
 # Install skills from agentic/skills directories into .claude/skills.
-# Safe to run repeatedly. See agentic/README.md for the one-time setup and the
-# security implication of executing the Skills CLI from the npm registry.
+# Safe to run repeatedly. See agentic/README.md. The Skills CLI is the copy
+# installed from agentic/skill-management/package-lock.json.
 
 set -euo pipefail
 
-SKILLS_CLI_PACKAGE="skills@1.7.1"
+SKILLS_CLI_VERSION="1.7.1"
 STAMP_NAME=".skill-managed"
 STAMP_LINE="managed-by: agentic/skill-management/install-skills.sh"
 MANIFEST_NAME=".skill-managed-manifest"
@@ -22,6 +22,34 @@ require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     die "$2"
   fi
+}
+
+lockfile_sha256() {
+  node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$1"
+}
+
+# Install skills@1.7.1 from the committed lockfile. npm ci installs the tarballs
+# named there and checks every integrity hash. Skip that install when the tree
+# is already present and stamped with this lockfile.
+ensure_skills_cli() {
+  local lockfile entry stamp current hash
+  lockfile="$script_dir/package-lock.json"
+  entry="$script_dir/node_modules/skills/bin/cli.mjs"
+  stamp="$script_dir/node_modules/.skills-cli-lock"
+  [[ -f "$lockfile" ]] || die "missing $lockfile"
+  hash=$(lockfile_sha256 "$lockfile")
+  if [[ -f "$entry" && -f "$stamp" ]]; then
+    current=$(tr -d '[:space:]' < "$stamp")
+    if [[ "$current" == "$hash" ]]; then
+      return 0
+    fi
+  fi
+  printf 'install-skills: installing Skills CLI %s from %s\n' "$SKILLS_CLI_VERSION" "$lockfile"
+  if ! (cd "$script_dir" && npm ci --ignore-scripts --no-audit --no-fund); then
+    die "could not install the pinned Skills CLI. See agentic/README.md."
+  fi
+  [[ -f "$entry" ]] || die "pinned Skills CLI is missing at $entry"
+  printf '%s\n' "$hash" > "$stamp"
 }
 
 contains_line() {
@@ -192,7 +220,7 @@ function check(skillsDir, expectedFile, jsonFiles) {
       parsed = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
     } catch (error) {
       fail(
-        `Skills CLI did not return JSON (${error.message}). The first run downloads ${process.env.SKILLS_CLI_PACKAGE} from the npm registry.`,
+        `Skills CLI did not return JSON (${error.message}).`,
       );
     }
     if (!Array.isArray(parsed)) {
@@ -256,6 +284,7 @@ EOF
 }
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run this inside the repository"
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$root"
 
 # Claude reads .claude/skills. Once it understands .agentic/skills, install there instead.
@@ -333,12 +362,14 @@ done < "$tmpdir/planned"
 
 : > "$tmpdir/installed"
 if [[ -s "$tmpdir/install.names" ]]; then
-  require_cmd npx "npx is required to run the Skills CLI (${SKILLS_CLI_PACKAGE} from the npm registry). Install Node.js, then re-run bash agentic/skill-management/setup.sh"
+  require_cmd node "Node.js is required to run the pinned Skills CLI. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
+  require_cmd npm "npm is required to install the pinned Skills CLI. Install Node.js, then re-run bash agentic/skill-management/setup.sh"
+  ensure_skills_cli
   sort -u "$tmpdir/managed" "$tmpdir/install.sanitized" > "$tmpdir/manifest.pre"
   write_manifest "$tmpdir/manifest.pre"
 
   skill_count=$(wc -l < "$tmpdir/install.names" | tr -d ' ')
-  printf 'install-skills: installing %s skill(s) with %s\n' "$skill_count" "$SKILLS_CLI_PACKAGE"
+  printf 'install-skills: installing %s skill(s) with skills@%s\n' "$skill_count" "$SKILLS_CLI_VERSION"
 
   json_index=0
   : > "$tmpdir/json.list"
@@ -353,7 +384,7 @@ if [[ -s "$tmpdir/install.names" ]]; then
       printf '%s\n' "$frontmatter" >> "$names_file"
     done < "$tmpdir/install.tsv"
 
-    cmd=(npx --yes "$SKILLS_CLI_PACKAGE" add "$source" -a claude-code -y --json)
+    cmd=(node "$script_dir/node_modules/skills/bin/cli.mjs" add "$source" -a claude-code -y --json)
     while IFS= read -r skill_name || [[ -n "$skill_name" ]]; do
       [[ -z "$skill_name" ]] && continue
       cmd+=(--skill "$skill_name")
@@ -362,13 +393,13 @@ if [[ -s "$tmpdir/install.names" ]]; then
     json_file="$tmpdir/cli-$json_index.json"
     err_file="$tmpdir/cli-$json_index.err"
     set +e
-    INSTALL_INTERNAL_SKILLS=1 DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 SKILLS_CLI_PACKAGE="$SKILLS_CLI_PACKAGE" \
+    INSTALL_INTERNAL_SKILLS=1 DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 \
       "${cmd[@]}" >"$json_file" 2>"$err_file"
     status=$?
     set -e
     if [[ "$status" -ne 0 ]]; then
       printf 'install-skills: Skills CLI failed (exit %s) for %s.\n' "$status" "$source" >&2
-      printf 'install-skills: the script downloads and executes %s from the npm registry. See agentic/README.md.\n' "$SKILLS_CLI_PACKAGE" >&2
+      printf 'install-skills: the script ran the Skills CLI pinned in agentic/skill-management/package-lock.json. See agentic/README.md.\n' >&2
       cat "$err_file" >&2 || true
       if [[ -s "$json_file" ]]; then
         printf 'install-skills: CLI output:\n' >&2

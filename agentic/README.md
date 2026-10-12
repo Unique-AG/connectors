@@ -27,8 +27,10 @@ Both hooks call `agentic/skill-management/install-skills.sh`. Running it again r
 
 ## Security
 
-Installation runs `npx --yes skills@1.7.1`. That downloads the [Skills CLI](https://skills.sh/) from the npm registry and executes it. The first run needs network access; later runs can use the npm cache. Run the script only if you trust that package and the contents of the `agentic/skills/` trees.
+The hooks run the [Skills CLI](https://skills.sh/) pinned in `agentic/skill-management/package-lock.json` (`skills@1.7.1` and its dependency tarballs, including `tar` and `yaml`). `install-skills.sh` installs that tree with `npm ci --ignore-scripts` when `node_modules` is missing or the lockfile hash no longer matches a stamp next to it. npm checks each tarball against the integrity hash in the lockfile and installs those exact versions. A later pull reuses the stamped install. The first install needs network access to download the pinned tarballs. The CLI requires Node.js 22.20 or newer.
 
-The script sets `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. It also sets `INSTALL_INTERNAL_SKILLS=1`, so skills marked `metadata.internal: true` are installed with the rest. The CLI writes `skills-lock.json` at the repository root. That file is gitignored.
+The script sets `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. It also sets `INSTALL_INTERNAL_SKILLS=1`, so skills marked `metadata.internal: true` are installed with the rest. The CLI writes `skills-lock.json` at the repository root. That file is gitignored, as is `agentic/skill-management/node_modules/`.
 
-The CLI is invoked as `npx skills add <agentic/skills> -a claude-code -y`, once per `agentic/skills/` directory. With Claude Code as the only target, skills.sh 1.7.1 installs the files into `.claude/skills/` and does not create a second skills tree.
+The CLI is invoked as `node agentic/skill-management/node_modules/skills/bin/cli.mjs add <agentic/skills> -a claude-code -y`, once per `agentic/skills/` directory. With Claude Code as the only target, skills.sh 1.7.1 installs the files into `.claude/skills/` and does not create a second skills tree.
+
+Run the script only if you trust that pinned CLI and the contents of the `agentic/skills/` trees.

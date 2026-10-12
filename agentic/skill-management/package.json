@@ -1,0 +1,8 @@
+{
+  "name": "agentic-skill-management",
+  "private": true,
+  "description": "Pinned Skills CLI for install-skills.sh. Not a workspace package.",
+  "dependencies": {
+    "skills": "1.7.1"
+  }
+}
