@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install skills from agentic/skills directories into .claude/skills.
 # Safe to run repeatedly. See agentic/README.md. Expects the Skills CLI at
-# agentic/skill-management/node_modules/skills/bin/cli.mjs and exits if it is missing.
+# node_modules/.bin/skills and exits if it is missing.
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ require_cmd() {
 }
 
 require_skills_cli() {
-  [[ -f "$script_dir/node_modules/skills/bin/cli.mjs" ]] || die "Skills CLI is missing at agentic/skill-management/node_modules/skills/bin/cli.mjs. Install it with: npm ci --ignore-scripts --prefix agentic/skill-management"
+  [[ -x "$root/node_modules/.bin/skills" ]] || die "Skills CLI is missing at node_modules/.bin/skills. From the repository root, run pnpm install."
 }
 
 contains_line() {
@@ -260,7 +260,6 @@ EOF
 }
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run this inside the repository"
-script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$root"
 
 # Claude reads .claude/skills. Once it understands .agentic/skills, install there instead.
@@ -359,7 +358,7 @@ if [[ -s "$tmpdir/install.names" ]]; then
       printf '%s\n' "$frontmatter" >> "$names_file"
     done < "$tmpdir/install.tsv"
 
-    cmd=(node "$script_dir/node_modules/skills/bin/cli.mjs" add "$source" -a claude-code -y --json)
+    cmd=("$root/node_modules/.bin/skills" add "$source" -a claude-code -y --json)
     while IFS= read -r skill_name || [[ -n "$skill_name" ]]; do
       [[ -z "$skill_name" ]] && continue
       cmd+=(--skill "$skill_name")
@@ -374,7 +373,7 @@ if [[ -s "$tmpdir/install.names" ]]; then
     set -e
     if [[ "$status" -ne 0 ]]; then
       printf 'install-skills: Skills CLI failed (exit %s) for %s.\n' "$status" "$source" >&2
-      printf 'install-skills: the script ran the Skills CLI pinned in agentic/skill-management/package-lock.json. See agentic/README.md.\n' >&2
+      printf 'install-skills: the script ran node_modules/.bin/skills from the pnpm install. See agentic/README.md.\n' >&2
       cat "$err_file" >&2 || true
       if [[ -s "$json_file" ]]; then
         printf 'install-skills: CLI output:\n' >&2

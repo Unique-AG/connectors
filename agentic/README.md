@@ -4,10 +4,10 @@ Server-specific skills live in `services/<svc>/agentic/skills/`. Skills that are
 
 Claude does not understand the `.agentic/skills` standard yet. Once it does, move these skills to `.agentic/skills` and stop installing them into `.claude/skills/`.
 
-Git does not turn on hooks when you clone or pull. Install the pinned Skills CLI, then run setup once in each clone:
+Git does not turn on hooks when you clone or pull. `nix develop` provides Node.js and pnpm. `pnpm install` then installs the Skills CLI with the other devDependencies. Run setup once in each clone:
 
 ```bash
-npm ci --ignore-scripts --prefix agentic/skill-management
+pnpm install
 bash agentic/skill-management/setup.sh
 ```
 
@@ -28,10 +28,10 @@ Both hooks call `agentic/skill-management/install-skills.sh`. Running it again r
 
 ## Security
 
-The hooks run the [Skills CLI](https://skills.sh/) at `agentic/skill-management/node_modules/skills/bin/cli.mjs`. That tree is `skills@1.7.1` and its dependency tarballs, including `tar` and `yaml`, as pinned in `agentic/skill-management/package-lock.json`. The script expects the binary to be there already. When the file is missing, it exits with an error. `npm ci --ignore-scripts --prefix agentic/skill-management` installs those exact tarballs and checks each integrity hash. The CLI requires Node.js 22.20 or newer. Pulls do not download it again.
+The hooks run the [Skills CLI](https://skills.sh/) at `node_modules/.bin/skills`. That binary is `skills@1.7.1`, a root devDependency. `pnpm-lock.yaml` pins it and its dependency tarballs, including `tar` and `yaml`, by integrity hash. The script expects the binary to be there already. When it is missing, it exits with an error that says to run `pnpm install` from the repository root. The CLI requires Node.js 22.20 or newer. The dev shell supplies Node.js 26.
 
-The script sets `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. It also sets `INSTALL_INTERNAL_SKILLS=1`, so skills marked `metadata.internal: true` are installed with the rest. The CLI writes `skills-lock.json` at the repository root. That file is gitignored, as is `agentic/skill-management/node_modules/`.
+The script sets `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. It also sets `INSTALL_INTERNAL_SKILLS=1`, so skills marked `metadata.internal: true` are installed with the rest. The CLI writes `skills-lock.json` at the repository root. That file is gitignored.
 
-The CLI is invoked as `node agentic/skill-management/node_modules/skills/bin/cli.mjs add <agentic/skills> -a claude-code -y`, once per `agentic/skills/` directory. With Claude Code as the only target, skills.sh 1.7.1 installs the files into `.claude/skills/` and does not create a second skills tree.
+The CLI is invoked as `node_modules/.bin/skills add <agentic/skills> -a claude-code -y`, once per `agentic/skills/` directory. With Claude Code as the only target, skills.sh 1.7.1 installs the files into `.claude/skills/` and does not create a second skills tree.
 
 Run the script only if you trust that pinned CLI and the contents of the `agentic/skills/` trees.
