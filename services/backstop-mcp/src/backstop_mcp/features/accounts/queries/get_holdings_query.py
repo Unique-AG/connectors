@@ -46,7 +46,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     SeriesFigureDto,
     ShareDto,
 )
-from backstop_mcp.features.accounts.utils import continuous_tenure, fetch_series
+from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ class GetHoldingsQuery:
             open_count=table.open_count,
             all_count=table.all_count,
             closed_count=table.closed_count,
-            tenure=continuous_tenure(
+            tenure=tenure_runs(
                 (
                     AccountSpanDto(
                         start=row.funded_date, end=row.closed_date, is_open=not row.closed
@@ -183,7 +183,7 @@ class GetHoldingsQuery:
             ),
             source="accounts-api",
             omitted_fields=FALLBACK_OMITTED_FIELDS,
-            tenure=continuous_tenure(
+            tenure=tenure_runs(
                 (
                     AccountSpanDto(
                         start=record.account_start_date,

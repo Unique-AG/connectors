@@ -9,8 +9,8 @@ Why `closedDate` stays meaningful under `fields=` is noted on `ACCOUNT_LISTING_F
 `regularCustomFieldValues` is requested unless `exclude_custom_fields` is set.
 `owner_ids` (a party id or its contacts envelope id) keeps only those owners' accounts,
 before the open/closed split, so `closed_omitted` counts their closed accounts only.
-`spans_by_owner` on the payload is also taken before the split, so tenure counts
-closed accounts whatever `include_closed` is.
+`spans_by_owner` and `owners` on the payload are also taken before the split, so tenure counts
+closed accounts, and owners with only closed accounts stay known, whatever `include_closed` is.
 """
 
 from collections.abc import Sequence
@@ -90,6 +90,7 @@ class GetAccountsForProductQuery:
                 ),
             ),
             spans_by_owner=self._spans_by_owner(rows),
+            owners={row.owner.id: row.owner for row in rows if row.owner is not None},
         )
 
     def _spans_by_owner(

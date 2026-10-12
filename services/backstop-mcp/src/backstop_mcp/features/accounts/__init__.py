@@ -34,6 +34,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ResolvedProductDto,
     ShareDto,
     TenureDto,
+    TenureRunDto,
 )
 from backstop_mcp.features.accounts.queries import (
     ACCOUNT_SERIES,
@@ -74,7 +75,7 @@ from backstop_mcp.features.accounts.responses import (
     ShareResponse,
     TimeSeriesResolvedResponse,
 )
-from backstop_mcp.features.accounts.utils import continuous_tenure, raise_if_invalid_series
+from backstop_mcp.features.accounts.utils import raise_if_invalid_series, tenure_runs
 
 __all__ = [
     "ACCOUNT_SERIES",
@@ -120,6 +121,7 @@ __all__ = [
     "ShareDto",
     "ShareResponse",
     "TenureDto",
+    "TenureRunDto",
     "TimeSeriesEntityType",
     "TimeSeriesName",
     "TimeSeriesResolvedResponse",
@@ -130,8 +132,8 @@ __all__ = [
     "get_product_investors_query_factory",
     "search_products_query_factory",
     "get_time_series_query_factory",
-    "continuous_tenure",
     "raise_if_invalid_series",
+    "tenure_runs",
     "resolve_product",
     "resolve_product_family",
     "resolve_product_query",

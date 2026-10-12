@@ -18,7 +18,11 @@ from backstop_mcp.features.accounts.internal_dto import (
     MoneyDto,
     ShareDto,
 )
-from backstop_mcp.features.accounts.responses.shared import closed_hint
+from backstop_mcp.features.accounts.responses.shared import (
+    TENURE_RUNS_DESCRIPTION,
+    TenureRunResponse,
+    closed_hint,
+)
 from backstop_mcp.features.party_resolver import (
     RESOLVED_PARTY_ECHO_DESCRIPTION,
     ResolvedPartyResponse,
@@ -138,7 +142,7 @@ class HoldingRowResponse(OmitNoneModel):
         default=None,
         description=(
             "When this account was funded: the start of this account, not of the party's "
-            "relationship. For how long the party has been invested, read `continuous_since`. "
+            "relationship. For how long the party has been invested, read `tenure_runs`. "
             "Read the provenance caveat: on the fallback path this is the account's start date "
             "instead."
         ),
@@ -273,23 +277,20 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
             "treating an empty list as 'this party owns nothing'."
         ),
     )
-    continuous_since: date | None = Field(
+    tenure_runs: tuple[TenureRunResponse, ...] | None = Field(
         default=None,
         description=(
-            "Since when this party has been invested without a break, across every product: "
-            "the start of the unbroken run of its accounts — closed ones included, whatever "
-            "`include_closed` was — that reaches today. Accounts that touch or overlap form one "
-            "run; a gap of more than a day ends it. Answer tenure and 'longest-standing' "
-            "questions from this, not from a row's `funded_date`. Omitted when the party holds "
-            "nothing today, or every open account is undated."
+            "Every unbroken stretch this party has been invested, merged across all its accounts "
+            f"in every product. {TENURE_RUNS_DESCRIPTION} Omitted when no dated account has "
+            "started."
         ),
     )
     tenure_undated_accounts: int | None = Field(
         default=None,
         description=(
-            "Accounts left out of `continuous_since` because they have no start date, or are "
-            "closed with no closed date. Say so when quoting tenure: they could make it longer. "
-            "Omitted when none."
+            "Accounts left out of `tenure_runs` because they have no start date, are closed "
+            "with no closed date, or closed before they started. Say so when quoting tenure: "
+            "they could make it longer. Omitted when none."
         ),
     )
     rows_dropped: int | None = Field(
@@ -329,7 +330,9 @@ class PartyAccountsResolvedResponse(OmitNoneModel):
                 returned=len(listing.rows),
                 subject="party",
             ),
-            continuous_since=listing.tenure.continuous_since,
+            tenure_runs=(
+                tuple(TenureRunResponse.from_dto(run) for run in listing.tenure.runs) or None
+            ),
             tenure_undated_accounts=listing.tenure.undated_accounts or None,
             rows_dropped=listing.rows_dropped or None,
         )

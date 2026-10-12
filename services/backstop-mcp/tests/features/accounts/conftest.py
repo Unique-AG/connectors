@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from datetime import date
 
 import pytest
 
@@ -14,6 +15,9 @@ from backstop_mcp.features.accounts import (
 )
 from tests.helpers import client_factory, credential
 
+# Tenure `years` are measured up to today, so the factories pin it.
+TODAY = date(2026, 10, 8)
+
 
 @pytest.fixture
 async def client() -> AsyncGenerator[BackstopClient]:
@@ -23,7 +27,7 @@ async def client() -> AsyncGenerator[BackstopClient]:
 
 
 def make_get_holdings_query(client: BackstopClient) -> GetHoldingsQuery:
-    return GetHoldingsQuery(client=client)
+    return GetHoldingsQuery(client=client, clock=lambda: TODAY)
 
 
 def make_get_accounts_for_product_query(client: BackstopClient) -> GetAccountsForProductQuery:
@@ -41,6 +45,7 @@ def make_get_product_investors_query(
         get_accounts_for_product_query=make_get_accounts_for_product_query(client),
         get_latest_account_values_query=make_get_latest_account_values_query(client),
         max_valued_accounts=max_valued_accounts,
+        clock=lambda: TODAY,
     )
 
 

@@ -32,6 +32,8 @@ from backstop_mcp.features.accounts.responses.product_investors import (
     ProductListingResponse,
     ValueTotalResponse,
     investors_from_listings,
+    longest_held_today,
+    longest_tenure_runs,
 )
 from backstop_mcp.features.accounts.responses.shared import (
     AccountRowResponse,
@@ -42,6 +44,7 @@ from backstop_mcp.features.accounts.responses.shared import (
     ProductAmbiguousResponse,
     ProductCandidateResponse,
     ProductRefResponse,
+    TenureRunResponse,
     closed_hint,
 )
 from backstop_mcp.features.accounts.responses.time_series import (
@@ -76,9 +79,12 @@ __all__ = [
     "ProductResolvedResponse",
     "ProductRefResponse",
     "ShareResponse",
+    "TenureRunResponse",
     "TimeSeriesPointResponse",
     "TimeSeriesResolvedResponse",
     "closed_hint",
     "ValueTotalResponse",
     "investors_from_listings",
+    "longest_held_today",
+    "longest_tenure_runs",
 ]

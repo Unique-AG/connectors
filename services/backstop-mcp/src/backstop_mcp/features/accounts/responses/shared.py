@@ -28,6 +28,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     AccountRecordDto,
     InvestorTypeDto,
     ResolvedProductDto,
+    TenureRunDto,
 )
 from backstop_mcp.features.custom_fields import StoredCustomFieldValueResponse
 from backstop_mcp.features.resolution import (
@@ -59,6 +60,44 @@ class ProductRefResponse(OmitNoneModel):
     @classmethod
     def from_product(cls, product: ResolvedProductDto) -> Self:
         return cls(id=product.id, name=product.name, short_name=product.short_name)
+
+
+TENURE_RUNS_DESCRIPTION = (
+    "Accounts merge into one run where they touch or overlap; a gap of more than a day starts a "
+    "new run. Closed accounts count whatever `include_closed` was. Longest first, the more "
+    "recent first on a tie. `held_today` says whether a run is still held; a run that ended is "
+    "listed alongside it."
+)
+
+
+class TenureRunResponse(OmitNoneModel):
+    """One unbroken stretch of holding, over one or more accounts."""
+
+    start: Date = Field(description="First day of the run: its earliest account's start.")
+    end: Date | None = Field(
+        default=None,
+        description=(
+            "Last day of the run: its last account's closed date. Omitted while the run is held "
+            "through an open account. A date after today means held today and booked to close "
+            "then; an account booked to start later is counted only when it continues a run."
+        ),
+    )
+    years: float = Field(
+        description=(
+            "Years held, from `start` to `end` or today, whichever is earlier. Compare runs by "
+            "this rather than working the dates out."
+        )
+    )
+    held_today: bool = Field(
+        description=(
+            "True when the run is still held today: no `end`, or an `end` after today. False "
+            "when it ended — the investor left, or came back later in another run."
+        )
+    )
+
+    @classmethod
+    def from_dto(cls, run: TenureRunDto) -> Self:
+        return cls(start=run.start, end=run.end, years=run.years, held_today=run.held_today)
 
 
 class OwnerResponse(OmitNoneModel):
@@ -264,7 +303,7 @@ class AccountRowResponse(OmitNoneModel):
         default=None,
         description=(
             "Day this account opened, when Backstop has one: the start of this account, not of "
-            "the owner's relationship. For tenure read `investors[].continuous_since`."
+            "the owner's relationship. For tenure read `investors[].tenure_runs`."
         ),
     )
     closed_date: Date | None = Field(

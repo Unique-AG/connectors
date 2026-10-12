@@ -402,6 +402,38 @@ class TestClosedFiltering:
         assert result.holdings[1].closed is True
         assert result.closed_omitted == 0
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_party_that_left_keeps_every_run_without_include_closed(
+        self, client: BackstopClient
+    ) -> None:
+        """A former investor's runs are published even when its rows are all omitted."""
+        respx.get(_TABLE_URL).mock(
+            return_value=_table(
+                _table_row(
+                    "1",
+                    closed=True,
+                    fundedDate="2008-08-01T00:00:00.000-0400",
+                    closedDate="2012-12-31T00:00:00.000-0500",
+                ),
+                _table_row(
+                    "2",
+                    closed=True,
+                    fundedDate="2016-01-01T00:00:00.000-0500",
+                    closedDate="2018-06-30T00:00:00.000-0400",
+                ),
+            )
+        )
+
+        result = tool_model(await _call(client), PartyAccountsResolvedResponse)
+
+        payload = object_dict(tool_payload(result))
+        assert payload["tenure_runs"] == [
+            {"start": "2008-08-01", "end": "2012-12-31", "years": 4.42, "held_today": False},
+            {"start": "2016-01-01", "end": "2018-06-30", "years": 2.49, "held_today": False},
+        ]
+        assert payload["holdings"] == []
+
 
 class TestResolution:
     @pytest.mark.asyncio

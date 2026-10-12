@@ -37,7 +37,7 @@ type GetProductInvestorsResponse = (
     ProductAmbiguousResponse | NotFoundResponse | ProductInvestorsResolvedResponse
 )
 
-_MAX_PRODUCTS = 10
+_MAX_PRODUCTS = 25
 
 
 @tool(
@@ -57,12 +57,13 @@ async def get_product_investors(
             min_length=1,
             max_length=_MAX_PRODUCTS,
             description=(
-                "One to ten products: ids echoed from a prior response, short names (`NWON`), "
-                "or names. An id, exact short name, or exact name is that one vehicle. A partial "
-                "name returns every vehicle whose name contains it, up to 6 (several vehicles "
-                "sharing a name). More matches ask the user. Pass several (`['NWON', 'NWOF']`) "
-                "when the user names specific ones. "
-                "Never invent an id."
+                f"One to {_MAX_PRODUCTS} products: ids echoed from a prior response, short names "
+                "(`NWON`), or names. An id, exact short name, or exact name is that one vehicle. "
+                "A partial name returns every vehicle whose name contains it, up to 6 (several "
+                "vehicles sharing a name). More matches ask the user. Pass several "
+                "(`['NWON', 'NWOF']`) when the user names specific ones. Pass every product the "
+                "answer covers in one call: `longest_tenure_runs` and `longest_held_today` rank "
+                "only the investors in that call. Never invent an id."
             ),
         ),
     ],
@@ -71,7 +72,8 @@ async def get_product_investors(
         Field(
             description=(
                 "When false (default), only open accounts are returned. Pass true to include "
-                "closed accounts. `investors[].continuous_since` counts closed accounts either way."
+                "closed account rows. Investors whose accounts are all closed, and their "
+                "`tenure_runs`, are in `investors` either way; only the rows are omitted."
             ),
         ),
     ] = False,
@@ -132,11 +134,17 @@ async def get_product_investors(
     Fund-level AUM is `get_time_series` on a product's `aums`: the product's total assets
     under management, not one investor's balance.
 
-    Tenure ("since when", "longest-standing", "longest consecutive investor"): rank by
-    `investors[].continuous_since`, which merges every account the investor has had in these
-    products, closed ones included, into the unbroken run that reaches today. Never rank by an
-    open account's `account_start_date`: investors who rotate accounts (private banks,
+    Tenure (how long an investor has held these products): `longest_tenure_runs` ranks the
+    investors by their longest unbroken run, investors who have left included, and
+    `longest_held_today` is the longest run still held. Each run has `years` and `held_today`.
+    `investors[].tenure_runs` is every run per investor. Runs are already merged across closed
+    and reopened accounts, so do not call again to check one is unbroken. Read tenure from the
+    runs, not an account's `account_start_date`: investors who rotate accounts (private banks,
     platforms, nominees) have no single old account. It covers only the products passed.
+
+    Investors who have left are in `investors` with `has_open_account: false`; their closed rows
+    need `include_closed=true`. Count only `has_open_account: true` when counting who holds these
+    products today.
 
     `products` has one listing per vehicle with its accounts. `investors` has one entry per
     owner across every vehicle, with a holding per vehicle they are in. Investor
