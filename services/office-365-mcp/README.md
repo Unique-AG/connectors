@@ -63,7 +63,6 @@ disagree about a shared fact. The `shared/` package lists every fact they must n
 - `messages.py` owns what a Teams message is:
   - the shape a message is answered in
   - the sender, normalized out of every identity shape Graph answers with
-  - the Teams HTML that a message body is unwound from
   - the test for "did a person write this"
 
   One function normalizes this type. So the same message, found by one tool and read by another

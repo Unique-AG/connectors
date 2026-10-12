@@ -47,7 +47,7 @@ the text names that tool. If not, the text tells the model to ask the user.
 | `teams_browse_channel` | Read | `ChannelMessage.Read.All` | Yes | One Teams channel's posts, with their replies. |
 | `teams_list_message_replies` | Read | `ChannelMessage.Read.All` | Yes | The replies to one Teams channel post, oldest first, by the `uri` of that post. The tool reads at most 50 replies, and `more_replies` is true when the list is not the whole thread. |
 | `teams_search_messages` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | A full-text search across every Teams message, in chats and channels, that the signed-in user can see. |
-| `teams_read_message` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | One Microsoft Teams message in full, from a handle that another tool minted. |
+| `teams_read_message` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | One Microsoft Teams message in full, from a handle that another tool minted. The `body` is as Microsoft 365 sent it, and `body_is_plain_text` says whether it is HTML. |
 | `teams_list_meeting_transcripts` | Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
 | `teams_read_transcript` | Read | `OnlineMeetingTranscript.Read.All` | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
 | `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
@@ -377,7 +377,6 @@ the same resource.
 | Capture a transcript into Unique's knowledge base | No | Yes, opt-in, needs a database |
 | Read the replies inside a channel thread | Yes, with limits. `teams_list_message_replies` reads up to 50 replies of one post in one call. `teams_browse_channel` reads the replies of each post on one page of the channel. Neither tool uses the cursor from Microsoft. | No, root posts only |
 | Read a transcript, or a recording's metadata, live, with no configuration | Yes | No, ingest only |
-| Plain, normalized text, not raw HTML | Yes | No |
 
 ### Compared to outlook-semantic-mcp
 

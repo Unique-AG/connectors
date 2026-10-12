@@ -106,7 +106,6 @@ class TestTheRequestItMakes:
 
         assert route.call_count == 1, "one message, one request"
         assert route.calls.last.request.url.query == b"", "no $select and no $expand"
-        assert message.text == "see @Ada\n[attachment: plan.xlsx]"
         assert [mention.text for mention in message.mentions] == ["Ada"]
         assert [attachment.name for attachment in message.attachments] == ["plan.xlsx"]
 
@@ -335,43 +334,38 @@ class TestReactions:
         assert message.reactions[0].user_id is None
 
 
-class TestTheBodyItNormalises:
-    async def test_plain_text_content_is_left_alone(
+class TestTheBodyAsGraphSendsIt:
+    async def test_plain_text_content_is_flagged_as_plain_text(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _reads(graph, message_payload(content="cut the release on Friday", content_type="text"))
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
-        assert message.text == "cut the release on Friday"
+        assert message.body == "cut the release on Friday"
+        assert message.body_is_plain_text
 
-    async def test_teams_html_becomes_readable_text(
+    async def test_html_comes_back_untouched_and_a_link_keeps_its_url(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content=(
-                    '<div><div itemprop="copy-paste-block"><p>Ship <strong>today</strong> '
-                    + "&amp; tell&nbsp;support.</p><p>Blockers:</p><ul><li>build #7</li>"
-                    + "<li>docs</li></ul>done<br/>thanks</div></div>"
-                )
-            ),
+        html = (
+            '<p>Read <a href="https://contoso.sharepoint.com/sites/x/Q3.pptx">Q3 deck</a> '
+            + '&amp; <at id="0">Ada</at></p><attachment id="7"></attachment>'
         )
+        _reads(graph, message_payload(content=html))
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
-        assert message.text == (
-            "Ship today & tell support.\nBlockers:\n- build #7\n- docs\ndone\nthanks"
-        )
+        assert message.body == html
+        assert not message.body_is_plain_text
 
-    async def test_a_mention_reads_as_the_person_it_names(
+    async def test_the_mentions_and_the_attachments_stay_as_lists_beside_the_body(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _reads(
             graph,
             message_payload(
-                content='<p><at id="0">Ada Lovelace</at> can you review?</p>',
+                content='<p><at id="0">Ada Lovelace</at> see this</p>',
                 mentions=[
                     {
                         "id": 0,
@@ -385,30 +379,25 @@ class TestTheBodyItNormalises:
                         },
                     }
                 ],
+                attachments=[
+                    {
+                        "id": "7",
+                        "contentType": "reference",
+                        "contentUrl": "https://contoso.sharepoint.invalid/Shared/plan.xlsx",
+                        "name": "plan.xlsx",
+                    }
+                ],
             ),
         )
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
-        assert message.text == "@Ada Lovelace can you review?"
         assert [(m.text, m.user_id) for m in message.mentions] == [
             ("Ada Lovelace", "00000000-0000-4000-8000-000000000001")
         ]
-
-    async def test_a_mention_with_no_text_of_its_own_is_resolved_from_the_mentions_list(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<p><at id="3"></at> heads up</p>',
-                mentions=[{"id": 3, "mentionText": "Release planning", "mentioned": {}}],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "@Release planning heads up"
+        assert [(a.name, a.content_type, a.url) for a in message.attachments] == [
+            ("plan.xlsx", "reference", "https://contoso.sharepoint.invalid/Shared/plan.xlsx")
+        ]
 
     async def test_a_mention_of_everyone_is_not_reported_as_a_person(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -437,39 +426,12 @@ class TestTheBodyItNormalises:
 
         assert [(m.text, m.user_id) for m in message.mentions] == [("Everyone", None)]
 
-    async def test_an_attachment_placeholder_names_what_was_attached(
+    async def test_a_forwarded_message_has_no_url_because_its_content_is_json(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _reads(
             graph,
             message_payload(
-                content='<p>see this</p><attachment id="1727881360458"></attachment>',
-                attachments=[
-                    {
-                        "id": "1727881360458",
-                        "contentType": "reference",
-                        "contentUrl": "https://contoso.sharepoint.invalid/Shared/plan.xlsx",
-                        "name": "plan.xlsx",
-                    }
-                ],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "see this\n[attachment: plan.xlsx]"
-        assert [(a.name, a.content_type) for a in message.attachments] == [
-            ("plan.xlsx", "reference")
-        ]
-        assert message.attachments[0].url is not None
-
-    async def test_an_unnamed_attachment_is_still_marked(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<attachment id="1727881360458"></attachment>',
                 attachments=[
                     {
                         "id": "1727881360458",
@@ -483,323 +445,10 @@ class TestTheBodyItNormalises:
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
-        assert message.text == "[attachment]"
-        assert message.attachments[0].url is None, (
-            "a forwarded message's `content` is a JSON payload, not a location"
-        )
-
-    async def test_emoji_survive_the_tags_that_carry_them(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<p>looking <emoji id="1f440_eyes" alt="\U0001f440" title="Eyes"></emoji>'
-                + '<customemoji id="x" alt="teams_party" source="https://x.invalid"></customemoji>'
-                + "</p>"
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "looking \U0001f440teams_party"
-
-    async def test_an_inline_image_is_reported_rather_than_dropped(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content=(
-                    '<div><img height="63" src="https://graph.microsoft.com/v1.0/chats/x/'
-                    + 'messages/y/hostedContents/z/$value" width="67"></div>'
-                )
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[image]"
-
-    async def test_a_body_with_nothing_in_it_is_null_rather_than_empty(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(graph, message_payload(content="<div>   </div>"))
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text is None
+        assert message.attachments[0].url is None
 
 
-_CARD_PAYLOAD = (
-    '{"type":"AdaptiveCard","version":"1.4",'
-    + '"body":[{"type":"TextBlock","text":"Deploy build #7?"}]}'
-)
-_CARD_ATTACHMENT: dict[str, object] = {
-    "id": "74d20c7f34aa4a7fb74e2b30004247c5",
-    "contentType": "application/vnd.microsoft.card.adaptive",
-    "content": _CARD_PAYLOAD,
-    "name": None,
-}
-
-
-class TestWhatCountsAsACard:
-    async def test_a_pasted_json_object_is_a_message_and_comes_back_whole(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        pasted = '{"type":"service","replicas":3,"image":"office-365-mcp:1.4.0"}'
-        _reads(graph, message_payload(content=f"<div><p>{pasted}</p></div>"))
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == pasted
-        assert message.attachments == [], "nothing was attached, so nothing was a card"
-
-    async def test_json_that_is_only_part_of_a_sentence_keeps_the_sentence(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<p>{"type":"TextBlock"} — is this the bit that broke prod?</p>'
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == '{"type":"TextBlock"} — is this the bit that broke prod?'
-
-    async def test_a_card_attachment_reads_as_a_card_where_its_placeholder_sat(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content=(
-                    "<p>ready?</p>"
-                    + '<attachment id="74d20c7f34aa4a7fb74e2b30004247c5"></attachment>'
-                ),
-                attachments=[_CARD_ATTACHMENT],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "ready?\n[card]"
-        assert [a.content_type for a in message.attachments] == [
-            "application/vnd.microsoft.card.adaptive"
-        ]
-
-    @pytest.mark.parametrize(
-        ("content_type", "expected"),
-        [
-            ("application/vnd.microsoft.card.adaptive", "[card]"),
-            ("application/vnd.microsoft.card.hero", "[card]"),
-            ("application/vnd.microsoft.card.thumbnail", "[card]"),
-            ("application/vnd.microsoft.card.receipt", "[card]"),
-            ("application/vnd.microsoft.card.signin", "[card]"),
-            ("application/vnd.microsoft.card.codesnippet", "[card]"),
-            ("application/vnd.microsoft.card.announcement", "[card]"),
-            ("application/vnd.microsoft.teams.card.list", "[card]"),
-            ("application/vnd.microsoft.teams.card.o365connector", "[card]"),
-            ("application/vnd.microsoft.card.somethingNew", "[card]"),
-            ("reference", "[attachment]"),
-            ("forwardedMessageReference", "[attachment]"),
-        ],
-    )
-    async def test_every_card_namespace_teams_documents_names_itself_a_card(
-        self,
-        client: GraphServiceClient,
-        graph: respx.MockRouter,
-        content_type: str,
-        expected: str,
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<attachment id="1727881360458"></attachment>',
-                attachments=[
-                    {"id": "1727881360458", "contentType": content_type, "name": None},
-                ],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == expected
-
-    async def test_a_named_card_is_named_rather_than_generically_marked(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content='<attachment id="1727881360458"></attachment>',
-                attachments=[
-                    {
-                        "id": "1727881360458",
-                        "contentType": "application/vnd.microsoft.card.codesnippet",
-                        "name": "deploy.sh",
-                    }
-                ],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[attachment: deploy.sh]"
-
-    async def test_a_card_teams_left_in_the_body_is_not_dumped_into_the_answer(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(graph, message_payload(content=_CARD_PAYLOAD, attachments=[_CARD_ATTACHMENT]))
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    async def test_the_same_payload_formatted_differently_is_still_the_same_card(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _reads(
-            graph,
-            message_payload(
-                content=(
-                    '{\n  "version": "1.4",\n  "type": "AdaptiveCard",\n'
-                    + '  "body": [ { "text": "Deploy build #7?", "type": "TextBlock" } ]\n}'
-                ),
-                attachments=[_CARD_ATTACHMENT],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    async def test_a_payload_carrying_a_non_breaking_space_is_still_the_card_it_came_from(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        payload = (
-            '{"type":"AdaptiveCard","version":"1.4",'
-            + '"body":[{"type":"TextBlock","text":"Deploy\xa0build #7?"}]}'
-        )
-        _reads(
-            graph,
-            message_payload(
-                content=payload, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    async def test_a_payload_carrying_markup_is_still_the_card_it_came_from(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        payload = (
-            '{"type":"AdaptiveCard","version":"1.4",'
-            + '"body":[{"type":"TextBlock","text":"<b>Deploy</b> build #7?"}]}'
-        )
-        _reads(
-            graph,
-            message_payload(
-                content=payload, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    async def test_a_payload_graph_escaped_on_its_way_into_the_body_is_still_that_card(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        payload = (
-            '{"type":"AdaptiveCard","version":"1.4",'
-            + '"body":[{"type":"TextBlock","text":"Ship & tell <b>everyone</b>"}]}'
-        )
-        escaped = (
-            '{"type":"AdaptiveCard","version":"1.4",'
-            + '"body":[{"type":"TextBlock","text":"Ship &amp; tell &lt;b&gt;everyone&lt;/b&gt;"}]}'
-        )
-        _reads(
-            graph,
-            message_payload(
-                content=escaped, attachments=[{**_CARD_ATTACHMENT, "content": payload}]
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    @pytest.mark.parametrize(
-        "wrapper",
-        [
-            "<div>{payload}</div>",
-            "<p>{payload}</p>",
-            "<div><p>{payload}</p></div>",
-            "{payload}<br>",
-        ],
-    )
-    async def test_a_payload_teams_wrapped_in_markup_is_still_the_card_it_came_from(
-        self, client: GraphServiceClient, graph: respx.MockRouter, wrapper: str
-    ) -> None:
-        payload = (
-            '{"type":"AdaptiveCard","version":"1.4",'
-            + '"body":[{"type":"TextBlock","text":"Deploy build #7?"}]}'
-        )
-        _reads(
-            graph,
-            message_payload(
-                content=wrapper.format(payload=payload),
-                attachments=[{**_CARD_ATTACHMENT, "content": payload}],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == "[card]"
-
-    async def test_a_card_attachment_does_not_license_discarding_unrelated_text(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        pasted = '{"type":"Deployment","replicas":3}'
-        _reads(graph, message_payload(content=f"<p>{pasted}</p>", attachments=[_CARD_ATTACHMENT]))
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == pasted
-        assert [a.content_type for a in message.attachments] == [
-            "application/vnd.microsoft.card.adaptive"
-        ]
-
-    async def test_json_text_with_no_card_attachment_survives_even_beside_a_file(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        pasted = '{"type":"service","port":9544}'
-        _reads(
-            graph,
-            message_payload(
-                content=f'<p>{pasted}</p><attachment id="1727881360458"></attachment>',
-                attachments=[
-                    {
-                        "id": "1727881360458",
-                        "contentType": "reference",
-                        "contentUrl": "https://contoso.sharepoint.invalid/Shared/values.yaml",
-                        "name": "values.yaml",
-                    }
-                ],
-            ),
-        )
-
-        message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
-
-        assert message.text == f"{pasted}\n[attachment: values.yaml]"
-
-
-class TestTheMessagesThatHaveNoText:
+class TestDeletedMessagesAndSystemEvents:
     async def test_a_deleted_message_is_not_presented_as_content(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -810,11 +459,11 @@ class TestTheMessagesThatHaveNoText:
 
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
-        assert message.text is None
+        assert message.body is None
         assert message.deleted_at is not None
         assert message.deleted_at.isoformat() == "2026-02-12T08:00:00+00:00"
 
-    async def test_a_system_event_says_what_happened_instead_of_the_literal_tag(
+    async def test_a_system_event_says_what_happened(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _reads(
@@ -834,7 +483,6 @@ class TestTheMessagesThatHaveNoText:
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event == "members joined"
-        assert message.text is None, "`<systemEventMessage/>` is not text"
         assert message.sender is None
 
     @pytest.mark.parametrize(
@@ -883,7 +531,6 @@ class TestTheMessagesThatHaveNoText:
         message = await teams_read_message.teams_read_message(client, handle=_CHAT_HANDLE)
 
         assert message.event is not None
-        assert message.text is None
 
     @pytest.mark.parametrize(
         "sender",
@@ -1020,8 +667,8 @@ class TestTheRoundTripFromASearchResult:
 
         assert route.called
         assert message.uri == uri
-        assert message.text == "cut the release on Friday", (
-            "the point of the round trip: search has no body, and this is where the text comes from"
+        assert message.body == "<p>cut the release on Friday</p>", (
+            "the point of the round trip: search has no body, and this is where the body comes from"
         )
         assert message.sender is not None
         assert message.sender.display_name == found.messages[0].sender.display_name, (

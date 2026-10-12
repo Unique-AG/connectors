@@ -914,7 +914,7 @@ class TestWhatItAnswers:
         )
 
         assert not isinstance(answer, InputRequiredResult)
-        assert answer.text == "Ship it Friday, cc @Ada"
+        assert answer.body == "Ship it Friday, cc @Ada"
 
 
 class TestTheFailuresItPassesOn:

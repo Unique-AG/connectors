@@ -81,6 +81,12 @@ _SEARCH = {
 _MESSAGE_URI = "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
 _MESSAGE_PATH = "/chats/19%3Arelease%40thread.v2/messages/1770000000000"
 
+_MESSAGE_HTML = (
+    "<div><p>Let's cut the <strong>release</strong> on Friday&nbsp;&amp; tell "
+    + '<a href="https://contoso.sharepoint.com/Plan.docx">the plan</a> '
+    + '<at id="0">Grace Hopper</at>.</p></div>'
+)
+
 _MESSAGE = {
     "@odata.type": "#microsoft.graph.chatMessage",
     "id": "1770000000000",
@@ -97,11 +103,7 @@ _MESSAGE = {
             "userIdentityType": "aadUser",
         }
     },
-    "body": {
-        "contentType": "html",
-        "content": "<div><p>Let's cut the <strong>release</strong> on Friday&nbsp;&amp; tell "
-        + '<at id="0">Grace Hopper</at>.</p></div>',
-    },
+    "body": {"contentType": "html", "content": _MESSAGE_HTML},
     "mentions": [
         {
             "id": 0,
@@ -845,7 +847,8 @@ class TestTheToolsThisServerAdvertises:
             "team_id",
             "channel_id",
             "sender",
-            "text",
+            "body",
+            "body_is_plain_text",
             "event",
             "created_at",
             "last_edited_at",
@@ -1560,10 +1563,12 @@ class TestCallingThem:
         assert in_team[0]["membership_type"] == "standard"
         assert all(route.called for route in (teams, listing, posts, read))
         assert [message["message_id"] for message in messages] == [_ROOT_POST_ID, _REPLY_ID]
-        assert messages[0]["text"] == "Release plan for Friday", "browsing returns the whole post"
+        assert messages[0]["body"] == "<div><p>Release plan for Friday</p></div>", (
+            "browsing returns the whole post"
+        )
         assert messages[1]["reply_to_id"] == _ROOT_POST_ID
         assert messages[1]["uri"] == _REPLY_URI
-        assert result["text"] == "agreed, Friday works"
+        assert result["body"] == "agreed, Friday works"
         assert result["uri"] == _REPLY_URI
         assert read.calls.last.request.headers["authorization"] == f"Bearer {OBO_TOKEN}"
         assert obo.requested_scopes == [
@@ -1701,7 +1706,8 @@ class TestCallingThem:
         assert search.called
         body = _structured(result)
         assert body["uri"] == _MESSAGE_URI == uri
-        assert body["text"] == "Let's cut the release on Friday & tell @Grace Hopper."
+        assert body["body"] == _MESSAGE_HTML
+        assert body["body_is_plain_text"] is False
         assert body["event"] is None
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
         assert [mention["user_id"] for mention in mentions] == [
@@ -1727,11 +1733,7 @@ class TestCallingThem:
 
         body = _structured(result)
         assert body["event"] == "members joined"
-        assert body["text"] is None
         assert body["sender"] is None
-        assert "systemEventMessage" not in json.dumps(body), (
-            "the literal tag Graph puts in the body is not an answer"
-        )
 
     @pytest.mark.usefixtures("obo")
     async def test_the_message_text_reaches_the_caller_and_no_log_or_span(
@@ -1748,7 +1750,7 @@ class TestCallingThem:
 
         result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
 
-        assert _structured(result)["text"] == secret, "the text has to have been returned"
+        assert _structured(result)["body"] == secret, "the text has to have been returned"
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
         spans = recorded_spans.get_finished_spans()
@@ -1780,7 +1782,7 @@ class TestCallingThem:
         )
 
         messages = cast("Sequence[Mapping[str, object]]", _structured(result)["messages"])
-        assert messages[0]["text"] == secret, "the post has to have been returned"
+        assert messages[0]["body"] == secret, "the post has to have been returned"
         for record in caplog.records:
             assert secret not in _record_text(record), f"logged by {record.name}"
         spans = recorded_spans.get_finished_spans()

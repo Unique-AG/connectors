@@ -165,7 +165,8 @@ class TestBrowsingOneChannel:
         )
 
         post = browsed.messages[0]
-        assert post.text == "ship it & tell everyone"
+        assert post.body == "<div><p>ship it&nbsp;&amp; tell everyone</p></div>"
+        assert not post.body_is_plain_text
         assert (post.team_id, post.channel_id) == (_TEAM_ID, _CHANNEL_ID)
         assert post.chat_id is None
         assert post.reply_to_id is None, "a root post answers nothing"

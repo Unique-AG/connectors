@@ -183,14 +183,14 @@ class TestWhatItAnswers:
         assert (resolved.chat_id, resolved.message_id) == (_CHAT_ID, _NEWER_ID)
         assert (row.chat_id, row.team_id, row.channel_id) == (_CHAT_ID, None, None)
 
-    async def test_a_row_carries_the_message_text(
+    async def test_a_row_carries_the_body_as_graph_sent_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _lists(graph, _page(message_payload(content="<div><p>ship it&nbsp;Friday</p></div>")))
 
         listed = await lister.list_chat_messages(client, chat_id=_CHAT_ID, limit=20)
 
-        assert listed.messages[0].text == "ship it Friday"
+        assert listed.messages[0].body == "<div><p>ship it&nbsp;Friday</p></div>"
 
     async def test_a_system_event_stays_in_the_list_and_says_what_happened(
         self, client: GraphServiceClient, graph: respx.MockRouter
