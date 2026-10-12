@@ -47,7 +47,7 @@ async def reserve_login_attempt(
 ) -> uuid.UUID | None:
     now = datetime.now(UTC)
     async with transaction(session_factory) as session:
-        if session.bind.dialect.name == "postgresql":
+        if session.get_bind().dialect.name == "postgresql":
             await session.execute(
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:username, 0))"),
                 {"username": username},
