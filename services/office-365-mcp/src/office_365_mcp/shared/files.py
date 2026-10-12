@@ -74,14 +74,15 @@ _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryPara
 class DriveItemSummary(BaseModel):
     """One file or folder: what it is, where it lives, and the handle that reaches it again."""
 
-    uri: str = Field(
+    uri: str | None = Field(
         description=(
             "This item's handle. A file is sharepoint:///files/{drive}/{item} and a folder is "
             + "sharepoint:///folders/{drive}/{item}. Pass a file handle to sharepoint_read_file "
             + "and a folder handle to sharepoint_browse_folder. Microsoft keeps a drive item's id "
             + "through a rename and through a move inside the same drive, so a handle stays good. "
             + "Take it verbatim and never build one: the drive id is part of it, and an item id "
-            + "alone reaches nothing."
+            + "alone reaches nothing. Null when Graph gave no drive id or no item id. No handle "
+            + "exists for such an item, so give the user its `web_url`."
         )
     )
     name: str | None = Field(
@@ -107,9 +108,9 @@ class DriveItemSummary(BaseModel):
     )
     web_url: str | None = Field(
         description=(
-            "The address that opens this item in a browser, for a person to follow. It is not a "
-            + "download link and this connector cannot read a file from it. Give it to the user "
-            + "when they ask where a file is."
+            "The address that opens this item in a browser. Always give this address to the user "
+            + "when you answer from this item or about it. It is not a download link, and this "
+            + "connector cannot read a file from it. Null when Graph gave no address."
         )
     )
     created_at: datetime | None = Field(
@@ -171,26 +172,25 @@ class DriveItemSummary(BaseModel):
         description=(
             "This is the handle of the folder that holds this item. Pass it to "
             + "sharepoint_browse_folder to see everything else in the same folder. This field is "
-            + "null only when Graph reported no parent. That happens for the root of a drive."
+            + "null when Graph reported no parent, as for the root of a drive. It is also null "
+            + "when Graph gave no drive id."
         )
     )
 
     @classmethod
-    def from_item(cls, item: DriveItem) -> Self | None:
+    def from_item(cls, item: DriveItem) -> Self:
         parent = item.parent_reference
         drive_id = parent.drive_id if parent is not None else None
-        if item.id is None or drive_id is None:
-            return None
-        is_folder = item.folder is not None
-        handle = (
-            DriveFolderHandle(drive_id, item.id)
-            if is_folder
-            else DriveFileHandle(drive_id, item.id)
-        )
         parent_id = parent.id if parent is not None else None
+        is_folder = item.folder is not None
+        handle = DriveFolderHandle if is_folder else DriveFileHandle
         return cls(
-            uri=handle.uri,
-            parent_uri=None if parent_id is None else DriveFolderHandle(drive_id, parent_id).uri,
+            uri=None if drive_id is None or item.id is None else handle(drive_id, item.id).uri,
+            parent_uri=(
+                None
+                if drive_id is None or parent_id is None
+                else DriveFolderHandle(drive_id, parent_id).uri
+            ),
             name=item.name,
             is_folder=is_folder,
             size=item.size,
@@ -368,22 +368,18 @@ async def summary_after_write(
     drive_id: str,
     answered: DriveItem | None,
     *,
-    item_id: str | None,
+    item_id: str | None = None,
     unread: str,
 ) -> DriveItemSummary:
-    summary = None if answered is None else DriveItemSummary.from_item(answered)
-    if summary is not None:
-        return summary
+    if answered is not None and answered.id is not None:
+        return DriveItemSummary.from_item(answered)
     if item_id is None:
         raise Advised(unread)
     try:
         reread = await item_for_a_question(client, drive_id, item_id)
     except GraphFailure as failure:
         raise Advised(unread) from failure
-    summary = DriveItemSummary.from_item(reread)
-    if summary is None:
-        raise Advised(unread)
-    return summary
+    return DriveItemSummary.from_item(reread)
 
 
 def item_access_refused(nothing_happened: str) -> str:

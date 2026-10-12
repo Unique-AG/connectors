@@ -131,11 +131,7 @@ async def create_folder(
             with graph_step(STEP_CREATE_FOLDER):
                 posted = await _post_folder(client, handle.drive_id, found.id, name=name)
             created = await summary_after_write(
-                client,
-                handle.drive_id,
-                posted,
-                item_id=None if posted is None else posted.id,
-                unread=_WRITTEN_BUT_UNREAD,
+                client, handle.drive_id, posted, unread=_WRITTEN_BUT_UNREAD
             )
 
     if asked is not None:

@@ -76,8 +76,7 @@ class DriveFolderLevel(BaseModel):
             "The files and folders inside the folder, in the order that Microsoft returned them "
             + "or that `order_by` names. A folder entry can hold more items than this list "
             + "shows. Call this tool again with its `uri` to reach them. An empty list means "
-            + "that the folder holds nothing. This tool does not list an item that Graph reports "
-            + "with no drive."
+            + "that the folder holds nothing."
         )
     )
     capped: bool = Field(
@@ -116,9 +115,7 @@ async def browse_folder(
             assert first_page is not None, "Graph answered a folder listing with no collection"
             collected = await collect_pages(first_page, client, limit=read)
 
-    rows = [
-        row for item in collected.items if (row := DriveItemSummary.from_item(item)) is not None
-    ]
+    rows = [DriveItemSummary.from_item(item) for item in collected.items]
     if order_by is None:
         return DriveFolderLevel(items=rows, capped=collected.capped, order_covers_level=None)
     ordered = _ordered(rows, order_by)

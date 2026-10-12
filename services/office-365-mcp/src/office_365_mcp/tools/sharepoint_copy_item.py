@@ -141,6 +141,12 @@ class CopyStarted(BaseModel):
             + "it to sharepoint_browse_folder to see the copy."
         )
     )
+    destination_web_url: str | None = Field(
+        description=(
+            "The web address that opens the destination folder in a browser. Always give it to "
+            + "the user, so that the user can open the folder and find the copy there."
+        )
+    )
     name: str | None = Field(
         description=(
             "The name that the copy gets. It is the value of `name`, or the name of the "
@@ -202,6 +208,7 @@ async def copy_item(
             started = CopyStarted(
                 source_uri=source.uri,
                 destination_uri=DriveFolderHandle(destination.drive_id, target.id).uri,
+                destination_web_url=target.web_url,
                 name=name if name is not None else original.name,
             )
 

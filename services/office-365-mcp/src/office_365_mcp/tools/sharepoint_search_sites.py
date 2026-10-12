@@ -41,8 +41,8 @@ class SiteSummary(BaseModel):
         description=(
             "The web address of the site, for example "
             + "`https://contoso.sharepoint.com/sites/Finance`. Pass it as `path` to "
-            + "sharepoint_search_files to search only this site. Give it to the user when they "
-            + "ask where the site is."
+            + "sharepoint_search_files to search only this site. Always give it to the user when "
+            + "you answer about this site."
         )
     )
     display_name: str | None = Field(

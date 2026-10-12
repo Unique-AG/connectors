@@ -10,7 +10,12 @@ import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import File
-from mcp.types import BlobResourceContents, TextResourceContents
+from mcp.types import (
+    BlobResourceContents,
+    EmbeddedResource,
+    TextContent,
+    TextResourceContents,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
@@ -75,10 +80,26 @@ def content(graph: respx.MockRouter) -> respx.Route:
     return graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=_BYTES))
 
 
+async def _answer(
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    file: str = _FILE,
+    convert_to: reader.ConvertTo | None = None,
+) -> list[File | str]:
+    return await reader.sharepoint_read_file(client, transport, file=file, convert_to=convert_to)
+
+
 async def _read(
-    client: GraphServiceClient, transport: httpx.AsyncClient, *, file: str = _FILE
+    client: GraphServiceClient,
+    transport: httpx.AsyncClient,
+    *,
+    file: str = _FILE,
+    convert_to: reader.ConvertTo | None = None,
 ) -> File:
-    return await reader.sharepoint_read_file(client, transport, file=file)
+    read = (await _answer(client, transport, file=file, convert_to=convert_to))[0]
+    assert isinstance(read, File), "the file comes first"
+    return read
 
 
 class TestWhatComesBack:
@@ -91,7 +112,6 @@ class TestWhatComesBack:
     ) -> None:
         read = await _read(client, transport)
 
-        assert isinstance(read, File)
         assert read.data == _BYTES
         resource = read.to_resource_content().resource
         assert resource.mime_type == _DOCX
@@ -140,6 +160,62 @@ class TestWhatComesBack:
         assert read.to_resource_content().resource.mime_type == _DOCX
 
 
+class TestTheWebAddress:
+    @pytest.mark.usefixtures("item", "content")
+    async def test_it_follows_the_file_as_a_line_of_text(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient
+    ) -> None:
+        answer = await _answer(client, transport)
+
+        assert len(answer) == 2
+        assert isinstance(answer[0], File)
+        assert answer[1] == f"Web address of this file: {_WEB_URL}"
+
+    @pytest.mark.usefixtures("item")
+    async def test_it_follows_a_converted_file_too(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=b"%PDF-1.7"))
+
+        answer = await _answer(client, transport, convert_to="pdf")
+
+        assert answer[1] == f"Web address of this file: {_WEB_URL}"
+
+    @pytest.mark.usefixtures("content")
+    async def test_a_file_with_no_web_address_comes_back_alone(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_payload(web_url=None))
+        )
+
+        answer = await _answer(client, transport)
+
+        assert len(answer) == 1
+        assert isinstance(answer[0], File)
+
+    @pytest.mark.usefixtures("item", "content")
+    async def test_the_client_gets_the_file_with_its_name_and_type_and_the_address(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient
+    ) -> None:
+        mcp: FastMCP = FastMCP(name="schema-under-test")
+        reader.register(mcp, transport)
+        tool = await mcp.get_tool(reader.TOOL_NAME)
+        assert tool is not None, "register left the tool off the server"
+
+        sent = tool.convert_result(await _answer(client, transport))
+
+        file, address = sent.content
+        assert isinstance(file, EmbeddedResource)
+        assert isinstance(file.resource, BlobResourceContents)
+        assert base64.b64decode(file.resource.blob) == _BYTES
+        assert file.resource.mime_type == _DOCX
+        assert str(file.resource.uri) == f"file:///{_NAME}"
+        assert isinstance(address, TextContent)
+        assert _WEB_URL in address.text
+        assert sent.structured_content is None
+
+
 class TestTheConversionMicrosoftPerforms:
     @pytest.mark.usefixtures("item")
     async def test_asking_for_pdf_sends_the_query_parameter_graph_accepts(
@@ -149,7 +225,7 @@ class TestTheConversionMicrosoftPerforms:
             return_value=httpx.Response(200, content=b"%PDF-1.7\nsynthetic")
         )
 
-        answer = await reader.sharepoint_read_file(client, transport, file=_FILE, convert_to="pdf")
+        answer = await _read(client, transport, convert_to="pdf")
 
         assert converted.calls.last.request.url.params["$format"] == "pdf", (
             "the SDK spells Graph's `format` parameter with a dollar, and a live tenant accepts it"
@@ -166,7 +242,7 @@ class TestTheConversionMicrosoftPerforms:
             return_value=httpx.Response(200, content=b"%PDF-1.7\nsynthetic")
         )
 
-        answer = await reader.sharepoint_read_file(client, transport, file=_FILE, convert_to="pdf")
+        answer = await _read(client, transport, convert_to="pdf")
 
         uri = str(answer.to_resource_content().resource.uri)
         assert uri.endswith(".pdf"), f"a converted file keeps the source name and gains .pdf: {uri}"
@@ -326,9 +402,7 @@ class TestWhatItRefuses:
         _ = graph.get(_CONTENT_PATH).mock(return_value=httpx.Response(200, content=body))
 
         with pytest.raises(ToolError, match="sharepoint_read_file returns a file of") as refused:
-            _ = await reader.sharepoint_read_file(
-                client, transport, file=_FILE, convert_to=convert_to
-            )
+            _ = await _read(client, transport, convert_to=convert_to)
 
         assert body.sent <= reader.MAX_BYTES + _STREAMED_CHUNK, (
             f"the tool read {body.sent} bytes to refuse a body, "
@@ -367,7 +441,7 @@ class TestWhatItRefuses:
         )
 
         with pytest.raises(ToolError) as refused:
-            _ = await reader.sharepoint_read_file(client, transport, file=_FILE, convert_to="pdf")
+            _ = await _read(client, transport, convert_to="pdf")
 
         assert "This file is more than 10.0 MB" in str(refused.value)
         assert f"{len(packed) / (1024 * 1024):.1f} MB" not in str(refused.value)
@@ -432,7 +506,7 @@ class TestWhatItRefuses:
         )
 
         with pytest.raises(ToolError, match="without `convert_to`"):
-            _ = await reader.sharepoint_read_file(client, transport, file=_FILE, convert_to="pdf")
+            _ = await _read(client, transport, convert_to="pdf")
 
     @pytest.mark.usefixtures("item")
     async def test_a_406_for_a_read_that_asked_for_no_conversion_is_not_blamed_on_conversion(
@@ -574,6 +648,7 @@ class TestHowItDeclaresItself:
         assert "This tool converts nothing" in described
         assert "does not turn a document into text" in described
         assert "A Word file comes back as a Word file" in described
+        assert "Always give that address to the user" in described
         assert "sharepoint_search_files" in described
         assert "sharepoint_browse_folder" in described
 

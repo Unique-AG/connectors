@@ -61,16 +61,20 @@ _ADA = "ada@example.invalid"
 _GRACE = "grace@example.invalid"
 
 _FILE_NAME = "Q3 forecast.xlsx"
+_WEB_URL = "https://contoso.sharepoint.invalid/sites/finance/Shared-Documents/Q3-forecast.xlsx"
 
 _MESSAGE = "Here is the forecast for the review on Friday."
 
 _NOTHING_SHARED = "Nothing was shared, and nobody was invited."
 
 
-def _item(*, name: str | None = _FILE_NAME, folder: bool = False) -> dict[str, object]:
+def _item(
+    *, name: str | None = _FILE_NAME, folder: bool = False, web_url: str | None = _WEB_URL
+) -> dict[str, object]:
     return {
         "id": _FOLDER_ID if folder else _FILE_ID,
         "name": name,
+        "webUrl": web_url,
         **({"folder": {"childCount": 2}} if folder else {"file": {"mimeType": "text/plain"}}),
         "parentReference": {"driveId": _DRIVE_ID, "driveType": "business"},
     }
@@ -797,6 +801,26 @@ class TestTheRetryItRefuses:
 
 
 class TestWhatItAnswers:
+    async def test_the_answer_gives_the_web_address_the_read_already_returned(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+
+        answer = await _invite(client)
+
+        assert answer.web_url == _WEB_URL
+        assert [call.request.method for call in _made(graph)] == ["GET", "POST"]
+
+    async def test_an_item_graph_gave_no_web_address_has_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _item(web_url=None))
+        _ = _invites(graph)
+
+        answer = await _invite(client)
+
+        assert answer.web_url is None
+
     async def test_each_row_graph_returned_becomes_one_recipient(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

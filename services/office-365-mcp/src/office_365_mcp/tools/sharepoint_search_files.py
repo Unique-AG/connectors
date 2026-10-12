@@ -12,7 +12,6 @@ from msgraph.generated.models.bucket_aggregation_sort_property import (
 )
 from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.entity_type import EntityType
-from msgraph.generated.models.search_hit import SearchHit
 from msgraph.generated.models.search_hits_container import SearchHitsContainer
 from msgraph.generated.models.search_query import SearchQuery
 from msgraph.generated.models.search_request import SearchRequest
@@ -85,7 +84,8 @@ class SiteMatches(BaseModel):
     url: str = Field(
         description=(
             "The site's web address. Pass it back as `path` to search only this site. It is "
-            + "already in the shape that `path` expects."
+            + "already in the shape that `path` expects. Always give it to the user when you "
+            + "answer about this site."
         )
     )
     match_count: int = Field(
@@ -103,8 +103,7 @@ class FileSearchResults(BaseModel):
         description=(
             "These are the files and folders that matched, on this page. An empty list means "
             + "that no file matched on this page. It does not mean that the file does not "
-            + "exist elsewhere. This tool drops a hit that Graph reports with no drive, "
-            + "because this tool cannot address that hit again."
+            + "exist elsewhere."
         )
     )
     sites: list[SiteMatches] = Field(
@@ -184,7 +183,11 @@ async def sharepoint_search_files(
     more_to_come = bool(container.more_results_available) if container else False
 
     return FileSearchResults(
-        files=[item for item in (_from_hit(hit) for hit in hits) if item is not None],
+        files=[
+            DriveItemSummary.from_item(hit.resource)
+            for hit in hits
+            if isinstance(hit.resource, DriveItem)
+        ],
         sites=_sites(container),
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
@@ -209,13 +212,6 @@ def _sites(container: SearchHitsContainer | None) -> list[SiteMatches]:
             if bucket.key is not None and bucket.count is not None
         ]
     return []
-
-
-def _from_hit(hit: SearchHit) -> DriveItemSummary | None:
-    resource = hit.resource
-    if not isinstance(resource, DriveItem):
-        return None
-    return DriveItemSummary.from_item(resource)
 
 
 def _hits_container(response: QueryPostResponse) -> SearchHitsContainer | None:

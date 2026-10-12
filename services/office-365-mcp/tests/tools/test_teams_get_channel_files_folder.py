@@ -7,7 +7,6 @@ import httpx
 import pytest
 import respx
 from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
@@ -103,7 +102,7 @@ class TestTheFolderItAnswers:
         )
 
         assert folder.uri == DriveFolderHandle(_DRIVE_ID, _FOLDER_ID).uri
-        assert drive_folder_handle(folder.uri) == DriveFolderHandle(_DRIVE_ID, _FOLDER_ID)
+        assert drive_folder_handle(folder.uri or "") == DriveFolderHandle(_DRIVE_ID, _FOLDER_ID)
 
     @pytest.mark.usefixtures("files_folder")
     async def test_the_child_count_and_the_web_address_come_through(
@@ -140,8 +139,8 @@ class TestTheFolderItAnswers:
         assert folder.created_at == datetime(1, 1, 1, tzinfo=UTC)
 
 
-class TestWhatItRefuses:
-    async def test_an_answer_with_no_drive_id_is_refused_with_the_reason(
+class TestAnAnswerWithNoDriveId:
+    async def test_it_is_the_folder_with_no_handle_and_its_web_address(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         graph.get(_FILES_FOLDER_PATH).mock(
@@ -150,24 +149,12 @@ class TestWhatItRefuses:
             )
         )
 
-        with pytest.raises(ToolError, match="without the drive id") as refused:
-            _ = await getter.teams_get_channel_files_folder(
-                client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID
-            )
+        folder = await getter.teams_get_channel_files_folder(
+            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID
+        )
 
-        assert "cannot browse" in str(refused.value)
-
-    async def test_an_answer_with_no_parent_reference_is_refused_too(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        payload = _folder_payload()
-        del payload["parentReference"]
-        graph.get(_FILES_FOLDER_PATH).mock(return_value=httpx.Response(200, json=payload))
-
-        with pytest.raises(ToolError, match="without the drive id"):
-            _ = await getter.teams_get_channel_files_folder(
-                client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID
-            )
+        assert folder.uri is None
+        assert folder.web_url == _WEB_URL
 
 
 class TestGraphFailures:

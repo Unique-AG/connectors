@@ -173,6 +173,12 @@ class Invitation(BaseModel):
             + "sharepoint_read_file for a file, or to sharepoint_browse_folder for a folder."
         )
     )
+    web_url: str | None = Field(
+        description=(
+            "The address that opens the shared item in a browser. Always give this address to "
+            + "the user when you report this invitation. Null when Graph gave no address."
+        )
+    )
     recipients: list[InvitedRecipient] = Field(
         description=(
             "The permissions that Microsoft reported for this call, one entry for each row of its "
@@ -225,6 +231,7 @@ async def invite(
     assert invited is not None, "Graph answered an invite with no permission collection"
     return Invitation(
         item_uri=handle.uri,
+        web_url=found.web_url,
         recipients=[InvitedRecipient.from_permission(row) for row in invited.value or []],
     )
 

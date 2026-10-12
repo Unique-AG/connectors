@@ -647,7 +647,7 @@ class TestWhatItAnswers:
         assert answer.name == _NAME
         assert answer.mime_type == "text/plain"
 
-    async def test_an_answer_with_no_drive_is_read_again_by_the_new_id(
+    async def test_an_answer_with_no_drive_is_the_answer_with_no_handle_and_its_web_address(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads_folder(graph)
@@ -658,8 +658,9 @@ class TestWhatItAnswers:
 
         answer = await _create(client)
 
-        assert reread.call_count == 1
-        assert answer.uri == DriveFileHandle(_DRIVE_ID, _FILE_ID).uri
+        assert reread.call_count == 0
+        assert answer.uri is None
+        assert answer.web_url == f"https://contoso.sharepoint.invalid/items/{_FILE_ID}"
 
     async def test_a_complete_answer_is_not_read_again(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -674,32 +675,17 @@ class TestWhatItAnswers:
 
         assert reread.call_count == 0
 
-    async def test_a_failed_second_read_says_that_the_file_was_created(
+    async def test_an_answer_with_no_body_says_that_the_file_was_created(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _reads_folder(graph)
-        route = _writes(graph, _created_payload(with_drive=False))
-        _ = graph.get(_FILE_ROUTE).mock(
-            return_value=httpx.Response(
-                404, json={"error": {"code": "itemNotFound", "message": "not found"}}
-            )
-        )
+        route = _no_write(graph)
 
         with pytest.raises(Advised, match="created the file") as raised:
             _ = await _create(client)
 
-        assert isinstance(raised.value.__cause__, GraphFailure)
         assert "Do not call this tool again for this file." in str(raised.value)
         assert route.call_count == 1
-
-    async def test_an_answer_with_no_id_says_that_the_file_was_created(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _reads_folder(graph)
-        _ = _writes(graph, _created_payload(with_drive=False, file_id=None))
-
-        with pytest.raises(Advised, match="created the file"):
-            _ = await _create(client)
 
 
 class TestTheFailuresItPassesOn:
