@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.3...outlook-semantic-mcp@4.0.0) (2026-10-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp:** paginate email search with per-request cursors and return previews instead of bodies ([#1195](https://github.com/Unique-AG/connectors/issues/1195))
+
+### Features
+
+* **outlook-semantic-mcp:** paginate email search with per-request cursors and return previews instead of bodies ([#1195](https://github.com/Unique-AG/connectors/issues/1195)) ([32fa9e7](https://github.com/Unique-AG/connectors/commit/32fa9e712e960ec6300ff5f371d52798b1cc5856))
+
 ## [3.6.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.2...outlook-semantic-mcp@3.6.3) (2026-10-12)
 
 
