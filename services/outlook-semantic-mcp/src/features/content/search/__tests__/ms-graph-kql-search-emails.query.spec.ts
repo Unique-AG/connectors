@@ -409,6 +409,30 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('sender', () => {
+    it('keeps the page when a sender has no email address', async () => {
+      const mockPost = makeSuccessPost({
+        [OWN_EMAIL]: [
+          makeMessage('no-address', { from: { emailAddress: { name: 'Postmaster' } } }),
+          makeMessage('no-email-address', { from: {} }),
+          makeMessage('msg1'),
+        ],
+      });
+      const { instance } = createQuery({ mockPost });
+
+      const { results, pages } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(pages[0]?.status).toBe(SearchPageStatus.Complete);
+      expect(results.map(({ msGraphMessageId, from }) => ({ msGraphMessageId, from }))).toEqual(
+        expect.arrayContaining([
+          { msGraphMessageId: 'no-address', from: '' },
+          { msGraphMessageId: 'no-email-address', from: '' },
+          { msGraphMessageId: 'msg1', from: 'sender-msg1@example.com' },
+        ]),
+      );
+    });
+  });
+
   describe('replyToParams', () => {
     it('marks draft messages as not replyable', async () => {
       const mockPost = makeSuccessPost({

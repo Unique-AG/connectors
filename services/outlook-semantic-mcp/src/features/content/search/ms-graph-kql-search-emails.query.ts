@@ -455,7 +455,7 @@ export class MsGraphKqlSearchEmailsQuery {
         mailbox: request.mailbox,
         isDelegated: request.isDelegated,
         subject: msg.subject ?? '',
-        from: msg.from?.emailAddress.address ?? '',
+        from: msg.from?.emailAddress?.address ?? '',
         rawSentDateTime: msg.sentDateTime ?? '',
         rawReceivedDateTime: msg.receivedDateTime ?? '',
         receivedDateTime: convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
@@ -630,9 +630,9 @@ const messagePageSchema = z.object({
     z.object({
       id: z.string(),
       subject: z.string().optional().nullish(),
+      // Graph omits the address on some drafts, non-delivery reports and automated mail.
       from: z
-        .object({ emailAddress: z.object({ address: z.string() }) })
-        .optional()
+        .object({ emailAddress: z.object({ address: z.string().nullish() }).nullish() })
         .nullish(),
       sentDateTime: z.string().optional().nullish(),
       receivedDateTime: z.string().optional().nullish(),
