@@ -25,11 +25,15 @@ export class McpToolsHandler extends McpHandlerBase {
     super(moduleRef, registry, McpToolsHandler.name);
   }
 
+  // The MCP spec says a tool returning structuredContent SHOULD also return the serialized JSON
+  // as a TextContent block, so the text copy stays. Indentation is only worth its bytes locally.
+  // https://modelcontextprotocol.io/specification/2025-11-25/server/tools#structured-content
   private buildDefaultContentBlock(result: any) {
+    const indent = process.env.NODE_ENV === 'development' ? 2 : undefined;
     return [
       {
         type: 'text',
-        text: JSON.stringify(result, null, 2),
+        text: JSON.stringify(result, null, indent),
       },
     ];
   }
