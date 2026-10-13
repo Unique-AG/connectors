@@ -448,8 +448,8 @@ class: tiingo
 
 | Area | State |
 |---|---|
-| OAuth storage | in memory, so sessions end with the process |
-| Deploy files | target the product repo, not run |
+| OAuth storage | in memory, so sessions end with the process, and the auth is expected to change |
+| Deployment | no deploy files, container image or Helm chart |
 | Zitadel login | mocked discovery only |
 | Chart | checked in the MCP Inspector only |
 | Plan limits | on our plan, 403 on news, splits, distributions and fund fees. Fundamentals: Dow 30 only |
