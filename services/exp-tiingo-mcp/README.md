@@ -1,16 +1,20 @@
 # tiingo-mcp
 
-Experimental: a demo, not a released or supported service. It is an MCP server for the Tiingo API, generated from a third-party OpenAPI spec with `FastMCP.from_openapi`. It follows the layout and conventions of the product repository's Python MCP services (`together-endpoint-mcp`, `world-check-mcp`).
+Experimental: a demo, not a released or supported service. It is an MCP server for the Tiingo API, generated from a third-party OpenAPI spec with `FastMCP.from_openapi`. Its layout and tooling follow the other Python MCP services in this repository, such as `kb-mcp`.
 
 ## Run
 
-Copy `.env.example` to `.env`, set `TIINGO_API_KEY` (the file is gitignored), then:
+Copy `.env.example` to `.env` and set `TIINGO_API_KEY` (the file is gitignored), then:
 
 ```sh
 uv run tiingo-mcp   # http://localhost:8741/mcp, plus /probe, /health and /metrics
 ```
 
-`MCP_AUTH_MODE=none` (the example's default) is restricted to non-production servers bound to loopback. A tunnel with an https `MCP_BASE_URL` may expose it, but then anyone with the URL can spend your Tiingo quota. Without it the server requires `ZITADEL_ISSUER_URL`, `ZITADEL_CLIENT_ID` (a public client, no secret) and `MCP_JWT_SIGNING_KEY`, and fails at startup if any is missing. OAuth state is kept in memory, so sessions end when the process stops. A deployment needs durable storage, as in `kb-mcp`. `MCP_BASE_URL` defaults to `http://HOST:PORT`, and both `localhost` and `127.0.0.1` URLs are accepted locally. Browser clients must be listed in `MCP_ALLOWED_ORIGINS` (default: the MCP Inspector on port 6274 in development, none in production). `LOG_LEVEL` sets the log level; logs are JSON on stderr, as in the other services.
+- `MCP_AUTH_MODE=none` (the example's default) only works for non-production servers bound to loopback. Behind a tunnel with an https `MCP_BASE_URL`, anyone with the URL can spend your Tiingo quota.
+- Otherwise the server needs `ZITADEL_ISSUER_URL`, `ZITADEL_CLIENT_ID` (a public client, no secret) and `MCP_JWT_SIGNING_KEY`, and fails at startup if one is missing. OAuth state lives in memory, so sessions end when the process stops.
+- `MCP_BASE_URL` defaults to `http://HOST:PORT`. Both `localhost` and `127.0.0.1` work locally.
+- Browser clients must be listed in `MCP_ALLOWED_ORIGINS` (default: the MCP Inspector on port 6274 in development, none in production).
+- `LOG_LEVEL` sets the log level. Logs are JSON on stderr, like the other services.
 
 Try the chart app with `npx @modelcontextprotocol/inspector`: connect with Streamable HTTP to the URL above, open the Apps tab and run `plot_cumulative_returns`.
 
@@ -26,23 +30,26 @@ The server shows what OpenAPI and FastMCP give you, from a plain pass-through to
 6. Outgoing requests carry only an allow-list of headers to Tiingo, so headers a client sends to this server are not forwarded upstream.
 7. Tests run the tools through an in-memory client against a mocked Tiingo transport. Ruff and basedpyright are part of the checks.
 
-Not covered: durable OAuth storage (it is in memory), the deploy files (they target the product repository's scripts and have not been run), a real Zitadel login (tested only against mocked discovery), and the chart in any host other than the MCP Inspector.
+Not covered: durable OAuth storage (it is in memory, and the auth is expected to change), the deploy files (carried over from another setup and not run), a real Zitadel login (tested only against mocked discovery), and the chart in any host other than the MCP Inspector.
 
 ## Layout
 
-- `settings.py`: pydantic settings with a security validator. `auth.py`: Zitadel OIDC proxy from `unique_mcp`.
+- `settings.py`: pydantic settings with a security validator. `auth.py`: Zitadel OIDC proxy from `unique_mcp`. `params.py`: argument and date types shared by the tools and models.
 - `server.py` builds the server (instructions), `main.py` runs it and mounts `/probe`, `/health` and `/metrics` with `unique_mcp.monitoring.setup_ops` (per-tool call counts and durations included).
 - `openapi/`: the spec (loaded as `SPEC` in `server.py`) and `EXPOSED`, the allow-list of operationIds. Anything not listed is hidden. Generated tools are marked read-only (`annotate_component`).
 - `tools/`: wrappers around generated tools (trimmed output, new arguments) and the chart tool, which calls a wrapper. `register_tools` registers the wrappers first and the chart tool after them.
 - `models/`: pydantic output models. `vendor_responses.py` is generated from the spec, with one model per response of every operation in `EXPOSED` (all fields optional) and the spec's field descriptions. `FIELDS` in the script limits a model to the fields a tool returns, and undeclared vendor fields are dropped. Regenerate with `uv run scripts/generate_response_models.py` after changing the spec, `EXPOSED` or `FIELDS`. Only the wrapped tools use these models. The other tools get their output schema from FastMCP, which reads the spec.
 - `apps/returns.html`: the MCP App widget.
-- `deploy/`: `config.sh`, `Dockerfile` and `.env.deploy.example` for the product repository's root `deploy.sh` and `configure-auth.sh` (see `together-endpoint-mcp/deploy/README.md` there).
+- `scripts/`: `generate_response_models.py`. `tests/`: the tests.
+- `deploy/`: `config.sh`, `Dockerfile` and `.env.deploy.example`, carried over from another setup. They are not adapted to this repository and have not been run.
 
 ## MCP App
 
-`plot_cumulative_returns(tickers, lookback_days)` returns cumulative adjusted-close returns for 1 to 5 tickers and renders them as a line chart (`ui://tiingo/returns.html`). Clients without MCP Apps support get a text summary.
+`plot_cumulative_returns(tickers, lookback_days)` returns cumulative adjusted-close returns for 1 to 5 tickers and renders them as a line chart (`ui://tiingo/returns.html`). Clients without MCP Apps support get a text summary. The chart was checked in the MCP Inspector, not in other MCP Apps hosts.
 
-Checks: `uv run pytest`, `uv run ruff check .` and `uv run basedpyright` (src only). The chart was checked in the MCP Inspector, not in other MCP Apps hosts.
+## Checks
+
+`uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .` and `uv run basedpyright` (src only).
 
 ## Adding a tool
 
@@ -61,10 +68,3 @@ The spec comes from `api-evangelist/tiingo` and is not official. FastMCP builds 
 - `DailyMeta.startDate` and `endDate` (null when there is no price data) and `FundamentalsMeta.dailyLastUpdated` and `statementLastUpdated` are nullable.
 
 After a spec refresh, call every tool against the live API and re-apply or drop these.
-
-## Moving into the product repository
-
-1. Copy this folder to `services/tiingo-mcp/` and add it to `tool.uv.workspace.members` (and `extraPaths`) in the root `pyproject.toml`.
-2. Delete the per-service `uv.lock`, `.venv/` and `.python-version`; run `uv lock` from the root.
-3. The product repo asks for no tests or test tooling unless requested: drop `tests/` and the `pytest` dev group, or keep them if you want them.
-4. Fill `deploy/.env.deploy.example` from another service's, and create the Zitadel app as described in the deploy README.
