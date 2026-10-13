@@ -4,6 +4,88 @@
   "description": "Values for the Backstop MCP Helm chart. Python FastMCP server with OAuth credential bridging to Backstop CRM. Exposure uses base chart Gateway API routes (no custom Ingress).",
   "type": "object",
   "properties": {
+    "mcpConfig": {
+      "type": "object",
+      "description": "Per-client, non-secret settings mapped to environment variables on the app container. A field is rendered only when set, so an unset field keeps the app default. Takes precedence over the same variable under env, which reaches the container through a ConfigMap. Secrets stay in envVars.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, none of the fields below are mapped to environment variables.",
+          "default": true
+        },
+        "app": {
+          "type": "object",
+          "description": "Application URLs.",
+          "properties": {
+            "publicBaseUrl": {
+              "type": "string",
+              "pattern": "^(https?://.+)?$",
+              "description": "PUBLIC_BASE_URL. The URL clients and browsers reach this server on, which is also the OAuth issuer. Required in production. Must match routes.hostname, e.g. https://backstop-mcp.<tenant>.unique.app."
+            }
+          },
+          "additionalProperties": false
+        },
+        "backstop": {
+          "type": "object",
+          "description": "Where to reach Backstop.",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "pattern": "^(https?://.+)?$",
+              "description": "BACKSTOP_BASE_URL. Backstop REST API origin: the tenant host (https://<firm>.backstopsolutions.com) or the shared API host. Unset means https://api.backstopsolutions.com."
+            },
+            "uiBaseUrl": {
+              "type": "string",
+              "pattern": "^(https?://.+)?$",
+              "description": "BACKSTOP_UI_BASE_URL. CRM UI origin used to build links to records. Unset means no links, unless baseUrl is already the tenant host."
+            }
+          },
+          "additionalProperties": false
+        },
+        "employment": {
+          "type": "object",
+          "description": "Departed-contact detection: which entity-relationship types mean employment, and which mean it has ended. Each list is rendered comma-separated. null keeps the app default. A markers list, even an empty one, replaces the app default. The two marker lists must not overlap.",
+          "properties": {
+            "relationshipTypeIds": {
+              "type": ["array", "null"],
+              "items": {
+                "type": ["string", "integer"],
+                "pattern": "^[^,]+$"
+              },
+              "description": "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment. Exact match. App default: none."
+            },
+            "relationshipTypeMarkers": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^,]+$"
+              },
+              "description": "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS. Case-insensitive substrings of a type's name that mean employment. App default: [employ]."
+            },
+            "formerRelationshipTypeIds": {
+              "type": ["array", "null"],
+              "items": {
+                "type": ["string", "integer"],
+                "pattern": "^[^,]+$"
+              },
+              "description": "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment has ended. Include the mirror type's id too. App default: none."
+            },
+            "formerRelationshipTypeMarkers": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^,]+$"
+              },
+              "description": "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS. Case-insensitive substrings that mean employment has ended. App default: [former, previous, ex-, no longer]."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "tenantGuidance": {
       "type": "object",
       "description": "Text appended to the server instructions and to individual tool and parameter descriptions. Empty means the shipped descriptions only. Set per deployment; the chart ships tenant-neutral.",

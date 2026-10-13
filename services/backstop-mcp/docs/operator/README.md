@@ -35,8 +35,8 @@ flowchart LR
 |---|---|
 | **Pod** | Serves MCP on `/mcp`, the OAuth endpoints, and the login form. Container port `8000` (`PORT`), Service port `80` |
 | **PostgreSQL** | Holds OAuth clients, hashed tokens, login attempts, and each user's encrypted Backstop credential. The pod is not ready without it (`/ready` returns `503`) |
-| **Public hostname with TLS** | MCP clients and browsers reach the server here. It is also the OAuth issuer, set in `PUBLIC_BASE_URL` |
-| **Egress to Backstop** | Every tool call is an HTTPS request to `BACKSTOP_BASE_URL` |
+| **Public hostname with TLS** | MCP clients and browsers reach the server here. It is also the OAuth issuer, set in `mcpConfig.app.publicBaseUrl` |
+| **Egress to Backstop** | Every tool call is an HTTPS request to the Backstop API host, `mcpConfig.backstop.baseUrl` |
 
 ## Who Does What
 
@@ -64,9 +64,9 @@ flowchart LR
    The server acts with that user's Backstop permissions. Nothing needs to be granted to Unique.
 2. **Send Unique Support or Solution Engineering:**
    - [ ] **Backstop API host**: your tenant host (`https://<firm>.backstopsolutions.com`) or the
-     shared `https://api.backstopsolutions.com`. Sets [`BACKSTOP_BASE_URL`](./configuration.md#Backstop-API).
+     shared `https://api.backstopsolutions.com`. Sets [`mcpConfig.backstop.baseUrl`](./configuration.md#Chart-values).
    - [ ] **CRM UI host**: the address your users open Backstop on, so tools can return links to
-     records. Sets [`BACKSTOP_UI_BASE_URL`](./configuration.md#Backstop-API). Without it, links are
+     records. Sets [`mcpConfig.backstop.uiBaseUrl`](./configuration.md#Chart-values). Without it, links are
      only produced when the API host is already your tenant host.
    - [ ] *(Optional)* **Employment relationship types**: if your firm records departures with its own
      relationship types, their names or ids. See
@@ -87,8 +87,9 @@ flowchart LR
 1. Provisions a PostgreSQL database and wires it to the chart (`postgresql.connection`).
 2. Generates a Fernet key and stores it as the `BACKSTOP_MCP_ENCRYPTION_KEY` secret.
 3. Deploys the chart through Unique's deployment overlay, which sets the hostname, TLS, Gateway API
-   route, and network policy, and sets `PUBLIC_BASE_URL` to that hostname.
-4. Applies the client's Backstop settings and tenant guidance (`env`, `tenantGuidance`).
+   route, and network policy, and sets `mcpConfig.app.publicBaseUrl` to that hostname.
+4. Applies the client's Backstop settings in `mcpConfig` and their guidance in `tenantGuidance`.
+   See [Configuration: Chart values](./configuration.md#Chart-values).
 5. Verifies the deployment (see [Verify](#Verify)) and sends the client the MCP endpoint,
    `https://<host>/mcp`. Steps 1 to 3 of Verify need no Backstop login. Step 4 does:
    - **With a test login from the client**, Unique runs step 4 before sending the endpoint, then
@@ -139,10 +140,12 @@ with a privately signed certificate needs `sslmode=require`. See [Database](./co
 ### 4. Write `values.yaml`
 
 ```yaml
-env:
-  PUBLIC_BASE_URL: https://backstop-mcp.example.com
-  BACKSTOP_BASE_URL: https://<firm>.backstopsolutions.com
-  BACKSTOP_UI_BASE_URL: https://<firm>.backstopsolutions.com
+mcpConfig:
+  app:
+    publicBaseUrl: https://backstop-mcp.example.com
+  backstop:
+    baseUrl: https://<firm>.backstopsolutions.com
+    uiBaseUrl: https://<firm>.backstopsolutions.com
 
 envVars:
   - name: BACKSTOP_MCP_ENCRYPTION_KEY
@@ -166,13 +169,18 @@ postgresql:
         key: database-url
 ```
 
-- `env` is merged with the chart defaults, which already set `APP_ENV=production` and the cache
-  flags. Every variable is listed in [Configuration](./configuration.md).
+- `mcpConfig` holds the settings that differ per firm. The chart checks it against its schema, so a
+  misspelt key fails the install instead of being ignored. Each value and the variable it sets is
+  listed in [Configuration: Chart values](./configuration.md#Chart-values).
+- Tuning settings (cache flags, timeouts, page sizes) go in `env`, which is merged with the chart
+  defaults that already set `APP_ENV=production` and the cache flags. Every variable is listed in
+  [Configuration](./configuration.md).
 - The chart sets `PORT` from `ports.application` (`8000`) and overwrites any `env.PORT`. Change
   `ports.application` to move the port.
 - `postgresql.connection.url` injects `DATABASE_URL` into both the server and the migration job.
 - `resources` overrides the chart's 256 Mi memory limit, which is too low. See [Memory](#Memory).
-- `APP_ENV=production` refuses to start if `PUBLIC_BASE_URL` is a loopback or `0.0.0.0` address.
+- `APP_ENV=production` refuses to start if `mcpConfig.app.publicBaseUrl` is a loopback or `0.0.0.0`
+  address.
 
 ### 5. Install
 
@@ -220,7 +228,7 @@ The pod needs:
 | Ingress to port `8000` | Prometheus | `networkPolicy.baseline.prometheus.namespace` (chart default `system`) and `matchLabels` |
 | Egress | DNS | Allowed by `networkPolicy.baseline.dns`, on by default |
 | Egress to port `5432` | PostgreSQL | With `postgresql.connection.url` the chart cannot derive the host from the secret, so it renders no PostgreSQL rule and neither the pod nor the migration hook can reach the database. Add the rule yourself and set `postgresql.networkPolicyEgressManaged: true` |
-| Egress to port `443` | `BACKSTOP_BASE_URL` | Add the rule yourself |
+| Egress to port `443` | The Backstop API host (`mcpConfig.backstop.baseUrl`) | Add the rule yourself |
 
 ```yaml
 networkPolicy:
@@ -255,8 +263,8 @@ internalServices:
 ### 7. Security checklist
 
 - [ ] `BACKSTOP_MCP_ENCRYPTION_KEY` was generated with the command above and lives only in a Secret.
-- [ ] `PUBLIC_BASE_URL` is the `https://` hostname clients use. The login form's CSRF cookie is
-      marked `Secure` only when the URL is `https`.
+- [ ] `mcpConfig.app.publicBaseUrl` is the `https://` hostname clients use. The login form's CSRF
+      cookie is marked `Secure` only when the URL is `https`.
 - [ ] The database connection uses TLS (`sslmode=verify-full` or `verify-ca` when the certificate
       chains to a public CA, `require` otherwise).
 - [ ] `/metrics` is not reachable from outside the cluster.
@@ -272,7 +280,7 @@ internalServices:
 1. `curl https://<host>/health` returns `200`.
 2. `curl https://<host>/ready` returns `{"status": "healthy", "checks": {"database": true}}`.
 3. `curl https://<host>/.well-known/oauth-authorization-server` shows `issuer` as your
-   `PUBLIC_BASE_URL` with a trailing slash, and `authorization_endpoint`, `token_endpoint`,
+   `mcpConfig.app.publicBaseUrl` with a trailing slash, and `authorization_endpoint`, `token_endpoint`,
    `registration_endpoint`, and `revocation_endpoint` on the same host.
 4. Add `https://<host>/mcp` to an MCP client, complete the login form, and call `list_system_users`.
    It returns your firm's Backstop logins. On Unique SaaS without a client test login, this step is
@@ -280,7 +288,7 @@ internalServices:
 
 If the login form says *"This Backstop login has no matching system user"*, the credential is valid
 but the login is not a system user. If it says *"Backstop is unreachable"*, the pod cannot reach
-`BACKSTOP_BASE_URL`. See the [FAQ](../faq.md#Connecting-and-Signing-In).
+the Backstop API host (`mcpConfig.backstop.baseUrl`). See the [FAQ](../faq.md#Connecting-and-Signing-In).
 
 ## Operating the Service
 

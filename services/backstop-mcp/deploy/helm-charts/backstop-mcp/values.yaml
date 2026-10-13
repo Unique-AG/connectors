@@ -6,6 +6,31 @@ nameOverride: backstop-mcp
 fullnameOverride: backstop-mcp
 selectorComponentLabel: server
 
+# Per-client settings, rendered as env vars on the app container. Each is rendered only when
+# set, so an unset value keeps the app default. Set per deployment in the overlay.
+# Takes precedence over the same variable under `env:`, which reaches the container through a
+# ConfigMap (`envFrom`), and Kubernetes lets a container's own `env` override that.
+mcpConfig:
+  enabled: true
+  app:
+    # PUBLIC_BASE_URL: the externally-reachable OAuth issuer URL. Required in production.
+    # Must match routes.hostname, e.g. https://backstop-mcp.<tenant>.unique.app
+    publicBaseUrl: ""
+  backstop:
+    # BACKSTOP_BASE_URL. Unset: the app uses https://api.backstopsolutions.com
+    baseUrl: ""
+    # BACKSTOP_UI_BASE_URL: the CRM UI origin for record links. Unset: no links, unless
+    # baseUrl is already the tenant CRM host (not api.backstopsolutions.com).
+    uiBaseUrl: ""
+  # Departed-contact detection. Lists are rendered comma-separated. null keeps the app default;
+  # a markers list, even [], replaces it (`employ` and `former,previous,ex-,no longer`). The two
+  # marker lists must not overlap.
+  employment:
+    relationshipTypeIds: null
+    relationshipTypeMarkers: null
+    formerRelationshipTypeIds: null
+    formerRelationshipTypeMarkers: null
+
 # Tenant guidance overlay: text appended to the server instructions and to individual tool
 # and parameter descriptions. Set per deployment in the overlay, never here — the chart ships
 # tenant-neutral. Shape: `TenantGuidance` in the server code and values.schema.json.
@@ -24,10 +49,8 @@ env:
   # be correlated without leaking. disclose: print the original (local debugging).
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   PORT: "8000"
-  # PUBLIC_BASE_URL must be the externally-reachable OAuth issuer URL (set in overlay).
-  # BACKSTOP_BASE_URL defaults to https://api.backstopsolutions.com inside the app.
-  # BACKSTOP_UI_BASE_URL is the CRM UI origin for deep links. Unset: no links, unless
-  # BACKSTOP_BASE_URL is already the tenant CRM host (not api.backstopsolutions.com).
+  # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL and the employment relationship
+  # types are set through mcpConfig above.
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide
   # `{id: dto}` map (custom-field definitions and groups, activity tags, system users,
