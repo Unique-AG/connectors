@@ -1,2 +1,8 @@
 node_modules
 dist
+*.pdf
+*.pptx
+pnpm-lock.yaml
+bun.lock
+bun.lockb
+package-lock.json

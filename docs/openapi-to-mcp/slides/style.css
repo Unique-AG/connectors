@@ -96,6 +96,7 @@
   display: block;
   font-size: 1rem;
   color: var(--accent);
+  text-wrap: balance;
 }
 
 .pipeline .step small {
@@ -228,6 +229,7 @@
 }
 
 .pipeline.flow .step {
+  flex: 1;
   padding-right: 0.8rem;
   padding-left: 0.8rem;
 }
