@@ -377,36 +377,82 @@ Two things can go wrong:
 
 ## Limitations
 
-office-365-mcp is meant to replace two other services: teams-mcp and outlook-semantic-mcp. It
-works differently: every tool call reaches Microsoft Graph directly, and it stores nothing
-beyond an OAuth token. The tables below name what a reader gains and loses against each service.
-Neither service has a formal deprecation date yet, and both remain in active development. This
-section is a comparison of the current state, not a finished handover. A comment in teams-mcp's
-message data states that its fields were "shaped to match the fields" office-365-mcp uses for
-the same resource.
+office-365-mcp replaces two other services: teams-mcp and outlook-semantic-mcp. The tables below
+name what a user gains and loses against each service. They list only differences that change
+the work of a user. Neither service has a formal deprecation date yet, and both remain in active
+development. This section compares the current state. It is not a finished handover.
+
+Every call of office-365-mcp goes to Microsoft Graph at once. The server keeps no copy of mail or
+messages. It stores only an OAuth token.
 
 ### Compared to teams-mcp
 
+#### Only in teams-mcp
+
+| Capability | teams-mcp | office-365-mcp |
+| --- | --- | --- |
+| Capture a transcript or a recording into the knowledge base of Unique | Yes, as an opt-in. It needs a database, a message queue, and a public webhook. | No |
+
+#### Only in office-365-mcp
+
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
-| Capture a transcript into Unique's knowledge base | No | Yes, opt-in, needs a database |
-| Read the replies inside a channel thread | Yes, with limits. `teams_list_message_replies` reads up to 50 replies of one post in one call. `teams_browse_channel` reads the replies of each post on one page of the channel. Neither tool uses the cursor from Microsoft. | No, root posts only |
-| Read a transcript, or a recording's metadata, live, with no configuration | Yes | No, ingest only |
+| Read a transcript in the chat | Yes, live. Microsoft erases a one-off transcript after about 60 days. | No, ingest only |
+| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives metadata only. Only the organizer reads attendance. | No |
+| Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
+| Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
+| Filter the list of chats by type or by topic | Yes | No |
+| Send a message with a mention, a subject, an importance, or a thread reply | Yes | No, plain text only |
+| Send a message with a file | Yes, if the file is already in SharePoint | No |
+| Edit, delete, or react to a message | Yes, edit and delete for own messages only | No |
+| Create a chat, change its members, or rename it | Yes | No |
+| Create, change, or delete a Teams meeting | Yes | No |
+| Find the SharePoint folder of a channel | Yes | No |
+
+#### Different in both
+
+| Topic | office-365-mcp | teams-mcp |
+| --- | --- | --- |
+| Approval before a send | Yes, every time | No |
+| What the server needs | A token store only | A database and a message queue. Ingestion also needs a knowledge base and a public webhook. |
 
 ### Compared to outlook-semantic-mcp
 
+#### Only in outlook-semantic-mcp
+
+| Capability | outlook-semantic-mcp | office-365-mcp |
+| --- | --- | --- |
+| Search mail by meaning, ranked by relevance | Yes, in the mode that ingests mail | No, keyword search only. Microsoft sets the order of the results. |
+| Search the words inside an attachment | Yes, for PDF, Office, text, HTML, and Markdown files | No, the file name only |
+| Add a file to a draft | Yes, a file of the knowledge base, or inline content | No, the user adds it in Outlook |
+| Search several mailboxes in one call | Yes, the own mailbox and the delegated ones | No, one mailbox in each call |
+
+#### Only in office-365-mcp
+
 | Capability | office-365-mcp | outlook-semantic-mcp |
 | --- | --- | --- |
-| Read a shared or delegated mailbox | Yes, one mailbox per call | Yes, own and delegated in one search |
-| Search the words inside an attachment | No, file name only | Yes |
-| List the attachments of a message, and get one file in its own format | Yes, a file of 10 MB or less | No, only the attachment text that a search matches |
-| Change an event's agenda or add a Teams meeting | Yes | Yes |
-| Add a file to a draft | No, the user adds it in Outlook | Yes, a Unique knowledge-base file by reference, or inline content |
-| Send a message outright | Yes | No, draft only |
-| Mark a message read or unread, set its flag or importance, or move it | Yes | No |
-| Read a whole conversation across folders, in one call | Yes | No, one message at a time |
-| Read and change the automatic reply | Yes | No |
-| Read an inbox rule, or create, change, turn off, or erase one | Yes | No |
+| Send a message | Yes, after the user approves it | No, draft only |
+| Reply, forward, or edit a draft | Yes | No, a new draft or a reply to all only |
+| Read an attachment file | Yes, a file of 10 MB or less | No, only the attachment text that a search matches |
+| Read a whole conversation across folders | Yes, in one call | No, one message at a time |
+| Mark a message, flag it, set its importance, move it, or copy it | Yes | No |
+| Create, rename, or delete a mail folder | Yes | No |
+| Read and change inbox rules, the automatic reply, and categories | Yes | No, categories are a search filter only |
+| Read and change contacts | Yes | No, a name lookup only |
+| Create a recurring event or an all-day event | Yes | No |
+| Add optional attendees or a meeting room to an event | Yes | No |
+| Delete or forward an event, or share a calendar | Yes | No |
+
+#### Different in both
+
+| Topic | office-365-mcp | outlook-semantic-mcp |
+| --- | --- | --- |
+| Setup | A token store only. The user can work at once after sign-in. | A database, a message queue, and for ingestion a knowledge base and a public webhook |
+| Wait after sign-in | None | Results are incomplete until the first sync of the mailbox ends |
+| Copy of the mail | None. Every call reads live data. | A copy in the knowledge base for the retention window |
+| Write in a shared mailbox | Yes, with approval | A draft only |
+| Read a shared mailbox | Yes, with the `mailbox` argument | Yes, if an administrator turns on the scan of delegated access |
+| Calendar tools | On, with the tool set of the deployment | Off by default. An administrator turns them on with a switch. |
 
 ### Limits that a user can meet
 
