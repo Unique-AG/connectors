@@ -1,6 +1,6 @@
 # tiingo-mcp
 
-Experiment: an MCP server for the Tiingo API, generated from a third-party OpenAPI spec with `FastMCP.from_openapi`. It follows the layout and conventions of the product repository's Python MCP services (`together-endpoint-mcp`, `world-check-mcp`).
+Experimental: a demo, not a released or supported service. It is an MCP server for the Tiingo API, generated from a third-party OpenAPI spec with `FastMCP.from_openapi`. It follows the layout and conventions of the product repository's Python MCP services (`together-endpoint-mcp`, `world-check-mcp`).
 
 ## Run
 

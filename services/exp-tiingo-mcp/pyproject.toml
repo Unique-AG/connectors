@@ -1,7 +1,8 @@
 [project]
 name = "tiingo-mcp"
 version = "0.1.0"
-description = "Tiingo market data MCP generated from an OpenAPI spec with FastMCP"
+description = "Experimental Tiingo market data MCP generated from an OpenAPI spec with FastMCP"
+classifiers = ["Development Status :: 3 - Alpha"]
 authors = [
     { name = "Sanzio Monti", email = "sanzio.monti@unique.ai" }
 ]
