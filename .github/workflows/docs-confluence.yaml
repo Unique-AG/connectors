@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - docs/recordings-and-transcripts
+          - services/backstop-mcp/docs
           - services/confluence-connector/docs
           - services/kb-mcp/docs
           - services/office-365-mcp/docs
