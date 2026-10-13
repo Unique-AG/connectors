@@ -1,4 +1,5 @@
 import asyncio
+from importlib.metadata import version
 from typing import override
 
 from fastmcp import FastMCP
@@ -8,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Receive, Scope, Send
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
+from unique_toolkit.monitoring import configure_tracing
 
 from kyckr_mcp.server import create_server
 from kyckr_mcp.settings import Settings
@@ -66,6 +68,7 @@ def run_server(mcp: FastMCP, settings: Settings) -> None:
 
 def main() -> None:
     settings = Settings()  # pyright: ignore[reportCallIssue]
+    configure_tracing(service_name="exp-kyckr-mcp", service_version=version("kyckr-mcp"))
     configure_logging(level=settings.log_level)
     mcp = create_server(settings)
     asyncio.run(register_tools(mcp, settings))

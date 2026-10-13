@@ -73,12 +73,21 @@ def strip_links(value: object) -> object:
     )
 
 
-def append_detail(existing: object, addition: str | None) -> str | None:
-    if not addition:
-        return existing if isinstance(existing, str) else None
-    if isinstance(existing, str) and existing:
-        return f"{existing} {addition}"
-    return addition
+def with_document(
+    response: JsonObject,
+    data: dict[str, object],
+    document_json: object | None,
+    detail: str | None,
+) -> JsonObject:
+    updated_data = {**cast(dict[str, object], strip_links(data))}
+    if document_json is not None:
+        updated_data["documentJson"] = document_json
+    existing = response.get("details")
+    details = " ".join(part for part in (existing, detail) if isinstance(part, str) and part)
+    result: JsonObject = {**response, "data": updated_data}
+    if details:
+        result["details"] = details
+    return result
 
 
 async def fetch_document_json(
@@ -104,7 +113,15 @@ def build_search_companies() -> Callable[..., object]:
         company_number: str | None = None,
         iso_code: str | None = None,
     ) -> JsonObject:
-        """Search the Kyckr company registry by name or registration number."""
+        """
+        Search the Kyckr company registry by name or registration number. Either `name` or
+        `company_number` must be provided. Pass `iso_code` (ISO 3166 alpha-2, e.g. 'GB', 'AU') to
+        search a specific jurisdiction directly. Without `iso_code`, Kyckr performs a global search
+        over stored data; once you locate the right jurisdiction, repeat the search with that
+        `iso_code` to confirm the entity is currently active. The returned `id` is the Kyckr id
+        required by every other tool, passed as `kyckr_id`, and is the starting point for
+        `list_company_documents`. Free to call.
+        """
         normalized_name = name.strip() if name else None
         normalized_number = company_number.strip() if company_number else None
         if not normalized_name and not normalized_number:
@@ -124,7 +141,13 @@ def build_search_companies() -> Callable[..., object]:
 
 def build_lite_profile(settings: Settings) -> Callable[..., object]:
     async def get_lite_profile(kyckr_id: str) -> JsonObject:
-        """Get a Lite company profile with identification, address, dates, and status."""
+        """
+        Fetch a paid Lite company profile using a confirmed `kyckr_id`. Returns basic verified
+        registry details: company name, registration number, registered address, registration and
+        foundation dates, legal form, legal status, activities, and registration authority.
+        Consumes credits. Does not return directors, shareholders, or beneficial owners; use
+        `get_enhanced_profile` for those. For orderable filings, see `list_company_documents`.
+        """
         arguments = {"kyckrId": required_text(kyckr_id, "kyckr_id")}
         return await forward_response(
             optional_argument(
@@ -137,7 +160,15 @@ def build_lite_profile(settings: Settings) -> Callable[..., object]:
 
 def build_enhanced_profile(settings: Settings) -> Callable[..., object]:
     async def get_enhanced_profile(kyckr_id: str) -> JsonObject:
-        """Get an Enhanced company profile including governance and ownership data."""
+        """
+        Fetch a paid Enhanced company profile using a confirmed `kyckr_id`. Returns everything in
+        `get_lite_profile` plus representatives, ultimate beneficial owners, share capital, contact
+        details, and activity declarations. Use only when ownership or representative data is
+        needed; `get_lite_profile` is cheaper for basic identification. A `statusCode: 405`
+        response means the enhanced profile is not available for that jurisdiction; tell the user
+        and do not substitute `create_document_order`, which orders registry filings, not profile
+        data.
+        """
         arguments = {"kyckrId": required_text(kyckr_id, "kyckr_id")}
         return await forward_response(
             optional_argument(
@@ -153,7 +184,13 @@ def build_company_documents(settings: Settings) -> Callable[..., object]:
         kyckr_id: str,
         continuation_key: str | None = None,
     ) -> JsonObject:
-        """List registry documents available to order for a company."""
+        """
+        List official registry documents available to order for a company. The listing is free;
+        only `create_document_order` consumes credits. Each entry includes a product `id` (use as
+        `product_id` when ordering), `name`, `category`, `documentDate`, expected
+        `deliveryTimeMinutes`, and the credit `cost` of ordering. Paginate with `continuation_key`
+        when the response includes one.
+        """
         arguments: JsonObject = {"kyckrId": required_text(kyckr_id, "kyckr_id")}
         if continuation_key:
             arguments["continuationKey"] = continuation_key.strip()
@@ -167,7 +204,19 @@ def build_company_documents(settings: Settings) -> Callable[..., object]:
 
 def build_document_order(settings: Settings, download_tool: Tool) -> Callable[..., object]:
     async def create_document_order(kyckr_id: str, product_id: str) -> JsonObject:
-        """Order a registry document and inline its JSON payload when immediately available."""
+        """
+        Place a paid Kyckr order for an official registry document. Every successful call
+        spends credits and creates a real registry order; it is the only write-side tool.
+        Required: `kyckr_id` (from `search_companies`) and `product_id` (from
+        `list_company_documents`). Call directly once the user has named or chosen a
+        specific filing; do not ask for a separate confirmation, the cost is already known.
+        Returns `data.orderId` and `data.status`. On `status: "Success"` the JSON view of
+        the document is inlined under `data.documentJson`; render it to the user as a
+        readable summary. If `data.documentJson` is absent, `details` says the document is
+        PDF-only and PDF delivery is not yet supported; relay that message. On `status:
+        "Pending"`, poll `get_order(data.orderId)` until `data.documentJson` is populated or
+        `status` is `Failed`. Never mention download URLs.
+        """
         arguments = {
             "kyckrId": required_text(kyckr_id, "kyckr_id"),
             "productId": required_text(product_id, "product_id"),
@@ -187,14 +236,7 @@ def build_document_order(settings: Settings, download_tool: Tool) -> Callable[..
                 return {**response, "data": strip_links(data)}
             order_id = str(data["orderId"])
             document_json, detail = await fetch_document_json(download_tool, order_id)
-            updated_data = {**cast(dict[str, object], strip_links(data))}
-            if document_json is not None:
-                updated_data["documentJson"] = document_json
-            return {
-                **response,
-                "details": append_detail(response.get("details"), detail),
-                "data": updated_data,
-            }
+            return with_document(response, data, document_json, detail)
         except (KyckrApiError, ToolError) as exc:
             return error_response(exc)
 
@@ -203,7 +245,14 @@ def build_document_order(settings: Settings, download_tool: Tool) -> Callable[..
 
 def build_get_order(download_tool: Tool) -> Callable[..., object]:
     async def get_order(order_id: str | int) -> JsonObject:
-        """Poll an order and inline its JSON document when the order succeeds."""
+        """
+        Retrieve a single Kyckr order by `order_id`. Free to call. Use to poll an order placed via
+        `create_document_order` until `data.status` is `Success` or `Failed`. On `Success` the JSON
+        view of the document is inlined under `data.documentJson`; render it to the user as a
+        readable summary. If it is absent, `details` says the document is PDF-only and PDF
+        delivery is not yet supported; relay that message. Treat `statusCode: 410` as terminal:
+        the order is no longer retrievable, do not retry. Never mention download URLs.
+        """
         normalized_id = required_text(str(order_id), "order_id")
         try:
             response = success_response(await forward_payload({"orderId": normalized_id}))
@@ -213,14 +262,7 @@ def build_get_order(download_tool: Tool) -> Callable[..., object]:
             if data.get("status") != "Success":
                 return {**response, "data": strip_links(data)}
             document_json, detail = await fetch_document_json(download_tool, normalized_id)
-            updated_data = {**cast(dict[str, object], strip_links(data))}
-            if document_json is not None:
-                updated_data["documentJson"] = document_json
-            return {
-                **response,
-                "details": append_detail(response.get("details"), detail),
-                "data": updated_data,
-            }
+            return with_document(response, data, document_json, detail)
         except (KyckrApiError, ToolError) as exc:
             return error_response(exc)
 
@@ -233,7 +275,12 @@ def build_list_orders() -> Callable[..., object]:
         end_date: str | None = None,
         iso_code: str | None = None,
     ) -> JsonObject:
-        """List Kyckr orders, optionally filtered by date and jurisdiction."""
+        """
+        List previously placed Kyckr orders. Free to call. Optional filters: `start_date` and
+        `end_date` (ISO 8601) and `iso_code` (jurisdiction). Orders are under `data.orders[]`, with
+        paging in `data.pageNumber`, `data.pageSize` and `data.totalCount`. Each entry has the same
+        shape as `get_order.data`. Use to reconcile when an order id is not in context.
+        """
         arguments: JsonObject = {}
         if start_date:
             arguments["startDate"] = start_date.strip()

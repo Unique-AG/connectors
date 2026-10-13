@@ -174,3 +174,80 @@ def test_api_errors_are_returned_as_structured_tool_responses(
         }
     finally:
         asyncio.run(upstream.aclose())
+
+
+def test_order_without_upstream_details_omits_details_key(
+    settings: Settings,
+    spec: dict[str, object],
+) -> None:
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/download"):
+            return httpx2.Response(200, json={"Data": {"companyName": "Acme"}})
+        return httpx2.Response(200, json={"data": {"orderId": 7, "status": "Success"}})
+
+    upstream = httpx2.AsyncClient(
+        base_url="https://test-api.kyckr.com/v2",
+        transport=httpx2.MockTransport(handler),
+    )
+    try:
+        result = run_tool(build_server(settings, spec, upstream), "get_order", {"order_id": "7"})
+        assert result.structured_content == {
+            "success": True,
+            "data": {"orderId": 7, "status": "Success", "documentJson": {"companyName": "Acme"}},
+        }
+    finally:
+        asyncio.run(upstream.aclose())
+
+
+def test_pdf_only_order_appends_notice_to_upstream_details(
+    settings: Settings,
+    spec: dict[str, object],
+) -> None:
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/download"):
+            return httpx2.Response(404, json={"correlationId": "c", "data": {"detail": "none"}})
+        return httpx2.Response(
+            200, json={"details": "Success", "data": {"orderId": 7, "status": "Success"}}
+        )
+
+    upstream = httpx2.AsyncClient(
+        base_url="https://test-api.kyckr.com/v2",
+        transport=httpx2.MockTransport(handler),
+        event_hooks={"response": [raise_for_kyckr_error]},
+    )
+    try:
+        result = run_tool(build_server(settings, spec, upstream), "get_order", {"order_id": "7"})
+        content = result.structured_content
+        assert content is not None
+        assert str(content["details"]).startswith("Success ")
+        assert "only available as a PDF" in str(content["details"])
+        assert "documentJson" not in content["data"]
+    finally:
+        asyncio.run(upstream.aclose())
+
+
+def test_paid_tools_are_not_advertised_as_idempotent(
+    settings: Settings,
+    spec: dict[str, object],
+) -> None:
+    async def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"data": []})
+
+    upstream = httpx2.AsyncClient(
+        base_url="https://test-api.kyckr.com/v2",
+        transport=httpx2.MockTransport(handler),
+    )
+    try:
+        mcp = build_server(settings, spec, upstream)
+        not_idempotent = {
+            tool.name
+            for tool in asyncio.run(mcp.list_tools())
+            if tool.annotations and tool.annotations.idempotent_hint is False
+        }
+        assert not_idempotent == {
+            "get_lite_profile",
+            "get_enhanced_profile",
+            "create_document_order",
+        }
+    finally:
+        asyncio.run(upstream.aclose())

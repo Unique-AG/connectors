@@ -30,6 +30,12 @@ The OpenAPI document is fetched from `KYCKR_OPENAPI_URL` during startup. The def
 
 `https://developer.kyckr.com/openapi/company_v2.yaml`
 
+## Metrics and tracing
+
+`/metrics` carries the shared `mcp_calls_total` and `mcp_call_duration_seconds` per tool, plus `kyckr_api_requests_total`, `kyckr_api_request_duration_seconds`, and `kyckr_credits_consumed_total` for calls to Kyckr. Credits count only on paid calls (lite profile, enhanced profile, order creation) that succeed. The `path` label is the route template, never a raw id.
+
+Tracing is off unless `OTEL_TRACES_EXPORTER` or `OTEL_EXPORTER_OTLP_ENDPOINT` is set. FastMCP emits the tool spans, and each Kyckr call adds a child span. Calls that fail before a response arrives (timeouts, connection errors) are not counted or traced.
+
 ## Checks
 
 ```sh

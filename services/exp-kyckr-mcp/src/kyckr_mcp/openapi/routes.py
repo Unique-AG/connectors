@@ -20,6 +20,10 @@ MCP_NAMES = {
 
 EXPOSED = dict.fromkeys(MCP_NAMES, MCPType.TOOL)
 
+PAID_OPERATIONS = frozenset(
+    {"get-companies-kyckrId", "get-companies-kyckrId-enhanced", "post-orders"}
+)
+
 
 def route_map_fn(route: HTTPRoute, _default: MCPType) -> MCPType:
     return EXPOSED.get(route.operation_id or "", MCPType.EXCLUDE)
@@ -31,5 +35,7 @@ def annotate_component(
     if isinstance(component, OpenAPITool):
         component.annotations = ToolAnnotations(
             read_only_hint=route.method.upper() == "GET",
+            destructive_hint=False,
+            idempotent_hint=route.operation_id not in PAID_OPERATIONS,
             open_world_hint=True,
         )

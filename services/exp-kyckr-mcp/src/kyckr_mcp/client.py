@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 import httpx2
 
 from kyckr_mcp.settings import Settings
+from kyckr_mcp.telemetry import record_upstream_call, start_upstream_call
 
 UPSTREAM_HEADERS = frozenset(
     {
@@ -100,7 +101,10 @@ def create_client(settings: Settings) -> httpx2.AsyncClient:
             "Accept": "application/json",
         },
         event_hooks={
-            "request": [_request_hook(settings.kyckr_api_key.get_secret_value())],
-            "response": [raise_for_kyckr_error],
+            "request": [
+                _request_hook(settings.kyckr_api_key.get_secret_value()),
+                start_upstream_call,
+            ],
+            "response": [record_upstream_call, raise_for_kyckr_error],
         },
     )
