@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -54,6 +54,7 @@
   th:first-child, td:first-child { text-align: left; }
   thead th { position: sticky; top: 0; background: var(--surface-1); color: var(--text-secondary); font-weight: 600; }
   #status { color: var(--text-secondary); padding: 24px 0; }
+  /* biome-ignore lint/complexity/noImportantStyles: hidden must beat the display rules below */
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -61,7 +62,7 @@
 <div class="wrap">
   <div class="head">
     <div><h1 id="title">Cumulative return</h1><div class="sub" id="sub"></div></div>
-    <button class="toggle" id="toggle" aria-pressed="false" hidden>Table</button>
+    <button type="button" class="toggle" id="toggle" aria-pressed="false" hidden>Table</button>
   </div>
   <div id="status" role="status">Loading returns…</div>
   <ul class="legend" id="legend" hidden></ul>
@@ -74,13 +75,13 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   const svgEl = (tag, attrs = {}, ...children) => {
     const node = document.createElementNS(SVG_NS, tag);
-    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    for (const [key, value] of Object.entries(attrs)) { node.setAttribute(key, value); }
     node.append(...children);
     return node;
   };
   const htmlEl = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
-    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    for (const [key, value] of Object.entries(attrs)) { node.setAttribute(key, value); }
     node.append(...children);
     return node;
   };
@@ -99,7 +100,7 @@
     const step = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= raw);
     const low = Math.floor(min / step) * step, high = Math.max(Math.ceil(max / step) * step, low + step);
     const ticks = [];
-    for (let v = low; v <= high + step / 2; v += step) ticks.push(Math.round(v / step) * step);
+    for (let v = low; v <= high + step / 2; v += step) { ticks.push(Math.round(v / step) * step); }
     return ticks;
   }
 
@@ -115,9 +116,9 @@
   const notify = (method, params) => send({ method, params });
 
   window.addEventListener("message", (event) => {
-    if (event.source !== window.parent) return;
+    if (event.source !== window.parent) { return; }
     const message = event.data;
-    if (!message || message.jsonrpc !== "2.0") return;
+    if (message?.jsonrpc !== "2.0") { return; }
     if (message.id !== undefined && !message.method && pending.has(message.id)) {
       const { resolve, reject } = pending.get(message.id);
       pending.delete(message.id);
@@ -131,7 +132,11 @@
     }
   });
 
-  const applyTheme = (context) => { if (context?.theme) document.documentElement.dataset.theme = context.theme; };
+  const applyTheme = (context) => {
+    if (context?.theme) {
+      document.documentElement.dataset.theme = context.theme;
+    }
+  };
   new ResizeObserver(() => notify("ui/notifications/size-changed", { height: document.documentElement.scrollHeight })).observe(document.body);
 
   request("ui/initialize", { appInfo: { name: "tiingo-returns", version: "0.1.0" }, appCapabilities: {}, protocolVersion: "2026-01-26" })
@@ -177,7 +182,7 @@
     $("table-wrap").hidden = chart;
     $("toggle").textContent = chart ? "Table" : "Chart";
     $("toggle").setAttribute("aria-pressed", String(!chart));
-    if (chart) drawChart();
+    if (chart) { drawChart(); }
   }
   $("toggle").addEventListener("click", () => data && setView(view === "chart" ? "table" : "chart"));
 
@@ -235,7 +240,7 @@
     for (const e of ends) {
       svg.append(svgEl("circle", { cx: e.x, cy: e.y, r: 6, fill: "var(--surface-1)" }));
       svg.append(svgEl("circle", { cx: e.x, cy: e.y, r: 4, fill: color(e.i) }));
-      if (!crowded) svg.append(svgEl("text", { class: "end", x: e.x + 10, y: e.y, "dominant-baseline": "middle" }, e.label));
+      if (!crowded) { svg.append(svgEl("text", { class: "end", x: e.x + 10, y: e.y, "dominant-baseline": "middle" }, e.label)); }
     }
 
     const crosshair = svgEl("line", { y1: MARGIN.top, y2: MARGIN.top + plotH, stroke: "var(--text-muted)", "stroke-width": 1, visibility: "hidden" });
@@ -245,7 +250,14 @@
     host.append(svg);
 
     const tip = $("tip");
-    const hide = () => { active = null; tip.hidden = true; crosshair.setAttribute("visibility", "hidden"); dots.forEach((g) => g.setAttribute("visibility", "hidden")); };
+    const hide = () => {
+      active = null;
+      tip.hidden = true;
+      crosshair.setAttribute("visibility", "hidden");
+      dots.forEach((g) => {
+        g.setAttribute("visibility", "hidden");
+      });
+    };
     const show = (index) => {
       active = index;
       const x = X(times[index]);
@@ -253,7 +265,7 @@
       const rows = series.map((s, i) => {
         const point = s.points.find((p) => p.date === days[index]);
         dots[i].setAttribute("visibility", point ? "visible" : "hidden");
-        if (point) dots[i].setAttribute("transform", `translate(${x},${Y(point.return_pct)})`);
+        if (point) { dots[i].setAttribute("transform", `translate(${x},${Y(point.return_pct)})`); }
         const key = htmlEl("span", { class: "key" });
         key.style.background = color(i);
         return htmlEl("div", { class: "row" }, key, htmlEl("strong", {}, point ? fmtPct(point.return_pct) : "–"), htmlEl("span", { class: "name" }, s.ticker));
@@ -272,15 +284,15 @@
     svg.addEventListener("keydown", (event) => {
       const last = times.length - 1, at = active ?? last;
       const next = { ArrowLeft: Math.max(0, at - 1), ArrowRight: Math.min(last, at + 1), Home: 0, End: last }[event.key];
-      if (event.key === "Escape") return hide();
-      if (next === undefined) return;
+      if (event.key === "Escape") { return hide(); }
+      if (next === undefined) { return; }
       event.preventDefault();
       show(next);
     });
   }
 
   new ResizeObserver(() => {
-    if (data && view === "chart" && $("chart").clientWidth !== drawnWidth) drawChart();
+    if (data && view === "chart" && $("chart").clientWidth !== drawnWidth) { drawChart(); }
   }).observe($("chart"));
 })();
 </script>
