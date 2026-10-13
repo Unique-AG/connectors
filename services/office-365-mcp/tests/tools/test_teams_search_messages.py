@@ -804,7 +804,7 @@ class TestIncludeBody:
         )
 
         assert len(graph.calls) == 1, "no hydration request without being asked for one"
-        assert found.messages[0].text is None
+        assert found.messages[0].body is None
         assert found.messages[0].reactions == []
 
     async def test_a_chat_hit_is_hydrated_from_the_same_endpoint_teams_read_message_uses(
@@ -830,7 +830,7 @@ class TestIncludeBody:
 
         assert read.called
         message = found.messages[0]
-        assert message.text == "cut the release on Friday"
+        assert message.body == "cut the release on Friday"
         assert [reaction.reaction_type for reaction in message.reactions] == ["\U0001f44d"]
 
     async def test_a_channel_hit_is_hydrated_too(
@@ -850,7 +850,7 @@ class TestIncludeBody:
         )
 
         assert read.called
-        assert found.messages[0].text == "the plan for Friday"
+        assert found.messages[0].body == "the plan for Friday"
 
     async def test_an_unaddressable_hit_is_never_fetched(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -864,7 +864,7 @@ class TestIncludeBody:
         )
 
         assert len(graph.calls) == 1, "a hit with no handle has nothing to hydrate from"
-        assert found.messages[0].text is None
+        assert found.messages[0].body is None
 
     async def test_a_hit_graph_refuses_to_hydrate_keeps_its_summary_and_the_rest_of_the_page(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -902,10 +902,10 @@ class TestIncludeBody:
         )
 
         refused, answered = found.messages
-        assert refused.text is None and refused.reactions == []
+        assert refused.body is None and refused.reactions == []
         assert refused.summary is not None, "the snippet survives a hydration that could not"
         assert refused.uri is not None, "the handle survives too"
-        assert answered.text is not None
+        assert answered.body is not None
 
     async def test_every_addressable_hit_on_the_page_is_hydrated(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -924,7 +924,7 @@ class TestIncludeBody:
         )
 
         assert read.call_count == hit_count
-        assert all(message.text is not None for message in found.messages)
+        assert all(message.body is not None for message in found.messages)
 
     async def test_a_refused_search_is_not_softened_by_include_body(
         self, client: GraphServiceClient, graph: respx.MockRouter

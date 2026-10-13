@@ -200,7 +200,8 @@ class TestReadingTheRepliesOfOnePost:
 
         listed = await _list(client)
 
-        assert listed.messages[0].text == "ship it, then tell everyone"
+        assert listed.messages[0].body == "ship it, then tell everyone"
+        assert listed.messages[0].body_is_plain_text
         assert listed.messages[0].sender is not None
 
 

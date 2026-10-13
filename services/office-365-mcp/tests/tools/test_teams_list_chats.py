@@ -445,9 +445,10 @@ class TestTheLastMessage:
             ),
         )
 
-        assert listed.chats[0].last_message_preview == "See you at ten"
+        assert listed.chats[0].last_message_body == "  See you at ten \n"
+        assert listed.chats[0].last_message_body_is_plain_text
 
-    async def test_an_html_preview_loses_its_tags_and_its_entities(
+    async def test_an_html_body_stays_as_microsoft_sent_it(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         listed = await _listed(
@@ -464,30 +465,12 @@ class TestTheLastMessage:
             ),
         )
 
-        assert listed.chats[0].last_message_preview == "Ship it & go home now <ok>"
-
-    async def test_a_preview_over_120_characters_is_cut_and_marked(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        listed = await _listed(
-            graph,
-            client,
-            chat_payload(
-                "19:text@thread.v2",
-                preview={"body": {"contentType": "text", "content": "a" * 200}},
-            ),
-            chat_payload(
-                "19:html@thread.v2",
-                preview={"body": {"contentType": "html", "content": f"<p>{'b' * 200}</p>"}},
-            ),
+        assert listed.chats[0].last_message_body == (
+            "<p>Ship it &amp; <b>go</b> home&nbsp;now</p><p>&lt;ok&gt;</p>"
         )
+        assert not listed.chats[0].last_message_body_is_plain_text
 
-        assert [chat.last_message_preview for chat in listed.chats] == [
-            "a" * 120 + "…",
-            "b" * 120 + "…",
-        ]
-
-    async def test_a_deleted_message_has_no_preview_even_when_its_body_survives(
+    async def test_a_deleted_message_has_no_body_even_when_its_body_survives(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         listed = await _listed(
@@ -502,9 +485,9 @@ class TestTheLastMessage:
             ),
         )
 
-        assert listed.chats[0].last_message_preview is None
+        assert listed.chats[0].last_message_body is None
 
-    async def test_a_system_event_and_an_empty_body_have_no_preview_and_a_system_event_no_sender(
+    async def test_a_system_event_keeps_its_body_and_has_no_sender(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         listed = await _listed(
@@ -533,7 +516,11 @@ class TestTheLastMessage:
             ),
         )
 
-        assert [chat.last_message_preview for chat in listed.chats] == [None, None, None]
+        assert [chat.last_message_body for chat in listed.chats] == [
+            "<systemEventMessage/>",
+            "   ",
+            '<attachment id="ee8d34acd36d4dfe"></attachment>',
+        ]
         assert listed.chats[0].last_message_sender is None
 
     async def test_a_chat_nobody_posted_in_has_no_last_message_fields(
@@ -546,7 +533,7 @@ class TestTheLastMessage:
         )
 
         chat = listed.chats[0]
-        assert (chat.last_message_preview, chat.last_message_sender, chat.unread) == (
+        assert (chat.last_message_body, chat.last_message_sender, chat.unread) == (
             None,
             None,
             None,
