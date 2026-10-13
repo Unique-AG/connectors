@@ -24,7 +24,14 @@ After setup:
 - A `git pull` that merges or fast-forwards runs `agentic/hooks/post-merge`.
 - A `git pull --rebase` that replays local commits runs `agentic/hooks/post-rewrite`. A fast-forward rebase does not rewrite commits; Git runs `post-merge` for that update instead. `git commit --amend` does not install skills.
 
-Both hooks call `agentic/skill-management/install-skills.sh`. Running it again replaces the managed copies in place, so repeated pulls do not create duplicate skills. When a skill disappears from `agentic/skills/`, the script deletes that installed copy only if this script created it (a stamp file inside the skill, recorded in `.claude/skills/.skill-managed-manifest`). Other files under `.claude/`, including skills you installed yourself, are left alone.
+A new git worktree has its own ignored `.claude/skills/`. The setup lives in two scripts, and each tool's config only names them:
+
+- `scripts/worktree-up.sh` runs `pnpm install --frozen-lockfile`, then `install-skills.sh`.
+- `scripts/worktree-down.sh` is the teardown hook. Installed files live in the worktree directory, and the agent removes that directory. `core.hooksPath` stays on the clone.
+
+Cursor runs the up script from `.cursor/worktrees.json`. Paseo runs up and down from `paseo.json`, which it reads from the base branch. A worktree you create by hand runs `bash scripts/worktree-up.sh` from the worktree root. `setup.sh` stays once per clone. It is interactive, so the worktree scripts call `install-skills.sh` directly.
+
+`post-merge` and `post-rewrite` call `agentic/skill-management/install-skills.sh`. Running it again replaces the managed copies in place, so repeated pulls do not create duplicate skills. When a skill disappears from `agentic/skills/`, the script deletes that installed copy only if this script created it (a stamp file inside the skill, recorded in `.claude/skills/.skill-managed-manifest`). Other files under `.claude/`, including skills you installed yourself, are left alone.
 
 ## Security
 

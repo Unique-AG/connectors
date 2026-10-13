@@ -101,8 +101,11 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
   lives in `agentic/skills/<name>/` at the repository root. Both still need
   `metadata.internal: true`. They are not Skills CLI discovery containers. `agentic/skill-management/setup.sh`
   installs them with the Skills CLI into gitignored `.claude/skills/`. Run
-  `bash agentic/skill-management/update-skills.sh` to refresh that install without pulling. The
-  agents we use read `.claude/skills/`. Claude does not understand the `.agentic/skills` standard
+  `bash agentic/skill-management/update-skills.sh` to refresh that install without pulling. A new
+  worktree runs `bash scripts/worktree-up.sh`, which installs dependencies and skills into that
+  working tree. Cursor calls it from `.cursor/worktrees.json`, and Paseo calls it from `paseo.json`.
+  `scripts/worktree-down.sh` is the shared teardown. The agents we use read `.claude/skills/`.
+  Claude does not understand the `.agentic/skills` standard
   yet. Once it does, move these skills there and stop installing them into `.claude/skills/`.
 
 ## Formatting
