@@ -180,11 +180,7 @@ async def create_text_file(
             with graph_step(STEP_CREATE_FILE):
                 written = await send_parsed(client, request, DriveItem)
             created = await summary_after_write(
-                client,
-                handle.drive_id,
-                written,
-                item_id=None if written is None else written.id,
-                unread=_WRITTEN_BUT_UNREAD,
+                client, handle.drive_id, written, unread=_WRITTEN_BUT_UNREAD
             )
 
     if asked is not None:

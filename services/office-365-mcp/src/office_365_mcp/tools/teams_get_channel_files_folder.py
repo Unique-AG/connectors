@@ -3,7 +3,6 @@ from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
@@ -33,12 +32,6 @@ Notes:
 error.\
 """
 
-_NO_DRIVE = (
-    "Microsoft 365 answered without the drive id of the files folder of this channel. This "
-    + "connector cannot browse a folder without that id. The arguments are not the problem. Tell "
-    + "the user to open the Files tab of the channel in Teams."
-)
-
 
 async def teams_get_channel_files_folder(
     client: GraphServiceClient, *, team_id: str, channel_id: str
@@ -49,10 +42,7 @@ async def teams_get_channel_files_folder(
         )
 
     assert item is not None, "Graph answered a channel files folder read with no item"
-    folder = DriveItemSummary.from_item(item)
-    if folder is None:
-        raise ToolError(_NO_DRIVE)
-    return folder
+    return DriveItemSummary.from_item(item)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

@@ -115,7 +115,7 @@ class SharingLink(BaseModel):
             + "to sharepoint_browse_folder."
         )
     )
-    web_url: str = Field(
+    share_url: str = Field(
         description=(
             "The link itself, for the user to give to other people. Every person that `audience` "
             + "names can open the item with it. The link does not expire unless the organization "
@@ -197,7 +197,7 @@ def _answer(handle: DriveFileHandle | DriveFolderHandle, created: Permission | N
     if link is None or link.web_url is None:
         raise ToolError(_NO_WEB_ADDRESS)
     return SharingLink(
-        item_uri=handle.uri, web_url=link.web_url, access=link.type, audience=link.scope
+        item_uri=handle.uri, share_url=link.web_url, access=link.type, audience=link.scope
     )
 
 

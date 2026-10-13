@@ -920,26 +920,6 @@ class TestWhatItAnswers:
         assert isinstance(raised.value.__cause__, GraphNotFound)
         assert patch.call_count == 1
 
-    async def test_a_read_after_the_move_with_no_drive_says_that_the_item_moved(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(_ITEM_PATH).mock(
-            side_effect=[
-                httpx.Response(200, json=_file_payload()),
-                httpx.Response(
-                    200, json={**_moved_payload(), "parentReference": {"id": FOLDER_ID}}
-                ),
-            ]
-        )
-        _ = graph.get(_FOLDER_PATH).mock(return_value=httpx.Response(200, json=_folder_payload()))
-        patch = _patches(graph, httpx.Response(204))
-
-        with pytest.raises(Advised, match="Microsoft 365 moved the item") as raised:
-            _ = await _move(client)
-
-        assert "makes no second change" in str(raised.value)
-        assert patch.call_count == 1
-
 
 class TestGraphFailures:
     async def test_a_404_on_the_item_read_is_a_not_found_and_nothing_is_patched(

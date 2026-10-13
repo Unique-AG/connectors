@@ -149,15 +149,15 @@ class TestWhatItAnswers:
         assert answer.is_folder is True
         assert answer.child_count == 3
 
-    async def test_an_item_with_no_drive_is_refused(
+    async def test_an_item_with_no_drive_is_answered_with_its_web_address_and_no_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.route().mock(return_value=httpx.Response(200, json=_item_payload(drive_id=None)))
 
-        with pytest.raises(ToolError, match="did not report the drive") as refused:
-            _ = await _resolve(client)
+        answer = await _resolve(client)
 
-        assert "open the link in a browser" in str(refused.value)
+        assert answer.uri is None
+        assert answer.web_url == "https://contoso.sharepoint.invalid/sites/Finance/Quarterly.pdf"
 
 
 class TestWhatItRefuses:

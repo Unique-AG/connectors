@@ -384,7 +384,7 @@ class TestWhatItAnswers:
 
         assert answer.previous_name is None
 
-    async def test_a_patch_answer_with_no_drive_is_read_again_for_the_answer(
+    async def test_a_patch_answer_with_no_content_is_read_again_for_the_answer(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         reads = graph.get(_ITEM_PATH).mock(
@@ -393,9 +393,7 @@ class TestWhatItAnswers:
                 httpx.Response(200, json=_item_payload(name=_NEW_NAME)),
             ]
         )
-        patch = graph.patch(_ITEM_PATH).mock(
-            return_value=httpx.Response(200, json={"id": _FILE_ID, "name": _NEW_NAME, "file": {}})
-        )
+        patch = graph.patch(_ITEM_PATH).mock(return_value=httpx.Response(204))
 
         answer = await _rename(client)
 
@@ -483,9 +481,7 @@ class TestGraphFailures:
         _ = graph.get(_ITEM_PATH).mock(
             side_effect=[httpx.Response(200, json=_item_payload()), _not_found()]
         )
-        patch = graph.patch(_ITEM_PATH).mock(
-            return_value=httpx.Response(200, json={"id": _FILE_ID, "name": _NEW_NAME, "file": {}})
-        )
+        patch = graph.patch(_ITEM_PATH).mock(return_value=httpx.Response(204))
 
         with pytest.raises(Advised, match="Microsoft 365 renamed the item.") as raised:
             _ = await _rename(client)
@@ -499,9 +495,7 @@ class TestGraphFailures:
         _ = graph.get(_ITEM_PATH).mock(
             side_effect=[httpx.Response(200, json=_item_payload()), _not_found()]
         )
-        _ = graph.patch(_ITEM_PATH).mock(
-            return_value=httpx.Response(200, json={"id": _FILE_ID, "name": _NEW_NAME, "file": {}})
-        )
+        _ = graph.patch(_ITEM_PATH).mock(return_value=httpx.Response(204))
 
         message = await _advised(client)
 
@@ -509,22 +503,6 @@ class TestGraphFailures:
         assert "nothing was renamed" not in message, (
             "the 404 advice replaced a rename that happened"
         )
-
-    async def test_a_re_read_with_no_drive_is_also_reported_as_a_rename_that_happened(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = graph.get(_ITEM_PATH).mock(
-            side_effect=[
-                httpx.Response(200, json=_item_payload()),
-                httpx.Response(200, json=_item_payload(name=_NEW_NAME, parent=None)),
-            ]
-        )
-        _ = graph.patch(_ITEM_PATH).mock(
-            return_value=httpx.Response(200, json={"id": _FILE_ID, "name": _NEW_NAME, "file": {}})
-        )
-
-        with pytest.raises(Advised, match="Microsoft 365 renamed the item."):
-            _ = await _rename(client)
 
     async def test_the_call_example_reaches_graph_and_the_pre_read_is_what_a_403_refuses(
         self, client: GraphServiceClient, graph: respx.MockRouter

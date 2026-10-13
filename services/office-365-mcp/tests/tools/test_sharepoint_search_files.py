@@ -131,7 +131,7 @@ class TestWhichSitesHoldTheMatches:
             client, query="report", offset=0, limit=25
         )
 
-        assert [(s.url, s.match_count) for s in answer.sites] == [
+        assert [(s.web_url, s.match_count) for s in answer.sites] == [
             (_SITE, 209),
             ("https://contoso.sharepoint.invalid/sites/BugBash", 20),
         ]
@@ -636,7 +636,7 @@ class TestTheHandleItMints:
         assert found.files[0].created_by is None
 
 
-class TestHitsThisToolCannotUse:
+class TestWhichHitsBecomeRows:
     async def test_a_hit_whose_resource_is_not_a_drive_item_is_skipped(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -648,7 +648,7 @@ class TestHitsThisToolCannotUse:
 
         assert [item.name for item in found.files] == ["Budget 2026.xlsx"]
 
-    async def test_a_hit_with_no_drive_id_is_skipped(
+    async def test_a_hit_with_no_drive_id_is_listed_with_its_web_address_and_no_handle(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _matching(
@@ -661,18 +661,10 @@ class TestHitsThisToolCannotUse:
             client, query="budget", offset=0, limit=25
         )
 
-        assert [item.name for item in found.files] == ["Plan.docx"]
-
-    async def test_one_unusable_hit_does_not_cost_the_caller_the_page(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _matching(graph, _file_hit(drive_id=None), chat_hit())
-
-        found = await sharepoint_search_files.sharepoint_search_files(
-            client, query="budget", offset=0, limit=25
-        )
-
-        assert found.files == []
+        assert [item.name for item in found.files] == ["Budget 2026.xlsx", "Plan.docx"]
+        assert found.files[0].uri is None
+        assert found.files[0].web_url == f"{_SITE}/Shared%20Documents/01SYNTHETICITEM0008"
+        assert found.files[1].uri is not None
 
 
 class TestPagingAndItsHonesty:
@@ -697,7 +689,7 @@ class TestPagingAndItsHonesty:
     ) -> None:
         _ = _matching(
             graph,
-            _file_hit(item_id="01SYNTHETICITEM0001", drive_id=None),
+            _file_hit(item_id="01SYNTHETICITEM0001"),
             chat_hit(),
             _file_hit(item_id="01SYNTHETICITEM0003"),
             more=True,
@@ -707,7 +699,7 @@ class TestPagingAndItsHonesty:
             client, query="budget", offset=0, limit=25
         )
 
-        assert len(found.files) == 1
+        assert len(found.files) == 2
         assert found.next_offset == 3
 
     async def test_the_last_page_offers_no_next_offset(

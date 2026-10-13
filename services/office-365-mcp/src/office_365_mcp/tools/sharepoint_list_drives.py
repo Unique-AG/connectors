@@ -61,9 +61,9 @@ class DriveSummary(BaseModel):
     )
     web_url: str | None = Field(
         description=(
-            "The address that opens this drive in a browser. Show it to the user. It is not a "
-            + "folder handle, so do not pass it to sharepoint_browse_folder. Null when Graph "
-            + "reported none."
+            "The address that opens this drive in a browser. Always give it to the user when you "
+            + "answer about this drive. It is not a folder handle, so do not pass it to "
+            + "sharepoint_browse_folder. Null when Graph reported none."
         )
     )
     owner_name: str | None = Field(

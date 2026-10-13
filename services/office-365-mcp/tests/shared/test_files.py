@@ -33,7 +33,7 @@ from office_365_mcp.shared.files import (
     summary_after_write,
     unusable_name,
 )
-from office_365_mcp.shared.handles import DriveFileHandle
+from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import Advised
 
@@ -59,6 +59,8 @@ _ITEM_ID = "01SYNTHETICITEM0001"
 _FOLDER_PATH = "/drives/b%21SYNTHETICDRIVE0001/items/01SYNTHETICFOLDER0001"
 _ITEM_PATH = "/drives/b%21SYNTHETICDRIVE0001/items/01SYNTHETICITEM0001"
 
+_WEB_URL = "https://contoso.sharepoint.invalid/sites/finance/Shared-Documents/Budget.xlsx"
+
 _UNREAD = "Microsoft 365 made the synthetic change. Then this connector did not receive the item."
 
 _RESERVED = '"*:<>?/\\|'
@@ -74,9 +76,7 @@ def _item(created_by: IdentitySet | None) -> DriveItem:
 
 
 def _summary(created_by: IdentitySet | None) -> DriveItemSummary:
-    summary = DriveItemSummary.from_item(_item(created_by))
-    assert summary is not None
-    return summary
+    return DriveItemSummary.from_item(_item(created_by))
 
 
 class TestDriveItemSummaryCreatedBy:
@@ -97,6 +97,34 @@ class TestDriveItemSummaryCreatedBy:
         summary = _summary(None)
 
         assert summary.created_by is None
+
+
+class TestDriveItemSummaryHandle:
+    def test_a_drive_and_an_id_make_the_handle(self) -> None:
+        summary = DriveItemSummary.from_item(_item(None))
+
+        assert summary.uri == DriveFileHandle(_DRIVE_ID, _ITEM_ID).uri
+
+    def test_an_item_with_no_drive_is_still_a_summary_with_its_web_address_and_no_handle(
+        self,
+    ) -> None:
+        item = DriveItem(id=_ITEM_ID, name="Budget 2026.xlsx", web_url=_WEB_URL)
+
+        summary = DriveItemSummary.from_item(item)
+
+        assert (summary.uri, summary.parent_uri) == (None, None)
+        assert summary.web_url == _WEB_URL
+
+    def test_an_item_with_no_id_has_no_handle_and_keeps_its_web_address(self) -> None:
+        item = DriveItem(
+            parent_reference=ItemReference(drive_id=_DRIVE_ID, id=_FOLDER_ID), web_url=_WEB_URL
+        )
+
+        summary = DriveItemSummary.from_item(item)
+
+        assert summary.uri is None
+        assert summary.parent_uri == DriveFolderHandle(_DRIVE_ID, _FOLDER_ID).uri
+        assert summary.web_url == _WEB_URL
 
 
 class TestUnusableName:
@@ -204,11 +232,13 @@ class TestItemForAQuestion:
             _ = await item_for_a_question(client, _DRIVE_ID, _FOLDER_ID)
 
 
-def _reread_payload(*, with_drive: bool = True) -> dict[str, object]:
-    payload: dict[str, object] = {"id": _ITEM_ID, "name": "Budget 2026.xlsx", "file": {}}
-    if with_drive:
-        payload["parentReference"] = {"driveId": _DRIVE_ID, "id": _FOLDER_ID}
-    return payload
+def _reread_payload() -> dict[str, object]:
+    return {
+        "id": _ITEM_ID,
+        "name": "Budget 2026.xlsx",
+        "file": {},
+        "parentReference": {"driveId": _DRIVE_ID, "id": _FOLDER_ID},
+    }
 
 
 class TestSummaryAfterWrite:
@@ -226,7 +256,7 @@ class TestSummaryAfterWrite:
         assert summary.uri == DriveFileHandle(_DRIVE_ID, _ITEM_ID).uri
         assert reread.call_count == 0
 
-    async def test_an_answer_with_no_drive_is_read_again_once_by_the_given_id(
+    async def test_no_answer_is_read_again_once_by_the_given_id(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         reread = graph.get(_ITEM_PATH).mock(
@@ -234,7 +264,7 @@ class TestSummaryAfterWrite:
         )
 
         summary = await summary_after_write(
-            client, _DRIVE_ID, DriveItem(id=_ITEM_ID), item_id=_ITEM_ID, unread=_UNREAD
+            client, _DRIVE_ID, None, item_id=_ITEM_ID, unread=_UNREAD
         )
 
         assert reread.call_count == 1
@@ -265,21 +295,6 @@ class TestSummaryAfterWrite:
 
         assert str(raised.value) == _UNREAD
         assert len(graph.calls) == 0
-
-    async def test_a_read_again_with_no_drive_raises_the_given_advice(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        reread = graph.get(_ITEM_PATH).mock(
-            return_value=httpx.Response(200, json=_reread_payload(with_drive=False))
-        )
-
-        with pytest.raises(Advised) as raised:
-            _ = await summary_after_write(
-                client, _DRIVE_ID, DriveItem(id=_ITEM_ID), item_id=_ITEM_ID, unread=_UNREAD
-            )
-
-        assert str(raised.value) == _UNREAD
-        assert reread.call_count == 1
 
 
 class TestItemAccessRefused:

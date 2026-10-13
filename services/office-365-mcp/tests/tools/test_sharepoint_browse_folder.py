@@ -275,7 +275,7 @@ class TestTheLevelItAnswers:
         assert [row.name for row in below.items] == ["Budget.xlsx"]
 
     @pytest.mark.usefixtures("my_drive")
-    async def test_an_item_microsoft_named_no_drive_for_is_left_out(
+    async def test_an_item_microsoft_named_no_drive_for_is_listed_with_its_web_address_only(
         self, client: GraphServiceClient, root_children: respx.Route
     ) -> None:
         root_children.mock(
@@ -287,7 +287,9 @@ class TestTheLevelItAnswers:
 
         level = await browser.browse_folder(client, limit=25)
 
-        assert [row.name for row in level.items] == ["Budget.xlsx"]
+        assert [row.name for row in level.items] == ["Budget.xlsx", "Notes.txt"]
+        assert level.items[1].uri is None
+        assert level.items[1].web_url == f"https://contoso.sharepoint.invalid/items/{_NOTES_ID}"
 
     @pytest.mark.usefixtures("my_drive")
     async def test_the_pages_of_one_level_are_followed_rather_than_read_once(
@@ -483,22 +485,6 @@ class TestTheOrderItGives:
         assert [row.name for row in level.items] == ["Budget.xlsx", "Notes.txt"]
         assert level.capped is False
         assert level.order_covers_level is True
-
-    @pytest.mark.usefixtures("my_drive")
-    async def test_an_item_left_out_for_want_of_a_drive_does_not_count_as_a_cut(
-        self, client: GraphServiceClient, root_children: respx.Route
-    ) -> None:
-        root_children.mock(
-            return_value=_page(
-                _item_payload(_BUDGET_ID, name="Budget.xlsx"),
-                _item_payload(_NOTES_ID, name="Notes.txt", drive_id=None),
-            )
-        )
-
-        level = await browser.browse_folder(client, limit=1, order_by="name")
-
-        assert [row.name for row in level.items] == ["Budget.xlsx"]
-        assert level.capped is False
 
     @pytest.mark.usefixtures("my_drive")
     async def test_a_level_of_1000_items_is_read_to_its_end(

@@ -47,13 +47,6 @@ _NOT_A_WEB_ADDRESS = (
     + "you call this tool again with the same arguments, the call will fail the same way."
 )
 
-_NO_DRIVE = (
-    "Microsoft 365 found the item that this link opens, but it did not report the drive and the "
-    + "id of that item. A handle needs both, so this tool cannot give a handle for this item. "
-    + "Tell the user to open the link in a browser. If you call this tool again with the same "
-    + "arguments, the call will fail the same way."
-)
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 found no file or folder at this link. The link can be expired or removed. It "
     + "can also be a link that does not open for the signed-in user. If this address is not a "
@@ -85,10 +78,7 @@ async def resolve_url(client: GraphServiceClient, *, url: str) -> DriveItemSumma
             )
         )
     assert item is not None, "Graph answered a shared item read with no item"
-    summary = DriveItemSummary.from_item(item)
-    if summary is None:
-        raise ToolError(_NO_DRIVE)
-    return summary
+    return DriveItemSummary.from_item(item)
 
 
 def _is_web_address(url: str) -> bool:
