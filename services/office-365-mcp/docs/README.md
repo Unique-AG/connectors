@@ -476,6 +476,7 @@ model then tells the user.
 | --- | --- |
 | An attachment of a message or an event is larger than 10 MB | The tool refuses the attachment. It never sends part of a file. The user opens the message in Outlook. |
 | An attachment is a message, an event, or a cloud link | The tool refuses the attachment. The user opens it in Outlook. |
+| A user wants to send a message with a file | No tool adds a file to a draft. The user adds the file in Outlook before the send. A forward keeps the files of the original message. |
 | A user searches for the words inside an attachment | The search matches the file name only. A read returns the file in its own format, not as text. |
 | A mailbox forwards its mail | The tools cannot see a forward that is set on the mailbox. A list of rules with no forward does not prove that nobody forwards the mail. |
 
