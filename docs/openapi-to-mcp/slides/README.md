@@ -9,6 +9,8 @@ bun run dev      # http://localhost:3030
 
 With pnpm, run `pnpm install --ignore-workspace` so the repo's root lockfile stays untouched.
 
+There is no lockfile on purpose. The three direct dependencies are pinned in `package.json`, and a lockfile would add thousands of lines to the repo and to dependency scanning for a presentation deck. Lockfiles are gitignored here, so a local install does not leave one in your diff.
+
 To export a PDF, install a Chromium once, then run the export:
 
 ```sh
