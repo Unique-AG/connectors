@@ -41,7 +41,7 @@ The tables use these symbols.
 | Kind | 🔴 | The tool changes or removes data. |
 | Admin consent | ⚠️ | An administrator must grant consent. |
 | User approval | ✋ | The tool asks the user every time. |
-| User approval | 🤝 | The tool asks the user only in the case that the cell names. |
+| User approval | 🤝 | The tool asks the user in some cases only. The text next to the symbol gives the case. |
 
 ### Identity
 
