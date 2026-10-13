@@ -24,16 +24,16 @@ null (the default) leaves the variable unset.
   value: {{ tpl .Values.mcpConfig.backstop.uiBaseUrl . | quote }}
 {{- end }}
 {{- $employment := .Values.mcpConfig.employment | default dict }}
-{{- $employmentEnv := dict
-  "relationshipTypeIds" "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS"
-  "relationshipTypeMarkers" "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS"
-  "formerRelationshipTypeIds" "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS"
-  "formerRelationshipTypeMarkers" "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS"
+{{- $employmentEnv := list
+  (list "relationshipTypeIds" "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS")
+  (list "relationshipTypeMarkers" "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS")
+  (list "formerRelationshipTypeIds" "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS")
+  (list "formerRelationshipTypeMarkers" "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS")
 }}
-{{- range $field, $name := $employmentEnv }}
-{{- $items := index $employment $field }}
+{{- range $pair := $employmentEnv }}
+{{- $items := index $employment (first $pair) }}
 {{- if not (kindIs "invalid" $items) }}
-- name: {{ $name }}
+- name: {{ last $pair }}
   value: {{ join "," $items | quote }}
 {{- end }}
 {{- end }}
