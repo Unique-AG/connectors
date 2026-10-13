@@ -37,4 +37,10 @@ null (the default) leaves the variable unset.
   value: {{ join "," $items | quote }}
 {{- end }}
 {{- end }}
+{{/* Top-level tenantGuidance is deprecated and read only while mcpConfig.tenantGuidance is empty. */}}
+{{- $guidance := .Values.mcpConfig.tenantGuidance | default .Values.tenantGuidance }}
+{{- if $guidance }}
+- name: BACKSTOP_MCP_TENANT_GUIDANCE
+  value: {{ toJson $guidance | quote }}
+{{- end }}
 {{- end -}}

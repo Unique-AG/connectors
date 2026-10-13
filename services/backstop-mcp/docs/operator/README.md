@@ -88,7 +88,7 @@ flowchart LR
 2. Generates a Fernet key and stores it as the `BACKSTOP_MCP_ENCRYPTION_KEY` secret.
 3. Deploys the chart through Unique's deployment overlay, which sets the hostname, TLS, Gateway API
    route, and network policy, and sets `mcpConfig.app.publicBaseUrl` to that hostname.
-4. Applies the client's Backstop settings in `mcpConfig` and their guidance in `tenantGuidance`.
+4. Applies the client's Backstop settings and tenant guidance in `mcpConfig`.
    See [Configuration: Chart values](./configuration.md#Chart-values).
 5. Verifies the deployment (see [Verify](#Verify)) and sends the client the MCP endpoint,
    `https://<host>/mcp`. Steps 1 to 3 of Verify need no Backstop login. Step 4 does:

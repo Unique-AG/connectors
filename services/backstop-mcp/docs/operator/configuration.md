@@ -27,7 +27,6 @@ Only two variables have no usable default in production: `PUBLIC_BASE_URL` and
 | Kind | Where | Example |
 |---|---|---|
 | Per-firm settings | `mcpConfig`, checked by the chart schema | `mcpConfig: { backstop: { baseUrl: https://<firm>.backstopsolutions.com } }`. See [Chart values](#Chart-values) |
-| Tenant guidance | `tenantGuidance` object, rendered as JSON into `BACKSTOP_MCP_TENANT_GUIDANCE` | See [Tenant guidance](#Tenant-Guidance) |
 | Tuning (caches, timeouts, page sizes, logging) | `env` map (rendered into a ConfigMap) | `env: { SEARCH_RESULT_SIZE: "200" }` |
 | Secrets | `envVars` list, native Kubernetes syntax | `- name: BACKSTOP_MCP_ENCRYPTION_KEY` with `valueFrom.secretKeyRef` |
 | Database | `postgresql.connection`, which injects `DATABASE_URL` | `url: { fromSecret: { name: ..., key: ... } }` |
@@ -45,6 +44,7 @@ The settings that differ per firm have typed values under `mcpConfig`:
 | `mcpConfig.employment.relationshipTypeMarkers` | `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
 | `mcpConfig.employment.formerRelationshipTypeIds` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | List |
 | `mcpConfig.employment.formerRelationshipTypeMarkers` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
+| `mcpConfig.tenantGuidance` | `BACKSTOP_MCP_TENANT_GUIDANCE` | Object, rendered as JSON. See [Tenant guidance](#Tenant-Guidance) |
 
 ```yaml
 mcpConfig:
@@ -65,11 +65,14 @@ mcpConfig:
   empty value. The chart default `null` leaves the variable unset. This matters for the markers
   lists: `[]` replaces their defaults, `null` keeps them. See
   [Departed-contact detection](#Departed-Contact-Detection).
+- `mcpConfig.tenantGuidance` is rendered only when it is not empty.
 - `mcpConfig.enabled: false` renders none of these variables.
 - A variable set both under `mcpConfig` and under `env` takes the `mcpConfig` value. `env` reaches
   the container through a ConfigMap (`envFrom`), and Kubernetes gives a container's own `env`
   entries precedence over it. A deployment that still sets these variables under `env` keeps
   working, and can move them to `mcpConfig` at any time.
+- The top-level `tenantGuidance` value is deprecated. It is still read while
+  `mcpConfig.tenantGuidance` is empty, so a deployment that sets it keeps working until it moves.
 
 ## Required
 
@@ -190,18 +193,19 @@ types mean employment and which mean it has ended.
 ## Tenant Guidance
 
 `BACKSTOP_MCP_TENANT_GUIDANCE` adds firm-specific text to what the AI reads, without changing the
-shipped tool descriptions. In Helm, set the `tenantGuidance` object; the chart renders it as JSON
-into the variable, and omits the variable when the object is empty.
+shipped tool descriptions. In Helm, set the `mcpConfig.tenantGuidance` object; the chart renders it
+as JSON into the variable, and omits the variable when the object is empty.
 
 ```yaml
-tenantGuidance:
-  server_instructions: >-
-    "Strategy" on a product is the custom field named Investment Strategy.
-  tools:
-    search_products:
-      description: Fund short names start with NW, for example NWGM.
-      parameters:
-        name: Short names are upper case.
+mcpConfig:
+  tenantGuidance:
+    server_instructions: >-
+      "Strategy" on a product is the custom field named Investment Strategy.
+    tools:
+      search_products:
+        description: Fund short names start with NW, for example NWGM.
+        parameters:
+          name: Short names are upper case.
 ```
 
 | Field | Limit | Appended to |

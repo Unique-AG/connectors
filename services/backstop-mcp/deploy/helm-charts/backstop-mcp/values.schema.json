@@ -2104,47 +2104,55 @@
             }
           },
           "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "tenantGuidance": {
-      "type": "object",
-      "description": "Text appended to the server instructions and to individual tool and parameter descriptions. Empty means the shipped descriptions only. Set per deployment; the chart ships tenant-neutral.",
-      "additionalProperties": false,
-      "properties": {
-        "server_instructions": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 2500,
-          "description": "Free text appended to the server instructions."
         },
-        "tools": {
+        "tenantGuidance": {
           "type": "object",
-          "description": "Per-tool text, keyed by tool name.",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "description": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 800,
-                "description": "Free text appended to this tool's description."
-              },
-              "parameters": {
+          "description": "BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. Text appended to the server instructions and to individual tool and parameter descriptions. Empty means the shipped descriptions only. Set per deployment; the chart ships tenant-neutral.",
+          "additionalProperties": false,
+          "properties": {
+            "server_instructions": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2500,
+              "description": "Free text appended to the server instructions."
+            },
+            "tools": {
+              "type": "object",
+              "description": "Per-tool text, keyed by tool name.",
+              "additionalProperties": {
                 "type": "object",
-                "description": "Free text appended to a top-level input property, keyed by property name.",
-                "additionalProperties": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 300
+                "additionalProperties": false,
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800,
+                    "description": "Free text appended to this tool's description."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "description": "Free text appended to a top-level input property, keyed by property name.",
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    }
+                  }
                 }
               }
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
+    },
+    "tenantGuidance": {
+      "description": "Deprecated: use mcpConfig.tenantGuidance. Read only while mcpConfig.tenantGuidance is empty.",
+      "allOf": [
+        {
+          "$ref": "#/properties/mcpConfig/properties/tenantGuidance"
+        }
+      ]
     }
   },
   "$defs": {
