@@ -72,7 +72,7 @@ layout: section
 | path, query, header and body parameters | input schema |
 | the first `2xx` response schema | output schema |
 
-The LLM sees what the spec says, so a thin or wrong spec gives thin or wrong tools.
+The LLM sees only what the spec says, so vague descriptions and wrong schemas go straight into the tools.
 
 ---
 
@@ -339,8 +339,6 @@ We called every tool against the live API and compared. FastMCP builds each tool
 | `IexTopOfBook` quote fields | never null | null outside market hours |
 | a fundamentals statement section | one pair | a list of pairs |
 | `DailyMeta` dates | never null | null when there is no price data |
-
-Call every tool live before you trust a third-party spec.
 
 ---
 class: tiingo
