@@ -50,6 +50,8 @@ Not covered: durable OAuth storage (it is in memory, and the auth is expected to
 
 `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .` and `uv run basedpyright` (src only).
 
+CI also runs `pnpm exec biome check .` from this folder, which covers the widget in `apps/returns.html`.
+
 ## Adding a tool
 
 - As-is: add its operationId to the `MCPType.TOOL` group in `EXPOSED`.
