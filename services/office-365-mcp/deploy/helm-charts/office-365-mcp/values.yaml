@@ -60,10 +60,10 @@ ports:
 
 resources:
   limits:
-    memory: 384Mi
+    memory: 512Mi
   requests:
     cpu: 25m
-    memory: 256Mi
+    memory: 512Mi
 
 probes:
   enabled: true
