@@ -30,7 +30,7 @@ The server shows what OpenAPI and FastMCP give you, from a plain pass-through to
 6. Outgoing requests carry only an allow-list of headers to Tiingo, so headers a client sends to this server are not forwarded upstream.
 7. Tests run the tools through an in-memory client against a mocked Tiingo transport. Ruff and basedpyright are part of the checks.
 
-Not covered: durable OAuth storage (it is in memory, and the auth is expected to change), the deploy files (carried over from another setup and not run), a real Zitadel login (tested only against mocked discovery), and the chart in any host other than the MCP Inspector.
+Not covered: durable OAuth storage (it is in memory, and the auth is expected to change), a deployment (there are no deploy files, container image or Helm chart), a real Zitadel login (tested only against mocked discovery), and the chart in any host other than the MCP Inspector.
 
 ## Layout
 
@@ -41,7 +41,6 @@ Not covered: durable OAuth storage (it is in memory, and the auth is expected to
 - `models/`: pydantic output models. `vendor_responses.py` is generated from the spec, with one model per response of every operation in `EXPOSED` (all fields optional) and the spec's field descriptions. `FIELDS` in the script limits a model to the fields a tool returns, and undeclared vendor fields are dropped. Regenerate with `uv run scripts/generate_response_models.py` after changing the spec, `EXPOSED` or `FIELDS`. Only the wrapped tools use these models. The other tools get their output schema from FastMCP, which reads the spec.
 - `apps/returns.html`: the MCP App widget.
 - `scripts/`: `generate_response_models.py`. `tests/`: the tests.
-- `deploy/`: `config.sh`, `Dockerfile` and `.env.deploy.example`, carried over from another setup. They are not adapted to this repository and have not been run.
 
 ## MCP App
 
