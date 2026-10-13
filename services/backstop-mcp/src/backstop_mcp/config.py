@@ -4,6 +4,7 @@ import ssl
 from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
+from pathlib import Path
 from typing import Annotated, ClassVar, Self, TypedDict, cast
 from urllib.parse import urlparse
 
@@ -64,7 +65,7 @@ class AsyncpgConnectArgs(TypedDict, total=False):
     ssl: ssl.SSLContext
 
 
-def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
+def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | None:
     """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
     if sslmode in ("disable", "allow"):
         return None
@@ -76,12 +77,17 @@ def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
         return ctx
     if sslmode == "verify-ca":
         # Libpq verify-ca checks the CA chain only — not the hostname (that is verify-full).
-        ctx = ssl.create_default_context()
+        ctx = ssl.create_default_context(cafile=cafile)
         ctx.check_hostname = False
         return ctx
     if sslmode in ("verify", "verify-full"):
-        return ssl.create_default_context()
-    raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
+        return ssl.create_default_context(cafile=cafile)
+    raise ValueError(f"Unsupported sslmode={sslmode!r} for the database connection")
+
+
+def _asyncpg_connect_args(sslmode: str | None, cafile: Path | None) -> AsyncpgConnectArgs:
+    ssl_arg = None if sslmode is None else _ssl_connect_arg(sslmode, cafile)
+    return AsyncpgConnectArgs() if ssl_arg is None else AsyncpgConnectArgs(ssl=ssl_arg)
 
 
 def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | None:
@@ -93,11 +99,14 @@ def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | Non
     return value
 
 
-def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
+def normalize_asyncpg_url(
+    url: str, default_sslmode: str | None = None, cafile: Path | None = None
+) -> tuple[str, AsyncpgConnectArgs]:
     """Rewrite a libpq Postgres URL for SQLAlchemy/asyncpg.
 
     Helm injects `DATABASE_URL` with libpq query params (`sslmode=...`). asyncpg rejects
-    those params, so strip them and return equivalent `connect_args` instead.
+    those params, so strip them and return equivalent `connect_args` instead. The URL's own
+    `sslmode` wins over `default_sslmode`.
     """
     parsed = make_url(url)
     if parsed.drivername == "postgresql":
@@ -105,15 +114,9 @@ def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
     elif not parsed.drivername.startswith("postgresql"):
         raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
 
-    sslmode = _query_param(dict(parsed.query), "sslmode")
+    sslmode = _query_param(dict(parsed.query), "sslmode") or default_sslmode
     parsed = parsed.difference_update_query(["sslmode", "channel_binding"])
-
-    connect_args: AsyncpgConnectArgs = {}
-    if sslmode is not None:
-        ssl_arg = _ssl_connect_arg(sslmode)
-        if ssl_arg is not None:
-            connect_args["ssl"] = ssl_arg
-    return parsed.render_as_string(hide_password=False), connect_args
+    return parsed.render_as_string(hide_password=False), _asyncpg_connect_args(sslmode, cafile)
 
 
 class AppEnv(StrEnum):
@@ -481,6 +484,9 @@ class DatabaseConfig(BaseSettings):
     name: str | None = None
     user: str | None = None
     password: str | None = None
+    # The base Helm chart sends sslmode separately: CloudNativePG's `fqdn-uri` carries none.
+    ssl_mode: str | None = Field(default=None, validation_alias="PG_DATABASE_SSL_MODE")
+    ssl_root_cert: Path | None = None
     _connection_url: str = PrivateAttr(default="")
     _connect_args: AsyncpgConnectArgs = PrivateAttr(default_factory=lambda: AsyncpgConnectArgs())
 
@@ -500,7 +506,9 @@ class DatabaseConfig(BaseSettings):
     @model_validator(mode="after")
     def _resolve_connection_url(self) -> Self:
         if self.url is not None:
-            self._connection_url, self._connect_args = normalize_asyncpg_url(str(self.url))
+            self._connection_url, self._connect_args = normalize_asyncpg_url(
+                str(self.url), self.ssl_mode, self._ssl_cafile
+            )
             return self
 
         missing = [
@@ -524,8 +532,16 @@ class DatabaseConfig(BaseSettings):
             port=self.port,
             database=self.name,
         ).render_as_string(hide_password=False)
-        self._connect_args = AsyncpgConnectArgs()
+        self._connect_args = _asyncpg_connect_args(self.ssl_mode, self._ssl_cafile)
         return self
+
+    @property
+    def _ssl_cafile(self) -> Path | None:
+        # The chart mounts the CloudNativePG CA Secret as optional, so on a managed Postgres the
+        # file is absent and the server is verified against the system trust store instead.
+        if self.ssl_root_cert is None or not self.ssl_root_cert.is_file():
+            return None
+        return self.ssl_root_cert
 
     @property
     def connection_url(self) -> str:

@@ -440,6 +440,57 @@ class TestDatabaseConfigSsl:
         with pytest.raises(ValidationError, match="DB_HOST"):
             DatabaseConfig()
 
+    def test_applies_the_chart_sslmode_when_the_url_has_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db:5432/backstop")
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
+
+        ssl_ctx = DatabaseConfig().connect_args.get("ssl")
+
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is True
+
+    def test_prefers_the_url_sslmode_over_the_chart_sslmode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(
+            "DATABASE_URL", "postgresql://user:pass@db:5432/backstop?sslmode=disable"
+        )
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
+
+        assert DatabaseConfig().connect_args == {}
+
+    def test_leaves_tls_to_the_driver_without_any_sslmode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db:5432/backstop")
+        monkeypatch.delenv("PG_DATABASE_SSL_MODE", raising=False)
+
+        assert DatabaseConfig().connect_args == {}
+
+    def test_applies_the_chart_sslmode_to_discrete_fields(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("DB_URL", raising=False)
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify-ca")
+
+        config = DatabaseConfig(host="db", name="backstop", user="user", password="pass")
+
+        ssl_ctx = config.connect_args.get("ssl")
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is False
+
+    def test_rejects_an_unknown_chart_sslmode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db:5432/backstop")
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "sideways")
+
+        with pytest.raises(ValidationError, match="Unsupported sslmode"):
+            DatabaseConfig()
+
 
 class TestEncryptionConfig:
     def test_requires_an_encryption_key(self, monkeypatch: pytest.MonkeyPatch) -> None:

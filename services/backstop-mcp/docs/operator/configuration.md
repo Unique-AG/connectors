@@ -230,24 +230,34 @@ mcpConfig:
 | `DB_NAME` | unset | |
 | `DB_USER` | unset | |
 | `DB_PASSWORD` | unset | |
+| `PG_DATABASE_SSL_MODE` | unset | `sslmode` used when the URL has none. The base chart sets it from `postgresql.connection.sslMode`, default `verify` |
+| `DB_SSL_ROOT_CERT` | chart: `/etc/postgresql-ca/ca.crt` | CA file `verify-ca` and `verify-full` check the certificate against. When unset or absent, the container's system CA bundle |
 
 Without a URL, `DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` are all required and startup names
 the missing ones.
 
-**TLS** is read from the URL's `sslmode` parameter:
+**TLS** is set by the URL's `sslmode` parameter, or by `PG_DATABASE_SSL_MODE` when the URL has none:
 
 | `sslmode` | Behaviour |
 |---|---|
-| `disable`, `allow`, or absent | No TLS |
+| `disable`, `allow` | No TLS |
+| absent from both | The driver's default, `prefer`: TLS when the server offers it, without verification |
 | `require`, `prefer` | TLS without certificate verification |
 | `verify-ca` | TLS, verifies the certificate chain but not the hostname |
 | `verify-full`, `verify` | TLS, verifies the chain and the hostname |
 
-- `verify-ca` and `verify-full` check the certificate against the container's system CA bundle.
-  `sslrootcert` and the other libpq certificate parameters are not supported (the driver rejects
-  them), so a database with a privately signed certificate can only use `require`.
-- With `postgresql.connection.url`, put `sslmode` in the URL. The chart's `postgresql.connection.sslMode`
-  and the `PG_DATABASE_SSL_MODE` variable it sets are not read by this server.
+- A failed verification fails the connection. It never falls back to an unverified one.
+- `sslrootcert` and the other libpq certificate parameters in the URL are not supported (the driver
+  rejects them). Use `DB_SSL_ROOT_CERT` instead.
+- The chart mounts the CloudNativePG cluster CA from the Secret `backstop-mcp-pg-cluster-ca` (only
+  its `ca.crt`) at `/etc/postgresql-ca` in the server and the migration job, and points
+  `DB_SSL_ROOT_CERT` at it. The mount is optional: on a database without that Secret the file is
+  absent and the system CA bundle is used, which suits a managed Postgres with a publicly signed
+  certificate. For another privately signed database, mount its CA and set `DB_SSL_ROOT_CERT`.
+- An overlay that sets `volumes` or `volumeMounts` replaces the chart's lists, so it must repeat the
+  `tmp` and `pg-cluster-ca` entries.
+- With `postgresql.connection.url` (CloudNativePG's `fqdn-uri` carries no `sslmode`),
+  `postgresql.connection.sslMode` applies through `PG_DATABASE_SSL_MODE`. An `sslmode` in the URL wins.
 - With `postgresql.connection.host`, `database`, `username`, and `password`, the chart builds
   `DATABASE_URL` itself with `sslmode=<postgresql.connection.sslMode>`, default `verify`.
 
