@@ -126,14 +126,33 @@ describe('MCP stateful session idle timeout (E2E)', () => {
     expect(await listToolsStatus(url, sessionId)).toBe(200);
   });
 
-  it('keeps a session open while the client holds its SSE stream', async () => {
+  it('closes an idle session and its SSE stream while the client still holds the stream', async () => {
+    const sessionId = await initializeSession(url);
+    const stream = await fetch(url, {
+      method: 'GET',
+      headers: {
+        accept: 'text/event-stream',
+        'mcp-session-id': sessionId,
+        'mcp-protocol-version': '2025-06-18',
+      },
+    });
+    expect(stream.status).toBe(200);
+    const reader = stream.body?.getReader();
+
+    await sleep(SESSION_IDLE_TIMEOUT_MS * 3);
+
+    await expect(reader?.read()).resolves.toMatchObject({ done: true });
+    expect(await listToolsStatus(url, sessionId)).toBe(404);
+  });
+
+  it('keeps a session open while the client sends requests over the SDK transport', async () => {
     const client = new Client({ name: 'test-client', version: '1.0.0' });
-    const transport = new StreamableHTTPClientTransport(url);
-    await client.connect(transport);
+    await client.connect(new StreamableHTTPClientTransport(url));
 
-    await sleep(SESSION_IDLE_TIMEOUT_MS * 4);
-
-    await expect(client.listTools()).resolves.toMatchObject({ tools: [{ name: 'wait' }] });
+    for (let tick = 0; tick < 4; tick++) {
+      await sleep(SESSION_IDLE_TIMEOUT_MS / 2);
+      await expect(client.listTools()).resolves.toMatchObject({ tools: [{ name: 'wait' }] });
+    }
     await client.close();
   });
 
