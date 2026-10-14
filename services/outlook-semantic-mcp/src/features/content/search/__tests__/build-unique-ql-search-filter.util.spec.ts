@@ -245,4 +245,44 @@ describe('buildUniqueQlSearchFilter', () => {
       value: 'false',
     });
   });
+
+  it('maps isRead to the isRead metadata path', () => {
+    const result = buildUniqueQlSearchFilter([
+      { isRead: { value: 'false', operator: UniqueQLOperator.EQUALS } },
+    ]);
+
+    expect(result).toEqual({
+      path: ['isRead'],
+      operator: UniqueQLOperator.EQUALS,
+      value: 'false',
+    });
+  });
+
+  it('maps flagStatus to the flagStatus metadata path', () => {
+    const result = buildUniqueQlSearchFilter([
+      { flagStatus: { value: 'flagged', operator: UniqueQLOperator.NOT_EQUALS } },
+    ]);
+
+    expect(result).toEqual({
+      path: ['flagStatus'],
+      operator: UniqueQLOperator.NOT_EQUALS,
+      value: 'flagged',
+    });
+  });
+
+  it('and-combines isRead and flagStatus within one condition', () => {
+    const result = buildUniqueQlSearchFilter([
+      {
+        isRead: { value: 'false', operator: UniqueQLOperator.EQUALS },
+        flagStatus: { value: 'flagged', operator: UniqueQLOperator.EQUALS },
+      },
+    ]);
+
+    expect(result).toEqual({
+      and: [
+        { path: ['isRead'], operator: UniqueQLOperator.EQUALS, value: 'false' },
+        { path: ['flagStatus'], operator: UniqueQLOperator.EQUALS, value: 'flagged' },
+      ],
+    });
+  });
 });

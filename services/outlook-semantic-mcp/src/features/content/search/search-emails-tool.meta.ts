@@ -80,7 +80,7 @@ const TOOL_FORMAT_INFORMATION = `## Email Display Rules
 
 export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   icon: 'search',
-  systemPrompt: `Searches ingested Outlook emails semantically, combined with Microsoft Graph KQL keyword search. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns pages of results with matched passages or body previews and metadata.
+  systemPrompt: `Searches ingested Outlook emails semantically, combined with Microsoft Graph KQL keyword search. Use conditions to filter by sender, date, recipient, folder, attachments, read state, flag state, or category. Returns pages of results with matched passages or body previews and metadata.
 
   ## Choose the strategy first
   - **Targeted question** (a specific fact, email, or thread): run up to ${maxQueriesPerBackend} semantic entries and up to ${maxQueriesPerBackend} KQL entries from different angles. Follow cursors with \`fetch_next_search_pages\` only if the answer is not found yet.
@@ -96,13 +96,16 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   - Specific recipient or recipient domain ("to Bob", "to anyone @client.com") → \`toRecipients\` / \`ccRecipients\`
   - Date range or relative time ("last week", "since March", "in Q2 2024") → \`dateFrom\` / \`dateTo\`
   - Attachment requirement ("with attachments", "PDFs from Alice") → \`hasAttachments\`
+  - Read state ("unread emails", "emails I haven't read") → \`isRead\` (\`false\` for unread)
+  - Follow-up flag ("flagged emails", "emails I marked for follow-up") → \`flagStatus\` (\`flagged\`, or \`complete\`). For "not flagged" use \`notEquals: "flagged"\`, never \`equals: "notFlagged"\`.
   - Folder mention ("in my Inbox", "from Sent Items") → \`directories\`
   - Category label ("tagged Important") → \`categories\`
   - Company name, ticker, or person name that may appear **anywhere** in the email body (e.g. "emails mentioning UBS", "where Zach Greenwald is mentioned") → no structured filter applies here; rely on semantic \`search\` AND always add a KQL \`body:\` entry for exact-match recall (e.g. \`body:UBS\`, \`body:"Zach Greenwald"\`). Use \`participants:\` in KQL when the name may appear in any address field.
 
   When you are confident a signal maps to one of these filters, prefer expressing it in BOTH backends:
   1. As a \`conditions\` entry on every \`uniqueSemanticSearchQueries\` entry that targets the same intent. Semantic search honors structured filters and tends to produce sharper results when conditions are populated than when the same signal is encoded only in the natural-language \`search\` text. A common failure mode is to phrase the filter in \`search\` ("emails from alice@x.com about budget") and leave \`conditions\` empty — generally avoid that.
-  2. As the matching KQL property filter on every relevant \`msGraphKeywordSearchQueries\` entry (e.g. \`from:\`, \`to:\`, \`received>=\`, \`hasAttachment:true\`, \`category:\`).
+  2. As the matching KQL property filter on every relevant \`msGraphKeywordSearchQueries\` entry (e.g. \`from:\`, \`to:\`, \`received>=\`, \`hasAttachment:true\`, \`isRead:false\`, \`category:\`).
+  Read state MUST go in both backends — the \`isRead\` condition on every semantic entry and \`isRead:false\` / \`isRead:true\` in every KQL query — otherwise the merged results mix read and unread mail. Flag state can only be filtered semantically via \`flagStatus\`; KQL has no property for it, so KQL entries cannot narrow by flag.
 
   If a signal is ambiguous (e.g. an unspecific name, a vague time reference you can't confidently map to a date range), it is fine to omit the condition rather than guess wrong — but lean toward populating conditions whenever the user's intent is clear.
 
@@ -227,8 +230,8 @@ export const META_MS_GRAPH = createMeta({
   Use both subject: and body: in parallel — the entity may appear in either place.
 
   **User asks "unread emails with attachments from the DevOps team this week":**
-  - Query 1: \`{ kqlQuery: "from:devops@acme.com hasAttachment:true received>=2026-05-19" }\`
-  Note: isRead/read: are not supported KQL properties — filter by read status is not possible via KQL.
+  - Query 1: \`{ kqlQuery: "from:devops@acme.com hasAttachment:true isRead:false received>=2026-05-19" }\`
+  isRead:false restricts the results to unread emails.
 
   **User asks "emails where Zach Greenwald is mentioned":**
   - Query 1: \`{ kqlQuery: "body:\\"Zach Greenwald\\"" }\`

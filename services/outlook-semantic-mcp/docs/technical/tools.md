@@ -115,6 +115,8 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
 | `ccRecipients` | `{ value: string, operator }` or array form | Filter by CC recipient |
 | `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs from `list_mailboxes_and_directories`, or well-known names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"`. Note: `"Deleted Items"`, `"Junk Email"`, and `"Recoverable Items Deletions"` are not synchronized and return no results. |
 | `hasAttachments` | `{ value: "true" \| "false", operator }` | Filter by attachment presence. Value is a string, not a boolean. |
+| `isRead` | `{ value: "true" \| "false", operator }` | Filter by read state (`"false"` for unread). Value is a string, not a boolean. |
+| `flagStatus` | `{ value: "flagged" \| "complete" \| "notFlagged", operator }` | Filter by follow-up flag. Emails without a flag can carry an empty value, so express "not flagged" as `notEquals: "flagged"`, never `equals: "notFlagged"`. |
 | `categories` | `{ value: string, operator }` or array form | Category labels from `list_categories` |
 
 **Available operators:**
@@ -198,6 +200,7 @@ Supported KQL property filters for `kqlQuery`:
 | `received>=YYYY-MM-DD` | `received>=2024-01-01` | Received on or after |
 | `received<=YYYY-MM-DD` | `received<=2024-03-31` | Received on or before |
 | `hasAttachment:true\|false` | `hasAttachment:true` | Has attachments |
+| `isRead:true\|false` | `isRead:false` | Read state (`false` for unread) |
 | `category:"label"` | `category:"Important"` | Outlook category |
 | `kind:email` | `kind:email` | Message type |
 
@@ -207,6 +210,9 @@ Syntax rules:
 - Suffix wildcards only: `report*`, not `*report`
 - Phrases in double quotes: `subject:"quarterly report"`
 - Do NOT use `folder:` — it is not supported; use `directories` instead
+- There is no KQL property for follow-up flags (`flag:`, `flagStatus:` are stripped)
+
+**Read state and flags by mode:** read-state filtering works in both modes — in Mode A, put it in both backends (the `isRead` condition on semantic entries and `isRead:` in the KQL query) so the merged results do not mix read and unread mail. Flag filtering (`flagStatus`) works only in Mode A, on the semantic side; Mode B cannot filter by flag.
 
 ---
 

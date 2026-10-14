@@ -115,6 +115,22 @@ export const SearchConditionSchema = z
           `Whether the email has attachments, e.g. 'true' or 'false'. This value is a string not a boolean. Recommended operator: equals, notEquals.`,
         ),
     ).optional(),
+    isRead: SingularConditionFieldSchema(
+      z
+        .enum(['true', 'false'])
+        .describe(
+          `Whether the email has been read, e.g. 'true' or 'false'. Use 'false' for unread emails. This value is a string not a boolean. Recommended operator: equals, notEquals.`,
+        ),
+    ).optional(),
+    flagStatus: SingularConditionFieldSchema(
+      z
+        .enum(['flagged', 'complete', 'notFlagged'])
+        .describe(
+          `Follow-up flag state of the email: 'flagged' (flagged for follow-up), 'complete' (flag marked complete) or 'notFlagged'. ` +
+            `Emails without a flag may carry an empty value instead of 'notFlagged', so to express "not flagged" always use notEquals: "flagged", never equals: "notFlagged". ` +
+            `Recommended operator: equals, notEquals.`,
+        ),
+    ).optional(),
     categories: SingularConditionFieldSchema(
       z
         .string()
@@ -134,10 +150,10 @@ export const SearchConditionSchema = z
       .optional(),
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
-    message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
+    message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'isRead', 'flagStatus', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
   })
   .describe(
-    `Structured filter applied on top of the semantic search. Lean toward populating this when the user clearly names a specific sender, recipient, date range, folder, attachment requirement, or category — populated conditions tend to produce sharper results than relying on the natural-language \`search\` text alone. If a signal is ambiguous, prefer omitting the condition over guessing. Fields within a single condition are AND-ed. Example: user says "from alice@x.com last month" → { fromSenders: { value: "alice@x.com", operator: "equals" }, dateFrom: { value: "2026-04-01T00:00:00Z", operator: "greaterThanOrEqual" } }.`,
+    `Structured filter applied on top of the semantic search. Lean toward populating this when the user clearly names a specific sender, recipient, date range, folder, attachment requirement, read state, flag state, or category — populated conditions tend to produce sharper results than relying on the natural-language \`search\` text alone. If a signal is ambiguous, prefer omitting the condition over guessing. Fields within a single condition are AND-ed. Example: user says "from alice@x.com last month" → { fromSenders: { value: "alice@x.com", operator: "equals" }, dateFrom: { value: "2026-04-01T00:00:00Z", operator: "greaterThanOrEqual" } }.`,
   );
 
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
@@ -159,7 +175,7 @@ export const SearchEmailsInputSchema = z.object({
     .array(SearchConditionSchema)
     .optional()
     .describe(
-      `Structured filters applied on top of the semantic search. Prefer populating this when the user clearly names a specific sender, recipient, date, folder, attachment requirement, or category — these signals tend to produce sharper results when expressed structurally rather than only in the natural-language \`search\` text. Omit a condition rather than guess if the signal is ambiguous. Each entry in this array is OR-ed with the others; fields within a single entry are AND-ed. Example: user says "from alice@x.com" → [{ fromSenders: { value: "alice@x.com", operator: "equals" } }].`,
+      `Structured filters applied on top of the semantic search. Prefer populating this when the user clearly names a specific sender, recipient, date, folder, attachment requirement, read state, flag state, or category — these signals tend to produce sharper results when expressed structurally rather than only in the natural-language \`search\` text. Omit a condition rather than guess if the signal is ambiguous. Each entry in this array is OR-ed with the others; fields within a single entry are AND-ed. Example: user says "from alice@x.com" → [{ fromSenders: { value: "alice@x.com", operator: "equals" } }].`,
     ),
 });
 
@@ -202,6 +218,7 @@ export const MsGraphKqlQuerySchema = z.object({
         '  sent>=YYYY-MM-DD                — sent on or after date\n' +
         '  sent<=YYYY-MM-DD                — sent on or before date\n' +
         '  hasAttachment:true/false        — whether the email has attachments\n' +
+        '  isRead:true/false               — whether the email has been read (isRead:false for unread emails)\n' +
         '  category:"label"               — Outlook category label\n' +
         '  importance:low/medium/high      — email importance level\n' +
         '  kind:email/meetings/voicemail   — message type; other values: contacts, docs, faxes, im, journals, notes, posts, rssfeeds, tasks\n' +
@@ -213,7 +230,7 @@ export const MsGraphKqlQuerySchema = z.object({
         '  - Suffix wildcards only: report* or budget*, NOT *report\n' +
         '  - Multi-word phrases: wrap in regular double quotes — subject:"quarterly report"\n' +
         'Unsupported properties (silently stripped — do NOT use them, they produce no filtering effect):\n' +
-        '  folder:, isRead:, read:, flag:, flagStatus:, sensitivity:, hasFlag:, isAttachment:\n' +
+        '  folder:, flag:, flagStatus:, sensitivity:, hasFlag:, isAttachment:\n' +
         '  mailbox: — NOT a KQL property. To scope to a specific mailbox use the top-level `mailbox` field on this query object instead.\n' +
         '  Any property not in the supported list above is removed before the query is sent.\n' +
         'Free-text terms (no property prefix) search across subject, body, and from.\n' +
@@ -261,7 +278,7 @@ export const SearchEmailsUnifiedInputSchema = z
           '(3) different condition combinations (e.g. one entry scoped to folder "Inbox", another to "Sent Items" to capture both sides of a conversation); ' +
           '(4) perspective shift (e.g. "emails I sent about the merger" vs "emails I received about the merger"). ' +
           'For an overview or listing question ("everything from last week", "summarise my emails with Alice"), use exactly ONE entry with precise `conditions` and page through it with `fetch_next_search_pages`. ' +
-          'Reason about the user\'s question first: when they clearly name a specific sender, recipient, date range, folder, attachment requirement, or category, prefer expressing it via `conditions` on every entry that targets the same intent rather than encoding it only in the natural-language `search` text. If a signal is ambiguous, it is fine to omit the condition — but generally lean toward populating them when the intent is clear. Example: user asks "emails from alice@x.com about the budget" → every entry should include `conditions: [{ fromSenders: { value: "alice@x.com", operator: "equals" } }]`, with `search` carrying only the topic ("budget"). ' +
+          'Reason about the user\'s question first: when they clearly name a specific sender, recipient, date range, folder, attachment requirement, read state, flag state, or category, prefer expressing it via `conditions` on every entry that targets the same intent rather than encoding it only in the natural-language `search` text. If a signal is ambiguous, it is fine to omit the condition — but generally lean toward populating them when the intent is clear. Example: user asks "emails from alice@x.com about the budget" → every entry should include `conditions: [{ fromSenders: { value: "alice@x.com", operator: "equals" } }]`, with `search` carrying only the topic ("budget"). ' +
           'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
@@ -269,7 +286,9 @@ export const SearchEmailsUnifiedInputSchema = z
       'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
         'For a targeted question, use up to 3 entries from different angles (e.g. different keyword combinations, subject vs. body focus). For an overview or listing question, use exactly ONE entry and page through it. ' +
         'Results from both backends are merged: semantic results are anchored first and enriched with the Graph body preview when the same email was matched by both. ' +
-        'A single backend alone will miss results: semantic may miss exact keyword hits; KQL will miss conceptual matches and attachment content.',
+        'A single backend alone will miss results: semantic may miss exact keyword hits; KQL will miss conceptual matches and attachment content. ' +
+        'When the user asks about read state ("unread emails"), put the filter in BOTH backends: the `isRead` condition on every semantic entry AND `isRead:false` (or `isRead:true`) in every KQL query — otherwise the merged results mix read and unread mail. ' +
+        'Flag questions ("flagged emails") can only be filtered on the semantic side via the `flagStatus` condition; KQL cannot express them.',
     ),
   })
   .describe(

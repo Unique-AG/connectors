@@ -12,6 +12,8 @@ const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = 
   ccRecipients: ['ccRecipientsEmailAddresses'],
   directories: ['parentFolderId'],
   hasAttachments: ['hasAttachments'],
+  isRead: ['isRead'],
+  flagStatus: ['flagStatus'],
   categories: ['categories'],
 };
 
