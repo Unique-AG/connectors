@@ -108,7 +108,7 @@ class TestDatabaseConfigSslMode:
         monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi?sslmode=disable")
         monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
 
-        assert DatabaseConfig().connect_args == {}
+        assert DatabaseConfig().connect_args == {"ssl": "disable"}
 
     def test_leaves_tls_to_the_driver_without_any_sslmode(
         self, monkeypatch: pytest.MonkeyPatch
@@ -151,10 +151,10 @@ class TestNormalizeAsyncpgUrl:
         assert "sslmode" not in url
         assert "ssl" in connect_args
 
-    def test_drops_sslmode_disable_entirely(self) -> None:
+    def test_hands_sslmode_disable_to_the_driver(self) -> None:
         url, connect_args = normalize_asyncpg_url("postgresql://u:p@db:5432/wi?sslmode=disable")
         assert "sslmode" not in url
-        assert connect_args == {}
+        assert connect_args == {"ssl": "disable"}
 
     def test_rejects_a_non_postgres_url(self) -> None:
         with pytest.raises(ValueError, match="PostgreSQL"):

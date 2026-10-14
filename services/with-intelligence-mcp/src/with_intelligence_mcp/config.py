@@ -6,7 +6,7 @@ from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import ClassVar, Self, TypedDict, cast
+from typing import ClassVar, Literal, Self, TypedDict, cast
 
 from pydantic import (
     Field,
@@ -23,13 +23,17 @@ from sqlalchemy.engine.url import URL, make_url
 PKG_VERSION = pkg_version("with-intelligence-mcp")
 
 
+type PlaintextSslMode = Literal["disable", "allow"]
+
+
 class AsyncpgConnectArgs(TypedDict, total=False):
-    ssl: ssl.SSLContext
+    ssl: ssl.SSLContext | PlaintextSslMode
 
 
-def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | None:
-    if sslmode in ("disable", "allow"):
-        return None
+def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | PlaintextSslMode:
+    # asyncpg parses these like libpq; leaving `ssl` unset would make it fall back to prefer.
+    if sslmode == "disable" or sslmode == "allow":
+        return sslmode
     if sslmode in ("require", "prefer"):
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -46,8 +50,9 @@ def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | None
 
 
 def _asyncpg_connect_args(sslmode: str | None, cafile: Path | None) -> AsyncpgConnectArgs:
-    ssl_arg = None if sslmode is None else _ssl_connect_arg(sslmode, cafile)
-    return AsyncpgConnectArgs() if ssl_arg is None else AsyncpgConnectArgs(ssl=ssl_arg)
+    if sslmode is None:
+        return AsyncpgConnectArgs()
+    return AsyncpgConnectArgs(ssl=_ssl_connect_arg(sslmode, cafile))
 
 
 def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | None:

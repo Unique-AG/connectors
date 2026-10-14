@@ -240,7 +240,8 @@ the missing ones.
 
 | `sslmode` | Behaviour |
 |---|---|
-| `disable`, `allow` | No TLS |
+| `disable` | No TLS |
+| `allow` | No TLS, unless the server requires it. Then TLS without verification |
 | absent from both | The driver's default, `prefer`: TLS when the server offers it, without verification |
 | `require`, `prefer` | TLS without certificate verification |
 | `verify-ca` | TLS, verifies the certificate chain but not the hostname |

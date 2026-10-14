@@ -5,7 +5,7 @@ from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Annotated, ClassVar, Self, TypedDict, cast
+from typing import Annotated, ClassVar, Literal, Self, TypedDict, cast
 from urllib.parse import urlparse
 
 from pydantic import (
@@ -61,14 +61,18 @@ def _cap_custom_field_schema_ttl_minutes(value: object) -> object:
     return value
 
 
+type PlaintextSslMode = Literal["disable", "allow"]
+
+
 class AsyncpgConnectArgs(TypedDict, total=False):
-    ssl: ssl.SSLContext
+    ssl: ssl.SSLContext | PlaintextSslMode
 
 
-def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | None:
+def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | PlaintextSslMode:
     """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
-    if sslmode in ("disable", "allow"):
-        return None
+    # asyncpg parses these like libpq; leaving `ssl` unset would make it fall back to prefer.
+    if sslmode == "disable" or sslmode == "allow":
+        return sslmode
     if sslmode in ("require", "prefer"):
         # Encrypt the connection but do not verify the server certificate.
         ctx = ssl.create_default_context()
@@ -86,8 +90,9 @@ def _ssl_connect_arg(sslmode: str, cafile: Path | None) -> ssl.SSLContext | None
 
 
 def _asyncpg_connect_args(sslmode: str | None, cafile: Path | None) -> AsyncpgConnectArgs:
-    ssl_arg = None if sslmode is None else _ssl_connect_arg(sslmode, cafile)
-    return AsyncpgConnectArgs() if ssl_arg is None else AsyncpgConnectArgs(ssl=ssl_arg)
+    if sslmode is None:
+        return AsyncpgConnectArgs()
+    return AsyncpgConnectArgs(ssl=_ssl_connect_arg(sslmode, cafile))
 
 
 def _query_param(query: dict[str, str | tuple[str, ...]], key: str) -> str | None:

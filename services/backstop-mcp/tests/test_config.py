@@ -62,7 +62,7 @@ class TestNormalizeAsyncpgUrl:
         )
 
         assert url == "postgresql+asyncpg://user:pass@db:5432/backstop"
-        assert connect_args == {}
+        assert connect_args == {"ssl": "disable"}
 
 
 class TestBackstopConfigDefaults:
@@ -460,7 +460,7 @@ class TestDatabaseConfigSsl:
         )
         monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
 
-        assert DatabaseConfig().connect_args == {}
+        assert DatabaseConfig().connect_args == {"ssl": "disable"}
 
     def test_leaves_tls_to_the_driver_without_any_sslmode(
         self, monkeypatch: pytest.MonkeyPatch

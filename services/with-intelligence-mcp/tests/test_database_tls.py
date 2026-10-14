@@ -20,6 +20,7 @@ from with_intelligence_mcp.config import DatabaseConfig
 from with_intelligence_mcp.db import create_engine
 
 LOOPBACK = "127.0.0.1"
+SSL_REQUEST = (8).to_bytes(4) + (80877103).to_bytes(4)
 
 
 @final
@@ -29,12 +30,16 @@ class FakePostgres:
     def __init__(self, server_ctx: ssl.SSLContext) -> None:
         self._server_ctx = server_ctx
         self.connections = 0
+        self.ssl_requests = 0
         self.handshakes = 0
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self.connections += 1
         with contextlib.suppress(ssl.SSLError, ConnectionError, asyncio.IncompleteReadError):
-            await reader.readexactly(8)
+            if await reader.readexactly(8) != SSL_REQUEST:
+                writer.close()
+                return
+            self.ssl_requests += 1
             writer.write(b"S")
             await writer.drain()
             await writer.start_tls(self._server_ctx)
@@ -185,6 +190,13 @@ class TestDatabaseTls:
                 await _connect(_database_config(port, "verify-full", pki.ca_path))
 
         assert (server.connections, server.handshakes) == (1, 0)
+
+    async def test_disable_never_asks_for_tls(self, pki: Pki) -> None:
+        async with _serve(pki.server_context(LOOPBACK_SAN)) as (server, port):
+            with pytest.raises(DBAPIError):
+                await _connect(_database_config(port, "disable", None))
+
+        assert (server.connections, server.ssl_requests) == (1, 0)
 
     async def test_verify_ca_accepts_a_hostname_mismatch(self, pki: Pki) -> None:
         async with _serve(pki.server_context(OTHER_HOST_SAN)) as (server, port):
