@@ -84,9 +84,9 @@ describe('sanitizeKqlQuery', () => {
       expect(sanitizeKqlQuery('folder:Inbox subject:report')).toBe('"subject:report"');
     });
 
-    it('strips isRead: clauses', () => {
+    it('keeps isRead: clauses', () => {
       expect(sanitizeKqlQuery('isRead:true from:alice@example.com')).toBe(
-        '"from:alice@example.com"',
+        '"isRead:true from:alice@example.com"',
       );
     });
 
@@ -95,7 +95,9 @@ describe('sanitizeKqlQuery', () => {
     });
 
     it('strips multiple unsupported properties at once', () => {
-      expect(sanitizeKqlQuery('folder:Inbox isRead:true subject:budget')).toBe('"subject:budget"');
+      expect(sanitizeKqlQuery('folder:Inbox flag:followup subject:budget')).toBe(
+        '"subject:budget"',
+      );
     });
   });
 
@@ -113,6 +115,7 @@ describe('sanitizeKqlQuery', () => {
       ['hasAttachment:true', '"hasAttachment:true"'],
       ['hasAttachments:false', '"hasAttachments:false"'],
       ['importance:high', '"importance:high"'],
+      ['isRead:false', '"isRead:false"'],
       ['kind:meetings', '"kind:meetings"'],
       ['size:1..1048576', '"size:1..1048576"'],
       ['category:"Red Category"', '"category:\\"Red Category\\""'],
@@ -142,7 +145,7 @@ describe('sanitizeKqlQuery', () => {
     });
 
     it('returns empty string when all properties are stripped', () => {
-      expect(sanitizeKqlQuery('folder:Inbox isRead:true')).toBe('');
+      expect(sanitizeKqlQuery('folder:Inbox flag:followup')).toBe('');
     });
   });
 

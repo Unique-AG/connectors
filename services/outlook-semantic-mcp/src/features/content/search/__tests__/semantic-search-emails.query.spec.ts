@@ -21,6 +21,34 @@ describe('SearchConditionSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it.each(['true', 'false'])('accepts isRead with value %s', (value) => {
+    const result = SearchConditionSchema.safeParse({ isRead: { value, operator: 'equals' } });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects isRead with a boolean value', () => {
+    const result = SearchConditionSchema.safeParse({
+      isRead: { value: false, operator: 'equals' },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(['flagged', 'complete', 'notFlagged'])('accepts flagStatus with value %s', (value) => {
+    const result = SearchConditionSchema.safeParse({ flagStatus: { value, operator: 'equals' } });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects flagStatus with an unknown value', () => {
+    const result = SearchConditionSchema.safeParse({
+      flagStatus: { value: 'important', operator: 'equals' },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('fails the refine when an empty object is provided', () => {
     const result = SearchConditionSchema.safeParse({});
 

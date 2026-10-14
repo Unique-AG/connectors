@@ -24,6 +24,7 @@
 - [Tool Usage](#Tool-Usage)
   - [How does search_emails search?](#How-does-search_emails-search?)
   - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder?)
+  - [Can I search for unread or flagged emails?](#Can-I-search-for-unread-or-flagged-emails?)
   - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email?)
   - [Can I create drafts in a shared mailbox?](#Can-I-create-drafts-in-a-shared-mailbox?)
   - [Why does a reply draft in a shared mailbox appear in Drafts instead of in the thread in Outlook Web?](#Why-does-a-reply-draft-in-a-shared-mailbox-appear-in-Drafts-instead-of-in-the-thread-in-Outlook-Web?)
@@ -421,6 +422,26 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 **Mode B (`microsoft_graph`):** Folder filtering is supported for your own mailbox and for mailboxes where you have Full Access delegation. Pass the folder ID (from `list_mailboxes_and_directories`) or a well-known name in the `directories` field of the relevant `msGraphKeywordSearchQueries` entry. Note: if you only have folder-level (partial) access to a mailbox, search does not work against it at all — not just when filtering by folder. The response will include a notice and no results are returned from that mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Tools — list_mailboxes_and_directories](./technical/tools.md#list_mailboxes_and_directories) — [Tools — search_emails](./technical/tools.md#search_emails)
+
+### Can I search for unread or flagged emails?
+
+**Answer:** Read state and follow-up flags are filterable, with a difference between modes:
+
+- **Read state** works in both modes. In Mode A, the agent sets the `isRead` condition on semantic entries and `isRead:false` in the KQL query, so the merged results contain only unread mail. In Mode B, `isRead:false` in the KQL query is the only option.
+- **Flags** work in Mode A only, through the `flagStatus` condition on semantic entries (`flagged`, `complete`, `notFlagged`). Microsoft Graph has no KQL property for follow-up flags, so Mode B cannot filter by flag. To express "not flagged", use `notEquals: "flagged"`.
+
+**Freshness (Mode A):** the semantic `isRead` and `flagStatus` values are metadata written at ingestion. Live catch-up only re-fetches a message and rewrites that metadata when its Graph `lastModifiedDateTime` is newer than the sync watermark. Whether Exchange moves `lastModifiedDateTime` when a message is marked read or flagged is not guaranteed by this service, so semantic read and flag results can lag behind the mailbox or stay at their ingested values. KQL `isRead:` is evaluated live by Microsoft Graph and is always current, which is why read-state questions go to both backends.
+
+```json
+{
+  "search": "budget",
+  "conditions": [
+    { "isRead": { "value": "false", "operator": "equals" } }
+  ]
+}
+```
+
+**See also:** [Tools — search_emails](./technical/tools.md#search_emails)
 
 ### Can I attach files when creating a draft email?
 

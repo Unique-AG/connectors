@@ -10,6 +10,7 @@ const SUPPORTED_KQL_PROPERTIES = new Set([
   'hasattachment',
   'hasattachments', // both spellings appear in MS docs
   'importance',
+  'isread',
   'kind',
   'participants',
   'received',
