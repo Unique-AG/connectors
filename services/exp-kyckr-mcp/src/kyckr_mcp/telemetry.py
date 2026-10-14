@@ -24,7 +24,6 @@ PAID_ROUTES = frozenset(
     }
 )
 START = "kyckr_start"
-SPAN = "kyckr_span"
 
 _metrics = MetricNamespace("kyckr")
 _requests = _metrics.counter(
@@ -56,13 +55,7 @@ def credit_cost(body: object) -> float:
 
 
 async def start_upstream_call(request: httpx2.Request) -> None:
-    route = route_template(request.url.path)
     request.extensions[START] = time.perf_counter()
-    request.extensions[SPAN] = _tracer.start_span(
-        f"{request.method} {route}",
-        kind=SpanKind.CLIENT,
-        attributes={"http.request.method": request.method, "url.template": route},
-    )
 
 
 async def record_upstream_call(response: httpx2.Response) -> None:
@@ -70,15 +63,23 @@ async def record_upstream_call(response: httpx2.Response) -> None:
     method = request.method
     route = route_template(request.url.path)
     status = response.status_code
+    elapsed = time.perf_counter() - request.extensions[START]
     _requests.labels(method=method, path=route, status=str(status)).inc()
-    _duration.labels(method=method, path=route).observe(
-        time.perf_counter() - request.extensions[START]
+    _duration.labels(method=method, path=route).observe(elapsed)
+    end_ns = time.time_ns()
+    span = _tracer.start_span(
+        f"{method} {route}",
+        kind=SpanKind.CLIENT,
+        attributes={
+            "http.request.method": method,
+            "url.template": route,
+            "http.response.status_code": status,
+        },
+        start_time=end_ns - int(elapsed * 1e9),
     )
-    span = request.extensions[SPAN]
-    span.set_attribute("http.response.status_code", status)
     if status >= 400:
         span.set_status(Status(StatusCode.ERROR))
-    span.end()
+    span.end(end_time=end_ns)
     if response.is_success and (method, route) in PAID_ROUTES:
         await response.aread()
         try:
