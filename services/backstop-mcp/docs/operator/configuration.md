@@ -72,8 +72,6 @@ mcpConfig:
   the container through a ConfigMap (`envFrom`), and Kubernetes gives a container's own `env`
   entries precedence over it. A deployment that still sets these variables under `env` keeps
   working, and can move them to `mcpConfig` at any time.
-- The top-level `tenantGuidance` value is gone. Setting it fails `helm install`; move it to
-  `mcpConfig.tenantGuidance`.
 
 ## Required
 

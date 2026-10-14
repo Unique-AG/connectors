@@ -2141,10 +2141,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "tenantGuidance": {
-      "description": "Removed: set mcpConfig.tenantGuidance instead. Rejected so that guidance left here fails the install rather than being dropped.",
-      "not": {}
     }
   },
   "$defs": {
