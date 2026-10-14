@@ -260,7 +260,7 @@ An operator is a person with write access to this repository who does this routi
 flowchart TD
   monday[Monday: list the Dependabot pull requests] --> kind{What kind is each pull request?}
   kind -->|GitHub Actions or docker| merge[Merge it]
-  kind -->|patch bump, no breaking change| ci{Does CI pass?}
+  kind -->|patch or minor bump, no breaking change| ci{Does CI pass?}
   kind -->|breaking change in the changelog| skill[Run the dependabot-pr-review skill]
   kind -->|pinned, or not fixed upstream| pin[Pin the version by hand]
   ci -->|yes| merge
@@ -289,7 +289,7 @@ Dependabot opened its pull requests on Friday. The registry image scan ran on We
 | The pull request is | What to do |
 |---|---|
 | A GitHub Actions update, or a docker update | Merge it. These updates are safe in almost all cases. |
-| A patch bump, and the changelog lists no breaking change | If CI passes, merge it. |
+| A patch or minor bump, and the changelog lists no breaking change | If CI passes, merge it. |
 | A bump, and the changelog lists a breaking change | Run the `dependabot-pr-review` skill. Merge the pull request only if the skill says that it is safe. |
 | A dependency that is hard to update, or that upstream does not fix | Pin the version by hand. See [Pins and overrides](#pins-and-overrides). |
 
@@ -310,8 +310,8 @@ Do this when the alerts rise in the Security tab. In this repository, a Dependab
 1. Read the alerts.
    - Dependabot alerts: `gh api 'repos/Unique-AG/connectors/dependabot/alerts?state=open' --jq '.[] | [.number, .security_advisory.severity, .dependency.package.name, .dependency.manifest_path, .dependency.relationship] | @tsv'`
    - Code scanning alerts: `gh api 'repos/Unique-AG/connectors/code-scanning/alerts?state=open' --jq '.[] | [.number, .rule.security_severity_level, .tool.name, .rule.id] | @tsv'`
-2. Refresh the npm lock file: `pnpm update -r --depth Infinity`.
-3. Refresh the Python lock file of each service that has an alert. In the service folder, run `uv lock --upgrade`.
+2. Refresh the npm lock file.
+3. Refresh the Python lock file of each service that has an alert.
 4. Read each pin and override. See [Pins and overrides](#pins-and-overrides).
 5. Open one pull request with all the changes. If CI passes, merge it.
 
@@ -327,7 +327,7 @@ A pin or an override can become stale. Upstream can fix the problem, and then th
 For each entry, do these steps:
 
 1. Remove the entry.
-2. Run `pnpm install`, or run `uv lock`.
+2. Resolve the lock file again.
 3. If the lock file now resolves to a version outside the range of the advisory, keep the entry removed.
 4. If the lock file still resolves to a vulnerable version, restore the entry.
 
