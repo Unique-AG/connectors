@@ -24,7 +24,8 @@ RUN rm -rf /usr/local/lib/python*/site-packages/pip \
  && ! python -c "import pip" 2>/dev/null
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /workspace/services/office-365-mcp/src /app/src
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=8000
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=8000 \
+    MALLOC_MMAP_THRESHOLD_=1048576 MALLOC_TRIM_THRESHOLD_=1048576
 USER app
 EXPOSE 8000
 CMD ["office-365-mcp"]

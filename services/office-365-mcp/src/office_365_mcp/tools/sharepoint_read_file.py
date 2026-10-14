@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
@@ -30,6 +31,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import ITEM_FIELDS
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
+
+logger = logging.getLogger(__name__)
 
 TOOL_NAME = "sharepoint_read_file"
 
@@ -169,6 +172,10 @@ async def _fetched(
                     max_bytes=MAX_BYTES,
                 ) as downloaded:
                     body = downloaded.path.read_bytes()
+                    logger.info(
+                        "sharepoint file downloaded",
+                        extra={"item_bytes": item.size, "downloaded_bytes": downloaded.size},
+                    )
         except GraphResponseTooLarge:
             return _too_large(size=None, web_url=item.web_url)
         except GraphFailure as failure:

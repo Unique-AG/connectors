@@ -1,5 +1,6 @@
 import base64
 import gzip
+import logging
 import os
 from collections.abc import AsyncIterator, Iterator, Mapping
 from typing import cast
@@ -97,6 +98,19 @@ class TestWhatComesBack:
         assert resource.mime_type == _DOCX
         assert resource.uri == f"file:///{_NAME}"
         assert (item.call_count, content.call_count) == (1, 1)
+
+    @pytest.mark.usefixtures("item", "content")
+    async def test_it_logs_the_size_graph_reported_and_the_size_it_downloaded(
+        self,
+        client: GraphServiceClient,
+        transport: httpx.AsyncClient,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        with caplog.at_level(logging.INFO, logger=reader.logger.name):
+            _ = await _read(client, transport)
+
+        [record] = [r for r in caplog.records if r.name == reader.logger.name]
+        assert (vars(record)["item_bytes"], vars(record)["downloaded_bytes"]) == (_SIZE, _SIZE)
 
     @pytest.mark.usefixtures("content")
     async def test_it_asks_for_the_fields_every_drive_tool_agrees_on(
