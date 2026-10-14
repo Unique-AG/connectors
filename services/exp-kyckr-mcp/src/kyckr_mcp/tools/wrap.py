@@ -30,12 +30,10 @@ def error_response(error: BaseException) -> JsonObject:
     if isinstance(cause, KyckrApiError):
         error = cause
     if isinstance(error, KyckrApiError):
-        return {
-            "success": False,
-            "statusCode": error.status,
-            "message": str(error),
-            "correlationId": error.correlation_id,
-        }
+        response: JsonObject = {"success": False, "statusCode": error.status, "message": str(error)}
+        if error.correlation_id:
+            response["correlationId"] = error.correlation_id
+        return response
     return {"success": False, "message": str(error)}
 
 

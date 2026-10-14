@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 from fastmcp.server.http import HostOriginGuardMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.types import Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
@@ -16,6 +16,8 @@ from kyckr_mcp.settings import Settings
 from kyckr_mcp.tools import register_tools
 
 OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
+MCP_PATH_LABEL = "/:mcpApiKey"
+REAL_PATH = "kyckr_real_path"
 
 
 class OpsExemptGuard(HostOriginGuardMiddleware):
@@ -25,6 +27,35 @@ class OpsExemptGuard(HostOriginGuardMiddleware):
             await self.app(scope, receive, send)
         else:
             await super().__call__(scope, receive, send)
+
+
+class HideMcpApiKey:
+    """Swap the secret path prefix for a template so the metrics middleware never sees it."""
+
+    def __init__(self, app: ASGIApp, prefix: str) -> None:
+        self.app = app
+        self.prefix = prefix
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
+        if scope["type"] == "http" and (path == self.prefix or path.startswith(f"{self.prefix}/")):
+            scope = {**scope, "path": MCP_PATH_LABEL + path[len(self.prefix) :], REAL_PATH: path}
+        await self.app(scope, receive, send)
+
+
+class RestoreMcpApiKey:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if REAL_PATH in scope:
+            scope = {**scope, "path": scope[REAL_PATH]}
+        await self.app(scope, receive, send)
+
+
+def metrics_without_api_key(settings: Settings, metrics: Middleware) -> list[Middleware]:
+    prefix = f"/{settings.mcp_api_key.get_secret_value()}"
+    return [Middleware(HideMcpApiKey, prefix=prefix), metrics, Middleware(RestoreMcpApiKey)]
 
 
 def host_origin_guard(settings: Settings, origins: list[str]) -> Middleware:
@@ -60,7 +91,7 @@ def run_server(mcp: FastMCP, settings: Settings) -> None:
                 ],
                 expose_headers=["Mcp-Session-Id"],
             ),
-            ops_middleware,
+            *metrics_without_api_key(settings, ops_middleware),
         ],
         uvicorn_config={"access_log": False},
     )

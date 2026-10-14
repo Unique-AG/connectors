@@ -87,6 +87,8 @@ def with_document(
     result: JsonObject = {**response, "data": updated_data}
     if details:
         result["details"] = details
+    else:
+        result.pop("details", None)
     return result
 
 

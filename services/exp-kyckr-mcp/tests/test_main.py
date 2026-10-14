@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from starlette.testclient import TestClient
 from unique_mcp.monitoring import setup_ops
 
-from kyckr_mcp.main import OPS_PATHS, host_origin_guard
+from kyckr_mcp.main import OPS_PATHS, host_origin_guard, metrics_without_api_key
 from kyckr_mcp.server import create_server
 from kyckr_mcp.settings import Settings
 from kyckr_mcp.tools import register_tools
@@ -36,7 +36,10 @@ def client(
         transport="streamable-http",
         stateless_http=True,
         host_origin_protection=False,
-        middleware=[host_origin_guard(settings, []), ops_middleware],
+        middleware=[
+            host_origin_guard(settings, []),
+            *metrics_without_api_key(settings, ops_middleware),
+        ],
     )
     try:
         with TestClient(app) as test_client:
@@ -62,3 +65,13 @@ def test_mcp_route_checks_origin(client: TestClient) -> None:
         "Origin": "https://evil.example.com",
     }
     assert client.post("/test-mcp-key/mcp", json=PING, headers=headers).status_code == 403
+
+
+def test_metrics_do_not_expose_the_mcp_api_key(client: TestClient) -> None:
+    headers = {**MCP_HEADERS, "Host": "127.0.0.1:9542"}
+    assert client.post("/test-mcp-key/mcp", json=PING, headers=headers).status_code == 200
+
+    metrics = client.get("/metrics", headers={"Host": "127.0.0.1:9542"}).text
+
+    assert "test-mcp-key" not in metrics
+    assert 'path="/:mcpApiKey/mcp"' in metrics

@@ -251,3 +251,49 @@ def test_paid_tools_are_not_advertised_as_idempotent(
         }
     finally:
         asyncio.run(upstream.aclose())
+
+
+def test_error_without_correlation_id_omits_the_key(
+    settings: Settings,
+    spec: dict[str, object],
+) -> None:
+    async def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(500, text="boom")
+
+    upstream = httpx2.AsyncClient(
+        base_url="https://test-api.kyckr.com/v2",
+        transport=httpx2.MockTransport(handler),
+        event_hooks={"response": [raise_for_kyckr_error]},
+    )
+    try:
+        result = run_tool(build_server(settings, spec, upstream), "search_companies", {"name": "A"})
+        assert result.structured_content == {
+            "success": False,
+            "statusCode": 500,
+            "message": "boom",
+        }
+    finally:
+        asyncio.run(upstream.aclose())
+
+
+def test_order_with_null_upstream_details_omits_details_key(
+    settings: Settings,
+    spec: dict[str, object],
+) -> None:
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/download"):
+            return httpx2.Response(200, json={"Data": {"companyName": "Acme"}})
+        return httpx2.Response(
+            200, json={"details": None, "data": {"orderId": 7, "status": "Success"}}
+        )
+
+    upstream = httpx2.AsyncClient(
+        base_url="https://test-api.kyckr.com/v2",
+        transport=httpx2.MockTransport(handler),
+    )
+    try:
+        result = run_tool(build_server(settings, spec, upstream), "get_order", {"order_id": "7"})
+        assert result.structured_content is not None
+        assert "details" not in result.structured_content
+    finally:
+        asyncio.run(upstream.aclose())
