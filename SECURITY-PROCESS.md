@@ -261,12 +261,12 @@ flowchart TD
   monday[Monday: list the Dependabot pull requests] --> kind{What kind is each pull request?}
   kind -->|GitHub Actions or docker| merge[Merge it]
   kind -->|patch or minor bump, no breaking change| ci{Does CI pass?}
-  kind -->|breaking change in the changelog| skill[Run the dependabot-pr-review skill]
+  kind -->|major bump, or breaking change in the changelog| skill[Run the dependabot-pr-review skill]
   kind -->|pinned, or not fixed upstream| pin[Pin the version by hand]
   ci -->|yes| merge
   ci -->|no| hold[Leave it open and read the CI log]
   skill -->|safe| merge
-  skill -->|not safe| hold
+  skill -->|needs a refactor| ticket[Open a follow-up ticket for the work]
   pin --> ci
   merge --> scan[Read the Wednesday scan and the release pull requests]
   scan --> alerts{Are the alerts high in the Security tab?}
@@ -290,7 +290,8 @@ Dependabot opened its pull requests on Friday. The registry image scan ran on We
 |---|---|
 | A GitHub Actions update, or a docker update | Merge it. These updates are safe in almost all cases. |
 | A patch or minor bump, and the changelog lists no breaking change | If CI passes, merge it. |
-| A bump, and the changelog lists a breaking change | Run the `dependabot-pr-review` skill. Merge the pull request only if the skill says that it is safe. |
+| A major bump, or a bump with a breaking change in the changelog | Run the `dependabot-pr-review` skill. Merge the pull request only if the skill says that it is safe. |
+| The skill finds that the change needs a refactor | Do not merge. This change usually needs a rewrite of packages in this repository. Open a follow-up ticket for the work. |
 | A dependency that is hard to update, or that upstream does not fix | Pin the version by hand. See [Pins and overrides](#pins-and-overrides). |
 
 An open Dependabot pull request counts toward the limit of 5 for its ecosystem. A queue that nobody reads stops Dependabot from opening new pull requests.
