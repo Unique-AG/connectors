@@ -54,7 +54,7 @@ encrypted, and issues its own short-lived MCP tokens. See [Authentication](./ope
 |---|---|
 | **Kubernetes + Helm** | The chart depends on Unique's `base` chart, which renders the Deployment, Service, Gateway API route, NetworkPolicy, and migration hook. The route and NetworkPolicy are off by default; the deployment's overlay turns them on |
 | **PostgreSQL** | One database. Schema migrations run as a Helm hook (`alembic upgrade head`) |
-| **Public HTTPS URL** | MCP clients and users' browsers must reach the server; the URL is the OAuth issuer (`PUBLIC_BASE_URL`) |
+| **Public HTTPS URL** | MCP clients and users' browsers must reach the server; the URL is the OAuth issuer (`mcpConfig.app.publicBaseUrl`) |
 
 ## What It Can Do
 

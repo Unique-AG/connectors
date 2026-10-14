@@ -5,3 +5,18 @@ postgresql:
 hooks:
   migration:
     enabled: false
+
+# Exercises every mcpConfig field, including a markers list set to [] on purpose.
+mcpConfig:
+  app:
+    publicBaseUrl: https://backstop-mcp.example.com
+  backstop:
+    baseUrl: https://example.backstopsolutions.com
+    uiBaseUrl: https://example.backstopsolutions.com
+  employment:
+    relationshipTypeIds: ["101", "102"]
+    relationshipTypeMarkers: [employ]
+    formerRelationshipTypeIds: ["201"]
+    formerRelationshipTypeMarkers: []
+  tenantGuidance:
+    server_instructions: Fund short names are upper case.

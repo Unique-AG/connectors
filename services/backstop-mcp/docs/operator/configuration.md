@@ -26,16 +26,60 @@ Only two variables have no usable default in production: `PUBLIC_BASE_URL` and
 
 | Kind | Where | Example |
 |---|---|---|
-| Plain settings | `env` map (rendered into a ConfigMap) | `env: { BACKSTOP_BASE_URL: https://<firm>.backstopsolutions.com }` |
+| Per-firm settings | `mcpConfig`, checked by the chart schema | `mcpConfig: { backstop: { baseUrl: https://<firm>.backstopsolutions.com } }`. See [Chart values](#Chart-values) |
+| Tuning (caches, timeouts, page sizes, logging) | `env` map (rendered into a ConfigMap) | `env: { SEARCH_RESULT_SIZE: "200" }` |
 | Secrets | `envVars` list, native Kubernetes syntax | `- name: BACKSTOP_MCP_ENCRYPTION_KEY` with `valueFrom.secretKeyRef` |
 | Database | `postgresql.connection`, which injects `DATABASE_URL` | `url: { fromSecret: { name: ..., key: ... } }` |
-| Tenant guidance | `tenantGuidance` object, rendered as JSON into `BACKSTOP_MCP_TENANT_GUIDANCE` | See [Tenant guidance](#Tenant-Guidance) |
+
+### Chart values
+
+The settings that differ per firm have typed values under `mcpConfig`:
+
+| Chart value | Variable | Type |
+|---|---|---|
+| `mcpConfig.app.publicBaseUrl` | `PUBLIC_BASE_URL` | URL |
+| `mcpConfig.backstop.baseUrl` | `BACKSTOP_BASE_URL` | URL |
+| `mcpConfig.backstop.uiBaseUrl` | `BACKSTOP_UI_BASE_URL` | URL |
+| `mcpConfig.employment.relationshipTypeIds` | `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | List |
+| `mcpConfig.employment.relationshipTypeMarkers` | `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
+| `mcpConfig.employment.formerRelationshipTypeIds` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | List |
+| `mcpConfig.employment.formerRelationshipTypeMarkers` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
+| `mcpConfig.tenantGuidance` | `BACKSTOP_MCP_TENANT_GUIDANCE` | Object, rendered as JSON. See [Tenant guidance](#Tenant-Guidance) |
+
+```yaml
+mcpConfig:
+  app:
+    publicBaseUrl: https://backstop-mcp.example.com
+  backstop:
+    baseUrl: https://<firm>.backstopsolutions.com
+    uiBaseUrl: https://<firm>.backstopsolutions.com
+  employment:
+    formerRelationshipTypeIds: ["1042", "1043"]
+```
+
+- A misspelt key fails `helm install` against the chart schema. A URL must start with `http://` or
+  `https://`, and a list item cannot contain a comma. Ids are strings: quote them (`["1042"]`), or
+  the schema rejects them.
+- A URL is rendered only when it is not empty, so an empty value keeps the app default. URLs pass
+  through `tpl`, so an overlay can build them from other values. The schema checks the raw value
+  before `tpl` runs, so the scheme must be literal: `https://{{ .Values.routes.hostname }}` passes,
+  while `{{ printf "https://%s" .Values.routes.hostname }}` is rejected.
+- A list is rendered comma-separated whenever it is set, including `[]`, which reaches the app as an
+  empty value. The chart default `null` leaves the variable unset. This matters for the markers
+  lists: `[]` replaces their defaults, `null` keeps them. See
+  [Departed-contact detection](#Departed-Contact-Detection).
+- `mcpConfig.tenantGuidance` is rendered only when it is not empty.
+- `mcpConfig.enabled: false` renders none of these variables, tenant guidance included.
+- A variable set both under `mcpConfig` and under `env` takes the `mcpConfig` value. `env` reaches
+  the container through a ConfigMap (`envFrom`), and Kubernetes gives a container's own `env`
+  entries precedence over it. A deployment that still sets these variables under `env` keeps
+  working, and can move them to `mcpConfig` at any time.
 
 ## Required
 
 | Variable | Format | Description |
 |---|---|---|
-| `PUBLIC_BASE_URL` | `https://host` | The URL clients and browsers reach this server on. It is the OAuth issuer; the login form and every OAuth endpoint hang off it. With `APP_ENV=production`, a loopback or `0.0.0.0` host is refused at startup |
+| `PUBLIC_BASE_URL` | `https://host` | The URL clients and browsers reach this server on. It is the OAuth issuer; the login form and every OAuth endpoint hang off it. With `APP_ENV=production`, a loopback or `0.0.0.0` host is refused at startup. In Helm, set `mcpConfig.app.publicBaseUrl` |
 | `BACKSTOP_MCP_ENCRYPTION_KEY` | Fernet key | Encrypts stored Backstop credentials. Startup fails if it is missing or invalid. See [Authentication: Encryption key](./authentication.md#Encryption-Key) |
 | `DATABASE_URL` or `DB_URL` or `DB_HOST`+`DB_NAME`+`DB_USER`+`DB_PASSWORD` | See [Database](#Database) | PostgreSQL connection |
 
@@ -47,7 +91,7 @@ Only two variables have no usable default in production: `PUBLIC_BASE_URL` and
 | `PORT` | `9010` | `8000` | HTTP port. The container image also sets `PORT=8000`. The chart writes it from `ports.application` and overwrites any `env.PORT` |
 | `LOG_LEVEL` | `info` | `info` | `debug`, `info`, `warning`, `error`, `critical` |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | `conceal` | `conceal` makes tool-level events write identifying values such as Backstop logins as `sha256:<hex>`, so lines can be correlated without the value. `disclose` writes the original, and only the exact lower-case value `disclose` turns it on. The Backstop HTTP client's request and re-check events (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either setting, so treat logs as containing Backstop logins. API tokens are never logged |
-| `PUBLIC_BASE_URL` | `http://localhost:9010` | (set per deployment) | See [Required](#Required) |
+| `PUBLIC_BASE_URL` | `http://localhost:9010` | Set per deployment in `mcpConfig.app.publicBaseUrl` | See [Required](#Required) |
 | `VERSION` | Package version | `image.tag`, falling back to the chart `appVersion` (set by the base chart) | Reported as the MCP server version and on metrics. Not meant to be set by hand |
 
 ## Backstop API
@@ -56,8 +100,8 @@ Where to reach Backstop and how the shared HTTP client behaves. Prefix `BACKSTOP
 
 | Variable | App default | Chart default | Description |
 |---|---|---|---|
-| `BACKSTOP_BASE_URL` | `https://api.backstopsolutions.com` | | Backstop REST API origin: the tenant's own host or the shared API host. Both work |
-| `BACKSTOP_UI_BASE_URL` | unset | | CRM UI origin used to build links to records (`{origin}/backstop/...`). See [CRM links](#CRM-links) |
+| `BACKSTOP_BASE_URL` | `https://api.backstopsolutions.com` | Set per deployment in `mcpConfig.backstop.baseUrl` | Backstop REST API origin: the tenant's own host or the shared API host. Both work |
+| `BACKSTOP_UI_BASE_URL` | unset | Set per deployment in `mcpConfig.backstop.uiBaseUrl` | CRM UI origin used to build links to records (`{origin}/backstop/...`). See [CRM links](#CRM-links) |
 | `BACKSTOP_DEFAULT_TIMEOUT_SECONDS` | `120` | | Timeout for one ordinary Backstop request |
 | `BACKSTOP_REPORTS_TIMEOUT_SECONDS` | `600` | | Timeout for requests to `/reports` and `/analytics` paths, which Backstop documents as slow |
 | `BACKSTOP_MAX_CONCURRENT_REQUESTS_PER_USER` | `5` | | Concurrent Backstop requests allowed per user, per pod. Backstop itself limits each user token to 5 |
@@ -120,15 +164,16 @@ organization is `current` or `former`. A firm may record a departure as a separa
 ("is a former employee of") rather than an end date, so the server needs to know which relationship
 types mean employment and which mean it has ended.
 
-| Variable | App default | Description |
-|---|---|---|
-| `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | empty | Relationship type ids that mean employment. Exact match |
-| `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | `employ` | Case-insensitive substrings of a type's name that mean employment |
-| `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | empty | Relationship type ids that mean employment has ended |
-| `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | `former,previous,ex-,no longer` | Case-insensitive substrings that mean employment has ended |
+| Variable | Chart value (`mcpConfig.employment.`) | App default | Description |
+|---|---|---|---|
+| `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | `relationshipTypeIds` | empty | Relationship type ids that mean employment. Exact match |
+| `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | `relationshipTypeMarkers` | `employ` | Case-insensitive substrings of a type's name that mean employment |
+| `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | `formerRelationshipTypeIds` | empty | Relationship type ids that mean employment has ended |
+| `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | `formerRelationshipTypeMarkers` | `former,previous,ex-,no longer` | Case-insensitive substrings that mean employment has ended |
 
-- All four are comma-separated. Setting a markers variable **replaces** its defaults; setting it
-  empty leaves only the ids for that bucket.
+- All four are comma-separated; in Helm they are lists. Setting a markers variable **replaces** its
+  defaults; setting it empty (`[]` in Helm) leaves only the ids for that bucket. Leave the chart
+  value `null` to keep the defaults.
 - The two marker lists must not overlap. A shared substring such as `employee` cannot tell a current
   type from a former one, which is why the departure word is the marker. This is not checked at
   startup: an overlap silently misclassifies links.
@@ -149,18 +194,19 @@ types mean employment and which mean it has ended.
 ## Tenant Guidance
 
 `BACKSTOP_MCP_TENANT_GUIDANCE` adds firm-specific text to what the AI reads, without changing the
-shipped tool descriptions. In Helm, set the `tenantGuidance` object; the chart renders it as JSON
-into the variable, and omits the variable when the object is empty.
+shipped tool descriptions. In Helm, set the `mcpConfig.tenantGuidance` object; the chart renders it
+as JSON into the variable, and omits the variable when the object is empty.
 
 ```yaml
-tenantGuidance:
-  server_instructions: >-
-    "Strategy" on a product is the custom field named Investment Strategy.
-  tools:
-    search_products:
-      description: Fund short names start with NW, for example NWGM.
-      parameters:
-        name: Short names are upper case.
+mcpConfig:
+  tenantGuidance:
+    server_instructions: >-
+      "Strategy" on a product is the custom field named Investment Strategy.
+    tools:
+      search_products:
+        description: Fund short names start with NW, for example NWGM.
+        parameters:
+          name: Short names are upper case.
 ```
 
 | Field | Limit | Appended to |

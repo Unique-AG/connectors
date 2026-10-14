@@ -230,9 +230,9 @@ Backstop is down, slow, or unreachable from the cluster.
   answer `401` or `403`; checks that time out or fail with `5xx` keep the session. See
   [Authentication: When Backstop rejects the credential](./authentication.md#When-Backstop-rejects-the-credential).
 
-**What the operator does.** Nothing in the server. Check egress from the pod to `BACKSTOP_BASE_URL`
-(network policy, DNS, proxy), and Backstop's own status. The server recovers by itself once Backstop
-answers.
+**What the operator does.** Nothing in the server. Check egress from the pod to the Backstop API host in
+`mcpConfig.backstop.baseUrl` (network policy, DNS, proxy), and Backstop's own status. The server
+recovers by itself once Backstop answers.
 
 A `429` with a day, hour, or minute quota is Backstop limiting that user, not an outage. The server
 does not retry those. `backstop_rate_limited_total` shows which kind it was.
@@ -262,7 +262,7 @@ keep serving. On a first install, there is no server yet.
 The pod, the namespace, or the whole cluster is gone.
 
 1. Install the chart in the new location with the same values, the same encryption key, and the
-   same `PUBLIC_BASE_URL`.
+   same `mcpConfig.app.publicBaseUrl`.
 2. Point it at the existing database, or at one restored from backup (see
    [PostgreSQL data lost](#PostgreSQL-Data-Lost)).
 3. Move the hostname to the new ingress.
