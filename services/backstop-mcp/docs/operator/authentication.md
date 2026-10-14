@@ -16,8 +16,8 @@ the server, where the user types their Backstop username and API token. The clie
 Backstop credential, and Backstop never sees the MCP tokens.
 
 There is nothing to register in Backstop or in an identity provider. The only operator tasks are
-the encryption key (see [Encryption key](#Encryption-Key)) and a `PUBLIC_BASE_URL` that clients and
-browsers can reach (see [Configuration: Required](./configuration.md#Required)).
+the encryption key (see [Encryption key](#Encryption-Key)) and a `mcpConfig.app.publicBaseUrl` that
+clients and browsers can reach (see [Configuration: Required](./configuration.md#Required)).
 
 Code: [`features/auth/provider.py`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/src/backstop_mcp/features/auth/provider.py)
 (login form) and the shared

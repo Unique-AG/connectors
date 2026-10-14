@@ -61,7 +61,9 @@ mcpConfig:
   `https://`, and a list item cannot contain a comma. Ids are strings: quote them (`["1042"]`), or
   the schema rejects them.
 - A URL is rendered only when it is not empty, so an empty value keeps the app default. URLs pass
-  through `tpl`, so an overlay can build them from other values.
+  through `tpl`, so an overlay can build them from other values. The schema checks the raw value
+  before `tpl` runs, so the scheme must be literal: `https://{{ .Values.routes.hostname }}` passes,
+  while `{{ printf "https://%s" .Values.routes.hostname }}` is rejected.
 - A list is rendered comma-separated whenever it is set, including `[]`, which reaches the app as an
   empty value. The chart default `null` leaves the variable unset. This matters for the markers
   lists: `[]` replaces their defaults, `null` keeps them. See
