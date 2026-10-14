@@ -324,7 +324,8 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.debug(`Establishing SSE stream for session ${sessionId}`);
     const transport = this.transports[sessionId];
-    this.trackOpenRequest(sessionId, adaptedRes);
+    // Not tracked as an open request: the standalone stream stays open for the life of the
+    // session and the SDK keeps it alive, so counting it would exempt the session from the sweep.
     await transport.handleRequest(adaptedReq.raw, adaptedRes.raw);
   }
 
@@ -401,7 +402,7 @@ export class McpStreamableHttpService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // Open requests (long tool calls, SSE streams) keep a session alive.
+  // Open POST requests (long tool calls) keep a session alive.
   private trackOpenRequest(sessionId: string, res: HttpResponse): void {
     this.recordSessionActivity(sessionId, 1);
     res.on?.('close', () => this.recordSessionActivity(sessionId, -1));
