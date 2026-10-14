@@ -1,10 +1,10 @@
 # Security process
 
-This document explains how this repository manages three things: known vulnerabilities, dependency versions, and the images it builds and ships. It tells you what runs, when it runs, and what to do when a check stops your pull request. It also tells you what to do when a published image has a finding.
+This document explains how this repository manages three things: known vulnerabilities, dependency versions, and the images it builds and ships. It tells you what runs, when it runs, and what to do when a check stops your pull request. It also tells you what to do when a published image has a finding, and gives the weekly routine of the person who operates the process.
 
 To report a vulnerability, read [SECURITY.md](./SECURITY.md). This document does not cover disclosure.
 
-Section 1 shows the whole process. Sections 2 to 6 follow a change from pull request to published image. Section 7 lists every waiver.
+Section 1 shows the whole process. Sections 2 to 6 follow a change from pull request to published image. Section 7 lists every waiver. Section 8 gives the weekly routine.
 
 ## 1. The process at a glance
 
@@ -31,6 +31,7 @@ flowchart LR
 | Every release | The image is built, signed, and pushed. Two more scans run against it. |
 | Wednesday, 06:00 UTC | A scan reads the latest image of each service. |
 | All the time | Dependabot re-reads the lockfiles on `main` for new advisories. |
+| Monday | An operator reads the results and clears the findings. See [Monday morning](#8-monday-morning-the-operator-routine). |
 
 ## 2. The checks and scans
 
@@ -140,7 +141,9 @@ Three settings shape what Dependabot does with what it finds:
 Dependabot does not rebase a pull request on its own. If `main` moves past it, do one of the following:
 
 - Update the branch yourself.
-- Close the pull request, and wait for Dependabot to open it again.
+- Comment `@dependabot recreate`. Dependabot builds the pull request again from `main`.
+
+**Do not close a Dependabot pull request to get a new one.** A closed Dependabot pull request stays closed. Dependabot does not propose that version again.
 
 ### Dependabot alerts
 
@@ -247,6 +250,61 @@ Use the label only when you accept the advisory.
 **The label only changes what happens on your pull request.** It does not reach the release image scan or the registry image scan. Once you merge and release, the same finding can open a fresh alert in the Security tab, with no link back to this label.
 
 A finding that you waive with the label before merge stays in the published image. Only a new version clears it. See [When a published image has a finding](#6-when-a-published-image-has-a-finding).
+
+## 8. Monday morning: the operator routine
+
+An operator is a person with write access to this repository who does this routine each week. On Monday, the inputs are ready. Dependabot opened its pull requests on Friday. The registry image scan ran on Wednesday.
+
+Do the steps in this order.
+
+| Step | Run this, or go here | A result means | Then |
+|---|---|---|---|
+| 1. Read the registry image scan | `gh run list --workflow security-trivy-registry.yaml --limit 1` | `failure`: a published image has a CRITICAL or HIGH finding with a fix. | Open the run summary. Write down each service in the table. Follow [When a published image has a finding](#6-when-a-published-image-has-a-finding). |
+| 2. Read the Dependabot pull requests | `gh pr list --label dependencies --state open` | Each pull request is one dependency, in one ecosystem. | Read each one. Merge it, or leave a comment that gives the reason it stays open. |
+| 3. Read the Dependabot alerts | `gh api 'repos/Unique-AG/connectors/dependabot/alerts?state=open' --jq '.[] \| [.number, .security_advisory.severity, .dependency.package.name, .dependency.manifest_path, .dependency.relationship] \| @tsv'` | Each row is a vulnerable version that is already on `main`. | Use the table in [How to clear a finding](#how-to-clear-a-finding). |
+| 4. Read the code scanning alerts | `gh api 'repos/Unique-AG/connectors/code-scanning/alerts?state=open' --jq '.[] \| [.number, .rule.security_severity_level, .tool.name, .rule.id] \| @tsv'` | `Trivy` rows come from the image scans. `CodeQL` rows come from the source. | Use the same table. |
+| 5. Read the release pull requests | `gh pr list --label 'autorelease: pending' --state open` | Each one is a service that has unreleased changes. | Merge it only after every fix for that service is on `main`. |
+
+An open Dependabot pull request counts toward the limit of 5 for its ecosystem. A queue that nobody reads stops Dependabot from opening new pull requests.
+
+To get a result that is newer than Wednesday, start the registry image scan by hand: `gh workflow run security-trivy-registry.yaml -f services=all`.
+
+### Read a Dependabot pull request
+
+Use the `dependabot-pr-review` skill. It reads the pull request, the release notes of every release in the range, and the CI result. It then says if the change breaks our code. See [.claude/skills/dependabot-pr-review/SKILL.md](./.claude/skills/dependabot-pr-review/SKILL.md).
+
+The skill does not edit the repository, comment on the pull request, or merge. You do those.
+
+### How to clear a finding
+
+| Finding | Fix | What clears it |
+|---|---|---|
+| A Dependabot alert on a direct dependency | Merge the Dependabot pull request. | Dependabot closes the alert. |
+| A Dependabot alert on a transitive Python dependency | In the service folder, run `uv lock --upgrade-package <package>`. Open a pull request. | Merge the pull request. Dependabot closes the alert. |
+| A Dependabot alert on a transitive npm dependency | Run `pnpm update -r --depth Infinity`. If the parent package pins an exact version, add an entry under `pnpm.overrides` in `package.json`. | Merge the pull request. Dependabot closes the alert. |
+| A `Trivy` code scanning alert | Use the table in [What to do](#what-to-do). | Each service that reports the alert must ship a new version. |
+| A `CodeQL` alert | Fix the code, or dismiss the alert and give a reason. | The next scan of `main`. |
+
+A transitive dependency has no entry in a manifest. In this repository, a Dependabot version update does not reach it.
+
+A `Trivy` alert can list more than one service. To see which services report alert `<n>`, run `gh api repos/Unique-AG/connectors/code-scanning/alerts/<n>/instances --jq '.[].category'`. Each category is `trivy-image/<service>`.
+
+### The order of the work
+
+Merge fixes first. Merge release pull requests last. A release builds the image from `main` at the moment you merge its release pull request.
+
+```mermaid
+flowchart LR
+  read[Read steps 1 to 4] --> fix[Merge the fixes to main]
+  fix --> starts{Does the fix start a release?}
+  starts -->|yes| relpr[release-please opens a release pull request]
+  starts -->|no| rebuild[Run the Rebuild Service workflow, and merge its pull request]
+  rebuild --> relpr
+  relpr --> merge[Merge the release pull request]
+  merge --> image[The service ships a new image]
+```
+
+[Which changes start a release](#which-changes-start-a-release) lists what starts a release.
 
 ## Files
 
