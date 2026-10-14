@@ -58,7 +58,8 @@ mcpConfig:
 ```
 
 - A misspelt key fails `helm install` against the chart schema. A URL must start with `http://` or
-  `https://`, and a list item cannot contain a comma.
+  `https://`, and a list item cannot contain a comma. Ids are strings: quote them (`["1042"]`), or
+  the schema rejects them.
 - A URL is rendered only when it is not empty, so an empty value keeps the app default. URLs pass
   through `tpl`, so an overlay can build them from other values.
 - A list is rendered comma-separated whenever it is set, including `[]`, which reaches the app as an
@@ -66,13 +67,13 @@ mcpConfig:
   lists: `[]` replaces their defaults, `null` keeps them. See
   [Departed-contact detection](#Departed-Contact-Detection).
 - `mcpConfig.tenantGuidance` is rendered only when it is not empty.
-- `mcpConfig.enabled: false` renders none of these variables.
+- `mcpConfig.enabled: false` renders none of these variables, tenant guidance included.
 - A variable set both under `mcpConfig` and under `env` takes the `mcpConfig` value. `env` reaches
   the container through a ConfigMap (`envFrom`), and Kubernetes gives a container's own `env`
   entries precedence over it. A deployment that still sets these variables under `env` keeps
   working, and can move them to `mcpConfig` at any time.
-- The top-level `tenantGuidance` value is deprecated. It is still read while
-  `mcpConfig.tenantGuidance` is empty, so a deployment that sets it keeps working until it moves.
+- The top-level `tenantGuidance` value is gone. Setting it fails `helm install`; move it to
+  `mcpConfig.tenantGuidance`.
 
 ## Required
 

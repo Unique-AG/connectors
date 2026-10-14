@@ -3,12 +3,8 @@ Chart-specific helpers. Generic identity/label helpers are provided by the base 
 */}}
 
 {{/*
-mcpConfig environment variables: non-secret fields with tenant-specific values.
-Secrets stay in envVars or secret refs.
-
-A list is rendered whenever it is set, even to []: setting a markers variable replaces the app's
-default markers, so an empty list has to reach the app as an empty string rather than be dropped.
-null (the default) leaves the variable unset.
+mcpConfig as container env vars. A list renders even when [], since an empty markers variable
+replaces the app default; null leaves it unset.
 */}}
 {{- define "chart.config.mcpEnv" -}}
 {{- if .Values.mcpConfig.app.publicBaseUrl }}
@@ -37,10 +33,8 @@ null (the default) leaves the variable unset.
   value: {{ join "," $items | quote }}
 {{- end }}
 {{- end }}
-{{/* Top-level tenantGuidance is deprecated and read only while mcpConfig.tenantGuidance is empty. */}}
-{{- $guidance := .Values.mcpConfig.tenantGuidance | default .Values.tenantGuidance }}
-{{- if $guidance }}
+{{- if .Values.mcpConfig.tenantGuidance }}
 - name: BACKSTOP_MCP_TENANT_GUIDANCE
-  value: {{ toJson $guidance | quote }}
+  value: {{ toJson .Values.mcpConfig.tenantGuidance | quote }}
 {{- end }}
 {{- end -}}

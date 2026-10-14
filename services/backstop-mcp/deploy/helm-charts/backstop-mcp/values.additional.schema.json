@@ -49,10 +49,11 @@
             "relationshipTypeIds": {
               "type": ["array", "null"],
               "items": {
-                "type": ["string", "integer"],
+                "type": "string",
+                "minLength": 1,
                 "pattern": "^[^,]+$"
               },
-              "description": "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment. Exact match. App default: none."
+              "description": "BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment, as strings. Exact match. App default: none."
             },
             "relationshipTypeMarkers": {
               "type": ["array", "null"],
@@ -66,10 +67,11 @@
             "formerRelationshipTypeIds": {
               "type": ["array", "null"],
               "items": {
-                "type": ["string", "integer"],
+                "type": "string",
+                "minLength": 1,
                 "pattern": "^[^,]+$"
               },
-              "description": "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment has ended. Include the mirror type's id too. App default: none."
+              "description": "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS. Relationship type ids that mean employment has ended, as strings. Include the mirror type's id too. App default: none."
             },
             "formerRelationshipTypeMarkers": {
               "type": ["array", "null"],
@@ -125,12 +127,8 @@
       "additionalProperties": false
     },
     "tenantGuidance": {
-      "description": "Deprecated: use mcpConfig.tenantGuidance. Read only while mcpConfig.tenantGuidance is empty.",
-      "allOf": [
-        {
-          "$ref": "#/properties/mcpConfig/properties/tenantGuidance"
-        }
-      ]
+      "description": "Removed: set mcpConfig.tenantGuidance instead. Rejected so that guidance left here fails the install rather than being dropped.",
+      "not": {}
     }
   }
 }

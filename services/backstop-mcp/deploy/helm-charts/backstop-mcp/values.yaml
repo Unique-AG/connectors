@@ -6,39 +6,26 @@ nameOverride: backstop-mcp
 fullnameOverride: backstop-mcp
 selectorComponentLabel: server
 
-# Per-client settings, rendered as env vars on the app container. Each is rendered only when
-# set, so an unset value keeps the app default. Set per deployment in the overlay.
-# Takes precedence over the same variable under `env:`, which reaches the container through a
-# ConfigMap (`envFrom`), and Kubernetes lets a container's own `env` override that.
+# Per-client settings, rendered as container env vars that override the same name under `env`.
+# Empty or null keeps the app default. Set per deployment in the overlay.
 mcpConfig:
   enabled: true
   app:
-    # PUBLIC_BASE_URL: the externally-reachable OAuth issuer URL. Required in production.
-    # Must match routes.hostname, e.g. https://backstop-mcp.<tenant>.unique.app
+    # PUBLIC_BASE_URL, the OAuth issuer. Required in production; must match routes.hostname.
     publicBaseUrl: ""
   backstop:
-    # BACKSTOP_BASE_URL. Unset: the app uses https://api.backstopsolutions.com
+    # BACKSTOP_BASE_URL. App default: https://api.backstopsolutions.com
     baseUrl: ""
-    # BACKSTOP_UI_BASE_URL: the CRM UI origin for record links. Unset: no links, unless
-    # baseUrl is already the tenant CRM host (not api.backstopsolutions.com).
+    # BACKSTOP_UI_BASE_URL, the CRM UI origin for record links.
     uiBaseUrl: ""
-  # Departed-contact detection. Lists are rendered comma-separated. null keeps the app default;
-  # a markers list, even [], replaces it (`employ` and `former,previous,ex-,no longer`). The two
-  # marker lists must not overlap.
+  # Departed-contact detection. Ids are strings. A markers list, even [], replaces the app default.
   employment:
     relationshipTypeIds: null
     relationshipTypeMarkers: null
     formerRelationshipTypeIds: null
     formerRelationshipTypeMarkers: null
-  # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON: text appended to the server instructions and
-  # to individual tool and parameter descriptions. Set per deployment in the overlay, never
-  # here — the chart ships tenant-neutral. Shape: `TenantGuidance` in the server code and
-  # values.schema.json. Empty means the shipped descriptions only.
+  # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}
-
-# Deprecated: use mcpConfig.tenantGuidance. Still read when mcpConfig.tenantGuidance is empty, so
-# an overlay that sets it here keeps working until it moves.
-tenantGuidance: {}
 
 # Loki scrapes use this label to parse stderr as pino-json
 # (unique_mcp.configure_logging).

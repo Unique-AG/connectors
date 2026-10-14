@@ -16,7 +16,7 @@ mcpConfig:
   employment:
     relationshipTypeIds: ["101", "102"]
     relationshipTypeMarkers: [employ]
-    formerRelationshipTypeIds: [201]
+    formerRelationshipTypeIds: ["201"]
     formerRelationshipTypeMarkers: []
   tenantGuidance:
     server_instructions: Fund short names are upper case.
