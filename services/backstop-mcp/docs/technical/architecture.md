@@ -39,7 +39,7 @@ src/backstop_mcp/
   dependencies.py      cached providers: configs, engine, Backstop client factory, OAuth provider
   logging.py           JSON logging setup
   metrics.py           OpenTelemetry instruments exported on /metrics
-  teardown.py          closes shared clients on shutdown
+  teardown.py          on shutdown, closes the HTTP pool and database engine, clears cached providers
   server/              how features are exposed over MCP
     instructions.py      server instructions sent to every client
     tools/registry.py    the registered tools (listed in Tools)
@@ -52,12 +52,15 @@ src/backstop_mcp/
   utils/               shared helpers, including log concealment of logins
 ```
 
+The tree shows the main parts only; a few small top-level modules (`dates.py`, `models.py`, …) are
+left out.
+
 Settings are described in [Configuration](../operator/configuration.md); every tool is listed in
 [Tools](./tools.md).
 
 `features/` never imports `server/`, and `backstop_client/` never imports `features/` or `config`.
-`tests/test_layering.py` enforces both, and that every tool file is registered. Each feature follows
-the same shape (`queries/`, `commands/`, `responses`, `tools/`); see
+`tests/test_layering.py` enforces these rules, and that every tool file is registered. Features share
+one shape (`queries/`, `commands/`, `responses`, `tools/`), each part present only when needed; see
 [`AGENT_README.md`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/AGENT_README.md).
 
 | Feature package | Domain |
@@ -178,7 +181,7 @@ is the only code that talks HTTP to Backstop.
 | **Authentication** | HTTP Basic with the caller's username and API token, resolved once per client call (`get`, `post`, `paginate`, …), so a 20-page `paginate()` walk decrypts once |
 | **Per-user gate** | At most `BACKSTOP_MAX_CONCURRENT_REQUESTS_PER_USER` (5) requests in flight per username, per process. The slot is held for one HTTP request, not a whole tool call, and released while a retry backs off |
 | **Timeouts** | `BACKSTOP_DEFAULT_TIMEOUT_SECONDS` (120), or `BACKSTOP_REPORTS_TIMEOUT_SECONDS` (600) for paths containing `/reports` or `/analytics` |
-| **429** | Classified from the body as concurrency, minute, hour, or day. Only concurrency `429`s are retried. The wait is `Retry-After` (at least 1 s) or exponential backoff of 1 s, 2 s, 4 s… plus up to 1 s of jitter. A request gets at most `BACKSTOP_MAX_RETRY_ATTEMPTS` (5) attempts in total, and a retry happens only when the wait is under `BACKSTOP_MAX_RETRY_WAIT_MS` (30 s) |
+| **429** | Classified from the body as concurrency, minute, hour, or day. Only concurrency `429`s are retried. The wait is `Retry-After` (at least 1 s) or exponential backoff of 1 s, 2 s, 4 s… plus up to 1 s of jitter. A request gets at most `BACKSTOP_MAX_RETRY_ATTEMPTS` (5) attempts in total, and a retry happens only when the wait before jitter is at most `BACKSTOP_MAX_RETRY_WAIT_MS` (30 s) |
 | **Nothing else retries** | 5xx responses, timeouts, network errors, and `429`s whose limit cannot be classified fail the call at once |
 | **401** | Re-checked by probing `/system-info` with backoff (1 s, 2 s, 4 s…) within 10 seconds. The session is revoked, and the call answered with HTTP `401`, only if every probe returns `401` or `403`. Otherwise the call fails with a retryable tool error and the session is kept |
 | **Pagination** | JSON:API `page[limit]` / `page[offset]`. Page size is `BACKSTOP_DEFAULT_PAGE_SIZE` (100), or `BACKSTOP_REPORT_PAGE_SIZE` (500, the maximum) for `/reports` and `/analytics`. Follows `links.next`, or fetches pages in parallel by offset where the total count is reliable. Offsets stay multiples of the page size, which Backstop requires. A walk stops at 10,000 records by default and marks the result truncated |
@@ -187,8 +190,9 @@ is the only code that talks HTTP to Backstop.
 ## Paged Searches
 
 `search_organizations`, `search_people`, `search_opportunities` (rows mode), and `search_activities`
-(rows mode) return at most `SEARCH_RESULT_SIZE` rows per call, plus a `continuation` with an opaque
-`cursor` when more may match.
+(rows mode) return about `SEARCH_RESULT_SIZE` rows per call, plus a `continuation` with an opaque
+`cursor` when more may match. The first three return at most that many. `search_activities` reads
+whole pages until it has at least that many, so it can return up to about twice as many.
 
 - Many filters are applied in memory after the read, because Backstop rejects them as query filters.
   A search therefore reads Backstop pages until it has a full page of matches or reaches the end.
@@ -217,9 +221,9 @@ Catalog caches use one shared fetch for concurrent callers. With the cache flag 
 still happens, but nothing is kept afterwards. The catalog caches hold instance-wide schema rather than
 per-user data: custom-field definitions carry no permission attribute in Backstop.
 
-If a refresh fails, custom-field and vocabulary catalogs keep serving the previous value (the
-response's `cache` field says `stale`). Opportunity stages and entity-relationship types never serve
-stale.
+If a refresh fails, a catalog whose cache is enabled keeps serving the previous value (the
+response's `cache` field says `stale`). With the cache off, the default for the small vocabularies,
+the failure reaches the caller. Opportunity stages and entity-relationship types never serve stale.
 
 ## Persistence
 
@@ -264,7 +268,7 @@ Served on `/metrics` in Prometheus format. `setup_ops` contributes the HTTP requ
 | `mcp_calls_total` | Counter (`kind`, `name`, `status`) | Tool calls by tool and outcome (the exception class name on failure) |
 | `mcp_call_duration_seconds` | Histogram (`kind`, `name`) | Tool-call latency |
 | `backstop_filter_ignored_total` | Counter (`endpoint`, `filter`) | `search_activities` found rows that contradict a filter Backstop accepted |
-| `custom_field_schema_loads_total` | Counter (`source`) | Custom-field catalog loads, by source |
+| `custom_field_schema_loads_total` | Counter (`source`) | Custom-field definition loads, by source (`backstop`, `stale`) |
 | `catalog_get_duration_seconds` | Histogram (`catalog`, `served`) | Every catalog read and what answered it: `backstop`, `coalesced`, `cache`, `stale`, `error`, `cancelled` |
 | `catalog_fetch_duration_seconds` | Histogram (`catalog`, `outcome`) | Actual catalog walks. Subtract its `_count` from the previous one for requests the cache avoided |
 
@@ -283,7 +287,7 @@ image these spans are not exported anywhere.
 
 - [Technical Reference](./README.md)
 - [Overview](../README.md)
-- [Features](./features/README.md)
+- [Features](./features.md)
 - [Tools](./tools.md)
 - [Authentication](../operator/authentication.md)
 - [Configuration](../operator/configuration.md)

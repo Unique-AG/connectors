@@ -9,6 +9,7 @@
 | Deploy the server, on Unique SaaS or self-managed, and configure it | [Operator Guide](./operator/README.md) |
 | Understand how it works, what it can read and write, and every tool | [Technical Reference](./technical/README.md) |
 | Find a quick answer | [FAQ](./faq.md) |
+| Change the server's code | [Local Development](./operator/local-development.md), then the [developer documentation](#Developer-documentation) on GitHub |
 
 ## Overview
 
@@ -33,7 +34,7 @@ encrypted, and issues its own short-lived MCP tokens. See [Authentication](./ope
 | **What it does** | 44 tools: 27 read-only, 17 that create, change, or delete CRM records |
 | **Who it acts as** | The connected user, with their own Backstop credential |
 | **Deployment** | One Python (FastMCP) container on Kubernetes, installed with a Helm chart |
-| **Durable state** | PostgreSQL only: OAuth clients and tokens, and each user's encrypted Backstop credential |
+| **Durable state** | PostgreSQL only: OAuth clients and tokens, each user's encrypted Backstop credential, and recent login attempts |
 | **Not needed** | No message queue, no Unique knowledge base, no Zitadel service account, no ingestion |
 | **CRM data at rest** | None. Backstop data is fetched live per call. Reference catalogs are cached in memory, and report results are held in memory for up to an hour so a slow build can be collected |
 
@@ -45,7 +46,7 @@ encrypted, and issues its own short-lived MCP tokens. See [Authentication](./ope
 |---|---|
 | **Backstop tenant** | Reachable over HTTPS from the cluster, either on the tenant's own host or on the shared `api.backstopsolutions.com` |
 | **Personal API token per user** | Created in Backstop under *Main Menu › System Tools › Administrative › Update Your Profile*, API Security section. The login form takes this token, never a password |
-| **Matching system user** | The Backstop login must belong to a Backstop system user. Login is refused otherwise, because writes are authored as that user |
+| **Matching system user** | The Backstop login must belong to a Backstop system user. Login is refused otherwise, because the activities a user logs are authored as that system user |
 
 ### Platform
 
@@ -57,16 +58,17 @@ encrypted, and issues its own short-lived MCP tokens. See [Authentication](./ope
 
 ## What It Can Do
 
-| Area | Read | Write |
+| Feature | Read | Write |
 |---|---|---|
-| Contacts (organizations and people) | Look up, search firm-wide, roster of an organization, employment history | Create, update, delete; add and end employment; edit addresses |
-| Activities | Firm-wide or per-party search, full detail and attachments, last activity per party, tasks | Log notes, meetings, calls, tasks; attach documents and email files; update; delete |
-| Opportunities (pipeline) | A party's deals with stage history, firm-wide search and counts, deals by id | Create, update (including stage moves), delete, backfill stage history |
-| Products and accounts | Products, a party's holdings, a product's investors, dated time series, subscriptions and redemptions | None |
-| Custom fields | Definitions, layout groups, values on records | Write values on people, organizations, and opportunities |
-| Reports and links | Run a saved Report Center report by name; build and parse CRM UI links | None |
+| [Contacts](./technical/features.md#Contacts) | Look up, search firm-wide, roster of an organization, employment history | Create, update, delete; add and end employment; edit addresses |
+| [Activities and Tasks](./technical/features.md#Activities-and-Tasks) | Firm-wide or per-party search, full detail and attachments, last activity per party, tasks | Log notes, meetings, calls, tasks; attach documents and email files; update; delete |
+| [Opportunities](./technical/features.md#Opportunities) | A party's deals with stage history, firm-wide search and counts, deals by id | Create, update (including stage moves), delete, backfill stage history |
+| [Products and Accounts](./technical/features.md#Products-and-Accounts) | Products, a party's holdings, a product's investors, dated time series, subscriptions and redemptions | None |
+| [Custom Fields](./technical/features.md#Custom-Fields) | Definitions, layout groups, values on records | Write values on people, organizations, and opportunities |
+| [Saved Reports](./technical/features.md#Saved-Reports) | Run a saved Report Center report by name | None |
+| [Backstop Links](./technical/features.md#Backstop-Links) | Build and parse links to the Backstop web app | None |
 
-See [Features](./technical/features/README.md) for what each area returns and its limits.
+See [Features](./technical/features.md) for the questions each feature answers and how it behaves.
 
 ## How It Works
 
@@ -117,8 +119,20 @@ See [Architecture](./technical/architecture.md) for components and request flow.
   - [Local Development](./operator/local-development.md)
 - [Technical Reference](./technical/README.md)
   - [Architecture](./technical/architecture.md)
-  - [Features](./technical/features/README.md)
+  - [Features](./technical/features.md)
   - [Tools](./technical/tools.md)
+
+### Developer documentation
+
+These pages live in the repository and are read on GitHub. They are for developers changing the
+server, not for using or operating it.
+
+| Document | What it covers |
+|---|---|
+| [Service README](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/README.md) | Code layout, the layering rule, and the steps for adding a feature or tool |
+| [`AGENT_README.md`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/AGENT_README.md) | The full guide to how features are structured, and the rules every feature follows |
+| [Backstop Data Model](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/docs/technical/backstop-data-model/README.md) | How the Backstop REST API behaves, and Backstop's standard records, fields and errors |
+| [`DEVELOP.md`](https://github.com/Unique-AG/connectors/blob/main/DEVELOP.md#python-services) | Repository-wide commands for Python services |
 
 ## Standard References
 

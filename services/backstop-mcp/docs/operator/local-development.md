@@ -47,7 +47,7 @@ BACKSTOP_BASE_URL=https://<firm>.backstopsolutions.com
 BACKSTOP_MCP_ENCRYPTION_KEY=<the key printed above>
 ```
 
-`.env.example` already points `DB_*` at the compose database and documents every other variable.
+`.env.example` already points `DB_*` at the compose database and documents most other variables.
 `APP_ENV=development` allows the `http://localhost` issuer, which production refuses. The full list
 is in [Configuration](./configuration.md).
 
@@ -96,14 +96,14 @@ Alembic reads the same `DB_URL` / `DATABASE_URL` / `DB_*` variables as the serve
 
 ## Tests, Lint, Types
 
-The same sequence the `[CI] Python` workflow runs:
+The same checks the `[CI] Python` workflow runs:
 
 ```bash
 pnpm install --frozen-lockfile                  # once, from the repository root, for biome
 cd services/backstop-mcp
 uv sync --locked
 uv run ruff format --check . && uv run ruff check .
-pnpm exec biome check .
+pnpm exec biome check . --no-errors-on-unmatched
 uv run basedpyright                             # do not pass `.`, that type-checks .venv
 uv run pytest                                   # needs Docker running
 ```
@@ -148,3 +148,6 @@ not part of the shipped server.
 - [Overview](../README.md)
 - [Configuration](./configuration.md)
 - [Authentication](./authentication.md)
+- [Developer documentation](../README.md#Developer-documentation): code layout,
+  [`AGENT_README.md`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/AGENT_README.md), and the
+  [Backstop Data Model](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/docs/technical/backstop-data-model/README.md)

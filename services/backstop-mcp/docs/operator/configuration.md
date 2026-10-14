@@ -178,7 +178,7 @@ tenantGuidance:
 | Variable | App default | Description |
 |---|---|---|
 | `DB_URL` | unset | PostgreSQL URL. `postgresql://` is accepted and rewritten for the async driver |
-| `DATABASE_URL` | unset | Used when `DB_URL` is unset. The base chart injects it when `postgresql.enabled` is true |
+| `DATABASE_URL` | unset | Used when `DB_URL` is unset. The base chart injects it when `postgresql.enabled` is true and `postgresql.connection` has either `url` or all of `host`, `database`, `username`, and `password` |
 | `DB_HOST` | unset | Used only when neither URL is set |
 | `DB_PORT` | `5432` | |
 | `DB_NAME` | unset | |

@@ -229,6 +229,14 @@ openssl rand -base64 32 | tr '+/' '-_'
 
   On its own this does not stop them: the login form accepts their API token again until it is
   revoked in Backstop.
+- Nothing deletes a stored credential automatically, for example when a user leaves; a later login
+  with the same username replaces it. Revoking the API token in Backstop makes the stored copy
+  useless. To remove it, revoke the user's MCP tokens as above and delete the row. `backstop_username`
+  is the login as the user typed it, without surrounding spaces:
+
+  ```sql
+  DELETE FROM backstop_credentials WHERE backstop_username = '<login>';
+  ```
 - An MCP client can revoke its own tokens through the `/revoke` endpoint.
 
 ## Related
@@ -238,4 +246,4 @@ openssl rand -base64 32 | tr '+/' '-_'
 - [Configuration: Authentication and Encryption](./configuration.md#Authentication-and-Encryption)
 - [Disaster Recovery: Rotating the encryption key](./disaster-recovery.md#Rotating-the-Encryption-Key)
 - [Architecture](../technical/architecture.md)
-- [FAQ: Connection and login](../faq.md#Connection-and-Login)
+- [FAQ: Connecting and Signing In](../faq.md#Connecting-and-Signing-In)

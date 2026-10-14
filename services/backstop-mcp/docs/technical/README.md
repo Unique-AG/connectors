@@ -16,18 +16,12 @@ record saved at login, every call reads or writes Backstop live, as the connecte
 | Document | What it covers |
 |---|---|
 | [Architecture](./architecture.md) | Components, HTTP surface, request lifecycle, party resolution, the Backstop client, paging, caching, persistence, observability |
-| [Features](./features/README.md) | What can be read and written, shared behaviour, and what is not supported |
-| [Features: Contacts](./features/contacts.md) | Organizations, people, employment, colleagues, categories, sources |
-| [Features: Activities](./features/activities.md) | Activity search and detail, inactivity, party streams, tasks, tags, activity writes and file attachments |
-| [Features: Opportunities](./features/opportunities.md) | Opportunities for one party or firm-wide, deal writes, stage moves and history |
-| [Features: Products and Accounts](./features/products-and-accounts.md) | Products, holdings, investors, time series, capital flows |
-| [Features: Custom Fields](./features/custom-fields.md) | The catalog, values on records, writing values |
-| [Features: Reports and Links](./features/reports-and-links.md) | Saved Report Center reports, CRM UI links |
+| [Features](./features.md) | What the server can do, feature by feature: the questions each answers, its behaviour, and what is not supported |
 | [Tools](./tools.md) | One line per tool, with the file that implements it and what it returns |
 | [Backstop Data Model](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/docs/technical/backstop-data-model/README.md) | For developers changing the server: how the Backstop REST API behaves, and Backstop's standard records, fields and errors |
 | [Authentication](../operator/authentication.md) | OAuth, the login form, token lifetimes, reconnecting, credential encryption |
-| Security | [Security checklist](../operator/README.md#7.-Security-checklist) for a self-managed install; [Login Throttling](../operator/authentication.md#Login-Throttling) and [Encryption Key](../operator/authentication.md#Encryption-Key); what is logged in [Architecture: Logs](./architecture.md#Logs) |
-| Permissions | Every call runs as the connected user, and Backstop applies that user's own permissions; the server has no permission model of its own. See [Authentication: How a Tool Call Authenticates](../operator/authentication.md#How-a-Tool-Call-Authenticates) and [Features: Every call runs as the user](./features/README.md#Every-call-runs-as-the-user) |
+| Security | [Security checklist](../operator/README.md) (section 7) for a self-managed install; [Login Throttling](../operator/authentication.md#Login-Throttling) and [Encryption Key](../operator/authentication.md#Encryption-Key); what is logged in [Architecture: Logs](./architecture.md#Logs) |
+| Permissions | Every call runs as the connected user, and Backstop applies that user's own permissions; the server has no permission model of its own. See [Authentication: How a Tool Call Authenticates](../operator/authentication.md#How-a-Tool-Call-Authenticates) and [Features: Safeguards](./features.md#Safeguards) |
 | [FAQ](../faq.md) | Common questions |
 
 ## Source

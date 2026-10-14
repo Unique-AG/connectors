@@ -204,16 +204,22 @@ Unique's Kong gateway and plugins and is off by default.
 #### Network policy
 
 The chart's `networkPolicy` block is off by default. With `enabled: true` it renders a
-`CiliumNetworkPolicy` (`flavor: cilium`, the chart default, which needs the Cilium CRDs; set
-`flavor: kubernetes` for a standard `NetworkPolicy`) with default deny in both directions. The pod
-needs:
+`CiliumNetworkPolicy` (`flavor: cilium`, the chart default, which needs the Cilium CRDs) with
+default deny in both directions and the baseline rules below. The rest of this section assumes
+Cilium.
+
+For a standard Kubernetes `NetworkPolicy`, set `flavor: kubernetes` and `enableDefaultDeny: null`,
+then write `policyTypes`, `ingress`, and `egress` yourself. That flavor adds no baseline rules and
+does not support `toFQDNs`.
+
+The pod needs:
 
 | Direction | Peer | How the chart handles it |
 |---|---|---|
-| Ingress to port `8000` | Your ingress gateway | `internalServices.dependents.ingressGateway`. The chart default is a Service named `gateway` in namespace `system`; set your own |
+| Ingress to port `8000` | Your ingress gateway | `internalServices.dependents.ingressGateway`. The chart default allows pods labelled `app.kubernetes.io/name: gateway` in namespace `system`; set `name` and `namespace` to match your gateway pods |
 | Ingress to port `8000` | Prometheus | `networkPolicy.baseline.prometheus.namespace` (chart default `system`) and `matchLabels` |
 | Egress | DNS | Allowed by `networkPolicy.baseline.dns`, on by default |
-| Egress to port `5432` | PostgreSQL | With `postgresql.connection.url` the chart cannot derive the host from the secret and fails to render. Add the rule yourself and set `postgresql.networkPolicyEgressManaged: true` |
+| Egress to port `5432` | PostgreSQL | With `postgresql.connection.url` the chart cannot derive the host from the secret, so it renders no PostgreSQL rule and neither the pod nor the migration hook can reach the database. Add the rule yourself and set `postgresql.networkPolicyEgressManaged: true` |
 | Egress to port `443` | `BACKSTOP_BASE_URL` | Add the rule yourself |
 
 ```yaml
@@ -242,7 +248,7 @@ postgresql:
 internalServices:
   dependents:
     ingressGateway:
-      name: <gateway Service name>
+      name: <gateway pods' app.kubernetes.io/name label>
       namespace: <gateway namespace>
 ```
 
@@ -274,7 +280,7 @@ internalServices:
 
 If the login form says *"This Backstop login has no matching system user"*, the credential is valid
 but the login is not a system user. If it says *"Backstop is unreachable"*, the pod cannot reach
-`BACKSTOP_BASE_URL`. See the [FAQ](../faq.md#Connection-and-Login).
+`BACKSTOP_BASE_URL`. See the [FAQ](../faq.md#Connecting-and-Signing-In).
 
 ## Operating the Service
 
@@ -290,8 +296,9 @@ but the login is not a system user. If it says *"Backstop is unreachable"*, the 
 The ServiceMonitor and the alert rules are rendered only when the Prometheus Operator CRDs
 (`monitoring.coreos.com/v1`) are installed. Without them, scrape `/metrics` on port `8000` yourself.
 
-The alert rules are the base chart's generic Kubernetes alerts (for example
-`KubernetesPodOOMKilled` and `KubernetesPodNearMemoryLimit`) plus one for this service,
+The alert rules are the base chart's generic Kubernetes and Argo CD application alerts (for example
+`KubernetesPodOOMKilled`, `KubernetesPodNearMemoryLimit`, `KubeJobFailed`, and
+`ArgoCDApplicationDegraded`) plus one for this service,
 `BackstopFilterIgnored`, which fires when `backstop_filter_ignored_total` increases: Backstop
 accepted a search filter but returned rows that do not match it. See
 [Architecture: Observability](../technical/architecture.md#Observability).

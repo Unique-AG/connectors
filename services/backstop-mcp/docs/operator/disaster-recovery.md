@@ -80,7 +80,7 @@ database. New logins fail too.
 users carry on without logging in again.
 
 If the database comes back at a new address, update the connection secret (`database-url` in the
-[self-managed example](./README.md#3.-Create-the-Kubernetes-secret)) and restart the pods, which read
+[self-managed example, step 3](./README.md)) and restart the pods, which read
 it only at startup:
 
 ```bash
@@ -175,7 +175,7 @@ On Unique SaaS, pause Argo CD auto-sync for the application first; otherwise it 
    ```
 
 3. Put the new key in the secret (`encryption-key` in the
-   [self-managed example](./README.md#3.-Create-the-Kubernetes-secret)). Keep the old key if any
+   [self-managed example, step 3](./README.md)). Keep the old key if any
    database backup still depends on it.
 
 4. Revoke every MCP token, and delete the credentials the new key cannot read:
