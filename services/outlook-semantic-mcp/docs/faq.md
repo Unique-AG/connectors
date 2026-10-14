@@ -430,7 +430,7 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 - **Read state** works in both modes. In Mode A, the agent sets the `isRead` condition on semantic entries and `isRead:false` in the KQL query, so the merged results contain only unread mail. In Mode B, `isRead:false` in the KQL query is the only option.
 - **Flags** work in Mode A only, through the `flagStatus` condition on semantic entries (`flagged`, `complete`, `notFlagged`). Microsoft Graph has no KQL property for follow-up flags, so Mode B cannot filter by flag. To express "not flagged", use `notEquals: "flagged"`.
 
-In Mode A the semantic index learns about read and flag changes through live catch-up, so a recent change can take a few minutes to show up.
+**Freshness (Mode A):** the semantic `isRead` and `flagStatus` values are metadata written at ingestion. Live catch-up only re-fetches a message and rewrites that metadata when its Graph `lastModifiedDateTime` is newer than the sync watermark. Whether Exchange moves `lastModifiedDateTime` when a message is marked read or flagged is not guaranteed by this service, so semantic read and flag results can lag behind the mailbox or stay at their ingested values. KQL `isRead:` is evaluated live by Microsoft Graph and is always current, which is why read-state questions go to both backends.
 
 ```json
 {

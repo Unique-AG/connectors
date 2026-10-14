@@ -214,6 +214,8 @@ Syntax rules:
 
 **Read state and flags by mode:** read-state filtering works in both modes — in Mode A, put it in both backends (the `isRead` condition on semantic entries and `isRead:` in the KQL query) so the merged results do not mix read and unread mail. Flag filtering (`flagStatus`) works only in Mode A, on the semantic side; Mode B cannot filter by flag.
 
+Semantic `isRead` and `flagStatus` are ingested metadata, refreshed by live catch-up only when the message's `lastModifiedDateTime` changes, so they can lag the mailbox. KQL `isRead:` is evaluated live by Graph.
+
 ---
 
 #### Return shape (`search_emails` and `fetch_next_search_pages`)
