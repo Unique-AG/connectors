@@ -63,10 +63,8 @@ serviceAccount:
   enabled: true
 
 # Base chart defaults to readOnlyRootFilesystem: true.
-# pg-cluster-ca: the CloudNativePG cluster CA, for the server and the migration Job, which both
-# read these lists. Optional, so a deployment on a managed Postgres starts without the Secret.
-# Only ca.crt is projected; the Secret also holds the CA private key.
-# An overlay that sets `volumes` or `volumeMounts` replaces these lists and must repeat both.
+# pg-cluster-ca: CloudNativePG CA for the server and migration Job; optional for managed Postgres.
+# An overlay that sets volumes or volumeMounts replaces these lists and must repeat it.
 volumes:
   - name: tmp
     emptyDir:
