@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.0.0...outlook-semantic-mcp@4.1.0) (2026-10-14)
+
+
+### Features
+
+* **outlook-semantic-mcp:** filter search_emails by read state and follow-up flag ([#1220](https://github.com/Unique-AG/connectors/issues/1220)) ([dcb45bf](https://github.com/Unique-AG/connectors/commit/dcb45bfd7770d224cecfeb8653ff567f4ebb1ae3))
+
 ## [4.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.6.3...outlook-semantic-mcp@4.0.0) (2026-10-12)
 
 
