@@ -12,6 +12,18 @@ never as a shared service account. Failed logins are rate-limited per username
 Tools resolve parties by name rather than by ID: "Northwind" is looked up against the live
 instance, and an ambiguous match asks the user to pick one.
 
+## Documentation
+
+Full documentation is available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| [Overview](./docs/README.md) | What it does, requirements, limitations, and how it works |
+| [FAQ](./docs/faq.md) | Common questions from users, admins, and operators |
+| [Operator Guide](./docs/operator/README.md) | Deployment, configuration, authentication, disaster recovery, local development |
+| [Technical Reference](./docs/technical/README.md) | Architecture, features, and every tool |
+| [Backstop Data Model](./docs/technical/backstop-data-model/README.md) | How the Backstop REST API behaves, for developers changing this server (not published to Confluence) |
+
 ## Layout
 
 ```
