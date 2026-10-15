@@ -31,6 +31,24 @@ class CryptoPriceBar(BaseModel):
     )
 
 
+class CryptoPrices(BaseModel):
+    baseCurrency: str | None = Field(
+        None, description='The base pair of the cryptocurrency, e.g. "btc" for "btcusd".'
+    )
+    exchangeData: dict[str, Any] | None = Field(
+        None,
+        description='The underlying data for each exchange. This will only be returned if the includeRawExchangeData flag is set to "true".',
+    )
+    priceData: list[CryptoPriceBar] | None = Field(
+        None,
+        description="Stores the top-of-book data being returned. See the table below for the fields in this object.",
+    )
+    quoteCurrency: str | None = Field(
+        None, description='The quote pair of the cryptocurrency, e.g. "usd" for "btcusd".'
+    )
+    ticker: str | None = Field(None, description="Ticker related to the asset.")
+
+
 class CryptoTopOfBookData(BaseModel):
     askExchange: str | None = Field(
         None,
@@ -98,6 +116,16 @@ class DailyPriceBar(BaseModel):
     volume: int | None = Field(None, description="The number of shares traded for the asset.")
     adjClose: float | None = Field(
         None, description="The adjusted closing price for the asset on the given date."
+    )
+
+
+class DataCodeValue(BaseModel):
+    dataCode: str | None = Field(
+        None,
+        description='An identifier representing the fundamentals field the value belongs to. For example, "peRatio."',
+    )
+    value: float | None = Field(
+        None, description="The value of the field corresponding to the dataCode"
     )
 
 
@@ -216,14 +244,11 @@ class FundamentalsMeta(BaseModel):
     ticker: str | None = Field(None, description="Ticker related to the asset.")
 
 
-class DataCodeValue(BaseModel):
-    dataCode: str | None = Field(
-        None,
-        description='An identifier representing the fundamentals field the value belongs to. For example, "peRatio."',
-    )
-    value: float | None = Field(
-        None, description="The value of the field corresponding to the dataCode"
-    )
+class FundamentalsStatementData(BaseModel):
+    overview: list[DataCodeValue] | None = None
+    incomeStatement: list[DataCodeValue] | None = None
+    balanceSheet: list[DataCodeValue] | None = None
+    cashFlow: list[DataCodeValue] | None = None
 
 
 class IexTopOfBook(BaseModel):
@@ -307,24 +332,6 @@ class SearchResult(BaseModel):
     ticker: str | None = Field(None, description="Ticker of the given asset.")
 
 
-class CryptoPrices(BaseModel):
-    baseCurrency: str | None = Field(
-        None, description='The base pair of the cryptocurrency, e.g. "btc" for "btcusd".'
-    )
-    exchangeData: dict[str, Any] | None = Field(
-        None,
-        description='The underlying data for each exchange. This will only be returned if the includeRawExchangeData flag is set to "true".',
-    )
-    priceData: list[CryptoPriceBar] | None = Field(
-        None,
-        description="Stores the top-of-book data being returned. See the table below for the fields in this object.",
-    )
-    quoteCurrency: str | None = Field(
-        None, description='The quote pair of the cryptocurrency, e.g. "usd" for "btcusd".'
-    )
-    ticker: str | None = Field(None, description="Ticker related to the asset.")
-
-
 class CryptoTopOfBook(BaseModel):
     baseCurrency: str | None = Field(
         None, description='The base pair of the cryptocurrency, e.g. "btc" for "btcusd".'
@@ -341,13 +348,6 @@ class CryptoTopOfBook(BaseModel):
         None,
         description="Stores the top-of-book data being returned. See the table below for the fields in this object.",
     )
-
-
-class FundamentalsStatementData(BaseModel):
-    overview: list[DataCodeValue] | None = None
-    incomeStatement: list[DataCodeValue] | None = None
-    balanceSheet: list[DataCodeValue] | None = None
-    cashFlow: list[DataCodeValue] | None = None
 
 
 class FundamentalsStatement(BaseModel):
