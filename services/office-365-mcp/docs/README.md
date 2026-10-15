@@ -285,6 +285,55 @@ Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-ma
 (in another repository) writes the pod's active tool selection. Nothing compares the two on its
 own.
 
+### What a preset asks for
+
+A deployment asks for the union of the permissions of its tools. This table gives that union for
+each preset. The count of tools includes `get_me`, which every deployment turns on.
+A preset needs admin consent when at least one of its tools needs it.
+
+| Preset | Tools | Graph permissions | Admin consent |
+| --- | --- | --- | --- |
+| `teams` | 13 | `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `Team.ReadBasic.All`, `User.Read` | ⚠️ Yes |
+| `teams-chat` | 3 | `Chat.Read`, `User.Read` | No |
+| `teams-messages` | 6 | `ChannelMessage.Read.All`, `Chat.Read`, `User.Read` | ⚠️ Yes |
+| `teams-channels` | 5 | `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `Team.ReadBasic.All`, `User.Read` | ⚠️ Yes |
+| `teams-transcripts` | 4 | `Chat.Read`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read` | ⚠️ Yes |
+| `teams-recordings` | 3 | `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetings.Read`, `User.Read` | ⚠️ Yes |
+| `teams-meetings` | 5 | `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read` | ⚠️ Yes |
+| `teams-write` | 9 | `Channel.ReadBasic.All`, `ChannelMessage.Send`, `Chat.Read`, `ChatMessage.Send`, `Team.ReadBasic.All`, `User.Read` | No |
+| `teams-write-files` | 14 | `Channel.ReadBasic.All`, `ChannelMessage.Send`, `Chat.Read`, `ChatMessage.Send`, `Files.Read.All`, `Team.ReadBasic.All`, `User.Read` | ⚠️ Yes |
+| `teams-edit` | 13 | `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `ChannelMessage.ReadWrite`, `ChannelMessage.Send`, `Chat.Read`, `Chat.ReadWrite`, `ChatMessage.Send`, `Team.ReadBasic.All`, `User.Read` | ⚠️ Yes |
+| `teams-meetings-write` | 7 | `Chat.Read`, `OnlineMeetingArtifact.Read.All`, `OnlineMeetings.Read`, `OnlineMeetings.ReadWrite`, `User.Read` | No |
+| `teams-chat-admin` | 7 | `Chat.Create`, `Chat.Read`, `Chat.ReadWrite`, `ChatMember.ReadWrite`, `User.Read` | ⚠️ Yes |
+| `teams-files` | 8 | `Channel.ReadBasic.All`, `Files.Read.All`, `Team.ReadBasic.All`, `User.Read` | ⚠️ Yes |
+| `outlook-read` | 11 | `Mail.Read`, `Mail.Read.Shared`, `People.Read`, `User.Read` | No |
+| `outlook-write` | 21 | `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `People.Read`, `User.Read` | No |
+| `outlook-delete` | 22 | `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `People.Read`, `User.Read` | No |
+| `outlook-send` | 22 | `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadBasic`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `Mail.Send`, `Mail.Send.Shared`, `People.Read`, `User.Read` | No |
+| `outlook-mailbox` | 4 | `MailboxSettings.Read`, `User.Read` | No |
+| `outlook-automate` | 7 | `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read` | No |
+| `outlook-rules` | 10 | `Mail.ReadBasic`, `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read` | No |
+| `outlook-calendar` | 13 | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `User.Read` | No |
+| `outlook-calendar-write` | 17 | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `User.Read` | No |
+| `outlook-calendar-manage` | 22 | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `User.Read` | No |
+| `outlook-calendar-delegate` | 18 | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `Calendars.ReadWrite.Shared`, `User.Read` | No |
+| `outlook-calendar-rooms` | 18 | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `Place.Read.All`, `User.Read` | ⚠️ Yes |
+| `outlook-group-calendar` | 3 | `Calendars.Read`, `Team.ReadBasic.All`, `User.Read` | No |
+| `outlook-contacts` | 3 | `Contacts.Read`, `User.Read` | No |
+| `outlook-contacts-write` | 5 | `Contacts.Read`, `Contacts.ReadWrite`, `User.Read` | No |
+| `sharepoint-search` | 4 | `Files.Read.All`, `User.Read` | ⚠️ Yes |
+| `sharepoint-read` | 5 | `Files.Read.All`, `User.Read` | ⚠️ Yes |
+| `sharepoint-write` | 12 | `Files.Read.All`, `Files.ReadWrite.All`, `User.Read` | ⚠️ Yes |
+| `sharepoint-share` | 14 | `Files.Read.All`, `Files.ReadWrite.All`, `User.Read` | ⚠️ Yes |
+| `sharepoint-sites` | 6 | `Files.Read.All`, `Sites.Read.All`, `User.Read` | ⚠️ Yes |
+| `onenote-read` | 9 | `Notes.Read`, `User.Read` | No |
+| `onenote-write` | 20 | `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read` | No |
+| `onenote-delete` | 21 | `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read` | No |
+
+The table follows the Tools tables. For a deployment, `curl $PUBLIC_BASE_URL/manifest` gives the
+exact list, as the Deployment section describes. A deployment with the `enabled` key can use the
+same rule: merge the permissions of the named tools.
+
 ## Permissions
 
 Each tool needs one or more Microsoft Graph permissions, and the Tools section names each one.
