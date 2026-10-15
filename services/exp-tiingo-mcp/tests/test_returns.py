@@ -2,12 +2,10 @@ import asyncio
 
 import pytest
 from fastmcp import Client
-from fastmcp.exceptions import ToolError
 
 from tiingo_mcp.models.vendor_responses import DailyPriceBar
 from tiingo_mcp.server import create_server
 from tiingo_mcp.settings import Settings
-from tiingo_mcp.tools import register_tools
 from tiingo_mcp.tools.returns import WIDGET_URI, cumulative_returns
 
 
@@ -34,7 +32,7 @@ def test_cumulative_returns_keeps_a_zero_price() -> None:
 
 
 def test_cumulative_returns_rejects_a_zero_starting_price() -> None:
-    with pytest.raises(ToolError, match="starts at 0"):
+    with pytest.raises(ValueError, match="starts at 0"):
         cumulative_returns([bar(1, 0.0), bar(2, 10.0)])
 
 
@@ -49,7 +47,6 @@ def test_price_bar_drops_other_vendor_fields() -> None:
 def test_returns_app_is_registered_with_its_widget(local_settings: Settings) -> None:
     async def inspect():  # noqa: ANN202
         mcp = create_server(local_settings)
-        await register_tools(mcp)
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
             widget = (await client.read_resource(WIDGET_URI))[0]

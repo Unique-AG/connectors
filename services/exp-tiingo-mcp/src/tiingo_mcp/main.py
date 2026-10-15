@@ -1,4 +1,3 @@
-import asyncio
 from typing import override
 
 from fastmcp.server.http import HostOriginGuardMiddleware
@@ -10,7 +9,6 @@ from unique_mcp.monitoring import setup_ops
 
 from tiingo_mcp.server import create_server
 from tiingo_mcp.settings import Settings
-from tiingo_mcp.tools import register_tools
 
 OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
 
@@ -41,7 +39,6 @@ def main() -> None:
     configure_logging(level=settings.log_level)
     origins = [str(url).rstrip("/") for url in settings.mcp_allowed_origins]
     mcp = create_server(settings)
-    asyncio.run(register_tools(mcp))
     # Mounts /probe, /health, /metrics and returns HTTP request-metrics middleware.
     ops_middleware = setup_ops(mcp)
     mcp.run(

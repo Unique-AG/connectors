@@ -1,30 +1,34 @@
-from datetime import date, timedelta
 from typing import Annotated, Literal, get_args
 
-from fastmcp import FastMCP
-from pydantic import Field, validate_call
+from fastmcp.dependencies import Depends
+from fastmcp.tools import tool
+from pydantic import Field, TypeAdapter
 
+from tiingo_mcp.deps import get_api
+from tiingo_mcp.helpers.openapi import TOOL_HINTS
+from tiingo_mcp.helpers.upstream import Operation, OperationClient
 from tiingo_mcp.models.fundamentals import FinancialPeriod
 from tiingo_mcp.models.vendor_responses import FundamentalsDaily, FundamentalsStatement
-from tiingo_mcp.params import LookbackDays
-from tiingo_mcp.tools.wrap import forward_rows, wrap_tool
+from tiingo_mcp.params import LookbackDays, since
 
 Section = Literal["overview", "incomeStatement", "balanceSheet", "cashFlow"]
 Periods = Annotated[int, Field(ge=1, le=20)]
+FundamentalsTicker = Annotated[
+    str,
+    Field(
+        min_length=1,
+        description="Use the ticker for active symbols, or Tiingo PermaTicker (stable identifier) "
+        "for delisted/recycled symbols.",
+    ),
+]
+GET_STATEMENTS = Operation("getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement]))
+GET_DAILY_FUNDAMENTALS = Operation("getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily]))
 
 
-@validate_call
-async def recent_financials(
-    ticker: str, periods: Periods = 4, sections: list[Section] | None = None
+def recent_financial_periods(
+    statements: list[FundamentalsStatement], periods: int, sections: list[Section] | None
 ) -> list[FinancialPeriod]:
-    """Latest reported financials for a ticker, newest first. `periods` is how many
-    quarterly periods to return (default 4); annual (quarter 0) rows are skipped.
-    `sections` limits the output to overview, incomeStatement, balanceSheet and/or
-    cashFlow (default all). Each section maps Tiingo data codes to values; the codes
-    are explained in the resource://fundamentals_definitions resource.
-    """
-    payload = await forward_rows(ticker=ticker)
-    statements = (FundamentalsStatement.model_validate(r) for r in payload)
+    """The newest `periods` quarterly statements, limited to `sections` (default all)."""
     rows = sorted(
         (row for row in statements if row.quarter != 0),
         key=lambda row: row.date or "",
@@ -49,18 +53,30 @@ async def recent_financials(
     ]
 
 
-@validate_call
+@tool(annotations=TOOL_HINTS)
+async def recent_financials(
+    ticker: FundamentalsTicker,
+    periods: Periods = 4,
+    sections: list[Section] | None = None,
+    api: OperationClient = Depends(get_api),
+) -> list[FinancialPeriod]:
+    """Latest reported financials for a ticker, newest first. `periods` is how many
+    quarterly periods to return (default 4); annual (quarter 0) rows are skipped.
+    `sections` limits the output to overview, incomeStatement, balanceSheet and/or
+    cashFlow (default all). Each section maps Tiingo data codes to values; the codes
+    are explained in the resource://fundamentals_definitions resource.
+    """
+    statements = await api.call(GET_STATEMENTS, ticker=ticker)
+    return recent_financial_periods(statements, periods, sections)
+
+
+@tool(annotations=TOOL_HINTS)
 async def recent_valuation_metrics(
-    ticker: str, lookback_days: LookbackDays = 30
+    ticker: FundamentalsTicker,
+    lookback_days: LookbackDays = 30,
+    api: OperationClient = Depends(get_api),
 ) -> list[FundamentalsDaily]:
     """Daily market cap, enterprise value, P/E, P/B and trailing PEG for a ticker
     over the last `lookback_days` calendar days (default 30).
     """
-    start = date.today() - timedelta(days=lookback_days)
-    rows = await forward_rows(ticker=ticker, startDate=start.isoformat())
-    return [FundamentalsDaily.model_validate(r) for r in rows]
-
-
-async def register(mcp: FastMCP) -> None:
-    await wrap_tool(mcp, "getFundamentalsStatements", recent_financials)
-    await wrap_tool(mcp, "getFundamentalsDaily", recent_valuation_metrics)
+    return await api.call(GET_DAILY_FUNDAMENTALS, ticker=ticker, startDate=since(lookback_days))

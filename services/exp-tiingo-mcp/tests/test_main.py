@@ -1,12 +1,9 @@
-import asyncio
-
 import pytest
 from starlette.testclient import TestClient
 
 from tiingo_mcp.main import OPS_PATHS, host_origin_guard
 from tiingo_mcp.server import create_server
 from tiingo_mcp.settings import Settings
-from tiingo_mcp.tools import register_tools
 
 PING = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -17,7 +14,6 @@ def client(local_settings: Settings) -> TestClient:
     from unique_mcp.monitoring import setup_ops
 
     mcp = create_server(local_settings)
-    asyncio.run(register_tools(mcp))
     setup_ops(mcp)
     app = mcp.http_app(
         path="/mcp",

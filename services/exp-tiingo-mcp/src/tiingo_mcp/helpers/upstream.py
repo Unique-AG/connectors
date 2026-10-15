@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 
 import httpx2
+from fastmcp.exceptions import ToolError
 from fastmcp.utilities.openapi import parse_openapi_to_http_routes
 from fastmcp.utilities.openapi.director import RequestDirector
 from jsonschema_path import SchemaPath
 from pydantic import TypeAdapter, ValidationError
 
 
-class UpstreamError(Exception):
+class UpstreamError(ToolError):
     """An upstream call failed, or its body does not fit the expected model."""
 
 
@@ -63,7 +64,9 @@ class OperationClient:
         except httpx2.HTTPStatusError as exc:
             url = exc.request.url.copy_with(query=None)
             status = f"{exc.response.status_code} {exc.response.reason_phrase}"
-            raise UpstreamError(f"{status} for {exc.request.method} {url}") from exc
+            message = f"{status} for {exc.request.method} {url}"
+            body = exc.response.text[:200]
+            raise UpstreamError(f"{message}: {body}" if body else message) from exc
         except httpx2.HTTPError as exc:
             raise UpstreamError(str(exc) or type(exc).__name__) from exc
         except ValidationError as exc:

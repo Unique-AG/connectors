@@ -1,17 +1,18 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
 
 import httpx2
 import yaml
 from fastmcp import FastMCP
+from fastmcp.server.providers import FileSystemProvider
 
 from tiingo_mcp.auth import create_auth
-from tiingo_mcp.openapi.routes import (
-    EXPOSED,
-    MCP_NAMES,
-    annotate_component,
-    route_map_fn,
-)
+from tiingo_mcp.helpers.headers import only_headers
+from tiingo_mcp.helpers.openapi import set_tool_hints
+from tiingo_mcp.helpers.upstream import OperationClient
+from tiingo_mcp.openapi.routes import CLIENT_BACKED, EXPOSED, MCP_NAMES, route_map_fn
 from tiingo_mcp.settings import Settings
 
 # there is no official endpoint with the docs
@@ -27,47 +28,35 @@ INSTRUCTIONS = (
 )
 
 # FastMCP copies the MCP caller's headers (origin, x-forwarded-*, ...) onto the Tiingo request.
-TIINGO_HEADERS = frozenset(
-    {
-        "host",
-        "authorization",
-        "content-type",
-        "content-length",
-        "accept",
-        "accept-encoding",
-        "connection",
-        "user-agent",
-    }
-)
-
-
-async def strip_forwarded_headers(request: httpx2.Request) -> None:
-    # httpx hooks can only change the request in place.
-    for name in {key for key in request.headers if key.lower() not in TIINGO_HEADERS}:
-        del request.headers[name]
+TIINGO_HEADERS = frozenset({"accept", "accept-encoding", "connection", "user-agent"})
 
 
 def create_server(settings: Settings) -> FastMCP:
-    spec_ids = {
-        operation.get("operationId")
-        for path_item in SPEC["paths"].values()
-        for operation in path_item.values()
-        if isinstance(operation, dict)
-    }
-    missing = EXPOSED.keys() - spec_ids
-    assert not missing, f"EXPOSED operationIds not in the spec: {sorted(missing)}"
-
+    base_url = str(settings.tiingo_api_url).rstrip("/")
+    authorization = f"Token {settings.tiingo_api_key.get_secret_value()}"
+    only_tiingo_headers = only_headers(
+        TIINGO_HEADERS, {"Authorization": authorization}, origin=base_url
+    )
     client = httpx2.AsyncClient(
-        base_url=str(settings.tiingo_api_url).rstrip("/"),
+        base_url=base_url,
         timeout=settings.tiingo_timeout_seconds,
         # /iex answers 301 to /iex/ (the spec path has no trailing slash).
         follow_redirects=True,
-        event_hooks={"request": [strip_forwarded_headers]},
+        event_hooks={"request": [only_tiingo_headers]},
         headers={
-            "Authorization": f"Token {settings.tiingo_api_key.get_secret_value()}",
+            "Authorization": authorization,
             "Content-Type": "application/json",
         },
     )
+    api = OperationClient(SPEC, client)
+    missing = {*EXPOSED, *CLIENT_BACKED} - api.operation_ids
+    assert not missing, f"operationIds not in the spec: {sorted(missing)}"
+
+    @asynccontextmanager
+    async def lifespan(_: FastMCP) -> AsyncIterator[dict[str, OperationClient]]:
+        async with client:
+            yield {"api": api}
+
     mcp = FastMCP.from_openapi(
         openapi_spec=SPEC,
         client=client,
@@ -77,6 +66,10 @@ def create_server(settings: Settings) -> FastMCP:
         auth=create_auth(settings),
         route_map_fn=route_map_fn,
         mcp_names=MCP_NAMES,
-        mcp_component_fn=annotate_component,
+        mcp_component_fn=set_tool_hints,
+        lifespan=lifespan,
     )
+    tools = FileSystemProvider(Path(__file__).parent / "tools")
+    assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
+    mcp.add_provider(tools)
     return mcp

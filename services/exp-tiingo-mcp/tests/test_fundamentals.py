@@ -11,7 +11,6 @@ from tiingo_mcp import server
 from tiingo_mcp.models.vendor_responses import FundamentalsStatementData
 from tiingo_mcp.server import create_server
 from tiingo_mcp.settings import Settings
-from tiingo_mcp.tools import register_tools
 from tiingo_mcp.tools.fundamentals import Section
 
 
@@ -57,7 +56,6 @@ def call(
 
     async def run() -> Any:  # noqa: ANN401
         mcp = create_server(settings)
-        await register_tools(mcp)
         async with Client(mcp) as client:
             return (await client.call_tool(tool, args)).structured_content["result"]
 
@@ -139,7 +137,7 @@ def test_recent_financials_tolerates_missing_statement_data_and_sections(
 def test_recent_financials_rejects_out_of_range_periods(
     local_settings: Settings, monkeypatch: pytest.MonkeyPatch, periods: int
 ) -> None:
-    with pytest.raises(ToolError, match="Invalid arguments: periods: "):
+    with pytest.raises(ToolError, match=r"\nperiods\n"):
         call(
             local_settings,
             monkeypatch,
@@ -173,12 +171,12 @@ def test_bad_arguments_name_the_field(
     args: dict[str, Any],
     field: str,
 ) -> None:
-    with pytest.raises(ToolError, match=f"Invalid arguments: {field}: "):
+    with pytest.raises(ToolError, match=rf"\n{field}\n"):
         call(local_settings, monkeypatch, tool, args, [])
 
 
 def test_a_response_that_does_not_fit_its_model_is_reported_as_such(
     local_settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with pytest.raises(ToolError, match="Unexpected Tiingo response: date: "):
+    with pytest.raises(ToolError, match=r"Unexpected response: 0\.date: "):
         call(local_settings, monkeypatch, "recent_daily_prices", {"ticker": "ABC"}, [{"date": 5}])

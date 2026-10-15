@@ -153,6 +153,12 @@ def test_call_error_does_not_include_the_query_string() -> None:
     assert str(error.value) == "404 Not Found for GET https://upstream.example/things/a"
 
 
+def test_call_error_includes_the_start_of_the_response_body() -> None:
+    client = api(lambda _: httpx2.Response(404, text='{"detail":"Not found."}'))
+    with pytest.raises(UpstreamError, match=r'404 Not Found for GET .*: \{"detail":"Not found."\}'):
+        asyncio.run(client.call(Operation("getThings", ROWS)))
+
+
 def test_call_names_the_body_when_it_is_not_json() -> None:
     client = api(lambda _: httpx2.Response(200, content=b"<html>"))
     with pytest.raises(UpstreamError, match="Unexpected response: body: Invalid JSON"):

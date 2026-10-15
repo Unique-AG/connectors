@@ -1,9 +1,14 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import BeforeValidator, Field
 
 LookbackDays = Annotated[int, Field(ge=1, le=366)]
+Ticker = Annotated[str, Field(min_length=1, description="Ticker of the asset, for example AAPL.")]
+
+
+def since(lookback_days: int) -> str:
+    return (date.today() - timedelta(days=lookback_days)).isoformat()
 
 
 def parse_tiingo_date(value: Any) -> Any:  # noqa: ANN401

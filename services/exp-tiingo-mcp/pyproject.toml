@@ -43,6 +43,9 @@ exclude = [".venv"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.CurrentContext"]
+
 [tool.basedpyright]
 pythonVersion = "3.12"
 typeCheckingMode = "recommended"
