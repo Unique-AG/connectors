@@ -318,7 +318,12 @@ A customer's own administrator, in Tenant C, must always grant admin consent:
   the tenant that owns the App registration. It cannot reach Tenant C.
 - To grant it, Tenant C's own administrator uses
   [the Entra portal](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent),
-  or the module's own `admin_consent_url` output, which works for any tenant.
+  or the `/admin/consent` endpoint of the deployed server. The module's own `admin_consent_url`
+  output gives the same link and works for any tenant.
+- `GET /admin/consent` needs no sign-in. It redirects to the Microsoft admin-consent page for this
+  deployment's own `ENTRA_TENANT_ID`, client, and tool permissions. The redirect target is
+  `ADMIN_CONSENT_REDIRECT_URI`, which defaults to the default `admin_consent_redirect_uri` of the
+  module. If you change it in the module, change it here to the same value.
 - The administrator sees the result as a new Enterprise Application in Tenant C. This is separate
   from the App registration, which stays in Tenant D or Tenant U.
 
