@@ -8,7 +8,7 @@ from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
@@ -22,7 +22,7 @@ from office_365_mcp.logging import (
     configure_logging,
 )
 from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.server import ready_response, surface_manifest
+from office_365_mcp.server import admin_consent_url, ready_response, surface_manifest
 from office_365_mcp.shared.seam import GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, register_tools, resolve
 from office_365_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
@@ -148,6 +148,19 @@ def create_app(
         """Unauthenticated on purpose, and it leaks nothing: the same scope list is already in the
         authorize URL every user's browser is sent to."""
         return PlainTextResponse(await surface_manifest(mcp, selection, version=config.version))
+
+    @mcp.custom_route("/admin/consent", methods=["GET"])
+    async def admin_consent(_request: Request) -> RedirectResponse:
+        """Unauthenticated on purpose, with a fixed target and no request input: the client id and
+        scope list are already in the authorize URL every user's browser is sent to."""
+        return RedirectResponse(
+            admin_consent_url(
+                tenant_id=entra_config.tenant_id,
+                client_id=entra_config.client_id,
+                selection=selection,
+                redirect_uri=str(config.admin_consent_redirect_uri),
+            )
+        )
 
     # Outside-in and load-bearing: `OpenTelemetryMiddleware` must have made the request's server
     # span current before `TraceContextCaptureMiddleware` records the context, or every MCP span is

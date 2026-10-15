@@ -115,6 +115,10 @@ class AppConfig(BaseSettings):
 
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
+    admin_consent_redirect_uri: HttpUrl = HttpUrl(
+        "https://www.unique.ai/setup/consent-completed/entra-id"
+    )
+
     session_idle_timeout_seconds: float = Field(default=3600.0, gt=0, allow_inf_nan=False)
 
     graph_request_timeout_seconds: float = Field(default=30.0, gt=0)

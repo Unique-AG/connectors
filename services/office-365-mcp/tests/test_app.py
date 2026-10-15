@@ -9,10 +9,11 @@ import logging
 import os
 import pathlib
 import re
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from types import ModuleType, UnionType
 from typing import Protocol, cast, final, get_args, get_origin, get_type_hints, override
 from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
@@ -102,11 +103,17 @@ class _HttpResponse(Protocol):
     def status_code(self) -> int: ...
     @property
     def text(self) -> str: ...
+    @property
+    def headers(self) -> Mapping[str, str]: ...
     def json(self) -> dict[str, object]: ...
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
     return cast("_HttpResponse", client.get(path))
+
+
+def _get_without_following(client: TestClient, path: str) -> _HttpResponse:
+    return cast("_HttpResponse", client.get(path, follow_redirects=False))
 
 
 def _request(client: TestClient, method: str, path: str) -> _HttpResponse:
@@ -255,6 +262,22 @@ class TestRoutes:
         assert response.status_code == 200
         assert "resolved tool surface" in response.text
         assert f"{ALWAYS_ON} (always on)" in response.text
+
+    def test_admin_consent_redirects_to_the_scope_matched_consent_url(
+        self, app_client: TestClient
+    ) -> None:
+        response = _get_without_following(app_client, "/admin/consent")
+
+        assert response.status_code == 307
+        location = urlsplit(response.headers["location"])
+        assert (location.scheme, location.netloc) == ("https", "login.microsoftonline.com")
+        assert location.path == "/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/v2.0/adminconsent"
+        query = parse_qs(location.query)
+        assert query["client_id"] == ["1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"]
+        assert query["scope"] == [
+            " ".join(resolve(preset=ToolsPreset.TEAMS, enabled=None).graph_scopes)
+        ]
+        assert query["redirect_uri"] == ["https://www.unique.ai/setup/consent-completed/entra-id"]
 
     def test_the_resolved_surface_is_logged_once_at_startup(
         self, postgres_container: PostgresContainer, caplog: pytest.LogCaptureFixture
