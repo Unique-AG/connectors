@@ -1,9 +1,24 @@
+import asyncio
+import json
+import re
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx2
 import pytest
+import yaml
+from pydantic import BaseModel, TypeAdapter
 
 from tiingo_mcp.helpers.codegen import generate_response_models
+from tiingo_mcp.helpers.headers import only_headers
+from tiingo_mcp.helpers.upstream import Operation, OperationClient, UpstreamError
+
+
+class Row(BaseModel):
+    value: int
+
+
+ROWS = TypeAdapter(list[Row])
 
 SPEC = """
 openapi: 3.0.3
@@ -55,6 +70,200 @@ components:
         secret: {type: string}
         qty: {type: integer, minimum: 0, maximum: 10}
 """
+
+
+def api(handler: Callable[[httpx2.Request], httpx2.Response]) -> OperationClient:
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        headers={"Authorization": "Token k"},
+        transport=httpx2.MockTransport(handler),
+    )
+    return OperationClient(yaml.safe_load(SPEC), http)
+
+
+def get_things(body: object, status: int = 200) -> list[Row]:
+    client = api(lambda _: httpx2.Response(status, json=body))
+    return asyncio.run(client.call(Operation("getThings", ROWS)))
+
+
+def test_operation_ids_lists_the_operations_of_the_spec() -> None:
+    assert api(lambda _: httpx2.Response(200)).operation_ids == {
+        "getThings",
+        "getThing",
+        "postThing",
+    }
+
+
+def test_call_parses_the_body_as_the_adapter_type() -> None:
+    assert get_things([{"value": 1}, {"value": 2}]) == [Row(value=1), Row(value=2)]
+
+
+def test_call_names_the_field_that_does_not_fit() -> None:
+    with pytest.raises(UpstreamError, match=r"Unexpected response: 1\.value: "):
+        get_things([{"value": 1}, {"value": "x"}])
+
+
+def test_call_reports_an_error_status() -> None:
+    with pytest.raises(UpstreamError, match="404"):
+        get_things({"detail": "nope"}, status=404)
+
+
+def test_call_builds_the_request_from_the_spec() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={"value": 1})
+
+    asyncio.run(
+        api(handler).call(Operation("getThing", TypeAdapter(Row)), name="a/b", since="2026-01-02")
+    )
+    request = seen[0]
+    assert (request.method, request.url.raw_path) == (
+        "GET",
+        b"/things/a%2Fb?since=2026-01-02",
+    )
+    assert request.headers["authorization"] == "Token k"
+
+
+def test_only_listed_headers_leave_and_fixed_ones_are_set() -> None:
+    request = httpx2.Request(
+        "GET",
+        "https://upstream.example/",
+        headers={
+            "Authorization": "Bearer caller",
+            "X-Forwarded-For": "203.0.113.9",
+            "Accept": "*/*",
+        },
+    )
+    asyncio.run(
+        only_headers(
+            frozenset({"accept"}), {"Authorization": "Token k"}, origin="https://upstream.example"
+        )(request)
+    )
+    assert request.headers["authorization"] == "Token k"
+    assert request.headers["accept"] == "*/*"
+    assert "x-forwarded-for" not in request.headers
+
+
+def test_call_error_does_not_include_the_query_string() -> None:
+    client = api(lambda _: httpx2.Response(404))
+    with pytest.raises(UpstreamError) as error:
+        asyncio.run(client.call(Operation("getThing", TypeAdapter(Row)), name="a", since="SECRET"))
+    assert str(error.value) == "404 Not Found for GET https://upstream.example/things/a"
+
+
+def test_call_names_the_body_when_it_is_not_json() -> None:
+    client = api(lambda _: httpx2.Response(200, content=b"<html>"))
+    with pytest.raises(UpstreamError, match="Unexpected response: body: Invalid JSON"):
+        asyncio.run(client.call(Operation("getThings", ROWS)))
+
+
+def test_call_rejects_an_operation_that_is_not_in_the_spec() -> None:
+    client = api(lambda _: httpx2.Response(200, json=[]))
+    with pytest.raises(AssertionError, match="operationId getMissing is not in the spec"):
+        asyncio.run(client.call(Operation("getMissing", ROWS)))
+
+
+def test_call_sends_path_query_header_and_body_arguments_where_the_spec_puts_them() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={})
+
+    arguments = {"name": "a/b", "dry": True, "X-Trace": "t1", "label": "x", "qty": 3}
+    asyncio.run(api(handler).call(Operation("postThing", TypeAdapter(dict)), **arguments))
+    request = seen[0]
+    assert (request.method, request.url.raw_path) == ("POST", b"/things/a%2Fb?dry=true")
+    assert request.headers["x-trace"] == "t1"
+    assert request.headers["content-type"] == "application/json"
+    assert json.loads(request.content) == {"label": "x", "qty": 3}
+    assert request.headers["authorization"] == "Token k"
+
+
+def test_call_rejects_an_argument_the_spec_does_not_know() -> None:
+    client = api(lambda _: httpx2.Response(200, json={"value": 1}))
+    operation = Operation("getThing", TypeAdapter(Row))
+    with pytest.raises(
+        ValueError, match=r"getThing has no \['sinc'\], it takes \['name', 'since'\]"
+    ):
+        asyncio.run(client.call(operation, name="a", sinc="2026-01-02"))
+
+
+@pytest.mark.parametrize(
+    ("arguments", "missing"),
+    [
+        ({"label": "x"}, "['name']"),
+        ({"name": "a"}, "['label']"),
+        ({"name": "a", "label": None}, "['label']"),
+        ({"name": "", "label": "x"}, "['name']"),
+    ],
+)
+def test_call_rejects_a_required_argument_that_is_missing(
+    arguments: dict[str, object], missing: str
+) -> None:
+    client = api(lambda _: httpx2.Response(200, json={}))
+    with pytest.raises(ValueError, match=rf"postThing needs {re.escape(missing)}"):
+        asyncio.run(client.call(Operation("postThing", TypeAdapter(dict)), **arguments))
+
+
+def redirected_authorization(location: str, origin: str = "https://upstream.example") -> list:
+    seen: list[tuple[str, str | None]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append((str(request.url), request.headers.get("authorization")))
+        if len(seen) == 1:
+            return httpx2.Response(301, headers={"location": location})
+        return httpx2.Response(200, json=[])
+
+    hook = only_headers(frozenset({"host"}), {"Authorization": "Token k"}, origin=origin)
+
+    async def run() -> None:
+        async with httpx2.AsyncClient(
+            follow_redirects=True,
+            transport=httpx2.MockTransport(handler),
+            event_hooks={"request": [hook]},
+        ) as client:
+            await client.get("https://upstream.example/start")
+
+    asyncio.run(run())
+    return seen
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["https://other.example/x", "http://upstream.example/x", "https://upstream.example:8443/x"],
+)
+def test_authorization_is_not_sent_to_another_origin_on_a_redirect(location: str) -> None:
+    assert redirected_authorization(location) == [
+        ("https://upstream.example/start", "Token k"),
+        (location, None),
+    ]
+
+
+def test_authorization_follows_a_redirect_within_the_origin() -> None:
+    seen = redirected_authorization("https://upstream.example/x")
+    assert [auth for _, auth in seen] == ["Token k", "Token k"]
+
+
+def test_origin_is_matched_case_insensitively() -> None:
+    seen = redirected_authorization("https://upstream.example/x", origin="https://Upstream.Example")
+    assert seen[0] == ("https://upstream.example/start", "Token k")
+
+
+def test_the_headers_a_request_cannot_be_sent_without_are_always_kept() -> None:
+    request = httpx2.Request("POST", "https://upstream.example/", content=b"{}")
+    request.headers["X-Other"] = "1"
+    asyncio.run(only_headers(frozenset(), {}, origin="https://upstream.example")(request))
+    assert {"host", "content-length"} <= set(request.headers)
+    assert "x-other" not in request.headers
+
+
+def test_allow_list_names_are_case_insensitive() -> None:
+    request = httpx2.Request("GET", "https://upstream.example/", headers={"Accept": "*/*"})
+    asyncio.run(only_headers(frozenset({"Accept"}), {}, origin="https://upstream.example")(request))
+    assert request.headers["accept"] == "*/*"
 
 
 def generate(
