@@ -13,7 +13,7 @@ from tiingo_mcp.settings import Settings
 OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
 
 
-class OpsExemptGuard(HostOriginGuardMiddleware):
+class _OpsExemptGuard(HostOriginGuardMiddleware):
     """FastMCP's Host/Origin guard, except for the ops routes that probes call by container IP."""
 
     @override
@@ -26,7 +26,7 @@ class OpsExemptGuard(HostOriginGuardMiddleware):
 
 def host_origin_guard(settings: Settings, origins: list[str]) -> Middleware:
     return Middleware(
-        OpsExemptGuard,
+        _OpsExemptGuard,
         allowed_hosts=settings.allowed_hosts,
         allowed_origins=[settings.base_url, *origins],
         mode="strict",
@@ -48,7 +48,7 @@ def main() -> None:
         path="/mcp",
         # Tools keep no per-session state and use no server-to-client requests.
         stateless_http=True,
-        # FastMCP's own guard would also cover the ops routes, so OpsExemptGuard replaces it.
+        # FastMCP's own guard would also cover the ops routes, so _OpsExemptGuard replaces it.
         host_origin_protection=False,
         middleware=[
             host_origin_guard(settings, origins),

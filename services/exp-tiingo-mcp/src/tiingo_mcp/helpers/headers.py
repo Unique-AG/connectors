@@ -2,7 +2,7 @@ from collections.abc import Awaitable, Callable, Mapping
 
 import httpx2
 
-TRANSPORT_HEADERS = frozenset({"host", "content-length", "content-type", "transfer-encoding"})
+_TRANSPORT_HEADERS = frozenset({"host", "content-length", "content-type", "transfer-encoding"})
 
 
 def only_headers(
@@ -13,7 +13,7 @@ def only_headers(
     The headers a request cannot be sent without are always kept. `fixed` is only set on
     requests to `origin`, so no other host, scheme or port gets it.
     """
-    allowed = frozenset(name.lower() for name in allowed) | TRANSPORT_HEADERS
+    allowed = frozenset(name.lower() for name in allowed) | _TRANSPORT_HEADERS
     base = httpx2.URL(origin)
 
     async def hook(request: httpx2.Request) -> None:

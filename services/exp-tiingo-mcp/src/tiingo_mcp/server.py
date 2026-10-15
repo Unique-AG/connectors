@@ -28,14 +28,14 @@ INSTRUCTIONS = (
 )
 
 # FastMCP copies the MCP caller's headers (origin, x-forwarded-*, ...) onto the Tiingo request.
-TIINGO_HEADERS = frozenset({"accept", "accept-encoding", "connection", "user-agent"})
+_TIINGO_HEADERS = frozenset({"accept", "accept-encoding", "connection", "user-agent"})
 
 
 def create_server(settings: Settings) -> FastMCP:
     base_url = str(settings.tiingo_api_url).rstrip("/")
     authorization = f"Token {settings.tiingo_api_key.get_secret_value()}"
     only_tiingo_headers = only_headers(
-        TIINGO_HEADERS, {"Authorization": authorization}, origin=base_url
+        _TIINGO_HEADERS, {"Authorization": authorization}, origin=base_url
     )
     client = httpx2.AsyncClient(
         base_url=base_url,

@@ -9,7 +9,7 @@ from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 from tiingo_mcp.settings import AuthMode, Settings
 
 # Identity only: Zitadel drops the mcp:* scopes, so requiring them would reject every token.
-REQUIRED_SCOPES = ["openid", "profile", "urn:zitadel:iam:user:resourceowner"]
+_REQUIRED_SCOPES = ["openid", "profile", "urn:zitadel:iam:user:resourceowner"]
 
 
 def create_auth(settings: Settings) -> OIDCProxy | None:
@@ -19,7 +19,7 @@ def create_auth(settings: Settings) -> OIDCProxy | None:
     assert settings.zitadel_issuer_url
     assert settings.zitadel_client_id
     assert settings.mcp_jwt_signing_key
-    required = list(REQUIRED_SCOPES)
+    required = list(_REQUIRED_SCOPES)
     authorize_scopes = list(ZITADEL_DEFAULT_MCP_SCOPES)
     if settings.zitadel_org_id:
         org_scope = f"urn:zitadel:iam:org:id:{settings.zitadel_org_id}"

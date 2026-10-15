@@ -11,7 +11,7 @@ from fastmcp.utilities.openapi import parse_openapi_to_http_routes
 from openapi_pydantic.v3.v3_0 import OpenAPI, Reference, Schema
 
 # Schema fields that constrain input. Responses keep wire-format values as they are.
-DROPPED = dict.fromkeys(
+_DROPPED = dict.fromkeys(
     [
         "example",
         "discriminator",
@@ -49,7 +49,7 @@ def _clean(node: Reference | Schema) -> Reference | Schema:
     additional = node.additionalProperties
     return node.model_copy(
         update={
-            **DROPPED,
+            **_DROPPED,
             **extensions,
             "properties": None
             if properties is None

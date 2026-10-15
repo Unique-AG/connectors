@@ -12,8 +12,8 @@ from tiingo_mcp.models.vendor_responses import FundamentalsDaily, FundamentalsSt
 from tiingo_mcp.params import LookbackDays, since
 
 Section = Literal["overview", "incomeStatement", "balanceSheet", "cashFlow"]
-Periods = Annotated[int, Field(ge=1, le=20)]
-FundamentalsTicker = Annotated[
+_Periods = Annotated[int, Field(ge=1, le=20)]
+_FundamentalsTicker = Annotated[
     str,
     Field(
         min_length=1,
@@ -21,11 +21,11 @@ FundamentalsTicker = Annotated[
         "for delisted/recycled symbols.",
     ),
 ]
-GET_STATEMENTS = Operation("getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement]))
-GET_DAILY_FUNDAMENTALS = Operation("getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily]))
+_GET_STATEMENTS = Operation("getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement]))
+_GET_DAILY_FUNDAMENTALS = Operation("getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily]))
 
 
-def recent_financial_periods(
+def _recent_financial_periods(
     statements: list[FundamentalsStatement], periods: int, sections: list[Section] | None
 ) -> list[FinancialPeriod]:
     """The newest `periods` quarterly statements, limited to `sections` (default all)."""
@@ -55,8 +55,8 @@ def recent_financial_periods(
 
 @tool(annotations=TOOL_HINTS)
 async def recent_financials(
-    ticker: FundamentalsTicker,
-    periods: Periods = 4,
+    ticker: _FundamentalsTicker,
+    periods: _Periods = 4,
     sections: list[Section] | None = None,
     api: OperationClient = Depends(get_api),
 ) -> list[FinancialPeriod]:
@@ -66,17 +66,17 @@ async def recent_financials(
     cashFlow (default all). Each section maps Tiingo data codes to values; the codes
     are explained in the resource://fundamentals_definitions resource.
     """
-    statements = await api.call(GET_STATEMENTS, ticker=ticker)
-    return recent_financial_periods(statements, periods, sections)
+    statements = await api.call(_GET_STATEMENTS, ticker=ticker)
+    return _recent_financial_periods(statements, periods, sections)
 
 
 @tool(annotations=TOOL_HINTS)
 async def recent_valuation_metrics(
-    ticker: FundamentalsTicker,
+    ticker: _FundamentalsTicker,
     lookback_days: LookbackDays = 30,
     api: OperationClient = Depends(get_api),
 ) -> list[FundamentalsDaily]:
     """Daily market cap, enterprise value, P/E, P/B and trailing PEG for a ticker
     over the last `lookback_days` calendar days (default 30).
     """
-    return await api.call(GET_DAILY_FUNDAMENTALS, ticker=ticker, startDate=since(lookback_days))
+    return await api.call(_GET_DAILY_FUNDAMENTALS, ticker=ticker, startDate=since(lookback_days))

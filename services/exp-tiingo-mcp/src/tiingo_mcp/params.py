@@ -1,5 +1,5 @@
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BeforeValidator, Field
 
@@ -11,7 +11,7 @@ def since(lookback_days: int) -> str:
     return (date.today() - timedelta(days=lookback_days)).isoformat()
 
 
-def parse_tiingo_date(value: Any) -> Any:  # noqa: ANN401
+def _parse_tiingo_date(value: object) -> object:
     """Tiingo sends dates as ISO strings, e.g. 2024-12-31T00:00:00.000Z."""
     return datetime.fromisoformat(value).date() if isinstance(value, str) else value
 
@@ -19,4 +19,4 @@ def parse_tiingo_date(value: Any) -> Any:  # noqa: ANN401
 if TYPE_CHECKING:
     StrDate = date | str  # what a model accepts; it always holds a date
 else:
-    StrDate = Annotated[date, BeforeValidator(parse_tiingo_date)]
+    StrDate = Annotated[date, BeforeValidator(_parse_tiingo_date)]

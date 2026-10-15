@@ -18,8 +18,8 @@ from tiingo_mcp.params import LookbackDays
 from tiingo_mcp.tools import prices
 
 WIDGET_URI = "ui://tiingo/returns.html"
-WIDGET_PATH = Path(__file__).parents[1] / "apps" / "returns.html"
-Tickers = Annotated[list[str], Field(min_length=1, max_length=5)]
+_WIDGET_PATH = Path(__file__).parents[1] / "apps" / "returns.html"
+_Tickers = Annotated[list[str], Field(min_length=1, max_length=5)]
 
 
 def cumulative_returns(bars: list[DailyPriceBar]) -> list[ReturnPoint]:
@@ -58,7 +58,7 @@ async def series_for(ticker: str, lookback_days: int, api: OperationClient) -> R
     meta={"ui": app_config_to_meta_dict(AppConfig(resource_uri=WIDGET_URI))},
 )
 async def plot_cumulative_returns(
-    tickers: Tickers,
+    tickers: _Tickers,
     lookback_days: LookbackDays = 90,
     api: OperationClient = Depends(get_api),
 ) -> ToolResult:
@@ -85,4 +85,4 @@ async def plot_cumulative_returns(
     meta={"ui": app_config_to_meta_dict(AppConfig(prefers_border=True))},
 )
 def widget() -> str:
-    return WIDGET_PATH.read_text()
+    return _WIDGET_PATH.read_text()
