@@ -5,7 +5,7 @@
 
 | You want to | Read |
 |---|---|
-| Connect your MCP client and log in | [Authentication: User Connection Flow](./operator/authentication.md#User-Connection-Flow) |
+| Connect your AI assistant and log in | [Authentication: User Connection Flow](./operator/authentication.md#User-Connection-Flow) |
 | Deploy the server, on Unique SaaS or self-managed, and configure it | [Operator Guide](./operator/README.md) |
 | Understand how it works, what it can read and write, and every tool | [Technical Reference](./technical/README.md) |
 | Find a quick answer | [FAQ](./faq.md) |
@@ -17,19 +17,21 @@ Backstop MCP is an MCP server that lets AI assistants read and write a firm's
 [Backstop](https://www.backstopsolutions.com/) CRM through the Backstop REST API. It covers
 organizations, people, activities (notes, meetings, calls, emails, documents, tasks), the
 opportunity pipeline, funds and investor accounts, custom fields, and saved Report Center reports,
-through 44 MCP tools.
+through 44 MCP tools. These pages say *AI assistant*, or just *assistant*, for the MCP client that
+connects to the server, such as Unique chat.
 
 Every tool call acts as the signed-in user. Each user connects once with their own Backstop
 username and personal API token; the server never uses a shared service account, so a user sees
 and changes exactly what Backstop allows them to.
 
-Backstop has no OAuth of its own, so this server is the OAuth 2.1 authorization server for its MCP
-clients. It hosts a small login form, checks the submitted credential against Backstop, stores it
-encrypted, and issues its own short-lived MCP tokens. See [Authentication](./operator/authentication.md).
+Backstop has no OAuth of its own, so this server is the OAuth 2.1 authorization server for the
+assistants that connect to it. It hosts a small login form, checks the submitted credential against
+Backstop, stores it encrypted, and issues its own short-lived MCP tokens. See
+[Authentication](./operator/authentication.md).
 
 ## Quick Summary
 
-| | |
+| Property | Detail |
 |---|---|
 | **What it does** | 44 tools: 27 read-only, 17 that create, change, or delete CRM records |
 | **Who it acts as** | The connected user, with their own Backstop credential |
@@ -46,15 +48,16 @@ encrypted, and issues its own short-lived MCP tokens. See [Authentication](./ope
 |---|---|
 | **Backstop tenant** | Reachable over HTTPS from the cluster, either on the tenant's own host or on the shared `api.backstopsolutions.com` |
 | **Personal API token per user** | Created in Backstop under *Main Menu › System Tools › Administrative › Update Your Profile*, API Security section. The login form takes this token, never a password |
-| **Matching system user** | The Backstop login must belong to a Backstop system user. Login is refused otherwise, because the activities a user logs are authored as that system user |
+| **Each user's login must be a Backstop system user** | A *system user* is a staff login at your own firm, the kind of account your Backstop administrator manages under user administration. It is not a CRM contact or an employee record, and your firm's staff are the only people who have one. A login without a system user is refused at sign-in, because every activity the assistant logs has to be authored as that system user |
 
 ### Platform
 
 | Requirement | Details |
 |---|---|
 | **Kubernetes + Helm** | The chart depends on Unique's `base` chart, which renders the Deployment, Service, Gateway API route, NetworkPolicy, and migration hook. The route and NetworkPolicy are off by default; the deployment's overlay turns them on |
+| **A memory limit set by you** | The chart's default limit of 256 Mi, with a 128 Mi request, is too low for real use: reading a large custom-field catalog gets the pod OOM-killed. Set `resources` in your own values. Unique's deployments use a 512 Mi limit and a 256 Mi request. See [Memory](./operator/README.md#Memory) |
 | **PostgreSQL** | One database. Schema migrations run as a Helm hook (`alembic upgrade head`) |
-| **Public HTTPS URL** | MCP clients and users' browsers must reach the server; the URL is the OAuth issuer (`mcpConfig.app.publicBaseUrl`) |
+| **Public HTTPS URL** | The assistant and the user's browser must reach the server; the URL is the OAuth issuer (`mcpConfig.app.publicBaseUrl`) |
 
 ## What It Can Do
 
@@ -74,7 +77,7 @@ See [Features](./technical/features.md) for the questions each feature answers a
 
 ```mermaid
 flowchart LR
-    Client["MCP client<br/>(e.g. Unique chat)"]
+    Client["AI assistant<br/>(MCP client, e.g. Unique chat)"]
     Browser["User's browser"]
     Server["Backstop MCP pod"]
     DB[("PostgreSQL")]
@@ -86,12 +89,12 @@ flowchart LR
     Server -->|"HTTPS, as the user<br/>(Basic auth + token header)"| Backstop
 ```
 
-1. The user adds the server to their MCP client. The client registers itself and starts an OAuth
-   flow.
+1. The user adds the server to their AI assistant. The assistant registers itself and starts an
+   OAuth flow.
 2. The browser opens the server's login form. The user enters their Backstop username and personal
    API token. The server checks them against Backstop and finds the user's system-user record.
-3. The server stores the credential encrypted, and gives the client a 15-minute access token and a
-   30-day refresh token.
+3. The server stores the credential encrypted, and gives the assistant a 15-minute access token and
+   a 30-day refresh token.
 4. Each tool call loads that user's credential and calls Backstop as them.
 
 See [Architecture](./technical/architecture.md) for components and request flow.
@@ -101,13 +104,13 @@ See [Architecture](./technical/architecture.md) for components and request flow.
 | Limitation | Details |
 |---|---|
 | **No shared service account** | Every user needs their own Backstop login and API token |
-| **5 concurrent requests per user** | Backstop's own limit. The server queues a user's requests to stay within it, per pod |
-| **Deletes are permanent** | Backstop has no recycle bin. The four delete tools show the record and ask the user to confirm when the client supports elicitation; otherwise they delete without asking |
+| **5 concurrent Backstop requests per user, per pod** | Backstop allows each user's token 5 requests at once, and every pod holds a gate of the same size. That gate counts one pod only, so two replicas can put 10 requests in flight for the same user. Backstop answers the excess with `429`, and the server retries those with backoff rather than preventing them. Read [Scaling](./operator/README.md#Scaling) before adding replicas |
+| **Deletes are permanent** | Backstop has no recycle bin. The four delete tools show the record and ask the user to confirm, but only when the assistant can put a question to the user mid-task; otherwise they delete without asking |
 | **Creates are not idempotent** | Repeating a create call makes a second record |
 | **Read-only areas** | Funds, accounts, flows, reports, and catalogs (tags, categories, sources, users) cannot be written |
 | **File size** | `attach_file` accepts files up to 3,096,576 bytes (about 2.95 MiB) |
-| **Search ceiling** | Backstop's activity search stops at 10,000 rows; larger sets come back with `coverage.ceiling_hit` set |
-| **Key employee** | The server rejects `is_key_employee` on person and employment writes; set it in the Backstop UI |
+| **Search ceiling** | Backstop's activity search stops at 10,000 rows. A larger result comes back marked as incomplete, so the assistant can tell the user the answer is partial and suggest a narrower question: a shorter date range, one party, or one activity type. The field carrying that mark is `coverage.ceiling_hit` |
+| **Key employee is read-only** | Sending `is_key_employee` to a person or employment write fails the whole call with a validation error and writes nothing; the field is not quietly dropped, so the other fields in that call are not saved either. Set *Key employee* in the Backstop UI. The assistant can still read the current value |
 
 ## Related Documentation
 
