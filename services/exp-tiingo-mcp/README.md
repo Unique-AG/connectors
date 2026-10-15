@@ -22,25 +22,26 @@ Try the chart app with `npx @modelcontextprotocol/inspector`: connect with Strea
 
 The server shows what OpenAPI and FastMCP give you, from a plain pass-through to a tool with its own UI, all starting from the vendored Tiingo spec.
 
-1. Pass-through tools. Twelve operations in `EXPOSED` become tools and one becomes a resource. FastMCP builds each tool's name, arguments and output schema from the spec. Names come from the operationId, and `annotate_component` marks every tool read-only.
-2. Typed models from the spec. `scripts/generate_response_models.py` generates a pydantic model for each response, with the spec's field descriptions, so a wrapped tool can return a typed list and the LLM sees its schema.
-3. Wrapped tools. `recent_daily_prices`, `recent_financials` and `recent_valuation_metrics` replace three generated tools. They take a `lookback_days` or `periods` argument instead of dates, hide the vendor arguments, trim the output and validate their bounds. Prices keep seven fields per bar, and financials skip the full-year rows.
-4. A composite tool with an app. `plot_cumulative_returns` calls `recent_daily_prices` for up to five tickers and returns a text summary plus structured data. A widget resource (`ui://tiingo/returns.html`) draws the chart in MCP Apps hosts.
+1. Pass-through tools. Nine operations in `EXPOSED` become tools and one becomes a resource. FastMCP builds each tool's name, arguments and output schema from the spec. Names come from the operationId, and `set_tool_hints` marks each generated GET tool read-only, and every generated tool open-world.
+2. Typed models from the spec. `scripts/generate_response_models.py` generates a pydantic model for each response, with the spec's field descriptions. The three tools that call the API themselves parse every response into them, so a field that does not fit fails on the server with an error naming it, and the LLM sees the model as the tool's output schema. The generated pass-through tools do not use the models; their output schema comes from FastMCP.
+3. Tools that call the API themselves. `recent_daily_prices`, `recent_financials` and `recent_valuation_metrics` are standalone `@tool` functions. They get an `OperationClient` through `Depends(get_api)`, take a `lookback_days` or `periods` argument instead of dates, trim the output and get their argument checks from FastMCP. Prices keep seven fields per bar, and financials skip the full-year rows. The trimming is plain functions over the models, and a tool can be called directly with a fake client, without an MCP client.
+4. A composite tool with an app. `plot_cumulative_returns` calls `recent_daily_prices` as a function for up to five tickers and returns a text summary plus structured data. A widget resource (`ui://tiingo/returns.html`) draws the chart in MCP Apps hosts.
 5. The server around the tools. It sends instructions to the LLM and uses Zitadel OAuth (public client with PKCE), or no auth for local use. It checks Host and Origin on `/mcp` (the ops routes are exempt), sets CORS, runs stateless HTTP, and serves `/probe`, `/health` and `/metrics` with per-tool metrics. Logs are JSON, and settings are validated at startup.
-6. Outgoing requests carry only an allow-list of headers to Tiingo, so headers a client sends to this server are not forwarded upstream.
-7. Tests run the tools through an in-memory client against a mocked Tiingo transport. Ruff and basedpyright are part of the checks.
+6. Outgoing requests carry only an allow-list of headers to Tiingo (plus the ones a request cannot go without), so headers a client sends to this server, such as `Origin` or `X-Forwarded-For`, are not forwarded upstream. `Authorization` is the Tiingo key, set only on requests to the Tiingo origin, so a redirect elsewhere never receives it.
+7. Tests run the tools through an in-memory client against a mocked Tiingo transport, and call the tools directly with a fake client. Ruff and basedpyright are part of the checks.
 
 Not covered: durable OAuth storage (it is in memory, and the auth is expected to change), a deployment (there are no deploy files, container image or Helm chart), a real Zitadel login (tested only against mocked discovery), and the chart in any host other than the MCP Inspector.
 
 ## Layout
 
 - `settings.py`: pydantic settings with a security validator. `auth.py`: Zitadel OIDC proxy from `unique_mcp`. `params.py`: argument and date types shared by the tools and models.
-- `server.py` builds the server (instructions), `main.py` runs it and mounts `/probe`, `/health` and `/metrics` with `unique_mcp.monitoring.setup_ops` (per-tool call counts and durations included).
-- `openapi/`: the spec (loaded as `SPEC` in `server.py`) and `EXPOSED`, the allow-list of operationIds. Anything not listed is hidden. Generated tools are marked read-only (`annotate_component`).
-- `tools/`: wrappers around generated tools (trimmed output, new arguments) and the chart tool, which calls a wrapper. `register_tools` registers the wrappers first and the chart tool after them.
-- `models/`: pydantic output models. `vendor_responses.py` is generated from the spec, with one model per response of every operation in `EXPOSED` (all fields optional) and the spec's field descriptions. `FIELDS` in the script limits a model to the fields a tool returns, and undeclared vendor fields are dropped. Regenerate with `uv run scripts/generate_response_models.py` after changing the spec, `EXPOSED` or `FIELDS`. Only the wrapped tools use these models. The other tools get their output schema from FastMCP, which reads the spec.
+- `server.py` builds the server (instructions, the HTTP client and the lifespan). It fails at startup if an operationId it uses is not in the spec or a tool file cannot be loaded. `main.py` runs it and mounts `/probe`, `/health` and `/metrics` with `unique_mcp.monitoring.setup_ops` (per-tool call counts and durations included).
+- `openapi/`: the spec (loaded as `SPEC` in `server.py`) and `EXPOSED`, the allow-list of operationIds served as generated tools. Anything not listed is hidden. `CLIENT_BACKED` lists the operations the tools call through `OperationClient`.
+- `deps.py`: the dependencies tools declare with `Depends`: `get_api` (the `OperationClient`, which `create_server` builds and the server lifespan hands out and closes with the HTTP client). `tools/`: the tools and the widget resource. `FileSystemProvider` imports every `.py` file there and registers each `@tool` and `@resource` it finds, so there is no list to update. `fundamentals.py` holds two tools, and `returns.py` holds the chart tool and its widget.
+- `models/`: pydantic output models. `vendor_responses.py` is generated from the spec, with one model per response of every operation in `EXPOSED` and `CLIENT_BACKED` (all fields optional) and the spec's field descriptions. `FIELDS` in the script limits a model to the fields a tool returns, and undeclared vendor fields are dropped. Regenerate with `uv run scripts/generate_response_models.py` after changing the spec, `EXPOSED`, `CLIENT_BACKED` or `FIELDS`. The generated pass-through tools get their output schema from FastMCP, which reads the spec.
+- `helpers/`: nothing in it knows about Tiingo, so it can move to a shared package. `upstream.py`: `OperationClient` calls an operation by its operationId, builds the request from the spec (path, query, header and body arguments), rejects unknown or missing arguments with a `ValueError`, and parses the body into a given type. `Operation` ties an operationId to that type, and `UpstreamError` (a `ToolError`, so its text reaches the client) carries the status, method, URL without the query string and the first 200 characters of the error body, or the path of the field that does not fit. Bad arguments raise a `ValueError`, and the chart tool prefixes either error with the ticker. `openapi.py`: route map, tool hints and tool names for `from_openapi`. `headers.py`: the request header allow-list. `codegen.py`: spec (a path or a URL) to pydantic models. It rejects specs that are not valid YAML or JSON, are not OpenAPI 3.0 or have no `components.schemas`, operationIds that are not in the spec, and field lists that name a model that is not generated.
 - `apps/returns.html`: the MCP App widget.
-- `scripts/`: `generate_response_models.py`. `tests/`: the tests.
+- `scripts/`: `generate_response_models.py`, which holds the Tiingo settings for `helpers/codegen.py`. `tests/`: the tests.
 
 ## MCP App
 
@@ -50,14 +51,15 @@ Not covered: durable OAuth storage (it is in memory, and the auth is expected to
 
 `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .` and `uv run basedpyright` (src only).
 
-CI also runs `pnpm exec biome check .` from this folder, which covers the widget in `apps/returns.html`.
+CI also runs `pnpm exec biome check . --no-errors-on-unmatched` from this folder, which covers the widget in `apps/returns.html`. Run `pnpm install` at the repository root first, or biome is not found.
 
 ## Adding a tool
 
 - As-is: add its operationId to the `MCPType.TOOL` group in `EXPOSED`.
 - As a resource: add it to the `MCPType.RESOURCE` group (GETs without query params only; path params become a template).
-- Wrapped: add it to the `MCPType.TOOL` group, then add a module in `tools/` and call it from `register_tools` with the other wrappers. `tools/prices.py` is the template. The function's name and docstring become the tool's name and description, and arguments it does not declare are hidden.
-- Composite (calls other tools): add a module in `tools/` that looks up each tool it needs with `require_tool(mcp, name)`, and call it from `register_tools` after those tools. `tools/returns.py` is the template. A missing or out-of-order dependency fails at startup.
+- Through the API caller: add its operationId to `CLIENT_BACKED`, regenerate the models, then add a file in `tools/` with a standalone `@tool` that takes `api: OperationClient = Depends(get_api)` and calls `api.call(OPERATION, **arguments)`, where `OPERATION = Operation("operationId", TypeAdapter(...))` ties the operationId to the type its response is parsed into. `tools/prices.py` is the template. Annotate it with `TOOL_HINTS`. The function's name and docstring become the tool's name and description.
+- Names: a generated tool is named after its operationId in snake_case without a leading `get_` (`mcp_name`), and `tests/test_routes.py` checks that the names are unique. A tool you write is named after its function.
+- Composite (uses several operations): call `api.call` more than once, or call another tool's function and pass `api` yourself, because a direct call does not resolve `Depends`. Combine the results. `tools/returns.py` is the template.
 
 Not exposed: news, splits, distributions and fund fees returned 403 on the current plan, and `getDistributionYield` returns ~780 KB (11k rows) with no trimming. The fundamentals tools only work for Dow 30 tickers on the current plan (other tickers return a 400 from Tiingo).
 
