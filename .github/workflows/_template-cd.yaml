@@ -21,6 +21,11 @@ on:
         required: false
         default: true
         type: boolean
+      dev:
+        description: "Build a dev image only. The run pushes no chart, starts no scan, and writes no build cache."
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   containerize:
@@ -101,6 +106,7 @@ jobs:
           password: ${{ steps.acr-token.outputs.token }}
 
       - name: Login to Azure as getunique token issuer (OIDC)
+        if: ${{ !inputs.dev }}
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: daa88f8d-0943-459c-890a-17b1a018d11e # acr_oidc getunique_push
@@ -108,6 +114,7 @@ jobs:
           subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
       - name: Get getunique ACR access token
+        if: ${{ !inputs.dev }}
         id: acr-token-getunique
         run: |
           TOKEN=$(az acr login --name getunique --expose-token --output tsv --query accessToken)
@@ -115,6 +122,7 @@ jobs:
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to helm registries
+        if: ${{ !inputs.dev }}
         env:
           UNIQUECR_TOKEN: ${{ steps.acr-token.outputs.token }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -196,8 +204,7 @@ jobs:
           cache-from: |
             type=gha,scope=${{ inputs.service-name }}
             type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache
-          cache-to: |
-            type=registry,ref=${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:cache,mode=min
+          cache-to: ${{ !inputs.dev && format('type=registry,ref={0}/{1}:cache,mode=min', env.GHCR_REGISTRY, env.GHCR_REPO) || '' }}
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -219,8 +226,10 @@ jobs:
             --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        if: ${{ !inputs.dev }}
 
       - name: Push Helm charts
+        if: ${{ !inputs.dev }}
         env:
           DESTINATION: /tmp
           SERVICE_NAME: ${{ inputs.service-name }}
@@ -237,6 +246,7 @@ jobs:
             --registry "oci://$GETUNIQUE_REGISTRY/$GETUNIQUE_CHART_REPO"
 
   security-trivy-image-scan:
+    if: ${{ !inputs.dev }}
     needs: containerize
     permissions:
       contents: read # to read the repository
@@ -294,6 +304,7 @@ jobs:
           fi
 
   security-trivy-license-scan:
+    if: ${{ !inputs.dev }}
     needs: containerize
     permissions:
       contents: read # to read the repository

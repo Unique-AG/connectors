@@ -1,0 +1,37 @@
+name: "[Release] Dev Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to build."
+        required: true
+        type: choice
+        options:
+          - backstop-mcp
+          - confluence-connector
+          - hello-mcp
+          - kb-mcp
+          - office-365-mcp
+          - outlook-semantic-mcp
+          - sharepoint-connector
+          - teams-mcp
+          - with-intelligence-mcp
+
+permissions:
+  contents: read # to read the repository
+
+jobs:
+  dev:
+    concurrency:
+      group: release-dev-${{ inputs.service }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # to let the called workflow push the dev branch
+      id-token: write # to let the called workflow sign in to Azure and sign the image
+      packages: write # to let the called workflow push the image to GHCR
+      security-events: write # to let the called workflow declare the scan permission
+    uses: ./.github/workflows/_template-dev.yaml
+    secrets: inherit
+    with:
+      service-name: ${{ inputs.service }}

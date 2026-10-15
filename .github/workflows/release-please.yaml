@@ -85,3 +85,24 @@ jobs:
       service-name: ${{ matrix.release.service }}
       service-version: ${{ matrix.release.version }}
       ref: ${{ matrix.release.ref }}
+
+  dev:
+    name: dev ${{ matrix.release.service }}
+    needs: release-please
+    if: github.ref == 'refs/heads/main' && needs.release-please.outputs.releases != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ${{ fromJson(needs.release-please.outputs.releases) }}
+    concurrency:
+      group: release-dev-${{ matrix.release.service }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # to let the called workflow push the dev branch
+      id-token: write # to let the called workflow sign in to Azure and sign the image
+      packages: write # to let the called workflow push the image to GHCR
+      security-events: write # to let the called workflow declare the scan permission
+    uses: ./.github/workflows/_template-dev.yaml
+    secrets: inherit
+    with:
+      service-name: ${{ matrix.release.service }}
