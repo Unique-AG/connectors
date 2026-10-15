@@ -32,6 +32,7 @@ from unique_toolkit.experimental.components.internal_search import (
 )
 
 from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.metadata_filter import (
     merge_request_metadata_filter,
     try_parse_llm_metadata_filter,
@@ -74,7 +75,7 @@ def _effective_service_config(
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "search",
+        "unique.app/icon": "IconFolderData",
         "unique.app/system-prompt": SEARCH_SYSTEM_PROMPT,
         "unique.app/tool-format-information": UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     },
@@ -91,6 +92,7 @@ _META = merge_tool_meta(
     # guidance, and a literal docstring can't reference module constants.
     description=SEARCH_SYSTEM_PROMPT + " " + TOOL_DESCRIPTION_CITATION_GUIDANCE,
     meta=_META,
+    icons=tool_icons("search"),
     annotations=ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,
