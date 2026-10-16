@@ -12,9 +12,15 @@ the parameters, and the docs to match. For the tool reference, read `../docs/REA
 | --- | --- |
 | `NN-name.feature` | The capability, as scenarios. It names no tool and no argument. |
 | `NN-name.calls.yaml` | For each scenario, the chain of tools that the assistant calls. |
-| `../tests/test_use_cases.py` | The check that the two files agree, and that the chains use real tools and real arguments. |
+| `../tests/test_use_cases.py` | The check that the two files agree, and that the chains use real tools and real arguments. It also checks the page below. |
+| `../docs/use-cases.md` | The page for readers. The text between its two markers comes from the feature files. A person writes the rest. |
+| `../scripts/render-use-cases.py` | Writes that text. Run `uv run python scripts/render-use-cases.py`, or add `--check` to find drift. |
 
 The number `NN` is a name and not a rank. The rank is in the table below.
+
+The page for readers shows no tool, no tag, and no status. It lists a scenario with `@known-gap` as
+"Not supported yet". `../docs/.mdignore` keeps the page out of the Confluence publish until the page
+has a Confluence page id.
 
 ## Tags
 

@@ -10,11 +10,12 @@ chain that used it. What it cannot see is whether a model chooses the chain. Tha
 model, and `provenance` says which chains came from real prod sessions and which were drafted.
 """
 
+import importlib.util
 import pathlib
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Protocol, cast
 
 import pytest
 import yaml
@@ -24,7 +25,10 @@ from gherkin.parser import Parser
 
 from office_365_mcp.tools import TOOL_NAMES
 
-_FEATURES = pathlib.Path(__file__).resolve().parents[1] / "features"
+_SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_FEATURES = _SERVICE_ROOT / "features"
+_PAGE_BEGIN = "<!-- use-cases:begin -->"
+_PAGE_END = "<!-- use-cases:end -->"
 _FEATURE_FILES = sorted(_FEATURES.glob("*.feature"))
 _ID = re.compile(r"uc-(?P<file>\d\d)-(?P<number>\d\d)")
 _PROVENANCE = {"observed", "drafted"}
@@ -212,3 +216,49 @@ class TestSidecars:
                     )
 
         assert problems == []
+
+
+class _Generator(Protocol):
+    """The part of `scripts/render-use-cases.py` this file drives. Loaded by path because the
+    filename carries hyphens."""
+
+    TARGET: pathlib.Path
+
+    @staticmethod
+    def render() -> str: ...
+
+
+def _generator() -> _Generator:
+    path = _SERVICE_ROOT / "scripts" / "render-use-cases.py"
+    spec = importlib.util.spec_from_file_location("render_use_cases", path)
+    assert spec is not None and spec.loader is not None, f"{path.name} could not be loaded"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return cast("_Generator", cast("object", module))
+
+
+class TestThePageForReaders:
+    def test_it_is_what_the_generator_produces(self) -> None:
+        generator = _generator()
+
+        assert generator.TARGET.read_text() == generator.render(), (
+            "docs/use-cases.md is stale: run scripts/render-use-cases.py and commit the result"
+        )
+
+    def test_it_holds_no_html_tag_outside_a_code_span(self) -> None:
+        generated = _generator().render().split(_PAGE_BEGIN)[1].split(_PAGE_END)[0]
+        outside_code = re.sub(r"`[^`]*`", "", generated)
+
+        assert re.findall(r"<[A-Za-z/!][^>]*>", outside_code) == [], (
+            "the publisher reads this as a tag and fails on the page"
+        )
+
+    def test_it_is_held_back_from_confluence_until_it_has_a_page(self) -> None:
+        docs = _generator().TARGET.parent
+        page = (docs / "use-cases.md").read_text()
+        ignored = (docs / ".mdignore").read_text().split() if (docs / ".mdignore").exists() else []
+
+        assert "confluence-page-id" in page or "use-cases.md" in ignored, (
+            "the publisher reads every Markdown file in docs/ and creates a page for one that has "
+            "no page id. Give the page an id, or list it in docs/.mdignore."
+        )
