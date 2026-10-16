@@ -133,9 +133,10 @@ kubectl -n backstop-mcp create secret generic backstop-mcp-secrets \
 ```
 
 The server reads TLS settings from the `sslmode` query parameter of the URL (`disable`, `allow`,
-`prefer`, `require`, `verify-ca`, `verify-full`, `verify`). `verify-ca` and `verify-full` check the
-certificate against the container's system CA bundle; `sslrootcert` is not supported, so a database
-with a privately signed certificate needs `sslmode=require`. See [Database](./configuration.md#Database).
+`prefer`, `require`, `verify-ca`, `verify-full`, `verify`), or from the chart's
+`postgresql.connection.sslMode` when the URL has none. `verify-ca` and `verify-full` check the
+certificate against the container's system CA bundle, or against the CA file in `DB_SSL_ROOT_CERT`
+for a privately signed certificate. See [Database](./configuration.md#Database).
 
 ### 4. Write `values.yaml`
 
@@ -265,8 +266,9 @@ internalServices:
 - [ ] `BACKSTOP_MCP_ENCRYPTION_KEY` was generated with the command above and lives only in a Secret.
 - [ ] `mcpConfig.app.publicBaseUrl` is the `https://` hostname clients use. The login form's CSRF
       cookie is marked `Secure` only when the URL is `https`.
-- [ ] The database connection uses TLS (`sslmode=verify-full` or `verify-ca` when the certificate
-      chains to a public CA, `require` otherwise).
+- [ ] The database connection verifies the server certificate (`sslmode=verify-full`, or `verify-ca`
+      when the hostname cannot match). A privately signed certificate needs its CA in
+      `DB_SSL_ROOT_CERT`.
 - [ ] `/metrics` is not reachable from outside the cluster.
 - [ ] `LOGS_DIAGNOSTICS_DATA_POLICY` is `conceal` (the default), so tool-level events write Backstop
       logins as `sha256:<hex>`. The Backstop HTTP client's request and re-check events

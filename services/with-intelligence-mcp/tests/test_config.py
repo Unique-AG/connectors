@@ -1,5 +1,7 @@
 """Config parsing, and the failures it turns into startup errors."""
 
+import ssl
+
 import pytest
 from pydantic import ValidationError
 
@@ -87,6 +89,57 @@ class TestDatabaseConfig:
         assert DatabaseConfig().connection_url == "postgresql+asyncpg://u:p@db:5432/wi"
 
 
+class TestDatabaseConfigSslMode:
+    def test_applies_the_chart_sslmode_when_the_url_has_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi")
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
+
+        ssl_ctx = DatabaseConfig().connect_args.get("ssl")
+
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is True
+
+    def test_prefers_the_url_sslmode_over_the_chart_sslmode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi?sslmode=disable")
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
+
+        assert DatabaseConfig().connect_args == {"ssl": "disable"}
+
+    def test_leaves_tls_to_the_driver_without_any_sslmode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi")
+        monkeypatch.delenv("PG_DATABASE_SSL_MODE", raising=False)
+
+        assert DatabaseConfig().connect_args == {}
+
+    def test_applies_the_chart_sslmode_to_discrete_fields(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify-ca")
+
+        config = DatabaseConfig.model_validate(
+            {"host": "db", "name": "wi", "user": "u", "password": "p"}
+        )
+
+        ssl_ctx = config.connect_args.get("ssl")
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ssl_ctx.check_hostname is False
+
+    def test_rejects_an_unknown_chart_sslmode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db:5432/wi")
+        monkeypatch.setenv("PG_DATABASE_SSL_MODE", "sideways")
+
+        with pytest.raises(ValidationError, match="Unsupported sslmode"):
+            DatabaseConfig()
+
+
 class TestNormalizeAsyncpgUrl:
     def test_adds_the_asyncpg_driver(self) -> None:
         url, connect_args = normalize_asyncpg_url("postgresql://u:p@db:5432/wi")
@@ -98,10 +151,10 @@ class TestNormalizeAsyncpgUrl:
         assert "sslmode" not in url
         assert "ssl" in connect_args
 
-    def test_drops_sslmode_disable_entirely(self) -> None:
+    def test_hands_sslmode_disable_to_the_driver(self) -> None:
         url, connect_args = normalize_asyncpg_url("postgresql://u:p@db:5432/wi?sslmode=disable")
         assert "sslmode" not in url
-        assert connect_args == {}
+        assert connect_args == {"ssl": "disable"}
 
     def test_rejects_a_non_postgres_url(self) -> None:
         with pytest.raises(ValueError, match="PostgreSQL"):
