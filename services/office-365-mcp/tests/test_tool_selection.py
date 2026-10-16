@@ -68,7 +68,7 @@ class TestTheTwoVariablesAreOneChoice:
         assert config.tools_enabled is None
 
     def test_several_presets_are_one_selection(self) -> None:
-        config = SurfaceConfig.model_validate({"tools_preset": "teams-chat, outlook-read ,"})
+        config = SurfaceConfig.model_validate({"tools_preset": "teams-chat, outlook-read "})
 
         assert config.tools_preset == (ToolsPreset.TEAMS_CHAT, ToolsPreset.OUTLOOK_READ)
         assert config.tools_enabled is None
@@ -87,6 +87,13 @@ class TestTheTwoVariablesAreOneChoice:
             SurfaceConfig.model_validate({"tools_preset": " , "})
 
         assert "names no preset" in str(refusal.value)
+
+    @pytest.mark.parametrize("spelling", ["teams-chat,", ",teams-chat", "teams-chat,,outlook-read"])
+    def test_an_empty_entry_in_a_preset_list_is_refused(self, spelling: str) -> None:
+        with pytest.raises(ValidationError) as refusal:
+            SurfaceConfig.model_validate({"tools_preset": spelling})
+
+        assert "empty entry" in str(refusal.value)
 
     def test_one_wrong_name_in_a_preset_list_is_refused(self) -> None:
         with pytest.raises(ValidationError) as refusal:

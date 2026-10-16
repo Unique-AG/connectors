@@ -181,7 +181,13 @@ class SurfaceConfig(BaseSettings):
     def _split_and_name_the_preset_that_is_not_one(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
-        names = _split_comma_list(value)
+        entries = tuple(entry.strip() for entry in value.split(","))
+        names = tuple(entry for entry in entries if entry)
+        if names and len(names) != len(entries):
+            raise ValueError(
+                "TOOLS_PRESET has an empty entry, from a stray comma. "
+                + "Write the presets with one comma between each pair"
+            )
         unknown = [name for name in names if name not in set(ToolsPreset)]
         if unknown:
             raise ValueError(
