@@ -1,22 +1,13 @@
 import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 
 import httpx2
+from mcp_openapi.headers import only_headers
 
 from kyckr_mcp.settings import Settings
 from kyckr_mcp.telemetry import record_upstream_call, start_upstream_call
 
-UPSTREAM_HEADERS = frozenset(
-    {
-        "host",
-        "content-type",
-        "content-length",
-        "accept",
-        "accept-encoding",
-        "connection",
-        "user-agent",
-    }
-)
+_KYCKR_HEADERS = frozenset({"accept", "accept-encoding", "connection", "user-agent"})
 
 
 class KyckrApiError(Exception):
@@ -81,28 +72,24 @@ async def raise_for_kyckr_error(response: httpx2.Response) -> None:
     )
 
 
-def _request_hook(api_key: str) -> Callable[[httpx2.Request], Awaitable[None]]:
-    async def prepare(request: httpx2.Request) -> None:
-        for name in list(request.headers):
-            if name.lower() not in UPSTREAM_HEADERS:
-                del request.headers[name]
-        request.headers["Authorization"] = f"Bearer {api_key}"
-
-    return prepare
-
-
-def create_client(settings: Settings) -> httpx2.AsyncClient:
+def create_client(
+    settings: Settings, transport: httpx2.AsyncBaseTransport | None = None
+) -> httpx2.AsyncClient:
+    authorization = f"Bearer {settings.kyckr_api_key.get_secret_value()}"
     return httpx2.AsyncClient(
         base_url=settings.kyckr_base_url,
         timeout=settings.kyckr_timeout_seconds,
+        transport=transport,
         headers={
-            "Authorization": f"Bearer {settings.kyckr_api_key.get_secret_value()}",
+            "Authorization": authorization,
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
         event_hooks={
             "request": [
-                _request_hook(settings.kyckr_api_key.get_secret_value()),
+                only_headers(
+                    _KYCKR_HEADERS, {"Authorization": authorization}, origin=settings.kyckr_base_url
+                ),
                 start_upstream_call,
             ],
             "response": [record_upstream_call, raise_for_kyckr_error],

@@ -1,8 +1,6 @@
 # Experimental Kyckr MCP
 
-This is an experimental FastMCP 4.1.0 version of the Kyckr MCP. It lives alongside `services/kyckr-mcp` for comparison, loads Kyckr's public Companies V2 OpenAPI document, and uses `FastMCP.from_openapi` to create the low-level tools.
-
-The generated tools are overridden with the existing agent-facing workflow:
+An experimental FastMCP 4.1.0 version of the Kyckr MCP. It lives next to `services/kyckr-mcp` for comparison and serves the same seven tools with the same agent-facing text, titles, icons and system prompts:
 
 - `search_companies`
 - `get_lite_profile`
@@ -12,9 +10,25 @@ The generated tools are overridden with the existing agent-facing workflow:
 - `get_order`
 - `list_orders`
 
-The generated download tool remains internal. Successful document orders call it with `format=json`, inline `documentJson`, and remove raw download links. Kyckr API errors are returned as structured `{ success: false, ... }` responses.
+Kyckr API errors come back as a structured `{ success: false, statusCode, message, correlationId }` reply, not an MCP error. A document order that has finished gets its JSON document inlined under `data.documentJson`, and download links are removed.
 
-Runtime response validation is disabled because the public spec documents multiple legacy order shapes; the wrappers normalize those responses for the agent.
+## How it is built
+
+The tools are plain `@tool` functions. Each one calls Kyckr through an `OperationClient` from [`mcp-openapi`](../../packages/mcp-openapi), which builds the request from the vendored spec and parses the answer into a model generated from the same spec.
+
+- `openapi/kyckr-openapi.yml`: Kyckr's Companies V2 spec, copied from `https://developer.kyckr.com/openapi/company_v2.yaml` so a restart never depends on that site. Lines marked `patched` differ from the published file because the API answers differently (order ids can be numbers, `POST /orders` and `GET /orders` carry the order and the page under `data`, and an enhanced profile can answer with a pending order).
+- `models/vendor_responses.py` and `models/operations.py` are generated from it with `uv run scripts/generate_response_models.py`. Models keep fields the spec does not declare, so a new Kyckr field reaches the agent. A field of the wrong type fails on the server with an error that names it.
+- `models/replies.py`: what each tool answers with. Every reply adds `success`, `statusCode` and `message` to the generated response, and leaves out empty fields. Each tool publishes its `data` type as its output schema.
+- `params.py`: tool arguments. Trimming, upper-casing the ISO code and the 2-letter pattern are part of the published input schema.
+- `orders.py`: the order logic, with no FastMCP in it. It reads the order out of either response shape and fetches the JSON document of a finished order. A 404 or a body that is not JSON on that download means the filing is PDF-only, and `details` says so. Any other failure of the download keeps the order and tells the agent to call `get_order` again.
+- `failures.py`: turns a failed Kyckr call into the failed reply of the tool's own type.
+- `tools/`: `companies.py` and `orders.py`. `FileSystemProvider` registers every `@tool` in them.
+- `hints.py`: the title, annotations, icon and system prompt each tool sets for the Unique platform.
+- `client.py`: the HTTP client. It sends only an allow-list of headers, sets the Kyckr key on requests to the Kyckr origin only, and records metrics and spans.
+
+### Refreshing the spec
+
+Download the new file over `openapi/kyckr-openapi.yml`, apply the `patched` changes again (or drop one that Kyckr has fixed), run the generator, and review the diff of the generated models. Nothing is refreshed on its own.
 
 ## Run
 
@@ -25,10 +39,6 @@ uv run kyckr-mcp
 ```
 
 The MCP endpoint is available at `http://127.0.0.1:9542/$MCP_API_KEY/mcp`. The shared `unique_mcp` runtime also exposes `/probe`, `/health`, and `/metrics`.
-
-The OpenAPI document is fetched from `KYCKR_OPENAPI_URL` during startup. The default is:
-
-`https://developer.kyckr.com/openapi/company_v2.yaml`
 
 ## Metrics and tracing
 

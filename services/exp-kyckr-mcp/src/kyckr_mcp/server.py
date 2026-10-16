@@ -1,46 +1,41 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.metadata import version
-from typing import Any, cast
+from pathlib import Path
 
 import httpx2
+import yaml
 from fastmcp import FastMCP
+from fastmcp.server.providers import FileSystemProvider
+from mcp_openapi.upstream import OperationClient
 
 from kyckr_mcp.client import create_client
 from kyckr_mcp.instructions import INSTRUCTIONS
-from kyckr_mcp.openapi.routes import EXPOSED, MCP_NAMES, annotate_component, route_map_fn
-from kyckr_mcp.openapi.spec import load_spec
+from kyckr_mcp.openapi.routes import CLIENT_BACKED
+from kyckr_mcp.orders import DOWNLOAD_ORDER
 from kyckr_mcp.settings import Settings
 
-
-def _operation_ids(spec: dict[str, object]) -> set[str]:
-    paths = spec.get("paths")
-    assert isinstance(paths, dict), "Kyckr OpenAPI spec has no paths object"
-    return {
-        operation["operationId"]
-        for path_item in paths.values()
-        if isinstance(path_item, dict)
-        for operation in path_item.values()
-        if isinstance(operation, dict) and isinstance(operation.get("operationId"), str)
-    }
+SPEC = yaml.safe_load((Path(__file__).parent / "openapi" / "kyckr-openapi.yml").read_text())
 
 
 def create_server(
-    settings: Settings,
-    spec: dict[str, object] | None = None,
-    client: httpx2.AsyncClient | None = None,
+    settings: Settings, transport: httpx2.AsyncBaseTransport | None = None
 ) -> FastMCP:
-    loaded_spec = spec or load_spec(str(settings.kyckr_openapi_url))
-    missing = EXPOSED.keys() - _operation_ids(loaded_spec)
-    assert not missing, f"Kyckr OpenAPI spec is missing operationIds: {sorted(missing)}"
+    @asynccontextmanager
+    async def lifespan(_: FastMCP) -> AsyncIterator[dict[str, object]]:
+        async with create_client(settings, transport) as http:
+            api = OperationClient(SPEC, http)
+            missing = {*CLIENT_BACKED, DOWNLOAD_ORDER.operation_id} - api.operation_ids
+            assert not missing, f"operationIds not in the spec: {sorted(missing)}"
+            yield {"api": api, "settings": settings}
 
-    upstream = client or create_client(settings)
-    return FastMCP.from_openapi(
-        openapi_spec=cast(dict[str, Any], loaded_spec),
-        client=upstream,
+    mcp = FastMCP(
         name="Kyckr MCP",
         version=version("kyckr-mcp"),
         instructions=INSTRUCTIONS,
-        route_map_fn=route_map_fn,
-        mcp_names=MCP_NAMES,
-        mcp_component_fn=annotate_component,
-        validate_output=False,
+        lifespan=lifespan,
     )
+    tools = FileSystemProvider(Path(__file__).parent / "tools")
+    assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
+    mcp.add_provider(tools)
+    return mcp

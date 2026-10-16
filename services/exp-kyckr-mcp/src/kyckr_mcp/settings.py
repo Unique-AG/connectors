@@ -4,10 +4,10 @@ from typing import ClassVar, Self
 from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
 
 
-def default_base_url(data: dict[str, object]) -> AnyHttpUrl:
+def _default_base_url(data: dict[str, object]) -> AnyHttpUrl:
     host = str(data["host"])
     if ":" in host:
         host = f"[{host}]"
@@ -16,8 +16,8 @@ def default_base_url(data: dict[str, object]) -> AnyHttpUrl:
     return AnyHttpUrl.build(scheme="http", host=host, port=port)
 
 
-def default_allowed_origins(data: dict[str, object]) -> list[AnyHttpUrl]:
-    if data["host"] in {"localhost", "127.0.0.1", "::1"}:
+def _default_allowed_origins(data: dict[str, object]) -> list[AnyHttpUrl]:
+    if data["host"] in _LOCAL_HOSTS:
         return [AnyHttpUrl("http://localhost:6274")]
     return []
 
@@ -35,15 +35,12 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = Field(default=9542, ge=1, le=65535)
     log_level: str = "INFO"
-    mcp_base_url: AnyHttpUrl = Field(default_factory=default_base_url)
-    mcp_allowed_origins: list[AnyHttpUrl] = Field(default_factory=default_allowed_origins)
+    mcp_base_url: AnyHttpUrl = Field(default_factory=_default_base_url)
+    mcp_allowed_origins: list[AnyHttpUrl] = Field(default_factory=_default_allowed_origins)
     mcp_api_key: SecretStr = Field(min_length=1)
 
     kyckr_api_key: SecretStr = Field(min_length=1)
     kyckr_api_url: AnyHttpUrl = AnyHttpUrl("https://test-api.kyckr.com/v2")
-    kyckr_openapi_url: AnyHttpUrl = AnyHttpUrl(
-        "https://developer.kyckr.com/openapi/company_v2.yaml"
-    )
     kyckr_timeout_seconds: float = Field(default=30, gt=0, le=120)
     kyckr_default_customer_reference: str | None = None
     kyckr_default_contact_email: str | None = None
@@ -64,13 +61,13 @@ class Settings(BaseSettings):
     def allowed_hosts(self) -> list[str]:
         host = self.mcp_base_url.host
         assert host is not None
-        return ["localhost", "127.0.0.1"] if host in LOCAL_HOSTS else [host]
+        return ["localhost", "127.0.0.1"] if host in _LOCAL_HOSTS else [host]
 
     @model_validator(mode="after")
     def validate_mcp_url(self) -> Self:
         url = self.mcp_base_url
         if url.path not in {None, "", "/"} or url.query or url.fragment or url.username:
             raise ValueError("MCP_BASE_URL must be a bare origin")
-        if url.host not in LOCAL_HOSTS and url.scheme != "https":
+        if url.host not in _LOCAL_HOSTS and url.scheme != "https":
             raise ValueError("Remote MCP_BASE_URL requires HTTPS")
         return self

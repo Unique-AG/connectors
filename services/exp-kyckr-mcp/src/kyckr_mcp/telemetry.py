@@ -7,7 +7,7 @@ from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from unique_toolkit.monitoring import MetricNamespace
 
-ROUTES = (
+_ROUTES = (
     (re.compile(r"/companies/[^/]+/enhanced$"), "/companies/:kyckrId/enhanced"),
     (re.compile(r"/companies/[^/]+/lite$"), "/companies/:kyckrId/lite"),
     (re.compile(r"/companies/[^/]+/documents$"), "/companies/:kyckrId/documents"),
@@ -16,14 +16,14 @@ ROUTES = (
     (re.compile(r"/orders/[^/]+$"), "/orders/:orderId"),
     (re.compile(r"/orders$"), "/orders"),
 )
-PAID_ROUTES = frozenset(
+_PAID_ROUTES = frozenset(
     {
         ("GET", "/companies/:kyckrId/lite"),
         ("GET", "/companies/:kyckrId/enhanced"),
         ("POST", "/orders"),
     }
 )
-START = "kyckr_start"
+_START = "kyckr_start"
 
 _metrics = MetricNamespace("kyckr")
 _requests = _metrics.counter(
@@ -39,7 +39,7 @@ _tracer = trace.get_tracer("kyckr_mcp")
 
 
 def route_template(path: str) -> str:
-    return next((template for pattern, template in ROUTES if pattern.search(path)), "[unknown]")
+    return next((template for pattern, template in _ROUTES if pattern.search(path)), "[unknown]")
 
 
 def credit_cost(body: object) -> float:
@@ -55,7 +55,7 @@ def credit_cost(body: object) -> float:
 
 
 async def start_upstream_call(request: httpx2.Request) -> None:
-    request.extensions[START] = time.perf_counter()
+    request.extensions[_START] = time.perf_counter()
 
 
 async def record_upstream_call(response: httpx2.Response) -> None:
@@ -63,7 +63,7 @@ async def record_upstream_call(response: httpx2.Response) -> None:
     method = request.method
     route = route_template(request.url.path)
     status = response.status_code
-    elapsed = time.perf_counter() - request.extensions[START]
+    elapsed = time.perf_counter() - request.extensions[_START]
     _requests.labels(method=method, path=route, status=str(status)).inc()
     _duration.labels(method=method, path=route).observe(elapsed)
     end_ns = time.time_ns()
@@ -80,7 +80,7 @@ async def record_upstream_call(response: httpx2.Response) -> None:
     if status >= 400:
         span.set_status(Status(StatusCode.ERROR))
     span.end(end_time=end_ns)
-    if response.is_success and (method, route) in PAID_ROUTES:
+    if response.is_success and (method, route) in _PAID_ROUTES:
         await response.aread()
         try:
             cost = credit_cost(response.json())
