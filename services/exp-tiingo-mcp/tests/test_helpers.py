@@ -9,7 +9,7 @@ import pytest
 import yaml
 from pydantic import BaseModel, TypeAdapter
 
-from tiingo_mcp.helpers.codegen import generate_response_models
+from tiingo_mcp.helpers.codegen import generate_operations, generate_response_models
 from tiingo_mcp.helpers.headers import only_headers
 from tiingo_mcp.helpers.upstream import Operation, OperationClient, UpstreamError
 
@@ -363,3 +363,114 @@ def test_operations_without_a_named_response_schema_are_rejected(tmp_path: Path)
     )
     with pytest.raises(ValueError, match="has a named response schema"):
         generate(tmp_path, spec_path=spec)
+
+
+def operations_for(tmp_path: Path, operation_ids: list[str]) -> str:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(SPEC)
+    output = tmp_path / "operations.py"
+    generate_operations(
+        spec_path=spec,
+        operation_ids=operation_ids,
+        operation_module="helpers.upstream",
+        models_module="models",
+        output=output,
+    )
+    return output.read_text()
+
+
+def test_each_operation_gets_a_constant_typed_with_its_response(tmp_path: Path) -> None:
+    generated = operations_for(tmp_path, ["getThings", "getThing"])
+    assert 'GET_THINGS = Operation("getThings", TypeAdapter(list[Thing]))' in generated
+    assert 'GET_THING = Operation("getThing", TypeAdapter(Thing))' in generated
+    assert "from models import Thing\n" in generated
+
+
+def test_a_constant_for_an_operation_without_a_named_response_is_refused(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="postThing: the success response is not a named schema"):
+        operations_for(tmp_path, ["postThing"])
+
+
+def test_a_constant_for_an_operation_missing_from_the_spec_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(AssertionError, match=r"not in the spec: \['getMissing'\]"):
+        operations_for(tmp_path, ["getMissing"])
+
+
+NESTED_SPEC = """
+openapi: 3.0.3
+info: {title: t, version: "1"}
+paths:
+  /parents:
+    get:
+      operationId: getParents
+      responses:
+        "200": {$ref: "#/components/responses/Parents"}
+  /dangling:
+    get:
+      operationId: getDangling
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Missing"}
+components:
+  responses:
+    Parents:
+      description: ok
+      content:
+        application/json; charset=utf-8:
+          schema: {type: array, items: {$ref: "#/components/schemas/Parent"}}
+  schemas:
+    Parent:
+      type: object
+      properties:
+        kid: {$ref: "#/components/schemas/Kid"}
+      additionalProperties: {$ref: "#/components/schemas/Extra"}
+    Kid:
+      type: object
+      properties:
+        leaf: {allOf: [{$ref: "#/components/schemas/Leaf"}]}
+    Leaf: {type: object, properties: {name: {type: string}}}
+    Extra: {type: object, properties: {note: {type: string}}}
+    Unused: {type: object, properties: {name: {type: string}}}
+"""
+
+
+def models_from_nested_spec(tmp_path: Path, operation_id: str) -> Path:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(NESTED_SPEC)
+    output = tmp_path / "models.py"
+    generate_response_models(spec_path=spec, operation_ids=[operation_id], fields={}, output=output)
+    return output
+
+
+def test_every_schema_a_response_reaches_is_generated_and_no_other(tmp_path: Path) -> None:
+    models = models_from_nested_spec(tmp_path, "getParents").read_text()
+    classes = {
+        line.split("(")[0].removeprefix("class ")
+        for line in models.splitlines()
+        if line.startswith("class ")
+    }
+    assert classes == {"Parent", "Kid", "Leaf", "Extra"}
+
+
+def test_a_response_that_refers_to_a_missing_schema_is_named(tmp_path: Path) -> None:
+    with pytest.raises(AssertionError, match="Missing is referenced but not in components.schemas"):
+        models_from_nested_spec(tmp_path, "getDangling")
+
+
+def test_a_response_defined_in_components_is_resolved(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(NESTED_SPEC)
+    output = tmp_path / "operations.py"
+    generate_operations(
+        spec_path=spec,
+        operation_ids=["getParents"],
+        operation_module="helpers.upstream",
+        models_module="models",
+        output=output,
+    )
+    assert 'GET_PARENTS = Operation("getParents", TypeAdapter(list[Parent]))' in output.read_text()

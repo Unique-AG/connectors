@@ -42,7 +42,7 @@ def cumulative_returns(bars: list[DailyPriceBar]) -> list[ReturnPoint]:
 
 async def series_for(ticker: str, lookback_days: int, api: OperationClient) -> ReturnSeries:
     try:
-        # A direct call skips Depends. Alternative: api.call(prices.GET_DAILY_PRICES, ...).
+        # A direct call skips Depends. Alternative: api.call(operations.GET_DAILY_PRICES, ...).
         bars = await prices.recent_daily_prices(ticker=ticker, lookback_days=lookback_days, api=api)
         points = cumulative_returns(bars)
     except (UpstreamError, ValueError) as exc:

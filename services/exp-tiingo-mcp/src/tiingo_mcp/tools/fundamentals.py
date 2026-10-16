@@ -2,11 +2,12 @@ from typing import Annotated, Literal, get_args
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
-from pydantic import Field, TypeAdapter
+from pydantic import Field
 
 from tiingo_mcp.deps import get_api
 from tiingo_mcp.helpers.openapi import TOOL_HINTS
-from tiingo_mcp.helpers.upstream import Operation, OperationClient
+from tiingo_mcp.helpers.upstream import OperationClient
+from tiingo_mcp.models import operations
 from tiingo_mcp.models.fundamentals import FinancialPeriod
 from tiingo_mcp.models.vendor_responses import FundamentalsDaily, FundamentalsStatement
 from tiingo_mcp.params import LookbackDays, since
@@ -21,8 +22,6 @@ _FundamentalsTicker = Annotated[
         "for delisted/recycled symbols.",
     ),
 ]
-_GET_STATEMENTS = Operation("getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement]))
-_GET_DAILY_FUNDAMENTALS = Operation("getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily]))
 
 
 def _recent_financial_periods(
@@ -67,11 +66,11 @@ async def recent_financials(
     are explained in the resource://fundamentals_definitions resource.
     """
     statements = await api.call(
-        _GET_STATEMENTS, ticker=ticker, startDate=since((periods + 2) * 100)
+        operations.GET_FUNDAMENTALS_STATEMENTS, ticker=ticker, startDate=since((periods + 2) * 100)
     )
     if sum(row.quarter != 0 for row in statements) < periods:
         # The window can miss older filings (delisted tickers, short histories): ask for all.
-        statements = await api.call(_GET_STATEMENTS, ticker=ticker)
+        statements = await api.call(operations.GET_FUNDAMENTALS_STATEMENTS, ticker=ticker)
     return _recent_financial_periods(statements, periods, sections)
 
 
@@ -84,4 +83,6 @@ async def recent_valuation_metrics(
     """Daily market cap, enterprise value, P/E, P/B and trailing PEG for a ticker
     over the last `lookback_days` calendar days (default 30).
     """
-    return await api.call(_GET_DAILY_FUNDAMENTALS, ticker=ticker, startDate=since(lookback_days))
+    return await api.call(
+        operations.GET_FUNDAMENTALS_DAILY, ticker=ticker, startDate=since(lookback_days)
+    )
