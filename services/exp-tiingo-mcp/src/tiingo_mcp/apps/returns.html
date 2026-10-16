@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cumulative returns</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+      --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text-primary); background: var(--surface-1); }
+  .wrap { padding: 14px 16px 12px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  .sub { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
+  button.toggle { font: inherit; font-size: 12px; color: var(--text-secondary); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+  button.toggle:hover, button.toggle[aria-pressed="true"] { color: var(--text-primary); background: var(--grid); }
+  button.toggle:focus-visible, svg:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+  ul.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 10px 0 0; padding: 0; }
+  ul.legend li { display: flex; align-items: center; gap: 6px; }
+  .key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
+  .muted { color: var(--text-secondary); }
+  .chart-wrap { position: relative; margin-top: 8px; }
+  svg { display: block; }
+  svg text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  svg text.end { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  .tip { position: absolute; pointer-events: none; padding: 6px 10px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); white-space: nowrap; }
+  .tip .when { color: var(--text-secondary); font-size: 11px; margin-bottom: 2px; }
+  .tip .row { display: flex; align-items: center; gap: 6px; }
+  .tip strong { font-weight: 600; min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+  .tip .name { color: var(--text-secondary); }
+  .table-wrap { margin-top: 8px; max-height: 300px; overflow: auto; border-top: 1px solid var(--grid); }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  caption { text-align: left; color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
+  th, td { text-align: right; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { position: sticky; top: 0; background: var(--surface-1); color: var(--text-secondary); font-weight: 600; }
+  #status { color: var(--text-secondary); padding: 24px 0; }
+  /* biome-ignore lint/complexity/noImportantStyles: hidden must beat the display rules below */
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <div class="head">
+    <div><h1 id="title">Cumulative return</h1><div class="sub" id="sub"></div></div>
+    <button type="button" class="toggle" id="toggle" aria-pressed="false" hidden>Table</button>
+  </div>
+  <div id="status" role="status">Loading returns…</div>
+  <ul class="legend" id="legend" hidden></ul>
+  <div class="chart-wrap" id="chart-wrap" hidden><div id="chart"></div><div class="tip" id="tip" hidden></div></div>
+  <div class="table-wrap" id="table-wrap" hidden></div>
+</div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs = {}, ...children) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attrs)) { node.setAttribute(key, value); }
+    node.append(...children);
+    return node;
+  };
+  const htmlEl = (tag, attrs = {}, ...children) => {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) { node.setAttribute(key, value); }
+    node.append(...children);
+    return node;
+  };
+
+  const MAX_SERIES = 5, HEIGHT = 280, MARGIN = { top: 12, right: 64, bottom: 28, left: 48 };
+  let data = null, active = null, view = "chart", drawnWidth = 0;
+
+  const color = (index) => `var(--series-${(index % MAX_SERIES) + 1})`;
+  const parseDay = (iso) => Date.parse(`${iso}T00:00:00Z`);
+  const fmtDay = (ms, extra = {}) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC", ...extra });
+  const fmtPct = (value) => `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+  const fmtTick = (value) => `${value > 0 ? "+" : ""}${+value.toFixed(2)}%`;
+
+  function niceTicks(min, max, count = 5) {
+    const raw = ((max - min) || 1) / count, magnitude = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= raw);
+    const low = Math.floor(min / step) * step, high = Math.max(Math.ceil(max / step) * step, low + step);
+    const ticks = [];
+    for (let v = low; v <= high + step / 2; v += step) { ticks.push(Math.round(v / step) * step); }
+    return ticks;
+  }
+
+  // MCP Apps bridge: JSON-RPC 2.0 over postMessage with the host.
+  const send = (message) => window.parent.postMessage({ jsonrpc: "2.0", ...message }, "*");
+  let nextId = 1;
+  const pending = new Map();
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, { resolve, reject });
+    send({ id, method, params });
+  });
+  const notify = (method, params) => send({ method, params });
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window.parent) { return; }
+    const message = event.data;
+    if (message?.jsonrpc !== "2.0") { return; }
+    if (message.id !== undefined && !message.method && pending.has(message.id)) {
+      const { resolve, reject } = pending.get(message.id);
+      pending.delete(message.id);
+      message.error ? reject(message.error) : resolve(message.result);
+    } else if (message.method === "ui/notifications/tool-result") {
+      onResult(message.params);
+    } else if (message.method === "ui/notifications/host-context-changed") {
+      applyTheme(message.params);
+    } else if (message.method === "ui/resource-teardown") {
+      send({ id: message.id, result: {} });
+    }
+  });
+
+  const applyTheme = (context) => {
+    if (context?.theme) {
+      document.documentElement.dataset.theme = context.theme;
+    }
+  };
+  new ResizeObserver(() => notify("ui/notifications/size-changed", { height: document.documentElement.scrollHeight })).observe(document.body);
+
+  request("ui/initialize", { appInfo: { name: "tiingo-returns", version: "0.1.0" }, appCapabilities: {}, protocolVersion: "2026-01-26" })
+    .then((result) => { applyTheme(result?.hostContext); notify("ui/notifications/initialized", {}); })
+    .catch(() => notify("ui/notifications/initialized", {}));
+
+  function onResult(result) {
+    const payload = result?.structuredContent;
+    if (result?.isError || !payload?.series?.length) {
+      $("status").textContent = result?.content?.[0]?.text || "No returns to show.";
+      return;
+    }
+    data = payload;
+    $("status").hidden = true;
+    renderHeader();
+    renderLegend();
+    $("toggle").hidden = false;
+    renderTable();
+    setView(view);
+  }
+
+  function renderHeader() {
+    const { series, start, end } = data;
+    $("title").textContent = series.length === 1 ? `Cumulative return · ${series[0].ticker}` : "Cumulative return";
+    $("sub").textContent = `Adjusted close, % change since ${fmtDay(parseDay(start))} · through ${fmtDay(parseDay(end), { year: "numeric" })}`;
+  }
+
+  // One series needs no legend box: the title names it.
+  function renderLegend() {
+    const legend = $("legend");
+    legend.replaceChildren(...data.series.map((s, i) => {
+      const key = htmlEl("span", { class: "key" });
+      key.style.background = color(i);
+      return htmlEl("li", {}, key, s.ticker, htmlEl("span", { class: "muted" }, fmtPct(s.total_return_pct)));
+    }));
+    legend.hidden = data.series.length < 2;
+  }
+
+  function setView(next) {
+    view = next;
+    const chart = view === "chart";
+    $("chart-wrap").hidden = !chart;
+    $("table-wrap").hidden = chart;
+    $("toggle").textContent = chart ? "Table" : "Chart";
+    $("toggle").setAttribute("aria-pressed", String(!chart));
+    if (chart) { drawChart(); }
+  }
+  $("toggle").addEventListener("click", () => data && setView(view === "chart" ? "table" : "chart"));
+
+  function renderTable() {
+    const days = [...new Set(data.series.flatMap((s) => s.points.map((p) => p.date)))].sort();
+    const lookup = data.series.map((s) => new Map(s.points.map((p) => [p.date, p.return_pct])));
+    const head = htmlEl("tr", {}, htmlEl("th", {}, "Date"), ...data.series.map((s) => htmlEl("th", {}, s.ticker)));
+    const rows = days.map((day) => htmlEl("tr", {}, htmlEl("td", {}, day),
+      ...lookup.map((values) => htmlEl("td", {}, values.has(day) ? fmtPct(values.get(day)) : "–"))));
+    $("table-wrap").replaceChildren(htmlEl("table", {}, htmlEl("caption", {}, "Cumulative return since the start date, adjusted close"),
+      htmlEl("thead", {}, head), htmlEl("tbody", {}, ...rows)));
+  }
+
+  function drawChart() {
+    const host = $("chart");
+    host.replaceChildren();
+    $("tip").hidden = true;
+    active = null;
+    const { series } = data;
+    const width = Math.max(300, host.clientWidth), plotW = width - MARGIN.left - MARGIN.right, plotH = HEIGHT - MARGIN.top - MARGIN.bottom;
+    const days = [...new Set(series.flatMap((s) => s.points.map((p) => p.date)))].sort();
+    const times = days.map(parseDay), t0 = times[0], t1 = times[times.length - 1];
+    drawnWidth = width;
+    const values = series.flatMap((s) => s.points.map((p) => p.return_pct));
+    const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values));
+    const v0 = ticks[0], v1 = ticks[ticks.length - 1];
+    const X = (t) => MARGIN.left + (t1 === t0 ? plotW / 2 : ((t - t0) / (t1 - t0)) * plotW);
+    const Y = (v) => MARGIN.top + ((v1 - v) / (v1 - v0)) * plotH;
+
+    const svg = svgEl("svg", { width, height: HEIGHT, role: "img", tabindex: "0",
+      "aria-label": `Cumulative return line chart: ${series.map((s) => `${s.ticker} ${fmtPct(s.total_return_pct)}`).join(", ")}. Use the Table button for all values.` });
+    for (const tick of ticks) {
+      const y = Y(tick);
+      svg.append(svgEl("line", { x1: MARGIN.left, x2: width - MARGIN.right, y1: y, y2: y, stroke: tick === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      svg.append(svgEl("text", { x: MARGIN.left - 8, y, "text-anchor": "end", "dominant-baseline": "middle" }, fmtTick(tick)));
+    }
+    const labelCount = Math.min(4, days.length);
+    for (let k = 0; k < labelCount; k++) {
+      const i = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (days.length - 1));
+      const anchor = k === 0 ? "start" : k === labelCount - 1 ? "end" : "middle";
+      svg.append(svgEl("text", { x: X(times[i]), y: HEIGHT - 8, "text-anchor": anchor }, fmtDay(times[i])));
+    }
+
+    series.forEach((s, i) => {
+      const d = s.points.map((p, n) => `${n ? "L" : "M"}${X(parseDay(p.date)).toFixed(1)},${Y(p.return_pct).toFixed(1)}`).join(" ");
+      svg.append(svgEl("path", { d, fill: "none", stroke: color(i), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    });
+
+    const ends = series.map((s, i) => {
+      const last = s.points[s.points.length - 1];
+      return { i, x: X(parseDay(last.date)), y: Y(last.return_pct), label: fmtPct(last.return_pct) };
+    });
+    const ys = ends.map((e) => e.y).sort((a, b) => a - b);
+    const crowded = ys.some((y, n) => n > 0 && y - ys[n - 1] < 14);
+    for (const e of ends) {
+      svg.append(svgEl("circle", { cx: e.x, cy: e.y, r: 6, fill: "var(--surface-1)" }));
+      svg.append(svgEl("circle", { cx: e.x, cy: e.y, r: 4, fill: color(e.i) }));
+      if (!crowded) { svg.append(svgEl("text", { class: "end", x: e.x + 10, y: e.y, "dominant-baseline": "middle" }, e.label)); }
+    }
+
+    const crosshair = svgEl("line", { y1: MARGIN.top, y2: MARGIN.top + plotH, stroke: "var(--text-muted)", "stroke-width": 1, visibility: "hidden" });
+    const dots = series.map((_, i) => svgEl("g", { visibility: "hidden" }, svgEl("circle", { r: 6, fill: "var(--surface-1)" }), svgEl("circle", { r: 4, fill: color(i) })));
+    const overlay = svgEl("rect", { x: MARGIN.left, y: MARGIN.top, width: plotW, height: plotH, fill: "transparent" });
+    svg.append(crosshair, ...dots, overlay);
+    host.append(svg);
+
+    const tip = $("tip");
+    const hide = () => {
+      active = null;
+      tip.hidden = true;
+      crosshair.setAttribute("visibility", "hidden");
+      dots.forEach((g) => {
+        g.setAttribute("visibility", "hidden");
+      });
+    };
+    const show = (index) => {
+      active = index;
+      const x = X(times[index]);
+      crosshair.setAttribute("x1", x); crosshair.setAttribute("x2", x); crosshair.setAttribute("visibility", "visible");
+      const rows = series.map((s, i) => {
+        const point = s.points.find((p) => p.date === days[index]);
+        dots[i].setAttribute("visibility", point ? "visible" : "hidden");
+        if (point) { dots[i].setAttribute("transform", `translate(${x},${Y(point.return_pct)})`); }
+        const key = htmlEl("span", { class: "key" });
+        key.style.background = color(i);
+        return htmlEl("div", { class: "row" }, key, htmlEl("strong", {}, point ? fmtPct(point.return_pct) : "–"), htmlEl("span", { class: "name" }, s.ticker));
+      });
+      tip.replaceChildren(htmlEl("div", { class: "when" }, fmtDay(times[index], { year: "numeric" })), ...rows);
+      tip.hidden = false;
+      const left = x + 14 + tip.offsetWidth > width - MARGIN.right ? x - 14 - tip.offsetWidth : x + 14;
+      tip.style.left = `${Math.max(0, left)}px`;
+      tip.style.top = `${MARGIN.top}px`;
+    };
+    const nearest = (px) => times.reduce((best, t, i) => (Math.abs(X(t) - px) < Math.abs(X(times[best]) - px) ? i : best), 0);
+    overlay.addEventListener("pointermove", (event) => show(nearest(event.clientX - svg.getBoundingClientRect().left)));
+    overlay.addEventListener("pointerleave", hide);
+    svg.addEventListener("focus", () => show(active ?? times.length - 1));
+    svg.addEventListener("blur", hide);
+    svg.addEventListener("keydown", (event) => {
+      const last = times.length - 1, at = active ?? last;
+      const next = { ArrowLeft: Math.max(0, at - 1), ArrowRight: Math.min(last, at + 1), Home: 0, End: last }[event.key];
+      if (event.key === "Escape") { return hide(); }
+      if (next === undefined) { return; }
+      event.preventDefault();
+      show(next);
+    });
+  }
+
+  new ResizeObserver(() => {
+    if (data && view === "chart" && $("chart").clientWidth !== drawnWidth) { drawChart(); }
+  }).observe($("chart"));
+})();
+</script>
+</body>
+</html>
