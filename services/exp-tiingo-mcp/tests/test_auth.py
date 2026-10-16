@@ -2,7 +2,9 @@ from typing import Any
 
 import httpx2
 import pytest
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
 from pydantic import SecretStr
+from unique_mcp.auth.zitadel import oidc_proxy
 
 from tiingo_mcp.auth import create_auth
 from tiingo_mcp.settings import Settings
@@ -31,6 +33,20 @@ def zitadel_discovery(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return requested
 
 
+@pytest.fixture
+def proxy_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The keyword arguments the OIDCProxy is constructed with."""
+    received: dict[str, Any] = {}
+
+    class RecordingProxy(OIDCProxy):
+        def __init__(self, **kwargs: Any) -> None:  # noqa: ANN401
+            received.update(kwargs)
+            super().__init__(**kwargs)
+
+    monkeypatch.setattr(oidc_proxy, "OIDCProxy", RecordingProxy)
+    return received
+
+
 def zitadel_settings(**overrides: Any) -> Settings:  # noqa: ANN401
     return Settings(
         _env_file=None,
@@ -56,18 +72,17 @@ def test_zitadel_proxy_discovers_the_issuer(zitadel_discovery: list[str]) -> Non
 
 
 def test_zitadel_proxy_is_a_public_client_even_if_a_secret_is_in_the_environment(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, proxy_kwargs: dict[str, Any]
 ) -> None:
     monkeypatch.setenv("ZITADEL_CLIENT_SECRET", "from-the-environment")
-    auth = create_auth(zitadel_settings())
-    assert auth is not None
-    assert auth._upstream_client_secret is None
-    assert auth._token_endpoint_auth_method == "none"
+    create_auth(zitadel_settings())
+    assert proxy_kwargs["client_secret"] is None
+    assert proxy_kwargs["token_endpoint_auth_method"] == "none"
 
 
-def test_org_restriction_is_required_and_requested() -> None:
+def test_org_restriction_is_required_and_requested(proxy_kwargs: dict[str, Any]) -> None:
     auth = create_auth(zitadel_settings(zitadel_org_id="42"))
     assert auth is not None
     org_scope = "urn:zitadel:iam:org:id:42"
     assert org_scope in auth.required_scopes
-    assert org_scope in auth._extra_authorize_params["scope"].split()
+    assert org_scope in proxy_kwargs["extra_authorize_params"]["scope"].split()
