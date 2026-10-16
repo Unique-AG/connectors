@@ -28,6 +28,8 @@ import re
 from collections.abc import Mapping
 from typing import Protocol, cast
 
+import pytest
+
 from office_365_mcp.config import ToolsPreset
 from office_365_mcp.shared.seam import graph_scope
 from office_365_mcp.tools import resolve
@@ -93,7 +95,7 @@ def _scalar(name: str) -> str:
     return value
 
 
-def _chart_preset_names() -> list[str]:
+def _chart_preset_pattern() -> str:
     node: object = cast("object", json.loads(_CHART_SCHEMA.read_text()))
     for key in (
         "properties",
@@ -107,7 +109,11 @@ def _chart_preset_names() -> list[str]:
         assert isinstance(node, Mapping), f"the chart schema has no {key} under this path"
         node = cast("Mapping[str, object]", node)[key]
     assert isinstance(node, str), "tools.preset carries no pattern in the chart schema"
-    names = re.fullmatch(r"\^\((.*)\)\(,\(\1\)\)\*\$", node)
+    return node
+
+
+def _chart_preset_names() -> list[str]:
+    names = re.fullmatch(r"\^\\s\*\((.*)\)\(\\s\*,\\s\*\(\1\)\)\*\\s\*\$", _chart_preset_pattern())
     assert names is not None, "tools.preset is no longer a comma-separated list of preset names"
     return names.group(1).split("|")
 
@@ -156,9 +162,9 @@ class TestTheRegistrationExposesWhatTheApplicationEnforces:
 
 class TestTheThreePlacesThePresetNamesAreWritten:
     def test_the_chart_the_module_and_the_enum_name_the_same_presets(self) -> None:
-        """The chart schema carries the preset names as a JSON Schema enum, so a name only spelled
-        correctly in two of the three places fails a `helm install` or a `terraform apply` rather
-        than a sign-in — but only if something compares all three."""
+        """The chart schema carries the preset names in a JSON Schema pattern, so a name only
+        spelled correctly in two of the three places fails a `helm install` or a
+        `terraform apply` rather than a sign-in — but only if something compares all three."""
         presets = _locals().get("presets")
 
         assert isinstance(presets, Mapping), f"{_GENERATED.name} carries no `presets` map"
@@ -166,6 +172,18 @@ class TestTheThreePlacesThePresetNamesAreWritten:
             cast("Mapping[str, object]", presets)
         )
         assert {preset.value for preset in ToolsPreset} == set(_chart_preset_names())
+
+    @pytest.mark.parametrize(
+        "spelling", ["teams-chat", "teams-chat,outlook-read", "teams-chat, outlook-read ", " teams"]
+    )
+    def test_the_chart_accepts_every_list_the_pod_and_the_module_accept(
+        self, spelling: str
+    ) -> None:
+        assert re.search(_chart_preset_pattern(), spelling) is not None
+
+    @pytest.mark.parametrize("spelling", ["", "teams-chat,", "teams-chat outlook-read", "outlook"])
+    def test_the_chart_refuses_a_list_the_module_refuses(self, spelling: str) -> None:
+        assert re.search(_chart_preset_pattern(), spelling) is None
 
 
 class TestTheTerraformTestsExpectWhatTheServerResolves:
