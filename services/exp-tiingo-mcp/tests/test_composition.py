@@ -7,9 +7,9 @@ import httpx2
 import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
+from mcp_openapi.upstream import Operation
 
 from tiingo_mcp import server
-from tiingo_mcp.helpers.upstream import Operation
 from tiingo_mcp.settings import Settings
 from tiingo_mcp.tools import prices, returns
 

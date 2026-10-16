@@ -7,11 +7,11 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.resources import resource
 from fastmcp.tools import ToolResult, tool
+from mcp_openapi.openapi import TOOL_HINTS
+from mcp_openapi.upstream import OperationClient, UpstreamError
 from pydantic import Field
 
 from tiingo_mcp.deps import get_api
-from tiingo_mcp.helpers.openapi import TOOL_HINTS
-from tiingo_mcp.helpers.upstream import OperationClient, UpstreamError
 from tiingo_mcp.models.returns import ReturnPoint, ReturnsChart, ReturnSeries
 from tiingo_mcp.models.vendor_responses import DailyPriceBar
 from tiingo_mcp.params import LookbackDays

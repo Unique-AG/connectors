@@ -10,8 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastmcp==4.1.0",
     "httpx2==2.13.1",
-    "mcp-types==2.3.0",
-    "openapi-pydantic==0.6.0",
+    "mcp-openapi==0.1.0",
     "py-key-value-aio[memory]==0.4.6",
     "pydantic==2.14.1",
     "pydantic-settings==2.15.0",
@@ -30,7 +29,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "basedpyright==1.40.1",
-    "datamodel-code-generator==0.83.0",
+    "mcp-openapi[codegen]==0.1.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
@@ -62,3 +61,6 @@ reportUnusedFunction = "none"
 reportImplicitStringConcatenation = "none"
 reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
+
+[tool.uv.sources]
+mcp-openapi = { path = "../../packages/mcp-openapi" }

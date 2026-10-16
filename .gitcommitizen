@@ -25,6 +25,7 @@ revert = Reverts a previous commit
 [scopes]
 # Services
 kyckr-mcp = services/kyckr-mcp/**
+exp-kyckr-mcp = services/exp-kyckr-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
@@ -43,6 +44,7 @@ instrumentation = packages/instrumentation/**
 logger = packages/logger/**
 mcp-credential-auth = packages/mcp-credential-auth/**
 mcp-oauth = packages/mcp-oauth/**
+mcp-openapi = packages/mcp-openapi/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
 proxy = packages/proxy/**

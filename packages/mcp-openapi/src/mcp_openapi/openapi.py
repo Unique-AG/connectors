@@ -13,10 +13,11 @@ from mcp_types import ToolAnnotations
 TOOL_HINTS = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 
 
-def mcp_name(operation_id: str) -> str:
-    """camelCase operationId as snake_case, without the leading get_."""
-    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", operation_id).lower()
-    return snake.removeprefix("get_")  # this is specific here but could be generalized
+def mcp_name(operation_id: str, *, remove_prefix: str = "") -> str:
+    """camelCase or kebab-case operationId as snake_case, without `remove_prefix` at the start."""
+    words = re.sub(r"[^A-Za-z0-9]+", "_", operation_id).strip("_")
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", words).lower()
+    return snake.removeprefix(remove_prefix)
 
 
 def route_map(exposed: dict[str, MCPType]) -> RouteMapFn:

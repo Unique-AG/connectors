@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from typing import cast
 
 import httpx2
 from fastmcp.exceptions import ToolError
-from fastmcp.utilities.openapi import parse_openapi_to_http_routes
+from fastmcp.utilities.openapi import HTTPRoute, parse_openapi_to_http_routes
 from fastmcp.utilities.openapi.director import RequestDirector
 from jsonschema_path import SchemaPath
 from pydantic import TypeAdapter, ValidationError
@@ -24,13 +25,13 @@ class OperationClient:
     """Calls the operations of an OpenAPI spec and parses the JSON body into the given type."""
 
     def __init__(self, spec: dict[str, object], http: httpx2.AsyncClient) -> None:
-        self._http = http
-        self._routes = {
+        self._http: httpx2.AsyncClient = http
+        self._routes: dict[str, HTTPRoute] = {
             route.operation_id: route
             for route in parse_openapi_to_http_routes(spec)
             if route.operation_id
         }
-        self._director = RequestDirector(SchemaPath.from_dict(spec))
+        self._director: RequestDirector = RequestDirector(SchemaPath.from_dict(spec))
 
     @property
     def operation_ids(self) -> set[str]:
@@ -45,7 +46,7 @@ class OperationClient:
             known = sorted(route.parameter_map)
             raise ValueError(f"{operation.operation_id} has no {sorted(unknown)}, it takes {known}")
         given = {name for name, value in arguments.items() if value not in (None, "")}
-        missing = set(route.flat_param_schema.get("required", [])) - given
+        missing = set(cast(list[str], route.flat_param_schema.get("required", []))) - given
         if missing:
             raise ValueError(f"{operation.operation_id} needs {sorted(missing)}")
         built = self._director.build(route, arguments, str(self._http.base_url))

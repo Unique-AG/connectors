@@ -7,11 +7,11 @@ import httpx2
 import yaml
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from mcp_openapi.headers import only_headers
+from mcp_openapi.openapi import set_tool_hints
+from mcp_openapi.upstream import OperationClient
 
 from tiingo_mcp.auth import create_auth
-from tiingo_mcp.helpers.headers import only_headers
-from tiingo_mcp.helpers.openapi import set_tool_hints
-from tiingo_mcp.helpers.upstream import OperationClient
 from tiingo_mcp.openapi.routes import CLIENT_BACKED, EXPOSED, MCP_NAMES, route_map_fn
 from tiingo_mcp.settings import Settings
 

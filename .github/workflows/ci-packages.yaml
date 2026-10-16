@@ -8,6 +8,7 @@ on:
     paths:
       - "packages/**"
       - "!packages/mcp-credential-auth/**"
+      - "!packages/mcp-openapi/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"

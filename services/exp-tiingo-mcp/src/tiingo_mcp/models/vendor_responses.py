@@ -332,6 +332,12 @@ class SearchResult(BaseModel):
     ticker: str | None = Field(None, description="Ticker of the given asset.")
 
 
+class TestConnectionResponse(BaseModel):
+    message: str | None = Field(
+        None, description="Confirmation message, e.g. 'You successfully sent a request'."
+    )
+
+
 class CryptoTopOfBook(BaseModel):
     baseCurrency: str | None = Field(
         None, description='The base pair of the cryptocurrency, e.g. "btc" for "btcusd".'
