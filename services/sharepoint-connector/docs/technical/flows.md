@@ -82,6 +82,11 @@ sequenceDiagram
             Unique->>Connector: Move confirmation
         end
 
+        opt Updated files that also moved
+            Connector->>Unique: GraphQL: contentUpdate<br/>(update ownerId and url)
+            Unique->>Connector: Move confirmation
+        end
+
         opt New/updated files
             Connector->>Graph: GET /drives/{driveId}/items/{itemId}/content
             Graph->>Connector: File content (stream)
@@ -203,6 +208,7 @@ sequenceDiagram
 - **Deduplication**: Subsites already configured as standalone sites (via compound ID) are skipped along with their descendants.
 - **Unified scope tree**: Subsite content is placed under the parent site's root scope. A subsite at path `ParentSite/SubA` creates scopes like `/RootScope/SubA/Documents/...`.
 - **File diff keying**: Subsite items carry a `syncSiteId` pointing to the parent site. The file-diff mechanism uses this to scope all items (parent + subsites) under one diff key, ensuring correct deletion detection when subsites are removed.
+- **Moved folders**: Files left in a folder that has moved are placed in the folder at its new path before the old folder is deleted.
 
 ## Permission Sync Flow
 
