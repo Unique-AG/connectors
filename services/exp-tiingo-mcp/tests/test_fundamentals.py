@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Callable
+from datetime import date, timedelta
 from functools import partial
 from typing import Any, get_args
 
@@ -36,17 +38,22 @@ ROWS = [
 ]
 
 
-def call(
+def call_with(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
     tool: str,
     args: dict[str, Any],
-    body: object,
-) -> Any:  # noqa: ANN401
-    """Run `tool` through the server with Tiingo answering `body`; returns the structured result."""
+    answer: Callable[[httpx2.Request], object],
+) -> tuple[Any, list[httpx2.Request]]:
+    """Run `tool` through the server with Tiingo answering `answer(request)`.
+
+    Returns the structured result and the requests Tiingo received.
+    """
+    seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(200, json=body)
+        seen.append(request)
+        return httpx2.Response(200, json=answer(request))
 
     monkeypatch.setattr(
         server.httpx2,
@@ -59,7 +66,18 @@ def call(
         async with Client(mcp) as client:
             return (await client.call_tool(tool, args)).structured_content["result"]
 
-    return asyncio.run(run())
+    return asyncio.run(run()), seen
+
+
+def call(
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    tool: str,
+    args: dict[str, Any],
+    body: object,
+) -> Any:  # noqa: ANN401
+    """Run `tool` through the server with Tiingo answering `body`; returns the structured result."""
+    return call_with(settings, monkeypatch, tool, args, lambda _: body)[0]
 
 
 def test_section_matches_the_generated_statement_sections() -> None:
@@ -88,6 +106,36 @@ def test_recent_financials_cuts_off_at_periods(
         local_settings, monkeypatch, "recent_financials", {"ticker": "ABC", "periods": 2}, ROWS
     )
     assert [(p["year"], p["quarter"]) for p in result] == [(2025, 1), (2024, 4)]
+
+
+@pytest.mark.parametrize("periods", [2, 5])
+def test_recent_financials_asks_only_for_a_window_that_covers_the_periods(
+    local_settings: Settings, monkeypatch: pytest.MonkeyPatch, periods: int
+) -> None:
+    result, seen = call_with(
+        local_settings,
+        monkeypatch,
+        "recent_financials",
+        {"ticker": "ABC", "periods": periods},
+        lambda _: ROWS,
+    )
+    window = (date.today() - timedelta(days=(periods + 2) * 100)).isoformat()
+    assert len(result) == periods
+    assert [r.url.params.get("startDate") for r in seen] == [window]
+
+
+@pytest.mark.parametrize("windowed_rows", [ROWS[:1], ROWS[:2]])
+def test_recent_financials_asks_for_the_full_history_when_the_window_is_too_short(
+    local_settings: Settings, monkeypatch: pytest.MonkeyPatch, windowed_rows: list[dict[str, Any]]
+) -> None:
+    def answer(request: httpx2.Request) -> object:
+        return windowed_rows if "startDate" in request.url.params else ROWS
+
+    result, seen = call_with(
+        local_settings, monkeypatch, "recent_financials", {"ticker": "ABC", "periods": 2}, answer
+    )
+    assert [(p["year"], p["quarter"]) for p in result] == [(2025, 1), (2024, 4)]
+    assert ["startDate" in r.url.params for r in seen] == [True, False]
 
 
 def test_recent_financials_keeps_an_explicit_empty_section_list(

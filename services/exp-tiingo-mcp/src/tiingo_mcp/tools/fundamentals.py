@@ -66,7 +66,12 @@ async def recent_financials(
     cashFlow (default all). Each section maps Tiingo data codes to values; the codes
     are explained in the resource://fundamentals_definitions resource.
     """
-    statements = await api.call(_GET_STATEMENTS, ticker=ticker)
+    statements = await api.call(
+        _GET_STATEMENTS, ticker=ticker, startDate=since((periods + 2) * 100)
+    )
+    if sum(row.quarter != 0 for row in statements) < periods:
+        # The window can miss older filings (delisted tickers, short histories): ask for all.
+        statements = await api.call(_GET_STATEMENTS, ticker=ticker)
     return _recent_financial_periods(statements, periods, sections)
 
 
