@@ -1,6 +1,5 @@
 from fastmcp.server.providers.openapi import MCPType
-
-from tiingo_mcp.helpers.openapi import mcp_name, route_map
+from mcp_openapi.openapi import mcp_name, route_map
 
 # operationIds from the spec and how they are exposed as-is. Everything else is hidden.
 # Resources are for GETs without query params only.
@@ -28,6 +27,8 @@ CLIENT_BACKED = ["getDailyPrices", "getFundamentalsStatements", "getFundamentals
 # Operations whose responses get a generated model.
 RESPONSE_MODELS = [*EXPOSED, *CLIENT_BACKED]
 
-MCP_NAMES: dict[str, str] = {operation_id: mcp_name(operation_id) for operation_id in EXPOSED}
+MCP_NAMES: dict[str, str] = {
+    operation_id: mcp_name(operation_id, remove_prefix="get_") for operation_id in EXPOSED
+}
 
 route_map_fn = route_map(EXPOSED)

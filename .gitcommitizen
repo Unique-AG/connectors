@@ -43,6 +43,7 @@ instrumentation = packages/instrumentation/**
 logger = packages/logger/**
 mcp-credential-auth = packages/mcp-credential-auth/**
 mcp-oauth = packages/mcp-oauth/**
+mcp-openapi = packages/mcp-openapi/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
 proxy = packages/proxy/**

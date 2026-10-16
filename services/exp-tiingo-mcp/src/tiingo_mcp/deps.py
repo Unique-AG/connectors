@@ -1,7 +1,6 @@
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
-
-from tiingo_mcp.helpers.upstream import OperationClient
+from mcp_openapi.upstream import OperationClient
 
 
 def get_api(ctx: Context = CurrentContext()) -> OperationClient:

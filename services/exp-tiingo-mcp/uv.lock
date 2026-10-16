@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1643,6 +1643,50 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9d/8d/e0d339616f4810e9051d4aba6887afab289ab1f81875fe908b606cdfd0e3/mcp-2.3.0.tar.gz", hash = "sha256:8b147a50441cf059dc88c684e0aeed3687f0aa0f39c6cde7b90330effd2b34d8", size = 4171955, upload-time = "2026-10-02T22:06:56.091Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/d7/4a2878f128df729db3ca04e71bfce26405cc2e0c9ebe19c592feeb4c61b9/mcp-2.3.0-py3-none-any.whl", hash = "sha256:dd0c44c089d16453e8ae31a3877a0054d7a2314caaa81f5e0541b9b1734b2377", size = 368664, upload-time = "2026-10-02T22:06:52.119Z" },
+]
+
+[[package]]
+name = "mcp-openapi"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-openapi" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "httpx2" },
+    { name = "jsonschema-path" },
+    { name = "mcp-types" },
+    { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+codegen = [
+    { name = "datamodel-code-generator" },
+    { name = "openapi-pydantic" },
+    { name = "pyyaml" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datamodel-code-generator", marker = "extra == 'codegen'", specifier = ">=0.83,<1" },
+    { name = "fastmcp", specifier = ">=4.1,<5" },
+    { name = "httpx2", specifier = ">=2.13,<3" },
+    { name = "jsonschema-path", specifier = ">=0.5,<1" },
+    { name = "mcp-types", specifier = ">=2.3,<3" },
+    { name = "openapi-pydantic", marker = "extra == 'codegen'", specifier = ">=0.6,<1" },
+    { name = "pydantic", specifier = ">=2.14,<3" },
+    { name = "pyyaml", marker = "extra == 'codegen'", specifier = ">=6,<7" },
+    { name = "ruff", marker = "extra == 'codegen'", specifier = ">=0.17,<1" },
+]
+provides-extras = ["codegen"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.1" },
+    { name = "datamodel-code-generator", specifier = "==0.83.0" },
+    { name = "openapi-pydantic", specifier = "==0.6.0" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "ruff", specifier = "==0.17.0" },
 ]
 
 [[package]]
@@ -3294,8 +3338,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "httpx2" },
-    { name = "mcp-types" },
-    { name = "openapi-pydantic" },
+    { name = "mcp-openapi" },
     { name = "py-key-value-aio", extra = ["memory"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -3307,7 +3350,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "basedpyright" },
-    { name = "datamodel-code-generator" },
+    { name = "mcp-openapi", extra = ["codegen"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -3316,8 +3359,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = "==4.1.0" },
     { name = "httpx2", specifier = "==2.13.1" },
-    { name = "mcp-types", specifier = "==2.3.0" },
-    { name = "openapi-pydantic", specifier = "==0.6.0" },
+    { name = "mcp-openapi", directory = "../../packages/mcp-openapi" },
     { name = "py-key-value-aio", extras = ["memory"], specifier = "==0.4.6" },
     { name = "pydantic", specifier = "==2.14.1" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
@@ -3329,7 +3371,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = "==1.40.1" },
-    { name = "datamodel-code-generator", specifier = "==0.83.0" },
+    { name = "mcp-openapi", extras = ["codegen"], directory = "../../packages/mcp-openapi" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.17.0" },
 ]

@@ -2,11 +2,11 @@ from typing import Annotated, Literal, get_args
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
+from mcp_openapi.openapi import TOOL_HINTS
+from mcp_openapi.upstream import OperationClient
 from pydantic import Field
 
 from tiingo_mcp.deps import get_api
-from tiingo_mcp.helpers.openapi import TOOL_HINTS
-from tiingo_mcp.helpers.upstream import OperationClient
 from tiingo_mcp.models import operations
 from tiingo_mcp.models.fundamentals import FinancialPeriod
 from tiingo_mcp.models.vendor_responses import FundamentalsDaily, FundamentalsStatement
