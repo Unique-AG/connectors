@@ -47,7 +47,7 @@
 }
 
 .slidev-layout.tiingo::after {
-  content: 'Tiingo example';
+  content: "Tiingo example";
   position: absolute;
   bottom: 2.6rem;
   right: 3.5rem;
@@ -73,7 +73,7 @@
 }
 
 .pipeline .col:not(:last-child)::after {
-  content: '→';
+  content: "→";
   position: absolute;
   top: 2.2rem;
   right: -1.6rem;
@@ -187,7 +187,6 @@
   white-space: nowrap;
 }
 
-
 .deck-footer {
   position: absolute;
   right: 3.5rem;
@@ -202,7 +201,6 @@
 .deck-footer b {
   color: var(--accent);
 }
-
 
 /* slides that carry a table or long code plus text */
 .dense .slidev-code-wrapper {
