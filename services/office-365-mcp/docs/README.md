@@ -15,8 +15,8 @@ through the Microsoft Graph API.
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
 - **Size:** 121 tools in total.
-- **Selection:** A deployment turns on a fixed subset of the tools. It picks a **preset**, which is
-  a named bundle of tools, or an exact **list** of tools.
+- **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
+  **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
@@ -25,7 +25,7 @@ through the Microsoft Graph API.
 
 1. Find your area in the index below: Teams, Outlook, SharePoint and OneDrive, or OneNote.
 2. Pick the smallest preset that does the job. A preset that builds on another preset holds all of
-   its tools.
+   its tools. To cover more than one area, pick one preset for each area.
 3. Read the Admin consent column. If it says Yes, a tenant administrator must grant consent before
    any user signs in.
 4. Set the preset in the Helm values. See [Deployment](#deployment).
@@ -35,11 +35,15 @@ Rules for the selection:
 - A deployment sets exactly one of `preset` or `enabled`. It never sets both, and it never sets
   neither. The Helm chart schema, the Terraform module, and the startup check of the server enforce
   this rule.
-- A deployment cannot start from a preset and then add or remove one tool. For a mix of tools that
-  no preset covers, name every wanted tool in the `enabled` list.
+- A deployment can name several presets in a comma-separated list, for example
+  `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
+  needs admin consent when at least one of the presets needs it.
+- A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
+  preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
 - Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
   `onenote-delete`. Each one is a base preset plus the tools that remove an item, write an inbox
-  rule, forward an event, or share a calendar. No other preset holds these tools.
+  rule, forward an event, or share a calendar. No other preset holds these tools. A list of presets
+  gets them only when the list names one of these four.
 
 ## Preset index
 
@@ -1198,9 +1202,11 @@ mcpConfig:
     preset: teams        # or: enabled: get_me,teams_list_chats
 ```
 
-The `preset` key names one of the 36 presets in the [preset index](#preset-index). The `enabled` key
-names an exact, comma-separated list of tool names instead. A deployment that needs a mix that no
-preset covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate
+The `preset` key names one of the 36 presets in the [preset index](#preset-index), or several of
+them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
+exact, comma-separated list of tool names instead. The `tools_preset` input of the Terraform module
+takes the same comma-separated string. A deployment that needs a mix that no presets cover uses
+`enabled`, and names every wanted tool. Granting admin consent is a separate
 step, covered in [Admin consent](#admin-consent).
 
 Terraform (in another repository) writes the Entra application registration. Argo (in another

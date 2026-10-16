@@ -82,7 +82,7 @@ def create_app(
 
     # Resolved once: the scopes sign-in asks for and the modules that get registered come from the
     # same resolution, and a permission not requested at sign-in cannot be redeemed by a later call.
-    selection = resolve(preset=surface_config.tools_preset, enabled=surface_config.tools_enabled)
+    selection = resolve(presets=surface_config.tools_preset, enabled=surface_config.tools_enabled)
 
     oauth_storage = build_oauth_storage(entra_config, database_config)
     auth = build_auth(

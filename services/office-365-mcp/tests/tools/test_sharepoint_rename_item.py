@@ -152,7 +152,9 @@ async def _registered(transport: httpx.AsyncClient) -> tuple[Mapping[str, object
 
 
 async def _advised(client: GraphServiceClient) -> str:
-    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(renamer.TOOL_NAME,))))
+    advice = GraphAdviceMiddleware(
+        graph_advice(resolve(presets=None, enabled=(renamer.TOOL_NAME,)))
+    )
 
     async def renames(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
         _ = context

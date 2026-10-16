@@ -1,5 +1,5 @@
 locals {
-  asked_for = var.tools_preset != null ? local.presets[var.tools_preset] : var.tools_enabled
+  asked_for = var.tools_preset != null ? distinct(flatten([for name in split(",", var.tools_preset) : local.presets[trimspace(name)]])) : var.tools_enabled
 
   wanted = concat([local.always_on], local.asked_for)
 

@@ -123,7 +123,7 @@ async def _create(
 async def _told_through_the_advice(
     client: GraphServiceClient, *, group: str | None = None, site: str | None = None
 ) -> str:
-    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=[creator.TOOL_NAME])))
+    advice = GraphAdviceMiddleware(graph_advice(resolve(presets=None, enabled=[creator.TOOL_NAME])))
     server: FastMCP[None] = FastMCP("creator", middleware=[advice])
 
     @server.tool(name=creator.TOOL_NAME, annotations=WRITE_ADDITIVE)

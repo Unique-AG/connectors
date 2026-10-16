@@ -275,7 +275,7 @@ class TestRoutes:
         query = parse_qs(location.query)
         assert query["client_id"] == ["1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"]
         assert query["scope"] == [
-            " ".join(resolve(preset=ToolsPreset.TEAMS, enabled=None).graph_scopes)
+            " ".join(resolve(presets=[ToolsPreset.TEAMS], enabled=None).graph_scopes)
         ]
         assert query["redirect_uri"] == ["https://www.unique.ai/setup/consent-completed/entra-id"]
 
@@ -340,14 +340,14 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_the_widest_surface_has_something_to_contribute(self) -> None:
         """Guards the guard: against an empty registry every assertion below holds vacuously."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         assert selection.tools, "the widest preset resolves to no tools at all"
         assert selection.graph_scopes, "the widest preset derives no scopes"
 
     def test_the_scope_list_follows_the_tools_it_was_resolved_from(self) -> None:
         """Read off the tool *files*, so this is not the registry compared with itself."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
         # `TOOL_NAME`, not the file stem: the two agree today and nothing makes them.
         by_name = {module.TOOL_NAME: module for _stem, module in _tool_modules()}
 
@@ -367,7 +367,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_every_tool_file_has_its_permissions_on_that_list(self) -> None:
         """Catches a tool file never added to `_TOOL_MODULES`: it registers and asks for nothing."""
-        asked_for = set(resolve(preset=None, enabled=list(TOOL_NAMES)).graph_scopes)
+        asked_for = set(resolve(presets=None, enabled=list(TOOL_NAMES)).graph_scopes)
 
         missing = {
             f"{name}: {permission}"
@@ -751,7 +751,7 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
 
     def test_the_sentinel_is_not_a_tool_this_server_registers(self) -> None:
         """Otherwise a bogus call would not just be counted as a real tool — it would run one."""
-        assert UNRESOLVED_NAME not in resolve(preset=ToolsPreset.TEAMS, enabled=None).tools
+        assert UNRESOLVED_NAME not in resolve(presets=[ToolsPreset.TEAMS], enabled=None).tools
 
     async def test_this_server_registers_no_resource_and_no_prompt_today(self) -> None:
         """Not a decision: empty only means the resolve-first branch on those two paths is never

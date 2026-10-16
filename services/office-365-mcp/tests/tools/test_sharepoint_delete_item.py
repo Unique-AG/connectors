@@ -149,7 +149,9 @@ async def _advised(client: GraphServiceClient) -> str:
         _ = await _delete(client)
         raise AssertionError("the delete answered, so there is no Graph failure to advise on")
 
-    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(deleter.TOOL_NAME,))))
+    advice = GraphAdviceMiddleware(
+        graph_advice(resolve(presets=None, enabled=(deleter.TOOL_NAME,)))
+    )
     context = MiddlewareContext(message=CallToolRequestParams(name=deleter.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:
         _ = await advice.on_call_tool(context, deleting)

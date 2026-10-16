@@ -722,30 +722,23 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True, slots=True)
 class Selection:
-    preset: str | None
+    presets: tuple[str, ...]
     tools: tuple[str, ...]
     permissions: tuple[str, ...]
     graph_scopes: tuple[str, ...]
 
 
-def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
-    assert (preset is None) != (enabled is None), (
-        "exactly one of preset and enabled is a selection, which SurfaceConfig guarantees "
-        + f"(got preset={preset!r}, enabled={enabled!r})"
+def resolve(*, presets: Sequence[str] | None, enabled: Sequence[str] | None) -> Selection:
+    assert (presets is None) != (enabled is None), (
+        "exactly one of presets and enabled is a selection, which SurfaceConfig guarantees "
+        + f"(got presets={presets!r}, enabled={enabled!r})"
     )
-    if preset is not None:
-        assert preset in PRESETS, (
-            f"no tools are mapped for preset {preset!r} — config.ToolsPreset and PRESETS have "
-            + f"drifted apart (mapped: {sorted(PRESETS)})"
-        )
-        asked_for = PRESETS[preset]
-        assert not _unknown(asked_for), (
-            f"preset {preset!r} names {', '.join(_unknown(asked_for))}, which this server has no "
-            + "tool for, so it would resolve that many tools short. The tools it has are: "
-            + f"{', '.join(TOOL_NAMES)}"
+    if presets is not None:
+        asked_for = tuple(
+            dict.fromkeys(tool for preset in presets for tool in _preset_tools(preset))
         )
     else:
-        assert enabled is not None, "the assertion above leaves enabled set when preset is not"
+        assert enabled is not None, "the assertion above leaves enabled set when presets is not"
         asked_for = _every_name_known(enabled)
 
     wanted = {ALWAYS_ON, *asked_for}
@@ -754,11 +747,25 @@ def resolve(*, preset: str | None, enabled: Sequence[str] | None) -> Selection:
         dict.fromkeys(permission for module in modules for permission in module.GRAPH_PERMISSIONS)
     )
     return Selection(
-        preset=preset,
+        presets=tuple(presets or ()),
         tools=tuple(module.TOOL_NAME for module in modules),
         permissions=permissions,
         graph_scopes=tuple(graph_scope(permission) for permission in permissions),
     )
+
+
+def _preset_tools(preset: str) -> tuple[str, ...]:
+    assert preset in PRESETS, (
+        f"no tools are mapped for preset {preset!r} — config.ToolsPreset and PRESETS have "
+        + f"drifted apart (mapped: {sorted(PRESETS)})"
+    )
+    tools = PRESETS[preset]
+    assert not _unknown(tools), (
+        f"preset {preset!r} names {', '.join(_unknown(tools))}, which this server has no "
+        + "tool for, so it would resolve that many tools short. The tools it has are: "
+        + f"{', '.join(TOOL_NAMES)}"
+    )
+    return tools
 
 
 def _unknown(names: Iterable[str]) -> list[str]:

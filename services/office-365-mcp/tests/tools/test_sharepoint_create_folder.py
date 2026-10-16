@@ -160,7 +160,7 @@ async def _advised_create(client: GraphServiceClient) -> str:
         raise AssertionError("Graph refused the create, and the call still answered")
 
     middleware = GraphAdviceMiddleware(
-        graph_advice(resolve(preset=None, enabled=(creator.TOOL_NAME,)))
+        graph_advice(resolve(presets=None, enabled=(creator.TOOL_NAME,)))
     )
     context = MiddlewareContext(message=CallToolRequestParams(name=creator.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:

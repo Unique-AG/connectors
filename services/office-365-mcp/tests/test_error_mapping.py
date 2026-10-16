@@ -54,7 +54,7 @@ _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_ID = "synthetic-request-id-every-tool"
 _REFUSED = {"error": {"code": "Authorization_RequestDenied", "message": "denied"}}
 
-_SELECTION: Selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+_SELECTION: Selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
 _EVERY_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(_SELECTION)
 
@@ -63,7 +63,7 @@ _NAMES_SEVERAL: tuple[str, ...] = tuple(
 )
 
 _EVERY_REGISTERED_TOOL: Mapping[str, GraphCallExample] = graph_call_examples(
-    resolve(preset=None, enabled=TOOL_NAMES)
+    resolve(presets=None, enabled=TOOL_NAMES)
 )
 
 _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
@@ -127,7 +127,7 @@ _CHECK_FIRST = "Do not call this tool again first."
 _ASK_THE_USER = "ask the user if the Microsoft 365 app shows the change."
 _RETRY_ONCE = "Retry once"
 
-_EVERY_ADVICE: Mapping[str, ToolAdvice] = graph_advice(resolve(preset=None, enabled=TOOL_NAMES))
+_EVERY_ADVICE: Mapping[str, ToolAdvice] = graph_advice(resolve(presets=None, enabled=TOOL_NAMES))
 
 _CHAT_MESSAGES = "/chats/19%3Arelease%40thread.v2/messages"
 _PAGE_ID = "1-SYNTHETICPAGE00000000000000000000!ABCDEF"
@@ -741,10 +741,10 @@ class TestAWriteThatFailsCanAlreadyBeDone:
         channel = "teams_send_channel_message"
 
         assert _EVERY_ADVICE[channel].shown_by == ("teams_browse_channel",)
-        assert graph_advice(resolve(preset="teams-write", enabled=None))[channel].shown_by == ()
+        assert graph_advice(resolve(presets=["teams-write"], enabled=None))[channel].shown_by == ()
 
     async def test_a_retry_bullet_that_names_a_tool_is_in_the_registered_descriptions(self) -> None:
-        descriptions = await _registered_descriptions(resolve(preset=None, enabled=TOOL_NAMES))
+        descriptions = await _registered_descriptions(resolve(presets=None, enabled=TOOL_NAMES))
 
         assert any(_tools_named_by_the_retry_advice(text) for text in descriptions.values())
 
@@ -752,7 +752,7 @@ class TestAWriteThatFailsCanAlreadyBeDone:
     async def test_the_retry_advice_of_a_tool_names_only_tools_that_its_preset_registers(
         self, preset: str
     ) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
         descriptions = await _registered_descriptions(selection)
 
         unregistered = {
@@ -769,7 +769,7 @@ class TestAWriteThatFailsCanAlreadyBeDone:
         shown_by_nothing = {
             (preset, tool)
             for preset in PRESETS
-            for tool, advice in graph_advice(resolve(preset=preset, enabled=None)).items()
+            for tool, advice in graph_advice(resolve(presets=[preset], enabled=None)).items()
             if tool in _A_REPEAT_CAN_WRITE_TWICE and not advice.shown_by
         }
 

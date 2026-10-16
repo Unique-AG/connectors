@@ -147,7 +147,7 @@ async def _advised_anonymous_share(client: GraphServiceClient) -> str:
         raise AssertionError("Graph refused the link, and the call still answered with one")
 
     middleware = GraphAdviceMiddleware(
-        graph_advice(resolve(preset=None, enabled=(sharer.TOOL_NAME,)))
+        graph_advice(resolve(presets=None, enabled=(sharer.TOOL_NAME,)))
     )
     context = MiddlewareContext(message=CallToolRequestParams(name=sharer.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:

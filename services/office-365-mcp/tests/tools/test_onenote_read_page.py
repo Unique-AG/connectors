@@ -519,7 +519,7 @@ class TestGraphFailures:
             )
         )
         advice = GraphAdviceMiddleware(
-            graph_advice(resolve(preset=None, enabled=[reader.TOOL_NAME]))
+            graph_advice(resolve(presets=None, enabled=[reader.TOOL_NAME]))
         )
         server: FastMCP[None] = FastMCP("reader", middleware=[advice])
 

@@ -1491,7 +1491,7 @@ class TestNotebooksOfAMicrosoft365Group:
             )
         )
         advice = GraphAdviceMiddleware(
-            graph_advice(resolve(preset=None, enabled=[copier.TOOL_NAME]))
+            graph_advice(resolve(presets=None, enabled=[copier.TOOL_NAME]))
         )
         server: FastMCP[None] = FastMCP("copier", middleware=[advice])
 

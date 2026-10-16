@@ -64,8 +64,42 @@ class TestTheTwoVariablesAreOneChoice:
     def test_a_preset_alone_is_a_selection(self) -> None:
         config = SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS})
 
-        assert config.tools_preset == ToolsPreset.TEAMS
+        assert config.tools_preset == (ToolsPreset.TEAMS,)
         assert config.tools_enabled is None
+
+    def test_several_presets_are_one_selection(self) -> None:
+        config = SurfaceConfig.model_validate({"tools_preset": "teams-chat, outlook-read "})
+
+        assert config.tools_preset == (ToolsPreset.TEAMS_CHAT, ToolsPreset.OUTLOOK_READ)
+        assert config.tools_enabled is None
+
+    def test_the_spelling_an_operator_writes_for_presets_is_the_one_that_works(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TOOLS_PRESET", "teams-chat,outlook-read")
+
+        config = SurfaceConfig()
+
+        assert config.tools_preset == (ToolsPreset.TEAMS_CHAT, ToolsPreset.OUTLOOK_READ)
+
+    def test_a_preset_list_that_names_nothing_is_refused_by_name(self) -> None:
+        with pytest.raises(ValidationError) as refusal:
+            SurfaceConfig.model_validate({"tools_preset": " , "})
+
+        assert "names no preset" in str(refusal.value)
+
+    @pytest.mark.parametrize("spelling", ["teams-chat,", ",teams-chat", "teams-chat,,outlook-read"])
+    def test_an_empty_entry_in_a_preset_list_is_refused(self, spelling: str) -> None:
+        with pytest.raises(ValidationError) as refusal:
+            SurfaceConfig.model_validate({"tools_preset": spelling})
+
+        assert "empty entry" in str(refusal.value)
+
+    def test_one_wrong_name_in_a_preset_list_is_refused(self) -> None:
+        with pytest.raises(ValidationError) as refusal:
+            SurfaceConfig.model_validate({"tools_preset": "teams-chat,outlook-reed"})
+
+        assert "outlook-reed" in str(refusal.value)
 
     def test_a_list_alone_is_a_selection(self) -> None:
         config = SurfaceConfig.model_validate({"tools_enabled": "get_me,teams_list_chats"})
@@ -146,19 +180,19 @@ class TestGetMeIsAlwaysOn:
 
     @pytest.mark.usefixtures("registry")
     def test_a_selection_that_does_not_name_it_gets_it_anyway(self) -> None:
-        selection = resolve(preset=None, enabled=[_SECOND])
+        selection = resolve(presets=None, enabled=[_SECOND])
 
         assert selection.tools == (ALWAYS_ON, _SECOND)
 
     @pytest.mark.usefixtures("registry")
     def test_naming_it_explicitly_is_accepted_rather_than_an_error(self) -> None:
-        selection = resolve(preset=None, enabled=[ALWAYS_ON, _SECOND])
+        selection = resolve(presets=None, enabled=[ALWAYS_ON, _SECOND])
 
         assert selection.tools == (ALWAYS_ON, _SECOND)
 
     @pytest.mark.usefixtures("registry")
     def test_so_every_deployment_asks_for_at_least_one_permission(self) -> None:
-        selection = resolve(preset=None, enabled=[_SECOND])
+        selection = resolve(presets=None, enabled=[_SECOND])
 
         assert selection.permissions[0] == "User.Read"
         assert selection.graph_scopes[0] == graph_scope("User.Read")
@@ -168,8 +202,8 @@ class TestTheOrderIsTheRegistrysAndNeverTheOperators:
     def test_reordering_the_list_changes_neither_the_tools_nor_the_scopes(
         self, registry: _Registry
     ) -> None:
-        forwards = resolve(preset=None, enabled=[_SECOND, _THIRD])
-        backwards = resolve(preset=None, enabled=[_THIRD, _SECOND])
+        forwards = resolve(presets=None, enabled=[_SECOND, _THIRD])
+        backwards = resolve(presets=None, enabled=[_THIRD, _SECOND])
 
         assert forwards.tools == backwards.tools == registry.names
         assert forwards.graph_scopes == backwards.graph_scopes
@@ -178,13 +212,13 @@ class TestTheOrderIsTheRegistrysAndNeverTheOperators:
     def test_a_permission_two_tools_share_is_asked_for_once_where_the_first_reaches_it(
         self,
     ) -> None:
-        selection = resolve(preset=None, enabled=[_THIRD, _SECOND])
+        selection = resolve(presets=None, enabled=[_THIRD, _SECOND])
 
         assert selection.permissions == ("User.Read", _SHARED, _OWN[0], _OWN[1])
 
     @pytest.mark.usefixtures("registry")
     def test_the_scopes_are_those_permissions_spelled_as_scopes(self) -> None:
-        selection = resolve(preset=None, enabled=[_SECOND, _THIRD])
+        selection = resolve(presets=None, enabled=[_SECOND, _THIRD])
 
         assert selection.graph_scopes == tuple(
             graph_scope(permission) for permission in selection.permissions
@@ -195,7 +229,7 @@ class TestANarrowedSelectionAsksForLess:
     async def test_a_tool_left_out_takes_its_permission_with_it_and_is_not_registered(
         self, registry: _Registry
     ) -> None:
-        selection = resolve(preset=None, enabled=[_SECOND])
+        selection = resolve(presets=None, enabled=[_SECOND])
         mcp: FastMCP = FastMCP("selection-under-test", version="0")
 
         async with httpx.AsyncClient() as transport:
@@ -212,14 +246,14 @@ class TestANarrowedSelectionAsksForLess:
         monkeypatch.setattr(tools_module, "PRESETS", {ToolsPreset.TEAMS: (_SECOND, "secnod_tool")})
 
         with pytest.raises(AssertionError, match="no tool for") as refusal:
-            resolve(preset=ToolsPreset.TEAMS, enabled=None)
+            resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         assert "secnod_tool" in str(refusal.value)
 
     @pytest.mark.usefixtures("registry")
     def test_a_name_this_server_has_no_tool_for_aborts_and_lists_the_ones_it_has(self) -> None:
         with pytest.raises(ValueError, match="no tool for") as refusal:
-            resolve(preset=None, enabled=[_SECOND, "secnod_tool"])
+            resolve(presets=None, enabled=[_SECOND, "secnod_tool"])
 
         assert "secnod_tool" in str(refusal.value)
         assert _SECOND in str(refusal.value)
@@ -229,16 +263,56 @@ class TestANarrowedSelectionAsksForLess:
 class TestResolveTrustsConfigToHaveAskedTheQuestion:
     def test_neither_argument_is_a_programming_error_here(self) -> None:
         with pytest.raises(AssertionError, match="exactly one"):
-            resolve(preset=None, enabled=None)
+            resolve(presets=None, enabled=None)
 
     def test_and_so_are_both(self) -> None:
         with pytest.raises(AssertionError, match="exactly one"):
-            resolve(preset=ToolsPreset.TEAMS, enabled=["get_me"])
+            resolve(presets=[ToolsPreset.TEAMS], enabled=["get_me"])
+
+
+class TestSeveralPresetsAreTheirUnion:
+    def test_the_tools_are_the_union_in_registry_order(self) -> None:
+        names = ("teams-chat", "outlook-read")
+
+        selection = resolve(presets=names, enabled=None)
+
+        wanted = {ALWAYS_ON, *PRESETS[names[0]], *PRESETS[names[1]]}
+        assert selection.tools == tuple(tool for tool in TOOL_NAMES if tool in wanted)
+        assert selection.presets == names
+
+    def test_the_permissions_are_what_the_tools_need_and_nothing_more(self) -> None:
+        both = resolve(presets=["teams-chat", "outlook-read"], enabled=None)
+        chat = resolve(presets=["teams-chat"], enabled=None)
+        mail = resolve(presets=["outlook-read"], enabled=None)
+
+        assert set(both.permissions) == set(chat.permissions) | set(mail.permissions)
+
+    def test_the_order_an_operator_writes_the_presets_in_changes_nothing(self) -> None:
+        forwards = resolve(presets=["teams-chat", "outlook-read"], enabled=None)
+        backwards = resolve(presets=["outlook-read", "teams-chat"], enabled=None)
+
+        assert forwards.tools == backwards.tools
+        assert forwards.permissions == backwards.permissions
+        assert forwards.graph_scopes == backwards.graph_scopes
+
+    def test_a_preset_named_twice_is_one_preset(self) -> None:
+        once = resolve(presets=["teams-chat"], enabled=None)
+        twice = resolve(presets=["teams-chat", "teams-chat"], enabled=None)
+
+        assert twice.tools == once.tools
+        assert twice.permissions == once.permissions
+
+    def test_an_opt_in_tool_stays_out_unless_its_preset_is_named(self) -> None:
+        without = resolve(presets=["outlook-write", "teams-write"], enabled=None)
+        with_delete = resolve(presets=["outlook-write", "outlook-delete"], enabled=None)
+
+        assert "outlook_delete_folder" not in without.tools
+        assert "outlook_delete_folder" in with_delete.tools
 
 
 class TestRegisteringWhatWasSelected:
     async def test_the_real_registry_declares_exactly_the_selection(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
         mcp: FastMCP = FastMCP("registration-under-test", version="0")
 
         async with httpx.AsyncClient() as transport:
@@ -614,7 +688,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         )
 
     async def test_the_table_answers_for_every_argument_a_tool_requires(self) -> None:
-        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
+        selection = resolve(presets=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("argument-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -641,7 +715,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
         )
 
     async def test_an_argument_whose_prose_names_a_tool_is_classified_as_minted(self) -> None:
-        selection = resolve(preset=None, enabled=list(TOOL_NAMES))
+        selection = resolve(presets=None, enabled=list(TOOL_NAMES))
         mcp: FastMCP = FastMCP("prose-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -674,7 +748,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
     def test_every_tool_in_it_can_obtain_its_arguments_from_another_member(
         self, preset: ToolsPreset
     ) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
         exposed = set(selection.tools)
 
         unreachable = {
@@ -690,7 +764,7 @@ class TestEveryCuratedPresetIsUsableOnItsOwn:
 
     @pytest.mark.parametrize("preset", list(ToolsPreset))
     def test_it_is_narrower_than_everything_or_is_everything(self, preset: ToolsPreset) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
 
         if preset is ToolsPreset.TEAMS:
             assert set(selection.tools) <= set(TOOL_NAMES)
@@ -825,7 +899,7 @@ class TestAToolNamesOnlyTheToolsOfItsPresets:
     async def test_its_prose_names_no_tool_that_the_preset_leaves_out(
         self, preset: ToolsPreset
     ) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
         mcp: FastMCP = FastMCP("preset-prose-survey", version="0")
         async with httpx.AsyncClient() as transport:
             register_tools(mcp, transport, selection)
@@ -1136,7 +1210,7 @@ class TestWhatEachPresetCostsATenant:
     def test_it_asks_for_exactly_the_permissions_the_design_promises(
         self, preset: ToolsPreset, permissions: tuple[str, ...], consents: int, tools: int
     ) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
         needing_an_administrator = [
             permission for permission in selection.permissions if NEEDS_ADMIN_CONSENT[permission]
         ]
@@ -1149,7 +1223,7 @@ class TestWhatEachPresetCostsATenant:
         assert len(selection.tools) == tools
 
     def test_the_transcripts_deployment_does_not_pay_for_channel_messages(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS_TRANSCRIPTS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS_TRANSCRIPTS], enabled=None)
 
         assert "ChannelMessage.Read.All" not in selection.permissions
         assert graph_scope("ChannelMessage.Read.All") not in selection.graph_scopes
