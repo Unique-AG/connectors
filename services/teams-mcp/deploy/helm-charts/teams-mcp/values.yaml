@@ -213,6 +213,9 @@ hooks:
     enabled: true
     command: |
       cd /app && ./node_modules/.bin/drizzle-kit migrate
+    argocd:
+      hook: Sync
+      syncWave: -1
 
 # ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:

@@ -197,6 +197,9 @@ hooks:
     enabled: true
     command: |
       alembic upgrade head
+    argocd:
+      hook: Sync
+      syncWave: -1
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 networkPolicy:

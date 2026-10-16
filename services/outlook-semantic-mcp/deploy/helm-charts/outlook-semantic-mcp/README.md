@@ -6,7 +6,7 @@ An experimental MCP server for Outlook leveraging the Microsoft Graph API.
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/unique-ag/helm | base | 0.1.0-4c70c3 |
+| oci://ghcr.io/unique-ag/helm | base | 0.1.0-9e9322 |
 
 ## Installation
 
@@ -67,12 +67,14 @@ spec:
 | fullnameOverride | string | `"outlook-semantic-mcp"` |  |
 | grafana.dashboard.enabled | bool | `true` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"mcp-servers"` | Grafana folder where the dashboard will be placed |
+| hooks.migration.argocd.hook | string | `"Sync"` |  |
+| hooks.migration.argocd.syncWave | int | `-1` |  |
 | hooks.migration.command | string | `"cd /app && ./node_modules/.bin/drizzle-kit migrate\n"` |  |
 | hooks.migration.enabled | bool | `true` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
 | image.repository | string | `"unique-ag/connectors/services/outlook-semantic-mcp"` |  |
-| image.tag | string | `"3.2.0"` |  |
+| image.tag | string | `"4.0.0"` |  |
 | ingress.additionalLabels | object | `{}` | Additional labels for the ingress resource |
 | ingress.annotations | object | `{"konghq.com/plugins":"unique-route-metrics"}` | Annotations for the ingress resource |
 | ingress.enabled | bool | `false` | Enable ingress resource creation |
