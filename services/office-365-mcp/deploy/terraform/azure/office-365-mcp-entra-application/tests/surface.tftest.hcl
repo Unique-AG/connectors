@@ -137,6 +137,27 @@ run "preset_teams_chat_costs_no_administrator" {
   }
 }
 
+run "several_presets_are_the_union_of_their_tools" {
+  variables {
+    tools_preset = "teams-chat,outlook-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Mail.Read,Mail.Read.Shared,People.Read"
+    error_message = "teams-chat,outlook-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "teams-chat,outlook-read resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-chat,outlook-read should need no administrator, needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_messages" {
   variables {
     tools_preset = "teams-messages"
@@ -867,6 +888,26 @@ run "an_unknown_preset_is_refused" {
 
   variables {
     tools_preset = "outlook"
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "one_unknown_preset_in_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat,outlook"
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "an_empty_preset_in_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat,"
   }
 
   expect_failures = [var.tools_preset]

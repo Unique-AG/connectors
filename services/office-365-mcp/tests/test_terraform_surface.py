@@ -93,13 +93,23 @@ def _scalar(name: str) -> str:
     return value
 
 
-def _chart_preset_enum() -> list[str]:
+def _chart_preset_names() -> list[str]:
     node: object = cast("object", json.loads(_CHART_SCHEMA.read_text()))
-    for key in ("properties", "mcpConfig", "properties", "tools", "properties", "preset", "enum"):
+    for key in (
+        "properties",
+        "mcpConfig",
+        "properties",
+        "tools",
+        "properties",
+        "preset",
+        "pattern",
+    ):
         assert isinstance(node, Mapping), f"the chart schema has no {key} under this path"
         node = cast("Mapping[str, object]", node)[key]
-    assert isinstance(node, list), "tools.preset carries no enum in the chart schema"
-    return [value for value in cast("list[object]", node) if isinstance(value, str)]
+    assert isinstance(node, str), "tools.preset carries no pattern in the chart schema"
+    names = re.fullmatch(r"\^\((.*)\)\(,\(\1\)\)\*\$", node)
+    assert names is not None, "tools.preset is no longer a comma-separated list of preset names"
+    return names.group(1).split("|")
 
 
 class TestTheCommittedRegistryIsTheGeneratedOne:
@@ -155,7 +165,7 @@ class TestTheThreePlacesThePresetNamesAreWritten:
         assert {preset.value for preset in ToolsPreset} == set(
             cast("Mapping[str, object]", presets)
         )
-        assert {preset.value for preset in ToolsPreset} == set(_chart_preset_enum())
+        assert {preset.value for preset in ToolsPreset} == set(_chart_preset_names())
 
 
 class TestTheTerraformTestsExpectWhatTheServerResolves:
@@ -180,7 +190,7 @@ class TestTheTerraformTestsExpectWhatTheServerResolves:
             + "derivation is the hand-written half and this is what checks it"
         )
         for name, composed in expectations.items():
-            expected = ",".join(resolve(preset=name, enabled=None).permissions)
+            expected = ",".join(resolve(presets=[name], enabled=None).permissions)
 
             assert composed == expected, f"{name} is asserted as {composed}, resolves to {expected}"
 
@@ -207,6 +217,6 @@ class TestTheTerraformTestsExpectWhatTheServerResolves:
         assert scopes == [graph_scope(permission) for permission in permissions], (
             f"the asserted spelling {asserted.group(1)} is not what graph_scope() produces"
         )
-        assert permissions == list(resolve(preset="teams-chat", enabled=None).permissions), (
+        assert permissions == list(resolve(presets=["teams-chat"], enabled=None).permissions), (
             "the run block asserting graph_scopes no longer covers the teams-chat selection"
         )

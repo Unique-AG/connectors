@@ -9,7 +9,7 @@ _REDIRECT_URI = "https://www.unique.ai/setup/consent-completed/entra-id"
 
 class TestAdminConsentUrl:
     def test_it_asks_for_exactly_the_selected_scopes(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         url = admin_consent_url(
             tenant_id="organizations",
@@ -28,7 +28,7 @@ class TestAdminConsentUrl:
         }
 
     def test_it_escapes_spaces_as_percent_20(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         url = admin_consent_url(
             tenant_id="organizations",

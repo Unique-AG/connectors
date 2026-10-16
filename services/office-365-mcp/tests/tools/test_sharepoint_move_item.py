@@ -231,7 +231,7 @@ async def _advised(client: GraphServiceClient) -> str:
         _ = await _move(client)
         raise AssertionError("the move answered, so there is no Graph failure to advise on")
 
-    advice = GraphAdviceMiddleware(graph_advice(resolve(preset=None, enabled=(mover.TOOL_NAME,))))
+    advice = GraphAdviceMiddleware(graph_advice(resolve(presets=None, enabled=(mover.TOOL_NAME,))))
     context = MiddlewareContext(message=CallToolRequestParams(name=mover.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:
         _ = await advice.on_call_tool(context, moving)

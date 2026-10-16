@@ -9,7 +9,9 @@ module: the caller supplies Azure ids, names, and a tool selection.
 Set **exactly one** of `tools_preset` or `tools_enabled`. You never write a Graph permission name
 anywhere in this interface — the module derives the delegated permissions, and the subset needing
 admin consent, from the tools selected. There is deliberately no default: "every tool" is the widest
-consent screen a tenant can be asked for, so it has to be chosen (`tools_preset = "teams"`).
+consent screen a tenant can be asked for, so it has to be chosen (`tools_preset = "teams"`). To
+turn on several presets, write them as a comma-separated string
+(`tools_preset = "teams-write,outlook-read"`). The module takes the union of their tools, as the pod does.
 
 ## The selection lives in two places and they must agree
 

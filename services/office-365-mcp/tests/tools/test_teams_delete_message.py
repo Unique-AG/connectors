@@ -795,7 +795,7 @@ class TestHowItDeclaresItself:
     def test_every_preset_that_holds_it_also_holds_a_tool_that_shows_the_change(
         self, preset: str
     ) -> None:
-        advice = graph_advice(resolve(preset=preset, enabled=None))
+        advice = graph_advice(resolve(presets=[preset], enabled=None))
 
         assert advice[deleter.TOOL_NAME].shown_by, preset
 
