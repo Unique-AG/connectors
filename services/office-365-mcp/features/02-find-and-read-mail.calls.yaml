@@ -1,0 +1,90 @@
+uc-02-01:
+  provenance: observed
+  evidence: outlook_list_mail alone in 18 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {unread_only: true, received_after: yesterday}
+
+uc-02-02:
+  provenance: observed
+  evidence: outlook_search_mail alone in 20 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {sender: Brightway, subject: March invoice, has_attachments: true}
+
+uc-02-03:
+  provenance: observed
+  evidence: outlook_search_mail alone in 20 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {sender: Anna, received_after: March start, received_before: March end}
+
+uc-02-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {flagged: true}
+
+uc-02-05:
+  provenance: observed
+  evidence: outlook_search_mail alone in 20 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: invoice, limit: 50}
+
+uc-02-06:
+  provenance: observed
+  evidence: outlook_search_mail then outlook_read_mail in 4 sessions; outlook_list_mail then outlook_read_mail in 4 sessions
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_read_mail
+      uses: {uri: uri of the message from the previous step}
+
+uc-02-07:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_list_attachments
+      uses: {uri: uri of the message}
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the attachment}
+
+uc-02-08:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_attachments
+      uses: {uri: uri of the message}
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the attachment}
+  note: the tool refuses above 10 MB
+
+uc-02-09:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+    - tool: outlook_read_thread
+      uses: {uri: uri of a message of the conversation}
+
+uc-02-10:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {mailbox: support, unread_only: true}
+
+uc-02-11:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {mailbox: finance}
+  note: Microsoft answers that Mia has no access

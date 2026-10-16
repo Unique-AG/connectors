@@ -5,12 +5,13 @@ Feature: Managing contacts
 
   Rule: The assistant answers from Mia's contacts
 
+    @uc-12-01
     Scenario: A phone number is found in a contact
       Given Mia has the contact Anna Meier with the telephone number "+41 44 555 01 01"
       When Mia asks her assistant for the telephone number of Anna Meier
       Then the assistant answers "+41 44 555 01 01"
 
-    @known-gap
+    @known-gap @uc-12-02
     Scenario: A person who is only in the company directory is found
       Given Tom Berger is in the company directory and not in Mia's contacts
       When Mia asks her assistant for the telephone number of Tom Berger
@@ -18,10 +19,12 @@ Feature: Managing contacts
 
   Rule: A change to a contact keeps what it already holds
 
+    @uc-12-03
     Scenario: A new contact is saved
       When Mia asks her assistant to save Tom Berger of Acme with the address "tom@acme.example" as a contact
       Then Mia's contacts hold one contact Tom Berger with the company "Acme" and that address
 
+    @uc-12-04
     Scenario: A second telephone number is added next to the first
       Given Mia has the contact Tom Berger with the mobile number "+41 79 555 01 02"
       When Mia asks her assistant to add the office number "+41 44 555 01 03" to Tom Berger

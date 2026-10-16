@@ -1,0 +1,54 @@
+uc-13-01:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: teams_create_chat
+      args: {chat_type: group, topic: Launch}
+      uses: {members: user id and name of Anna and Tom}
+
+uc-13-02:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+    - tool: teams_add_chat_member
+      args: {share_history: true}
+      uses: {chat_id: id of the chat, member: user id and name of Priya}
+
+uc-13-03:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chat_members
+      uses: {chat_id: id of the chat}
+    - tool: teams_remove_chat_member
+      uses: {chat_id: id of the chat, membership_id: membership id of Tom}
+
+uc-13-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: teams_add_chat_member
+      uses: {chat_id: id of the chat}
+  note: Microsoft refuses an addition to a one-to-one chat
+
+uc-13-05:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_create_meeting
+      args: {subject: Design review, starts_at: tomorrow 14:00, ends_at: tomorrow 14:30, attendees: Anna and Tom}
+
+uc-13-06:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_read_meeting
+      uses: {meeting_uri: uri of the meeting}
+  note: Microsoft Graph gives attendance to the organizer only

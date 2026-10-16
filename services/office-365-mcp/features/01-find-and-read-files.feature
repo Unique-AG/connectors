@@ -9,24 +9,28 @@ Feature: Finding and reading files in OneDrive and SharePoint
 
   Rule: The assistant finds a file from what Mia remembers about it
 
+    @uc-01-01
     Scenario: A file is found by a word in its name and by its type
       Given the Legal site holds "Brightway Master Agreement.docx" and "Brightway Pricing.xlsx"
       When Mia asks her assistant for the Brightway agreement as a Word document
       Then the assistant shows "Brightway Master Agreement.docx"
       But it does not show "Brightway Pricing.xlsx"
 
+    @uc-01-02
     Scenario: The file that was edited last comes first, with its editor
       Given Mia has quarterly plans edited in January by Anna, in March by Tom, and in May by Priya
       When Mia asks her assistant for the quarterly plan that was edited last
       Then the assistant shows the May plan first
       And it names Priya as the editor
 
+    @uc-01-03
     Scenario: A search stays on the site that Mia names
       Given the Legal site and the Sales site each hold "NDA Template.docx"
       When Mia asks her assistant for the NDA template on the Legal site only
       Then the assistant shows the Legal copy
       But it does not show the Sales copy
 
+    @uc-01-04
     Scenario: A missing file is reported as missing
       Given no file that Mia can open mentions "Zephyr"
       When Mia asks her assistant for the Zephyr budget
@@ -34,6 +38,7 @@ Feature: Finding and reading files in OneDrive and SharePoint
 
   Rule: The assistant shows what a folder holds, one level at a time
 
+    @uc-01-05
     Scenario: A folder lists its files and subfolders, newest first
       Given the folder "2026 Contracts" holds 12 files and 3 subfolders
       When Mia asks her assistant what "2026 Contracts" holds, newest first
@@ -42,6 +47,7 @@ Feature: Finding and reading files in OneDrive and SharePoint
 
   Rule: The assistant answers from the content of one file
 
+    @uc-01-06
     Scenario Outline: The answer comes from the content of the file
       Given Mia has a <kind> that states "the launch date is 14 June"
       When Mia asks her assistant for the launch date in that file
@@ -55,23 +61,33 @@ Feature: Finding and reading files in OneDrive and SharePoint
         | PDF             |
         | plain text file |
 
+    @uc-01-07
     Scenario: A file that opens through a sharing link is read
       Given Anna sent Mia a sharing link to the deck "Q3 Plan.pptx"
       When Mia asks her assistant to summarize what the sharing link opens
       Then the assistant summarizes "Q3 Plan.pptx"
 
+    @uc-01-08
+    Scenario: Several files of a folder answer one question
+      Given the folder "Tenders" holds 6 offers from 6 vendors
+      When Mia asks her assistant which offer has the lowest price
+      Then the assistant reads all 6 offers
+      And it names the vendor with the lowest price
+
+    @uc-01-09
     Scenario: A file of exactly 10 MB is read
       Given Mia has a PDF of exactly 10 MB
       When Mia asks her assistant to summarize it
       Then the assistant summarizes the PDF
 
+    @uc-01-10
     Scenario: A file above 10 MB is refused as a whole
       Given Mia has a PDF of 10.5 MB
       When Mia asks her assistant to summarize it
       Then the assistant tells Mia that the file is too large to read
       But it does not summarize only a part of the file
 
-    @seen-failing
+    @seen-failing @uc-01-11
     Scenario: A file that Microsoft cannot provide is reported and not guessed
       Given Microsoft cannot provide "Brightway Master Agreement.docx" as a PDF
       When Mia asks her assistant for that agreement as a PDF

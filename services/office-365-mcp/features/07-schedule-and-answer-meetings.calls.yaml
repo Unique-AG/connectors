@@ -1,0 +1,110 @@
+uc-07-01:
+  provenance: observed
+  evidence: outlook_respond_to_invite in 2 calls; outlook_list_events in 5 sessions alone
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {owner_response: notResponded}
+    - tool: outlook_respond_to_invite
+      args: {response: accept}
+      uses: {uri: uri of the event from the listing}
+
+uc-07-02:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_respond_to_invite
+      args: {response: decline, comment: I am on leave}
+      uses: {uri: uri of the event from the listing}
+
+uc-07-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_respond_to_invite
+      args: {response: decline, proposed_new_time: Monday 10:00}
+      uses: {uri: uri of the event}
+  note: the tool proposes a time only when the organizer allows it
+
+uc-07-04:
+  provenance: observed
+  evidence: outlook_check_availability in 3 sessions; one session ran outlook_search_mail, outlook_read_mail, and outlook_check_availability in a row
+  asks_user: false
+  chain:
+    - tool: outlook_check_availability
+      args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
+    - tool: outlook_suggest_meeting_times
+      optional: true
+      args: {attendees: Anna and Tom, duration_minutes: 30}
+
+uc-07-05:
+  provenance: observed
+  evidence: outlook_create_event in 4 sessions
+  asks_user: true
+  chain:
+    - tool: outlook_check_availability
+      optional: true
+    - tool: outlook_create_event
+      args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom, online_meeting: true}
+
+uc-07-06:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_event
+      args: {subject: Stand-up, recurrence: weekly for 8 weeks}
+
+uc-07-07:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_find_rooms
+      args: {min_capacity: 6}
+    - tool: outlook_create_event
+      args: {subject: Workshop}
+      uses: {room_addresses: address of the room from outlook_find_rooms}
+
+uc-07-08:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: a calendar event has no draft state, and outlook_create_event invites in the same call
+
+uc-07-09:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: outlook_create_event has no calendar argument and writes to the default calendar only
+
+uc-07-10:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Team sync}
+    - tool: outlook_update_event
+      args: {starts_at: Friday}
+      uses: {uri: uri of the occurrence and not of the series master}
+  note: whether the tool asks Mia when attendees exist is not verified
+
+uc-07-11:
+  provenance: observed
+  evidence: outlook_cancel_event in 1 call, which failed
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Team sync}
+    - tool: outlook_cancel_event
+      uses: {uri: uri of the series master}
+  note: whether the tool asks Mia when attendees exist is not verified
+
+uc-07-12:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_read_event
+    - tool: outlook_update_event
+      args: {starts_at: Friday}
+      uses: {uri: uri of the event}
+  note: the tool refuses an event that Mia does not organize

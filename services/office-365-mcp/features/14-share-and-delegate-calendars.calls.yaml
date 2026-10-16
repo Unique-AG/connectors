@@ -1,0 +1,45 @@
+uc-14-01:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_share_calendar
+      args: {address: anna@example.com, role: read}
+      uses: {calendar_ref: handle of Mia's calendar}
+
+uc-14-02:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_list_calendar_shares
+      uses: {calendar_ref: handle of Mia's calendar}
+    - tool: outlook_unshare_calendar
+      uses: {share_ref: handle of the share with Anna}
+
+uc-14-03:
+  provenance: observed
+  evidence: outlook_create_event_on_behalf in 1 call
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_create_event_on_behalf
+      args: {subject: Budget review}
+      uses: {calendar_ref: handle of Lena's calendar}
+
+uc-14-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendars
+  must_not: [outlook_create_event_on_behalf]
+
+uc-14-05:
+  provenance: observed
+  evidence: outlook_list_group_events in 1 call, which failed
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: outlook_list_group_events
+      args: {starts_on: Monday, ends_on: Sunday}
+      uses: {group_id: id of the team Platform}

@@ -1,0 +1,91 @@
+uc-01-01:
+  provenance: observed
+  evidence: sharepoint_search_files alone in 30 sessions
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Brightway agreement, file_type: docx}
+
+uc-01-02:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: quarterly plan, sort_by: modified}
+
+uc-01-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      optional: true
+    - tool: sharepoint_search_files
+      args: {query: NDA Template}
+      uses: {path: web address of the site that Mia names}
+
+uc-01-04:
+  provenance: observed
+  evidence: sharepoint_search_files alone in 30 sessions
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Zephyr}
+
+uc-01-05:
+  provenance: observed
+  evidence: sharepoint_browse_folder alone in 8 sessions
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_drives
+      optional: true
+    - tool: sharepoint_browse_folder
+      args: {order_by: modified}
+
+uc-01-06:
+  provenance: observed
+  evidence: sharepoint_search_files then sharepoint_read_file in 9 sessions; sharepoint_read_file alone in 27 sessions
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      optional: true
+    - tool: sharepoint_read_file
+      uses: {file: handle of the file from the search or the folder}
+
+uc-01-07:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_resolve_url
+    - tool: sharepoint_read_file
+      uses: {file: handle from sharepoint_resolve_url}
+
+uc-01-08:
+  provenance: observed
+  evidence: 18 runs of 5 to 14 consecutive sharepoint_read_file calls, between searches and folder listings
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_read_file
+      repeat: many
+      uses: {file: handle of each file}
+
+uc-01-09:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+
+uc-01-10:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+  note: the tool refuses above 10 MB and sends no part of the file
+
+uc-01-11:
+  provenance: observed
+  evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}

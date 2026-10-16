@@ -1,0 +1,65 @@
+uc-10-01:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_folder
+      args: {name: 2026 Signed}
+      uses: {parent: handle of the folder Contracts}
+    - tool: sharepoint_move_item
+      repeat: many
+      uses: {item: handle of each contract, to_folder: handle of 2026 Signed}
+
+uc-10-02:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_drives
+    - tool: sharepoint_copy_item
+      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site}
+
+uc-10-03:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_delete_item
+      uses: {item: handle of the file}
+
+uc-10-04:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_browse_folder
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+
+uc-10-05:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: sharepoint_create_text_file creates new files only and cannot replace a file
+
+uc-10-06:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_invite
+      args: {role: edit}
+      uses: {item: handle of the file, recipients: address of Anna}
+
+uc-10-07:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_create_share_link
+      uses: {item: handle of the file}
+
+uc-10-08:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: no tool removes a permission
