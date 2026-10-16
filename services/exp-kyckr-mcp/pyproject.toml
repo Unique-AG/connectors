@@ -61,3 +61,13 @@ reportUnannotatedClassAttribute = "none"
 
 [tool.uv.sources]
 mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/kyckr_mcp/openapi/kyckr-openapi.yml"
+operation-ids = "kyckr_mcp.openapi.routes:CLIENT_BACKED"
+fields = "kyckr_mcp.openapi.fields:RESPONSE_FIELDS"
+allow-extra-fields = true
+operation-module = "mcp_openapi.upstream"
+models-module = "kyckr_mcp.models.vendor_responses"
+models-output = "src/kyckr_mcp/models/vendor_responses.py"
+operations-output = "src/kyckr_mcp/models/operations.py"

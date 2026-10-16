@@ -19,6 +19,9 @@ codegen = [
     "ruff>=0.17,<1",
 ]
 
+[project.scripts]
+mcp-openapi-codegen = "mcp_openapi.cli:main"
+
 [build-system]
 requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
