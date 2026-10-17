@@ -14,8 +14,9 @@ import yaml
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType
 from fastmcp.tools import Tool
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from mcp_openapi.cli import main
 from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
@@ -965,3 +966,78 @@ def test_an_operation_id_with_characters_a_model_name_would_lose_is_refused(
     spec_text = SPEC.replace("operationId: postThing", "operationId: postÜbersicht")
     with pytest.raises(AssertionError, match="characters a name would lose"):
         models_for(tmp_path, spec_text, ["postÜbersicht"])
+
+
+CODEGEN_CONFIG = """
+[tool.mcp-openapi]
+spec = "spec.yml"
+operation-ids = ["getThings"]
+operation-module = "mcp_openapi.upstream"
+models-module = "models"
+models-output = "out/models.py"
+operations-output = "out/operations.py"
+"""
+
+
+def test_cli_generates_models_and_operations_from_the_pyproject_table(tmp_path: Path) -> None:
+    (tmp_path / "spec.yml").write_text(SPEC)
+    (tmp_path / "pyproject.toml").write_text(
+        CODEGEN_CONFIG + '[tool.mcp-openapi.fields]\nThing = ["name"]\n'
+    )
+    (tmp_path / "out").mkdir()
+
+    main([str(tmp_path)])
+
+    assert "class Thing(BaseModel)" in (tmp_path / "out/models.py").read_text()
+    assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
+
+
+def test_cli_generates_models_for_more_operations_than_it_makes_constants_for(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "spec.yml").write_text(SPEC)
+    config = CODEGEN_CONFIG.replace(
+        'operation-ids = ["getThings"]',
+        'operation-ids = ["getThings"]\nresponse-operation-ids = ["getThings", "postThing"]',
+    )
+    (tmp_path / "pyproject.toml").write_text(config)
+    (tmp_path / "out").mkdir()
+
+    main([str(tmp_path)])
+
+    assert "POST_THING" not in (tmp_path / "out/operations.py").read_text()
+    assert "PostThingResponse" in (tmp_path / "out/models.py").read_text()
+
+
+def test_cli_rejects_an_unknown_key_in_the_table(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(CODEGEN_CONFIG + "operation-id = []\n")
+
+    with pytest.raises(ValidationError, match="operation-id"):
+        main([str(tmp_path)])
+
+
+def test_cli_imports_an_operation_id_list_given_as_module_and_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "codegen_routes_fixture.py").write_text(
+        'IDS = ["getThings"]\nFIELDS = {"Thing": ("name",)}\n'
+    )
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+    (tmp_path / "spec.yml").write_text(SPEC)
+    (tmp_path / "pyproject.toml").write_text(
+        CODEGEN_CONFIG.replace('["getThings"]', '"codegen_routes_fixture:IDS"')
+        + 'fields = "codegen_routes_fixture:FIELDS"\n'
+    )
+    (tmp_path / "out").mkdir()
+
+    main([str(tmp_path)])
+
+    assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
+    assert "secret" not in (tmp_path / "out/models.py").read_text()
+
+
+def test_cli_rejects_an_operation_id_reference_without_a_name(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(CODEGEN_CONFIG.replace('["getThings"]', '"routes"'))
+
+    with pytest.raises(ValidationError, match="module:NAME"):
+        main([str(tmp_path)])

@@ -64,3 +64,15 @@ reportUnannotatedClassAttribute = "none"
 
 [tool.uv.sources]
 mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/tiingo_mcp/openapi/tiingo-openapi.yml"
+# Operations whose responses get a model.
+response-operation-ids = "tiingo_mcp.openapi.routes:RESPONSE_MODELS"
+# Operations the tools call through `OperationClient`, one `Operation` constant each.
+operation-ids = "tiingo_mcp.openapi.routes:CLIENT_BACKED"
+fields = "tiingo_mcp.openapi.fields:RESPONSE_FIELDS"
+operation-module = "mcp_openapi.upstream"
+models-module = "tiingo_mcp.models.vendor_responses"
+models-output = "src/tiingo_mcp/models/vendor_responses.py"
+operations-output = "src/tiingo_mcp/models/operations.py"
