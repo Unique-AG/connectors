@@ -8,5 +8,5 @@
   "services/kb-mcp": "0.1.6",
   "services/backstop-mcp": "1.0.1",
   "services/office-365-mcp": "0.3.0",
-  "services/with-intelligence-mcp": "0.1.1"
+  "services/with-intelligence-mcp": "0.2.0"
 }
