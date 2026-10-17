@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.0](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.1...with-intelligence-mcp@0.2.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219))
+
+### Features
+
+* **backstop-mcp,deps,main,with-intelligence-mcp:** install agent skills after pull ([#1182](https://github.com/Unique-AG/connectors/issues/1182)) ([a8f0104](https://github.com/Unique-AG/connectors/commit/a8f0104bb541182a6e94fa86fc4cec027e7bcf9c))
+
+
+### Bug Fixes
+
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219)) ([4f26e36](https://github.com/Unique-AG/connectors/commit/4f26e36e8e96a9770c9f17d29e61a193928c4ed6))
+* **with-intelligence-mcp:** raise memory above the steady working set ([#1196](https://github.com/Unique-AG/connectors/issues/1196)) ([0e77bc0](https://github.com/Unique-AG/connectors/commit/0e77bc0ad2a376bd7abb125c7d8c19963e181ad8))
+
+
+### Dependencies
+
+* bump basedpyright in /* ([#1192](https://github.com/Unique-AG/connectors/issues/1192)) ([5c0cf09](https://github.com/Unique-AG/connectors/commit/5c0cf0965c6d476057e2f63373b753385b81d218))
+* bump cryptography in /* ([#1189](https://github.com/Unique-AG/connectors/issues/1189)) ([b2f3689](https://github.com/Unique-AG/connectors/commit/b2f3689c6f4c342bc2e05b4795bf9f552196e572))
+* bump fastmcp in /* ([#1198](https://github.com/Unique-AG/connectors/issues/1198)) ([9108152](https://github.com/Unique-AG/connectors/commit/9108152e00405dcb49e1ccf4d17a703a7e4acb79))
+* bump mcp in /* ([#1191](https://github.com/Unique-AG/connectors/issues/1191)) ([576fcad](https://github.com/Unique-AG/connectors/commit/576fcad8912cef078f6241f78d13620377e0d159))
+* bump ruff in /* ([#1193](https://github.com/Unique-AG/connectors/issues/1193)) ([ac0d4c2](https://github.com/Unique-AG/connectors/commit/ac0d4c21318fe86aec8317a8215fd823250f6fe7))
+* **deps:** move pinned vulnerable dependencies to patched versions ([#1200](https://github.com/Unique-AG/connectors/issues/1200)) ([531d6e0](https://github.com/Unique-AG/connectors/commit/531d6e0d8625cd25014ea8b056475f550af27902))
+* **deps:** refresh all transitive dependencies ([#1201](https://github.com/Unique-AG/connectors/issues/1201)) ([68a747d](https://github.com/Unique-AG/connectors/commit/68a747dc8df80f05ba8a5dc5a5caacf111af446f))
+
 ## [0.1.1](https://github.com/Unique-AG/connectors/compare/with-intelligence-mcp@0.1.0...with-intelligence-mcp@0.1.1) (2026-10-09)
 
 
