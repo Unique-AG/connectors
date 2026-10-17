@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.1...backstop-mcp@2.0.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219))
+* **backstop-mcp:** per-client chart settings move to `mcpConfig`. Set `mcpConfig.app.publicBaseUrl`, `mcpConfig.backstop.baseUrl`, `mcpConfig.backstop.uiBaseUrl`, `mcpConfig.employment.*` and `mcpConfig.tenantGuidance` instead of the matching `env:` keys and the top-level `tenantGuidance`. The top-level `tenantGuidance` is removed; a value left there is ignored. Relationship type ids must be quoted strings (`["1042"]`). A value under `mcpConfig` overrides the same variable under `env:`. Tenant guidance now reaches the pod through the container `env` list instead of the env ConfigMap, so the first deploy rolls the pod.
+
+### Features
+
+* **backstop-mcp:** move per-client Helm settings into typed mcpConfig values ([#1217](https://github.com/Unique-AG/connectors/issues/1217)) ([169aac6](https://github.com/Unique-AG/connectors/commit/169aac6413140409ad04fe3ab95a552c4a22225b))
+
+
+### Bug Fixes
+
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219)) ([4f26e36](https://github.com/Unique-AG/connectors/commit/4f26e36e8e96a9770c9f17d29e61a193928c4ed6))
+
 ## [1.0.1](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.0...backstop-mcp@1.0.1) (2026-10-12)
 
 
