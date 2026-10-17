@@ -21,6 +21,11 @@ on:
         required: false
         default: true
         type: boolean
+      dev:
+        description: "Build a dev image only. The run pushes no chart and starts no scan."
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   containerize:
@@ -221,6 +226,7 @@ jobs:
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
 
       - name: Push Helm charts
+        if: ${{ !inputs.dev }}
         env:
           DESTINATION: /tmp
           SERVICE_NAME: ${{ inputs.service-name }}
@@ -237,6 +243,7 @@ jobs:
             --registry "oci://$GETUNIQUE_REGISTRY/$GETUNIQUE_CHART_REPO"
 
   security-trivy-image-scan:
+    if: ${{ !inputs.dev }}
     needs: containerize
     permissions:
       contents: read # to read the repository
@@ -294,6 +301,7 @@ jobs:
           fi
 
   security-trivy-license-scan:
+    if: ${{ !inputs.dev }}
     needs: containerize
     permissions:
       contents: read # to read the repository
