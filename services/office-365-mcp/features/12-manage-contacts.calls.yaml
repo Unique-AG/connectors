@@ -1,0 +1,30 @@
+uc-12-01:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+      args: {limit: 20}
+    - tool: outlook_read_contact
+      uses: {uri: uri of the contact}
+
+uc-12-02:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: outlook_find_recipient gives an address and no telephone number, and the contact tools read only the default Contacts folder
+
+uc-12-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_contact
+      args: {given_name: Tom, surname: Berger, company_name: Acme, email_addresses: tom@acme.example}
+
+uc-12-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_update_contact
+      args: {add_business_phones: office number}
+      uses: {uri: uri of the contact}

@@ -1,0 +1,82 @@
+uc-06-01:
+  provenance: observed
+  evidence: teams_list_chats alone in 7 sessions; in 30 sessions in total
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {limit: 50}
+
+uc-06-02:
+  provenance: observed
+  evidence: teams_list_chats in 30 sessions
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {include_member_emails: true}
+
+uc-06-03:
+  provenance: observed
+  evidence: teams_search_messages in 19 sessions, alone in 9
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {query: pricing change}
+    - tool: teams_read_message
+      optional: true
+      uses: {uri: uri of a hit}
+
+uc-06-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: teams_browse_channel
+      uses: {team_id: id of the team, channel_id: id of the channel}
+    - tool: teams_list_message_replies
+      optional: true
+      uses: {uri: uri of a post}
+
+uc-06-05:
+  provenance: observed
+  evidence: teams_list_chats then teams_list_meeting_transcripts then teams_read_transcript in 7 sessions
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+
+uc-06-06:
+  provenance: drafted
+  evidence: teams_read_transcript in 18 calls
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      repeat: many
+      args: {offset: next page, limit: page size}
+      uses: {uri: uri of the transcript}
+
+uc-06-07:
+  provenance: observed
+  evidence: teams_list_meeting_transcripts in 17 calls
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+  must_not: [teams_read_transcript]
+
+uc-06-08:
+  provenance: observed
+  evidence: teams_list_meeting_recordings in 1 call
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_meeting_recordings
+      uses: {meeting_uri: uri of the meeting}

@@ -1,0 +1,56 @@
+uc-03-01:
+  provenance: observed
+  evidence: outlook_list_events alone in 5 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
+
+uc-03-02:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: next Monday, ends_on: next Sunday}
+
+uc-03-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow}
+
+uc-03-04:
+  provenance: observed
+  evidence: outlook_list_events then outlook_read_event 20 times, 15 of them in 2 automated sessions; 233 of 244 read_event calls sit in those 2 sessions
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_read_event
+      uses: {uri: uri of the event from the listing}
+
+uc-03-05:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: no attendee filter on outlook_list_events and no attendees in a listing row, so the assistant must open each upcoming event
+
+uc-03-06:
+  provenance: observed
+  evidence: outlook_search_mail then outlook_read_event 22 times, 21 of them in 2 automated sessions
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+    - tool: outlook_list_events
+      optional: true
+    - tool: outlook_read_event
+      uses: {uri: uri of the event}
+
+uc-03-07:
+  provenance: observed
+  evidence: 11 failures in 2 automated sessions, Microsoft 404 item not found
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_read_event
+      uses: {uri: uri of the event from the listing}

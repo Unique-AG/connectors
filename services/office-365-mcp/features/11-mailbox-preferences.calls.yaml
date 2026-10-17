@@ -1,0 +1,29 @@
+uc-11-01:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: scheduled, start: Monday, end: Friday, internal_message: short message}
+
+uc-11-02:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_automatic_reply
+  note: the tool never runs the reply without an end date
+
+uc-11-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+
+uc-11-04:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_focused_overrides
+      optional: true
+    - tool: outlook_set_focused_override
+      args: {sender: CEO, classify_as: focused}

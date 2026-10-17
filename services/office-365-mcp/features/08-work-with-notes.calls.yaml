@@ -1,0 +1,73 @@
+uc-08-01:
+  provenance: observed
+  evidence: onenote_list_pages in 8 sessions
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+
+uc-08-02:
+  provenance: drafted
+  asks_user: false
+  chain: []
+  note: Microsoft Graph has no full-text search for OneNote, so a page is found by its title only
+
+uc-08-03:
+  provenance: observed
+  evidence: onenote_find_notebook_from_url in 2 sessions
+  asks_user: false
+  chain:
+    - tool: onenote_find_notebook_from_url
+    - tool: onenote_list_sections
+      uses: {parent: handle of the notebook}
+
+uc-08-04:
+  provenance: observed
+  evidence: one session ran onenote_list_notebooks, onenote_create_notebook, onenote_create_section_group 15 times, and onenote_create_page
+  asks_user: false
+  chain:
+    - tool: onenote_list_sections
+    - tool: onenote_create_page
+      args: {title: Weekly sync, body_html: three notes}
+      uses: {section: handle of the section Work}
+
+uc-08-05:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Planning}
+    - tool: onenote_append_to_page
+      args: {body_html: task list}
+      uses: {page: handle of the page}
+
+uc-08-06:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+    - tool: onenote_read_page
+      args: {include_ids: true}
+      uses: {page: handle of the page}
+    - tool: onenote_edit_page
+      args: {commands: replace the second paragraph}
+      uses: {page: handle of the page}
+
+uc-08-07:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: onenote_list_pages
+    - tool: onenote_delete_page
+      uses: {page: handle of the page}
+
+uc-08-08:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_my_teams
+    - tool: onenote_list_notebooks
+      args: {group: id of the team Platform}
+    - tool: onenote_create_page
+      args: {title: Retro}
+      uses: {section: handle of a section of the team notebook}

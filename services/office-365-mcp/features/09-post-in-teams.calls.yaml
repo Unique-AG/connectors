@@ -1,0 +1,71 @@
+uc-09-01:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_chat_members
+      uses: {chat_id: id of the chat}
+    - tool: teams_send_chat_message
+      args: {message: the build is green, mentions: Anna}
+      uses: {chat_id: id of the chat}
+
+uc-09-02:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_send_chat_message
+      uses: {chat_id: id of the chat}
+  note: Mia declines, so the tool posts nothing
+
+uc-09-03:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chat_members
+      uses: {chat_id: id of the chat}
+    - tool: teams_send_chat_message
+      args: {mentions: Priya}
+      uses: {chat_id: id of the chat}
+  note: the tool refuses a mention of a person who is not a member, before it asks
+
+uc-09-04:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: teams_browse_channel
+      uses: {team_id: id of the team, channel_id: id of the channel}
+    - tool: teams_send_channel_message
+      args: {message: "Yes, since noon"}
+      uses: {team_id: id of the team, channel_id: id of the channel, reply_to_id: id of the post}
+
+uc-09-05:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Q3 Plan}
+    - tool: teams_send_channel_message_with_files
+      uses: {attachments: handle of the file from the search}
+
+uc-09-06:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+    - tool: teams_edit_message
+      args: {message: Launch on 14 June}
+      uses: {uri: uri of the message}
+
+uc-09-07:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+    - tool: teams_edit_message
+      uses: {uri: uri of the message}
+  note: the tool refuses a message of another person, before it asks
