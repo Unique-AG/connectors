@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.0...office-365-mcp@0.3.1) (2026-10-17)
+
+
+### Features
+
+* **office-365-mcp:** add /admin/consent redirect to the admin-consent URL ([#1226](https://github.com/Unique-AG/connectors/issues/1226)) ([fa4948b](https://github.com/Unique-AG/connectors/commit/fa4948bed0d9934462355800826808c4c2ba5d61))
+* **office-365-mcp:** select several presets in one deployment ([#1244](https://github.com/Unique-AG/connectors/issues/1244)) ([7923a6e](https://github.com/Unique-AG/connectors/commit/7923a6e8fdc5aa8d6e36b97f11c1afa07f0d4ced))
+
 ## [0.3.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.4...office-365-mcp@0.3.0) (2026-10-14)
 
 
