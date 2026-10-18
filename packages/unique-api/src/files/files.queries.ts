@@ -79,10 +79,11 @@ export interface PaginatedContentQueryInput {
 export interface PaginatedContentQueryResult {
   paginatedContent: {
     nodes: UniqueFile[];
-    totalCount: number;
   };
 }
 
+// totalCount is deliberately not selected: it triggers a separate COUNT on the Unique side that no
+// caller of this query reads. Use PAGINATED_CONTENT_COUNT_QUERY when a count is actually needed.
 export const PAGINATED_CONTENT_QUERY = gql`
   query PaginatedContent($skip: Int!, $take: Int!, $where: ContentWhereInput) {
     paginatedContent(skip: $skip, take: $take, where: $where) {
@@ -97,7 +98,6 @@ export const PAGINATED_CONTENT_QUERY = gql`
         expiresAt
         ingestionState
       }
-      totalCount
     }
   }
 `;

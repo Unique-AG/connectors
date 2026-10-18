@@ -1,6 +1,6 @@
 import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
-import { chunk } from 'remeda';
+import { chunk, unique } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   ADD_ACCESSES_MUTATION,
@@ -34,6 +34,11 @@ import { UniqueFilesFacade } from './unique-files.facade';
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
 
+// Content.key is only covered by a GIN trigram index on the Unique side, so a `key: { in: [...] }`
+// filter degrades badly as the list grows. This bounds the filter independently of the pagination
+// page size, which the two must not share: `take` limits rows returned, not keys sent.
+const CONTENT_KEY_CHUNK_SIZE = 100;
+
 // We decide for this batch size because on the Unique side, for each permission requested we make a
 // concurrent call to node-ingestion and further to Zitadel, so we want to avoid overwhelming the
 // system when we have a huge folder with many files.
@@ -46,31 +51,36 @@ export class FilesService implements UniqueFilesFacade {
   ) {}
 
   public async getByKeys(keys: string[]): Promise<UniqueFile[]> {
-    if (keys.length === 0) {
+    // Deduplicated up front so chunking cannot return the same content twice for a repeated key,
+    // which the single `in` filter previously collapsed server-side.
+    const distinctKeys = unique(keys);
+    if (distinctKeys.length === 0) {
       return [];
     }
 
-    let skip = 0;
     const files: UniqueFile[] = [];
 
-    let batchCount = 0;
-    do {
-      const batchResult = await this.ingestionClient.request<
-        PaginatedContentQueryResult,
-        PaginatedContentQueryInput
-      >(PAGINATED_CONTENT_QUERY, {
-        skip,
-        take: CONTENT_BATCH_SIZE,
-        where: {
-          key: {
-            in: keys,
+    for (const keyChunk of chunk(distinctKeys, CONTENT_KEY_CHUNK_SIZE)) {
+      let skip = 0;
+      let batchCount = 0;
+      do {
+        const batchResult = await this.ingestionClient.request<
+          PaginatedContentQueryResult,
+          PaginatedContentQueryInput
+        >(PAGINATED_CONTENT_QUERY, {
+          skip,
+          take: CONTENT_BATCH_SIZE,
+          where: {
+            key: {
+              in: keyChunk,
+            },
           },
-        },
-      });
-      files.push(...batchResult.paginatedContent.nodes);
-      batchCount = batchResult.paginatedContent.nodes.length;
-      skip += CONTENT_BATCH_SIZE;
-    } while (batchCount === CONTENT_BATCH_SIZE);
+        });
+        files.push(...batchResult.paginatedContent.nodes);
+        batchCount = batchResult.paginatedContent.nodes.length;
+        skip += CONTENT_BATCH_SIZE;
+      } while (batchCount === CONTENT_BATCH_SIZE);
+    }
 
     return files;
   }
