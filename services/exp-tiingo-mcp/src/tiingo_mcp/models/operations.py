@@ -8,8 +8,12 @@ from tiingo_mcp.models.vendor_responses import (
     FundamentalsStatement,
 )
 
-GET_DAILY_PRICES = Operation("getDailyPrices", TypeAdapter(list[DailyPriceBar]))
-GET_FUNDAMENTALS_STATEMENTS = Operation(
+GET_DAILY_PRICES = Operation[list[DailyPriceBar]](
+    "getDailyPrices", TypeAdapter(list[DailyPriceBar])
+)
+GET_FUNDAMENTALS_STATEMENTS = Operation[list[FundamentalsStatement]](
     "getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement])
 )
-GET_FUNDAMENTALS_DAILY = Operation("getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily]))
+GET_FUNDAMENTALS_DAILY = Operation[list[FundamentalsDaily]](
+    "getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily])
+)
