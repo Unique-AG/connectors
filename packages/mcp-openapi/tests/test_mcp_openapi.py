@@ -21,7 +21,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from mcp_openapi.cli import main
 from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
-from mcp_openapi.lock import LockPolicy, RequestLock
+from mcp_openapi.lock import LockConfig, RequestLock
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
 from mcp_openapi.retry import RetryAfterPolicy, RetryPolicy
 from mcp_openapi.upstream import LockTimeoutError, Operation, OperationClient, UpstreamError
@@ -244,7 +244,9 @@ def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() 
         return httpx2.Response(200, json={"value": 1})
 
     row = asyncio.run(
-        api(handler).request_raw("POST", "/hidden", Row, params={"dry": True}, json={"label": "x"})
+        api(handler).request_raw(
+            "POST", "/hidden", TypeAdapter(Row), params={"dry": True}, json={"label": "x"}
+        )
     )
     assert row == Row(value=1)
     request = seen[0]
@@ -256,14 +258,14 @@ def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() 
 def test_request_raw_names_the_field_that_does_not_fit() -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": "x"}))
     with pytest.raises(UpstreamError, match=r"Unexpected response: value: "):
-        asyncio.run(client.request_raw("GET", "/hidden", Row))
+        asyncio.run(client.request_raw("GET", "/hidden", TypeAdapter(Row)))
 
 
 @pytest.mark.parametrize("path", ["https://other.example/x", "//other.example/x", "hidden"])
 def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": 1}))
     with pytest.raises(ValueError, match="is not a path"):
-        asyncio.run(client.request_raw("GET", path, Row))
+        asyncio.run(client.request_raw("GET", path, TypeAdapter(Row)))
 
 
 RETRY_AFTER = RetryAfterPolicy()
@@ -372,8 +374,8 @@ def locked_api(
         headers={"Authorization": "Token k"},
         transport=httpx2.MockTransport(handler),
     )
-    lock_policy = LockPolicy(lock=lock, acquire_timeout_seconds=acquire_timeout_seconds)
-    return OperationClient(load_spec(SPEC), http, retry_policy=RETRY_AFTER, lock_policy=lock_policy)
+    lock_config = LockConfig(lock=lock, acquire_timeout_seconds=acquire_timeout_seconds)
+    return OperationClient(load_spec(SPEC), http, retry_policy=RETRY_AFTER, lock_config=lock_config)
 
 
 async def answer_ok(_: httpx2.Request) -> httpx2.Response:
@@ -453,7 +455,7 @@ def test_the_lock_is_held_per_attempt_with_the_request() -> None:
 def test_request_raw_holds_the_lock_with_its_request() -> None:
     lock = RecordingLock()
     client = locked_api(answer_ok, lock)
-    asyncio.run(client.request_raw("POST", "/hidden", list[Row], params={"dry": True}))
+    asyncio.run(client.request_raw("POST", "/hidden", ROWS, params={"dry": True}))
     assert lock.held == [("POST", b"/hidden?dry=true", "Token k")]
 
 
@@ -466,9 +468,26 @@ def test_only_acquiring_the_lock_counts_against_the_timeout() -> None:
     assert asyncio.run(client.call(Operation("getThings", ROWS))) == [Row(value=1)]
 
 
-def test_lock_policy_rejects_something_that_is_not_a_lock() -> None:
+def test_a_timeout_error_of_the_lock_itself_is_not_reported_as_a_lock_timeout() -> None:
+    class BrokenLock:
+        def hold(self, _request: httpx2.Request) -> "BrokenLock":
+            return self
+
+        async def __aenter__(self) -> None:
+            raise TimeoutError("socket timed out")
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    client = locked_api(answer_ok, BrokenLock())
+    with pytest.raises(TimeoutError, match="socket timed out") as error:
+        asyncio.run(client.call(Operation("getThings", ROWS)))
+    assert not isinstance(error.value, LockTimeoutError)
+
+
+def test_lock_config_rejects_something_that_is_not_a_lock() -> None:
     with pytest.raises(ValidationError, match="Input should be an instance of RequestLock"):
-        LockPolicy.model_validate({"lock": object(), "acquire_timeout_seconds": 1})
+        LockConfig.model_validate({"lock": object(), "acquire_timeout_seconds": 1})
 
 
 def redirected_authorization(

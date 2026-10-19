@@ -13,12 +13,12 @@ class RequestLock(Protocol):
         `request` carries the method, URL, query, body and the client's default headers, so a
         lock can be keyed on any of them, such as the `Authorization` header. Headers that an
         event hook sets are not on it yet. Entering is cancelled when it outlasts the timeout of
-        its `LockPolicy`, so it must not leave the lock taken when that happens.
+        its `LockConfig`, so it must not leave the lock taken when that happens.
         """
         ...
 
 
-class LockPolicy(BaseModel):
+class LockConfig(BaseModel):
     """A `RequestLock` and how long a request waits to acquire it before failing."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
