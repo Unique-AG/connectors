@@ -262,7 +262,7 @@ def test_request_raw_names_the_field_that_does_not_fit() -> None:
 @pytest.mark.parametrize("path", ["https://other.example/x", "//other.example/x", "hidden"])
 def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": 1}))
-    with pytest.raises(AssertionError, match="is not a path"):
+    with pytest.raises(ValueError, match="is not a path"):
         asyncio.run(client.request_raw("GET", path, Row))
 
 
