@@ -18,8 +18,6 @@ resource "azuread_application" "office_365_mcp" {
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
 
-  prevent_duplicate_names = var.prevent_duplicate_names
-
   api {
     # The provider defaults this to 1 and forces 2 only for audiences this app is not.
     requested_access_token_version = 2

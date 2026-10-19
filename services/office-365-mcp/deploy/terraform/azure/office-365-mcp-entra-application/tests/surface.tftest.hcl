@@ -1040,26 +1040,14 @@ run "a_composed_secret_name_over_127_characters_is_refused" {
   expect_failures = [var.secret_name_prefix]
 }
 
-run "a_second_registration_with_the_same_name_is_refused_by_default" {
+run "registrations_may_share_a_display_name" {
   variables {
     tools_preset = "teams-chat"
   }
 
   assert {
-    condition     = azuread_application.office_365_mcp.prevent_duplicate_names == true
-    error_message = "the default must refuse a second registration with the same display name"
-  }
-}
-
-run "duplicate_names_are_allowed_when_asked_for" {
-  variables {
-    tools_preset            = "teams-chat"
-    prevent_duplicate_names = false
-  }
-
-  assert {
-    condition     = azuread_application.office_365_mcp.prevent_duplicate_names == false
-    error_message = "prevent_duplicate_names = false must reach the application"
+    condition     = azuread_application.office_365_mcp.prevent_duplicate_names != true
+    error_message = "a second registration with the same display name must not be refused"
   }
 }
 

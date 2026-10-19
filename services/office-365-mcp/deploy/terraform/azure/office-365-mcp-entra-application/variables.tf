@@ -63,17 +63,6 @@ variable "display_name" {
   }
 }
 
-variable "prevent_duplicate_names" {
-  description = <<-EOT
-    Whether creating the registration fails when another registration of the tenant has the same
-    display_name. It guards create only: adopting a registration that already exists needs an
-    import, not an apply. Set it to false to give one display_name to the registrations of several
-    customers in one tenant.
-  EOT
-  type        = bool
-  default     = true
-}
-
 variable "notes" {
   description = "Notes for the Entra application, inherited by the service principal unless service_principal_configuration.notes overrides it. Where to write down which cluster consumes this registration."
   type        = string
