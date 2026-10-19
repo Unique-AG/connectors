@@ -95,9 +95,11 @@ class OperationClient:
         """Only for endpoints the spec does not document. Use `call` for every one it does.
 
         Nothing checks `params` or `json` against the spec, so the upstream is the first to see
-        a mistake in them. `path` is relative to the base URL, which keeps the auth on it.
+        a mistake in them. `path` is relative to the base URL, which keeps the auth on it, and
+        anything else is a ValueError.
         """
-        assert path.startswith("/") and not path.startswith("//"), f"{path} is not a path"
+        if not path.startswith("/") or path.startswith("//"):
+            raise ValueError(f"{path} is not a path")
         request = self._http.build_request(method, path, params=params, json=json)
         return self._parse(TypeAdapter(schema), await self._send(request))
 
