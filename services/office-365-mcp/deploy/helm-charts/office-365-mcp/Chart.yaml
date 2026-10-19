@@ -2,8 +2,8 @@ apiVersion: v2
 name: office-365-mcp
 description: Office 365 FastMCP server.
 type: application
-version: 0.3.1
-appVersion: 0.3.1
+version: 0.3.2
+appVersion: 0.3.2
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm

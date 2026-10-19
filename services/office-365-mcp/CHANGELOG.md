@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.1...office-365-mcp@0.3.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* **office-365-mcp:** allow several registrations with one display name ([#1248](https://github.com/Unique-AG/connectors/issues/1248)) ([70a36ac](https://github.com/Unique-AG/connectors/commit/70a36aca9936ccdc8fe64f7681af779c49bd1097))
+
 ## [0.3.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.0...office-365-mcp@0.3.1) (2026-10-19)
 
 
