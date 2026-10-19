@@ -10,6 +10,7 @@ from typing import cast
 
 import httpx2
 import pytest
+import tenacity
 import yaml
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType
@@ -20,6 +21,7 @@ from mcp_openapi.cli import main
 from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
+from mcp_openapi.retry import DEFAULT_RETRY_POLICY, RetryAfterPolicy, RetryPolicy
 from mcp_openapi.upstream import Operation, OperationClient, UpstreamError
 
 
@@ -230,6 +232,106 @@ def test_call_rejects_a_required_argument_that_is_missing(
     client = api(lambda _: httpx2.Response(200, json={}))
     with pytest.raises(ValueError, match=rf"postThing needs {re.escape(missing)}"):
         asyncio.run(client.call(Operation("postThing", OBJECT), **arguments))
+
+
+def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={"value": 1})
+
+    row = asyncio.run(
+        api(handler).request_raw("POST", "/hidden", Row, params={"dry": True}, json={"label": "x"})
+    )
+    assert row == Row(value=1)
+    request = seen[0]
+    assert (request.method, request.url.raw_path) == ("POST", b"/hidden?dry=true")
+    assert json.loads(request.content) == {"label": "x"}
+    assert request.headers["authorization"] == "Token k"
+
+
+def test_request_raw_names_the_field_that_does_not_fit() -> None:
+    client = api(lambda _: httpx2.Response(200, json={"value": "x"}))
+    with pytest.raises(UpstreamError, match=r"Unexpected response: value: "):
+        asyncio.run(client.request_raw("GET", "/hidden", Row))
+
+
+@pytest.mark.parametrize("path", ["https://other.example/x", "//other.example/x", "hidden"])
+def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
+    client = api(lambda _: httpx2.Response(200, json={"value": 1}))
+    with pytest.raises(AssertionError, match="is not a path"):
+        asyncio.run(client.request_raw("GET", path, Row))
+
+
+def replay(
+    responses: list[httpx2.Response], retry_policy: RetryPolicy | None = DEFAULT_RETRY_POLICY
+) -> tuple[list[Row] | UpstreamError, int]:
+    """Answers each request with the next response, and returns the result and the count."""
+    remaining = iter(responses)
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: next(remaining)),
+    )
+    client = OperationClient(load_spec(SPEC), http, retry_policy=retry_policy)
+    try:
+        result: list[Row] | UpstreamError = asyncio.run(client.call(Operation("getThings", ROWS)))
+    except UpstreamError as error:
+        result = error
+    return result, len(responses) - len(list(remaining))
+
+
+def rate_limited(retry_after: str | None = None) -> httpx2.Response:
+    return httpx2.Response(429, headers={"Retry-After": retry_after} if retry_after else None)
+
+
+def ok() -> httpx2.Response:
+    return httpx2.Response(200, json=[{"value": 1}])
+
+
+NO_BACKOFF = RetryAfterPolicy(max_attempts=3, backoff=tenacity.wait_none())
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_default_policy_retries_after_the_delay_retry_after_asks_for(status: int) -> None:
+    responses = [httpx2.Response(status, headers={"Retry-After": "0"}), ok()]
+    assert replay(responses) == ([Row(value=1)], 2)
+
+
+def test_default_policy_reads_retry_after_as_an_http_date() -> None:
+    assert replay([rate_limited("Wed, 21 Oct 2015 07:28:00 GMT"), ok()]) == ([Row(value=1)], 2)
+
+
+@pytest.mark.parametrize("retry_after", ["31", "Fri, 01 Jan 9999 00:00:00 GMT"])
+def test_default_policy_gives_up_when_retry_after_asks_for_more_than_the_ceiling(
+    retry_after: str,
+) -> None:
+    result, sent = replay([rate_limited(retry_after), ok()])
+    assert sent == 1
+    assert str(result).startswith("429 Too Many Requests for GET")
+
+
+def test_policy_falls_back_to_backoff_without_retry_after_and_stops_after_max_attempts() -> None:
+    result, sent = replay([rate_limited(), rate_limited(), rate_limited(), ok()], NO_BACKOFF)
+    assert sent == 3
+    assert isinstance(result, UpstreamError)
+
+
+def test_policy_caps_backoff_at_the_ceiling() -> None:
+    policy = RetryAfterPolicy(max_wait_seconds=0, backoff=tenacity.wait_fixed(3600))
+    assert replay([rate_limited("not a date"), ok()], policy) == ([Row(value=1)], 2)
+
+
+def test_policy_does_not_retry_a_status_it_does_not_list() -> None:
+    result, sent = replay([httpx2.Response(500), ok()], NO_BACKOFF)
+    assert sent == 1
+    assert str(result) == "500 Internal Server Error for GET https://upstream.example/things"
+
+
+def test_no_policy_sends_a_request_once() -> None:
+    result, sent = replay([rate_limited("0"), ok()], retry_policy=None)
+    assert sent == 1
+    assert isinstance(result, UpstreamError)
 
 
 def redirected_authorization(
