@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.0...office-365-mcp@0.3.1) (2026-10-19)
+
+
+### Features
+
+* **office-365-mcp:** add /admin/consent redirect to the admin-consent URL ([#1226](https://github.com/Unique-AG/connectors/issues/1226)) ([fa4948b](https://github.com/Unique-AG/connectors/commit/fa4948bed0d9934462355800826808c4c2ba5d61))
+* **office-365-mcp:** select several presets in one deployment ([#1244](https://github.com/Unique-AG/connectors/issues/1244)) ([7923a6e](https://github.com/Unique-AG/connectors/commit/7923a6e8fdc5aa8d6e36b97f11c1afa07f0d4ced))
+
+
+### Dependencies
+
+* bump asyncpg in /* ([#1240](https://github.com/Unique-AG/connectors/issues/1240)) ([23628b0](https://github.com/Unique-AG/connectors/commit/23628b0de199bbf5ff4f60d8c27c112c68c3d28c))
+* bump pydantic in /services/* ([#1238](https://github.com/Unique-AG/connectors/issues/1238)) ([01801d2](https://github.com/Unique-AG/connectors/commit/01801d2b560ef29bdced07bbe1101cc8fd655457))
+* bump python in /services/*/deploy ([#1229](https://github.com/Unique-AG/connectors/issues/1229)) ([c5e1f49](https://github.com/Unique-AG/connectors/commit/c5e1f49ff2c9fce8ef01561463d193b6f627c81b))
+* bump ruff in /packages/* ([#1241](https://github.com/Unique-AG/connectors/issues/1241)) ([fe61f41](https://github.com/Unique-AG/connectors/commit/fe61f410134445384ce6f5de5ed25edbb249c34e))
+* bump uvicorn[standard] in /services/* ([#1242](https://github.com/Unique-AG/connectors/issues/1242)) ([28f9743](https://github.com/Unique-AG/connectors/commit/28f9743dfa4dbdcc6d9c57a7e09cd432f7d0036f))
+
 ## [0.3.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.2.4...office-365-mcp@0.3.0) (2026-10-14)
 
 
