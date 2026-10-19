@@ -58,9 +58,6 @@ class RetryAfterPolicy(BaseModel):
         return min(self.backoff(state), self.max_wait_seconds) if delay is None else delay
 
 
-DEFAULT_RETRY_POLICY = RetryAfterPolicy()
-
-
 def _failed_response(state: tenacity.RetryCallState) -> httpx2.Response | None:
     outcome = state.outcome
     error = outcome.exception() if outcome is not None and outcome.failed else None
