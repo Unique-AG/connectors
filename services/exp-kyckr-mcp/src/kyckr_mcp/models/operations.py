@@ -12,16 +12,18 @@ from kyckr_mcp.models.vendor_responses import (
     PostOrdersResponse,
 )
 
-GET_COMPANIES = Operation("get-companies", TypeAdapter(GetCompaniesResponse))
-GET_COMPANIES_KYCKR_ID = Operation(
+GET_COMPANIES = Operation[GetCompaniesResponse]("get-companies", TypeAdapter(GetCompaniesResponse))
+GET_COMPANIES_KYCKR_ID = Operation[GetCompaniesKyckrIdResponse](
     "get-companies-kyckrId", TypeAdapter(GetCompaniesKyckrIdResponse)
 )
-GET_COMPANIES_KYCKR_ID_ENHANCED = Operation(
+GET_COMPANIES_KYCKR_ID_ENHANCED = Operation[GetCompaniesKyckrIdEnhancedResponse](
     "get-companies-kyckrId-enhanced", TypeAdapter(GetCompaniesKyckrIdEnhancedResponse)
 )
-GET_COMPANIES_KYCKR_ID_DOCUMENTS = Operation(
+GET_COMPANIES_KYCKR_ID_DOCUMENTS = Operation[GetCompaniesKyckrIdDocumentsResponse](
     "get-companies-kyckrId-documents", TypeAdapter(GetCompaniesKyckrIdDocumentsResponse)
 )
-POST_ORDERS = Operation("post-orders", TypeAdapter(PostOrdersResponse))
-GET_ORDERS_ORDER_ID = Operation("get-orders-orderId", TypeAdapter(GetOrdersOrderIdResponse))
-GET_ORDER = Operation("get-order", TypeAdapter(GetOrderResponse))
+POST_ORDERS = Operation[PostOrdersResponse]("post-orders", TypeAdapter(PostOrdersResponse))
+GET_ORDERS_ORDER_ID = Operation[GetOrdersOrderIdResponse](
+    "get-orders-orderId", TypeAdapter(GetOrdersOrderIdResponse)
+)
+GET_ORDER = Operation[GetOrderResponse]("get-order", TypeAdapter(GetOrderResponse))

@@ -302,8 +302,9 @@ def _constant_name(operation_id: str) -> str:
 
 
 def _constant(name: str, operation_id: str, model: str, is_array: bool) -> str:
-    adapter = f"list[{model}]" if is_array else model
-    return f"{name} = Operation({json.dumps(operation_id)}, TypeAdapter({adapter}))"
+    body = f"list[{model}]" if is_array else model
+    # Some checkers infer `Operation[Unknown]` from the `TypeAdapter` alone.
+    return f"{name} = Operation[{body}]({json.dumps(operation_id)}, TypeAdapter({body}))"
 
 
 def generate_operations(
