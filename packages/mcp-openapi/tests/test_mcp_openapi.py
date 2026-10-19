@@ -406,8 +406,8 @@ def operations_for(tmp_path: Path, operation_ids: list[str], spec_text: str = SP
 
 def test_each_operation_gets_a_constant_typed_with_its_response(tmp_path: Path) -> None:
     generated = operations_for(tmp_path, ["getThings", "getThing"])
-    assert 'GET_THINGS = Operation("getThings", TypeAdapter(list[Thing]))' in generated
-    assert 'GET_THING = Operation("getThing", TypeAdapter(Thing))' in generated
+    assert 'GET_THINGS = Operation[list[Thing]]("getThings", TypeAdapter(list[Thing]))' in generated
+    assert 'GET_THING = Operation[Thing]("getThing", TypeAdapter(Thing))' in generated
     assert "from models import Thing\n" in generated
 
 
@@ -437,7 +437,10 @@ def test_a_response_written_in_place_gets_a_model_named_after_its_operation(
     tmp_path: Path,
 ) -> None:
     generated = operations_for(tmp_path, ["postThing"])
-    assert 'POST_THING = Operation("postThing", TypeAdapter(PostThingResponse))' in generated
+    assert (
+        'POST_THING = Operation[PostThingResponse]("postThing", TypeAdapter(PostThingResponse))'
+        in generated
+    )
     assert "from models import PostThingResponse\n" in generated
 
 
@@ -635,9 +638,10 @@ def test_an_allof_envelope_written_in_place_is_generated_with_the_schemas_it_use
     generated = models.read_text()
     assert "class GetCompaniesResponse(BaseResponse):" in generated
     assert "data: list[Company] | None" in generated
-    assert 'GET_COMPANIES = Operation("get-companies", TypeAdapter(GetCompaniesResponse))' in (
-        operations_for(tmp_path, ["get-companies"], ENVELOPE_SPEC)
-    )
+    assert (
+        'GET_COMPANIES = Operation[GetCompaniesResponse]("get-companies", '
+        "TypeAdapter(GetCompaniesResponse))"
+    ) in operations_for(tmp_path, ["get-companies"], ENVELOPE_SPEC)
 
 
 def test_a_model_name_made_from_an_operation_cannot_replace_a_schema_of_the_spec(
@@ -735,7 +739,10 @@ def test_a_response_defined_in_components_is_resolved(tmp_path: Path) -> None:
         models_module="models",
         output=output,
     )
-    assert 'GET_PARENTS = Operation("getParents", TypeAdapter(list[Parent]))' in output.read_text()
+    assert (
+        'GET_PARENTS = Operation[list[Parent]]("getParents", TypeAdapter(list[Parent]))'
+        in output.read_text()
+    )
 
 
 @pytest.mark.parametrize(
@@ -882,7 +889,7 @@ def test_an_operation_id_with_characters_a_name_would_lose_is_refused(tmp_path: 
 
 def test_the_lowest_success_code_gives_the_model_of_an_operation(tmp_path: Path) -> None:
     generated = operations_for(tmp_path, ["getThing"], TWO_CODES_SPEC)
-    assert 'GET_THING = Operation("getThing", TypeAdapter(Thing))' in generated
+    assert 'GET_THING = Operation[Thing]("getThing", TypeAdapter(Thing))' in generated
 
 
 def test_arguments_that_are_none_are_not_sent() -> None:
