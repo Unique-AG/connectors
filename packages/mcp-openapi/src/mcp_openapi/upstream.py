@@ -12,7 +12,7 @@ from jsonschema_path import SchemaPath
 from pydantic import TypeAdapter, ValidationError
 
 from mcp_openapi.lock import LockPolicy
-from mcp_openapi.retry import DEFAULT_RETRY_POLICY, RetryPolicy
+from mcp_openapi.retry import RetryPolicy
 
 
 class UpstreamError(ToolError):
@@ -43,7 +43,7 @@ class OperationClient:
         spec: dict[str, object],
         http: httpx2.AsyncClient,
         *,
-        retry_policy: RetryPolicy | None = DEFAULT_RETRY_POLICY,
+        retry_policy: RetryPolicy | None = None,
         lock_policy: LockPolicy | None = None,
     ) -> None:
         self._http: httpx2.AsyncClient = http

@@ -23,7 +23,7 @@ from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
 from mcp_openapi.lock import LockPolicy, RequestLock
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
-from mcp_openapi.retry import DEFAULT_RETRY_POLICY, RetryAfterPolicy, RetryPolicy
+from mcp_openapi.retry import RetryAfterPolicy, RetryPolicy
 from mcp_openapi.upstream import LockTimeoutError, Operation, OperationClient, UpstreamError
 
 
@@ -266,8 +266,11 @@ def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
         asyncio.run(client.request_raw("GET", path, Row))
 
 
+RETRY_AFTER = RetryAfterPolicy()
+
+
 def replay(
-    responses: list[httpx2.Response], retry_policy: RetryPolicy | None = DEFAULT_RETRY_POLICY
+    responses: list[httpx2.Response], retry_policy: RetryPolicy | None = RETRY_AFTER
 ) -> tuple[list[Row] | UpstreamError, int]:
     """Answers each request with the next response, and returns the result and the count."""
     remaining = iter(responses)
@@ -370,7 +373,7 @@ def locked_api(
         transport=httpx2.MockTransport(handler),
     )
     lock_policy = LockPolicy(lock=lock, acquire_timeout_seconds=acquire_timeout_seconds)
-    return OperationClient(load_spec(SPEC), http, lock_policy=lock_policy)
+    return OperationClient(load_spec(SPEC), http, retry_policy=RETRY_AFTER, lock_policy=lock_policy)
 
 
 async def answer_ok(_: httpx2.Request) -> httpx2.Response:
