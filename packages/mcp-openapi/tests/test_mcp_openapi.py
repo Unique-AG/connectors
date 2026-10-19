@@ -3,7 +3,8 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import ModuleType
 from typing import cast
@@ -20,9 +21,10 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from mcp_openapi.cli import main
 from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
+from mcp_openapi.lock import LockPolicy, RequestLock
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
 from mcp_openapi.retry import DEFAULT_RETRY_POLICY, RetryAfterPolicy, RetryPolicy
-from mcp_openapi.upstream import Operation, OperationClient, UpstreamError
+from mcp_openapi.upstream import LockTimeoutError, Operation, OperationClient, UpstreamError
 
 
 class Row(BaseModel):
@@ -332,6 +334,138 @@ def test_no_policy_sends_a_request_once() -> None:
     result, sent = replay([rate_limited("0"), ok()], retry_policy=None)
     assert sent == 1
     assert isinstance(result, UpstreamError)
+
+
+class SemaphoreLock:
+    """A `RequestLock` over an `asyncio.Semaphore`, as a service could write one."""
+
+    def __init__(self, limit: int) -> None:
+        self._semaphore: asyncio.Semaphore = asyncio.Semaphore(limit)
+
+    @asynccontextmanager
+    async def hold(self, _request: httpx2.Request) -> AsyncGenerator[None]:
+        async with self._semaphore:
+            yield
+
+
+class RecordingLock:
+    def __init__(self) -> None:
+        self.held: list[tuple[str, bytes, str | None]] = []
+
+    @asynccontextmanager
+    async def hold(self, request: httpx2.Request) -> AsyncGenerator[None]:
+        authorization = request.headers.get("authorization")
+        self.held.append((request.method, request.url.raw_path, authorization))
+        yield
+
+
+def locked_api(
+    handler: Callable[[httpx2.Request], Coroutine[None, None, httpx2.Response]],
+    lock: RequestLock,
+    acquire_timeout_seconds: float = 30,
+) -> OperationClient:
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        headers={"Authorization": "Token k"},
+        transport=httpx2.MockTransport(handler),
+    )
+    lock_policy = LockPolicy(lock=lock, acquire_timeout_seconds=acquire_timeout_seconds)
+    return OperationClient(load_spec(SPEC), http, lock_policy=lock_policy)
+
+
+async def answer_ok(_: httpx2.Request) -> httpx2.Response:
+    return ok()
+
+
+def test_the_lock_is_held_while_the_request_is_in_flight() -> None:
+    in_flight: list[int] = [0]
+    peak: list[int] = [0]
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        in_flight[0] += 1
+        peak[0] = max(peak[0], in_flight[0])
+        await asyncio.sleep(0.01)
+        in_flight[0] -= 1
+        return ok()
+
+    async def run() -> None:
+        client = locked_api(handler, SemaphoreLock(2))
+        await asyncio.gather(*(client.call(Operation("getThings", ROWS)) for _ in range(5)))
+
+    asyncio.run(run())
+    assert peak[0] == 2
+
+
+def test_a_request_fails_when_the_lock_is_not_acquired_in_time() -> None:
+    async def run() -> None:
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def handler(_: httpx2.Request) -> httpx2.Response:
+            started.set()
+            await release.wait()
+            return ok()
+
+        client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+        first = asyncio.create_task(client.call(Operation("getThings", ROWS)))
+        await started.wait()
+        with pytest.raises(
+            LockTimeoutError,
+            match=r"No lock acquired within 0\.01s for GET https://upstream\.example/things$",
+        ):
+            await client.call(Operation("getThings", ROWS))
+        release.set()
+        assert await first == [Row(value=1)]
+
+    asyncio.run(run())
+
+
+def test_the_lock_is_released_after_a_failed_request() -> None:
+    responses = iter([httpx2.Response(500), ok()])
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        return next(responses)
+
+    async def run() -> list[Row]:
+        client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+        with pytest.raises(UpstreamError):
+            await client.call(Operation("getThings", ROWS))
+        return await client.call(Operation("getThings", ROWS))
+
+    assert asyncio.run(run()) == [Row(value=1)]
+
+
+def test_the_lock_is_held_per_attempt_with_the_request() -> None:
+    responses = iter([rate_limited("0"), httpx2.Response(200, json={"value": 1})])
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        return next(responses)
+
+    lock = RecordingLock()
+    client = locked_api(handler, lock, acquire_timeout_seconds=5)
+    asyncio.run(client.call(Operation("getThing", TypeAdapter(Row)), name="a", since="2026-01-02"))
+    attempt = ("GET", b"/things/a?since=2026-01-02", "Token k")
+    assert lock.held == [attempt, attempt]
+
+
+def test_request_raw_holds_the_lock_with_its_request() -> None:
+    lock = RecordingLock()
+    client = locked_api(answer_ok, lock)
+    asyncio.run(client.request_raw("POST", "/hidden", list[Row], params={"dry": True}))
+    assert lock.held == [("POST", b"/hidden?dry=true", "Token k")]
+
+
+def test_only_acquiring_the_lock_counts_against_the_timeout() -> None:
+    async def slow(_: httpx2.Request) -> httpx2.Response:
+        await asyncio.sleep(0.05)
+        return ok()
+
+    client = locked_api(slow, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+    assert asyncio.run(client.call(Operation("getThings", ROWS))) == [Row(value=1)]
+
+
+def test_lock_policy_rejects_something_that_is_not_a_lock() -> None:
+    with pytest.raises(ValidationError, match="Input should be an instance of RequestLock"):
+        LockPolicy.model_validate({"lock": object(), "acquire_timeout_seconds": 1})
 
 
 def redirected_authorization(
