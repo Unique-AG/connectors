@@ -1092,6 +1092,17 @@ run "an_unsupported_sign_in_audience_is_refused" {
   expect_failures = [var.sign_in_audience]
 }
 
+run "the_overlay_gets_the_tools_as_a_list" {
+  variables {
+    tools_preset = "teams-chat"
+  }
+
+  assert {
+    condition     = output.deployment_env["unique-qa"].mcpConfig.tools.enabled == local.tools
+    error_message = "the overlay carries ${jsonencode(output.deployment_env["unique-qa"].mcpConfig.tools.enabled)} as its tools, not the list of tool names that the registration resolved"
+  }
+}
+
 run "a_single_tenant_registration_emits_a_tenant_id" {
   variables {
     tools_preset = "teams-chat"
