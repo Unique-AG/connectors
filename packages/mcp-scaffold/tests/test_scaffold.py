@@ -5,9 +5,11 @@ from typing import cast
 
 import pytest
 
+from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
 from mcp_scaffold.options import Auth, Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned
+from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import scaffold
 from tests.conftest import UseVenv
 
@@ -76,7 +78,8 @@ def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 # Each option appears alone once, and the stores once together. Custom with Postgres is the one
-# server that opens a resource but takes no settings with a required field.
+# server that opens a resource but takes no settings with a required field. The last is every
+# option at once, as services/architecture-demo-mcp is generated.
 @pytest.mark.parametrize(
     ("upstream", "persistence", "auth"),
     [
@@ -84,6 +87,7 @@ def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
         (Upstream.HTTP, set[Persistence](), Auth.UNIQUE),
         (Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.NONE),
         (Upstream.HTTP, {Persistence.POSTGRES, Persistence.REDIS}, Auth.NONE),
+        (Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}, Auth.UNIQUE),
     ],
 )
 def test_a_scaffolded_mcp_passes_its_own_checks(
@@ -127,6 +131,22 @@ def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(repo: Path) -> None:
     assert all(f'"{pin}",' in pyproject for pin in pins)
     assert '"mcp-runtime==' in pyproject
     assert '"mcp-openapi' not in pyproject
+
+
+def test_a_new_migration_keeps_the_code_style(repo: Path, use_venv: UseVenv) -> None:
+    service = repo / "services" / "probe-custom-postgres-mcp"
+    use_venv(service.name)
+
+    run([["uv", "run", "alembic", "revision", "-m", "create things"]], service)
+
+    (migration,) = (service / "src" / "probe_custom_postgres_mcp" / "persistence").glob(
+        "migrations/versions/*_create_things.py"
+    )
+    assert migration.read_text().startswith('"""Create things.\n')
+    run(
+        [["uv", "run", "ruff", "format", "--check", "."], ["uv", "run", "ruff", "check", "."]],
+        service,
+    )
 
 
 def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(repo: Path) -> None:
@@ -178,7 +198,7 @@ def test_the_scaffolds_registered_their_release_and_scope(repo: Path) -> None:
         dict[str, str], json.loads((repo / ".release-please-manifest.json").read_text())
     )
 
-    assert len(names) == 4, names
+    assert len(names) == 5, names
     for name in names:
         assert config["packages"][f"services/{name}"]["component"] == name
         assert manifest[f"services/{name}"] == "0.0.1"
@@ -187,3 +207,23 @@ def test_the_scaffolds_registered_their_release_and_scope(repo: Path) -> None:
             f"          - {name}\n" in (repo / ".github/workflows/release-rerun.yaml").read_text()
         )
         assert f'"!services/{name}"' in (repo / "pnpm-workspace.yaml").read_text()
+
+
+def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
+    for registry in REGISTRIES:
+        (tmp_path / registry).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / registry, tmp_path / registry)
+    options = Options(
+        name="probe-again-mcp",
+        description="Registered twice.",
+        upstream=Upstream.CUSTOM,
+        persistence=frozenset(),
+        auth=Auth.NONE,
+    )
+
+    register(options, tmp_path, release=True)
+    registered = {registry: (tmp_path / registry).read_text() for registry in REGISTRIES}
+    register(options, tmp_path, release=True)
+
+    assert {registry: (tmp_path / registry).read_text() for registry in REGISTRIES} == registered
+    assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1

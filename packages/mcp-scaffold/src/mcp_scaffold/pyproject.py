@@ -7,7 +7,7 @@ from pathlib import Path
 
 from mcp_architecture import render_importlinter
 
-from mcp_scaffold.options import Options, Upstream
+from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned, shared, source
 from mcp_scaffold.skeleton import PACKAGE
 
@@ -33,6 +33,7 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
         *pinned("service-dev"),
         shared(repo, "mcp-architecture"),
         *([shared(repo, "mcp-openapi", "[codegen]")] if openapi else []),
+        *(pinned("service-postgres-dev") if Persistence.POSTGRES in options.persistence else []),
     ]
     packages = ["mcp-architecture", *(["mcp-openapi"] if openapi else []), "mcp-runtime"]
     for old, new in [
