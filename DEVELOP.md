@@ -70,15 +70,20 @@ uv run ruff format --check . && uv run ruff check .
 pnpm exec biome check .
 uv run basedpyright
 uv run pytest
+# only in a service that depends on mcp-architecture
+uv run pytest -o addopts= -p mcp_architecture -k mcp_architecture
 ```
+
+The last run repeats mcp-architecture's checks with the service's `addopts` cleared, so its own
+pytest configuration cannot leave them out. It fails when it collects none of them.
 
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
 the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-runtime` and
 `packages/mcp-architecture` work the same way. `packages/mcp-scaffold` also runs for a change to
-`packages/mcp-runtime` or `packages/mcp-architecture`, because the MCPs its tests generate use
-both.
+`packages/mcp-runtime`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the MCPs its
+tests generate use all three: the last for an OpenAPI upstream.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.

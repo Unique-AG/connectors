@@ -1,6 +1,6 @@
 [project]
 name = "mcp-skeleton"
-version = "0.0.1"
+version = "0.0.0"
 description = "Set by mcp-scaffold"
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"

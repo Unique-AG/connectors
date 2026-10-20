@@ -1,28 +1,22 @@
 import json
 import shutil
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import cast
 
 import pytest
 
+from mcp_scaffold import commands, openapi
 from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
 from mcp_scaffold.options import Auth, Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned
 from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import scaffold
-from tests.conftest import UseVenv
+from tests.conftest import REGISTRIES, REPO, UseVenv, link_project_environment, venvs
 
-REPO = Path(__file__).parents[3]
-# What the scaffold registers a new MCP in. The tests register in copies.
-REGISTRIES = [
-    ".gitcommitizen",
-    "release-please-config.json",
-    ".release-please-manifest.json",
-    ".github/workflows/release-rerun.yaml",
-    "pnpm-workspace.yaml",
-]
 type Config = dict[str, dict[str, dict[str, object]]]
+type Scaffolded = Callable[[str], Path]
 
 
 def json_response(schema: str, code: str = "200") -> dict[str, object]:
@@ -77,26 +71,9 @@ def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return repo
 
 
-# Each option appears alone once, and the stores once together. Custom with Postgres is the one
-# server that opens a resource but takes no settings with a required field. The last is every
-# option at once, as services/architecture-demo-mcp is generated.
-@pytest.mark.parametrize(
-    ("upstream", "persistence", "auth"),
-    [
-        (Upstream.OPENAPI, {Persistence.REDIS}, Auth.NONE),
-        (Upstream.HTTP, set[Persistence](), Auth.UNIQUE),
-        (Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.NONE),
-        (Upstream.HTTP, {Persistence.POSTGRES, Persistence.REDIS}, Auth.NONE),
-        (Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}, Auth.UNIQUE),
-    ],
-)
-def test_a_scaffolded_mcp_passes_its_own_checks(
-    repo: Path, use_venv: UseVenv, upstream: Upstream, persistence: set[Persistence], auth: Auth
-) -> None:
-    name = "-".join(["probe", upstream, *sorted(persistence or {"none"}), "mcp"])
-    use_venv(name)
-    options = Options(
-        name=name,
+def probe(upstream: Upstream, persistence: set[Persistence], auth: Auth) -> Options:
+    return Options(
+        name="-".join(["probe", upstream, *sorted(persistence or {"none"}), "mcp"]),
         description="Answers questions about the probe upstream, a stand-in for a vendor API "
         "that is long enough to wrap onto a second line of the server instructions.",
         upstream=upstream,
@@ -105,7 +82,47 @@ def test_a_scaffolded_mcp_passes_its_own_checks(
         auth=auth,
     )
 
-    target = scaffold(options, repo)
+
+# Each option appears alone once, and the stores once together. Custom with Postgres is the one
+# server that opens a resource but takes no settings with a required field. The last is every
+# option at once, as services/architecture-demo-mcp is generated.
+PROBES = {
+    options.name: options
+    for options in [
+        probe(Upstream.OPENAPI, {Persistence.REDIS}, Auth.NONE),
+        probe(Upstream.HTTP, set(), Auth.UNIQUE),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.NONE),
+        probe(Upstream.HTTP, {Persistence.POSTGRES, Persistence.REDIS}, Auth.NONE),
+        probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}, Auth.UNIQUE),
+    ]
+}
+
+
+@pytest.fixture(scope="module")
+def scaffolded(repo: Path, request: pytest.FixtureRequest) -> Iterator[Scaffolded]:
+    """Scaffolds a probe the first time a test asks for it, so each test runs alone too."""
+    built: dict[str, Path] = {}
+
+    def run_linked(commands_to_run: list[list[str]], service: Path) -> None:
+        link_project_environment(service)
+        run(commands_to_run, service)
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(commands, "run", run_linked)
+        monkeypatch.setattr(openapi, "run", run_linked)
+
+        def scaffold_probe(name: str) -> Path:
+            if name not in built:
+                monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(venvs(request.config) / name))
+                built[name] = scaffold(PROBES[name], repo)
+            return built[name]
+
+        yield scaffold_probe
+
+
+@pytest.mark.parametrize("name", PROBES)
+def test_a_scaffolded_mcp_passes_its_own_checks(scaffolded: Scaffolded, name: str) -> None:
+    target = scaffolded(name)
 
     leftovers = [
         str(path.relative_to(target))
@@ -124,8 +141,8 @@ def test_a_scaffolded_mcp_passes_its_own_checks(
     assert (target / architecture).is_file()
 
 
-def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(repo: Path) -> None:
-    pyproject = (repo / "services" / "probe-custom-postgres-mcp" / "pyproject.toml").read_text()
+def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(scaffolded: Scaffolded) -> None:
+    pyproject = (scaffolded("probe-custom-postgres-mcp") / "pyproject.toml").read_text()
 
     pins = [*pinned("service"), *pinned("service-postgres"), *pinned("service-dev")]
     assert all(f'"{pin}",' in pyproject for pin in pins)
@@ -133,8 +150,8 @@ def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(repo: Path) -> None:
     assert '"mcp-openapi' not in pyproject
 
 
-def test_a_new_migration_keeps_the_code_style(repo: Path, use_venv: UseVenv) -> None:
-    service = repo / "services" / "probe-custom-postgres-mcp"
+def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: UseVenv) -> None:
+    service = scaffolded("probe-custom-postgres-mcp")
     use_venv(service.name)
 
     run([["uv", "run", "alembic", "revision", "-m", "create things"]], service)
@@ -149,9 +166,11 @@ def test_a_new_migration_keeps_the_code_style(repo: Path, use_venv: UseVenv) -> 
     )
 
 
-def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(repo: Path) -> None:
-    upstream = repo / "services" / "probe-openapi-redis-mcp" / "src" / "probe_openapi_redis_mcp"
-    upstream /= "upstream"
+def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
+    scaffolded: Scaffolded,
+) -> None:
+    service = scaffolded("probe-openapi-redis-mcp")
+    upstream = service / "src" / "probe_openapi_redis_mcp" / "upstream"
 
     assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
     assert "GET_FORECAST = Operation[Forecast]" in (upstream / "operations.py").read_text()
@@ -191,17 +210,19 @@ def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
         VendorSpec.load("spec.json", tmp_path)
 
 
-def test_the_scaffolds_registered_their_release_and_scope(repo: Path) -> None:
-    names = [path.name for path in (repo / "services").iterdir()]
+def test_the_scaffolds_registered_their_release_and_scope(
+    repo: Path, scaffolded: Scaffolded
+) -> None:
+    names = [scaffolded(name).name for name in PROBES]
     config = cast(Config, json.loads((repo / "release-please-config.json").read_text()))
     manifest = cast(
         dict[str, str], json.loads((repo / ".release-please-manifest.json").read_text())
     )
 
-    assert len(names) == 5, names
+    assert sorted(path.name for path in (repo / "services").iterdir()) == sorted(names)
     for name in names:
         assert config["packages"][f"services/{name}"]["component"] == name
-        assert manifest[f"services/{name}"] == "0.0.1"
+        assert manifest[f"services/{name}"] == "0.0.0"
         assert f"{name} = services/{name}/**" in (repo / ".gitcommitizen").read_text()
         assert (
             f"          - {name}\n" in (repo / ".github/workflows/release-rerun.yaml").read_text()
