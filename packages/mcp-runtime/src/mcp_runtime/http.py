@@ -5,9 +5,15 @@ import httpx2
 
 from mcp_runtime.settings import RetrySettings
 
+# A 503 may come from a gateway after the upstream applied the request, so only a request that is
+# safe to apply twice is sent again on it. A 429 means the upstream turned the request away.
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE"})
+_TOO_MANY_REQUESTS = 429
+
 
 class RetryingTransport(httpx2.AsyncBaseTransport):
-    """Sends a request again on a status in `retry.statuses`.
+    """Sends a request again on a status in `retry.statuses`: any request on a 429, and only an
+    idempotent one on another status.
 
     It waits for the response's `Retry-After`, or an exponential backoff without one, as long as
     the wait stays within `retry.max_wait_seconds`.
@@ -23,7 +29,7 @@ class RetryingTransport(httpx2.AsyncBaseTransport):
         response = await self._inner.handle_async_request(request)
         while (
             attempt < self._retry.max_attempts
-            and (delay := self._delay(response, attempt)) is not None
+            and (delay := self._delay(request, response, attempt)) is not None
         ):
             await response.aclose()
             await asyncio.sleep(delay)
@@ -35,8 +41,12 @@ class RetryingTransport(httpx2.AsyncBaseTransport):
     async def aclose(self) -> None:
         await self._inner.aclose()
 
-    def _delay(self, response: httpx2.Response, attempt: int) -> float | None:
+    def _delay(
+        self, request: httpx2.Request, response: httpx2.Response, attempt: int
+    ) -> float | None:
         if response.status_code not in self._retry.statuses:
+            return None
+        if response.status_code != _TOO_MANY_REQUESTS and request.method not in _IDEMPOTENT_METHODS:
             return None
         retry_after = response.headers.get("Retry-After", "")
         if not retry_after.isdigit():

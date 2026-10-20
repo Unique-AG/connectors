@@ -7,8 +7,28 @@ from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mcp_runtime.settings.config import shared_config
+from mcp_runtime.settings.hosts import url_host
 
 SslMode = Literal["disable", "allow", "prefer", "require", "verify-ca", "verify", "verify-full"]
+# SQLAlchemy passes each URL parameter to asyncpg.connect, which rejects these libpq ones.
+_LIBPQ_ONLY = frozenset(
+    {
+        "channel_binding",
+        "gssencmode",
+        "requiressl",
+        "ssl_max_protocol_version",
+        "ssl_min_protocol_version",
+        "sslcert",
+        "sslcompression",
+        "sslcrl",
+        "sslcrldir",
+        "sslkey",
+        "sslmode",
+        "sslpassword",
+        "sslrootcert",
+        "sslsni",
+    }
+)
 
 
 class AsyncpgConnectArgs(TypedDict, total=False):
@@ -20,7 +40,7 @@ class PostgresSettings(BaseSettings):
 
     Either a URL or the discrete fields. The base Helm chart injects `DATABASE_URL`, and
     `PG_DATABASE_SSL_MODE` beside it because a CloudNativePG URL carries no `sslmode`. An
-    `sslmode` in the URL wins over it.
+    `sslmode` or `sslrootcert` in the URL wins over the setting beside it.
     """
 
     model_config: ClassVar[SettingsConfigDict] = shared_config("DB_")
@@ -62,14 +82,10 @@ class PostgresSettings(BaseSettings):
 
     @property
     def connection_url(self) -> str:
-        """The URL for `create_async_engine`. asyncpg rejects libpq's `sslmode` and
-        `channel_binding` parameters, so they are dropped here and passed as `connect_args`."""
+        """The URL for `create_async_engine`, without the libpq parameters asyncpg rejects.
+        `sslmode` and `sslrootcert` reach it through `connect_args` instead."""
         parts = urlsplit(self._raw_url)
-        query = [
-            (key, value)
-            for key, value in parse_qsl(parts.query)
-            if key not in {"sslmode", "channel_binding"}
-        ]
+        query = [(key, value) for key, value in parse_qsl(parts.query) if key not in _LIBPQ_ONLY]
         return urlunsplit(parts._replace(scheme="postgresql+asyncpg", query=urlencode(query)))
 
     @property
@@ -77,9 +93,9 @@ class PostgresSettings(BaseSettings):
         sslmode = self._sslmode
         if sslmode is None:
             return {}
-        cafile = (
-            str(self.ssl_root_cert) if self.ssl_root_cert and self.ssl_root_cert.is_file() else None
-        )
+        in_url = self._url_parameter("sslrootcert")
+        root_cert = Path(in_url) if in_url is not None else self.ssl_root_cert
+        cafile = str(root_cert) if root_cert and root_cert.is_file() else None
         match sslmode:
             # asyncpg takes libpq's mode names, and only a name lets "allow" and "prefer" fall
             # back to plain text: an SSLContext makes TLS mandatory.
@@ -107,9 +123,13 @@ class PostgresSettings(BaseSettings):
         credentials = (
             f"{quote(self.user, safe='')}:{quote(self.password.get_secret_value(), safe='')}"
         )
-        return f"postgresql://{credentials}@{self.host}:{self.port}/{quote(self.name, safe='')}"
+        host = url_host(self.host)
+        return f"postgresql://{credentials}@{host}:{self.port}/{quote(self.name, safe='')}"
 
     @property
     def _sslmode(self) -> SslMode | None:
-        in_url = dict(parse_qsl(urlsplit(self._raw_url).query)).get("sslmode")
+        in_url = self._url_parameter("sslmode")
         return self.ssl_mode if in_url is None else cast(SslMode, in_url)
+
+    def _url_parameter(self, key: str) -> str | None:
+        return dict(parse_qsl(urlsplit(self._raw_url).query)).get(key)

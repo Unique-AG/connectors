@@ -75,6 +75,14 @@ def test_the_mcps_own_middleware_runs_after_the_guard(client: TestClient) -> Non
     assert "x-own" not in rejected.headers
 
 
+def test_cors_lets_a_browser_client_read_the_auth_and_session_headers(client: TestClient) -> None:
+    headers = {**MCP_HEADERS, "Host": LOCAL_HOST, "Origin": "http://localhost:6274"}
+
+    response = client.post("/mcp", json=PING, headers=headers)
+
+    assert response.headers["access-control-expose-headers"] == "WWW-Authenticate, Mcp-Session-Id"
+
+
 def test_server_settings_default_to_a_local_origin_and_the_inspector() -> None:
     settings = ServerSettings()
 
