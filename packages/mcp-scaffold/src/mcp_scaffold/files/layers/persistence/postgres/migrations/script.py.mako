@@ -1,14 +1,19 @@
-"""${message}
+<% summary = (message or "Migration").rstrip(".!?") %>\
+"""${summary[:1].upper() + summary[1:]}.
 
 Revision ID: ${up_revision}
+% if down_revision:
 Revises: ${down_revision | comma,n}
+% else:
+Revises: none, the first revision
+% endif
 Create Date: ${create_date}
-
 """
+
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
+import sqlalchemy as sa
 ${imports if imports else ""}
 
 revision: str = ${repr(up_revision)}

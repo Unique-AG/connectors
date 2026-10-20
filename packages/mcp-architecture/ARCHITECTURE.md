@@ -8,8 +8,9 @@ rule fails `uv run pytest`, and the failure names the import or folder at fault.
 `<package>` below is the MCP's Python package, `weather_mcp` for `services/weather-mcp`.
 
 `services/architecture-demo-mcp` is an MCP the scaffold generated, with a working example on
-top, against a fictional catalog API: `search_products`, `get_product` and `place_order`. Every
-example path below is in that service. Read it next to this file when you write a feature, a
+top, against Tiingo's market data API, with a Postgres watchlist and a Redis quote cache:
+`search_assets`, `get_asset`, `get_quote`, `add_to_watchlist`, `get_watchlist` and
+`remove_from_watchlist`. Every example path below is in that service. Read it next to this file when you write a feature, a
 tool or a test.
 
 ## What the MCP owns and what it shares
@@ -53,10 +54,10 @@ main.py ─▶ mcp ─▶ contexts ─▶ upstream ─┐
 |---|---|
 | A layer only imports the layers below it. | `layers` contract |
 | A layer is imported through its top level, `from <package>.upstream import X`, never `from <package>.upstream.client import X`. Inside a layer, deep imports are fine. | `protected` contracts |
-| A feature is imported through its top level, `from <package>.contexts.products import get_product`, also by other features. Inside a feature, deep imports are fine. | `feature_privacy` contract |
+| A feature is imported through its top level, `from <package>.contexts.assets import get_asset`, also by other features. Inside a feature, deep imports are fine. | `feature_privacy` contract |
 | Features do not import each other in a cycle (`a → b → c → a`). | `acyclic_siblings` contract |
 | A command may import queries. A query never imports a command, in its own feature or another, directly or through other modules. | `command_query_separation` contract |
-| `contexts/` is flat. Each folder in it is a feature, a package named for its domain (`orders`). | `feature-packages` rule |
+| `contexts/` is flat. Each folder in it is a feature, a package named for its domain (`watchlists`). | `feature-packages` rule |
 | A feature holds only `commands/` and `queries/` folders, and those hold no folder deeper than one per command or query. | `feature-folders` rule |
 | A tool folder does not nest. | `tool-folders` rule |
 | Every folder with Python code has an `__init__.py`. import-linter does not see the others. | ruff `INP001` |
@@ -117,15 +118,16 @@ abstraction: a context calls the client's own API, so changing the client change
 
 ## contexts
 
-A feature is one domain concept, named in the plural of what it handles: `products`, `orders`,
-`invoices`. Features sit side by side. A feature never contains another feature.
+A feature is one domain concept, named in the plural of what it handles: `assets`, `quotes`,
+`watchlists`. Features sit side by side. A feature never contains another feature.
 
 Split a feature into what changes state and what reads it:
 
 - `commands/`: places, creates, updates or deletes something upstream or in storage.
-- `queries/`: reads, and changes nothing.
+- `queries/`: reads, and changes nothing. A cache it fills changes nothing a caller sees, so
+  `quotes.get_quote` is still a query though it writes to Redis.
 
-A command may call queries, as `place_order` calls `products.get_product` to check stock. A
+A command may call queries, as `add_to_watchlist` calls `assets.get_asset` to check the ticker. A
 query never reaches a command or anything inside `commands/`, including a command's input or
 output model. A model both sides need goes in a file at the feature's top level. The contract
 follows what a module takes from another feature's top level, so a query may still import
@@ -134,33 +136,36 @@ another feature's queries from there.
 Start small and grow only when the code asks for it:
 
 1. A query or command starts as one file, with its small models inline:
-   `contexts/products/queries/get_product.py` holds `ProductDetails` and `get_product`.
+   `contexts/assets/queries/get_asset.py` holds `AssetDetails` and `get_asset`.
 2. When its inputs or outputs grow past about ten lines, it becomes a folder with the inputs,
    the outputs and the implementation apart:
 
    ```
-   contexts/orders/commands/place_order/
+   contexts/watchlists/commands/add_to_watchlist/
    ├── __init__.py
-   ├── inputs.py        PlaceOrderInput
-   ├── outputs.py       PlacedOrder, OrderRejectedError
-   └── place_order.py   place_order()
+   ├── inputs.py             AddToWatchlistInput
+   ├── outputs.py            AddedToWatchlist, WatchlistRejectedError
+   └── add_to_watchlist.py   add_to_watchlist()
    ```
 
 3. Nothing nests deeper than that. A model several commands or queries share goes in a file at
-   the feature's top level, such as `contexts/orders/models.py`. It does not go in a new folder.
+   the feature's top level, such as `contexts/watchlists/models.py`. It does not go in a new folder.
 
 A module reads top down: the one public function first, then the private helpers it calls, then
 its models. Python 3.14 evaluates annotations lazily, so a function may return a model defined
 below it. Every function takes keyword arguments only, so a call names what it passes:
 
 ```python
-async def place_order(*, upstream: Upstream, order: PlaceOrderInput) -> PlacedOrder:
-    product = await get_product(upstream=upstream, product_id=order.product_id)
-    _check_stock(product=product, order=order)
+async def add_to_watchlist(
+    *, upstream: Upstream, persistence: Persistence, entry: AddToWatchlistInput
+) -> AddedToWatchlist:
+    asset = await get_asset(upstream=upstream, ticker=entry.ticker)
+    watched = await list_watchlist(persistence=persistence, watchlist=entry.watchlist)
+    _check_room(ticker=asset.ticker, watchlist=entry.watchlist, watched=watched)
     ...
 
 
-def _check_stock(*, product: ProductDetails, order: PlaceOrderInput) -> None: ...
+def _check_room(*, ticker: str, watchlist: str, watched: list[WatchlistEntry]) -> None: ...
 ```
 
 Extract a private helper when it names a step, not to split a function that reads fine whole.
@@ -171,9 +176,9 @@ A context:
   globals or the FastMCP context.
 - Returns its own pydantic models, never the upstream's. Map the vendor's field names to
   snake_case here, so a vendor change stops at this layer.
-- Knows nothing about MCP. It raises its own errors (`OrderRejectedError`), not `ToolError`.
-- May use another feature through that feature's top level: `place_order` checks stock with
-  `products.get_product`. If two features need each other, the shared part is a third feature.
+- Knows nothing about MCP. It raises its own errors (`WatchlistRejectedError`), not `ToolError`.
+- May use another feature through that feature's top level: `get_watchlist` prices each
+  ticker with `quotes.get_quote`. If two features need each other, the shared part is a third feature.
 
 ## mcp
 
@@ -187,24 +192,24 @@ A context:
   `mcp.add_middleware(...)`.
 - `tools/`: `FileSystemProvider` discovers every `@tool` under it. A new tool file is picked up
   with no registration step. If one fails to import, the server refuses to start.
-- A tool starts as one file, `tools/get_product.py`. It becomes a folder when its inputs or
+- A tool starts as one file, `tools/get_asset.py`. It becomes a folder when its inputs or
   responses grow past about ten lines:
 
   ```
-  mcp/tools/place_order/
+  mcp/tools/add_to_watchlist/
   ├── __init__.py
-  ├── place_order.py             the @tool
-  ├── place_order_inputs.py      Annotated parameter types
-  └── place_order_responses.py   only if the tool reshapes what the context returns
+  ├── add_to_watchlist.py             the @tool
+  ├── add_to_watchlist_inputs.py      Annotated parameter types
+  └── add_to_watchlist_responses.py   only if the tool reshapes what the context returns
   ```
 
 - An input or response several tools share goes in `mcp/inputs/<name>.py` or
-  `mcp/responses/<name>.py`, as `ProductId` does in `mcp/inputs/product_id.py`.
+  `mcp/responses/<name>.py`, as `Ticker` does in `mcp/inputs/ticker.py`.
 - A tool is thin. It turns parameters into the context's input, calls one context function,
   and turns the context's errors into `ToolError`. It holds no business rule.
 - Every parameter is `Annotated[..., Field(description=...)]`. The description and the
   docstring are what the model reads, so say when to call the tool and what its ids feed into.
-- Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only.
+- Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only, and one that deletes is destructive, as `remove_from_watchlist` is.
 - Return the context's model unless the tool needs another shape.
 
 ## upstream
@@ -216,7 +221,7 @@ variables either way.
   tool in one of two ways:
   - **Served from the spec.** List its operationId in `EXPOSED` in `upstream/routes.py`.
     `upstream_tools` serves it with the name, arguments and output schema the spec gives
-    (`getOrder` becomes `get_order`), with no context and no code. It says what the spec
+    (`getDailyPrices` becomes `get_daily_prices`), with no context and no code. It says what the spec
     says, so the description check skips it, and retries do not apply to it.
   - **A tool of our own.** List the operationId under `operation-ids` in `[tool.mcp-openapi]`
     and run `uv run mcp-openapi-codegen`. It writes `vendor_responses.py` and `operations.py`;
@@ -229,7 +234,7 @@ variables either way.
   served, and typed for when it is promoted. Serve more operations to grow the first version.
   Promote one when its output needs trimming or renaming, or a business rule, or when several
   operations make one tool: remove it from `EXPOSED` and write the tool, as
-  `services/architecture-demo-mcp` did for `get_product` and left `get_order` served.
+  `services/architecture-demo-mcp` did for `getDailyMeta`, now `get_asset`, and left `get_daily_prices` served.
   `upstream_http` builds the one client both kinds share, so they send the same auth.
 
   When the vendor changes the spec:
@@ -262,14 +267,16 @@ holds each of them as a field, so adding a store later changes no existing calle
 - **Postgres.** `persistence.database` is an `async_sessionmaker`:
   `async with persistence.database() as session`. Models subclass `persistence.Base` in
   `persistence/models.py`. `uv run alembic revision --autogenerate -m "<what changed>"` writes a
-  migration into `persistence/migrations/versions/`, and the chart's migration hook runs
-  `alembic upgrade head` before each rollout. The base chart injects `DATABASE_URL`.
-- **Redis.** `persistence.store` is a `py-key-value-aio` `RedisStore` with `get`, `put`,
-  `delete` and a TTL per entry. `StoreSettings` is `mcp_runtime.RedisSettings`, set by
-  `REDIS_URL`.
+  migration into `persistence/migrations/versions/` and runs ruff over it, so it keeps the code
+  style. The chart's migration hook runs `alembic upgrade head` before each rollout. The base
+  chart injects `DATABASE_URL`.
+- **Redis.** `persistence.store` is a `py-key-value-aio` `RedisStore`, typed as the
+  `AsyncKeyValue` protocol, with `get`, `put`, `delete` and a TTL per entry. `StoreSettings` is
+  `mcp_runtime.RedisSettings`, set by `REDIS_URL`.
 
 Contexts depend on what is stored, never on SQLAlchemy or Redis directly. Expose functions or
-models from `persistence/__init__.py` that say what they store.
+models from `persistence/__init__.py` that say what they store, as the demo's
+`persistence/watchlists.py` and `persistence/quote_cache.py` do.
 
 ## telemetry
 
@@ -317,9 +324,14 @@ own.
 
 ## Tests
 
-- In the demo, `tests/conftest.py` holds `FakeCatalog`, the upstream answering through
+- In the demo, `tests/conftest.py` holds `FakeTiingo`, the upstream answering through
   `httpx2.MockTransport`, and a `call_tool` fixture that calls a tool through a real FastMCP
   `Client`. Test tools this way, end to end through the context to the fake upstream.
+- CI runs no Postgres or Redis. `create_server` takes the function that opens the persistence,
+  so the `persistence` fixture in `tests/conftest.py` opens SQLite through `aiosqlite` and a
+  `MemoryStore` in their place. That is why `Store` is typed as the `AsyncKeyValue` protocol.
+  SQLite is not Postgres: a test that needs Postgres behaviour, such as a timezone or a JSON
+  column, needs a real database.
 - `tests/test_server.py` covers the ops routes and the host and origin guard, through the
   MCP's own `http_middleware`.
 - `mcp-architecture`'s plugin adds the architecture's checks, listed under
