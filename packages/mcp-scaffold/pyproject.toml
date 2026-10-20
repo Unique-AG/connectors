@@ -38,6 +38,7 @@ service = [
     "starlette==1.8.0",
     "tenacity==9.1.4",
     "unique-mcp==2026.44.0.dev1",
+    "unique-sdk==2026.44.0.dev10",
     "unique-toolkit[monitoring,otel]==2026.44.0.dev2",
     "uvicorn[standard]==0.53.0",
 ]
