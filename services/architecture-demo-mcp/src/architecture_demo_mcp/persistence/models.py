@@ -12,6 +12,11 @@ class Base(DeclarativeBase):
 
 
 class WatchlistEntryRow(Base):
+    """Every user of the server shares a watchlist, as the table has no owner column yet.
+
+    Once auth lands, the owner joins the primary key.
+    """
+
     __tablename__: str = "watchlist_entries"
 
     watchlist: Mapped[str] = mapped_column(String(64), primary_key=True)

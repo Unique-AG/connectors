@@ -75,10 +75,9 @@ class FakeTiingo:
                 return httpx2.Response(200, json=FUND_META)
             case "GET", "/tiingo/daily/ACME/prices", bytes():
                 return httpx2.Response(200, json=ACME_DAILY_PRICES)
-            case "GET", "/iex", b"tickers=ACME":
-                return httpx2.Response(200, json=[ACME_TOP_OF_BOOK])
             case "GET", "/iex", bytes():
-                return httpx2.Response(200, json=[])
+                tickers = request.url.params["tickers"].split(",")
+                return httpx2.Response(200, json=[ACME_TOP_OF_BOOK] if "ACME" in tickers else [])
             case _:
                 return httpx2.Response(404, json={"detail": "Not found."})
 
@@ -108,7 +107,11 @@ def upstream_transport(tiingo: FakeTiingo) -> httpx2.MockTransport:
 
 @pytest.fixture
 async def persistence() -> AsyncGenerator[Persistence]:
-    """SQLite and an in-memory store in place of Postgres and Redis, shared by every client."""
+    """SQLite and an in-memory store in place of Postgres and Redis, shared by every client.
+
+    StaticPool hands every session the one connection, so writes never run side by side here. A
+    test of two writes racing needs a real Postgres.
+    """
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

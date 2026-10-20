@@ -30,7 +30,7 @@
           "type": "string"
         },
         "watchlist": {
-          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists.",
           "maxLength": 64,
           "minLength": 1,
           "type": "string"
@@ -394,7 +394,7 @@
       "additionalProperties": false,
       "properties": {
         "watchlist": {
-          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists.",
           "maxLength": 64,
           "minLength": 1,
           "type": "string"
@@ -487,7 +487,7 @@
           "type": "string"
         },
         "watchlist": {
-          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists.",
           "maxLength": 64,
           "minLength": 1,
           "type": "string"
