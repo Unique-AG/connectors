@@ -1,15 +1,5 @@
-# The code style every MCP keeps: the Google Python Style Guide
-# (https://google.github.io/styleguide/pyguide.html) as far as ruff can check it, and a few rules
-# of our own. Every MCP's [tool.ruff] extends this file, and mcp-architecture's code-style rule
-# runs it on the MCP's code whatever its own [tool.ruff] says.
-#
-# Where the MCPs depart from the guide:
-# - Lines run to 100 characters, not 80.
-# - A docstring is only for what the code cannot say, so D1 (missing docstring) is off. A
-#   docstring that is written keeps Google's format.
-#
-# What ruff cannot check is left to review: importing modules rather than names (2.2), the
-# power features (2.19) and function length (3.18).
+# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
+# packages/mcp-architecture/ARCHITECTURE.md lists where it departs from the guide.
 line-length = 100
 
 [lint]
