@@ -3,14 +3,20 @@ from typing import cast
 from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
+import httpx2
 from mcp_types import TextContent
 from sqlalchemy import text
 
+from architecture_demo_mcp.contexts.quotes.queries.get_quotes import get_quotes
 from architecture_demo_mcp.persistence import add_watchlist_entry
 from architecture_demo_mcp.persistence import list_watchlist
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.persistence import WatchlistRefusal
+from architecture_demo_mcp.upstream.client import open_upstream
+from architecture_demo_mcp.upstream.client import upstream_http
+from architecture_demo_mcp.upstream.settings import UpstreamSettings
 from tests.conftest import ACME_DAILY_PRICES
+from tests.conftest import ACME_TOP_OF_BOOK
 from tests.conftest import CallTool
 from tests.conftest import FakeTiingo
 
@@ -148,6 +154,24 @@ async def test_add_to_watchlist_rejects_an_unknown_ticker_without_storing_it(
 
     assert "404 Not Found" in _error_text(result)
     assert watchlist.structured_content == {"result": []}
+
+
+async def test_get_quotes_keeps_a_quote_when_the_vendor_ticker_case_differs(
+    persistence: Persistence, upstream_settings: UpstreamSettings
+) -> None:
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.params["tickers"] == "Acme"
+        return httpx2.Response(200, json=[{**ACME_TOP_OF_BOOK, "ticker": "acme"}])
+
+    async with (
+        upstream_http(upstream_settings, httpx2.MockTransport(respond)) as http,
+        open_upstream(http, upstream_settings) as upstream,
+    ):
+        quotes = await get_quotes(upstream=upstream, persistence=persistence, tickers=["Acme"])
+
+    assert set(quotes) == {"Acme"}
+    assert quotes["Acme"].ticker == "Acme"
+    assert quotes["Acme"].last_price == 101.25
 
 
 async def test_get_watchlist_lists_each_ticker_with_its_price(call_tool: CallTool) -> None:

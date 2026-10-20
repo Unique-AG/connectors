@@ -12,10 +12,7 @@ class Base(DeclarativeBase):
 
 
 class WatchlistEntryRow(Base):
-    """Every user of the server shares a watchlist, as the table has no owner column yet.
-
-    Once auth lands, the owner joins the primary key.
-    """
+    """Shared by every user until auth adds an owner to the primary key."""
 
     __tablename__: str = "watchlist_entries"
 
