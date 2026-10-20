@@ -12,7 +12,7 @@ SslMode = Literal["disable", "allow", "prefer", "require", "verify-ca", "verify"
 
 
 class AsyncpgConnectArgs(TypedDict, total=False):
-    ssl: ssl.SSLContext | Literal["disable", "allow"]
+    ssl: ssl.SSLContext | Literal["disable", "allow", "prefer"]
 
 
 class PostgresSettings(BaseSettings):
@@ -81,9 +81,11 @@ class PostgresSettings(BaseSettings):
             str(self.ssl_root_cert) if self.ssl_root_cert and self.ssl_root_cert.is_file() else None
         )
         match sslmode:
-            case "disable" | "allow":
+            # asyncpg takes libpq's mode names, and only a name lets "allow" and "prefer" fall
+            # back to plain text: an SSLContext makes TLS mandatory.
+            case "disable" | "allow" | "prefer":
                 return {"ssl": sslmode}
-            case "prefer" | "require":
+            case "require":
                 context = ssl.create_default_context()
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
