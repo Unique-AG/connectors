@@ -27,6 +27,7 @@ select = [
     "PTH",               # pathlib over os.path
     "RET",               # consistent returns, no else after return
     "INP",               # import-linter does not see a folder of Python code without an __init__.py
+    "PGH004",            # a noqa names the rule it turns off
 ]
 ignore = [
     "D1",                # a docstring only for what the code cannot say

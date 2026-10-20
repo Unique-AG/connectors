@@ -1,9 +1,12 @@
 """The rules a scaffolded MCP keeps. Each check returns what breaks it, empty when it holds."""
 
 import ast
+import io
 import json
+import re
 import subprocess
 import sys
+import tokenize
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import cast
@@ -11,7 +14,7 @@ from typing import cast
 from importlinter.api import read_configuration  # pyright: ignore[reportUnknownVariableType]
 from importlinter.application.output import console
 from importlinter.cli import lint_imports
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from ruff.__main__ import find_ruff_bin
 
 from mcp_architecture.contracts import CONTRACT_TYPES, required_contracts
@@ -25,8 +28,10 @@ _SESSION_OPTIONS = {"root_packages", "contract_types", "include_external_package
 _RUFF_RULES = ["INP001", "N999", "TID252"]
 _CODE_STYLE = Path(__file__).parent / "code_style.toml"
 _TYPE_CHECK = Path(__file__).parent / "type_check.json"
-# Besides a report's severity, what loosens the type check of the whole service.
-_LOOSENING_OPTIONS = {"typeCheckingMode", "ignore"}
+# What [tool.basedpyright] may set besides restating type_check.json or making a report stricter.
+_SERVICE_TYPE_CHECK_OPTIONS = {"extends", "venv", "venvPath", "pythonVersion"}
+_TYPE_CHECKED = ["src", "tests"]
+_PYRIGHT_COMMENT = re.compile(r"#\s*pyright:\s*(?P<directive>.*)")
 
 
 class Rule(BaseModel, frozen=True):
@@ -67,7 +72,7 @@ def _every_required_contract_is_declared(service: Service) -> list[str]:
             if kind not in CONTRACT_TYPES and kind.split(":")[0].strip() in required_types
         ),
     ]
-    for contract in required:
+    for contract in map(_as_read_back, required):
         name = str(contract["name"])
         actual = declared.get(name)
         if actual is None:
@@ -77,66 +82,45 @@ def _every_required_contract_is_declared(service: Service) -> list[str]:
     return problems
 
 
+def _as_read_back(contract: dict[str, object]) -> dict[str, object]:
+    """import-linter reads a TOML boolean back as the string `True` or `False`."""
+    return {
+        key: str(value) if isinstance(value, bool) else value for key, value in contract.items()
+    }
+
+
 def _package_keeps_the_ruff_rules_the_architecture_relies_on(service: Service) -> list[str]:
     """Runs ruff with the service's own configuration and `noqa` comments ignored, so neither
     can turn these rules off."""
-    result = subprocess.run(
-        [
-            find_ruff_bin(),
-            "check",
-            "--isolated",
-            "--ignore-noqa",
-            "--no-cache",
-            "--quiet",
-            "--output-format=concise",
-            f"--select={','.join(_RUFF_RULES)}",
-            '--config=lint.flake8-tidy-imports.ban-relative-imports="all"',
-            str(service.source.relative_to(service.root)),
-        ],
-        cwd=service.root,
-        capture_output=True,
-        text=True,
-        check=False,
+    return _ruff(
+        service,
+        "--isolated",
+        "--ignore-noqa",
+        f"--select={','.join(_RUFF_RULES)}",
+        '--config=lint.flake8-tidy-imports.ban-relative-imports="all"',
+        str(service.source.relative_to(service.root)),
     )
-    assert result.returncode in (0, 1), f"ruff failed: {result.stderr}"
-    return result.stdout.splitlines()
 
 
 def _code_keeps_the_style(service: Service) -> list[str]:
     """Runs ruff with the code style every MCP shares, so the service's own [tool.ruff] cannot
-    loosen it. A `noqa` with a reason beside it still can, as Google's guide allows. The code
-    generated from a vendor's spec keeps the vendor's names, so it is left out."""
-    files = [
-        path
-        for folder in (service.source, service.root / "tests")
-        for path in folder.rglob("*.py")
-        if path not in service.generated
-    ]
-    result = subprocess.run(
-        [
-            find_ruff_bin(),
-            "check",
-            f"--config={_CODE_STYLE}",
-            f"--config=lint.isort.known-first-party=[{service.package!r}]",
-            f"--target-version=py{sys.version_info.major}{sys.version_info.minor}",
-            "--no-cache",
-            "--quiet",
-            "--output-format=concise",
-            *sorted(str(path.relative_to(service.root)) for path in files),
-        ],
-        cwd=service.root,
-        capture_output=True,
-        text=True,
-        check=False,
+    loosen it. A `noqa` naming its rule still can, as Google's guide allows. The code generated
+    from a vendor's spec keeps the vendor's names, so it is left out."""
+    files = [path for path in _python_files(service) if path not in service.generated]
+    return _ruff(
+        service,
+        f"--config={_CODE_STYLE}",
+        f"--config=lint.isort.known-first-party=[{service.package!r}]",
+        f"--target-version=py{sys.version_info.major}{sys.version_info.minor}",
+        *sorted(str(path.relative_to(service.root)) for path in files),
     )
-    assert result.returncode in (0, 1), f"ruff failed: {result.stderr}"
-    return result.stdout.splitlines()
 
 
 def _type_check_keeps_the_strictness(service: Service) -> list[str]:
-    """basedpyright lets a key in [tool.basedpyright] override the config it extends, and a
-    pyrightconfig.json replaces that table altogether. So a report may only be made stricter, or
-    restated as the shared config has it."""
+    """basedpyright lets a key in [tool.basedpyright] override the config it extends, a
+    pyrightconfig.json replace that table altogether, and a `# pyright:` comment change the check
+    of one file. So the table may only set what is the service's own, restate the shared config
+    or make a report stricter, and a comment may only ignore a named rule on its line."""
     shared = cast(dict[str, object], json.loads(_TYPE_CHECK.read_text()))
     table = service.type_check
     extends = table.get("extends")
@@ -149,19 +133,30 @@ def _type_check_keeps_the_strictness(service: Service) -> list[str]:
     problems.extend(
         f"[tool.basedpyright] may not set {key} = {value!r}"
         for key, value in table.items()
-        if value != shared.get(key)
-        and (
-            key in _LOOSENING_OPTIONS or (key.startswith("report") and value not in (True, "error"))
-        )
+        if not _keeps_the_type_check(key=key, value=value, shared=shared)
+    )
+    problems.extend(
+        f"{path.relative_to(service.root)}:{line}: a `# pyright:` comment may only be "
+        f"`ignore[rule]`, not `{directive}`"
+        for path in _python_files(service)
+        for line, directive in _pyright_directives(path)
+        if not directive.startswith("ignore[")
     )
     return problems
 
 
 def _features_are_packages(service: Service) -> list[str]:
     return [
-        f"{feature.name} needs an __init__.py"
-        for feature in _folders(service.contexts)
-        if not (feature / "__init__.py").is_file()
+        *(
+            f"{feature.name} needs an __init__.py"
+            for feature in _folders(service.contexts)
+            if not (feature / "__init__.py").is_file()
+        ),
+        *(
+            f"contexts/{path.name} belongs in a feature"
+            for path in sorted(service.contexts.glob("*"))
+            if path.is_file() and path.name != "__init__.py"
+        ),
     ]
 
 
@@ -241,6 +236,65 @@ def _context_functions_take_keyword_arguments_only(service: Service) -> list[str
     ]
 
 
+class _Location(BaseModel):
+    row: int
+    column: int
+
+
+class _Diagnostic(BaseModel):
+    filename: Path
+    location: _Location
+    code: str | None
+    message: str
+
+
+_DIAGNOSTICS = TypeAdapter(list[_Diagnostic])
+
+
+def _ruff(service: Service, *arguments: str) -> list[str]:
+    """JSON output carries no colour, whatever FORCE_COLOR says."""
+    result = subprocess.run(
+        [find_ruff_bin(), "check", "--no-cache", "--quiet", "--output-format=json", *arguments],
+        cwd=service.root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode in (0, 1), f"ruff failed: {result.stderr}"
+    return [
+        f"{diagnostic.filename.relative_to(service.root)}:{diagnostic.location.row}:"
+        f"{diagnostic.location.column}: {diagnostic.code} {diagnostic.message}"
+        for diagnostic in _DIAGNOSTICS.validate_json(result.stdout or "[]")
+    ]
+
+
+def _keeps_the_type_check(*, key: str, value: object, shared: dict[str, object]) -> bool:
+    if key == "include":
+        return value == _TYPE_CHECKED
+    return (
+        key in _SERVICE_TYPE_CHECK_OPTIONS
+        or value == shared.get(key)
+        or (key.startswith("report") and value in (True, "error"))
+    )
+
+
+def _python_files(service: Service) -> list[Path]:
+    return sorted(
+        path
+        for folder in (service.source, service.root / "tests")
+        for path in folder.rglob("*.py")
+        if "__pycache__" not in path.parts
+    )
+
+
+def _pyright_directives(path: Path) -> Iterator[tuple[int, str]]:
+    tokens = tokenize.generate_tokens(io.StringIO(path.read_text()).readline)
+    for token in tokens:
+        match = _PYRIGHT_COMMENT.match(token.string) if token.type == tokenize.COMMENT else None
+        if match:
+            yield token.start[0], match["directive"].strip()
+
+
 def _folders(parent: Path) -> Iterator[Path]:
     if not parent.is_dir():
         return iter(())
@@ -263,9 +317,14 @@ def _functions(body: list[ast.stmt]) -> list[ast.FunctionDef | ast.AsyncFunction
 
 def _is_re_export(node: ast.stmt) -> bool:
     is_docstring = isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
-    is_all = isinstance(node, ast.Assign) and [
-        target.id for target in node.targets if isinstance(target, ast.Name)
-    ] == ["__all__"]
+    targets = (
+        node.targets
+        if isinstance(node, ast.Assign)
+        else [node.target]
+        if isinstance(node, ast.AnnAssign)
+        else []
+    )
+    is_all = [target.id for target in targets if isinstance(target, ast.Name)] == ["__all__"]
     return isinstance(node, ast.ImportFrom) or is_docstring or is_all
 
 
@@ -300,12 +359,15 @@ RULES = [
     Rule(
         name="type-check",
         summary="[tool.basedpyright] extends mcp-architecture's type_check.json, basedpyright's "
-        "`all` mode, and turns no report down, whatever it sets.",
+        "`all` mode. Besides extends, venv, venvPath, pythonVersion and include = "
+        '["src", "tests"], it only restates the shared config or makes a report stricter. A '
+        "`# pyright:` comment only ignores a named rule on its line.",
         check=_type_check_keeps_the_strictness,
     ),
     Rule(
         name="feature-packages",
-        summary="Each folder in contexts/ is a feature, a package with an __init__.py.",
+        summary="Each folder in contexts/ is a feature, a package with an __init__.py, and "
+        "contexts/ holds no module of its own besides its __init__.py.",
         check=_features_are_packages,
     ),
     Rule(
