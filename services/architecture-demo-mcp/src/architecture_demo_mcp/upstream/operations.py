@@ -2,8 +2,12 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
-from architecture_demo_mcp.upstream.vendor_responses import TestConnectionResponse
+from architecture_demo_mcp.upstream.vendor_responses import DailyMeta
+from architecture_demo_mcp.upstream.vendor_responses import IexTopOfBook
+from architecture_demo_mcp.upstream.vendor_responses import SearchResult
 
-TEST_CONNECTION = Operation[TestConnectionResponse](
-    "testConnection", TypeAdapter(TestConnectionResponse)
+SEARCH_ASSETS = Operation[list[SearchResult]]("searchAssets", TypeAdapter(list[SearchResult]))
+GET_DAILY_META = Operation[DailyMeta]("getDailyMeta", TypeAdapter(DailyMeta))
+GET_IEX_TOP_OF_BOOK = Operation[list[IexTopOfBook]](
+    "getIexTopOfBook", TypeAdapter(list[IexTopOfBook])
 )
