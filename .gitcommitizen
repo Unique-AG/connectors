@@ -24,6 +24,7 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
+architecture-demo-mcp = services/architecture-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
@@ -42,9 +43,12 @@ exp-tiingo-mcp = services/exp-tiingo-mcp/**
 aes-gcm-encryption = packages/aes-gcm-encryption/**
 instrumentation = packages/instrumentation/**
 logger = packages/logger/**
+mcp-architecture = packages/mcp-architecture/**
 mcp-credential-auth = packages/mcp-credential-auth/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-openapi = packages/mcp-openapi/**
+mcp-runtime = packages/mcp-runtime/**
+mcp-scaffold = packages/mcp-scaffold/**
 mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
 proxy = packages/proxy/**

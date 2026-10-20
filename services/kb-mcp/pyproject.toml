@@ -71,6 +71,8 @@ extend-select = ["I"]
 ignore = ["B008"]
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "recommended"
 include = ["src"]

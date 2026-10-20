@@ -1306,3 +1306,76 @@ def test_cli_rejects_an_operation_id_reference_without_a_name(tmp_path: Path) ->
 
     with pytest.raises(ValidationError, match="module:NAME"):
         main([str(tmp_path)])
+
+
+def codegen_project(tmp_path: Path, config: str = CODEGEN_CONFIG) -> Path:
+    (tmp_path / "spec.yml").write_text(SPEC)
+    (tmp_path / "pyproject.toml").write_text(config)
+    (tmp_path / "out").mkdir()
+    return tmp_path
+
+
+def test_cli_check_passes_when_the_generated_files_are_current(tmp_path: Path) -> None:
+    main([str(codegen_project(tmp_path))])
+
+    main([str(tmp_path), "--check"])
+
+
+def test_cli_check_fails_on_a_stale_file_and_leaves_it_as_it_was(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main([str(codegen_project(tmp_path))])
+    operations = tmp_path / "out/operations.py"
+    edited = operations.read_text().replace("GET_THINGS", "GET_ROWS")
+    operations.write_text(edited)
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([str(tmp_path), "--check"])
+
+    assert exit_info.value.code == 1
+    assert f"{operations} is stale:" in capsys.readouterr().out
+    assert operations.read_text() == edited
+
+
+def test_cli_check_fails_on_a_file_never_generated_and_does_not_leave_it(tmp_path: Path) -> None:
+    codegen_project(tmp_path)
+
+    with pytest.raises(SystemExit):
+        main([str(tmp_path), "--check"])
+
+    assert not (tmp_path / "out/models.py").exists()
+
+
+def test_cli_refresh_spec_vendors_a_json_source_as_yaml_and_regenerates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec = "spec.yml"\nspec-source = "v2.json"'
+    )
+    codegen_project(tmp_path, config)
+    vendor = load_spec(SPEC)
+    paths = cast(dict[str, dict[str, object]], vendor["paths"])
+    del paths["/things/{name}"]["post"]
+    paths["/rows"] = paths["/things"]
+    (tmp_path / "v2.json").write_text(json.dumps(vendor))
+
+    main([str(tmp_path), "--refresh-spec"])
+
+    assert load_spec((tmp_path / "spec.yml").read_text()) == vendor
+    assert not (tmp_path / "spec.yml").read_text().startswith("{")
+    assert capsys.readouterr().out == "operationIds changed:\n- postThing\n"
+    assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
+
+
+def test_cli_refresh_spec_needs_a_spec_source(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        main([str(codegen_project(tmp_path)), "--refresh-spec"])
+
+
+def test_cli_rejects_a_spec_source_without_a_vendored_spec(tmp_path: Path) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec-url = "https://x"\nspec-source = "y"'
+    )
+
+    with pytest.raises(ValidationError, match="spec-source"):
+        main([str(codegen_project(tmp_path, config))])

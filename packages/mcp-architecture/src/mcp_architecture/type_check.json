@@ -1,0 +1,7 @@
+{
+  "typeCheckingMode": "all",
+  "reportMissingTypeStubs": false,
+  "reportUnusedCallResult": false,
+  "reportCallInDefaultInitializer": false,
+  "reportImplicitStringConcatenation": false
+}

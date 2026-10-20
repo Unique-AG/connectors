@@ -75,7 +75,10 @@ uv run pytest
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
-the shared-package consumers. `packages/mcp-openapi` works the same way.
+the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-runtime` and
+`packages/mcp-architecture` work the same way. `packages/mcp-scaffold` also runs for a change to
+`packages/mcp-runtime` or `packages/mcp-architecture`, because the MCPs its tests generate use
+both.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.

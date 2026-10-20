@@ -1,0 +1,160 @@
+{% set postgres = "postgres" in options.persistence %}
+# mcp-skeleton chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: mcp-skeleton
+fullnameOverride: mcp-skeleton
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+{% if postgres %}
+  # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
+  DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
+{% endif %}
+
+# Set per deployment in the overlay. The app refuses to start without them.
+# - MCP_BASE_URL: the public https origin, matching routes.hostname
+# - every secret in .env.example, e.g. UPSTREAM_API_KEY, from a secret through envVars
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/mcp-skeleton
+  tag: 0.0.1 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+{% if postgres %}
+  # Optional for a managed Postgres. An overlay that sets volumes repeats it.
+  - name: pg-cluster-ca
+    secret:
+      secretName: mcp-skeleton-pg-cluster-ca
+      optional: true
+      items:
+        - key: ca.crt
+          path: ca.crt
+{% endif %}
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+{% if postgres %}
+  - name: pg-cluster-ca
+    mountPath: /etc/postgresql-ca
+    readOnly: true
+{% endif %}
+
+{% if postgres %}
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # The overlay supplies the host or URL. The base chart injects DATABASE_URL and
+    # PG_DATABASE_SSL_MODE, which mcp_runtime.PostgresSettings reads.
+{% else %}
+postgresql:
+  enabled: false
+{% endif %}
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: mcp-skeleton.mcp.qa.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+{% if postgres %}
+    enabled: true
+    command: |
+      alembic upgrade head
+{% else %}
+    enabled: false
+{% endif %}
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false
