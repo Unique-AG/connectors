@@ -34,6 +34,7 @@ A service Dockerfile has to `COPY packages/mcp-openapi` before `uv sync`, like `
 ```toml
 [tool.mcp-openapi]
 spec = "src/my_mcp/openapi/spec.yml"  # or spec-url = "https://..."
+spec-source = "https://vendor.example.com/openapi.json"  # optional, where --refresh-spec fetches `spec` from; a URL or a path
 operation-ids = ["getThing"]          # one Operation constant each
 response-operation-ids = "my_mcp.openapi.routes:RESPONSE_MODELS"  # optional, models for these; defaults to operation-ids
 allow-extra-fields = true             # optional, default false
@@ -43,6 +44,16 @@ models-output = "src/my_mcp/models/vendor_responses.py"
 operations-output = "src/my_mcp/models/operations.py"
 fields = "my_mcp.openapi.fields:RESPONSE_FIELDS"  # optional, trims a model to these fields
 ```
+
+Two flags, never together:
+
+- `--check` regenerates both files, puts them back as they were, and exits 1 with a diff for
+  each one that changed. CI runs it in every service with a `[tool.mcp-openapi]` table, so a
+  spec or table change that was not regenerated, or a generated file edited by hand, fails.
+- `--refresh-spec` fetches `spec-source` again and writes it over the vendored `spec`, a JSON
+  spec as YAML, prints the operationIds added (`+`) and removed (`-`), then regenerates. A
+  removed operationId that `operation-ids` still lists fails the generation, and a removed or
+  changed served tool fails the service's tool surface snapshot.
 
 ## Working on the package from a service
 
