@@ -2,37 +2,42 @@
 {% set redis = "redis" in options.persistence %}
 {% set parameters = [
     options.opens_upstream and "upstream_settings: UpstreamSettings",
-    options.opens_persistence and "persistence_settings: PersistenceSettings",
+    options.opens_persistence and "persistence: Persistence",
     options.opens_upstream and "upstream_transport: httpx2.MockTransport",
 ] | select | join(", ") %}
 {% set arguments = [
     options.opens_upstream and "upstream_settings",
-    options.opens_persistence and "persistence_settings",
+    options.opens_persistence and "open_persistence",
     options.opens_upstream and "upstream_transport",
 ] | select | list %}
+{% if options.opens_persistence %}
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+{% endif %}
 {% if options.opens_upstream %}
 import httpx2
 {% endif %}
 import pytest
 from fastmcp import FastMCP
+{% if redis %}
+from key_value.aio.stores.memory import MemoryStore
+{% endif %}
 from mcp_runtime import ServerSettings
-{% if arguments %}
+{% if options.opens_upstream %}
 from pydantic import SecretStr
+{% endif %}
+{% if postgres %}
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 {% endif %}
 
 from mcp_skeleton.mcp import create_server
 {% if options.opens_persistence %}
-from mcp_skeleton.persistence import {{ [postgres and "DatabaseSettings", "PersistenceSettings", redis and "StoreSettings"] | select | join(", ") }}
+from mcp_skeleton.persistence import {{ [postgres and "Base", "Persistence"] | select | join(", ") }}
 {% endif %}
 {% if options.opens_upstream %}
 from mcp_skeleton.upstream import UpstreamSettings
-{% endif %}
-
-{% if postgres %}
-TEST_DATABASE_URL = SecretStr("postgresql://dummy-user:dummy-password@localhost:5432/test")
-{% endif %}
-{% if redis %}
-TEST_STORE_URL = SecretStr("redis://localhost:6379/0")
 {% endif %}
 
 
@@ -51,7 +56,7 @@ def upstream_settings() -> UpstreamSettings:
 def upstream_transport() -> httpx2.MockTransport:
     """Stands in for the upstream.
 
-    Answer each route with fixed data, as FakeCatalog does in services/architecture-demo-mcp.
+    Answer each route with fixed data, as FakeTiingo does in services/architecture-demo-mcp.
     """
     return httpx2.MockTransport(lambda _request: httpx2.Response(404))
 {% endif %}
@@ -59,17 +64,35 @@ def upstream_transport() -> httpx2.MockTransport:
 
 
 @pytest.fixture
-def persistence_settings() -> PersistenceSettings:
+async def persistence() -> AsyncGenerator[Persistence]:
+{% if postgres and redis %}
+    """SQLite and an in-memory store in place of Postgres and Redis, which CI does not run.
+{% elif postgres %}
+    """SQLite in place of Postgres, which CI does not run.
+{% else %}
+    """An in-memory store in place of Redis, which CI does not run.
+{% endif %}
+
+    Every client the tests open shares it, as the server's clients share the real stores.
+    """
 {% if postgres %}
-    database = DatabaseSettings(url=TEST_DATABASE_URL, _env_file=None)  # pyright: ignore[reportCallIssue]
+    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
 {% endif %}
-{% if redis %}
-    store = StoreSettings(url=TEST_STORE_URL, _env_file=None)  # pyright: ignore[reportCallIssue]
+    yield Persistence({{ [postgres and "database=async_sessionmaker(engine, expire_on_commit=False)", redis and "store=MemoryStore()"] | select | join(", ") }})
+{% if postgres %}
+    await engine.dispose()
 {% endif %}
-    return PersistenceSettings({{ [postgres and "database=database", redis and "store=store"] | select | join(", ") }})
 {% endif %}
 
 
 @pytest.fixture
 def server({{ parameters }}) -> FastMCP:
+{% if options.opens_persistence %}
+    @asynccontextmanager
+    async def open_persistence() -> AsyncGenerator[Persistence]:
+        yield persistence
+
+{% endif %}
     return create_server({{ arguments | join(", ") }})

@@ -1,14 +1,18 @@
 {% set settings = [
     options.opens_upstream and "UpstreamSettings()",
-    options.opens_persistence and "PersistenceSettings()",
+    options.opens_persistence and "persistence",
 ] | select | join(", ") %}
 {# UpstreamSettings needs an API key. PersistenceSettings builds each store's settings itself. #}
 {% set ignore_call = "  # pyright: ignore[reportCallIssue]" if options.opens_upstream else "" %}
+{% if options.opens_persistence %}
+from functools import partial
+
+{% endif %}
 from mcp_runtime import LoggingSettings, ServerSettings, run_server
 
 from mcp_skeleton.mcp import create_server, http_middleware
 {% if options.opens_persistence %}
-from mcp_skeleton.persistence import PersistenceSettings
+from mcp_skeleton.persistence import PersistenceSettings, open_persistence
 {% endif %}
 from mcp_skeleton.telemetry import init_telemetry
 {% if options.opens_upstream %}
@@ -18,6 +22,9 @@ from mcp_skeleton.upstream import UpstreamSettings
 
 def main() -> None:
     init_telemetry(LoggingSettings())
+{% if options.opens_persistence %}
+    persistence = partial(open_persistence, PersistenceSettings())
+{% endif %}
     server = create_server({{ settings }}){{ ignore_call }}
     run_server(server, ServerSettings(), http_middleware(server))
 

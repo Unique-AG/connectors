@@ -91,8 +91,12 @@ for Redis.
 - **Postgres**: add the models to `persistence/models.py`, then the functions the contexts call
   to `persistence/__init__.py`. `uv run alembic revision --autogenerate -m "<what>"` needs a
   database at `DATABASE_URL`. Start one locally with Docker, or write the first migration by
-  hand into `persistence/migrations/versions/`.
+  hand into `persistence/migrations/versions/`. Alembic runs ruff over each revision it writes.
 - **Redis**: add the functions the contexts call, with the collection and TTL each entry uses.
+
+The tests need neither store running: the `persistence` fixture in `tests/conftest.py` opens
+SQLite and a `MemoryStore` in their place, and every client a test opens shares it. Seed it
+through the functions in `persistence/__init__.py`, as the demo's `tests/test_tools.py` does.
 
 ## 5. Build the first feature and tool
 

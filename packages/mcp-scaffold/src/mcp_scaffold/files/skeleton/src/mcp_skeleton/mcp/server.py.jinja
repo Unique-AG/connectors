@@ -1,7 +1,7 @@
 {% set openapi = options.upstream == "openapi" %}
 {% set parameters = [
     options.opens_upstream and "upstream: UpstreamSettings",
-    options.opens_persistence and "persistence: PersistenceSettings",
+    options.opens_persistence and "open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]]",
     options.opens_upstream and "transport: httpx2.AsyncBaseTransport | None = None",
 ] | select | join(", ") %}
 {# An OpenAPI upstream shares its client with the tools served straight from the spec. #}
@@ -11,10 +11,14 @@
 ] | select | list %}
 {% set openers = {
     "upstream": "open_upstream(http, upstream)" if openapi else "open_upstream(upstream, transport)",
-    "persistence": "open_persistence(persistence)",
+    "persistence": "open_persistence()",
 } %}
 {% if resources %}
 from collections.abc import AsyncGenerator
+{% if options.opens_persistence %}
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+{% endif %}
 from contextlib import asynccontextmanager
 {% endif %}
 from importlib.metadata import version
@@ -28,7 +32,7 @@ from fastmcp.server.providers import FileSystemProvider
 from starlette.middleware import Middleware
 
 {% if options.opens_persistence %}
-from mcp_skeleton.persistence import PersistenceSettings, open_persistence
+from mcp_skeleton.persistence import Persistence
 {% endif %}
 from mcp_skeleton.telemetry import instrument
 {% if openapi %}
@@ -45,6 +49,9 @@ INSTRUCTIONS = (
 
 
 def create_server({{ parameters }}) -> FastMCP:
+{% if options.opens_persistence %}
+    """Build the server. `open_persistence` opens every store, so the tests can open their own."""
+{% endif %}
 {% if openapi %}
     http = upstream_http(upstream, transport)
 
