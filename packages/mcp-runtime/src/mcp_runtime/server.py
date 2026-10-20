@@ -7,12 +7,22 @@ from starlette.middleware import Middleware
 
 from mcp_runtime.middleware import build_middleware
 from mcp_runtime.settings import ServerSettings
+from mcp_runtime.settings.hosts import LOCAL_HOSTS
 
 
 def run_server(
     mcp: FastMCP, settings: ServerSettings, middleware: Sequence[Middleware] = ()
 ) -> None:
-    """Serve `mcp` over streamable HTTP at `/mcp`, with `middleware` inside the guard and CORS."""
+    """Serve `mcp` over streamable HTTP at `/mcp`, with `middleware` inside the guard and CORS.
+
+    A server without an auth provider only binds to loopback: every tool would otherwise answer
+    anyone who reaches the pod, with the MCP's own upstream credentials and storage.
+    """
+    if mcp.auth is None and settings.host not in LOCAL_HOSTS:
+        raise RuntimeError(
+            f"{mcp.name} has no auth provider, so it only serves on loopback, not on "
+            + f"HOST={settings.host}. Pass one to FastMCP(auth=...) to serve beyond this machine."
+        )
     mcp.run(
         transport="streamable-http",
         host=settings.host,

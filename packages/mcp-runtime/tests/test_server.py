@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastmcp import FastMCP
+from fastmcp.server.auth import StaticTokenVerifier
 from pydantic import AnyHttpUrl, ValidationError
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -9,7 +10,7 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from mcp_runtime import ServerSettings, http_app
+from mcp_runtime import ServerSettings, http_app, run_server
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 PING = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
@@ -115,3 +116,39 @@ def test_server_settings_reject_a_base_url_that_is_not_a_public_https_origin(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         ServerSettings(mcp_base_url=AnyHttpUrl(url))
+
+
+@pytest.fixture
+def served(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The hosts `FastMCP.run` was asked to bind, without binding them."""
+    hosts: list[str] = []
+
+    def run(_: FastMCP, **options: object) -> None:
+        hosts.append(str(options["host"]))
+
+    monkeypatch.setattr(FastMCP, "run", run)
+    return hosts
+
+
+def test_a_server_without_auth_refuses_to_serve_beyond_loopback(served: list[str]) -> None:
+    settings = ServerSettings(host="0.0.0.0", mcp_base_url=AnyHttpUrl("https://mcp.example.com"))
+
+    with pytest.raises(RuntimeError, match="Probe has no auth provider"):
+        run_server(FastMCP(name="Probe"), settings)
+
+    assert served == []
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "::1", "localhost"])
+def test_a_server_without_auth_serves_on_loopback(served: list[str], host: str) -> None:
+    run_server(FastMCP(name="Probe"), ServerSettings(host=host))
+
+    assert served == [host]
+
+
+def test_a_server_with_auth_serves_beyond_loopback(served: list[str]) -> None:
+    settings = ServerSettings(host="0.0.0.0", mcp_base_url=AnyHttpUrl("https://mcp.example.com"))
+
+    run_server(FastMCP(name="Probe", auth=StaticTokenVerifier(tokens={})), settings)
+
+    assert served == ["0.0.0.0"]
