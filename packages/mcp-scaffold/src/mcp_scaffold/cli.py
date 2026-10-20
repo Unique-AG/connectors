@@ -12,7 +12,11 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
+from pydantic import ValidationError
+from pydantic_core import ErrorDetails
+
 from mcp_scaffold.options import Auth, Options, Persistence, Upstream
+from mcp_scaffold.repository import name_conflict
 from mcp_scaffold.scaffold import scaffold
 
 
@@ -46,13 +50,19 @@ def main() -> None:
     arguments = parser.parse_args()
 
     repo = Path.cwd()
-    assert (repo / ".gitcommitizen").is_file(), "run mcp-scaffold from the repository root"
+    if not (repo / ".gitcommitizen").is_file():
+        parser.error("run mcp-scaffold from the repository root")
     stores = cast(list[str], arguments.persistence)
     if "none" in stores and len(stores) > 1:
         parser.error("--persistence none cannot be combined with a store")
-    options = Options.model_validate(
-        {**vars(arguments), "persistence": [store for store in stores if store != "none"]}
-    )
+    try:
+        options = Options.model_validate(
+            {**vars(arguments), "persistence": [store for store in stores if store != "none"]}
+        )
+    except ValidationError as error:
+        parser.error("\n".join(_describe(problem) for problem in error.errors()))
+    if (conflict := name_conflict(options.name, repo)) is not None:
+        parser.error(conflict)
     _require_clean(parser, repo)
     target = scaffold(options, repo, release=cast(bool, arguments.release))
     print(f"{target} is ready. The new-mcp skill lists what to fill in next.")
@@ -60,7 +70,7 @@ def main() -> None:
 
 def _require_clean(parser: argparse.ArgumentParser, repo: Path) -> None:
     changes = subprocess.run(
-        ["git", "status", "--porcelain"],
+        ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=repo,
         capture_output=True,
         text=True,
@@ -71,6 +81,12 @@ def _require_clean(parser: argparse.ArgumentParser, repo: Path) -> None:
             "commit or stash every change first, untracked files too, so git alone can undo "
             f"the run:\n{changes}"
         )
+
+
+def _describe(problem: ErrorDetails) -> str:
+    field = ".".join(str(part) for part in problem["loc"])
+    message = problem["msg"].removeprefix("Value error, ")
+    return f"{field}: {message}" if field else message
 
 
 if __name__ == "__main__":

@@ -7,6 +7,23 @@ from pathlib import Path
 from typing import cast
 
 from mcp_scaffold.options import Options
+from mcp_scaffold.pins import dependency_names
+
+
+def name_conflict(name: str, repo: Path) -> str | None:
+    """Why `name` cannot be a new service in `repo`, or None when it can.
+
+    A scope that a service since removed left under the same name may be registered again.
+    """
+    if (repo / "services" / name).exists():
+        return f"services/{name} already exists"
+    if name in dependency_names() or (repo / "packages" / name).exists():
+        return f"{name} would shadow the package of that name"
+    scopes = (repo / ".gitcommitizen").read_text()
+    scope = re.search(rf"^{re.escape(name)} = (.+)$", scopes, flags=re.MULTILINE)
+    if scope is not None and scope.group(1) != f"services/{name}/**":
+        return f"{name} is already the commit scope of {scope.group(1)}"
+    return None
 
 
 def register(options: Options, repo: Path, *, release: bool) -> None:
@@ -66,7 +83,7 @@ def _register_release(name: str, repo: Path) -> None:
 
     manifest = repo / ".release-please-manifest.json"
     versions = cast(dict[str, str], json.loads(manifest.read_text()))
-    versions.setdefault(f"services/{name}", "0.0.1")
+    versions.setdefault(f"services/{name}", "0.0.0")
     manifest.write_text(json.dumps(versions, indent=2) + "\n")
 
     rerun = repo / ".github" / "workflows" / "release-rerun.yaml"

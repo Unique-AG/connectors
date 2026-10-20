@@ -1,9 +1,10 @@
 """What a new MCP asks for: its name, what it talks to, what it stores and its auth."""
 
+import re
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Upstream(StrEnum):
@@ -23,7 +24,7 @@ class Auth(StrEnum):
 
 
 class Options(BaseModel):
-    name: str = Field(pattern=r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
+    name: str
     description: str = Field(min_length=1)
     upstream: Upstream
     # The vendor's OpenAPI spec, a path or an http(s) URL. Only an OpenAPI upstream has one.
@@ -32,10 +33,18 @@ class Options(BaseModel):
     persistence: frozenset[Persistence]
     auth: Auth
 
+    @field_validator("name")
+    @classmethod
+    def _kebab_case_ending_in_mcp(cls, name: str) -> str:
+        """The `-mcp` suffix also keeps the package name from being a Python keyword."""
+        if not re.fullmatch(r"[a-z][a-z0-9]*(-[a-z0-9]+)*-mcp", name):
+            raise ValueError("must be kebab-case and end in -mcp, e.g. weather-mcp")
+        return name
+
     @model_validator(mode="after")
     def _spec_only_for_openapi(self) -> Self:
-        wanted = self.upstream is Upstream.OPENAPI
-        assert wanted == (self.spec is not None), "--spec goes with --upstream openapi, and only it"
+        if (self.upstream is Upstream.OPENAPI) != (self.spec is not None):
+            raise ValueError("--spec goes with --upstream openapi, and only it")
         return self
 
     @property
