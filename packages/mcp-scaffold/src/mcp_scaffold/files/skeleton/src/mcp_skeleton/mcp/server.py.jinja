@@ -1,0 +1,90 @@
+{% set openapi = options.upstream == "openapi" %}
+{% set parameters = [
+    options.opens_upstream and "upstream: UpstreamSettings",
+    options.opens_persistence and "persistence: PersistenceSettings",
+    options.opens_upstream and "transport: httpx2.AsyncBaseTransport | None = None",
+] | select | join(", ") %}
+{# An OpenAPI upstream shares its client with the tools served straight from the spec. #}
+{% set resources = [
+    options.opens_upstream and "upstream",
+    options.opens_persistence and "persistence",
+] | select | list %}
+{% set openers = {
+    "upstream": "open_upstream(http, upstream)" if openapi else "open_upstream(upstream, transport)",
+    "persistence": "open_persistence(persistence)",
+} %}
+{% if resources %}
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+{% endif %}
+from importlib.metadata import version
+from pathlib import Path
+
+{% if options.opens_upstream %}
+import httpx2
+{% endif %}
+from fastmcp import FastMCP
+from fastmcp.server.providers import FileSystemProvider
+from starlette.middleware import Middleware
+
+{% if options.opens_persistence %}
+from mcp_skeleton.persistence import PersistenceSettings, open_persistence
+{% endif %}
+from mcp_skeleton.telemetry import instrument
+{% if openapi %}
+from mcp_skeleton.upstream import UpstreamSettings, open_upstream, upstream_http, upstream_tools
+{% elif options.opens_upstream %}
+from mcp_skeleton.upstream import UpstreamSettings, open_upstream
+{% endif %}
+
+INSTRUCTIONS = (
+{% for line in python_lines(options.description, 85) %}
+    {{ line }}
+{% endfor %}
+)
+
+
+def create_server({{ parameters }}) -> FastMCP:
+{% if openapi %}
+    http = upstream_http(upstream, transport)
+
+{% endif %}
+{% if resources %}
+    @asynccontextmanager
+    async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
+        async with (
+{% for key in resources %}
+            {{ openers[key] }} as {{ key }}_resource,
+{% endfor %}
+        ):
+            yield {
+{% for key in resources %}
+                "{{ key }}": {{ key }}_resource{{ "," if not loop.last else "" }}
+{% endfor %}
+            }
+
+{% endif %}
+    mcp = FastMCP(
+        name="MCP Skeleton",
+        version=version("mcp-skeleton"),
+        instructions=INSTRUCTIONS,
+{% if resources %}
+        lifespan=lifespan,
+{% endif %}
+    )
+{% if openapi %}
+    mcp.add_provider(upstream_tools(http))
+{% endif %}
+    tools = FileSystemProvider(Path(__file__).parent / "tools")
+    assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
+    mcp.add_provider(tools)
+    return mcp
+
+
+def http_middleware(mcp: FastMCP) -> list[Middleware]:
+    """The MCP's own HTTP middleware.
+
+    mcp_runtime puts the host and origin guard and CORS before it, in production and in the
+    tests alike.
+    """
+    return [instrument(mcp)]

@@ -1,0 +1,59 @@
+[project]
+name = "mcp-skeleton"
+version = "0.0.1"
+description = "Set by mcp-scaffold"
+classifiers = ["Development Status :: 3 - Alpha"]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+mcp-skeleton = "mcp_skeleton.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = []
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
+
+[tool.ruff]
+# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
+# mcp-architecture's code-style rule enforces it whatever this table says.
+extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
+target-version = "py314"
+exclude = [".venv"]
+
+[tool.ruff.lint.per-file-ignores]
+# Generated from the vendor's spec, so its field names are the vendor's.
+"src/mcp_skeleton/upstream/vendor_responses.py" = ["N815"]
+
+[tool.basedpyright]
+# The type check every MCP keeps. mcp-architecture's type-check rule fails on a setting here that
+# loosens it.
+extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+include = ["src", "tests"]
+
+[tool.uv.sources]
+
+[tool.mcp-openapi]
+spec = "src/mcp_skeleton/upstream/openapi.yml"
+operation-ids = []
+operation-module = "mcp_openapi.upstream"
+models-module = "mcp_skeleton.upstream.vendor_responses"
+models-output = "src/mcp_skeleton/upstream/vendor_responses.py"
+operations-output = "src/mcp_skeleton/upstream/operations.py"
+
+# The architecture. packages/mcp-architecture/ARCHITECTURE.md explains each rule, and
+# mcp-architecture's pytest plugin checks it.
+# The scaffold writes the contracts every MCP keeps. Add a contract of the MCP's own after them.
+[tool.importlinter]

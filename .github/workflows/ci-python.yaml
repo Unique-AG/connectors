@@ -9,8 +9,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - "packages/mcp-architecture/**"
       - "packages/mcp-credential-auth/**"
       - "packages/mcp-openapi/**"
+      - "packages/mcp-runtime/**"
+      - "packages/mcp-scaffold/**"
       - "services/**"
       - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
@@ -41,7 +44,10 @@ jobs:
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
+      mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
+      mcp-runtime-changed: ${{ steps.filter.outputs.mcp_runtime }}
+      mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,8 +64,18 @@ jobs:
               - 'services/**'
             shared_auth:
               - 'packages/mcp-credential-auth/**'
+            mcp_architecture:
+              - 'packages/mcp-architecture/**'
             mcp_openapi:
               - 'packages/mcp-openapi/**'
+            mcp_runtime:
+              - 'packages/mcp-runtime/**'
+            # The MCPs the scaffold's tests generate depend on mcp-runtime and run mcp-architecture's
+            # rules, so a change to either runs them too.
+            mcp_scaffold:
+              - 'packages/mcp-scaffold/**'
+              - 'packages/mcp-architecture/**'
+              - 'packages/mcp-runtime/**'
             workflow:
               - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
@@ -77,7 +93,9 @@ jobs:
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          MCP_ARCHITECTURE_CHANGED: ${{ steps.filter.outputs.mcp_architecture }}
           MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
+          MCP_RUNTIME_CHANGED: ${{ steps.filter.outputs.mcp_runtime }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -126,6 +144,14 @@ jobs:
               consumers=$(grep -l '"mcp-openapi' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
+            if [ "$MCP_ARCHITECTURE_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-architecture' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
+            if [ "$MCP_RUNTIME_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-runtime' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
           fi
 
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
@@ -168,6 +194,14 @@ jobs:
         run: |
           if [ -f scripts/render-terraform-registry.py ]; then
             uv run python scripts/render-terraform-registry.py --check
+          fi
+
+      # A service with [tool.mcp-openapi] commits the code generated from its vendored spec.
+      # This fails when the spec or the table changed and the code was not regenerated, or the code was edited by hand.
+      - name: Check generated OpenAPI code drift
+        run: |
+          if grep -q '^\[tool\.mcp-openapi\]' pyproject.toml; then
+            uv run mcp-openapi-codegen --check
           fi
 
       - name: Check formatting
@@ -246,6 +280,129 @@ jobs:
     defaults:
       run:
         working-directory: packages/mcp-openapi
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-architecture:
+    name: Test mcp-architecture
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-architecture-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-architecture
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-runtime:
+    name: Test mcp-runtime
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-runtime-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-runtime
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-scaffold:
+    name: Test mcp-scaffold
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-scaffold-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/mcp-scaffold
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

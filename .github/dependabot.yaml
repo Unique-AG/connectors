@@ -28,8 +28,12 @@ updates:
 
   - package-ecosystem: uv
     directories:
+      - packages/mcp-architecture
       - packages/mcp-credential-auth
       - packages/mcp-openapi
+      - packages/mcp-runtime
+      # Its `service*` dependency groups are the versions every new MCP pins.
+      - packages/mcp-scaffold
       - services/**/*
     schedule:
       interval: cron

@@ -46,6 +46,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.CurrentContext"]
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.12"
 typeCheckingMode = "recommended"
 include = ["src"]

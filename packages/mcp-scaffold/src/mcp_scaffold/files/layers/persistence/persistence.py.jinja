@@ -1,0 +1,58 @@
+{% set postgres = "postgres" in options.persistence %}
+{% set redis = "redis" in options.persistence %}
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import ClassVar
+
+from pydantic import BaseModel, ConfigDict, Field
+
+{% if postgres %}
+from mcp_skeleton.persistence.database import Database, DatabaseSettings, open_database
+{% endif %}
+{% if redis %}
+from mcp_skeleton.persistence.store import Store, StoreSettings, open_store
+{% endif %}
+{% if redis %}
+
+
+def _store_settings() -> StoreSettings:
+    return StoreSettings()  # pyright: ignore[reportCallIssue]
+{% endif %}
+
+
+class PersistenceSettings(BaseModel):
+    """Each store reads its own settings from the environment."""
+
+{% if postgres %}
+{# PostgresSettings checks its own required settings at runtime. #}
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+{% endif %}
+{% if redis %}
+    store: StoreSettings = Field(default_factory=_store_settings)
+{% endif %}
+
+
+class Persistence(BaseModel):
+    """What the contexts receive: every store the MCP owns, opened once by the server lifespan."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+{% if postgres %}
+    database: Database
+{% endif %}
+{% if redis %}
+    store: Store
+{% endif %}
+
+
+@asynccontextmanager
+async def open_persistence(settings: PersistenceSettings) -> AsyncGenerator[Persistence]:
+    async with (
+{% if postgres %}
+        open_database(settings.database) as database,
+{% endif %}
+{% if redis %}
+        open_store(settings.store) as store,
+{% endif %}
+    ):
+        yield Persistence({{ [postgres and "database=database", redis and "store=store"] | select | join(", ") }})
