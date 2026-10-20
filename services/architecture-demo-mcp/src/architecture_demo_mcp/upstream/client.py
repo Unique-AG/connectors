@@ -36,7 +36,7 @@ def upstream_http(
         timeout=settings.timeout_seconds,
         transport=transport,
         headers={
-            "Authorization": f"Bearer {settings.api_key.get_secret_value()}",
+            "Authorization": f"Token {settings.api_key.get_secret_value()}",
             "Accept": "application/json",
         },
     )
