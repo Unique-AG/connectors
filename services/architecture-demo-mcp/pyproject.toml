@@ -1,6 +1,6 @@
 [project]
 name = "architecture-demo-mcp"
-version = "0.0.1"
+version = "0.0.0"
 description = "Reference MCP showing every scaffold layer: Tiingo market data through OpenAPI, with Postgres and Redis persistence. Copy its patterns; do not deploy it."
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
@@ -98,6 +98,7 @@ name = "Layers only import downwards"
 type = "layers"
 containers = ["architecture_demo_mcp"]
 layers = ["main", "mcp", "contexts", "upstream | persistence", "telemetry"]
+exhaustive = true
 
 [[tool.importlinter.contracts]]
 name = "Context features do not import each other in a cycle"

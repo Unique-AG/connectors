@@ -44,6 +44,7 @@ def create_server(
         version=version("architecture-demo-mcp"),
         instructions=INSTRUCTIONS,
         lifespan=lifespan,
+        mask_error_details=True,
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
