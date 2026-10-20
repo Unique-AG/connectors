@@ -5,6 +5,7 @@ packages:
   - "!services/backstop-mcp"
   - "!services/office-365-mcp"
   - "!services/with-intelligence-mcp"
+  - "!services/architecture-demo-mcp"
   - packages/*
 
 injectWorkspacePackages: true
