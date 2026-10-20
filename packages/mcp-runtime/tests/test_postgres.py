@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from mcp_runtime import PostgresSettings
+from mcp_runtime import PostgresSettings, SslMode
 
 CNPG_URL = "postgresql://dummy-user:dummy-password@cluster-rw.db.svc:5432/app"
 
@@ -95,6 +95,13 @@ def test_the_url_sslmode_wins_over_the_chart(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("PG_DATABASE_SSL_MODE", "verify")
 
     assert PostgresSettings().connect_args == {"ssl": "disable"}
+
+
+@pytest.mark.parametrize("ssl_mode", ["disable", "allow", "prefer"])
+def test_passes_a_mode_that_may_skip_tls_to_asyncpg_by_name(ssl_mode: SslMode) -> None:
+    settings = PostgresSettings(url=SecretStr(CNPG_URL), ssl_mode=ssl_mode)
+
+    assert settings.connect_args == {"ssl": ssl_mode}
 
 
 def test_verify_ca_checks_the_certificate_but_not_the_host() -> None:
