@@ -17,7 +17,9 @@ run_server(mcp, ServerSettings(), [instrument(mcp)])
 ```
 
 `run_server` serves the FastMCP app over streamable HTTP at `/mcp`, stateless, without uvicorn's
-access log. `http_app` builds the same app for tests. Both put the same middleware first:
+access log. It refuses to start when the server has no auth provider (`FastMCP(auth=...)`) and
+`HOST` is not loopback, so an MCP without auth runs locally but never in a pod. `http_app` builds
+the same app for tests. Both put the same middleware first:
 
 1. A host and origin guard: a request must name a host of `MCP_BASE_URL` (or `localhost`) and,
    from a browser, an allowed origin. `/probe`, `/health` and `/metrics` skip it, since
