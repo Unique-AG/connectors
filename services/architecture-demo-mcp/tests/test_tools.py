@@ -4,9 +4,12 @@ from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
 from mcp_types import TextContent
+from sqlalchemy import text
 
 from architecture_demo_mcp.persistence import add_watchlist_entry
+from architecture_demo_mcp.persistence import list_watchlist
 from architecture_demo_mcp.persistence import Persistence
+from architecture_demo_mcp.persistence import WatchlistRefusal
 from tests.conftest import ACME_DAILY_PRICES
 from tests.conftest import CallTool
 from tests.conftest import FakeTiingo
@@ -77,7 +80,9 @@ async def test_get_asset_renames_the_vendor_fields(call_tool: CallTool) -> None:
     }
 
 
-async def test_get_quote_asks_tiingo_once_a_minute(call_tool: CallTool, tiingo: FakeTiingo) -> None:
+async def test_get_quote_answers_a_second_ask_from_the_cache(
+    call_tool: CallTool, tiingo: FakeTiingo
+) -> None:
     first = await call_tool("get_quote", {"ticker": "ACME"})
     second = await call_tool("get_quote", {"ticker": "ACME"})
 
@@ -127,7 +132,7 @@ async def test_add_to_watchlist_rejects_a_full_watchlist(
 ) -> None:
     for number in range(20):
         await add_watchlist_entry(
-            persistence=persistence, watchlist="tech", ticker=f"T{number}", note=None
+            persistence=persistence, watchlist="tech", ticker=f"T{number}", note=None, capacity=20
         )
 
     result = await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACME"})
@@ -162,6 +167,34 @@ async def test_get_watchlist_lists_each_ticker_with_its_price(call_tool: CallToo
     ]
 
 
+async def test_get_watchlist_prices_every_ticker_in_one_request(
+    call_tool: CallTool, tiingo: FakeTiingo
+) -> None:
+    await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACME"})
+    await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACMFX"})
+    tiingo.requests.clear()
+
+    await call_tool("get_watchlist", {"watchlist": "tech"})
+
+    (request,) = tiingo.requests
+    assert request.url.path == "/iex"
+    assert request.url.params["tickers"] == "ACME,ACMFX"
+
+
+async def test_get_watchlist_asks_tiingo_only_for_the_tickers_not_cached(
+    call_tool: CallTool, tiingo: FakeTiingo
+) -> None:
+    await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACME"})
+    await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACMFX"})
+    await call_tool("get_quote", {"ticker": "ACME"})
+    tiingo.requests.clear()
+
+    await call_tool("get_watchlist", {"watchlist": "tech"})
+
+    (request,) = tiingo.requests
+    assert request.url.params["tickers"] == "ACMFX"
+
+
 async def test_remove_from_watchlist_takes_the_ticker_off(call_tool: CallTool) -> None:
     await call_tool("add_to_watchlist", {"watchlist": "tech", "ticker": "ACME"})
 
@@ -172,6 +205,31 @@ async def test_remove_from_watchlist_takes_the_ticker_off(call_tool: CallTool) -
     assert removed.structured_content == {"watchlist": "tech", "ticker": "ACME", "removed": True}
     assert again.structured_content == {"watchlist": "tech", "ticker": "ACME", "removed": False}
     assert watchlist.structured_content == {"result": []}
+
+
+async def test_adding_a_ticker_already_stored_stores_nothing(persistence: Persistence) -> None:
+    await add_watchlist_entry(
+        persistence=persistence, watchlist="tech", ticker="ACME", note="First", capacity=20
+    )
+
+    again = await add_watchlist_entry(
+        persistence=persistence, watchlist="tech", ticker="ACME", note="Second", capacity=20
+    )
+
+    assert again is WatchlistRefusal.ALREADY_WATCHED
+    [stored] = await list_watchlist(persistence=persistence, watchlist="tech")
+    assert stored.note == "First"
+
+
+async def test_an_unexpected_error_reaches_the_client_without_its_details(
+    call_tool: CallTool, persistence: Persistence
+) -> None:
+    async with persistence.database() as session, session.begin():
+        await session.execute(text("DROP TABLE watchlist_entries"))
+
+    result = await call_tool("get_watchlist", {"watchlist": "tech"})
+
+    assert "watchlist_entries" not in _error_text(result)
 
 
 async def test_an_upstream_error_reaches_the_client(call_tool: CallTool) -> None:

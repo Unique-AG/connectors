@@ -2,8 +2,8 @@ apiVersion: v2
 name: architecture-demo-mcp
 description: The base every new Python FastMCP server starts from.
 type: application
-version: 0.0.1
-appVersion: 0.0.1
+version: 0.0.0
+appVersion: 0.0.0
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
