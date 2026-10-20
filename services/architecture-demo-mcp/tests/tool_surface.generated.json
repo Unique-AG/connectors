@@ -1,0 +1,33 @@
+[
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Utilities",
+          "passthrough"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Test API connectivity and authentication",
+    "inputSchema": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "name": "test_connection",
+    "outputSchema": {
+      "properties": {
+        "message": {
+          "description": "Confirmation message, e.g. 'You successfully sent a request'.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "title": "Test Connection"
+  }
+]
