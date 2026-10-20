@@ -20,7 +20,7 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 
 | Question | Becomes |
 |---|---|
-| Name, kebab-case, ending in `-mcp` | `--name`, the service folder, package, chart and commit scope |
+| Name, kebab-case, ending in `-mcp` (the scaffold refuses any other) | `<name>`, the first argument: the service folder, package, chart and commit scope |
 | One or two sentences on what it does for the user | `--description`, the server instructions and the pyproject description |
 | What does it talk to? OpenAPI / plain HTTP without a spec / something else | `--upstream openapi\|http\|custom` |
 | What does it store? Nothing, or any of Postgres and Redis (multi-select) | `--persistence none`, or every store chosen: `--persistence postgres redis` |
@@ -51,7 +51,8 @@ It refuses to start unless `git status` is clean, untracked files included. Ask 
 commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff,
 basedpyright and pytest in the new service, and fails loudly if any of them does. Since it
 started from a clean tree, everything it wrote is its own: undo a failed run with
-`git checkout -- . && git clean -fd`.
+`git checkout -- . && git clean -fd && git clean -fdx services/<name>`. The last command also
+removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
 
 It records the first `tests/tool_surface.generated.json`. Prefer a spec URL over a downloaded
 file: it becomes `spec-source`, so `uv run mcp-openapi-codegen --refresh-spec` can fetch the

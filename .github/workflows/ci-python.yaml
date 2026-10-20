@@ -70,11 +70,12 @@ jobs:
               - 'packages/mcp-openapi/**'
             mcp_runtime:
               - 'packages/mcp-runtime/**'
-            # The MCPs the scaffold's tests generate depend on mcp-runtime and run mcp-architecture's
-            # rules, so a change to either runs them too.
+            # The MCPs the scaffold's tests generate depend on mcp-runtime, run mcp-architecture's
+            # rules, and use mcp-openapi for an OpenAPI upstream, so a change to any of them runs them too.
             mcp_scaffold:
               - 'packages/mcp-scaffold/**'
               - 'packages/mcp-architecture/**'
+              - 'packages/mcp-openapi/**'
               - 'packages/mcp-runtime/**'
             workflow:
               - '.github/workflows/ci-python.yaml'
@@ -227,6 +228,15 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+      # The service's own pytest configuration could leave mcp-architecture's checks out of the step above:
+      # `-p no:mcp_architecture` or a `-k` in addopts, or no [tool.importlinter] for the plugin to find.
+      # This run clears addopts and loads the plugin itself. It exits 5 when it collects no check.
+      - name: Check the architecture
+        run: |
+          if grep -q '"mcp-architecture' pyproject.toml; then
+            uv run pytest -o addopts= -p mcp_architecture -k mcp_architecture
+          fi
+
   test-shared-auth:
     name: Test mcp-credential-auth
     needs: detect-changes
@@ -286,7 +296,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.11.33"
           enable-cache: true
@@ -327,7 +337,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.11.33"
           enable-cache: true
@@ -368,7 +378,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.11.33"
           enable-cache: true
@@ -409,7 +419,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.11.33"
           enable-cache: true

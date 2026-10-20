@@ -75,6 +75,9 @@ def create_server({{ parameters }}) -> FastMCP:
         name="MCP Skeleton",
         version=version("mcp-skeleton"),
         instructions=INSTRUCTIONS,
+        # An unexpected error, such as a database error with its SQL, reaches the client as the
+        # tool's name alone. A ToolError still reaches it as raised.
+        mask_error_details=True,
 {% if resources %}
         lifespan=lifespan,
 {% endif %}
