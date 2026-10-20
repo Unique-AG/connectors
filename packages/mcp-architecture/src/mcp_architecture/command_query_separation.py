@@ -46,8 +46,9 @@ class _Separation:
     def __init__(self, graph: ImportGraph, container: str) -> None:
         self._graph: ImportGraph = graph
         self._container: str = container
+        self._package: str = container.split(".")[0]
         self._features: set[str] = graph.find_children(container)
-        root = find_spec(container.split(".")[0])
+        root = find_spec(self._package)
         assert root is not None and root.origin is not None, f"{container} is not importable"
         self._source_root: Path = Path(root.origin).parent.parent
 
@@ -71,15 +72,16 @@ class _Separation:
         return None
 
     def _targets(self, module: str) -> set[str]:
-        """The contexts modules `module` depends on, with a feature's top level resolved to the
-        modules defining the names taken from it."""
+        """The package's modules `module` depends on, with a feature's top level resolved to the
+        modules defining the names taken from it. Modules outside contexts are followed too, so
+        a query cannot reach a command through one."""
         targets: set[str] = set()
         for imported in self._graph.find_modules_directly_imported_by(module):
             if imported in self._features and imported != module:
                 names = self._names_taken(module, imported)
                 exports = self._exports(imported)
                 targets |= {exports.get(name, imported) for name in names} if names else {imported}
-            elif imported.startswith(f"{self._container}."):
+            elif imported.startswith(f"{self._package}."):
                 targets.add(imported)
         return targets
 
@@ -107,8 +109,12 @@ class _Separation:
         }
 
     def _exports(self, feature: str) -> dict[str, str]:
+        """The module each name re-exported by `feature` comes from: the submodule itself when
+        the name is one, as in `from <feature>.commands import place_order`."""
         return {
-            alias.asname or alias.name: node.module
+            alias.asname or alias.name: submodule
+            if (submodule := f"{node.module}.{alias.name}") in self._graph.modules
+            else node.module
             for node in ast.walk(self._parse(feature))
             if isinstance(node, ast.ImportFrom) and node.module is not None
             for alias in node.names

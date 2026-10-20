@@ -154,6 +154,66 @@ def test_a_query_reaching_a_command_through_another_query_breaks_the_import_cont
     )
 
 
+def test_a_module_outside_the_layers_breaks_the_import_contracts(service: Service) -> None:
+    write(service, "logic/__init__.py", "")
+    write(service, "logic/pricing.py", "def price(*, cents: int) -> int:\n    return cents\n")
+
+    [problem] = rule("import-contracts").check(service)
+
+    assert "shop.logic" in unwrapped(problem)
+
+
+def test_a_query_reaching_a_command_through_a_module_outside_contexts_breaks_the_import_contracts(
+    service: Service,
+) -> None:
+    write(service, "logic/__init__.py", "")
+    write(
+        service,
+        "logic/ordering.py",
+        "from shop.contexts.orders import place_order\n\nreorder = place_order\n",
+    )
+    write(
+        service,
+        "contexts/products/queries/get_product.py",
+        "from shop.logic.ordering import reorder\n\n\n"
+        "def get_product(*, product_id: str) -> str:\n"
+        "    return reorder(product_id=product_id)\n",
+    )
+
+    [problem] = rule("import-contracts").check(service)
+
+    assert (
+        "- shop.contexts.products.queries.get_product -> shop.logic.ordering -> "
+        "shop.contexts.orders.commands.place_order" in unwrapped(problem)
+    )
+
+
+def test_a_query_taking_a_command_module_re_exported_from_its_package_breaks_the_import_contracts(
+    service: Service,
+) -> None:
+    write_invoice_query(
+        service,
+        list_orders=LIST_ORDERS,
+        get_invoice="from shop.contexts.orders import place_order\n\n\n"
+        "def get_invoice(*, product_id: str) -> str:\n"
+        "    return place_order.place_order(product_id=product_id)\n",
+    )
+    write(
+        service,
+        "contexts/orders/__init__.py",
+        "from shop.contexts.orders.commands import place_order\n"
+        "from shop.contexts.orders.queries.list_orders import list_orders\n\n"
+        '__all__ = ["list_orders", "place_order"]\n',
+    )
+
+    [problem] = rule("import-contracts").check(service)
+
+    assert (
+        "- shop.contexts.invoices.queries.get_invoice -> shop.contexts.orders.commands.place_order"
+        in unwrapped(problem)
+    )
+
+
 def test_a_session_option_that_loosens_every_contract_breaks_the_required_contracts(
     service: Service,
 ) -> None:
@@ -175,15 +235,16 @@ def test_a_loosened_contract_breaks_the_required_contracts(service: Service) -> 
     table = render_importlinter("shop")
     without_the_last = table[: table.rindex("\n[[tool.importlinter.contracts]]\n") + 1]
     ignore = ["shop.upstream -> shop.mcp"]
-    layers_line = f"layers = {json.dumps(LAYERS)}\n"
+    layers_end = f"layers = {json.dumps(LAYERS)}\nexhaustive = true\n"
     loosened = without_the_last.replace(
-        layers_line, f"{layers_line}ignore_imports = {json.dumps(ignore)}\n"
+        layers_end, f"{layers_end}ignore_imports = {json.dumps(ignore)}\n"
     )
     service.pyproject.write_text(loosened)
 
     problems = rule("required-contracts").check(service)
 
-    layers = required_contracts("shop")[0]
+    # import-linter reads a TOML boolean back as a string.
+    layers = {**required_contracts("shop")[0], "exhaustive": "True"}
     loosened_layers = {**layers, "ignore_imports": ignore}
     assert problems == [
         f"'Layers only import downwards' was changed to {loosened_layers}; it must be {layers}",
@@ -244,6 +305,35 @@ def test_code_against_the_style_breaks_it_whatever_the_service_configures(
     assert [problem.split()[1] for problem in problems] == ["N803", "E722"]
 
 
+def test_ruff_findings_carry_no_colour_whatever_the_terminal_forces(
+    service: Service, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    write(service, "contexts/products/queries/GetPrice.py", "")
+
+    problems = rule("required-lint").check(service)
+
+    assert [problem.split(" ")[:2] for problem in problems] == [
+        ["src/shop/contexts/products/queries/GetPrice.py:1:1:", "N999"]
+    ]
+
+
+def test_a_noqa_that_names_no_rule_breaks_the_code_style(service: Service) -> None:
+    write(
+        service,
+        "telemetry/counters.py",
+        "def count(Total: int) -> int:  # noqa\n    return Total\n",
+    )
+    write(service, "telemetry/totals.py", "# ruff: noqa\nTOTAL = 1\n")
+
+    problems = rule("code-style").check(service)
+
+    assert [problem.split()[:2] for problem in problems] == [
+        ["src/shop/telemetry/counters.py:1:32:", "PGH004"],
+        ["src/shop/telemetry/totals.py:1:1:", "PGH004"],
+    ]
+
+
 def test_the_mcps_departures_from_googles_style_keep_it(service: Service) -> None:
     write(service, "telemetry/notes.py", f'NOTE = "{"x" * 85}"\n')
     (service.root / "tests").mkdir()
@@ -298,6 +388,47 @@ def test_a_type_check_that_turns_a_report_down_breaks_the_rule(service: Service)
     ]
 
 
+@pytest.mark.parametrize(
+    ("setting", "problem"),
+    [
+        ('exclude = ["src"]', "exclude = ['src']"),
+        ('include = ["src/shop/mcp"]', "include = ['src/shop/mcp']"),
+        (
+            'executionEnvironments = [{ root = "src" }]',
+            "executionEnvironments = [{'root': 'src'}]",
+        ),
+        ("analyzeUnannotatedFunctions = false", "analyzeUnannotatedFunctions = False"),
+        ("strictListInference = false", "strictListInference = False"),
+    ],
+    ids=["exclude", "narrowed-include", "execution-environments", "unannotated", "strict"],
+)
+def test_a_type_check_setting_outside_the_allowlist_breaks_the_rule(
+    service: Service, setting: str, problem: str
+) -> None:
+    loose = set_type_check(service, f"{TYPE_CHECK_TABLE}{setting}\n")
+
+    assert rule("type-check").check(loose) == [f"[tool.basedpyright] may not set {problem}"]
+
+
+def test_a_pyright_comment_that_changes_the_check_breaks_the_rule(service: Service) -> None:
+    write(
+        service,
+        "telemetry/counters.py",
+        "# pyright: basic\n\n"
+        "def count(total: int) -> int:\n"
+        "    return total  # pyright: ignore\n\n\n"
+        "def total(count: int) -> int:\n"
+        "    return count  # pyright: ignore[reportAny]\n",
+    )
+
+    assert rule("type-check").check(service) == [
+        "src/shop/telemetry/counters.py:1: a `# pyright:` comment may only be `ignore[rule]`, "
+        "not `basic`",
+        "src/shop/telemetry/counters.py:4: a `# pyright:` comment may only be `ignore[rule]`, "
+        "not `ignore`",
+    ]
+
+
 def test_a_type_check_made_stricter_or_restated_keeps_the_rule(service: Service) -> None:
     strict = set_type_check(
         service,
@@ -325,6 +456,12 @@ def test_a_context_folder_without_an_init_breaks_the_feature_packages(service: S
     write(service, "contexts/billing/queries/__init__.py", "")
 
     assert rule("feature-packages").check(service) == ["billing needs an __init__.py"]
+
+
+def test_a_module_directly_in_contexts_breaks_the_feature_packages(service: Service) -> None:
+    write(service, "contexts/helpers.py", "")
+
+    assert rule("feature-packages").check(service) == ["contexts/helpers.py belongs in a feature"]
 
 
 def test_a_feature_folder_outside_commands_and_queries_or_nested_breaks_the_rule(
@@ -359,6 +496,17 @@ def test_a_feature_init_that_defines_a_name_breaks_the_rule(service: Service) ->
         "products/__init__.py:5: define it in a command, a query or a model module, and "
         "re-export it here"
     ]
+
+
+def test_a_feature_init_with_an_annotated_all_keeps_the_rule(service: Service) -> None:
+    write(
+        service,
+        "contexts/products/__init__.py",
+        "from shop.contexts.products.queries.get_product import get_product\n\n"
+        '__all__: list[str] = ["get_product"]\n',
+    )
+
+    assert rule("feature-inits").check(service) == []
 
 
 def test_a_context_module_with_two_public_functions_or_a_constant_breaks_the_rule(

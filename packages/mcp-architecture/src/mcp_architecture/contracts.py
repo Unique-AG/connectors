@@ -20,6 +20,7 @@ def required_contracts(package: str) -> list[dict[str, object]]:
             "type": "layers",
             "containers": [package],
             "layers": LAYERS,
+            "exhaustive": True,
         },
         {
             "name": "Context features do not import each other in a cycle",
