@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -204,6 +204,7 @@ dependencies = [
     { name = "starlette" },
     { name = "tenacity" },
     { name = "unique-mcp" },
+    { name = "unique-sdk" },
     { name = "unique-toolkit", extra = ["monitoring", "otel"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -236,6 +237,7 @@ requires-dist = [
     { name = "starlette", specifier = "==1.8.0" },
     { name = "tenacity", specifier = "==9.1.4" },
     { name = "unique-mcp", specifier = "==2026.44.0.dev1" },
+    { name = "unique-sdk", specifier = "==2026.44.0.dev10" },
     { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.44.0.dev2" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.53.0" },
 ]
