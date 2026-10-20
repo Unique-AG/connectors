@@ -1,9 +1,199 @@
 [
   {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Put a ticker on a watchlist, creating the watchlist with its first ticker.\n\nA watchlist holds at most 20 tickers, each once. Tiingo must know the ticker.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why the user watches the ticker, shown beside it in the watchlist. Pass it only when the user gives a reason."
+        },
+        "ticker": {
+          "description": "A stock or ETF ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        "watchlist": {
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "watchlist",
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "add_to_watchlist",
+    "outputSchema": {
+      "properties": {
+        "added_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "exchange": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ticker": {
+          "type": "string"
+        },
+        "watchlist": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "watchlist",
+        "ticker",
+        "name",
+        "exchange",
+        "note",
+        "added_at"
+      ],
+      "type": "object"
+    },
+    "title": "Add To Watchlist"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read an asset's name, description, exchange and the dates its price history covers.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ticker": {
+          "description": "A stock or ETF ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_asset",
+    "outputSchema": {
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exchange": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_price_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_price_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ticker": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker",
+        "name",
+        "description",
+        "exchange",
+        "first_price_date",
+        "last_price_date"
+      ],
+      "type": "object"
+    },
+    "title": "Get Asset"
+  },
+  {
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Utilities",
+          "End-of-Day",
           "passthrough"
         ]
       }
@@ -12,22 +202,410 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Test API connectivity and authentication",
+    "description": "Get end-of-day price history for a ticker",
     "inputSchema": {
-      "properties": {},
-      "required": [],
-      "type": "object"
-    },
-    "name": "test_connection",
-    "outputSchema": {
       "properties": {
-        "message": {
-          "description": "Confirmation message, e.g. 'You successfully sent a request'.",
+        "endDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or before the endDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "format": {
+          "description": "Response format. Supports \"json\" (default) and \"csv\". CSV is a bare-bones return type that is often 4-5x faster than JSON.",
+          "enum": [
+            "json",
+            "csv"
+          ],
+          "type": "string"
+        },
+        "resampleFreq": {
+          "description": "Allows resampled values that allow you to choose the values returned as daily, weekly, monthly, or annually values. Note: ONLY DAILY takes into account holidays. All others use standard business days Acceptable values: daily : Values returned as daily periods, with a holiday calendar. weekly : Values returned as weekly data, with days ending on Friday. monthly : Values returned as monthly data, with days ending on the last standard business day (Mon-Fri) of each month. annually : Values returned as annual data, with days ending on the last standard business day (Mon-Fri) of each year. Note, that if you choose a value in-between the resample period for weekly, monthly, and daily, the start date rolls back to consider the entire period. For example, if you choose to resample weekly, but your \"startDate\" parameter is set to Wednesday of that week, the startDate will be adjusted to Monday, so the entire week is captured. Another example is if you send a startDate mid-month, we roll back the startDate to the beginning of the month. Similarly, if you provide an endDate, and it's midway through the period, we roll-forward the date to capture the whole period. In the above example, if the end date is set to a wednesday with a weekly resample, the end date is rolled forward to the Friday of that week.",
+          "type": "string"
+        },
+        "sort": {
+          "description": "This field allows you to specify the sort direct and which column to sort by. Prepend \"-\" if you want descending order, otherwise it will be ascending. E.g. sort=date will sort by date in ascending order. sort=-date will sort by date in descending order.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or after the startDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Ticker related to the asset.",
           "type": "string"
         }
       },
+      "required": [
+        "ticker"
+      ],
       "type": "object"
     },
-    "title": "Test Connection"
+    "name": "get_daily_prices",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "adjClose": {
+                "description": "The adjusted closing price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjHigh": {
+                "description": "The adjusted high price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjLow": {
+                "description": "The adjusted low price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjOpen": {
+                "description": "The adjusted opening price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjVolume": {
+                "description": "The number of shares traded for the asset.",
+                "type": "integer"
+              },
+              "close": {
+                "description": "The closing price for the asset on the given date.",
+                "type": "number"
+              },
+              "date": {
+                "description": "The date this data pertains to.",
+                "format": "date",
+                "type": "string"
+              },
+              "divCash": {
+                "description": "The dividend paid out on \"date\" (note that \"date\" will be the \"exDate\" for the dividend).",
+                "type": "number"
+              },
+              "high": {
+                "description": "The high price for the asset on the given date.",
+                "type": "number"
+              },
+              "low": {
+                "description": "The low price for the asset on the given date.",
+                "type": "number"
+              },
+              "open": {
+                "description": "The opening price for the asset on the given date.",
+                "type": "number"
+              },
+              "splitFactor": {
+                "description": "The factor used to adjust prices when a company splits, reverse splits, or pays a distribution.",
+                "type": "number"
+              },
+              "volume": {
+                "description": "The number of shares traded for the asset.",
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Daily Prices"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a stock's latest IEX price and its previous close, at most a minute old.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ticker": {
+          "description": "A stock or ETF ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_quote",
+    "outputSchema": {
+      "properties": {
+        "as_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_price": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_close": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ticker": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker",
+        "last_price",
+        "previous_close",
+        "as_of"
+      ],
+      "type": "object"
+    },
+    "title": "Get Quote"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List the tickers on a watchlist, oldest first, each with its latest price.\n\nA ticker IEX does not quote is listed without a price. An unknown watchlist is empty.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "watchlist": {
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "watchlist"
+      ],
+      "type": "object"
+    },
+    "name": "get_watchlist",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "added_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "last_price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "previous_close": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ticker": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ticker",
+              "note",
+              "added_at",
+              "last_price",
+              "previous_close"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Watchlist"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Take a ticker off a watchlist, with its note. `removed` is false if it was not on it.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ticker": {
+          "description": "A stock or ETF ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        "watchlist": {
+          "description": "The watchlist's name, such as `tech`. Every user of this server shares the watchlists until it has auth.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "watchlist",
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "remove_from_watchlist",
+    "outputSchema": {
+      "properties": {
+        "removed": {
+          "type": "boolean"
+        },
+        "ticker": {
+          "type": "string"
+        },
+        "watchlist": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "watchlist",
+        "ticker",
+        "removed"
+      ],
+      "type": "object"
+    },
+    "title": "Remove From Watchlist"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Find stocks, ETFs and mutual funds by ticker or name.\n\nEach match carries the `ticker` every other tool takes.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 10,
+          "description": "The most matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "A ticker or words from the company or fund name.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search_assets",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "asset_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "is_active": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ticker": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ticker",
+              "name",
+              "asset_type",
+              "is_active"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Search Assets"
   }
 ]

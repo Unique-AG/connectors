@@ -7,7 +7,99 @@ from pydantic import BaseModel
 from pydantic import Field
 
 
-class TestConnectionResponse(BaseModel):
-    message: str | None = Field(
-        None, description="Confirmation message, e.g. 'You successfully sent a request'."
+class DailyMeta(BaseModel):
+    description: str | None = Field(None, description="Long-form descripton of the asset.")
+    endDate: str | None = Field(
+        None,
+        description="The latest date we have price data available for the asset. When null it means no price data available for the given asset.",
     )
+    exchangeCode: str | None = Field(
+        None, description="An identifier that maps which Exchange this asset is listed on."
+    )
+    name: str | None = Field(None, description="Full-length name of the asset.")
+    startDate: str | None = Field(
+        None,
+        description="The earliest date we have price data available for the asset. When null it means no price data available for the given asset.",
+    )
+    ticker: str | None = Field(None, description="Ticker related to the asset.")
+
+
+class IexTopOfBook(BaseModel):
+    askPrice: float | None = Field(
+        None, description="The current ask price. IEX entitlement required"
+    )
+    askSize: float | None = Field(
+        None, description="The amount of shares at the ask price. IEX entitlement required"
+    )
+    bidPrice: float | None = Field(
+        None, description="The current bid price. IEX entitlement required"
+    )
+    bidSize: float | None = Field(
+        None, description="The amount of shares at the bid price. IEX entitlement required"
+    )
+    high: float | None = Field(
+        None,
+        description="The high price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    last: float | None = Field(
+        None,
+        description="Last is the last trade that was executed on IEX. IEX entitlement required",
+    )
+    lastSaleTimestamp: str | None = Field(
+        None,
+        description="The timestamp the last time the trade (last/lastSize) data was received from IEX. IEX entitlement required",
+    )
+    lastSize: int | None = Field(
+        None,
+        description="The amount of shares traded (volume) at the last price on IEX. IEX entitlement required",
+    )
+    low: float | None = Field(
+        None,
+        description="The low price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    mid: float | None = Field(
+        None,
+        description='The mid price of the current timestamp when both "bidPrice" and "askPrice" are not-null. In mathematical terms: mid = (bidPrice + askPrice)/2.0 This value is calculated by Tiingo and not provided by IEX.',
+    )
+    open: float | None = Field(
+        None,
+        description="The opening price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    prevClose: float | None = Field(
+        None,
+        description="Previous day's closing price of the security.This can be from any of the exchanges, NYSE, NASDAQ, IEX, etc.",
+    )
+    quoteTimestamp: str | None = Field(
+        None,
+        description="The timestamp the last time the quote (bid/ask) data was received from IEX. IEX entitlement required",
+    )
+    ticker: str | None = Field(None, description="Ticker related to the asset.")
+    timestamp: str | None = Field(None, description="The timestamp the data was last refresh on.")
+    tngoLast: float | None = Field(
+        None,
+        description="Tiingo Last is either the last price or mid price. The mid price is only used if our algo determines it is a good proxy for the last price. So if the spread is considered wide by our algo, we do not use it. Also, after the official exchange print comes in, this value changes to that value. This value is calculated by Tiingo and not provided by IEX .",
+    )
+    volume: int | None = Field(
+        None,
+        description="Volume will be IEX Volume throughout the day, but once the official closing price comes in, volume will reflect the volume done on the entire day across all exchanges. This field is available for convenience.",
+    )
+
+
+class SearchResult(BaseModel):
+    assetType: str | None = Field(
+        None, description="The asset type of the asset (Stock, ETF, & Mutual Fund)."
+    )
+    isActive: bool | None = Field(
+        None,
+        description="True if the ticker is still actively quoted, and false if the ticker is no longer actively quoted (delisted).",
+    )
+    name: str | None = Field(None, description="The name of the asset.")
+    openFIGI: str | None = Field(
+        None,
+        description="Placeholder for an upcoming change to the Tiingo API that allows querying by the openFIGI ticker.",
+    )
+    permaTicker: str | None = Field(
+        None,
+        description="Placeholder for an upcoming change to the Tiingo API that allows querying by permaticker.",
+    )
+    ticker: str | None = Field(None, description="Ticker of the given asset.")

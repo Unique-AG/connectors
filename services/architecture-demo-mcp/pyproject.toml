@@ -76,7 +76,7 @@ mcp-runtime = { path = "../../packages/mcp-runtime" }
 
 [tool.mcp-openapi]
 spec = "src/architecture_demo_mcp/upstream/openapi.yml"
-operation-ids = ["testConnection"]
+operation-ids = ["searchAssets", "getDailyMeta", "getIexTopOfBook"]
 operation-module = "mcp_openapi.upstream"
 models-module = "architecture_demo_mcp.upstream.vendor_responses"
 models-output = "src/architecture_demo_mcp/upstream/vendor_responses.py"

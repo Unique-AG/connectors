@@ -18,7 +18,8 @@ from architecture_demo_mcp.upstream import UpstreamSettings
 
 INSTRUCTIONS = (
     "Reference MCP showing every scaffold layer: Tiingo market data through OpenAPI, with "
-    "Postgres and Redis persistence. Copy its patterns; do not deploy it."
+    "Postgres and Redis persistence. Copy its patterns; do not deploy it. Find a ticker with "
+    "`search_assets` first, since every other tool takes the ticker it returns."
 )
 
 
