@@ -18,15 +18,19 @@ async def get_quotes(
     if not missing:
         return cached
     books = await upstream.call(GET_IEX_TOP_OF_BOOK, tickers=",".join(missing))
+    requested_by_upper: dict[str, list[str]] = {}
+    for ticker in missing:
+        requested_by_upper.setdefault(ticker.upper(), []).append(ticker)
     fetched = {
-        book.ticker.upper(): Quote(
-            ticker=book.ticker.upper(),
+        ticker: Quote(
+            ticker=ticker,
             last_price=book.tngoLast,
             previous_close=book.prevClose,
             as_of=book.timestamp,
         )
         for book in books
-        if book.ticker is not None and book.ticker.upper() in missing
+        if book.ticker is not None
+        for ticker in requested_by_upper.get(book.ticker.upper(), [])
     }
     await cache_quotes(persistence=persistence, quotes=fetched)
     return {**cached, **fetched}

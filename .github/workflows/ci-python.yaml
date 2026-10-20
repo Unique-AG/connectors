@@ -228,9 +228,7 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-      # The service's own pytest configuration could leave mcp-architecture's checks out of the step above:
-      # `-p no:mcp_architecture` or a `-k` in addopts, or no [tool.importlinter] for the plugin to find.
-      # This run clears addopts and loads the plugin itself. It exits 5 when it collects no check.
+      # Forces the architecture plugin with addopts cleared, so a service cannot skip those checks.
       - name: Check the architecture
         run: |
           if grep -q '"mcp-architecture' pyproject.toml; then
