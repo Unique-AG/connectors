@@ -54,7 +54,8 @@ http = httpx2.AsyncClient(
 
 `RetryingTransport` sends a request again on a status in `RetrySettings.statuses`, after its
 `Retry-After` in seconds, or an exponential backoff without one, as long as the wait stays
-within `max_wait_seconds`. It returns the last response, so the client's own hook decides what an
+within `max_wait_seconds`. It resends any request on a 429, but a POST or PATCH on no other
+status, since a gateway's 503 may come after the upstream applied it. It returns the last response, so the client's own hook decides what an
 error status raises.
 
 ## Settings

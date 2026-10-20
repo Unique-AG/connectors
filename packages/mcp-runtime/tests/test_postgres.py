@@ -53,6 +53,17 @@ def test_builds_the_url_from_discrete_fields(monkeypatch: pytest.MonkeyPatch) ->
     )
 
 
+def test_brackets_an_ipv6_host_from_discrete_fields() -> None:
+    settings = PostgresSettings(
+        host="fd00::1", name="app", user="dummy-user", password=SecretStr("dummy-password")
+    )
+
+    assert (
+        settings.connection_url
+        == "postgresql+asyncpg://dummy-user:dummy-password@[fd00::1]:5432/app"
+    )
+
+
 def test_names_the_missing_fields_without_a_url() -> None:
     with pytest.raises(ValidationError, match="missing required fields: DB_HOST, DB_NAME"):
         PostgresSettings(user="dummy-user", password=SecretStr("dummy-password"))
@@ -77,6 +88,29 @@ def test_moves_sslmode_from_the_url_into_connect_args() -> None:
     context = settings.connect_args.get("ssl")
     assert isinstance(context, ssl.SSLContext)
     assert context.verify_mode == ssl.CERT_NONE
+
+
+def test_drops_the_libpq_parameters_asyncpg_rejects() -> None:
+    url = (
+        f"{CNPG_URL}?sslmode=verify-full&sslrootcert=/certs/ca.crt&sslcert=/certs/client.crt"
+        "&sslkey=/certs/client.key&sslcrl=/certs/ca.crl&sslsni=1&target_session_attrs=read-write"
+    )
+
+    settings = PostgresSettings(url=SecretStr(url))
+
+    assert settings.connection_url.endswith("/app?target_session_attrs=read-write")
+
+
+def test_the_url_sslrootcert_wins_over_the_mounted_ca(tmp_path: Path) -> None:
+    unreadable_ca = tmp_path / "ca.crt"
+    unreadable_ca.write_text("not a certificate")
+    settings = PostgresSettings(
+        url=SecretStr(f"{CNPG_URL}?sslmode=verify-full&sslrootcert={unreadable_ca}"),
+        ssl_root_cert=tmp_path / "absent.crt",
+    )
+
+    with pytest.raises(ssl.SSLError):
+        _ = settings.connect_args
 
 
 def test_uses_the_chart_sslmode_when_the_url_has_none(monkeypatch: pytest.MonkeyPatch) -> None:
