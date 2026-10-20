@@ -1,2 +1,13 @@
+{% if "postgres" in options.persistence %}
+# A placeholder for the connection the overlay supplies, so `helm template` clears the base
+# chart's schema.
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: mcp-skeleton-ci-dummy
+        key: database-url
+{% else %}
 # Intentionally empty — chart defaults are CI-safe.
 {}
+{% endif %}

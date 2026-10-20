@@ -1,2 +1,8 @@
-# Intentionally empty — chart defaults are CI-safe.
-{}
+# A placeholder for the connection the overlay supplies, so `helm template` clears the base
+# chart's schema.
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: architecture-demo-mcp-ci-dummy
+        key: database-url
