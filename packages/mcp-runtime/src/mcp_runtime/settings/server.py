@@ -4,22 +4,18 @@ from pydantic import AnyHttpUrl, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mcp_runtime.settings.config import shared_config
-
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
+from mcp_runtime.settings.hosts import LOCAL_HOSTS, url_host
 
 
 def _default_base_url(data: dict[str, object]) -> AnyHttpUrl:
-    host = str(data["host"])
-    if ":" in host:
-        host = f"[{host}]"
     port = data["port"]
     assert isinstance(port, int), "port is validated before base_url"
-    return AnyHttpUrl.build(scheme="http", host=host, port=port)
+    return AnyHttpUrl.build(scheme="http", host=url_host(str(data["host"])), port=port)
 
 
 def _default_allowed_origins(data: dict[str, object]) -> list[AnyHttpUrl]:
     # The MCP Inspector, so local debugging works without configuration.
-    return [AnyHttpUrl("http://localhost:6274")] if data["host"] in _LOCAL_HOSTS else []
+    return [AnyHttpUrl("http://localhost:6274")] if data["host"] in LOCAL_HOSTS else []
 
 
 class ServerSettings(BaseSettings):
@@ -38,7 +34,7 @@ class ServerSettings(BaseSettings):
     def allowed_hosts(self) -> list[str]:
         host = self.mcp_base_url.host
         assert host is not None, "an http URL always has a host"
-        return ["localhost", "127.0.0.1"] if host in _LOCAL_HOSTS else [host]
+        return ["localhost", "127.0.0.1"] if host in LOCAL_HOSTS else [host]
 
     @property
     def allowed_origins(self) -> list[str]:
@@ -49,6 +45,6 @@ class ServerSettings(BaseSettings):
         url = self.mcp_base_url
         if url.path not in {None, "", "/"} or url.query or url.fragment or url.username:
             raise ValueError("MCP_BASE_URL must be a bare origin")
-        if url.host not in _LOCAL_HOSTS and url.scheme != "https":
+        if url.host not in LOCAL_HOSTS and url.scheme != "https":
             raise ValueError("Remote MCP_BASE_URL requires HTTPS")
         return self

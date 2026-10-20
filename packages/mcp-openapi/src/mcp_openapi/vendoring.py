@@ -13,9 +13,7 @@ import yaml
 _HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 
 
-def refresh_spec(
-    *, spec: Path, source: str | Path, client: httpx2.Client | None = None
-) -> list[str]:
+def refresh_spec(*, spec: Path, source: str | Path) -> list[str]:
     """Write the spec at `source`, a URL or a file, over `spec`, and list the operationIds added
     (`+`) and removed (`-`).
 
@@ -25,7 +23,7 @@ def refresh_spec(
     if isinstance(source, Path):
         text = source.read_text()
     else:
-        response = client.get(source) if client else httpx2.get(source, follow_redirects=True)
+        response = httpx2.get(source, follow_redirects=True)
         response.raise_for_status()
         text = response.text
     if text.lstrip().startswith("{"):

@@ -30,7 +30,8 @@ def build_middleware(settings: ServerSettings, own: Sequence[Middleware]) -> lis
                 "Mcp-Protocol-Version",
                 "Mcp-Session-Id",
             ],
-            expose_headers=["Mcp-Session-Id"],
+            # A browser client reads the auth pointer of a 401 from WWW-Authenticate.
+            expose_headers=["WWW-Authenticate", "Mcp-Session-Id"],
         ),
         *own,
     ]

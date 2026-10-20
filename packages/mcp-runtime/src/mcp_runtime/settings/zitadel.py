@@ -4,8 +4,8 @@ from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mcp_runtime.settings.config import shared_config
+from mcp_runtime.settings.hosts import LOCAL_HOSTS
 
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
 # What every MCP needs from the token: who the user is and which organisation they belong to.
 _REQUIRED_SCOPES = ("openid", "profile", "urn:zitadel:iam:user:resourceowner")
 
@@ -30,7 +30,7 @@ class ZitadelSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _https_unless_local(self) -> Self:
-        if self.base_url.host not in _LOCAL_HOSTS and self.base_url.scheme != "https":
+        if self.base_url.host not in LOCAL_HOSTS and self.base_url.scheme != "https":
             raise ValueError("ZITADEL_BASE_URL must use https outside localhost")
         return self
 

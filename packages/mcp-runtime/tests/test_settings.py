@@ -65,6 +65,13 @@ def test_redis_requires_a_url() -> None:
         RedisSettings()  # pyright: ignore[reportCallIssue]
 
 
+def test_redis_ignores_a_url_without_its_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("URL", "redis://elsewhere:6379/0")
+
+    with pytest.raises(ValidationError):
+        RedisSettings()  # pyright: ignore[reportCallIssue]
+
+
 def test_elicitation_asks_for_everything_by_default() -> None:
     settings = ElicitationSettings()
 
