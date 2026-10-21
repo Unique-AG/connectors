@@ -175,18 +175,10 @@ def test_call_error_does_not_include_the_query_string() -> None:
     assert str(error.value) == "404 Not Found for GET https://upstream.example/things/a"
 
 
-def test_call_error_logs_the_start_of_the_response_body_but_does_not_return_it(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    client = api(lambda _: httpx2.Response(404, text='{"detail":"internal"}' + "x" * 300))
-    with pytest.raises(UpstreamError) as error:
+def test_call_error_includes_the_start_of_the_response_body() -> None:
+    client = api(lambda _: httpx2.Response(404, text='{"detail":"Not found."}'))
+    with pytest.raises(UpstreamError, match=r'404 Not Found for GET .*: \{"detail":"Not found."\}'):
         asyncio.run(client.call(Operation("getThings", ROWS)))
-    assert str(error.value) == "404 Not Found for GET https://upstream.example/things"
-    (record,) = caplog.records
-    assert record.levelname == "WARNING"
-    assert record.getMessage() == (
-        '404 Not Found for GET https://upstream.example/things: {"detail":"internal"}' + "x" * 179
-    )
 
 
 def test_call_names_the_body_when_it_is_not_json() -> None:
@@ -341,6 +333,36 @@ def test_policy_does_not_retry_a_status_it_does_not_list() -> None:
     result, sent = replay([httpx2.Response(500), ok()], NO_BACKOFF)
     assert sent == 1
     assert str(result) == "500 Internal Server Error for GET https://upstream.example/things"
+
+
+def replay_post(responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, int]:
+    """`replay` for a POST, which is not idempotent."""
+    remaining = iter(responses)
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: next(remaining)),
+    )
+    client = OperationClient(load_spec(SPEC), http, retry_policy=NO_BACKOFF)
+    try:
+        result: Row | UpstreamError = asyncio.run(
+            client.request_raw("POST", "/hidden", TypeAdapter(Row), json={"label": "x"})
+        )
+    except UpstreamError as error:
+        result = error
+    return result, len(responses) - len(list(remaining))
+
+
+def test_policy_sends_a_rate_limited_post_again() -> None:
+    assert replay_post([rate_limited(), httpx2.Response(200, json={"value": 1})]) == (
+        Row(value=1),
+        2,
+    )
+
+
+def test_policy_does_not_send_a_post_again_on_a_503() -> None:
+    result, sent = replay_post([httpx2.Response(503), httpx2.Response(200, json={"value": 1})])
+    assert sent == 1
+    assert str(result) == "503 Service Unavailable for POST https://upstream.example/hidden"
 
 
 def test_no_policy_sends_a_request_once() -> None:

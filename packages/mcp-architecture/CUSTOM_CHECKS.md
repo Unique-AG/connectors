@@ -12,7 +12,7 @@ file names them, the tools we looked at instead, and why we keep the code.
 | `# pyright:` check in `scripts/check-python-service.sh` | No file changes its own type check | basedpyright honours a file-level `# pyright: basic` whatever the shared config says |
 | `undescribed_tools` | Every tool and parameter has a description | MCP-specific: needs the schema the server lists |
 | `tools_with_a_root_combinator` | No `anyOf`, `oneOf`, `allOf` or `not` at a tool schema's root | MCP-specific: needs the schema the server lists |
-| `masks_error_details` | An unexpected error reaches the client without its message | Needs the built `FastMCP` object |
+| `masks_error_details` | An unexpected error reaches the client without its message | Needs to call a tool that raises on the built server |
 | `settings_showing_input_in_errors` | A settings error does not print its input | Needs every loaded settings class |
 | `tool_surface` | What a client sees matches a snapshot | MCP-specific: needs the tools the server lists |
 | `render_importlinter` | Every MCP declares the same contracts | import-linter cannot extend a shared file |
@@ -32,7 +32,7 @@ import rules:
 | A layer is imported through its top level | `protected` | `interfaces` |
 | Feature privacy | `FeaturePrivacyContract` | `interfaces` |
 | No cycle between siblings, at any depth | `acyclic_siblings` | `forbid_circular_dependencies`, between declared modules only |
-| `contexts` and `persistence` import nothing from `fastmcp` or `mcp` | `forbidden` | Not supported |
+| `contexts` and `persistence` import nothing from `fastmcp`, `mcp` or `mcp_types` | `forbidden` | Not supported |
 | Indirect chains (`a → b → c`) | Checked | Direct imports only |
 | A contract type of our own | Python plugin | Not supported |
 

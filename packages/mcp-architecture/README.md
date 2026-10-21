@@ -14,7 +14,7 @@ rule, and the `AGENTS.md` of every scaffolded MCP points to it.
 | A layer is imported through its top level, and `contexts` through `<package>.contexts` | import-linter |
 | A feature imports another only through that feature's top level | `FeaturePrivacyContract` |
 | No package imports its siblings in a cycle, at any depth | import-linter |
-| `contexts` and `persistence` import nothing from `fastmcp` or `mcp` | import-linter |
+| `contexts` and `persistence` import nothing from `fastmcp`, `mcp` or `mcp_types` | import-linter |
 | Every Python folder has an `__init__.py`, and imports are absolute | ruff |
 | A context function takes keyword arguments only | ruff |
 | APIs a past fix replaced stay banned | ruff |
@@ -75,8 +75,9 @@ upstream and the stores.
     output schema, annotations and tags) as JSON, compared with the snapshot.
   - `tools_with_a_root_combinator(server)`: each tool whose input schema has `anyOf`, `oneOf`,
     `allOf` or `not` at its root.
-  - `masks_error_details(server)`: whether an unexpected error reaches the client without its
-    message.
+  - `masks_error_details(factory)`: whether an unexpected error reaches the client without its
+    message. It adds a tool that raises to a server of its own from `offline_server`, and calls
+    it.
   - `settings_showing_input_in_errors(package)`: each settings class whose validation error
     would print the value it was given.
 

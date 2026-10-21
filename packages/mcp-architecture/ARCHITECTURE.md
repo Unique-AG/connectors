@@ -19,7 +19,8 @@ comes from a package it depends on instead of a copy, so a fix reaches every MCP
 bump:
 
 - `packages/mcp-configs`: the settings with their defaults.
-- `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
+- `packages/mcp-openapi`: the retry policy of every upstream client, and for an OpenAPI
+  upstream the client and the codegen.
 - `packages/mcp-architecture`: this file, the code style and the type check the MCP extends, the
   import contracts the scaffold writes and `mcp-architecture-check`, the checks of what a client
   sees.
@@ -67,7 +68,7 @@ breaks the `layers` contract.
 | Outside `contexts/`, code imports the domain from `<package>.contexts` only: `from <package>.contexts import get_price_performance`, never `from <package>.contexts.prices import get_price_performance`. | import-linter `protected` contract on `contexts` |
 | Inside `contexts/`, a feature imports another through that feature's top level: `from <package>.contexts.prices import get_latest_close`. Inside a feature, deep imports are fine. | import-linter `feature_privacy` contract, the one contract type of our own |
 | No package imports its siblings in a cycle (`a → b → c → a`), at any depth: features in `contexts/`, folders in `mcp/`, modules inside a feature. | import-linter `acyclic_siblings` contract |
-| `contexts/` and `persistence/` import nothing from `fastmcp` or `mcp` themselves. | import-linter `forbidden` contract |
+| `contexts/` and `persistence/` import nothing from `fastmcp`, `mcp` or `mcp_types` themselves. | import-linter `forbidden` contract |
 | Every folder with Python code has an `__init__.py`, since import-linter does not see the others. | ruff `INP001` |
 | A context function takes keyword arguments only: `def f(*, a, b)`. | ruff `PLR0917`, which `[tool.ruff.lint.per-file-ignores]` turns off outside `contexts/` |
 | Imports are absolute. | ruff `TID252` |
@@ -126,7 +127,7 @@ behind them:
 |---|---|---|
 | `Upstream` | `Persistence` | What the contexts receive |
 | `UpstreamSettings` | `PersistenceSettings` | Its settings, read from the environment |
-| `open_upstream(settings)` | `open_persistence(settings)` | An async context manager the server lifespan opens. An OpenAPI upstream takes `open_upstream(http, settings)`, the client it shares with the tools served from the spec |
+| `open_upstream(settings, transport)` | `open_persistence(settings)` | An async context manager the server lifespan opens. `transport` stands in for the upstream in tests. An OpenAPI upstream takes `open_upstream(http, settings)`, the client it shares with the tools served from the spec |
 | `UpstreamError` | | A `ToolError`, so an upstream failure reaches the client as is |
 
 `Upstream` is the client's own type: an alias of `OperationClient` for OpenAPI, and the class in
@@ -312,11 +313,12 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
   one `request(method, path, adapter, params=..., json=...)` for any method and path. It
   validates every body with the `TypeAdapter` it is given, so a context only ever receives a
   pydantic model, and raises `UpstreamError` on an error status, a transport error or a body
-  that does not fit. As in mcp-openapi, the error names the status, method and URL without its
-  query, and the start of an error body goes to the server log only. It retries with `RetrySettings` as mcp-openapi's `RetryAfterPolicy` does,
-  written out rather than imported: a status in `statuses` after its `Retry-After` or a backoff,
-  within `max_wait_seconds`, any request on a 429 and only an idempotent one on another status.
-  Put the response models in `upstream/` and export them from `upstream/__init__.py`. For
+  that does not fit. The error names the status, method and URL without its query, and the
+  start of an error body goes to the server log only. It retries with mcp-openapi's
+  `RetryAfterPolicy`, built from `RetrySettings`: a status in `statuses` after its `Retry-After`
+  or a backoff, within `max_wait_seconds`, any request on a 429 and only an idempotent one on
+  another status. For a status or header of the upstream's own, pass `Upstream` another
+  `RetryPolicy`. Put the response models in `upstream/` and export them from `upstream/__init__.py`. For
   another protocol (SOAP, gRPC, a vendor SDK), replace the client behind the same four names.
   When the upstream limits concurrent requests, hold a lock around each attempt and release it
   while a retry waits, as mcp-openapi's `LockConfig` does.
@@ -407,8 +409,9 @@ Adding one:
 ## Tests
 
 - Answer the upstream from `tests/conftest.py` through `httpx2.MockTransport`, and call each
-  tool with a `call_tool` fixture that uses a real FastMCP `Client`. Test tools this way, end
-  to end through the context to the fake upstream.
+  tool through a real FastMCP `Client`. With the first tool, add a `call_tool` fixture to
+  `tests/conftest.py` that does this, as the demo's does. Test tools this way, end to end
+  through the context to the fake upstream.
 - CI runs no Postgres or Redis. `create_server` takes the function that opens the persistence,
   so `open_fake_persistence` in `tests/offline_server.py` opens SQLite through `aiosqlite` and a
   `MemoryStore` in their place, for the `persistence` fixture in `tests/conftest.py`. That is why `Store` is typed as the `AsyncKeyValue` protocol.

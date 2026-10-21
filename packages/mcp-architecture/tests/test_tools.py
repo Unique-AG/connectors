@@ -1,4 +1,6 @@
 import json
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Annotated, cast
 
 import pytest
@@ -93,5 +95,11 @@ async def test_tools_with_plain_object_schemas_are_not_listed(server: FastMCP) -
 
 
 @pytest.mark.parametrize("masked", [True, False])
-def test_masks_error_details_reads_the_servers_setting(masked: bool) -> None:
-    assert masks_error_details(FastMCP(name="Shop", mask_error_details=masked)) is masked
+async def test_masks_error_details_tells_whether_an_error_message_reaches_the_client(
+    masked: bool,
+) -> None:
+    @asynccontextmanager
+    async def factory() -> AsyncGenerator[FastMCP]:
+        yield FastMCP(name="Shop", mask_error_details=masked)
+
+    assert await masks_error_details(factory) is masked

@@ -105,14 +105,14 @@ and `UpstreamError`.
    in `upstream/` (for example `upstream/responses.py`) and export what contexts need from
    `upstream/__init__.py`. Map vendor field names to snake_case in the contexts, as
    ARCHITECTURE.md says.
-3. **Retries.** Base them on mcp-openapi's `RetryAfterPolicy`
-   (`packages/mcp-openapi/src/mcp_openapi/retry.py`), with `RetrySettings` from `mcp-configs`:
-   retry a status in `statuses` after its `Retry-After` (seconds or an HTTP-date) or an
-   exponential backoff with jitter, never wait past `max_wait_seconds`, stop after
-   `max_attempts`, resend any request on a 429 and only an idempotent one on another status, and
-   build a new tenacity `AsyncRetrying` per request. The custom client does this already; keep
-   it when you change the client, and check the upstream's docs for a status or header it adds,
-   such as a 502 or `X-RateLimit-Reset`.
+3. **Retries.** The custom client retries with mcp-openapi's `RetryAfterPolicy`
+   (`packages/mcp-openapi/src/mcp_openapi/retry.py`), built from `RetrySettings` in
+   `open_upstream`: a status in `statuses` after its `Retry-After` (seconds or an HTTP-date) or
+   an exponential backoff with jitter, never past `max_wait_seconds`, at most `max_attempts`,
+   any request on a 429 and only an idempotent one on another status. Keep it when you change
+   the client. Check the upstream's docs for a status or header it adds, such as a 502 or
+   `X-RateLimit-Reset`: a new status goes in `statuses`, and a new header needs a `RetryPolicy`
+   of its own, passed to `Upstream` in place of `RetryAfterPolicy`.
 4. **Concurrency.** Check whether the upstream limits concurrent requests, per key or per user.
    If it does, base the limit on mcp-openapi's `LockConfig` and `RequestLock`
    (`packages/mcp-openapi/src/mcp_openapi/lock.py`, used in `OperationClient._attempt`): hold the

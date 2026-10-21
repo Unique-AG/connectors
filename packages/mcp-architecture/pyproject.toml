@@ -4,8 +4,7 @@ version = "0.1.0"
 description = "The architecture every scaffolded Python MCP keeps, as tool configuration: its code style, its type check, its import contracts and the checks of what a client sees"
 requires-python = ">=3.12"
 dependencies = [
-    # masks_error_details reads a private FastMCP field: check it before widening.
-    "fastmcp>=4.1,<4.2",
+    "fastmcp>=4.1,<5",
     "grimp>=3.17,<4",
     "import-linter>=2.15,<3",
     "mcp-types>=2.3,<3",
