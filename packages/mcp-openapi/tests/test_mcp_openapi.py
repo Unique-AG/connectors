@@ -1370,9 +1370,10 @@ def test_cli_check_fails_on_a_stale_file_and_leaves_it_as_it_was(
 def test_cli_check_fails_on_a_file_never_generated_and_does_not_leave_it(tmp_path: Path) -> None:
     codegen_project(tmp_path)
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exit_:
         main([str(tmp_path), "--check"])
 
+    assert exit_.value.code == 1
     assert not (tmp_path / "out/models.py").exists()
 
 
@@ -1397,9 +1398,14 @@ def test_cli_refresh_spec_vendors_a_json_source_as_yaml_and_regenerates(
     assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
 
 
-def test_cli_refresh_spec_needs_a_spec_source(tmp_path: Path) -> None:
-    with pytest.raises(SystemExit):
+def test_cli_refresh_spec_needs_a_spec_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as exit_:
         main([str(codegen_project(tmp_path)), "--refresh-spec"])
+
+    assert exit_.value.code == 2
+    assert "--refresh-spec needs spec and spec-source" in capsys.readouterr().err
 
 
 def test_cli_rejects_a_spec_source_without_a_vendored_spec(tmp_path: Path) -> None:

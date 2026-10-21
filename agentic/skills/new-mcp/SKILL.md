@@ -31,7 +31,8 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 Then ask the follow-ups for what they chose, again in one round:
 
 - **OpenAPI**: where the spec is, a URL or a file; it becomes `--spec`. Only OpenAPI 3.0 is
-  read. mcp-openapi's `OperationClient` is the typed client, so there is no client to write.
+  read. Pass a URL as it is. Save a file you download outside the repository, such as in
+  `/tmp`, since the scaffold refuses to run beside an untracked file. mcp-openapi's `OperationClient` is the typed client, so there is no client to write.
 - **No usable spec**: work out the client with the user before you write it. Ask what protocol
   it speaks (REST without a spec, GraphQL, SOAP, gRPC, a vendor SDK), the Python library to use
   if it is not plain HTTP (for example `zeep` for SOAP), where its contract lives (docs, a WSDL,
@@ -75,9 +76,17 @@ here on, `mcp/server.py`, `mcp/http.py`, `mcp/middleware.py` and `telemetry/setu
 
 ## 3. Write the upstream client
 
-Skip this step for an MCP without an upstream. To add one later, write the client by these
-rules into the empty `upstream/`, open it in the lifespan in `mcp/server.py`, and add
-`get_upstream` to `mcp/dependencies.py`, mirroring how persistence is wired there.
+Skip this step for an MCP without an upstream. To add one later, scaffold a throwaway MCP with
+the same options plus `--upstream custom` (or `openapi`) on a branch, diff it against this one,
+and carry over what differs:
+
+- the client by these rules into the empty `upstream/`, opened in the lifespan in
+  `mcp/server.py`, and `get_upstream` in `mcp/dependencies.py`;
+- the `mcp-openapi` dependency and its `[tool.uv.sources]` entry in `pyproject.toml`, since
+  every client retries with its `RetryAfterPolicy`;
+- `COPY packages/mcp-openapi` in `deploy/Dockerfile`, or the image's `uv sync --frozen` fails;
+- the fake upstream in `tests/conftest.py` and `tests/offline_server.py`;
+- the `UPSTREAM_*` variables in `.env.example`.
 
 Everything here stays in `upstream/`, behind `Upstream`, `UpstreamSettings`, `open_upstream`
 and `UpstreamError`.

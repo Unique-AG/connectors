@@ -1442,7 +1442,7 @@
   },
   {
     "annotations": {
-      "destructiveHint": false,
+      "destructiveHint": true,
       "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": false
@@ -1453,6 +1453,7 @@
       "properties": {
         "cost_basis": {
           "description": "What one share or unit cost on average, in the ticker's currency.",
+          "exclusiveMaximum": 1000000000.0,
           "exclusiveMinimum": 0,
           "type": "number"
         },
@@ -1464,6 +1465,7 @@
         },
         "quantity": {
           "description": "How many shares or units are held, replacing any earlier quantity.",
+          "exclusiveMaximum": 1000000000000.0,
           "exclusiveMinimum": 0,
           "type": "number"
         },

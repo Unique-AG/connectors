@@ -52,20 +52,30 @@ async def masks_error_details(factory: ServerFactory) -> bool:
     """Whether an unexpected error inside a tool reaches the client without its message, which can
     carry a secret, an internal URL or the upstream's own words.
 
-    Adds a tool that raises to a server `factory` builds for this check alone, and calls it.
+    Adds a tool that raises to a server `factory` builds for this check alone, and calls it. A
+    call that never reaches the tool, such as one a middleware rejects, proves nothing, so it
+    counts as unmasked.
     """
+    calls: list[None] = []
+
+    def raise_probe_secret() -> None:
+        calls.append(None)
+        raise RuntimeError(_PROBE_SECRET)
+
     async with factory() as server:
-        server.add_tool(ServedTool.from_function(_raise_probe_secret, name=_PROBE_TOOL))
+        server.add_tool(ServedTool.from_function(raise_probe_secret, name=_PROBE_TOOL))
         async with Client(server) as client:
             with _fastmcp_logs_off():
                 result = await client.call_tool(_PROBE_TOOL, {}, raise_on_error=False)
-    return not any(
-        _PROBE_SECRET in block.text for block in result.content if isinstance(block, TextContent)
+    return (
+        bool(calls)
+        and result.is_error
+        and not any(
+            _PROBE_SECRET in block.text
+            for block in result.content
+            if isinstance(block, TextContent)
+        )
     )
-
-
-def _raise_probe_secret() -> None:
-    raise RuntimeError(_PROBE_SECRET)
 
 
 @contextmanager

@@ -17,7 +17,7 @@ def run_server(mcp: FastMCP, settings: ServerSettings) -> None:
     if mcp.auth is None and not settings.binds_to_loopback:
         raise RuntimeError(
             f"{mcp.name} has no auth provider, so it only serves on loopback, not on "
-            + f"HOST={settings.host}. Pass one to FastMCP(auth=...) to serve beyond this machine."
+            f"HOST={settings.host}. Pass one to FastMCP(auth=...) to serve beyond this machine."
         )
     mcp.run(
         transport="streamable-http",

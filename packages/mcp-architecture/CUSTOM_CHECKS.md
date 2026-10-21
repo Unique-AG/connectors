@@ -16,7 +16,8 @@ file names them, the tools we looked at instead, and why we keep the code.
 | `settings_showing_input_in_errors` | A settings error does not print its input | Needs every loaded settings class |
 | `tool_surface` | What a client sees matches a snapshot | MCP-specific: needs the tools the server lists |
 | `render_importlinter` | Every MCP declares the same contracts | import-linter cannot extend a shared file |
-| `mcp-architecture-check` | The checks above run, and `root_package` is the project's package | A pytest run lets a `conftest.py` skip or rewrite a check's outcome |
+| `loosened_configuration` | An MCP's ruff, basedpyright and import-linter tables only add to the shared ones | None of the three checks its own configuration |
+| `mcp-architecture-check` | The checks above run | A pytest run lets a `conftest.py` skip or rewrite a check's outcome |
 
 ## Alternatives we looked at
 

@@ -3,9 +3,9 @@ the `new-mcp` skill works it out with the user once the MCP exists."""
 
 import re
 from enum import StrEnum
-from typing import Self
+from typing import Annotated, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, StringConstraints, field_validator, model_validator
 
 
 class Upstream(StrEnum):
@@ -23,7 +23,7 @@ class Persistence(StrEnum):
 
 class Options(BaseModel):
     name: str
-    description: str = Field(min_length=1)
+    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     # None when the MCP calls no system of its own, such as one that only works over its storage.
     upstream: Upstream | None = None
     # The vendor's OpenAPI spec, a path or an http(s) URL. Only an OpenAPI upstream has one.

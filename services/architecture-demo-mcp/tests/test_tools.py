@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
@@ -6,6 +8,7 @@ from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
 from mcp_configs import ServerSettings
 from mcp_types import TextContent
+import pytest
 
 from architecture_demo_mcp.mcp import http_app
 from architecture_demo_mcp.persistence import list_positions
@@ -189,14 +192,58 @@ async def test_record_position_rejects_a_ticker_tiingo_never_priced(
     assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
 
 
-async def test_a_signed_in_caller_owns_the_positions_it_records(
+async def test_record_position_leaves_a_ticker_it_cannot_price_unpriced(
+    call_tool: CallTool, persistence: Persistence
+) -> None:
+    await call_tool(
+        "record_position",
+        {"portfolio": "core", "ticker": "ACME", "quantity": 10, "cost_basis": 100},
+    )
+    result = await call_tool(
+        "record_position",
+        {"portfolio": "core", "ticker": "INITECH", "quantity": 2, "cost_basis": 30},
+    )
+
+    assert not result.is_error
+    valuation = cast(dict[str, object], result.structured_content)
+    assert [
+        (position["ticker"], position["last_close"])
+        for position in cast(list[dict[str, object]], valuation["positions"])
+    ] == [("ACME", 120.0), ("INITECH", None)]
+    assert (valuation["market_value"], valuation["unrealized_pnl"]) == (1200.0, 200.0)
+    stored = await list_positions(persistence=persistence, owner="local", portfolio="core")
+    assert [position.ticker for position in stored] == ["ACME", "INITECH"]
+
+
+@pytest.mark.parametrize("bound", ["quantity", "cost_basis"])
+@pytest.mark.parametrize("value", ["inf", "Infinity", "nan", 1e13])
+async def test_record_position_rejects_an_amount_without_a_finite_valuation(
+    call_tool: CallTool, persistence: Persistence, bound: str, value: object
+) -> None:
+    arguments: dict[str, object] = {
+        "portfolio": "core",
+        "ticker": "ACME",
+        "quantity": 10,
+        "cost_basis": 100,
+    }
+
+    result = await call_tool("record_position", {**arguments, bound: value})
+
+    assert result.is_error
+    assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
+
+
+async def test_each_signed_in_caller_sees_only_the_positions_it_records(
     upstream_settings: UpstreamSettings,
     upstream_transport: httpx2.MockTransport,
     server_settings: ServerSettings,
     persistence: Persistence,
 ) -> None:
     signed_in = StaticTokenVerifier(
-        tokens={"token-a": {"client_id": "client", "scopes": [], "sub": "owner-a"}}
+        tokens={
+            "token-a": {"client_id": "client", "scopes": [], "sub": "owner-a"},
+            "token-b": {"client_id": "client", "scopes": [], "sub": "owner-b"},
+        }
     )
     server = build_server(upstream_settings, persistence, upstream_transport, auth=signed_in)
     app = http_app(server, server_settings)
@@ -215,15 +262,23 @@ async def test_a_signed_in_caller_owns_the_positions_it_records(
             follow_redirects=follow_redirects,
         )
 
-    transport = StreamableHttpTransport(
-        f"{server_settings.base_url}/mcp", auth="token-a", httpx_client_factory=over_asgi
-    )
-    async with app.router.lifespan_context(app), Client(transport) as client:
-        await client.call_tool(
-            "record_position",
-            {"portfolio": "core", "ticker": "ACME", "quantity": 1, "cost_basis": 100},
+    async def record(token: str, ticker: str) -> CallToolResult:
+        transport = StreamableHttpTransport(
+            f"{server_settings.base_url}/mcp", auth=token, httpx_client_factory=over_asgi
         )
+        async with Client(transport) as client:
+            return await client.call_tool(
+                "record_position",
+                {"portfolio": "core", "ticker": ticker, "quantity": 1, "cost_basis": 100},
+            )
 
+    async with app.router.lifespan_context(app):
+        await record("token-a", "ACME")
+        seen_by_b = await record("token-b", "GLOBEX")
+
+    valuation = cast(dict[str, object], seen_by_b.structured_content)
+    positions = cast(list[dict[str, object]], valuation["positions"])
+    assert [position["ticker"] for position in positions] == ["GLOBEX"]
     owned = await list_positions(persistence=persistence, owner="owner-a", portfolio="core")
     assert [position.ticker for position in owned] == ["ACME"]
     assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
