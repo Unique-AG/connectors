@@ -8,7 +8,7 @@ that breaks a rule fails one of them, and the failure names the import or the li
 `bash ../../scripts/check-python-service.sh .` runs them all, in the order CI does.
 
 `<package>` below is the MCP's Python package, `weather_mcp` for `services/weather-mcp`.
-Example paths such as `contexts/assets/queries/get_asset.py` show the shape a feature, a tool
+Example paths such as `contexts/assets/get_asset.py` show the shape a feature, a tool
 or a test takes.
 
 ## What the MCP owns and what it shares
@@ -138,19 +138,17 @@ Nothing outside `upstream/` imports `upstream/client.py` or any other module in 
 
 A feature is one domain concept, named in the plural of what it handles: `assets`, `quotes`,
 `watchlists`. Features sit side by side. A feature never contains another feature, and organizes
-its own modules as its code asks. Split a feature into `commands/`, which change something
-upstream or in storage, and `queries/`, which read, when that keeps it readable. That split is
-optional.
+its own modules as its code asks.
 
 Start small and grow only when the code asks for it:
 
 1. A function starts as one module, with its small models inline:
-   `contexts/assets/queries/get_asset.py` holds `AssetDetails` and `get_asset`.
+   `contexts/assets/get_asset.py` holds `AssetDetails` and `get_asset`.
 2. When its inputs or outputs grow past about ten lines, it becomes a folder with the inputs,
    the outputs and the implementation apart:
 
    ```
-   contexts/watchlists/commands/add_to_watchlist/
+   contexts/watchlists/add_to_watchlist/
    ├── __init__.py
    ├── inputs.py             AddToWatchlistInput
    ├── outputs.py            AddedToWatchlist, WatchlistRejectedError
