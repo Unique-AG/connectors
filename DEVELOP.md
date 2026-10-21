@@ -81,7 +81,11 @@ It runs, in this order:
    change a file's mode or turn a report down
 6. `uv run pytest`
 
-Each step is a plain `uv run` command, so you can also run one alone from the service's folder.
+Every check runs even after one fails, and the run ends with the list of those that failed, so one
+run shows all there is to fix. Each failure names the command that fixes it, such as
+`uv run ruff format .`. In GitHub Actions each check is a collapsible group of the log, a failure
+is an error annotation on the run, and a lint or type error is an annotation on its line. Each step
+is a plain `uv run` command, so you can also run one alone from the service's folder.
 
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
