@@ -1,4 +1,5 @@
-"""The tools an MCP serves, as a client lists them: their descriptions and their snapshot."""
+"""The tools an MCP serves, as a client lists them: their descriptions, their schemas, their
+snapshot and what an error inside one shows."""
 
 import json
 from typing import cast
@@ -6,6 +7,8 @@ from typing import cast
 from fastmcp import Client, FastMCP
 from mcp_types import Tool
 
+# Some clients reject a tool whose input schema is not a plain object at its root.
+_ROOT_COMBINATORS = ["anyOf", "oneOf", "allOf", "not"]
 # mcp-openapi's `PASSTHROUGH_TAG`, which `upstream_tools` in an OpenAPI MCP sets. Such a tool says
 # what the spec says until promoted. A copy, since an MCP without an OpenAPI upstream has no
 # mcp-openapi to import it from.
@@ -26,6 +29,24 @@ async def undescribed_tools(server: FastMCP) -> list[str]:
         ).items()
         if not schema.get("description")
     ]
+
+
+async def tools_with_a_root_combinator(server: FastMCP) -> list[str]:
+    """Each tool whose input schema combines schemas at its root, as `tool: keyword`. Tools served
+    from a spec are checked too, since a client rejects them alike."""
+    return [
+        f"{tool.name}: {keyword}"
+        for tool in await _list_tools(server)
+        for keyword in _ROOT_COMBINATORS
+        if keyword in tool.input_schema
+    ]
+
+
+def masks_error_details(server: FastMCP) -> bool:
+    """Whether an unexpected error inside a tool reaches the client without its message, which can
+    carry a secret, an internal URL or the upstream's own words."""
+    # FastMCP keeps the setting private and has no public reader.
+    return server._mask_error_details  # pyright: ignore[reportPrivateUsage]
 
 
 async def tool_surface(server: FastMCP) -> str:

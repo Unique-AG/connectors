@@ -49,7 +49,7 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
         text = text.replace(old, new, 1)
     if not openapi:
         text = re.sub(r"\n\[tool\.mcp-openapi\]\n(?:[^\n]+\n)*", "", text)
-        text = re.sub(r"\n\[tool\.ruff\.lint\.per-file-ignores\]\n(?:[^\n]+\n)*", "", text)
+        text = re.sub(r"# Generated from the vendor's spec.*\n.*vendor_responses.*\n", "", text)
     pyproject.write_text(text)
 
 

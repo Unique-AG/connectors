@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 def check(target: Path) -> None:
-    """Format the generated code, then check it. The generator leaves layout to ruff, and pytest
-    records the first tool surface snapshot."""
+    """Format the generated code, then check it as CI does. The generator leaves layout to ruff,
+    and pytest records the first tool surface snapshot."""
     run(
         [
             ["uv", "sync"],
@@ -15,6 +15,7 @@ def check(target: Path) -> None:
             ["uv", "run", "ruff", "check", "--fix", "--quiet", "."],
             ["uv", "run", "ruff", "format", "--quiet", "."],
             ["uv", "run", "basedpyright"],
+            ["uv", "run", "lint-imports"],
             ["uv", "run", "pytest", "-q", "--regen-all"],
         ],
         target,

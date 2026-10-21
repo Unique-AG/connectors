@@ -46,6 +46,7 @@ service-dev = [
     "basedpyright==1.40.2",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
+    "pytest-regressions==2.11.0",
     "ruff==0.17.0",
 ]
 service-openapi = ["pyyaml==6.0.3"]

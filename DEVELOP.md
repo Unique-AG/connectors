@@ -60,22 +60,28 @@ Jobs that build images, scan images, or run Docker stay on `ubuntu-24.04`.
 ## Python Services
 
 Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
-workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the `[CI] Python` workflow runs:
+workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the
+`[CI] Python` workflow runs `scripts/check-python-service.sh`, and you run the same script
+locally:
 
 ```bash
-pnpm install --frozen-lockfile          # from the repo root, for biome
-cd services/<service>
-uv sync --locked
-uv run ruff format --check . && uv run ruff check .
-pnpm exec biome check .
-uv run basedpyright
-uv run pytest
-# only in a service that depends on mcp-architecture
-uv run pytest -o addopts= -p mcp_architecture -k mcp_architecture
+pnpm install --frozen-lockfile          # once, from the repo root, for biome
+bash scripts/check-python-service.sh services/<service>
 ```
 
-The last run repeats mcp-architecture's checks with the service's `addopts` cleared, so its own
-pytest configuration cannot leave them out. It fails when it collects none of them.
+It runs, in this order:
+
+1. `uv sync --locked`
+2. the generated-code drift checks, in a service that has a generator
+3. `uv run ruff format --check .`, then `pnpm exec biome check .`
+4. `uv run ruff check .` and `uv run basedpyright`
+5. in a service with `[tool.importlinter]`, one that keeps
+   `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, and a check that no file
+   carries a `# pyright:` comment other than `ignore[rule]`, since basedpyright lets such a comment
+   change a file's mode or turn a report down
+6. `uv run pytest`
+
+Each step is a plain `uv run` command, so you can also run one alone from the service's folder.
 
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.

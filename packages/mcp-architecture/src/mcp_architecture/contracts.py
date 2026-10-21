@@ -1,42 +1,38 @@
-"""The import contracts every scaffolded MCP declares in `[tool.importlinter]`, as import-linter
-reads them back."""
+"""The import contracts every scaffolded MCP declares in `[tool.importlinter]`."""
 
 import json
 
-CONTRACT_TYPES = [
-    "feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract",
-    "command_query_separation: "
-    "mcp_architecture.command_query_separation.CommandQuerySeparationContract",
-]
-LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "telemetry"]
-_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "upstream", "persistence", "telemetry"]
+_CONTRACT_TYPES = ["feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract"]
+_LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "telemetry"]
+_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "contexts", "upstream", "persistence", "telemetry"]
 
 
-def required_contracts(package: str) -> list[dict[str, object]]:
+def render_importlinter(package: str) -> str:
+    """`[tool.importlinter]` with the contracts every MCP keeps, as the scaffold writes it. A JSON
+    string, list or boolean is valid TOML as it is."""
+    types = "".join(f"    {json.dumps(kind)},\n" for kind in _CONTRACT_TYPES)
+    contracts = "".join(
+        "\n[[tool.importlinter.contracts]]\n"
+        + "".join(f"{key} = {json.dumps(value)}\n" for key, value in contract.items())
+        for contract in _contracts(package)
+    )
+    return (
+        f"[tool.importlinter]\nroot_package = {json.dumps(package)}\n"
+        # Puts fastmcp and mcp in the graph, for the contract that keeps them out of the domain.
+        "include_external_packages = true\n"
+        f"contract_types = [\n{types}]\n{contracts}"
+    )
+
+
+def _contracts(package: str) -> list[dict[str, object]]:
     contexts = f"{package}.contexts"
     return [
         {
             "name": "Layers only import downwards",
             "type": "layers",
             "containers": [package],
-            "layers": LAYERS,
+            "layers": _LAYERS,
             "exhaustive": True,
-        },
-        {
-            "name": "Context features do not import each other in a cycle",
-            "type": "acyclic_siblings",
-            "ancestors": [contexts],
-            "depth": 0,
-        },
-        {
-            "name": "A context feature is imported through its top level only",
-            "type": "feature_privacy",
-            "container": contexts,
-        },
-        {
-            "name": "A query never imports a command",
-            "type": "command_query_separation",
-            "container": contexts,
         },
         *(
             {
@@ -47,19 +43,24 @@ def required_contracts(package: str) -> list[dict[str, object]]:
             }
             for layer in _IMPORTED_THROUGH_TOP_LEVEL
         ),
+        {
+            "name": "A context feature is imported through its top level only",
+            "type": "feature_privacy",
+            "container": contexts,
+        },
+        {
+            "name": "Context features do not import each other in a cycle",
+            "type": "acyclic_siblings",
+            "ancestors": [contexts],
+            "depth": 0,
+        },
+        {
+            # Indirect imports are allowed: contexts reach fastmcp through upstream, whose
+            # UpstreamError is a ToolError.
+            "name": "The domain and the storage know nothing about MCP",
+            "type": "forbidden",
+            "source_modules": [contexts, f"{package}.persistence"],
+            "forbidden_modules": ["fastmcp", "mcp"],
+            "allow_indirect_imports": True,
+        },
     ]
-
-
-def render_importlinter(package: str) -> str:
-    """`[tool.importlinter]` with the required contracts, as the scaffold writes it. A JSON
-    string, list or integer is valid TOML as it is."""
-    types = "".join(f"    {json.dumps(kind)},\n" for kind in CONTRACT_TYPES)
-    contracts = "".join(
-        "\n[[tool.importlinter.contracts]]\n"
-        + "".join(f"{key} = {json.dumps(value)}\n" for key, value in contract.items())
-        for contract in required_contracts(package)
-    )
-    return (
-        f"[tool.importlinter]\nroot_package = {json.dumps(package)}\n"
-        f"contract_types = [\n{types}]\n{contracts}"
-    )

@@ -15,6 +15,7 @@ on:
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
       - "services/**"
+      - "scripts/check-python-service.sh"
       - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
       - ".github/workflows/_template-helm.yaml"
@@ -79,6 +80,7 @@ jobs:
               - 'packages/mcp-configs/**'
             workflow:
               - '.github/workflows/ci-python.yaml'
+              - 'scripts/check-python-service.sh'
               - '.github/workflows/_template-containerize.yaml'
               - '.github/workflows/_template-helm.yaml'
               - '.github/workflows/_template-terraform.yaml'
@@ -185,29 +187,6 @@ jobs:
       - name: Set up Python
         run: uv python install
 
-      - name: Sync dependencies
-        run: uv sync --locked
-
-      # This step runs here and not in the Terraform template.
-      # The generator imports the Python code of the service and needs no terraform binary.
-      # The test for the file, not a matrix entry, selects the services. A second service with a generator needs no edit here.
-      - name: Check generated Terraform registry drift
-        run: |
-          if [ -f scripts/render-terraform-registry.py ]; then
-            uv run python scripts/render-terraform-registry.py --check
-          fi
-
-      # A service with [tool.mcp-openapi] commits the code generated from its vendored spec.
-      # This fails when the spec or the table changed and the code was not regenerated, or the code was edited by hand.
-      - name: Check generated OpenAPI code drift
-        run: |
-          if grep -q '^\[tool\.mcp-openapi\]' pyproject.toml; then
-            uv run mcp-openapi-codegen --check
-          fi
-
-      - name: Check formatting
-        run: uv run ruff format --check .
-
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           run_install: false
@@ -216,24 +195,9 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Check formatting of the files ruff does not own
-        run: pnpm exec biome check . --no-errors-on-unmatched
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Typecheck
-        run: uv run basedpyright
-
-      - name: Run tests
-        run: uv run pytest
-
-      # Forces the architecture plugin with addopts cleared, so a service cannot skip those checks.
-      - name: Check the architecture
-        run: |
-          if grep -q '"mcp-architecture' pyproject.toml; then
-            uv run pytest -o addopts= -p mcp_architecture -k mcp_architecture
-          fi
+      # The same script runs every check locally. DEVELOP.md lists what it runs and why.
+      - name: Check the service
+        run: bash ../../scripts/check-python-service.sh .
 
   test-shared-auth:
     name: Test mcp-credential-auth
