@@ -62,6 +62,9 @@ upstream and the stores.
   - `files_changing_their_type_check(root)`: each `# pyright:` comment in `src` and `tests` that
     sets a file's mode or a report, which basedpyright honours whatever the shared config says.
     Only an ignore that names its rule is left.
+  - `files_turning_rules_off(root, package)`: each `# ruff: noqa` or `# ruff: disable` comment in
+    `src` and `tests`, which turns a rule off for the rest of the file, as a `per-file-ignores`
+    entry would. The codegen's output in `src/<package>/upstream/generated/` may have one.
   - `loosened_configuration(root, pyproject, package)`: each way the MCP's tool tables, or a file
     read in their place, drop or loosen what the shared files and `render_importlinter` give.
     [Where each rule is configured](ARCHITECTURE.md#where-each-rule-is-configured) lists what a
