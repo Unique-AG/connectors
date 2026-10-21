@@ -3,8 +3,8 @@
 import json
 
 _CONTRACT_TYPES = ["feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract"]
-_LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "telemetry"]
-_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "contexts", "upstream", "persistence", "telemetry"]
+_LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "utils", "telemetry"]
+_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "contexts", "upstream", "persistence", "utils", "telemetry"]
 
 
 def render_importlinter(package: str) -> str:

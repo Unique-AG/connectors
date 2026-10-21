@@ -103,7 +103,7 @@ contract_types = [
 name = "Layers only import downwards"
 type = "layers"
 containers = ["architecture_demo_mcp"]
-layers = ["main", "mcp", "contexts", "upstream | persistence", "telemetry"]
+layers = ["main", "mcp", "contexts", "upstream | persistence", "utils", "telemetry"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
@@ -129,6 +129,12 @@ name = "persistence is imported through its top level only"
 type = "protected"
 protected_modules = ["architecture_demo_mcp.persistence.*"]
 allowed_importers = ["architecture_demo_mcp.persistence"]
+
+[[tool.importlinter.contracts]]
+name = "utils is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.utils.*"]
+allowed_importers = ["architecture_demo_mcp.utils"]
 
 [[tool.importlinter.contracts]]
 name = "telemetry is imported through its top level only"

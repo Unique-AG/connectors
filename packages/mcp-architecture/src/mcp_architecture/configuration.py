@@ -13,14 +13,26 @@ type Table = dict[str, object]
 
 _CODE_STYLE = "mcp_architecture/code_style.toml"
 _TYPE_CHECK = "mcp_architecture/type_check.json"
-# Each replaces or narrows the rules code_style.toml selects. per-file-ignores is left to review,
-# since generated code needs it.
-_RUFF_LOOSENING = ("select", "ignore", "extend-ignore", "extend-exclude")
+# The only keys an MCP's tables may set. Any other replaces, narrows or turns down a setting of the
+# shared files, a sub-table such as [tool.ruff.lint.pylint] or an option such as
+# basedpyright's analyzeUnannotatedFunctions alike.
+_RUFF_KEYS = {"extend", "target-version", "exclude", "lint"}
+_RUFF_LINT_KEYS = {"extend-select", "per-file-ignores"}
 _RUFF_EXCLUDE = [".venv"]
-# Each turns basedpyright's `all` mode down for the whole MCP or for some of its files.
-_PYRIGHT_LOOSENING = ("typeCheckingMode", "ignore", "exclude", "enableTypeIgnoreComments")
+_PYRIGHT_KEYS = {
+    "extends",
+    "venvPath",
+    "venv",
+    "pythonVersion",
+    "include",
+    "strict",
+    "executionEnvironments",
+}
+_ENVIRONMENT_KEYS = {"root", "extraPaths", "pythonVersion"}
 _PYRIGHT_INCLUDE = ["src", "tests"]
 _STRICT_VALUES = (True, "error")
+# basedpyright reads it without being told, and drops every error it lists.
+_PYRIGHT_BASELINE = ".basedpyright"
 # Each is read in place of a table of the MCP's pyproject.toml: ruff's in any folder, the others
 # in the MCP's own.
 _RUFF_CONFIGURATION = ("ruff.toml", ".ruff.toml")
@@ -35,7 +47,7 @@ def loosened_configuration(root: Path, pyproject: Mapping[str, object], package:
     return [
         *_other_configuration_findings(root),
         *_importlinter_findings(tool.get("importlinter", {}), package),
-        *_ruff_findings(tool.get("ruff", {})),
+        *_ruff_findings(tool.get("ruff", {}), package),
         *_basedpyright_findings(tool.get("basedpyright", {})),
     ]
 
@@ -47,9 +59,13 @@ def _other_configuration_findings(root: Path) -> list[str]:
         if not _NOT_THE_MCPS.intersection(path.relative_to(root).parts)
         and _replaces_a_table(path, in_root=path.parent == root)
     ]
-    if not found:
-        return []
-    return [f"Remove {found}: each replaces a tool table of pyproject.toml."]
+    findings = [f"Remove {found}: each replaces a tool table of pyproject.toml."] if found else []
+    if (root / _PYRIGHT_BASELINE).exists():
+        findings.append(
+            f"Remove {_PYRIGHT_BASELINE}/: basedpyright drops every error its baseline lists. Fix "
+            "the errors instead."
+        )
+    return findings
 
 
 def _replaces_a_table(path: Path, *, in_root: bool) -> bool:
@@ -96,7 +112,7 @@ def _importlinter_findings(table: Table, package: str) -> list[str]:
     return findings
 
 
-def _ruff_findings(table: Table) -> list[str]:
+def _ruff_findings(table: Table, package: str) -> list[str]:
     findings: list[str] = []
     if not str(table.get("extend", "")).endswith(_CODE_STYLE):
         findings.append(
@@ -104,15 +120,33 @@ def _ruff_findings(table: Table) -> list[str]:
             f'mcp-architecture/src/{_CODE_STYLE}".'
         )
     lint = cast(Table, table.get("lint", {}))
-    loosened = [key for key in _RUFF_LOOSENING if key in table or key in lint]
-    if table.get("exclude", _RUFF_EXCLUDE) != _RUFF_EXCLUDE or "exclude" in lint:
-        loosened.append("exclude")
+    loosened = sorted(
+        [key for key in table if key not in _RUFF_KEYS]
+        + [f"lint.{key}" for key in lint if key not in _RUFF_LINT_KEYS]
+        + (["exclude"] if table.get("exclude", _RUFF_EXCLUDE) != _RUFF_EXCLUDE else [])
+    )
     if loosened:
         findings.append(
             f"[tool.ruff] replaces or narrows the code style with {loosened}. Remove them, and "
             "name the rule in a `# noqa: <rule>` on the line that needs it."
         )
+    per_file = cast(dict[str, list[str]], lint.get("per-file-ignores", {}))
+    if ignored := [
+        path for path, rules in per_file.items() if not _generated(path, rules, package)
+    ]:
+        findings.append(
+            f"[tool.ruff.lint.per-file-ignores] turns rules off outside generated code for "
+            f"{ignored}. Remove them, and name the rule in a `# noqa: <rule>` on the line that "
+            f"needs it. Only src/{package}/upstream/generated/ may be listed there."
+        )
     return findings
+
+
+def _generated(path: str, rules: list[str], package: str) -> bool:
+    """Generated code, or the entry that limits keyword-only arguments to `contexts/`."""
+    if path == f"!src/{package}/contexts/**":
+        return rules == ["PLR0917"]
+    return path.startswith(f"src/{package}/upstream/generated/")
 
 
 def _basedpyright_findings(table: Table) -> list[str]:
@@ -129,7 +163,13 @@ def _basedpyright_findings(table: Table) -> list[str]:
     narrowed = ["include"] if table.get("include", _PYRIGHT_INCLUDE) != _PYRIGHT_INCLUDE else []
     loosened = (
         narrowed
-        + [key for key in _PYRIGHT_LOOSENING if key in table]
+        + [key for key in table if key not in _PYRIGHT_KEYS and not key.startswith("report")]
+        + [
+            key
+            for environment in environments
+            for key in environment
+            if key not in _ENVIRONMENT_KEYS and not key.startswith("report")
+        ]
         + [
             key
             for settings in [table, *environments]

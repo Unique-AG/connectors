@@ -57,17 +57,18 @@ Write code only for what none of them provide.
 ## Layers
 
 ```
-main.py ─▶ mcp ─▶ contexts ─▶ upstream ─┐
-                          └─▶ persistence ─▶ telemetry
+main.py ─▶ mcp ─▶ contexts ─▶ upstream ────┐
+                          └─▶ persistence ─┴─▶ utils ─▶ telemetry
 ```
 
 | Layer | Owns | May import |
 |---|---|---|
 | `main.py` | Starts telemetry, builds the server, runs it | everything |
-| `mcp/` | The FastMCP server, its HTTP serving and middleware, auth, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `telemetry` |
-| `contexts/` | The domain: one folder per feature | `upstream`, `persistence`, `telemetry` |
-| `upstream/` | The system the MCP fronts: its client, settings and, for OpenAPI, the spec and generated code | `telemetry` |
-| `persistence/` | Storage the MCP owns: Postgres, Redis, a key-value store | `telemetry` |
+| `mcp/` | The FastMCP server, its HTTP serving and middleware, auth, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `utils`, `telemetry` |
+| `contexts/` | The domain: one folder per feature | `upstream`, `persistence`, `utils`, `telemetry` |
+| `upstream/` | The system the MCP fronts: its client, settings and, for OpenAPI, the spec and generated code | `utils`, `telemetry` |
+| `persistence/` | Storage the MCP owns: Postgres, Redis, a key-value store | `utils`, `telemetry` |
+| `utils/` | Helpers more than one layer uses, such as a formatter or a date rule | `telemetry` |
 | `telemetry/` | Tracing, logging, metrics and the ops routes | nothing in the package |
 
 `upstream` and `persistence` do not import each other. Imports only point down the table. The
@@ -96,7 +97,7 @@ breaks the `layers` contract.
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run mcp-architecture-check` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run mcp-architecture-check` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run mcp-architecture-check` |
-| `[tool.importlinter]` keeps every contract and option the scaffold wrote, `[tool.ruff]` and `[tool.basedpyright]` extend the shared files and turn no rule down. | `uv run mcp-architecture-check` |
+| `[tool.importlinter]` keeps every contract and option the scaffold wrote. `[tool.ruff]` and `[tool.basedpyright]` extend the shared files, set only the keys listed in [Where each rule is configured](#where-each-rule-is-configured) and turn no rule down. No `.basedpyright/` baseline. | `uv run mcp-architecture-check` |
 | `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
 
 ### Where each rule is configured
@@ -104,28 +105,34 @@ breaks the `layers` contract.
 The MCP's `pyproject.toml` holds each tool's configuration, and the scaffold writes it:
 
 - `[tool.ruff]` extends `mcp-architecture`'s `code_style.toml`, and `uv run ruff check --fix`
-  fixes most of what it finds. Add to the table, such as a `per-file-ignores` entry for generated
-  code, but never loosen the style. A `noqa` that names its rule, with the reason beside it, is
-  fine, as Google's guide allows. A bare `# noqa` or `# ruff: noqa` breaks the style (`PGH004`).
-  The `per-file-ignores` entry that limits `PLR0917` to `contexts/` sits in the MCP's table and
-  not in `code_style.toml`, because ruff reads a path in an extended file from that file's folder.
-- `[tool.basedpyright]` extends `type_check.json`. Make a report stricter there, never turn one
-  down, and add no `pyrightconfig.json`, which would replace the table. Its
-  `executionEnvironments` entry lets `tests/` use private names, for the same reason as the ruff
-  entry above.
+  fixes most of what it finds. It sets `extend`, `target-version`, `exclude = [".venv"]` and, under
+  `lint`, `extend-select` and `per-file-ignores`, and nothing else: any other key or sub-table,
+  such as `[tool.ruff.lint.pylint]`, replaces a setting of the shared style. A `per-file-ignores`
+  entry covers `src/<package>/upstream/generated/` only, apart from the one that limits `PLR0917`
+  to `contexts/`, which sits in the MCP's table and not in `code_style.toml` because ruff reads a
+  path in an extended file from that file's folder. A `noqa` that names its rule, with the reason
+  beside it, is fine, as Google's guide allows. A bare `# noqa` or `# ruff: noqa` breaks the style
+  (`PGH004`).
+- `[tool.basedpyright]` extends `type_check.json`. It sets `extends`, `venvPath`, `venv`,
+  `pythonVersion`, `include = ["src", "tests"]`, `strict`, `executionEnvironments` and reports,
+  and nothing else: any other option, such as `analyzeUnannotatedFunctions` or `baselineFile`,
+  turns the check down. Make a report stricter there, never turn one down. An
+  `executionEnvironments` entry sets only `root`, `extraPaths`, `pythonVersion` and reports. The
+  one the scaffold writes lets `tests/` use private names, for the same reason as the ruff entry
+  above. Never run `basedpyright --writebaseline`: basedpyright drops every error the
+  `.basedpyright/` baseline lists.
 - `[tool.importlinter]` holds the contracts, which `mcp_architecture.render_importlinter` writes.
   import-linter has no way to extend a shared file, so each MCP carries its own copy. Never
   loosen a contract, add an `ignore_imports` entry or set an option such as
   `exclude_type_checking_imports` to make a change pass. Move the code to the layer it belongs
   in. A contract of your own, stricter than these, is fine to add after them.
 
-`uv run mcp-architecture-check` fails when a table drops or loosens what the shared files and
-`render_importlinter` give, and when a `ruff.toml`, `.ruff.toml`, nested `pyproject.toml`,
-`.importlinter` or `setup.cfg` would be read in place of a table. A ruff `per-file-ignores` entry is the one loosening it lets
-through, so review keeps it to generated code: every change to a service's `pyproject.toml`
-goes through the code owners. What ruff cannot check is left to review as well:
-import modules rather than names where the guide asks it, keep functions short, and avoid the
-guide's power features.
+`uv run mcp-architecture-check` fails when a table sets anything else or drops what the shared
+files and `render_importlinter` give, when a `.basedpyright/` baseline exists, and when a
+`ruff.toml`, `.ruff.toml`, nested `pyproject.toml`, `pyrightconfig.json`, `.importlinter` or
+`setup.cfg` would be read in place of a table. What ruff cannot check is left to review: import
+modules rather than names where the guide asks it, keep functions short, and avoid the guide's
+power features.
 
 ## The top level is the interface
 
@@ -362,6 +369,13 @@ holds each of them as a field, so adding a store later changes no existing calle
 Contexts depend on what is stored, never on SQLAlchemy or Redis directly. Expose functions or
 models from `persistence/__init__.py` that say what they store, such as
 `persistence/positions.py` and `persistence/price_cache.py`.
+
+## utils
+
+Empty until a helper is needed by more than one layer: an `__init__.py` with an empty `__all__`,
+so the layers contract still sees the layer. A helper imports nothing from the package but
+`telemetry`, so it holds no business rule and knows no upstream or store. One only a single
+feature or layer uses stays there instead. The demo has none.
 
 ## telemetry
 
