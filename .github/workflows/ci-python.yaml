@@ -197,6 +197,9 @@ jobs:
 
       # The same script runs every check locally. DEVELOP.md lists what it runs and why.
       - name: Check the service
+        env:
+          # A lint finding becomes an annotation on the line it is about.
+          RUFF_OUTPUT_FORMAT: github
         run: bash ../../scripts/check-python-service.sh .
 
   test-shared-auth:

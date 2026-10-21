@@ -2,44 +2,93 @@
 # Every check the [CI] Python workflow runs on a service, in its order, so a run that passes here
 # passes there. Usage: scripts/check-python-service.sh services/<service>
 # biome comes from the repository's node_modules: run `pnpm install` once first.
-set -euo pipefail
+#
+# Every check runs even after one fails, so one run lists all there is to fix. Each failure names
+# the command that fixes it. In GitHub Actions, each check is a collapsible group of the log and a
+# failure is an error annotation on the run.
+set -uo pipefail
 
-cd "${1:?usage: $0 <service-dir>}"
+cd "${1:?usage: $0 <service-dir>}" || exit 1
 
-step() {
-  echo "==> $*"
-  "$@"
+failed=()
+
+in_github_actions() {
+  [ -n "${GITHUB_ACTIONS:-}" ]
 }
 
-step uv sync --locked
+# check <name> <how to fix it> <command...>
+check() {
+  local name=$1 fix=$2
+  shift 2
+  if in_github_actions; then
+    echo "::group::$name"
+  else
+    echo "==> $name: $*"
+  fi
+  local status=0
+  "$@" || status=$?
+  if in_github_actions; then
+    echo "::endgroup::"
+  fi
+  if [ "$status" -ne 0 ]; then
+    failed+=("$name")
+    if in_github_actions; then
+      echo "::error title=$name failed::$fix"
+    else
+      echo "!! $name failed. $fix" >&2
+    fi
+  fi
+}
 
-# The generator imports the Python code of the service and needs no terraform binary.
+# basedpyright honours a `# pyright:` comment that sets a file's mode or a report, whatever the
+# shared config says. Only `# pyright: ignore[rule]` on one line is left.
+no_file_changes_its_type_check() {
+  ! grep -rnE --include='*.py' '#[[:space:]]*pyright:' src tests \
+    | grep -vE '#[[:space:]]*pyright:[[:space:]]*ignore\['
+}
+
+check "Install" "Run \`uv lock\` and commit uv.lock." uv sync --locked
+if [ ${#failed[@]} -ne 0 ]; then
+  exit 1
+fi
+
 if [ -f scripts/render-terraform-registry.py ]; then
-  step uv run python scripts/render-terraform-registry.py --check
+  check "Terraform registry" \
+    "Run \`uv run python scripts/render-terraform-registry.py\` and commit the result." \
+    uv run python scripts/render-terraform-registry.py --check
 fi
 
-# A service with [tool.mcp-openapi] commits the code generated from its vendored spec. This fails
-# when the spec or the table changed and the code was not regenerated, or was edited by hand.
+# A service with [tool.mcp-openapi] commits the code generated from its vendored spec.
 if grep -q '^\[tool\.mcp-openapi\]' pyproject.toml; then
-  step uv run mcp-openapi-codegen --check
+  check "OpenAPI codegen" \
+    "Run \`uv run mcp-openapi-codegen\` and commit the result. Never edit the generated files." \
+    uv run mcp-openapi-codegen --check
 fi
 
-step uv run ruff format --check .
-step pnpm exec biome check . --no-errors-on-unmatched
-step uv run ruff check .
-step uv run basedpyright
+check "Format" "Run \`uv run ruff format .\`." uv run ruff format --check .
+check "Biome" "Run \`pnpm exec biome check --write .\`." \
+  pnpm exec biome check . --no-errors-on-unmatched
+check "Lint" "Run \`uv run ruff check --fix .\`, then fix by hand what it lists." \
+  uv run ruff check .
+check "Types" "Fix what \`uv run basedpyright\` lists. Never turn a report down." \
+  uv run basedpyright
 
 # Only a service that keeps packages/mcp-architecture/ARCHITECTURE.md declares contracts.
 if grep -q '^\[tool\.importlinter\]' pyproject.toml; then
-  step uv run lint-imports
-  # basedpyright honours a `# pyright:` comment that sets a file's mode or a report, whatever the
-  # shared config says. Only `# pyright: ignore[rule]` on one line is left.
-  echo "==> no file changes its type check"
-  if grep -rnE --include='*.py' '#[[:space:]]*pyright:' src tests \
-    | grep -vE '#[[:space:]]*pyright:[[:space:]]*ignore\['; then
-    echo "Remove the comment above: a file keeps the type check of the whole MCP." >&2
-    exit 1
-  fi
+  check "Imports" \
+    "Move the import named above to the layer or top level ARCHITECTURE.md gives it. Never loosen a contract." \
+    uv run lint-imports
+  check "Type check comments" \
+    "Remove the \`# pyright:\` comment listed above; a file keeps the type check of the whole MCP." \
+    no_file_changes_its_type_check
 fi
 
-step uv run pytest
+check "Tests" \
+  "Fix the failing tests. If only the tool surface changed and you meant it, run \`uv run pytest --regen-all\`." \
+  uv run pytest
+
+if [ ${#failed[@]} -ne 0 ]; then
+  echo "Failed: ${failed[*]}" >&2
+  exit 1
+fi
+echo "Every check passed."
