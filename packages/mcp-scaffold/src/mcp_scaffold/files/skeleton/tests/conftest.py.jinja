@@ -23,7 +23,7 @@ from fastmcp import FastMCP
 {% if redis %}
 from key_value.aio.stores.memory import MemoryStore
 {% endif %}
-from mcp_runtime import ServerSettings
+from mcp_configs import ServerSettings
 {% if options.opens_upstream %}
 from pydantic import SecretStr
 {% endif %}

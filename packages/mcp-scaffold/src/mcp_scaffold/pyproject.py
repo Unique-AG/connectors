@@ -25,7 +25,7 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
     openapi = options.upstream is Upstream.OPENAPI
     dependencies = [
         *pinned("service"),
-        shared(repo, "mcp-runtime"),
+        shared(repo, "mcp-configs"),
         *([shared(repo, "mcp-openapi"), *pinned("service-openapi")] if openapi else []),
         *(dependency for store in options.stores for dependency in pinned(f"service-{store}")),
     ]
@@ -35,7 +35,7 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
         *([shared(repo, "mcp-openapi", "[codegen]")] if openapi else []),
         *(pinned("service-postgres-dev") if Persistence.POSTGRES in options.persistence else []),
     ]
-    packages = ["mcp-architecture", *(["mcp-openapi"] if openapi else []), "mcp-runtime"]
+    packages = ["mcp-architecture", "mcp-configs", *(["mcp-openapi"] if openapi else [])]
     for old, new in [
         ("dependencies = []\n", dependency_array("dependencies", dependencies)),
         ("dev = []\n", dependency_array("dev", dev)),

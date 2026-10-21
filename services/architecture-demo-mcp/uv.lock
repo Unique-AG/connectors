@@ -193,8 +193,8 @@ dependencies = [
     { name = "asyncpg" },
     { name = "fastmcp" },
     { name = "httpx2" },
+    { name = "mcp-configs" },
     { name = "mcp-openapi" },
-    { name = "mcp-runtime" },
     { name = "mcp-types" },
     { name = "py-key-value-aio", extra = ["redis"] },
     { name = "pydantic" },
@@ -226,8 +226,8 @@ requires-dist = [
     { name = "asyncpg", specifier = "==0.31.0" },
     { name = "fastmcp", specifier = "==4.1.0" },
     { name = "httpx2", specifier = "==2.13.1" },
+    { name = "mcp-configs", directory = "../../packages/mcp-configs" },
     { name = "mcp-openapi", directory = "../../packages/mcp-openapi" },
-    { name = "mcp-runtime", directory = "../../packages/mcp-runtime" },
     { name = "mcp-types", specifier = "==2.3.0" },
     { name = "py-key-value-aio", extras = ["redis"], specifier = "==0.4.6" },
     { name = "pydantic", specifier = "==2.14.1" },
@@ -1684,6 +1684,28 @@ dev = [
 ]
 
 [[package]]
+name = "mcp-configs"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-configs" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "pydantic-settings", specifier = ">=2.15,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "ruff", specifier = "==0.17.0" },
+]
+
+[[package]]
 name = "mcp-openapi"
 version = "0.1.0"
 source = { directory = "../../packages/mcp-openapi" }
@@ -1726,40 +1748,6 @@ dev = [
     { name = "openapi-pydantic", specifier = "==0.6.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "ruff", specifier = "==0.17.0" },
-]
-
-[[package]]
-name = "mcp-runtime"
-version = "0.1.0"
-source = { directory = "../../packages/mcp-runtime" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "httpx2" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "starlette" },
-    { name = "unique-mcp" },
-    { name = "unique-toolkit", extra = ["monitoring", "otel"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp", specifier = ">=4.1,<5" },
-    { name = "httpx2", specifier = ">=2.13,<3" },
-    { name = "pydantic", specifier = ">=2.13,<3" },
-    { name = "pydantic-settings", specifier = ">=2.15,<3" },
-    { name = "starlette", specifier = ">=1.8,<2" },
-    { name = "unique-mcp", specifier = ">=2026.44.0.dev1" },
-    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = ">=2026.44.0.dev2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "basedpyright", specifier = "==1.40.2" },
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "pytest", specifier = "==9.1.1" },
-    { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.17.0" },
 ]
 

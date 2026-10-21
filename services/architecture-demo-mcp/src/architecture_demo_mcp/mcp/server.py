@@ -7,10 +7,8 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
-from starlette.middleware import Middleware
 
 from architecture_demo_mcp.persistence import Persistence
-from architecture_demo_mcp.telemetry import instrument
 from architecture_demo_mcp.upstream import open_upstream
 from architecture_demo_mcp.upstream import upstream_http
 from architecture_demo_mcp.upstream import upstream_tools
@@ -51,12 +49,3 @@ def create_server(
     assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
     mcp.add_provider(tools)
     return mcp
-
-
-def http_middleware(mcp: FastMCP) -> list[Middleware]:
-    """The MCP's own HTTP middleware.
-
-    mcp_runtime puts the host and origin guard and CORS before it, in production and in the
-    tests alike.
-    """
-    return [instrument(mcp)]

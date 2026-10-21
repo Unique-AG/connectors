@@ -1,8 +1,7 @@
 # architecture-demo-mcp
 
-An MCP that `packages/mcp-scaffold` generated with every option, an OpenAPI upstream, Postgres,
-Redis and the pending Unique auth, and a small worked example on top against Tiingo's market
-data API. It is the reference for writing code in any of our Python MCPs.
+An MCP that `packages/mcp-scaffold` generated with every option, an OpenAPI upstream, Postgres
+and Redis, and a small worked example on top against Tiingo's market data API. It is the reference for writing code in any of our Python MCPs.
 [`ARCHITECTURE.md`](../../packages/mcp-architecture/ARCHITECTURE.md) is the contract, and every
 example it names lives here.
 
@@ -27,7 +26,8 @@ in `persistence/migrations/versions/`. Everything else is what the scaffold wrot
 service like any other: when the skeleton changes in a way the reference should show, change it
 here by hand.
 
-Until the Unique auth package exists, every user of a running server shares the watchlists.
+It has no auth, so it only serves on loopback, and every user of a running server shares the
+watchlists.
 
 ## Environment
 

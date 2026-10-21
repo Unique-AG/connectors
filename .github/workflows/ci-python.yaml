@@ -10,9 +10,9 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "packages/mcp-architecture/**"
+      - "packages/mcp-configs/**"
       - "packages/mcp-credential-auth/**"
       - "packages/mcp-openapi/**"
-      - "packages/mcp-runtime/**"
       - "packages/mcp-scaffold/**"
       - "services/**"
       - ".github/workflows/ci-python.yaml"
@@ -44,7 +44,7 @@ jobs:
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
       mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
-      mcp-runtime-changed: ${{ steps.filter.outputs.mcp_runtime }}
+      mcp-configs-changed: ${{ steps.filter.outputs.mcp_configs }}
       mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
@@ -66,15 +66,15 @@ jobs:
               - 'packages/mcp-architecture/**'
             mcp_openapi:
               - 'packages/mcp-openapi/**'
-            mcp_runtime:
-              - 'packages/mcp-runtime/**'
-            # The MCPs the scaffold's tests generate depend on mcp-runtime, run mcp-architecture's
+            mcp_configs:
+              - 'packages/mcp-configs/**'
+            # The MCPs the scaffold's tests generate depend on mcp-configs, run mcp-architecture's
             # rules, and use mcp-openapi for an OpenAPI upstream, so a change to any of them runs them too.
             mcp_scaffold:
               - 'packages/mcp-scaffold/**'
               - 'packages/mcp-architecture/**'
               - 'packages/mcp-openapi/**'
-              - 'packages/mcp-runtime/**'
+              - 'packages/mcp-configs/**'
             workflow:
               - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
@@ -93,7 +93,7 @@ jobs:
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
           MCP_ARCHITECTURE_CHANGED: ${{ steps.filter.outputs.mcp_architecture }}
           MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
-          MCP_RUNTIME_CHANGED: ${{ steps.filter.outputs.mcp_runtime }}
+          MCP_CONFIGS_CHANGED: ${{ steps.filter.outputs.mcp_configs }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -146,8 +146,8 @@ jobs:
               consumers=$(grep -l '"mcp-architecture' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
-            if [ "$MCP_RUNTIME_CHANGED" = "true" ]; then
-              consumers=$(grep -l '"mcp-runtime' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            if [ "$MCP_CONFIGS_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-configs' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
           fi
@@ -355,18 +355,18 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-  test-mcp-runtime:
-    name: Test mcp-runtime
+  test-mcp-configs:
+    name: Test mcp-configs
     needs: detect-changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.detect-changes.outputs.mcp-runtime-changed == 'true' ||
+      needs.detect-changes.outputs.mcp-configs-changed == 'true' ||
       needs.detect-changes.outputs.workflow-changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: packages/mcp-runtime
+        working-directory: packages/mcp-configs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

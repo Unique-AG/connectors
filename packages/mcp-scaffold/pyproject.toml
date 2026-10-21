@@ -1,6 +1,6 @@
 [project]
 name = "mcp-scaffold"
-version = "0.2.0"
+version = "0.0.1"
 description = "Generates a new Python MCP service: the shared skeleton, the layers it asks for, its deploy and its release wiring"
 requires-python = ">=3.14"
 dependencies = [

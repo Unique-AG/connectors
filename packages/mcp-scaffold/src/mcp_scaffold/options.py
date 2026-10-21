@@ -1,4 +1,5 @@
-"""What a new MCP asks for: its name, what it talks to, what it stores and its auth."""
+"""What a new MCP asks for: its name, what it talks to and what it stores. Auth is not asked:
+the `new-mcp` skill works it out with the user once the MCP exists."""
 
 import re
 from enum import StrEnum
@@ -8,8 +9,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Upstream(StrEnum):
+    """`openapi` is mcp-openapi's typed client over the vendor's spec. `custom` is a small HTTP
+    client to start from, which the agent shapes to the upstream with the user."""
+
     OPENAPI = "openapi"
-    HTTP = "http"
     CUSTOM = "custom"
 
 
@@ -18,20 +21,15 @@ class Persistence(StrEnum):
     REDIS = "redis"
 
 
-class Auth(StrEnum):
-    NONE = "none"
-    UNIQUE = "unique"
-
-
 class Options(BaseModel):
     name: str
     description: str = Field(min_length=1)
-    upstream: Upstream
+    # None when the MCP calls no system of its own, such as one that only works over its storage.
+    upstream: Upstream | None = None
     # The vendor's OpenAPI spec, a path or an http(s) URL. Only an OpenAPI upstream has one.
     spec: str | None = None
     # Empty when the MCP stores nothing.
     persistence: frozenset[Persistence]
-    auth: Auth
 
     @field_validator("name")
     @classmethod
@@ -57,8 +55,7 @@ class Options(BaseModel):
 
     @property
     def opens_upstream(self) -> bool:
-        """A custom upstream is written by hand, so the server does not open one yet."""
-        return self.upstream is not Upstream.CUSTOM
+        return self.upstream is not None
 
     @property
     def opens_persistence(self) -> bool:
