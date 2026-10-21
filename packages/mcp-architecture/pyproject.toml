@@ -1,22 +1,15 @@
 [project]
 name = "mcp-architecture"
 version = "0.1.0"
-description = "The architecture every scaffolded Python MCP keeps: its import contracts, folder and module rules, type check, tool descriptions and tool surface snapshot"
+description = "The architecture every scaffolded Python MCP keeps, as tool configuration: its code style, its type check, its import contracts and the checks of what a client sees"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=4.1,<5",
     "grimp>=3.17,<4",
     "import-linter>=2.15,<3",
     "mcp-types>=2.3,<3",
-    "pydantic>=2.13,<3",
-    "pytest>=9.1,<10",
-    "pytest-asyncio>=1.4,<2",
-    "pytest-regressions>=2.11,<3",
-    "ruff>=0.17,<1",
+    "pydantic-settings>=2.15,<3",
 ]
-
-[project.entry-points.pytest11]
-mcp_architecture = "mcp_architecture.plugin"
 
 [build-system]
 requires = ["hatchling==1.32.4"]

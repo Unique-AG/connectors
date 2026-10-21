@@ -55,7 +55,7 @@ uv run --project packages/mcp-scaffold mcp-scaffold new <name> \
 
 It refuses to start unless `git status` is clean, untracked files included. Ask the user to
 commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff,
-basedpyright and pytest in the new service, and fails loudly if any of them does. Since it
+basedpyright, import-linter and pytest in the new service, and fails loudly if any of them does. Since it
 started from a clean tree, everything it wrote is its own: undo a failed run with
 `git checkout -- . && git clean -fd && git clean -fdx services/<name>`. The last command also
 removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
@@ -189,8 +189,9 @@ For OpenAPI, this is promoting a served operation, when the user asks for a tool
 cannot give as it is: trimmed, renamed, with a rule, or merged from several operations.
 Follow `packages/mcp-architecture/ARCHITECTURE.md`, using `services/architecture-demo-mcp` as the
 model:
-1. Write a feature under `contexts/<plural noun>/` with its queries and commands.
-2. Write a tool under `mcp/tools/` that calls it.
+1. Write a feature under `contexts/<plural noun>/`, and re-export what the tool calls from
+   `contexts/__init__.py`.
+2. Write a tool under `mcp/tools/` that calls it, imported from `<package>.contexts`.
 3. Write a test in the style of the demo's `tests/test_tools.py`, with a fake upstream
    behind `httpx2.MockTransport` or a stub of the custom client.
 
@@ -203,8 +204,8 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - If you changed `values.additional.schema.json`, run `scripts/render-values-schema.sh`.
 - Each tool you added or served changes the tool surface. Read the snapshot test's diff, then
   accept it with `uv run pytest --regen-all`.
-- Run `uv run pytest`, `uv run ruff format . && uv run ruff check .` and `uv run basedpyright`
-  in the service.
+- Run `bash scripts/check-python-service.sh services/<name>` from the repository root: every
+  check CI runs, in its order.
 - Tell the user what is registered and what is still theirs to do:
   - Registered: release-please, release-rerun and the `<name>` commit scope. Commit with that
     scope, e.g. `feat(<name>): ...`.
