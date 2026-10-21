@@ -13,8 +13,7 @@ Dockerfile, the Helm chart, and the release and commit-scope registration. It is
 tool: never import from it. Your job is to find out what the MCP needs before running it, and to
 write what the scaffold cannot know afterwards: the upstream client when there is no OpenAPI
 spec, the auth, the persistence and the tools. Read `packages/mcp-architecture/ARCHITECTURE.md`
-first: it is the contract the new service is checked against, and
-`services/architecture-demo-mcp` holds every example it names.
+first: it is the contract the new service is checked against.
 
 ## 1. Ask
 
@@ -181,18 +180,17 @@ for Redis.
 
 The tests need neither store running: the `persistence` fixture in `tests/conftest.py` opens
 SQLite and a `MemoryStore` in their place, and every client a test opens shares it. Seed it
-through the functions in `persistence/__init__.py`, as the demo's `tests/test_tools.py` does.
+through the functions in `persistence/__init__.py`.
 
 ## 6. Build the first feature and tool
 
 For OpenAPI, this is promoting a served operation, when the user asks for a tool the spec
 cannot give as it is: trimmed, renamed, with a rule, or merged from several operations.
-Follow `packages/mcp-architecture/ARCHITECTURE.md`, using `services/architecture-demo-mcp` as the
-model:
+Follow `packages/mcp-architecture/ARCHITECTURE.md`:
 1. Write a feature under `contexts/<plural noun>/`, and re-export what the tool calls from
    `contexts/__init__.py`.
 2. Write a tool under `mcp/tools/` that calls it, imported from `<package>.contexts`.
-3. Write a test in the style of the demo's `tests/test_tools.py`, with a fake upstream
+3. Write a test that calls the tool through a real FastMCP `Client`, with a fake upstream
    behind `httpx2.MockTransport` or a stub of the custom client.
 
 Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with that fake.

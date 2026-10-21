@@ -65,7 +65,7 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-# The skeleton is checked where it lands: in each generated MCP and in architecture-demo-mcp.
+# The skeleton is checked where it lands, in each generated MCP.
 exclude = [".venv", "src/mcp_scaffold/files"]
 
 [tool.ruff.lint]

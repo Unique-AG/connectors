@@ -8,12 +8,8 @@ that breaks a rule fails one of them, and the failure names the import or the li
 `bash ../../scripts/check-python-service.sh .` runs them all, in the order CI does.
 
 `<package>` below is the MCP's Python package, `weather_mcp` for `services/weather-mcp`.
-
-`services/architecture-demo-mcp` is an MCP the scaffold generated, with a working example on
-top, against Tiingo's market data API, with a Postgres watchlist and a Redis quote cache:
-`search_assets`, `get_asset`, `get_quote`, `add_to_watchlist`, `get_watchlist` and
-`remove_from_watchlist`. Every example path below is in that service. Read it next to this file when you write a feature, a
-tool or a test.
+Example paths such as `contexts/assets/queries/get_asset.py` show the shape a feature, a tool
+or a test takes.
 
 ## What the MCP owns and what it shares
 
@@ -142,9 +138,9 @@ Nothing outside `upstream/` imports `upstream/client.py` or any other module in 
 
 A feature is one domain concept, named in the plural of what it handles: `assets`, `quotes`,
 `watchlists`. Features sit side by side. A feature never contains another feature, and organizes
-its own modules as its code asks. The demo splits each feature into `commands/`, which change
-something upstream or in storage, and `queries/`, which read. That split is one way to keep a
-feature readable, not a rule.
+its own modules as its code asks. Split a feature into `commands/`, which change something
+upstream or in storage, and `queries/`, which read, when that keeps it readable. That split is
+optional.
 
 Start small and grow only when the code asks for it:
 
@@ -260,8 +256,8 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
   A new MCP starts with its spec's first JSON operation, a GET if there is one, in both lists:
   served, and typed for when it is promoted. Serve more operations to grow the first version.
   Promote one when its output needs trimming or renaming, or a business rule, or when several
-  operations make one tool: remove it from `EXPOSED` and write the tool, as
-  `services/architecture-demo-mcp` did for `getDailyMeta`, now `get_asset`, and left `get_daily_prices` served.
+  operations make one tool: remove it from `EXPOSED` and write the tool. For example, promote
+  `getDailyMeta` into `get_asset` and leave `get_daily_prices` served.
   `upstream_http` builds the one client both kinds share, so they send the same auth.
 
   When the vendor changes the spec:
@@ -307,8 +303,8 @@ holds each of them as a field, so adding a store later changes no existing calle
   `mcp_configs.RedisSettings`, set by `REDIS_URL`.
 
 Contexts depend on what is stored, never on SQLAlchemy or Redis directly. Expose functions or
-models from `persistence/__init__.py` that say what they store, as the demo's
-`persistence/watchlists.py` and `persistence/quote_cache.py` do.
+models from `persistence/__init__.py` that say what they store, such as
+`persistence/watchlists.py` and `persistence/quote_cache.py`.
 
 ## telemetry
 
@@ -374,9 +370,9 @@ Adding one:
 
 ## Tests
 
-- In the demo, `tests/conftest.py` holds `FakeTiingo`, the upstream answering through
-  `httpx2.MockTransport`, and a `call_tool` fixture that calls a tool through a real FastMCP
-  `Client`. Test tools this way, end to end through the context to the fake upstream.
+- Answer the upstream from `tests/conftest.py` through `httpx2.MockTransport`, and call each
+  tool with a `call_tool` fixture that uses a real FastMCP `Client`. Test tools this way, end
+  to end through the context to the fake upstream.
 - CI runs no Postgres or Redis. `create_server` takes the function that opens the persistence,
   so the `persistence` fixture in `tests/conftest.py` opens SQLite through `aiosqlite` and a
   `MemoryStore` in their place. That is why `Store` is typed as the `AsyncKeyValue` protocol.

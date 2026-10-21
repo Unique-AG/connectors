@@ -24,7 +24,6 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
-architecture-demo-mcp = services/architecture-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**

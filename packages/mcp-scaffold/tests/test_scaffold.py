@@ -87,7 +87,7 @@ def probe(upstream: Upstream | None, persistence: set[Persistence]) -> Options:
 
 # Each option appears alone once, and the stores once together. The first without an upstream
 # opens nothing, so its server has no lifespan; the second opens only its store. The last is
-# every option at once, as services/architecture-demo-mcp is generated.
+# every option at once: an OpenAPI upstream with Postgres and Redis.
 PROBES = {
     options.name: options
     for options in [
