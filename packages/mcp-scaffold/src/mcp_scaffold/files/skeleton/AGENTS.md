@@ -4,8 +4,7 @@
 
 This MCP keeps the architecture every Python MCP in this repo shares. Read
 [`packages/mcp-architecture/ARCHITECTURE.md`](../../packages/mcp-architecture/ARCHITECTURE.md)
-before you write code here: ruff, basedpyright and import-linter check most of it, and
-`services/architecture-demo-mcp` holds a worked example of every part.
+before you write code here: ruff, basedpyright and import-linter check most of it.
 
 ## Commands
 
