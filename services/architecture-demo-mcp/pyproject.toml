@@ -40,7 +40,6 @@ dev = [
     "mcp-architecture==0.1.0",
     "mcp-openapi[codegen]==0.1.0",
     "pytest-asyncio==1.4.0",
-    "pytest-regressions==2.11.0",
     "pytest==9.1.1",
     "ruff==0.17.0",
 ]

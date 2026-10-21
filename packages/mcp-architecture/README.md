@@ -50,7 +50,8 @@ extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
 ```
 
 The scaffold writes this, the `[tool.importlinter]` table from `render_importlinter`, and
-`tests/test_architecture.py`.
+`tests/offline_server.py`, whose `offline_server()` builds the server with fakes in place of the
+upstream and the stores.
 
 ## What it gives
 
@@ -63,11 +64,15 @@ The scaffold writes this, the `[tool.importlinter]` table from `render_importlin
 - `FeaturePrivacyContract`: the one contract type of our own, which the rendered table
   registers. import-linter's `protected` contract lets an allowed importer's descendants in too,
   so it cannot say that one feature only reaches another through its top level.
-- The checks of what a client sees, for `tests/test_architecture.py`:
+- `mcp-architecture-check`: runs, in the MCP's folder, the checks of what a client sees against
+  the server `offline_server()` builds, and checks that `[tool.importlinter]`'s `root_package`
+  is the project's own package. CI runs it as a step of its own, outside pytest, so a
+  `conftest.py` cannot skip, xfail or deselect a check. `--update` writes
+  `tests/tool_surface.generated.json` instead of comparing with it. The checks it runs:
   - `undescribed_tools(server)`: each tool without a description and each parameter without one,
     skipping a tool tagged `passthrough` (served straight from an OpenAPI spec).
   - `tool_surface(server)`: the tools the server lists (name, title, description, input and
-    output schema, annotations and tags) as JSON, for pytest-regressions' `file_regression`.
+    output schema, annotations and tags) as JSON, compared with the snapshot.
   - `tools_with_a_root_combinator(server)`: each tool whose input schema has `anyOf`, `oneOf`,
     `allOf` or `not` at its root.
   - `masks_error_details(server)`: whether an unexpected error reaches the client without its

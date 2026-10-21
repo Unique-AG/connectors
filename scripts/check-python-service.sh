@@ -96,11 +96,13 @@ if grep -q '^\[tool\.importlinter\]' pyproject.toml; then
   check "Type check comments" \
     "Remove the \`# pyright:\` comment listed above; a file keeps the type check of the whole MCP." \
     no_file_changes_its_type_check
+  # Outside pytest, so a conftest.py cannot skip, xfail or deselect it.
+  check "What a client sees" \
+    "Fix what \`uv run mcp-architecture-check\` lists. If only the tool surface changed and you meant it, run \`uv run mcp-architecture-check --update\`." \
+    uv run mcp-architecture-check
 fi
 
-check "Tests" \
-  "Fix the failing tests. If only the tool surface changed and you meant it, run \`uv run pytest --regen-all\`." \
-  uv run pytest
+check "Tests" "Fix the failing tests." uv run pytest
 
 if [ ${#failed[@]} -ne 0 ]; then
   echo "Failed: ${failed[*]}" >&2
