@@ -6,31 +6,9 @@ tightening it reaches every MCP with `uv sync`.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) explains the architecture and names the tool behind each
 rule, and the `AGENTS.md` of every scaffolded MCP points to it.
 
-## The rules
-
-| Rule | Checked by |
-|---|---|
-| Layers only import downwards: `main → mcp → contexts → upstream / persistence → telemetry` | import-linter |
-| A layer is imported through its top level, and `contexts` through `<package>.contexts` | import-linter |
-| A feature imports another only through that feature's top level | `FeaturePrivacyContract` |
-| No package imports its siblings in a cycle, at any depth | import-linter |
-| `contexts` and `persistence` import nothing from `fastmcp`, `mcp` or `mcp_types` | import-linter |
-| Every Python folder has an `__init__.py`, and imports are absolute | ruff |
-| A context function takes keyword arguments only | ruff |
-| APIs a past fix replaced stay banned | ruff |
-| The Google Python Style Guide, as far as ruff checks it | ruff |
-| Every type is known | basedpyright |
-| No file changes its own type check | `files_changing_their_type_check` |
-| Every tool and parameter has a description | `undescribed_tools` |
-| No tool schema combines schemas at its root | `tools_with_a_root_combinator` |
-| An unexpected error reaches the client without its message | `masks_error_details` |
-| A settings error does not print its input | `settings_showing_input_in_errors` |
-| What a client sees matches a snapshot | `tool_surface` |
-| The MCP's tool tables keep every shared rule and contract | `loosened_configuration` |
-| `contexts` is flat, one folder per feature | review |
-
-A rule checked by a name in code, not a tool, is code of our own.
-[`CUSTOM_CHECKS.md`](CUSTOM_CHECKS.md) says why, and which tools we looked at instead.
+[The rules in `ARCHITECTURE.md`](ARCHITECTURE.md#the-rules) list each rule and the tool or
+check behind it. A rule checked by code of our own rather than a tool is explained in
+[`CUSTOM_CHECKS.md`](CUSTOM_CHECKS.md), with the tools we looked at instead.
 
 ## Install
 
@@ -84,13 +62,10 @@ upstream and the stores.
   - `files_changing_their_type_check(root)`: each `# pyright:` comment in `src` and `tests` that
     sets a file's mode or a report, which basedpyright honours whatever the shared config says.
     Only an ignore that names its rule is left.
-  - `loosened_configuration(root, pyproject, package)`: each contract or import-linter option
-    that differs from what `render_importlinter` writes, a missing `extend` of `code_style.toml`
-    or `type_check.json`, a ruff `select`, `ignore`, `extend-ignore` or narrowed `exclude`, a
-    basedpyright mode, narrowed `include`, ignored path or report turned down, and a
-    `ruff.toml`, `.ruff.toml`, nested `pyproject.toml`, `pyrightconfig.json`, `.importlinter` or
-    `setup.cfg`, which a tool reads in place of the tables. A contract of the MCP's own after the
-    shared ones, a stricter report and a ruff `per-file-ignores` entry pass.
+  - `loosened_configuration(root, pyproject, package)`: each way the MCP's tool tables, or a file
+    read in their place, drop or loosen what the shared files and `render_importlinter` give.
+    [Where each rule is configured](ARCHITECTURE.md#where-each-rule-is-configured) lists what a
+    table may set.
 
 ## Working on the package from a service
 

@@ -41,6 +41,7 @@ SHOP = {
         "class Upstream:\n    name = 'upstream'\n"
     ),
     "persistence/__init__.py": "",
+    "utils/__init__.py": "",
     "telemetry/__init__.py": "",
 }
 
@@ -184,6 +185,26 @@ def test_the_domain_or_the_storage_importing_mcp_breaks_the_contract(
 
     assert "The domain and the storage know nothing about MCP" in report
     assert f"-> {package}" in report
+
+
+@pytest.mark.parametrize("layer", ["mcp", "contexts", "upstream", "persistence"])
+def test_every_layer_above_utils_may_use_it(shop: Path, layer: str) -> None:
+    write(shop, "utils/__init__.py", "import shop.telemetry\n")
+    write(shop, f"{layer}/helpers.py", "import shop.utils\n")
+
+    assert broken_contracts(shop) == ""
+
+
+@pytest.mark.parametrize("layer", ["mcp", "contexts", "upstream", "persistence"])
+def test_utils_importing_a_layer_above_it_breaks_the_layers_contract(
+    shop: Path, layer: str
+) -> None:
+    write(shop, "utils/__init__.py", f"import shop.{layer}\n")
+
+    report = broken_contracts(shop)
+
+    assert "Layers only import downwards" in report
+    assert f"shop.utils -> shop.{layer}" in report
 
 
 def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> None:
