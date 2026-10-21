@@ -56,7 +56,7 @@ def upstream_settings() -> UpstreamSettings:
 def upstream_transport() -> httpx2.MockTransport:
     """Stands in for the upstream.
 
-    Answer each route with fixed data, as FakeTiingo does in services/architecture-demo-mcp.
+    Answer each route the tools call with fixed data.
     """
     return httpx2.MockTransport(lambda _request: httpx2.Response(404))
 {% endif %}

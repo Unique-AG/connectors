@@ -1,5 +1,4 @@
-"""Generate a new MCP: the shared skeleton with the layers it asks for. `cli.py` runs it, and
-`services/architecture-demo-mcp` is its output with a worked example on top."""
+"""Generate a new MCP: the shared skeleton with the layers it asks for. `cli.py` runs it."""
 
 from datetime import UTC, datetime
 from pathlib import Path
