@@ -6,6 +6,31 @@ tightening it reaches every MCP with `uv sync`.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) explains the architecture and names the tool behind each
 rule, and the `AGENTS.md` of every scaffolded MCP points to it.
 
+## The rules
+
+| Rule | Checked by |
+|---|---|
+| Layers only import downwards: `main → mcp → contexts → upstream / persistence → telemetry` | import-linter |
+| A layer is imported through its top level, and `contexts` through `<package>.contexts` | import-linter |
+| A feature imports another only through that feature's top level | `FeaturePrivacyContract` |
+| No package imports its siblings in a cycle, at any depth | import-linter |
+| `contexts` and `persistence` import nothing from `fastmcp` or `mcp` | import-linter |
+| Every Python folder has an `__init__.py`, and imports are absolute | ruff |
+| A context function takes keyword arguments only | ruff |
+| APIs a past fix replaced stay banned | ruff |
+| The Google Python Style Guide, as far as ruff checks it | ruff |
+| Every type is known | basedpyright |
+| No file changes its own type check | `scripts/check-python-service.sh` |
+| Every tool and parameter has a description | `undescribed_tools` |
+| No tool schema combines schemas at its root | `tools_with_a_root_combinator` |
+| An unexpected error reaches the client without its message | `masks_error_details` |
+| A settings error does not print its input | `settings_showing_input_in_errors` |
+| What a client sees matches a snapshot | `tool_surface` |
+| `contexts` is flat, one folder per feature | review |
+
+A rule checked by a name in code, not a tool, is code of our own.
+[`CUSTOM_CHECKS.md`](CUSTOM_CHECKS.md) says why, and which tools we looked at instead.
+
 ## Install
 
 A dev dependency only; the image never installs it:
