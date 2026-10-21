@@ -1,4 +1,4 @@
-from pydantic_settings import SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def shared_config(env_prefix: str = "") -> SettingsConfigDict:
@@ -13,3 +13,9 @@ def shared_config(env_prefix: str = "") -> SettingsConfigDict:
         hide_input_in_errors=True,
         validate_by_name=True,
     )
+
+
+def from_environment[S: BaseSettings](settings: type[S]) -> S:
+    """`settings` read from the environment alone. Called directly, a class with a required field
+    fails the type check, which cannot see that the environment gives the field."""
+    return settings()

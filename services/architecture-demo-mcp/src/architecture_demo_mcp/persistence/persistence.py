@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import ClassVar
 
+from mcp_configs import from_environment
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -16,15 +17,11 @@ from architecture_demo_mcp.persistence.store import Store
 from architecture_demo_mcp.persistence.store import StoreSettings
 
 
-def _store_settings() -> StoreSettings:
-    return StoreSettings()  # pyright: ignore[reportCallIssue]
-
-
 class PersistenceSettings(BaseModel):
     """Each store reads its own settings from the environment."""
 
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
-    store: StoreSettings = Field(default_factory=_store_settings)
+    store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
 
 
 class Persistence(BaseModel):

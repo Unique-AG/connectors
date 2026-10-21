@@ -10,7 +10,9 @@ Its siblings split the rest: `mcp-architecture` checks the structure an MCP keep
 
 ## Settings
 
-Each class reads the environment and a `.env` file the same way (`shared_config`).
+Each class reads the environment and a `.env` file the same way (`shared_config`). Build one
+that has a required field with `from_environment(RedisSettings)` rather than `RedisSettings()`,
+which the type check rejects, since it cannot see that the environment gives the field.
 
 | Class | Env | Defaults |
 |---|---|---|

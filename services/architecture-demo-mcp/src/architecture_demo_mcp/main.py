@@ -2,6 +2,7 @@
 
 from functools import partial
 
+from mcp_configs import from_environment
 from mcp_configs import LoggingSettings
 from mcp_configs import ServerSettings
 from mcp_configs import ZitadelSettings
@@ -22,14 +23,10 @@ def main() -> None:
     server_settings = ServerSettings()
     persistence_settings = PersistenceSettings()
     # Read only in zitadel mode, so a server without sign-in starts without its variables.
-    zitadel = (
-        ZitadelSettings()  # pyright: ignore[reportCallIssue]
-        if AuthSettings().mode is AuthMode.ZITADEL
-        else None
-    )
+    zitadel = from_environment(ZitadelSettings) if AuthSettings().mode is AuthMode.ZITADEL else None
     auth = create_auth(zitadel=zitadel, server=server_settings, store=persistence_settings.store)
     persistence = partial(open_persistence, persistence_settings)
-    server = create_server(UpstreamSettings(), persistence, auth=auth)  # pyright: ignore[reportCallIssue]
+    server = create_server(from_environment(UpstreamSettings), persistence, auth=auth)
     run_server(server, server_settings)
 
 
