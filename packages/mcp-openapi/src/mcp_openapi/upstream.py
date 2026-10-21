@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -14,9 +13,6 @@ from pydantic import TypeAdapter, ValidationError
 
 from mcp_openapi.lock import LockConfig
 from mcp_openapi.retry import RetryPolicy
-
-_LOGGER = logging.getLogger(__name__)
-_LOGGED_BODY_CHARS = 200
 
 
 class UpstreamError(ToolError):
@@ -116,9 +112,8 @@ class OperationClient:
             url = exc.request.url.copy_with(query=None)
             status = f"{exc.response.status_code} {exc.response.reason_phrase}"
             message = f"{status} for {exc.request.method} {url}"
-            # The body may hold the upstream's internals, so only the server log sees it.
-            _LOGGER.warning("%s: %s", message, exc.response.text[:_LOGGED_BODY_CHARS])
-            raise UpstreamError(message) from exc
+            body = exc.response.text[:200]
+            raise UpstreamError(f"{message}: {body}" if body else message) from exc
         except httpx2.HTTPError as exc:
             raise UpstreamError(str(exc) or type(exc).__name__) from exc
 

@@ -7,8 +7,6 @@ import difflib
 import importlib.util
 import sys
 import tomllib
-from collections.abc import Callable
-from contextlib import AbstractAsyncContextManager
 from pathlib import Path
 from typing import cast
 
@@ -16,6 +14,7 @@ from fastmcp import FastMCP
 
 from mcp_architecture.settings import settings_showing_input_in_errors
 from mcp_architecture.tools import (
+    ServerFactory,
     masks_error_details,
     tool_surface,
     tools_with_a_root_combinator,
@@ -24,8 +23,6 @@ from mcp_architecture.tools import (
 
 OFFLINE_SERVER = Path("tests") / "offline_server.py"
 SNAPSHOT = Path("tests") / "tool_surface.generated.json"
-
-type ServerFactory = Callable[[], AbstractAsyncContextManager[FastMCP]]
 
 
 def main() -> None:
@@ -63,6 +60,8 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
         async with factory() as server:
             findings.extend(await _server_findings(server))
             findings.extend(_snapshot_findings(root / SNAPSHOT, await tool_surface(server), update))
+        if not await masks_error_details(factory):
+            findings.append("Create the server with mask_error_details=True.")
     shown = settings_showing_input_in_errors(package)
     if shown:
         findings.append(f"Build the model_config of these with mcp_configs.shared_config: {shown}")
@@ -101,8 +100,6 @@ async def _server_findings(server: FastMCP) -> list[str]:
         findings.append(
             f"Some clients reject these tools, make their input a plain object: {combined}"
         )
-    if not masks_error_details(server):
-        findings.append("Create the server with mask_error_details=True.")
     return findings
 
 

@@ -28,9 +28,8 @@ tool of our own replaces it. A spec given as a URL is recorded as `spec-source`,
 | `--no-release` | skip release-please and the release re-run list |
 
 A `custom` upstream starts as `upstream/client.py`: one `request(method, path, adapter)` that
-parses every body into a pydantic model, with retries on `RetrySettings` that follow
-mcp-openapi's `RetryAfterPolicy`, written out rather than imported, so it can change with the
-upstream.
+parses every body into a pydantic model, retried by mcp-openapi's `RetryAfterPolicy` built from
+`RetrySettings`. An upstream with a status or header of its own gets another `RetryPolicy`.
 
 There is no auth option. Every MCP starts without auth, and `run_server` refuses to serve beyond
 loopback until the server has an auth provider. The `new-mcp` skill works out the auth with the

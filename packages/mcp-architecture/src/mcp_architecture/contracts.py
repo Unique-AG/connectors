@@ -59,7 +59,7 @@ def _contracts(package: str) -> list[dict[str, object]]:
             "name": "The domain and the storage know nothing about MCP",
             "type": "forbidden",
             "source_modules": [contexts, f"{package}.persistence"],
-            "forbidden_modules": ["fastmcp", "mcp"],
+            "forbidden_modules": ["fastmcp", "mcp", "mcp_types"],
             "allow_indirect_imports": True,
         },
     ]

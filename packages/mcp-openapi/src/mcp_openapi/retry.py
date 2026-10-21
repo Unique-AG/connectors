@@ -9,6 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 type WaitStrategy = Callable[[tenacity.RetryCallState], float]
 
+# A 503 may come from a gateway after the upstream applied the request, so only a request that is
+# safe to apply twice is sent again on it. A 429 means the upstream turned the request away.
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE"})
+_TOO_MANY_REQUESTS = 429
+
 
 class RetryPolicy(Protocol):
     def retrying(self) -> tenacity.AsyncRetrying:
@@ -25,7 +30,8 @@ class RetryAfterPolicy(BaseModel):
 
     A response without the header waits for `backoff` instead, capped at `max_wait_seconds`. A
     response that asks for more than `max_wait_seconds` is not retried, because a quota that
-    resets in an hour is better reported now than waited out.
+    resets in an hour is better reported now than waited out. Any request is sent again on a 429,
+    and only an idempotent one on another status.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
@@ -48,6 +54,11 @@ class RetryAfterPolicy(BaseModel):
     def _should_retry(self, state: tenacity.RetryCallState) -> bool:
         response = _failed_response(state)
         if response is None or response.status_code not in self.statuses:
+            return False
+        if (
+            response.status_code != _TOO_MANY_REQUESTS
+            and response.request.method not in _IDEMPOTENT_METHODS
+        ):
             return False
         delay = _retry_after_seconds(response)
         return delay is None or delay <= self.max_wait_seconds

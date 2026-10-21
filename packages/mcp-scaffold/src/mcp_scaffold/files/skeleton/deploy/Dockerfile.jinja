@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0 UV_PROJECT_ENVIRONMENT=/app/.venv
 WORKDIR /workspace/services/mcp-skeleton
 COPY packages/mcp-configs /workspace/packages/mcp-configs
-{% if options.upstream == "openapi" %}
+{% if options.opens_upstream %}
 COPY packages/mcp-openapi /workspace/packages/mcp-openapi
 {% endif %}
 RUN --mount=type=cache,target=/root/.cache/uv \
