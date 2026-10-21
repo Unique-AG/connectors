@@ -162,6 +162,16 @@ async def test_a_root_package_other_than_the_projects_is_a_finding(tmp_path: Pat
     ]
 
 
+async def test_a_file_that_changes_its_type_check_is_a_finding(tmp_path: Path) -> None:
+    service = write_service(tmp_path)
+    (service / "src" / "kiosk" / "loose.py").write_text("# pyright: basic\n")
+
+    assert await check_service(service, update=True) == [
+        "Remove these `# pyright:` comments, so each file keeps the type check of the whole MCP: "
+        "['src/kiosk/loose.py:1']"
+    ]
+
+
 async def test_an_mcp_without_an_offline_server_is_a_finding(tmp_path: Path) -> None:
     service = write_service(tmp_path)
     (service / "tests" / "offline_server.py").unlink()

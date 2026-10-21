@@ -3,8 +3,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Crypto",
-          "passthrough"
+          "Crypto"
         ]
       }
     },
@@ -128,8 +127,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Crypto",
-          "passthrough"
+          "Crypto"
         ]
       }
     },
@@ -260,8 +258,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "End-of-Day",
-          "passthrough"
+          "End-of-Day"
         ]
       }
     },
@@ -327,8 +324,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "End-of-Day",
-          "passthrough"
+          "End-of-Day"
         ]
       }
     },
@@ -452,8 +448,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Forex",
-          "passthrough"
+          "Forex"
         ]
       }
     },
@@ -525,8 +520,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Fundamentals",
-          "passthrough"
+          "Fundamentals"
         ]
       }
     },
@@ -610,8 +604,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Fundamentals",
-          "passthrough"
+          "Fundamentals"
         ]
       }
     },
@@ -726,8 +719,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Fundamentals",
-          "passthrough"
+          "Fundamentals"
         ]
       }
     },
@@ -889,8 +881,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "IEX",
-          "passthrough"
+          "IEX"
         ]
       }
     },
@@ -1159,8 +1150,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Corporate Actions",
-          "passthrough"
+          "Corporate Actions"
         ]
       }
     },
@@ -1251,8 +1241,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Corporate Actions",
-          "passthrough"
+          "Corporate Actions"
         ]
       }
     },
@@ -1336,8 +1325,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "News",
-          "passthrough"
+          "News"
         ]
       }
     },
@@ -1620,8 +1608,7 @@
     "_meta": {
       "fastmcp": {
         "tags": [
-          "Utilities",
-          "passthrough"
+          "Utilities"
         ]
       }
     },

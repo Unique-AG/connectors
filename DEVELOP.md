@@ -76,10 +76,10 @@ It runs, in this order:
 3. `uv run ruff format --check .`, then `pnpm exec biome check .`
 4. `uv run ruff check .` and `uv run basedpyright`
 5. in a service with `[tool.importlinter]`, one that keeps
-   `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, a check that no file
-   carries a `# pyright:` comment other than `ignore[rule]`, since basedpyright lets such a comment
-   change a file's mode or turn a report down, and `uv run mcp-architecture-check`, the checks of
-   what a client sees
+   `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, then
+   `uv run mcp-architecture-check`, the checks of what a client sees and that no file carries a
+   `# pyright:` comment other than an ignore that names its rule, since basedpyright lets such a
+   comment change a file's mode or turn a report down
 6. `uv run pytest`
 
 Every check runs even after one fails, and the run ends with the list of those that failed, so one

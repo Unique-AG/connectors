@@ -42,5 +42,5 @@ def scaffold(options: Options, repo: Path, *, release: bool = True) -> Path:
     if spec is not None:
         written.add(generate_operations(options, target))
     stamp(sorted(written), version=scaffold_version(), timestamp=started)
-    check(target)
+    check(target, openapi=spec is not None)
     return target

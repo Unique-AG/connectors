@@ -1,5 +1,6 @@
-"""`mcp-architecture-check`: the checks of what a client sees, run outside pytest, so nothing in a
-service's `conftest.py` can skip, xfail or deselect them."""
+"""`mcp-architecture-check`: the checks of what a client sees and of the files' type check
+comments, run outside pytest, so nothing in a service's `conftest.py` can skip, xfail or deselect
+them."""
 
 import argparse
 import asyncio
@@ -20,6 +21,7 @@ from mcp_architecture.tools import (
     tools_with_a_root_combinator,
     undescribed_tools,
 )
+from mcp_architecture.type_check_comments import files_changing_their_type_check
 
 OFFLINE_SERVER = Path("tests") / "offline_server.py"
 SNAPSHOT = Path("tests") / "tool_surface.generated.json"
@@ -28,7 +30,7 @@ SNAPSHOT = Path("tests") / "tool_surface.generated.json"
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="mcp-architecture-check",
-        description="Check what a client sees of the MCP in the current folder.",
+        description="Check the MCP in the current folder for the rules no other tool checks.",
     )
     parser.add_argument(
         "--update", action="store_true", help=f"write {SNAPSHOT} instead of comparing with it"
@@ -50,6 +52,11 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
     )
     package = str(pyproject["project"]["name"]).replace("-", "_")
     findings = _root_package_findings(pyproject, package)
+    if comments := files_changing_their_type_check(root):
+        findings.append(
+            "Remove these `# pyright:` comments, so each file keeps the type check of the whole "
+            f"MCP: {comments}"
+        )
     factory = _offline_server(root / OFFLINE_SERVER)
     if factory is None:
         findings.append(

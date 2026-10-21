@@ -7,7 +7,6 @@ from fastmcp.server.providers.openapi import MCPType
 from fastmcp.server.providers.openapi import OpenAPIProvider
 import httpx2
 from mcp_openapi.openapi import mcp_name
-from mcp_openapi.openapi import PASSTHROUGH_TAG
 from mcp_openapi.openapi import route_map
 from mcp_openapi.openapi import set_tool_hints
 from mcp_openapi.retry import RetryAfterPolicy
@@ -70,5 +69,4 @@ def upstream_tools(http: httpx2.AsyncClient) -> OpenAPIProvider:
         route_map_fn=route_map(dict.fromkeys(EXPOSED, MCPType.TOOL)),
         mcp_names={operation_id: mcp_name(operation_id) for operation_id in EXPOSED},
         mcp_component_fn=set_tool_hints,
-        tags={PASSTHROUGH_TAG},
     )

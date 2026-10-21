@@ -5,15 +5,17 @@ import subprocess
 from pathlib import Path
 
 
-def check(target: Path) -> None:
-    """Format the generated code, then check it as CI does. The generator leaves layout to ruff,
-    and `mcp-architecture-check` records the first tool surface snapshot."""
+def check(target: Path, *, openapi: bool) -> None:
+    """Format the generated code, then check it as `scripts/check-python-service.sh` does, but
+    for biome. The generator leaves layout to ruff, and `mcp-architecture-check` records the first
+    tool surface snapshot."""
     run(
         [
             ["uv", "sync"],
             ["uv", "run", "ruff", "format", "--quiet", "."],
             ["uv", "run", "ruff", "check", "--fix", "--quiet", "."],
             ["uv", "run", "ruff", "format", "--quiet", "."],
+            *([["uv", "run", "mcp-openapi-codegen", "--check"]] if openapi else []),
             ["uv", "run", "basedpyright"],
             ["uv", "run", "lint-imports"],
             ["uv", "run", "mcp-architecture-check", "--update"],

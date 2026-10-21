@@ -20,7 +20,7 @@ rule, and the `AGENTS.md` of every scaffolded MCP points to it.
 | APIs a past fix replaced stay banned | ruff |
 | The Google Python Style Guide, as far as ruff checks it | ruff |
 | Every type is known | basedpyright |
-| No file changes its own type check | `scripts/check-python-service.sh` |
+| No file changes its own type check | `files_changing_their_type_check` |
 | Every tool and parameter has a description | `undescribed_tools` |
 | No tool schema combines schemas at its root | `tools_with_a_root_combinator` |
 | An unexpected error reaches the client without its message | `masks_error_details` |
@@ -70,7 +70,7 @@ upstream and the stores.
   `conftest.py` cannot skip, xfail or deselect a check. `--update` writes
   `tests/tool_surface.generated.json` instead of comparing with it. The checks it runs:
   - `undescribed_tools(server)`: each tool without a description and each parameter without one,
-    skipping a tool tagged `passthrough` (served straight from an OpenAPI spec).
+    skipping a tool served straight from an OpenAPI spec, which says what the spec says.
   - `tool_surface(server)`: the tools the server lists (name, title, description, input and
     output schema, annotations and tags) as JSON, compared with the snapshot.
   - `tools_with_a_root_combinator(server)`: each tool whose input schema has `anyOf`, `oneOf`,
@@ -80,6 +80,9 @@ upstream and the stores.
     it.
   - `settings_showing_input_in_errors(package)`: each settings class whose validation error
     would print the value it was given.
+  - `files_changing_their_type_check(root)`: each `# pyright:` comment in `src` and `tests` that
+    sets a file's mode or a report, which basedpyright honours whatever the shared config says.
+    Only an ignore that names its rule is left.
 
 ## Working on the package from a service
 

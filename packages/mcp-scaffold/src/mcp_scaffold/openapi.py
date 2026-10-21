@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Self, cast
 
 import yaml
+from mcp_openapi.vendoring import HTTP_METHODS, as_yaml
 from pydantic import BaseModel, Field
 
 from mcp_scaffold.commands import run
@@ -38,7 +39,7 @@ class VendorSpec(BaseModel):
             (method, operation.operation_id)
             for item in spec.paths.values()
             for method, raw in item.items()
-            if method in _HTTP_METHODS
+            if method in HTTP_METHODS
             for operation in [_Operation.model_validate(raw)]
             if operation.operation_id is not None and operation.answers_json
         ]
@@ -50,10 +51,8 @@ class VendorSpec(BaseModel):
             for server in spec.servers
             if server.url.startswith(("http://", "https://")) and "{" not in server.url
         ]
-        if text.lstrip().startswith("{"):
-            text = yaml.safe_dump(json.loads(text), sort_keys=False, allow_unicode=True)
         return cls(
-            text=text,
+            text=as_yaml(text),
             operation=(reads or [operation for _, operation in operations])[0],
             api_url=servers[0].rstrip("/") if servers else None,
             url=url,
@@ -171,4 +170,3 @@ EXPOSED: list[str] = {exposed}
 """
 # The upstream settings' default, replaced by the spec's server.
 _EXAMPLE_API_URL = "https://api.example.com"
-_HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
