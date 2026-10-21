@@ -2,17 +2,25 @@
 snapshot and what an error inside one shows."""
 
 import json
+import logging
+from collections.abc import Callable, Generator
+from contextlib import AbstractAsyncContextManager, contextmanager
 from typing import cast
 
 from fastmcp import Client, FastMCP
-from mcp_types import Tool
+from fastmcp.tools import Tool as ServedTool
+from mcp_types import TextContent, Tool
+
+type ServerFactory = Callable[[], AbstractAsyncContextManager[FastMCP]]
 
 # Some clients reject a tool whose input schema is not a plain object at its root.
 _ROOT_COMBINATORS = ["anyOf", "oneOf", "allOf", "not"]
 # mcp-openapi's `PASSTHROUGH_TAG`, which `upstream_tools` in an OpenAPI MCP sets. Such a tool says
-# what the spec says until promoted. A copy, since an MCP without an OpenAPI upstream has no
-# mcp-openapi to import it from.
+# what the spec says until promoted. A copy, since an MCP without an upstream has no mcp-openapi
+# to import it from.
 PASSTHROUGH_TAG = "passthrough"
+_PROBE_TOOL = "mcp_architecture_masking_probe"
+_PROBE_SECRET = "mcp-architecture-probe-secret"
 
 
 async def undescribed_tools(server: FastMCP) -> list[str]:
@@ -42,15 +50,41 @@ async def tools_with_a_root_combinator(server: FastMCP) -> list[str]:
     ]
 
 
-def masks_error_details(server: FastMCP) -> bool:
+async def masks_error_details(factory: ServerFactory) -> bool:
     """Whether an unexpected error inside a tool reaches the client without its message, which can
-    carry a secret, an internal URL or the upstream's own words."""
-    # FastMCP keeps the setting private and has no public reader.
-    return server._mask_error_details  # pyright: ignore[reportPrivateUsage]
+    carry a secret, an internal URL or the upstream's own words.
+
+    Adds a tool that raises to a server `factory` builds for this check alone, and calls it.
+    """
+    async with factory() as server:
+        server.add_tool(ServedTool.from_function(_raise_probe_secret, name=_PROBE_TOOL))
+        async with Client(server) as client:
+            with _fastmcp_logs_off():
+                result = await client.call_tool(_PROBE_TOOL, {}, raise_on_error=False)
+    return not any(
+        _PROBE_SECRET in block.text for block in result.content if isinstance(block, TextContent)
+    )
+
+
+def _raise_probe_secret() -> None:
+    raise RuntimeError(_PROBE_SECRET)
+
+
+@contextmanager
+def _fastmcp_logs_off() -> Generator[None]:
+    """FastMCP logs the probe's error with its traceback, which reads as a failure of the check."""
+    logger = logging.getLogger("fastmcp")
+    level = logger.level
+    logger.setLevel(logging.CRITICAL + 1)
+    try:
+        yield
+    finally:
+        logger.setLevel(level)
 
 
 async def tool_surface(server: FastMCP) -> str:
-    """The tools the server lists, sorted by name, as JSON to snapshot with `file_regression`.
+    """The tools the server lists, sorted by name, as JSON for `mcp-architecture-check` to compare
+    with `tests/tool_surface.generated.json`.
 
     Of `_meta`, only the tags are kept: they decide whether `undescribed_tools` checks a tool.
     """

@@ -109,6 +109,41 @@ def test_a_feature_reaching_a_submodule_through_another_features_top_level_break
     assert "shop.contexts.orders.place_order imports shop.contexts.products.lookup" in report
 
 
+def test_a_feature_reaching_a_module_another_feature_re_exports_a_name_from_breaks_it(
+    shop: Path,
+) -> None:
+    write(shop, "contexts/products/models.py", "class Product: ...\n\n\nclass Secret: ...\n")
+    write(
+        shop,
+        "contexts/products/__init__.py",
+        "from shop.contexts.products.lookup.get_product import get_product\n"
+        "from shop.contexts.products.models import Product\n",
+    )
+    write(shop, "contexts/orders/place_order.py", "from shop.contexts.products import models\n")
+
+    report = broken_contracts(shop)
+
+    assert "shop.contexts.orders.place_order imports shop.contexts.products.models" in report
+
+
+def test_a_feature_importing_a_function_another_feature_re_exports_keeps_it(shop: Path) -> None:
+    write(shop, "contexts/products/get_price.py", "def get_price() -> int:\n    return 1\n")
+    write(
+        shop,
+        "contexts/products/__init__.py",
+        "from shop.contexts.products.get_price import get_price\n"
+        "from shop.contexts.products.lookup.get_product import get_product\n",
+    )
+    write(
+        shop,
+        "contexts/orders/place_order.py",
+        "from shop.contexts.products import get_price\n\n\ndef place_order() -> int:\n"
+        "    return get_price()\n",
+    )
+
+    assert broken_contracts(shop) == ""
+
+
 def test_features_importing_each_other_break_the_acyclic_contract(shop: Path) -> None:
     write(
         shop, "contexts/products/lookup/stock.py", "from shop.contexts.orders import place_order\n"
@@ -133,15 +168,22 @@ def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract
 
 
 @pytest.mark.parametrize("layer", ["contexts/orders/errors.py", "persistence/errors.py"])
-def test_the_domain_or_the_storage_importing_fastmcp_breaks_the_contract(
-    shop: Path, layer: str
+@pytest.mark.parametrize(
+    ("statement", "package"),
+    [
+        ("from fastmcp.exceptions import ToolError", "fastmcp"),
+        ("from mcp_types import ToolAnnotations", "mcp_types"),
+    ],
+)
+def test_the_domain_or_the_storage_importing_mcp_breaks_the_contract(
+    shop: Path, layer: str, statement: str, package: str
 ) -> None:
-    write(shop, layer, "from fastmcp.exceptions import ToolError\n")
+    write(shop, layer, f"{statement}\n")
 
     report = broken_contracts(shop)
 
     assert "The domain and the storage know nothing about MCP" in report
-    assert "-> fastmcp" in report
+    assert f"-> {package}" in report
 
 
 def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> None:

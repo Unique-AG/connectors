@@ -150,5 +150,5 @@ ancestors = ["architecture_demo_mcp"]
 name = "The domain and the storage know nothing about MCP"
 type = "forbidden"
 source_modules = ["architecture_demo_mcp.contexts", "architecture_demo_mcp.persistence"]
-forbidden_modules = ["fastmcp", "mcp"]
+forbidden_modules = ["fastmcp", "mcp", "mcp_types"]
 allow_indirect_imports = true

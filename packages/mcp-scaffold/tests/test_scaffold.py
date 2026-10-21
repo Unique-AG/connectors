@@ -163,7 +163,9 @@ def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(scaffolded: Scaffolded) ->
     pins = [*pinned("service"), *pinned("service-postgres"), *pinned("service-dev")]
     assert all(f'"{pin}",' in pyproject for pin in pins)
     assert '"mcp-configs==' in pyproject
-    assert '"mcp-openapi' not in pyproject
+    assert '"mcp-openapi==' in pyproject
+    assert "mcp-openapi[codegen]" not in pyproject
+    assert "[tool.mcp-openapi]" not in pyproject
 
 
 def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: UseVenv) -> None:
@@ -195,6 +197,7 @@ def test_an_mcp_without_an_upstream_keeps_the_layer_empty(
     assert "UPSTREAM_" not in (target / ".env.example").read_text()
     assert "get_upstream" not in (package / "mcp" / "dependencies.py").read_text()
     assert not (target / "tests" / "test_upstream.py").exists()
+    assert "mcp-openapi" not in (target / "pyproject.toml").read_text()
 
 
 def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
