@@ -38,6 +38,10 @@ _PYRIGHT_BASELINE = ".basedpyright"
 _RUFF_CONFIGURATION = ("ruff.toml", ".ruff.toml")
 _ROOT_CONFIGURATION = ("pyrightconfig.json", ".importlinter", "setup.cfg")
 _NOT_THE_MCPS = {".venv", "node_modules", ".ruff_cache", ".pytest_cache"}
+_RESTORE = (
+    "`uv run mcp-architecture-check --update` writes the table back as "
+    "mcp_architecture.render_importlinter gives it, keeping the MCP's own contracts."
+)
 
 
 def loosened_configuration(root: Path, pyproject: Mapping[str, object], package: str) -> list[str]:
@@ -82,7 +86,8 @@ def _importlinter_findings(table: Table, package: str) -> list[str]:
     if table.get("root_package") != package:
         return [
             f"[tool.importlinter] root_package is {table.get('root_package')!r}, not the "
-            f"project's package {package!r}, so `lint-imports` does not check the MCP's own code."
+            f"project's package {package!r}, so `lint-imports` does not check the MCP's own code. "
+            f"{_RESTORE}"
         ]
     findings: list[str] = []
     contracts = cast(list[Table], table.get("contracts", []))
@@ -93,8 +98,7 @@ def _importlinter_findings(table: Table, package: str) -> list[str]:
     ]
     if missing:
         findings.append(
-            "[tool.importlinter] dropped or changed these contracts. Restore them as "
-            f"mcp_architecture.render_importlinter writes them: {missing}"
+            f"[tool.importlinter] dropped or changed these contracts: {missing}. {_RESTORE}"
         )
     types = cast(list[str], table.get("contract_types", []))
     options = {key: value for key, value in table.items() if key != "contracts"}
@@ -106,8 +110,8 @@ def _importlinter_findings(table: Table, package: str) -> list[str]:
     )
     if changed or not set(cast(list[str], rendered["contract_types"])) <= set(types):
         findings.append(
-            "[tool.importlinter] changed options every MCP keeps. Restore them as "
-            f"mcp_architecture.render_importlinter writes them: {changed or ['contract_types']}"
+            "[tool.importlinter] changed options every MCP keeps: "
+            f"{changed or ['contract_types']}. {_RESTORE}"
         )
     return findings
 
