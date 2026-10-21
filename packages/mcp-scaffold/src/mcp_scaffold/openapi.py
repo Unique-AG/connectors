@@ -5,11 +5,11 @@ import json
 import urllib.request
 from http.client import HTTPResponse
 from pathlib import Path
-from typing import Self, cast
+from typing import Annotated, Self, cast
 
 import yaml
 from mcp_openapi.vendoring import HTTP_METHODS, as_yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from mcp_scaffold.commands import run
 from mcp_scaffold.options import Options
@@ -127,6 +127,17 @@ __all__ = {json.dumps(names)}
     return upstream / "__init__.py"
 
 
+def _without_extensions(value: object) -> object:
+    """A map of paths or responses without the `x-` extension keys OpenAPI allows beside them."""
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: item
+        for key, item in cast(dict[object, object], value).items()
+        if not str(key).startswith("x-")
+    }
+
+
 class _Response(BaseModel):
     content: dict[str, object] = {}
     ref: str | None = Field(default=None, alias="$ref")
@@ -135,7 +146,7 @@ class _Response(BaseModel):
 class _Operation(BaseModel):
     operation_id: str | None = Field(default=None, alias="operationId")
     # YAML reads an unquoted `200:` as an int.
-    responses: dict[str | int, _Response] = {}
+    responses: Annotated[dict[str | int, _Response], BeforeValidator(_without_extensions)] = {}
 
     @property
     def answers_json(self) -> bool:
@@ -159,7 +170,7 @@ class _OpenApi(BaseModel):
 
     openapi: str = Field(pattern=r"^3\.0\.", description="mcp-openapi reads OpenAPI 3.0 only")
     servers: list[_Server] = []
-    paths: dict[str, dict[str, object]] = {}
+    paths: Annotated[dict[str, dict[str, object]], BeforeValidator(_without_extensions)] = {}
 
 
 _ROUTES = """\

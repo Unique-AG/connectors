@@ -9,6 +9,7 @@ The `new-mcp` skill asks for the options and runs it. The MCP owns every file it
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -68,16 +69,23 @@ def main() -> None:
         parser.error("\n".join(_describe(problem) for problem in error.errors()))
     if (conflict := name_conflict(options.name, repo)) is not None:
         parser.error(conflict)
-    _require_clean(parser, repo)
+    _require_clean(parser, repo, options.spec)
     try:
         spec = load_spec(options, repo)
     except (OSError, ValueError, yaml.YAMLError) as error:
         parser.error(f"cannot use the spec {options.spec}: {error}")
-    target = scaffold(options, repo, spec=spec, release=cast(bool, arguments.release))
+    try:
+        target = scaffold(options, repo, spec=spec, release=cast(bool, arguments.release))
+    except subprocess.CalledProcessError as error:
+        command = " ".join(cast(list[str], error.cmd))
+        sys.exit(
+            f"`{command}` failed in services/{options.name}, as printed above. Undo the run from "
+            f"the repository root:\n  git checkout . && git clean -fdx services/{options.name}"
+        )
     print(f"{target} is ready. The new-mcp skill lists what to fill in next.")
 
 
-def _require_clean(parser: argparse.ArgumentParser, repo: Path) -> None:
+def _require_clean(parser: argparse.ArgumentParser, repo: Path, spec: str | None) -> None:
     try:
         changes = subprocess.run(
             ["git", "status", "--porcelain", "--untracked-files=all"],
@@ -95,8 +103,20 @@ def _require_clean(parser: argparse.ArgumentParser, repo: Path) -> None:
     if changes:
         parser.error(
             "commit or stash every change first, untracked files too, so git alone can undo "
-            f"the run:\n{changes}"
+            f"the run:\n{changes}{_untracked_spec_hint(repo, spec, changes)}"
         )
+
+
+def _untracked_spec_hint(repo: Path, spec: str | None, changes: str) -> str:
+    if spec is None or spec.startswith(("http://", "https://")):
+        return ""
+    root = repo.resolve()
+    path = (repo / spec).resolve()
+    if not path.is_relative_to(root):
+        return ""
+    if f"?? {path.relative_to(root).as_posix()}" not in changes.splitlines():
+        return ""
+    return "The spec is one of them: commit it, or pass a --spec path outside the repository."
 
 
 def _describe(problem: ErrorDetails) -> str:

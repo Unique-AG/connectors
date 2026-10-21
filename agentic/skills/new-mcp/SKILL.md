@@ -27,6 +27,7 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 | One or two sentences on what it does for the user | `--description`, the server instructions and the pyproject description |
 | Does it call an upstream, a system of its own such as a vendor API? If so, does it publish an OpenAPI 3.0 spec we can use? | `--upstream openapi` with `--spec`, `--upstream custom`, or no `--upstream` at all |
 | What does it store? Nothing, or any of Postgres and Redis (multi-select) | `--persistence none`, or every store chosen: `--persistence postgres redis` |
+| Will it be released and deployed, or is it an example or experiment? | nothing, or `--no-release`, which skips release-please and the release re-run list |
 
 Then ask the follow-ups for what they chose, again in one round:
 
@@ -52,7 +53,7 @@ From the repository root:
 ```bash
 uv run --project packages/mcp-scaffold mcp-scaffold new <name> \
     --description "<description>" [--upstream openapi|custom] [--spec <path or URL>] \
-    --persistence <kind>...
+    --persistence <kind>... [--no-release]
 ```
 
 It refuses to start unless `git status` is clean, untracked files included. Ask the user to
@@ -136,8 +137,7 @@ and `UpstreamError`.
    `from <package>.upstream.client import Upstream`. `upstream/` imports neither `mcp` nor
    `contexts`, and nothing from auth.
 6. **Tests.** Cover each rule above against `httpx2.MockTransport`, as
-   `tests/test_upstream.py` does, and give `tests/conftest.py` a fake upstream in place of the
-   404-only `upstream_transport`.
+   `tests/test_upstream.py` does.
 
 Settings that every MCP shares (server, Postgres, Redis, Zitadel, retries, logging, elicitation)
 come from `packages/mcp-configs`. Use those classes and their defaults; never copy one into the
@@ -203,7 +203,7 @@ Follow `packages/mcp-architecture/ARCHITECTURE.md`:
    `contexts/__init__.py`.
 2. Write a tool under `mcp/tools/` that calls it, imported from `<package>.contexts`.
 3. Write a test that calls the tool through a real FastMCP `Client`, with a fake upstream
-   behind `httpx2.MockTransport` or a stub of the custom client.
+   behind `httpx2.MockTransport`.
 
 Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with that fake.
 
@@ -218,7 +218,7 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - Run `bash scripts/check-python-service.sh services/<name>` from the repository root: every
   check CI runs, in its order.
 - Tell the user what is registered and what is still theirs to do:
-  - Registered: release-please, release-rerun and the `<name>` commit scope. Commit with that
-    scope, e.g. `feat(<name>): ...`.
+  - Registered: the `<name>` commit scope, and release-please and release-rerun unless it ran
+    with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.
   - Still to do: the Argo overlay with the hostname, `MCP_BASE_URL` and the secrets, and auth
     if it was left for later.

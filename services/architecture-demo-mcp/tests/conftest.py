@@ -7,6 +7,7 @@ from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
 import httpx2
 from mcp_configs import ServerSettings
+from pydantic import AnyHttpUrl
 import pytest
 
 from architecture_demo_mcp.persistence import Persistence
@@ -90,7 +91,13 @@ class FakeTiingo:
 
 @pytest.fixture
 def server_settings() -> ServerSettings:
-    return ServerSettings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    """Every field given, so neither the environment nor `.env` changes what the tests see."""
+    return ServerSettings(
+        host="127.0.0.1",
+        port=8000,
+        mcp_base_url=AnyHttpUrl("http://127.0.0.1:8000"),
+        mcp_allowed_origins=[AnyHttpUrl("http://localhost:6274")],
+    )
 
 
 @pytest.fixture

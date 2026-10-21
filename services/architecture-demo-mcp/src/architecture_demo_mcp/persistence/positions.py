@@ -40,11 +40,8 @@ async def list_positions(*, persistence: Persistence, owner: str, portfolio: str
 def _upsert(*, session: AsyncSession, values: dict[str, object]) -> Executable:
     """`on_conflict_do_update` is dialect-specific in SQLAlchemy. The tests run on SQLite."""
     key = [PositionRow.owner, PositionRow.portfolio, PositionRow.ticker]
-    if session.get_bind().dialect.name == "sqlite":
-        inserted = sqlite.insert(PositionRow).values(values)
-        updated = {column: inserted.excluded[column] for column in _UPDATED}
-        return inserted.on_conflict_do_update(index_elements=key, set_=updated)
-    inserted = postgresql.insert(PositionRow).values(values)
+    insert = sqlite.insert if session.get_bind().dialect.name == "sqlite" else postgresql.insert
+    inserted = insert(PositionRow).values(values)
     updated = {column: inserted.excluded[column] for column in _UPDATED}
     return inserted.on_conflict_do_update(index_elements=key, set_=updated)
 

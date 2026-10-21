@@ -12,7 +12,8 @@ from architecture_demo_mcp.upstream import Upstream
 from architecture_demo_mcp.upstream import UpstreamError
 
 _logger = logging.getLogger(__name__)
-# Tiingo limits requests per hour, so a large portfolio is priced a few tickers at a time.
+# A large portfolio is priced a few tickers at a time, so it does not send Tiingo a burst of
+# requests at once.
 _CONCURRENT_PRICE_REQUESTS = 4
 
 
@@ -61,7 +62,9 @@ async def _latest_close_or_none(
         try:
             return await get_latest_close(upstream=upstream, persistence=persistence, ticker=ticker)
         except UpstreamError:
-            _logger.warning("Left %s unpriced: Tiingo did not answer its latest close", ticker)
+            _logger.warning(
+                "Left %s unpriced: Tiingo did not answer its latest close", ticker, exc_info=True
+            )
             return None
 
 

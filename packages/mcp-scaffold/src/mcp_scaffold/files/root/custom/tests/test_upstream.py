@@ -41,7 +41,7 @@ async def request(
 
 @pytest.fixture
 def settings(upstream_settings: UpstreamSettings) -> UpstreamSettings:
-    """Three attempts that never sleep, whatever the environment says."""
+    """Three attempts that never sleep, whatever the fake upstream settings say."""
     retry = RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503}))
     return upstream_settings.model_copy(update={"retry": retry})
 

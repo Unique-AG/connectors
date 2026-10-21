@@ -6,23 +6,20 @@ from unique_mcp.auth.zitadel.oidc_proxy import create_zitadel_oidc_proxy
 from unique_mcp.auth.zitadel.oidc_proxy import ZitadelOIDCProxySettings
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 
-from architecture_demo_mcp.mcp.auth.settings import AuthMode
-from architecture_demo_mcp.mcp.auth.settings import AuthSettings
 from architecture_demo_mcp.persistence import sign_in_store
 from architecture_demo_mcp.persistence import StoreSettings
 
 
 def create_auth(
-    *, auth: AuthSettings, server: ServerSettings, store: StoreSettings
+    *, zitadel: ZitadelSettings | None, server: ServerSettings, store: StoreSettings
 ) -> OIDCProxy | None:
-    """Signs users in with Zitadel, unless `auth` turns sign-in off.
+    """Signs users in with Zitadel. Without `zitadel`, as with `MCP_AUTH_MODE=none`, it is None.
 
     Requires only the identity scopes: Zitadel drops the `mcp:*` scopes it is asked for, so
     requiring them would reject every token.
     """
-    if auth.mode is AuthMode.NONE:
+    if zitadel is None:
         return None
-    zitadel = ZitadelSettings()  # pyright: ignore[reportCallIssue]
     signing_key = zitadel.jwt_signing_key.get_secret_value()
     return create_zitadel_oidc_proxy(
         mcp_server_base_url=server.base_url,

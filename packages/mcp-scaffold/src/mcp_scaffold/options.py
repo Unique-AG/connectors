@@ -37,7 +37,21 @@ class Options(BaseModel):
         """The `-mcp` suffix also keeps the package name from being a Python keyword."""
         if not re.fullmatch(r"[a-z][a-z0-9]*(-[a-z0-9]+)*-mcp", name):
             raise ValueError("must be kebab-case and end in -mcp, e.g. weather-mcp")
+        if len(name) > _MAX_NAME_LENGTH:
+            raise ValueError(
+                f"must be at most {_MAX_NAME_LENGTH} characters, so every Kubernetes name the "
+                "chart derives from it fits in 63"
+            )
         return name
+
+    @field_validator("description")
+    @classmethod
+    def _one_line(cls, description: str) -> str:
+        """INSTRUCTIONS wraps a newline into a space, while pyproject.toml, Chart.yaml and
+        AGENTS.md would keep it."""
+        if re.search(r"[\x00-\x1f\x7f-\x9f]", description):
+            raise ValueError("must be one line, without a control character such as a newline")
+        return description
 
     @model_validator(mode="after")
     def _spec_only_for_openapi(self) -> Self:
@@ -65,3 +79,8 @@ class Options(BaseModel):
     def stores(self) -> list[Persistence]:
         """The persistence choices in a fixed order, so generated code does not depend on it."""
         return sorted(self.persistence)
+
+
+# The longest name the chart derives is `<name>-kubernetes-application-alerts`, and 63
+# characters is the most a Kubernetes name that is a DNS label holds.
+_MAX_NAME_LENGTH = 63 - len("-kubernetes-application-alerts")

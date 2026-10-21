@@ -75,8 +75,8 @@ It runs, in this order:
 2. the generated-code drift checks, in a service that has a generator
 3. `uv run ruff format --check .`, then `pnpm exec biome check .`
 4. `uv run ruff check .` and `uv run basedpyright`
-5. in a service that depends on `mcp-architecture`, one that keeps
-   `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, then
+5. in a service whose `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one
+   that keeps `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, then
    `uv run mcp-architecture-check`, the checks of what a client sees, that the tool tables in
    `pyproject.toml` keep every shared rule and contract, and that no file carries a
    `# pyright:` comment other than an ignore that names its rule, since basedpyright lets such a

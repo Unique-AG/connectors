@@ -13,16 +13,33 @@ from mcp_scaffold.pins import dependency_names
 def name_conflict(name: str, repo: Path) -> str | None:
     """Why `name` cannot be a new service in `repo`, or None when it can.
 
-    A scope that a service since removed left under the same name may be registered again.
+    A scope that a service since removed left under the same name may be registered again, but
+    not a release: its version would carry on from the removed service's.
     """
-    if (repo / "services" / name).exists():
-        return f"services/{name} already exists"
+    service = f"services/{name}"
+    if (repo / service).exists():
+        return (
+            f"{service} already exists. If git lists nothing there, it is what a failed run "
+            f"left, which `git clean -fdx {service}` removes"
+        )
     if name in dependency_names() or (repo / "packages" / name).exists():
         return f"{name} would shadow the package of that name"
     scopes = (repo / ".gitcommitizen").read_text()
     scope = re.search(rf"^{re.escape(name)} = (.+)$", scopes, flags=re.MULTILINE)
-    if scope is not None and scope.group(1) != f"services/{name}/**":
+    if scope is not None and scope.group(1) != f"{service}/**":
         return f"{name} is already the commit scope of {scope.group(1)}"
+    config = cast(dict[str, dict[str, object]], json.loads((repo / _RELEASE_CONFIG).read_text()))
+    manifest = cast(dict[str, str], json.loads((repo / _RELEASE_MANIFEST).read_text()))
+    releases = [
+        file
+        for file, entries in [(_RELEASE_CONFIG, config["packages"]), (_RELEASE_MANIFEST, manifest)]
+        if service in entries
+    ]
+    if releases:
+        return (
+            f"{service} still has a release entry in {' and '.join(releases)}, from a service "
+            "since removed. Remove it, or pick another name"
+        )
     return None
 
 
@@ -70,7 +87,7 @@ def _register_release(name: str, repo: Path) -> None:
             },
         ],
     }
-    config = repo / "release-please-config.json"
+    config = repo / _RELEASE_CONFIG
     text = config.read_text()
     packages = cast(dict[str, dict[str, object]], json.loads(text))["packages"]
     if f"services/{name}" not in packages:
@@ -81,7 +98,7 @@ def _register_release(name: str, repo: Path) -> None:
         entry = textwrap.indent(f'"services/{name}": {json.dumps(package, indent=2)}', "    ")
         config.write_text(f"{text[: -len(closing)]}    }},\n{entry}\n  }}\n}}\n")
 
-    manifest = repo / ".release-please-manifest.json"
+    manifest = repo / _RELEASE_MANIFEST
     versions = cast(dict[str, str], json.loads(manifest.read_text()))
     versions.setdefault(f"services/{name}", "0.0.0")
     manifest.write_text(json.dumps(versions, indent=2) + "\n")
@@ -93,3 +110,7 @@ def _register_release(name: str, repo: Path) -> None:
     services = sorted({*re.findall(r"- (.+)", block.group(2)), name})
     listed = "".join(f"          - {service}\n" for service in services)
     rerun.write_text(text[: block.start(2)] + listed + text[block.end(2) :])
+
+
+_RELEASE_CONFIG = "release-please-config.json"
+_RELEASE_MANIFEST = ".release-please-manifest.json"
