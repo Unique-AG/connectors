@@ -116,7 +116,20 @@ def test_features_importing_each_other_break_the_acyclic_contract(shop: Path) ->
 
     report = broken_contracts(shop)
 
-    assert "Context features do not import each other in a cycle" in report
+    assert "No package imports its siblings in a cycle" in report
+    assert "No cycles are allowed in shop.contexts" in report
+
+
+def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract(
+    shop: Path,
+) -> None:
+    write(shop, "mcp/tools/order.py", "import shop.mcp.inputs\n")
+    write(shop, "mcp/inputs/__init__.py", "import shop.mcp.tools.order\n")
+
+    report = broken_contracts(shop)
+
+    assert "No package imports its siblings in a cycle" in report
+    assert "No cycles are allowed in shop.mcp" in report
 
 
 @pytest.mark.parametrize("layer", ["contexts/orders/errors.py", "persistence/errors.py"])

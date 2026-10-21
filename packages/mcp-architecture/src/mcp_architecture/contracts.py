@@ -49,10 +49,9 @@ def _contracts(package: str) -> list[dict[str, object]]:
             "container": contexts,
         },
         {
-            "name": "Context features do not import each other in a cycle",
+            "name": "No package imports its siblings in a cycle",
             "type": "acyclic_siblings",
-            "ancestors": [contexts],
-            "depth": 0,
+            "ancestors": [package],
         },
         {
             # Indirect imports are allowed: contexts reach fastmcp through upstream, whose

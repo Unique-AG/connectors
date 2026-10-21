@@ -1,0 +1,70 @@
+# Why some checks are our own code
+
+Most rules in [`ARCHITECTURE.md`](ARCHITECTURE.md) are configuration for ruff, basedpyright and
+import-linter. A few are code of our own, because no tool in the Python stack checks them. This
+file names them, the tools we looked at instead, and why we keep the code.
+
+## What is our own code
+
+| Check | Rule it enforces | Why a tool does not do it |
+|---|---|---|
+| `FeaturePrivacyContract` | One feature imports another only through that feature's top level | import-linter's `protected` contract lets an allowed importer's descendants in too |
+| `# pyright:` check in `scripts/check-python-service.sh` | No file changes its own type check | basedpyright honours a file-level `# pyright: basic` whatever the shared config says |
+| `undescribed_tools` | Every tool and parameter has a description | MCP-specific: needs the schema the server lists |
+| `tools_with_a_root_combinator` | No `anyOf`, `oneOf`, `allOf` or `not` at a tool schema's root | MCP-specific: needs the schema the server lists |
+| `masks_error_details` | An unexpected error reaches the client without its message | Needs the built `FastMCP` object |
+| `settings_showing_input_in_errors` | A settings error does not print its input | Needs every loaded settings class |
+| `tool_surface` | What a client sees matches a snapshot | Only the JSON is ours; pytest-regressions compares it |
+| `render_importlinter` | Every MCP declares the same contracts | import-linter cannot extend a shared file |
+
+## Alternatives we looked at
+
+### Tach instead of, or beside, import-linter
+
+[Tach](https://github.com/tach-org/tach) checks imports against modules declared in `tach.toml`.
+Its `interfaces` express feature privacy without code, which import-linter cannot. Against our
+import rules:
+
+| Rule | import-linter | Tach |
+|---|---|---|
+| Layers only import downwards, no module outside them | `layers`, `exhaustive` | `layers`, `root_module = "forbid"` |
+| A layer is imported through its top level | `protected` | `interfaces` |
+| Feature privacy | `FeaturePrivacyContract` | `interfaces` |
+| No cycle between siblings, at any depth | `acyclic_siblings` | `forbid_circular_dependencies`, between declared modules only |
+| `contexts` and `persistence` import nothing from `fastmcp` or `mcp` | `forbidden` | Not supported |
+| Indirect chains (`a → b → c`) | Checked | Direct imports only |
+| A contract type of our own | Python plugin | Not supported |
+
+Tach cannot extend a shared file either, so the scaffold would still render its config into each
+MCP.
+
+Replacing import-linter loses the `fastmcp` ban, which a nested `ruff.toml` with `TID251` under
+`contexts/` and `persistence/` would have to take over. Running both means two configs per MCP,
+two CI steps, and rules that disagree when a chain is indirect, all to retire one class of about
+50 lines.
+
+### The other checks
+
+| Check | Alternative | Why not |
+|---|---|---|
+| `# pyright:` check | basedpyright's `reportIgnoreCommentWithoutRule` | Already on through `all` mode, but it only covers `# pyright: ignore`, not a file-level mode |
+| `masks_error_details`, `settings_showing_input_in_errors` | A Semgrep rule | Matches the source, not the built object, so a server or settings class built indirectly slips past. Adds a tool for two checks |
+| `undescribed_tools`, `tools_with_a_root_combinator` | A Semgrep rule on `Field(description=...)` | Cannot see the schema FastMCP generates, nor tools served from an OpenAPI spec |
+| `tool_surface` | syrupy | Same job as pytest-regressions, which the MCPs already use |
+
+## Why we keep the code
+
+- It is small, tested, and each check fails with the tool or the line at fault.
+- `FeaturePrivacyContract` uses import-linter's plugin API and reports with the other contracts,
+  in the same CI step.
+- One tool per concern keeps one answer per rule.
+- Its one fragile point is `importlinter.domain.imports.Module`, an internal path. The `<3`
+  pin on import-linter guards it.
+
+## When to look again
+
+- More contract types of our own pile up: then Tach's built-in `interfaces` and `visibility`
+  pay for a migration. Replace import-linter rather than run both.
+- We want what only Tach has, such as running only the tests a change affects, or the
+  dependency graph.
+- An import-linter major version breaks `FeaturePrivacyContract` in a way a few lines do not fix.
