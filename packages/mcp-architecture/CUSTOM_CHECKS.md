@@ -14,8 +14,9 @@ file names them, the tools we looked at instead, and why we keep the code.
 | `tools_with_a_root_combinator` | No `anyOf`, `oneOf`, `allOf` or `not` at a tool schema's root | MCP-specific: needs the schema the server lists |
 | `masks_error_details` | An unexpected error reaches the client without its message | Needs the built `FastMCP` object |
 | `settings_showing_input_in_errors` | A settings error does not print its input | Needs every loaded settings class |
-| `tool_surface` | What a client sees matches a snapshot | Only the JSON is ours; pytest-regressions compares it |
+| `tool_surface` | What a client sees matches a snapshot | MCP-specific: needs the tools the server lists |
 | `render_importlinter` | Every MCP declares the same contracts | import-linter cannot extend a shared file |
+| `mcp-architecture-check` | The checks above run, and `root_package` is the project's package | A pytest run lets a `conftest.py` skip or rewrite a check's outcome |
 
 ## Alternatives we looked at
 
@@ -50,7 +51,7 @@ two CI steps, and rules that disagree when a chain is indirect, all to retire on
 | `# pyright:` check | basedpyright's `reportIgnoreCommentWithoutRule` | Already on through `all` mode, but it only covers `# pyright: ignore`, not a file-level mode |
 | `masks_error_details`, `settings_showing_input_in_errors` | A Semgrep rule | Matches the source, not the built object, so a server or settings class built indirectly slips past. Adds a tool for two checks |
 | `undescribed_tools`, `tools_with_a_root_combinator` | A Semgrep rule on `Field(description=...)` | Cannot see the schema FastMCP generates, nor tools served from an OpenAPI spec |
-| `tool_surface` | syrupy | Same job as pytest-regressions, which the MCPs already use |
+| `tool_surface` | syrupy or pytest-regressions | Both compare inside pytest, where a `conftest.py` can skip the comparison |
 
 ## Why we keep the code
 

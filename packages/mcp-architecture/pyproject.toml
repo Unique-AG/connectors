@@ -12,6 +12,9 @@ dependencies = [
     "pydantic-settings>=2.15,<3",
 ]
 
+[project.scripts]
+mcp-architecture-check = "mcp_architecture.check:main"
+
 [build-system]
 requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"

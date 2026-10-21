@@ -63,8 +63,8 @@ bump rather than a copy:
 - `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-architecture`: `ARCHITECTURE.md`, which the generated `AGENTS.md` points to, the
   code style the MCP's `[tool.ruff]` extends, the type check its `[tool.basedpyright]` extends,
-  the import contracts its `[tool.importlinter]` holds, and the checks `tests/test_architecture.py`
-  runs on what a client sees.
+  the import contracts its `[tool.importlinter]` holds, and `mcp-architecture-check`, which
+  checks what a client sees of the server `tests/offline_server.py` builds.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 
 The server with its host and origin guard (`mcp/http.py`, `mcp/middleware.py`) and the
@@ -87,7 +87,7 @@ needs belongs in their code, put it in one of those packages instead.
 - `src/mcp_scaffold/files/root/`: files outside the package a choice brings, such as `alembic.ini`
   or a custom upstream's `tests/test_upstream.py`.
 - A file under `files/` named `*.jinja` depends on the combination of choices: the server,
-  `tests/conftest.py`, `.env.example`, the Dockerfile, the chart's `values.yaml` and the
+  `tests/conftest.py`, `tests/offline_server.py`, `.env.example`, the Dockerfile, the chart's `values.yaml` and the
   persistence layer's `__init__.py` and `persistence.py`. Once every layer is copied,
   `render_templates` in `skeleton.py` renders each with the `Options` as `options` and drops
   the suffix.

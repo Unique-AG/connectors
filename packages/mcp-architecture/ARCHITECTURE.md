@@ -21,7 +21,8 @@ bump:
 - `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 - `packages/mcp-architecture`: this file, the code style and the type check the MCP extends, the
-  import contracts the scaffold writes and the checks `tests/test_architecture.py` runs.
+  import contracts the scaffold writes and `mcp-architecture-check`, the checks of what a client
+  sees.
 
 The rest is the MCP's own code from the start: the HTTP server with its host and origin guard
 (`mcp/http.py`, `mcp/middleware.py`), the telemetry setup (`telemetry/setup.py`) and, for a
@@ -74,11 +75,12 @@ breaks the `layers` contract.
 | The [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), as far as ruff checks it, with three departures: lines run to 100 characters, a docstring is only for what the code cannot say, and its summary may run onto a second line. Besides it: no `print`, `pathlib` over `os.path`, no `else` after `return`, a long string split by implicit concatenation rather than `+`, and an error logged in an `except` with its traceback. | ruff, with `code_style.toml` |
 | Every type is known: no `Any`, no unannotated attribute, `@override` on an override, `super().__init__()` in a subclass. A test may use a private name of the code it tests. | basedpyright `all`, with `type_check.json` |
 | No file changes its own type check: a `# pyright:` comment only ignores a named rule on its line. | `scripts/check-python-service.sh` |
-| Every tool has a description and every parameter a `Field(description=...)`. | `tests/test_architecture.py` |
-| Every tool's input schema is a plain object, with no `anyOf`, `oneOf`, `allOf` or `not` at its root, which some clients reject. | `tests/test_architecture.py` |
-| An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `tests/test_architecture.py` |
-| A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `tests/test_architecture.py` |
-| What every tool shows a client matches `tests/tool_surface.generated.json`. | `tests/test_architecture.py` |
+| Every tool has a description and every parameter a `Field(description=...)`. | `uv run mcp-architecture-check` |
+| Every tool's input schema is a plain object, with no `anyOf`, `oneOf`, `allOf` or `not` at its root, which some clients reject. | `uv run mcp-architecture-check` |
+| An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run mcp-architecture-check` |
+| A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run mcp-architecture-check` |
+| What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run mcp-architecture-check` |
+| `[tool.importlinter]`'s `root_package` is the project's own package, so the contracts check the MCP's code. | `uv run mcp-architecture-check` |
 | `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
 
 ### Where each rule is configured
@@ -300,9 +302,9 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
      and removed, and regenerates. Set `spec-source` first if the MCP has none.
   2. `uv run basedpyright` names each context a changed response model breaks. Fix the
      mapping there, so the change stops at `contexts/`.
-  3. `uv run pytest` fails on `tests/tool_surface.generated.json` when a served tool's
-     arguments or output changed. Read the diff, then accept it with
-     `uv run pytest --regen-all`.
+  3. `uv run mcp-architecture-check` fails on `tests/tool_surface.generated.json` when a served
+     tool's arguments or output changed. Read the diff, then accept it with
+     `uv run mcp-architecture-check --update`.
 
   CI runs `uv run mcp-openapi-codegen --check`, which fails when the generated code is not what
   the spec and the table generate.
@@ -408,20 +410,22 @@ Adding one:
   tool with a `call_tool` fixture that uses a real FastMCP `Client`. Test tools this way, end
   to end through the context to the fake upstream.
 - CI runs no Postgres or Redis. `create_server` takes the function that opens the persistence,
-  so the `persistence` fixture in `tests/conftest.py` opens SQLite through `aiosqlite` and a
-  `MemoryStore` in their place. That is why `Store` is typed as the `AsyncKeyValue` protocol.
+  so `open_fake_persistence` in `tests/offline_server.py` opens SQLite through `aiosqlite` and a
+  `MemoryStore` in their place, for the `persistence` fixture in `tests/conftest.py`. That is why `Store` is typed as the `AsyncKeyValue` protocol.
   SQLite is not Postgres: a test that needs Postgres behaviour, such as a timezone or a JSON
   column, needs a real database.
 - `tests/test_server.py` covers the ops routes, the host and origin guard, CORS and the refusal
   to serve beyond loopback without auth, through the MCP's own `http_app` and `run_server`.
 - A custom upstream's `tests/test_upstream.py` covers its client: the parse into the model, the
   auth header and each retry rule, against `httpx2.MockTransport`.
-- `tests/test_architecture.py` runs `mcp-architecture`'s checks of what a client sees, against
-  the `server` fixture in `tests/conftest.py`: the descriptions, the input schemas, the masked
-  errors and the settings that keep their input out of an error.
+- `uv run mcp-architecture-check` runs the checks of what a client sees against the server
+  `offline_server()` in `tests/offline_server.py` builds: the descriptions, the input schemas,
+  the masked errors and the settings that keep their input out of an error. CI runs it as a step
+  of its own, outside pytest, so nothing in `tests/conftest.py` can skip, xfail or deselect a
+  check. The `server` fixture builds the same server with `build_server`.
 - One of them compares every tool the server lists, its arguments, output, annotations and
   tags, with `tests/tool_surface.generated.json`. A change to what a client sees is a diff of
-  that file in review. Accept a change you meant with `uv run pytest --regen-all`.
+  that file in review. Accept a change you meant with `uv run mcp-architecture-check --update`.
 - Tests import through the top level too.
 
 ## Commands
@@ -435,6 +439,7 @@ bash ../../scripts/check-python-service.sh .
 uv run ruff format . && uv run ruff check .
 uv run basedpyright
 uv run lint-imports
+uv run mcp-architecture-check
 uv run pytest
 # serve on http://127.0.0.1:8000/mcp, after cp .env.example .env
 uv run <name>
