@@ -121,6 +121,8 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
   4. paths owned by another toolchain — `.github` (yaml), `scripts` (Deno)
 - Name a generated file `<name>.generated.<ext>` and biome ignores it without an edit to
   `biome.json`.
+- A Python module cannot have a dot in its name, so generated Python goes in a package named
+  `generated` instead, such as an MCP's `upstream/generated/`, which `mcp-openapi-codegen` writes.
 - `html.parser.interpolation` is on, so a Jinja or Handlebars template parses and is checked
   rather than skipped. Helm templates are yaml and `.tpl`, which biome does not parse at all.
 

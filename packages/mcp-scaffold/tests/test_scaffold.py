@@ -204,7 +204,8 @@ def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
     upstream = service / "src" / "probe_openapi_redis_mcp" / "upstream"
 
     assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
-    assert "GET_FORECAST = Operation[Forecast]" in (upstream / "operations.py").read_text()
+    operations = upstream / "generated" / "operations.py"
+    assert "GET_FORECAST = Operation[Forecast]" in operations.read_text()
     assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
     assert (upstream / "openapi.yml").read_text().splitlines()[1] == "openapi: 3.0.3"
@@ -310,9 +311,13 @@ def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
 
 def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
     target = scaffolded("probe-openapi-redis-mcp")
-    upstream = target / "src" / "probe_openapi_redis_mcp" / "upstream"
+    generated = target / "src" / "probe_openapi_redis_mcp" / "upstream" / "generated"
 
-    for path in [target / "uv.lock", upstream / "operations.py", upstream / "vendor_responses.py"]:
+    for path in [
+        target / "uv.lock",
+        generated / "operations.py",
+        generated / "vendor_responses.py",
+    ]:
         assert not STAMP.search(path.read_text()), path.name
 
 

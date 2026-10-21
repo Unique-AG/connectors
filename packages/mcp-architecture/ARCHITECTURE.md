@@ -279,8 +279,8 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
     (`getDailyPrices` becomes `get_daily_prices`), with no context and no code. It says what the spec
     says, so the description check skips it, and retries do not apply to it.
   - **A tool of our own.** List the operationId under `operation-ids` in `[tool.mcp-openapi]`
-    and run `uv run mcp-openapi-codegen`. It writes `vendor_responses.py` and `operations.py`;
-    never edit those two by hand. Export the operation's constant from `upstream/__init__.py`,
+    and run `uv run mcp-openapi-codegen`. It writes `vendor_responses.py` and `operations.py`
+    in `upstream/generated/`; never edit that package by hand. Export the operation's constant from `upstream/__init__.py`,
     then write a context that calls `upstream.call(GET_X, ...)` and a tool over it.
     `Upstream` is mcp-openapi's `OperationClient`, which validates arguments against the spec
     and parses each response into its generated model.

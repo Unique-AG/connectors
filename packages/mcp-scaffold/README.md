@@ -47,7 +47,7 @@ Every file the scaffold writes starts with the same comment, in the file's own s
 The version is this package's, and the timestamp the moment the run started, the same in every
 file of one run, so a file tells which scaffold wrote it. A Dockerfile's `# syntax=` line and a
 shebang stay first, and a JSON schema takes it as `"$comment"`. What a tool writes is not
-stamped: `uv.lock`, the codegen's `operations.py` and `vendor_responses.py`, the tool surface
+stamped: `uv.lock`, the codegen's `upstream/generated/` modules, the tool surface
 snapshot and the chart's `values.schema.json`, which `scripts/render-values-schema.sh`
 regenerates. Nor is an Alembic migration: the stamp in `script.py.mako` is a Mako comment,
 which the revisions it renders leave out. Only the run stamps, so a file an agent or a person

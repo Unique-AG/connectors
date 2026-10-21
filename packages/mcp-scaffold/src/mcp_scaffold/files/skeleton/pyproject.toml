@@ -35,7 +35,7 @@ exclude = [".venv"]
 # the shared code style, since ruff reads a path there from the folder of that file.
 "!src/mcp_skeleton/contexts/**" = ["PLR0917"]
 # Generated from the vendor's spec, so its field names are the vendor's.
-"src/mcp_skeleton/upstream/vendor_responses.py" = ["N815"]
+"src/mcp_skeleton/upstream/generated/vendor_responses.py" = ["N815"]
 
 [tool.basedpyright]
 # The type check every MCP keeps. Make a report stricter here, but never turn one down.
@@ -54,9 +54,9 @@ executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsag
 spec = "src/mcp_skeleton/upstream/openapi.yml"
 operation-ids = []
 operation-module = "mcp_openapi.upstream"
-models-module = "mcp_skeleton.upstream.vendor_responses"
-models-output = "src/mcp_skeleton/upstream/vendor_responses.py"
-operations-output = "src/mcp_skeleton/upstream/operations.py"
+models-module = "mcp_skeleton.upstream.generated.vendor_responses"
+models-output = "src/mcp_skeleton/upstream/generated/vendor_responses.py"
+operations-output = "src/mcp_skeleton/upstream/generated/operations.py"
 
 # The architecture. packages/mcp-architecture/ARCHITECTURE.md explains each contract, and
 # `uv run lint-imports` checks them.
