@@ -175,10 +175,18 @@ def test_call_error_does_not_include_the_query_string() -> None:
     assert str(error.value) == "404 Not Found for GET https://upstream.example/things/a"
 
 
-def test_call_error_includes_the_start_of_the_response_body() -> None:
-    client = api(lambda _: httpx2.Response(404, text='{"detail":"Not found."}'))
-    with pytest.raises(UpstreamError, match=r'404 Not Found for GET .*: \{"detail":"Not found."\}'):
+def test_call_error_logs_the_start_of_the_response_body_but_does_not_return_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = api(lambda _: httpx2.Response(404, text='{"detail":"internal"}' + "x" * 300))
+    with pytest.raises(UpstreamError) as error:
         asyncio.run(client.call(Operation("getThings", ROWS)))
+    assert str(error.value) == "404 Not Found for GET https://upstream.example/things"
+    (record,) = caplog.records
+    assert record.levelname == "WARNING"
+    assert record.getMessage() == (
+        '404 Not Found for GET https://upstream.example/things: {"detail":"internal"}' + "x" * 179
+    )
 
 
 def test_call_names_the_body_when_it_is_not_json() -> None:
