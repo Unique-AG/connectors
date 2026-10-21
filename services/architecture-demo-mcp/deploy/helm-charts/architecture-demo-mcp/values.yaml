@@ -1,0 +1,149 @@
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
+# architecture-demo-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: architecture-demo-mcp
+fullnameOverride: architecture-demo-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+  MCP_AUTH_MODE: zitadel
+  # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
+  DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
+
+# Set per deployment in the overlay. The app refuses to start without them.
+# - MCP_BASE_URL: the public https origin, matching routes.hostname
+# - ZITADEL_BASE_URL and ZITADEL_CLIENT_ID, and ZITADEL_ORG_ID to restrict sign-in
+# - REDIS_URL
+# - every secret in .env.example, e.g. UPSTREAM_API_KEY and ZITADEL_JWT_SIGNING_KEY, from a
+#   secret through envVars
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/architecture-demo-mcp
+  tag: 0.0.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+  # Optional for a managed Postgres. An overlay that sets volumes repeats it.
+  - name: pg-cluster-ca
+    secret:
+      secretName: architecture-demo-mcp-pg-cluster-ca
+      optional: true
+      items:
+        - key: ca.crt
+          path: ca.crt
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: pg-cluster-ca
+    mountPath: /etc/postgresql-ca
+    readOnly: true
+
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # The overlay supplies the host or URL. The base chart injects DATABASE_URL and
+    # PG_DATABASE_SSL_MODE, which mcp_configs.PostgresSettings reads.
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: architecture-demo-mcp.mcp.qa.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: true
+    command: |
+      alembic upgrade head
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false

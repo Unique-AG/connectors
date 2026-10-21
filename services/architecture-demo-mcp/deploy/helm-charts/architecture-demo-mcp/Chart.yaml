@@ -1,0 +1,11 @@
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
+apiVersion: v2
+name: architecture-demo-mcp
+description: The base every new Python FastMCP server starts from.
+type: application
+version: 0.0.0
+appVersion: 0.0.0
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-87990c
