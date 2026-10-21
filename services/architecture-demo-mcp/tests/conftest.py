@@ -1,25 +1,19 @@
 # mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import AbstractAsyncContextManager
-from contextlib import asynccontextmanager
 
 from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
 import httpx2
-from key_value.aio.stores.memory import MemoryStore
 from mcp_configs import ServerSettings
-from pydantic import SecretStr
 import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.pool import StaticPool
 
-from architecture_demo_mcp.mcp import create_server
-from architecture_demo_mcp.persistence import Base
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import UpstreamSettings
+from tests.offline_server import build_server
+from tests.offline_server import fake_upstream_settings
+from tests.offline_server import open_fake_persistence
 
 type CallTool = Callable[[str, dict[str, object]], Awaitable[CallToolResult]]
 
@@ -97,7 +91,7 @@ def server_settings() -> ServerSettings:
 
 @pytest.fixture
 def upstream_settings() -> UpstreamSettings:
-    return UpstreamSettings(api_key=SecretStr("dummy-api-key"), _env_file=None)  # pyright: ignore[reportCallIssue]
+    return fake_upstream_settings()
 
 
 @pytest.fixture
@@ -112,37 +106,17 @@ def upstream_transport(tiingo: FakeTiingo) -> httpx2.MockTransport:
 
 @pytest.fixture
 async def persistence() -> AsyncGenerator[Persistence]:
-    """SQLite and an in-memory store in place of Postgres and Redis, which CI does not run.
-
-    Every client the tests open shares it, as the server's clients share the real stores.
-    """
-    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    yield Persistence(
-        database=async_sessionmaker(engine, expire_on_commit=False), store=MemoryStore()
-    )
-    await engine.dispose()
-
-
-@pytest.fixture
-def open_persistence(
-    persistence: Persistence,
-) -> Callable[[], AbstractAsyncContextManager[Persistence]]:
-    @asynccontextmanager
-    async def open_test_persistence() -> AsyncGenerator[Persistence]:
-        yield persistence
-
-    return open_test_persistence
+    async with open_fake_persistence() as fake:
+        yield fake
 
 
 @pytest.fixture
 def server(
     upstream_settings: UpstreamSettings,
-    open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
+    persistence: Persistence,
     upstream_transport: httpx2.MockTransport,
 ) -> FastMCP:
-    return create_server(upstream_settings, open_persistence, upstream_transport)
+    return build_server(upstream_settings, persistence, upstream_transport)
 
 
 @pytest.fixture

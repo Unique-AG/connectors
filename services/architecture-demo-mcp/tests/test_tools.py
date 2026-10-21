@@ -1,6 +1,3 @@
-from collections.abc import Callable
-from contextlib import AbstractAsyncContextManager
-
 from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
@@ -10,13 +7,13 @@ import httpx2
 from mcp_configs import ServerSettings
 from mcp_types import TextContent
 
-from architecture_demo_mcp.mcp import create_server
 from architecture_demo_mcp.mcp import http_app
 from architecture_demo_mcp.persistence import list_positions
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import UpstreamSettings
 from tests.conftest import CallTool
 from tests.conftest import FakeTiingo
+from tests.offline_server import build_server
 
 ACME_PERFORMANCE = {
     "ticker": "ACME",
@@ -194,7 +191,6 @@ async def test_record_position_rejects_a_ticker_tiingo_never_priced(
 
 async def test_a_signed_in_caller_owns_the_positions_it_records(
     upstream_settings: UpstreamSettings,
-    open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
     upstream_transport: httpx2.MockTransport,
     server_settings: ServerSettings,
     persistence: Persistence,
@@ -202,7 +198,7 @@ async def test_a_signed_in_caller_owns_the_positions_it_records(
     signed_in = StaticTokenVerifier(
         tokens={"token-a": {"client_id": "client", "scopes": [], "sub": "owner-a"}}
     )
-    server = create_server(upstream_settings, open_persistence, upstream_transport, auth=signed_in)
+    server = build_server(upstream_settings, persistence, upstream_transport, auth=signed_in)
     app = http_app(server, server_settings)
 
     def over_asgi(

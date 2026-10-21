@@ -18,6 +18,7 @@ bash ../../scripts/check-python-service.sh .
 uv run ruff format . && uv run ruff check .
 uv run basedpyright
 uv run lint-imports
+uv run mcp-architecture-check
 uv run pytest
 # serve on http://127.0.0.1:8000/mcp, after cp .env.example .env
 uv run architecture-demo-mcp
