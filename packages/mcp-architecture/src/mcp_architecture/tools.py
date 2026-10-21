@@ -8,6 +8,7 @@ from contextlib import AbstractAsyncContextManager, contextmanager
 from typing import cast
 
 from fastmcp import Client, FastMCP
+from fastmcp.server.providers.openapi import OpenAPITool
 from fastmcp.tools import Tool as ServedTool
 from mcp_types import TextContent, Tool
 
@@ -15,10 +16,6 @@ type ServerFactory = Callable[[], AbstractAsyncContextManager[FastMCP]]
 
 # Some clients reject a tool whose input schema is not a plain object at its root.
 _ROOT_COMBINATORS = ["anyOf", "oneOf", "allOf", "not"]
-# mcp-openapi's `PASSTHROUGH_TAG`, which `upstream_tools` in an OpenAPI MCP sets. Such a tool says
-# what the spec says until promoted. A copy, since an MCP without an upstream has no mcp-openapi
-# to import it from.
-PASSTHROUGH_TAG = "passthrough"
 _PROBE_TOOL = "mcp_architecture_masking_probe"
 _PROBE_SECRET = "mcp-architecture-probe-secret"
 
@@ -26,14 +23,15 @@ _PROBE_SECRET = "mcp-architecture-probe-secret"
 async def undescribed_tools(server: FastMCP) -> list[str]:
     """Each tool without a description and each parameter without one, as `tool(parameter)`.
 
-    The descriptions are all the model reads before it picks a tool and fills its arguments.
+    The descriptions are all the model reads before it picks a tool and fills its arguments. A
+    tool served straight from an OpenAPI spec says what the spec says, so it is skipped.
     """
-    tools = [tool for tool in await _list_tools(server) if PASSTHROUGH_TAG not in _tags(tool)]
+    tools = [tool for tool in await server.list_tools() if not isinstance(tool, OpenAPITool)]
     return [tool.name for tool in tools if not tool.description] + [
         f"{tool.name}({parameter})"
         for tool in tools
         for parameter, schema in cast(
-            dict[str, dict[str, object]], tool.input_schema.get("properties", {})
+            dict[str, dict[str, object]], tool.parameters.get("properties", {})
         ).items()
         if not schema.get("description")
     ]
@@ -86,7 +84,7 @@ async def tool_surface(server: FastMCP) -> str:
     """The tools the server lists, sorted by name, as JSON for `mcp-architecture-check` to compare
     with `tests/tool_surface.generated.json`.
 
-    Of `_meta`, only the tags are kept: they decide whether `undescribed_tools` checks a tool.
+    Of `_meta`, only the tags are kept.
     """
     surface = [
         {

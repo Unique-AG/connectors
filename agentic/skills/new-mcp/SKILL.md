@@ -13,7 +13,9 @@ Dockerfile, the Helm chart, and the release and commit-scope registration. It is
 tool: never import from it. Your job is to find out what the MCP needs before running it, and to
 write what the scaffold cannot know afterwards: the upstream client when there is no OpenAPI
 spec, the auth, the persistence and the tools. Read `packages/mcp-architecture/ARCHITECTURE.md`
-first: it is the contract the new service is checked against.
+first: it is the contract the new service is checked against. Its "Use what exists before writing
+code" section applies to every step below: look in FastMCP and the shared packages before you
+write anything of your own.
 
 ## 1. Ask
 
@@ -53,8 +55,9 @@ uv run --project packages/mcp-scaffold mcp-scaffold new <name> \
 ```
 
 It refuses to start unless `git status` is clean, untracked files included. Ask the user to
-commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff,
-basedpyright, import-linter and pytest in the new service, and fails loudly if any of them does. Since it
+commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff, the
+codegen's drift check for an OpenAPI upstream, basedpyright, import-linter,
+`mcp-architecture-check` and pytest in the new service, and fails loudly if any of them does. Since it
 started from a clean tree, everything it wrote is its own: undo a failed run with
 `git checkout -- . && git clean -fd && git clean -fdx services/<name>`. The last command also
 removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
@@ -200,8 +203,9 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - Write `README.md`: what the MCP does, its env variables, how to run it locally. The scaffold
   does not write one.
 - If you changed `values.additional.schema.json`, run `scripts/render-values-schema.sh`.
-- Each tool you added or served changes the tool surface. Read the snapshot test's diff, then
-  accept it with `uv run pytest --regen-all`.
+- Each tool you added or served changes the tool surface. Read the diff
+  `uv run mcp-architecture-check` prints, then accept it with
+  `uv run mcp-architecture-check --update`.
 - Run `bash scripts/check-python-service.sh services/<name>` from the repository root: every
   check CI runs, in its order.
 - Tell the user what is registered and what is still theirs to do:

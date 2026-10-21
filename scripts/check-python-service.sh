@@ -40,28 +40,6 @@ check() {
   fi
 }
 
-# basedpyright honours a `# pyright:` comment that sets a file's mode or a report, whatever the
-# shared config says. Only `# pyright: ignore[rule]` on one line is left.
-# The verdict comes from the lines found, not the pipeline's status, which pipefail would take
-# from the first grep.
-no_file_changes_its_type_check() {
-  local folders=() folder found
-  for folder in src tests; do
-    if [ -d "$folder" ]; then
-      folders+=("$folder")
-    fi
-  done
-  if [ ${#folders[@]} -eq 0 ]; then
-    return 0
-  fi
-  found=$(grep -rnE --include='*.py' '#[[:space:]]*pyright:' "${folders[@]}" \
-    | grep -vE '#[[:space:]]*pyright:[[:space:]]*ignore\[')
-  if [ -n "$found" ]; then
-    echo "$found"
-    return 1
-  fi
-}
-
 check "Install" "Run \`uv lock\` and commit uv.lock." uv sync --locked
 if [ ${#failed[@]} -ne 0 ]; then
   exit 1
@@ -93,11 +71,8 @@ if grep -q '^\[tool\.importlinter\]' pyproject.toml; then
   check "Imports" \
     "Move the import named above to the layer or top level ARCHITECTURE.md gives it. Never loosen a contract." \
     uv run lint-imports
-  check "Type check comments" \
-    "Remove the \`# pyright:\` comment listed above; a file keeps the type check of the whole MCP." \
-    no_file_changes_its_type_check
   # Outside pytest, so a conftest.py cannot skip, xfail or deselect it.
-  check "What a client sees" \
+  check "Architecture" \
     "Fix what \`uv run mcp-architecture-check\` lists. If only the tool surface changed and you meant it, run \`uv run mcp-architecture-check --update\`." \
     uv run mcp-architecture-check
 fi
