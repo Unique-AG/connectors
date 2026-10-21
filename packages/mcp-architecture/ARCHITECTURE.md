@@ -92,6 +92,7 @@ breaks the `layers` contract.
 | The [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), as far as ruff checks it, with three departures: lines run to 100 characters, a docstring is only for what the code cannot say, and its summary may run onto a second line. Besides it: no `print`, `pathlib` over `os.path`, no `else` after `return`, a long string split by implicit concatenation rather than `+`, and an error logged in an `except` with its traceback. | ruff, with `code_style.toml` |
 | Every type is known: no `Any`, no unannotated attribute, `@override` on an override, `super().__init__()` in a subclass. A test may use a private name of the code it tests. | basedpyright `all`, with `type_check.json` |
 | No file changes its own type check: a `# pyright:` comment only ignores a named rule on its line. | `uv run mcp-architecture-check` |
+| No file turns a lint rule off beyond one line: no `# ruff: noqa` or `# ruff: disable` comment outside `upstream/generated/`. | `uv run mcp-architecture-check` |
 | Every tool has a description and every parameter a `Field(description=...)`. | `uv run mcp-architecture-check` |
 | Every tool's input schema is a plain object, with no `anyOf`, `oneOf`, `allOf` or `not` at its root, which some clients reject. | `uv run mcp-architecture-check` |
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run mcp-architecture-check` |
@@ -110,9 +111,11 @@ The MCP's `pyproject.toml` holds each tool's configuration, and the scaffold wri
   such as `[tool.ruff.lint.pylint]`, replaces a setting of the shared style. A `per-file-ignores`
   entry covers `src/<package>/upstream/generated/` only, apart from the one that limits `PLR0917`
   to `contexts/`, which sits in the MCP's table and not in `code_style.toml` because ruff reads a
-  path in an extended file from that file's folder. A `noqa` that names its rule, with the reason
-  beside it, is fine, as Google's guide allows. A bare `# noqa` or `# ruff: noqa` breaks the style
-  (`PGH004`).
+  path in an extended file from that file's folder. A `# noqa: <rule>` on the line that needs it,
+  with the reason beside it, is fine, as Google's guide allows. A bare `# noqa` breaks the style
+  (`PGH004`). A `# ruff: noqa` or `# ruff: disable` comment turns a rule off for the rest of the
+  file, as a `per-file-ignores` entry would, so `mcp-architecture-check` fails on one outside
+  generated code.
 - `[tool.basedpyright]` extends `type_check.json`. It sets `extends`, `venvPath`, `venv`,
   `pythonVersion`, `include = ["src", "tests"]`, `strict`, `executionEnvironments` and reports,
   and nothing else: any other option, such as `analyzeUnannotatedFunctions` or `baselineFile`,
