@@ -289,7 +289,8 @@ def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
         for path in target.rglob("*")
         if path.is_file()
         and not path.is_symlink()
-        and not {".venv", ".ruff_cache", ".pytest_cache", "__pycache__"} & set(path.parts)
+        and not {".venv", ".ruff_cache", ".import_linter_cache", ".pytest_cache", "__pycache__"}
+        & set(path.parts)
         and path.name not in NOT_THE_SCAFFOLDS
     ]
 

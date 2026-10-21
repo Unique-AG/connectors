@@ -9,7 +9,11 @@ class FeaturePrivacyContract(Contract):
     """Only a feature reaches inside itself. Everyone else imports the feature's top level.
 
     The built-in `protected` contract cannot say this: an allowed importer's descendants are
-    allowed too, so `orders.commands.x` could import `products.queries.y` unnoticed.
+    allowed too, so `orders.place_order` could import `products.lookup.get_product` unnoticed.
+
+    `from <feature> import name` is an import of the top level when the top level imports the
+    submodule `name` itself, to re-export the function of the same name from it: the import graph
+    records the submodule all the same.
     """
 
     container: fields.ModuleField = fields.ModuleField()
@@ -27,6 +31,7 @@ class FeaturePrivacyContract(Contract):
             for line in sorted(
                 detail["line_number"]
                 for detail in graph.get_import_details(importer=importer, imported=internal)
+                if not _is_re_export(graph, detail["line_contents"], feature, internal)
             )
         ]
         return ContractCheck(kept=not violations, metadata={"violations": violations})
@@ -37,3 +42,9 @@ class FeaturePrivacyContract(Contract):
         for violation in cast(list[str], check.metadata["violations"]):
             output.print_error(f"- {violation}")
         output.new_line()
+
+
+def _is_re_export(graph: ImportGraph, line: str, feature: str, internal: str) -> bool:
+    return line.startswith(f"from {feature} import ") and graph.direct_import_exists(
+        importer=feature, imported=internal
+    )

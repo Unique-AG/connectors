@@ -3,9 +3,16 @@ from typing import Annotated, cast
 
 import pytest
 from fastmcp import FastMCP
+from fastmcp.tools import Tool
 from pydantic import Field
 
-from mcp_architecture import PASSTHROUGH_TAG, tool_surface, undescribed_tools
+from mcp_architecture import (
+    PASSTHROUGH_TAG,
+    masks_error_details,
+    tool_surface,
+    tools_with_a_root_combinator,
+    undescribed_tools,
+)
 
 
 @pytest.fixture
@@ -62,3 +69,29 @@ async def test_tool_surface_keeps_only_the_tags_of_meta(server: FastMCP) -> None
 
     assert surface["get_order"]["_meta"] == {"fastmcp": {"tags": [PASSTHROUGH_TAG]}}
     assert "_meta" not in surface["get_product"]
+
+
+def find_product(sku: str) -> str:
+    return sku
+
+
+async def test_a_tool_whose_input_schema_combines_schemas_at_its_root_is_listed(
+    server: FastMCP,
+) -> None:
+    either_key = {
+        "type": "object",
+        "anyOf": [{"required": ["sku"]}, {"required": ["product_id"]}],
+        "properties": {"sku": {"type": "string"}, "product_id": {"type": "string"}},
+    }
+    server.add_tool(Tool.from_function(find_product).model_copy(update={"parameters": either_key}))
+
+    assert await tools_with_a_root_combinator(server) == ["find_product: anyOf"]
+
+
+async def test_tools_with_plain_object_schemas_are_not_listed(server: FastMCP) -> None:
+    assert await tools_with_a_root_combinator(server) == []
+
+
+@pytest.mark.parametrize("masked", [True, False])
+def test_masks_error_details_reads_the_servers_setting(masked: bool) -> None:
+    assert masks_error_details(FastMCP(name="Shop", mask_error_details=masked)) is masked

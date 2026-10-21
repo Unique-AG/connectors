@@ -1,16 +1,19 @@
-from mcp_architecture.contracts import CONTRACT_TYPES, render_importlinter, required_contracts
-from mcp_architecture.rules import RULES, Rule
-from mcp_architecture.service import Service
-from mcp_architecture.tools import PASSTHROUGH_TAG, tool_surface, undescribed_tools
+from mcp_architecture.contracts import render_importlinter
+from mcp_architecture.settings import settings_showing_input_in_errors
+from mcp_architecture.tools import (
+    PASSTHROUGH_TAG,
+    masks_error_details,
+    tool_surface,
+    tools_with_a_root_combinator,
+    undescribed_tools,
+)
 
 __all__ = [
-    "CONTRACT_TYPES",
     "PASSTHROUGH_TAG",
-    "RULES",
-    "Rule",
-    "Service",
+    "masks_error_details",
     "render_importlinter",
-    "required_contracts",
+    "settings_showing_input_in_errors",
     "tool_surface",
+    "tools_with_a_root_combinator",
     "undescribed_tools",
 ]

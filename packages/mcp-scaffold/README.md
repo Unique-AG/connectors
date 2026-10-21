@@ -62,9 +62,9 @@ bump rather than a copy:
 
 - `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-architecture`: `ARCHITECTURE.md`, which the generated `AGENTS.md` points to, the
-  type check the MCP's `[tool.basedpyright]` extends, and the pytest plugin that checks the
-  layers, the contracts, the folder rules, the code style and the type check on every
-  `uv run pytest`.
+  code style the MCP's `[tool.ruff]` extends, the type check its `[tool.basedpyright]` extends,
+  the import contracts its `[tool.importlinter]` holds, and the checks `tests/test_architecture.py`
+  runs on what a client sees.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 
 The server with its host and origin guard (`mcp/http.py`, `mcp/middleware.py`) and the
