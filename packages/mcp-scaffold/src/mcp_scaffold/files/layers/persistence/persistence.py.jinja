@@ -4,6 +4,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import ClassVar
 
+{% if redis %}
+from mcp_configs import from_environment
+{% endif %}
 from pydantic import BaseModel, ConfigDict, Field
 
 {% if postgres %}
@@ -11,12 +14,6 @@ from mcp_skeleton.persistence.database import Database, DatabaseSettings, open_d
 {% endif %}
 {% if redis %}
 from mcp_skeleton.persistence.store import Store, StoreSettings, open_store
-{% endif %}
-{% if redis %}
-
-
-def _store_settings() -> StoreSettings:
-    return StoreSettings()  # pyright: ignore[reportCallIssue]
 {% endif %}
 
 
@@ -28,7 +25,7 @@ class PersistenceSettings(BaseModel):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
 {% endif %}
 {% if redis %}
-    store: StoreSettings = Field(default_factory=_store_settings)
+    store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
 {% endif %}
 
 

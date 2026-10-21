@@ -1,4 +1,4 @@
-from mcp_configs.config import shared_config
+from mcp_configs.config import from_environment, shared_config
 from mcp_configs.elicitation import ElicitationSettings, Toggle
 from mcp_configs.logging import DiagnosticsDataPolicy, LoggingSettings, LogLevel
 from mcp_configs.postgres import AsyncpgConnectArgs, PostgresSettings, SslMode
@@ -20,5 +20,6 @@ __all__ = [
     "SslMode",
     "Toggle",
     "ZitadelSettings",
+    "from_environment",
     "shared_config",
 ]

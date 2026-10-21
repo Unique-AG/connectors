@@ -11,6 +11,7 @@ from mcp_configs import (
     ServerSettings,
     Toggle,
     ZitadelSettings,
+    from_environment,
 )
 
 SIGNING_KEY = "k" * 32
@@ -66,19 +67,21 @@ def test_retry_takes_another_prefix_for_a_second_upstream(monkeypatch: pytest.Mo
 def test_redis_reads_the_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
-    assert RedisSettings().url.get_secret_value() == "redis://localhost:6379/0"  # pyright: ignore[reportCallIssue]
+    url = from_environment(RedisSettings).url
+
+    assert url.get_secret_value() == "redis://localhost:6379/0"
 
 
 def test_redis_requires_a_url() -> None:
     with pytest.raises(ValidationError):
-        RedisSettings()  # pyright: ignore[reportCallIssue]
+        from_environment(RedisSettings)
 
 
 def test_redis_ignores_a_url_without_its_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("URL", "redis://elsewhere:6379/0")
 
     with pytest.raises(ValidationError):
-        RedisSettings()  # pyright: ignore[reportCallIssue]
+        from_environment(RedisSettings)
 
 
 def test_elicitation_asks_for_everything_by_default() -> None:
@@ -116,7 +119,7 @@ def test_zitadel_derives_the_issuer_and_scopes(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("ZITADEL_JWT_SIGNING_KEY", SIGNING_KEY)
     monkeypatch.setenv("ZITADEL_ORG_ID", "42")
 
-    settings = ZitadelSettings()  # pyright: ignore[reportCallIssue]
+    settings = from_environment(ZitadelSettings)
 
     assert settings.issuer == "https://auth.example.com"
     assert settings.config_url == "https://auth.example.com/.well-known/openid-configuration"
