@@ -16,10 +16,8 @@ from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
 from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned, scaffold_version
-from mcp_scaffold.pyproject import edit_pyproject
 from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import load_spec, scaffold
-from mcp_scaffold.skeleton import NAME, PACKAGE, copy_skeleton, render_templates
 from mcp_scaffold.stamp import stamped
 from tests.conftest import (
     DEVELOPER_ENVIRONMENT,
@@ -275,16 +273,21 @@ def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
     ],
     ids=["a hyphen and a long URL", "an emoji"],
 )
-def test_the_description_reaches_every_file_as_given(tmp_path: Path, description: str) -> None:
+def test_the_description_reaches_every_file_as_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, description: str
+) -> None:
+    def run_nothing(_commands: list[list[str]], _service: Path) -> None: ...
+
+    copy_registries(tmp_path)
+    (tmp_path / "packages").symlink_to((REPO / "packages").resolve())
+    monkeypatch.setattr(commands, "run", run_nothing)
     options = Options(name="probe-text-mcp", description=description, persistence=frozenset())
-    target = tmp_path / "probe-text-mcp"
-    copy_skeleton(target)
-    render_templates(options, target)
-    edit_pyproject(options, target, REPO)
+
+    target = scaffold(options, tmp_path, spec=None, release=False)
 
     pyproject = tomllib.loads((target / "pyproject.toml").read_text())
-    chart = (target / "deploy" / "helm-charts" / NAME / "Chart.yaml").read_text()
-    server = ast.parse((target / "src" / PACKAGE / "mcp" / "server.py").read_text())
+    chart = (target / "deploy" / "helm-charts" / options.name / "Chart.yaml").read_text()
+    server = ast.parse((target / "src" / options.package / "mcp" / "server.py").read_text())
     (instructions,) = [
         node.value
         for node in server.body
