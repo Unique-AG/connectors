@@ -8,8 +8,8 @@ that breaks a rule fails one of them, and the failure names the import or the li
 `bash ../../scripts/check-python-service.sh .` runs them all, in the order CI does.
 
 `<package>` below is the MCP's Python package, `weather_mcp` for `services/weather-mcp`.
-Example paths such as `contexts/assets/get_asset.py` show the shape a feature, a tool
-or a test takes.
+Example paths such as `contexts/prices/get_latest_close.py` come from
+`services/architecture-demo-mcp`, unless the text says the demo has none.
 
 ## What the MCP owns and what it shares
 
@@ -63,8 +63,8 @@ breaks the `layers` contract.
 |---|---|
 | A layer only imports the layers below it, and the package holds no module outside them. | import-linter `layers` contract |
 | A layer is imported through its top level, `from <package>.upstream import X`, never `from <package>.upstream.client import X`. Inside a layer, deep imports are fine. | import-linter `protected` contracts |
-| Outside `contexts/`, code imports the domain from `<package>.contexts` only: `from <package>.contexts import get_asset`, never `from <package>.contexts.assets import get_asset`. | import-linter `protected` contract on `contexts` |
-| Inside `contexts/`, a feature imports another through that feature's top level: `from <package>.contexts.quotes import get_quotes`. Inside a feature, deep imports are fine. | import-linter `feature_privacy` contract, the one contract type of our own |
+| Outside `contexts/`, code imports the domain from `<package>.contexts` only: `from <package>.contexts import get_price_performance`, never `from <package>.contexts.prices import get_price_performance`. | import-linter `protected` contract on `contexts` |
+| Inside `contexts/`, a feature imports another through that feature's top level: `from <package>.contexts.prices import get_latest_close`. Inside a feature, deep imports are fine. | import-linter `feature_privacy` contract, the one contract type of our own |
 | No package imports its siblings in a cycle (`a → b → c → a`), at any depth: features in `contexts/`, folders in `mcp/`, modules inside a feature. | import-linter `acyclic_siblings` contract |
 | `contexts/` and `persistence/` import nothing from `fastmcp` or `mcp` themselves. | import-linter `forbidden` contract |
 | Every folder with Python code has an `__init__.py`, since import-linter does not see the others. | ruff `INP001` |
@@ -113,9 +113,9 @@ Each layer's and each feature's `__init__.py` re-exports what others may use and
 decide whether it belongs in the interface, and add it to `__init__.py` if it does.
 
 `contexts/__init__.py` re-exports what the tools use from every feature, so `mcp/` imports
-`from <package>.contexts import get_asset` and never names a feature. Its names are one flat list,
-so they are unique across features. A feature's own `__init__.py` re-exports what other features
-may use.
+`from <package> import contexts` and calls `contexts.get_price_performance`, never naming a
+feature. Its names are one flat list, so they are unique across features. A feature's own
+`__init__.py` re-exports what other features may use, as `prices` does with `get_latest_close`.
 
 `upstream` and `persistence` expose the same names in every MCP that has them, whatever is
 behind them:
@@ -136,59 +136,88 @@ Nothing outside `upstream/` imports `upstream/client.py` or any other module in 
 
 ## contexts
 
-A feature is one domain concept, named in the plural of what it handles: `assets`, `quotes`,
-`watchlists`. Features sit side by side. A feature never contains another feature, and organizes
+A feature is one domain concept, named in the plural of what it handles: `prices`,
+`portfolios`. Features sit side by side. A feature never contains another feature, and organizes
 its own modules as its code asks.
 
 Start small and grow only when the code asks for it:
 
 1. A function starts as one module, with its small models inline:
-   `contexts/assets/get_asset.py` holds `AssetDetails` and `get_asset`.
+   `contexts/prices/get_price_performance.py` holds `get_price_performance`, `PricePerformance`
+   and `PerformanceUnavailableError`.
 2. When its inputs or outputs grow past about ten lines, it becomes a folder with the inputs,
-   the outputs and the implementation apart:
+   the outputs and the implementation apart. No feature in the demo has grown this far. If
+   `record_position` did:
 
    ```
-   contexts/watchlists/add_to_watchlist/
+   contexts/portfolios/record_position/
    ├── __init__.py
-   ├── inputs.py             AddToWatchlistInput
-   ├── outputs.py            AddedToWatchlist, WatchlistRejectedError
-   └── add_to_watchlist.py   add_to_watchlist()
+   ├── inputs.py             PositionInput
+   ├── outputs.py            PositionRejectedError
+   └── record_position.py    record_position()
    ```
 
 3. A model several modules of a feature share goes in a file at the feature's top level, such as
-   `contexts/quotes/models.py`.
+   `contexts/portfolios/models.py`, whose `PortfolioValuation` both `record_position` and
+   `value_portfolio` return.
 
 A module reads top down: the one public function first, then the private helpers it calls, then
 its models. Python 3.14 evaluates annotations lazily, so a function may return a model defined
 below it. Every function takes keyword arguments only, so a call names what it passes:
 
 ```python
-async def add_to_watchlist(
-    *, upstream: Upstream, persistence: Persistence, entry: AddToWatchlistInput
-) -> AddedToWatchlist:
-    asset = await get_asset(upstream=upstream, ticker=entry.ticker)
-    stored = await add_watchlist_entry(
-        persistence=persistence, watchlist=entry.watchlist, ticker=asset.ticker, ...
+async def get_price_performance(
+    *,
+    upstream: Upstream,
+    persistence: Persistence,
+    ticker: str,
+    start_date: date,
+    end_date: date | None,
+) -> PricePerformance:
+    closes = await get_daily_closes(
+        upstream=upstream,
+        persistence=persistence,
+        ticker=ticker,
+        start_date=start_date,
+        end_date=end_date,
     )
-    if isinstance(stored, WatchlistRefusal):
-        raise _rejection(refusal=stored, ticker=asset.ticker, watchlist=entry.watchlist)
-    ...
+    if len(closes) < _MIN_TRADING_DAYS:
+        raise PerformanceUnavailableError(...)
+    daily_returns = [later.close / earlier.close - 1 for earlier, later in pairwise(closes)]
+    return PricePerformance(
+        ...,
+        annualized_volatility=_annualized_volatility(daily_returns=daily_returns),
+        max_drawdown=_max_drawdown(closes=closes),
+    )
 
 
-def _rejection(*, refusal: WatchlistRefusal, ticker: str, watchlist: str) -> WatchlistRejectedError: ...
+def _annualized_volatility(*, daily_returns: list[float]) -> float | None: ...
+
+
+def _max_drawdown(*, closes: list[DailyClose]) -> float: ...
+
+
+class PricePerformance(BaseModel): ...
+
+
+class PerformanceUnavailableError(Exception): ...
 ```
 
 Extract a private helper when it names a step, not to split a function that reads fine whole.
 
 A context:
 
-- Takes its dependencies as arguments, such as `upstream: Upstream`. It does not reach for
-  globals or the FastMCP context.
+- Takes its dependencies as arguments, such as `upstream: Upstream` and
+  `persistence: Persistence`. It does not reach for globals or the FastMCP context.
+- May read and write the MCP's own storage through `persistence`'s top level:
+  `record_position` stores a holding with `save_position`, and `value_portfolio` reads them
+  back with `list_positions`. It calls what `persistence` exposes, never SQLAlchemy or Redis
+  directly (see [persistence](#persistence)).
 - Returns its own pydantic models, never the upstream's. Map the vendor's field names to
   snake_case here, so a vendor change stops at this layer.
-- Knows nothing about MCP. It raises its own errors (`WatchlistRejectedError`), not `ToolError`.
-- May use another feature through that feature's top level: `get_watchlist` prices its
-  tickers with one `get_quotes` call, imported from `<package>.contexts.quotes`. If two features
+- Knows nothing about MCP. It raises its own errors (`PositionRejectedError`), not `ToolError`.
+- May use another feature through that feature's top level: `value_portfolio` prices each
+  position with `get_latest_close`, imported from `<package>.contexts.prices`. If two features
   need each other, the shared part is a third feature.
 
 ## mcp
@@ -210,16 +239,19 @@ A context:
   `__init__.py` (see [Auth](#auth)).
 - `tools/`: `FileSystemProvider` discovers every `@tool` under it. A new tool file is picked up
   with no registration step. If one fails to import, the server refuses to start.
-- A tool starts as one file, `tools/get_asset.py`. It becomes a folder when its inputs or
-  responses grow past about ten lines:
+- A tool starts as one file, `tools/get_price_performance.py`. It becomes a folder when its
+  inputs or responses grow past about ten lines:
 
   ```
-  mcp/tools/add_to_watchlist/
+  mcp/tools/record_position/
   ├── __init__.py
-  ├── add_to_watchlist.py             the @tool
-  ├── add_to_watchlist_inputs.py      Annotated parameter types
-  └── add_to_watchlist_responses.py   only if the tool reshapes what the context returns
+  ├── record_position.py             the @tool
+  ├── record_position_inputs.py      Annotated parameter types
+  └── record_position_responses.py   only if the tool reshapes what the context returns
   ```
+
+  The demo's `record_position` has no responses file, since it returns the context's
+  `PortfolioValuation` as it is.
 
 - An input or response several tools share goes in `mcp/inputs/<name>.py` or
   `mcp/responses/<name>.py`, as `Ticker` does in `mcp/inputs/ticker.py`.
@@ -227,7 +259,9 @@ A context:
   and turns the context's errors into `ToolError`. It holds no business rule.
 - Every parameter is `Annotated[..., Field(description=...)]`. The description and the
   docstring are what the model reads, so say when to call the tool and what its ids feed into.
-- Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only, and one that deletes is destructive, as `remove_from_watchlist` is.
+- Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only, and one
+  that deletes is destructive. `record_position` writes, so it is not read-only, and replacing a
+  holding destroys nothing, so it is not destructive. The demo has no tool that deletes.
 - Return the context's model unless the tool needs another shape.
 
 ## upstream
@@ -254,8 +288,9 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
   A new MCP starts with its spec's first JSON operation, a GET if there is one, in both lists:
   served, and typed for when it is promoted. Serve more operations to grow the first version.
   Promote one when its output needs trimming or renaming, or a business rule, or when several
-  operations make one tool: remove it from `EXPOSED` and write the tool. For example, promote
-  `getDailyMeta` into `get_asset` and leave `get_daily_prices` served.
+  operations make one tool: remove it from `EXPOSED` and write the tool. An operation may also
+  stay served while a tool of our own builds on it: the demo serves `get_daily_prices` for the
+  raw bars, and `get_price_performance` turns the same `getDailyPrices` into a summary.
   `upstream_http` builds the one client both kinds share, so they send the same auth.
 
   When the vendor changes the spec:
@@ -302,7 +337,7 @@ holds each of them as a field, so adding a store later changes no existing calle
 
 Contexts depend on what is stored, never on SQLAlchemy or Redis directly. Expose functions or
 models from `persistence/__init__.py` that say what they store, such as
-`persistence/watchlists.py` and `persistence/quote_cache.py`.
+`persistence/positions.py` and `persistence/price_cache.py`.
 
 ## telemetry
 

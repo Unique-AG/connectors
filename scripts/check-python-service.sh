@@ -42,9 +42,24 @@ check() {
 
 # basedpyright honours a `# pyright:` comment that sets a file's mode or a report, whatever the
 # shared config says. Only `# pyright: ignore[rule]` on one line is left.
+# The verdict comes from the lines found, not the pipeline's status, which pipefail would take
+# from the first grep.
 no_file_changes_its_type_check() {
-  ! grep -rnE --include='*.py' '#[[:space:]]*pyright:' src tests \
-    | grep -vE '#[[:space:]]*pyright:[[:space:]]*ignore\['
+  local folders=() folder found
+  for folder in src tests; do
+    if [ -d "$folder" ]; then
+      folders+=("$folder")
+    fi
+  done
+  if [ ${#folders[@]} -eq 0 ]; then
+    return 0
+  fi
+  found=$(grep -rnE --include='*.py' '#[[:space:]]*pyright:' "${folders[@]}" \
+    | grep -vE '#[[:space:]]*pyright:[[:space:]]*ignore\[')
+  if [ -n "$found" ]; then
+    echo "$found"
+    return 1
+  fi
 }
 
 check "Install" "Run \`uv lock\` and commit uv.lock." uv sync --locked

@@ -774,7 +774,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastmcp", specifier = ">=4.1,<5" },
+    { name = "fastmcp", specifier = ">=4.1,<4.2" },
     { name = "grimp", specifier = ">=3.17,<4" },
     { name = "import-linter", specifier = ">=2.15,<3" },
     { name = "mcp-types", specifier = ">=2.3,<3" },

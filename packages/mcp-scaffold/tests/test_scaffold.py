@@ -147,7 +147,8 @@ def test_a_scaffolded_mcp_passes_its_own_checks(scaffolded: Scaffolded, name: st
         and "mcp_skeleton" in path.read_text(errors="ignore")
     ]
     assert not leftovers, f"files still name the skeleton package: {leftovers}"
-    assert (target / "deploy" / "helm-charts" / name / "Chart.yaml").is_file()
+    chart = (target / "deploy" / "helm-charts" / name / "Chart.yaml").read_text()
+    assert f"description: {json.dumps(PROBES[name].description)}\n" in chart
     assert f"services/{name}" in (target / "deploy" / "Dockerfile").read_text()
     assert (target / "tests" / "tool_surface.generated.json").is_file()
     agents = (target / "AGENTS.md").read_text()

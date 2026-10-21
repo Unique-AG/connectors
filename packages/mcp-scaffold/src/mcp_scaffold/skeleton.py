@@ -31,7 +31,7 @@ def render_templates(options: Options, target: Path) -> None:
     )
     for template in sorted(target.rglob("*.jinja")):
         rendered = environment.from_string(template.read_text()).render(
-            options=options, python_lines=_python_lines
+            options=options, python_lines=_python_lines, quoted=json.dumps
         )
         template.with_suffix("").write_text(rendered)
         template.unlink()
