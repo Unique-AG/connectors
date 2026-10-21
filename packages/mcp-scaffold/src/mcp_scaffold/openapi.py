@@ -99,8 +99,11 @@ def write_spec(spec: VendorSpec, target: Path) -> None:
         path.write_text(text.replace(old, new))
 
 
-def generate_operations(options: Options, target: Path) -> None:
-    """Run the codegen, and export the `Operation` constants it writes from `upstream`."""
+def generate_operations(options: Options, target: Path) -> Path:
+    """Run the codegen, and export the `Operation` constants it writes from `upstream`.
+
+    Returns the `upstream/__init__.py` it writes, which is the scaffold's own, unlike the codegen's
+    output."""
     run([["uv", "sync"], ["uv", "run", "mcp-openapi-codegen"]], target)
     upstream = target / "src" / options.package / "upstream"
     constants = [
@@ -122,6 +125,7 @@ from {options.package}.upstream.settings import UpstreamSettings
 __all__ = {json.dumps(names)}
 """
     )
+    return upstream / "__init__.py"
 
 
 class _Response(BaseModel):

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from key_value.aio.protocols import AsyncKeyValue
 from key_value.aio.stores.redis import RedisStore
-from mcp_runtime import RedisSettings
+from mcp_configs import RedisSettings
 
 # The connection every MCP shares: REDIS_URL.
 StoreSettings = RedisSettings

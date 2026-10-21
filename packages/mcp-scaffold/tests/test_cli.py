@@ -12,10 +12,8 @@ VALID_ARGUMENTS = [
     "--description",
     "Probes.",
     "--upstream",
-    "http",
+    "custom",
     "--persistence",
-    "none",
-    "--auth",
     "none",
 ]
 
@@ -85,7 +83,7 @@ def test_a_name_that_cannot_be_a_service_is_refused(
         ),
         (["--spec", "weather.json"], "--spec goes with --upstream openapi, and only it"),
     ],
-    ids=["none with a store", "a spec without openapi"],
+    ids=["none with a store", "a spec with a custom upstream"],
 )
 @pytest.mark.usefixtures("repo")
 def test_options_that_contradict_each_other_are_refused(
@@ -95,6 +93,17 @@ def test_options_that_contradict_each_other_are_refused(
     message: str,
 ) -> None:
     assert message in refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS, *arguments)
+
+
+@pytest.mark.usefixtures("repo")
+def test_a_spec_without_an_upstream_is_refused(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = ["--description", "Probes.", "--persistence", "none", "--spec", "weather.json"]
+
+    error = refusal(monkeypatch, capsys, "weather-mcp", *arguments)
+
+    assert "--spec goes with --upstream openapi, and only it" in error
 
 
 def test_an_untracked_file_refuses_the_run_whatever_git_is_told_to_show(

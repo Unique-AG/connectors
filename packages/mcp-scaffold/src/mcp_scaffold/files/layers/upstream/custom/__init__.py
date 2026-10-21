@@ -1,10 +1,14 @@
-"""The upstream this MCP calls, through a client written by hand.
+"""The upstream this MCP calls, through a client of its own.
 
-Its protocol (SOAP, gRPC, a vendor SDK...) is not OpenAPI or plain HTTP. Expose the same
-interface the other upstream kinds do, so the server and the contexts read the same way in
-every MCP: `Upstream` (the client the contexts receive), `UpstreamError` (a ToolError),
-`UpstreamSettings`, and `open_upstream(settings)`, an async context manager the server lifespan
-opens. Then register it in `mcp/server.py` and `mcp/dependencies.py`.
+`client.py` is where it starts: an HTTP client with one `request` for any method and path. Shape
+it to the upstream with the user, following the new-mcp skill's rules for coding a client, or
+replace it for another protocol (SOAP, gRPC, a vendor SDK). Keep these four names whatever is
+behind them, so the server and the contexts read the same way in every MCP.
 """
 
-__all__: list[str] = []
+from mcp_skeleton.upstream.client import open_upstream
+from mcp_skeleton.upstream.client import Upstream
+from mcp_skeleton.upstream.client import UpstreamError
+from mcp_skeleton.upstream.settings import UpstreamSettings
+
+__all__ = ["Upstream", "UpstreamError", "UpstreamSettings", "open_upstream"]
