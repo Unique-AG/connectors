@@ -181,6 +181,16 @@ async def test_a_file_that_changes_its_type_check_is_a_finding(tmp_path: Path) -
     ]
 
 
+async def test_a_file_that_turns_a_lint_rule_off_is_a_finding(tmp_path: Path) -> None:
+    service = write_service(tmp_path)
+    (service / "src" / "kiosk" / "loose.py").write_text("# ruff: noqa: T201\nprint('x')\n")
+
+    assert await check_service(service, update=True) == [
+        "Remove these `# ruff: noqa` and `# ruff: disable` comments, and name the rule in a "
+        "`# noqa: <rule>` on the line that needs it: ['src/kiosk/loose.py:1']"
+    ]
+
+
 async def test_an_mcp_without_an_offline_server_is_a_finding(tmp_path: Path) -> None:
     service = write_service(tmp_path)
     (service / "tests" / "offline_server.py").unlink()

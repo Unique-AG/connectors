@@ -10,6 +10,7 @@ file names them, the tools we looked at instead, and why we keep the code.
 |---|---|---|
 | `FeaturePrivacyContract` | One feature imports another only through that feature's top level | import-linter's `protected` contract lets an allowed importer's descendants in too |
 | `files_changing_their_type_check` | No file changes its own type check | basedpyright honours a file-level `# pyright: basic` whatever the shared config says |
+| `files_turning_rules_off` | No file turns a lint rule off beyond one line | ruff honours `# ruff: noqa: <rule>` and `# ruff: disable[<rule>]` whatever the shared config says |
 | `undescribed_tools` | Every tool and parameter has a description | MCP-specific: needs the schema the server lists |
 | `tools_with_a_root_combinator` | No `anyOf`, `oneOf`, `allOf` or `not` at a tool schema's root | MCP-specific: needs the schema the server lists |
 | `masks_error_details` | An unexpected error reaches the client without its message | Needs to call a tool that raises on the built server |
@@ -50,6 +51,7 @@ two CI steps, and rules that disagree when a chain is indirect, all to retire on
 | Check | Alternative | Why not |
 |---|---|---|
 | `files_changing_their_type_check` | basedpyright's `reportIgnoreCommentWithoutRule` | Already on through `all` mode, but it only covers `# pyright: ignore`, not a file-level mode |
+| `files_turning_rules_off` | ruff's `PGH004` | Already on, but it only flags a `noqa` that names no rule |
 | `masks_error_details`, `settings_showing_input_in_errors` | A Semgrep rule | Matches the source, not the built object, so a server or settings class built indirectly slips past. Adds a tool for two checks |
 | `undescribed_tools`, `tools_with_a_root_combinator` | A Semgrep rule on `Field(description=...)` | Cannot see the schema FastMCP generates, nor tools served from an OpenAPI spec |
 | `tool_surface` | syrupy or pytest-regressions | Both compare inside pytest, where a `conftest.py` can skip the comparison |
