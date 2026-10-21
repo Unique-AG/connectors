@@ -14,6 +14,7 @@ from typing import cast
 from fastmcp import FastMCP
 
 from mcp_architecture.configuration import loosened_configuration
+from mcp_architecture.contracts import restore_importlinter
 from mcp_architecture.settings import settings_showing_input_in_errors
 from mcp_architecture.suppression_comments import (
     files_changing_their_type_check,
@@ -37,7 +38,10 @@ def main() -> None:
         description="Check the MCP in the current folder for the rules no other tool checks.",
     )
     parser.add_argument(
-        "--update", action="store_true", help=f"write {SNAPSHOT} instead of comparing with it"
+        "--update",
+        action="store_true",
+        help=f"write {SNAPSHOT} instead of comparing with it, and restore the shared contracts in "
+        "[tool.importlinter]",
     )
     update = cast(bool, parser.parse_args().update)
     findings = asyncio.run(check_service(Path.cwd(), update=update))
@@ -49,12 +53,17 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
     """Each way the MCP at `root` breaks a rule, as a message that says how to fix it.
 
     The server comes from `offline_server()` in `tests/offline_server.py`, an async context
-    manager that builds it with fakes in place of the upstream and the stores.
+    manager that builds it with fakes in place of the upstream and the stores. `update` also
+    writes `[tool.importlinter]` back as `render_importlinter` gives it, keeping the MCP's own
+    contracts.
     """
-    pyproject = cast(
-        dict[str, dict[str, object]], tomllib.loads((root / "pyproject.toml").read_text())
-    )
+    path = root / "pyproject.toml"
+    text = path.read_text()
+    pyproject = cast(dict[str, dict[str, object]], tomllib.loads(text))
     package = str(pyproject["project"]["name"]).replace("-", "_")
+    if update and (restored := restore_importlinter(text, package)) != text:
+        path.write_text(restored)
+        pyproject = cast(dict[str, dict[str, object]], tomllib.loads(restored))
     findings = loosened_configuration(root, pyproject, package)
     if comments := files_changing_their_type_check(root):
         findings.append(
