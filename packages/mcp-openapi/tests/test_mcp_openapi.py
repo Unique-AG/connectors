@@ -187,6 +187,27 @@ def test_call_names_the_body_when_it_is_not_json() -> None:
         asyncio.run(client.call(Operation("getThings", ROWS)))
 
 
+def test_call_error_carries_the_status_of_an_error_response() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things({"detail": "Not found."}, status=404)
+    assert error.value.status_code == 404
+
+
+def test_call_error_carries_no_status_when_the_body_does_not_fit() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things([{"value": "x"}])
+    assert error.value.status_code is None
+
+
+def test_call_error_carries_no_status_when_the_upstream_does_not_answer() -> None:
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("refused", request=request)
+
+    with pytest.raises(UpstreamError) as error:
+        asyncio.run(api(refuse).call(Operation("getThings", ROWS)))
+    assert error.value.status_code is None
+
+
 def test_call_rejects_an_operation_that_is_not_in_the_spec() -> None:
     client = api(lambda _: httpx2.Response(200, json=[]))
     with pytest.raises(AssertionError, match="operationId getMissing is not in the spec"):
@@ -335,8 +356,8 @@ def test_policy_does_not_retry_a_status_it_does_not_list() -> None:
     assert str(result) == "500 Internal Server Error for GET https://upstream.example/things"
 
 
-def replay_post(responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, int]:
-    """`replay` for a POST, which is not idempotent."""
+def replay_write(method: str, responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, int]:
+    """`replay` for a request that writes."""
     remaining = iter(responses)
     http = httpx2.AsyncClient(
         base_url="https://upstream.example",
@@ -345,24 +366,34 @@ def replay_post(responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, 
     client = OperationClient(load_spec(SPEC), http, retry_policy=NO_BACKOFF)
     try:
         result: Row | UpstreamError = asyncio.run(
-            client.request_raw("POST", "/hidden", TypeAdapter(Row), json={"label": "x"})
+            client.request_raw(method, "/hidden", TypeAdapter(Row), json={"label": "x"})
         )
     except UpstreamError as error:
         result = error
     return result, len(responses) - len(list(remaining))
 
 
-def test_policy_sends_a_rate_limited_post_again() -> None:
-    assert replay_post([rate_limited(), httpx2.Response(200, json={"value": 1})]) == (
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT", "DELETE"])
+def test_policy_sends_a_rate_limited_write_again(method: str) -> None:
+    assert replay_write(method, [rate_limited(), httpx2.Response(200, json={"value": 1})]) == (
         Row(value=1),
         2,
     )
 
 
-def test_policy_does_not_send_a_post_again_on_a_503() -> None:
-    result, sent = replay_post([httpx2.Response(503), httpx2.Response(200, json={"value": 1})])
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+def test_policy_sends_an_idempotent_write_again_on_a_503(method: str) -> None:
+    responses = [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    assert replay_write(method, responses) == (Row(value=1), 2)
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_policy_does_not_send_a_non_idempotent_write_again_on_a_503(method: str) -> None:
+    result, sent = replay_write(
+        method, [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    )
     assert sent == 1
-    assert str(result) == "503 Service Unavailable for POST https://upstream.example/hidden"
+    assert str(result) == f"503 Service Unavailable for {method} https://upstream.example/hidden"
 
 
 def test_no_policy_sends_a_request_once() -> None:

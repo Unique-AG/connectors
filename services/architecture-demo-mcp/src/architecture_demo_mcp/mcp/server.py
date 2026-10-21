@@ -18,9 +18,14 @@ from architecture_demo_mcp.upstream import upstream_tools
 from architecture_demo_mcp.upstream import UpstreamSettings
 
 INSTRUCTIONS = (
-    "Reference MCP showing every scaffold layer against Tiingo market data: OpenAPI "
-    "operations served as tools, a Redis-cached price performance summary and a Postgres "
-    "portfolio, behind Zitadel sign-in."
+    "Market data from Tiingo, and the user's own portfolios. When you only have a company's "
+    "name, find its ticker with `search_assets`. The other `get_` and `list_` tools answer "
+    "straight from Tiingo: daily prices and listing details, real-time and crypto and forex "
+    "quotes, fundamentals, news, dividends and splits. For how a ticker did over a period, its "
+    "return, volatility, drawdown and range, call `get_price_performance` rather than working it "
+    "out from daily prices. When the user says what they hold, call `record_position`: it stores "
+    "the holding in one of their named portfolios and answers with the whole portfolio valued at "
+    "the latest closes. Each user sees only their own portfolios."
 )
 
 

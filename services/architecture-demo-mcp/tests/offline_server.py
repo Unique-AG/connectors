@@ -11,6 +11,8 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AuthProvider
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp_configs import RetrySettings
+from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,7 +25,15 @@ from architecture_demo_mcp.upstream import UpstreamSettings
 
 
 def fake_upstream_settings() -> UpstreamSettings:
-    return UpstreamSettings(api_key=SecretStr("dummy-api-key"), _env_file=None)  # pyright: ignore[reportCallIssue]
+    """Every field given, so neither the environment nor `.env` changes what the tests see.
+    Retries never wait.
+    """
+    return UpstreamSettings(
+        api_key=SecretStr("dummy-api-key"),
+        api_url=AnyHttpUrl("https://api.tiingo.com"),
+        timeout_seconds=30,
+        retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
+    )
 
 
 def unanswered_upstream() -> httpx2.MockTransport:

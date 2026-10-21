@@ -22,6 +22,7 @@ class PositionRow(Base):
     owner: Mapped[str] = mapped_column(String(255), primary_key=True)
     portfolio: Mapped[str] = mapped_column(String(64), primary_key=True)
     ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # Float keeps the demo short. An MCP that stores real money uses Numeric and Decimal.
     quantity: Mapped[float] = mapped_column(Float)
     cost_basis: Mapped[float] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

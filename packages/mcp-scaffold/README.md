@@ -11,6 +11,13 @@ uv run --project packages/mcp-scaffold mcp-scaffold new weather-mcp \
     --upstream openapi --spec https://api.example.com/openapi.yml --persistence none
 ```
 
+A run that fails partway leaves what it wrote. From the repository root, this undoes it, the
+`.venv` and caches git ignores included:
+
+```bash
+git checkout . && git clean -fdx services/weather-mcp
+```
+
 It is a command-line tool for agents and people, never a library: nothing imports
 `mcp_scaffold`, and no MCP depends on it. What MCPs share at run time comes from the packages
 listed under [After it runs](#after-it-runs).

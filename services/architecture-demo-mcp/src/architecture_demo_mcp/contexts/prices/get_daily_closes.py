@@ -38,8 +38,10 @@ async def get_daily_closes(
 
 
 def _daily_close(*, bar: DailyPriceBar) -> DailyClose | None:
-    """None for a bar Tiingo sent half-filled, which no figure can use."""
-    if bar.date is None or bar.adjClose is None:
+    """None for a bar Tiingo sent half-filled or without a positive close, which no figure can
+    use, since every return and weight divides by a close.
+    """
+    if bar.date is None or bar.adjClose is None or bar.adjClose <= 0:
         return None
     # Tiingo sends a date as midnight UTC, such as 2026-10-19T00:00:00.000Z.
     return DailyClose(

@@ -4,11 +4,11 @@
     options.opens_persistence and "open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]]",
     options.opens_upstream and "transport: httpx2.AsyncBaseTransport | None = None",
 ] | select | join(", ") %}
-{# An OpenAPI upstream shares its client with the tools served straight from the spec. #}
 {% set resources = [
     options.opens_upstream and "upstream",
     options.opens_persistence and "persistence",
 ] | select | list %}
+{# An OpenAPI upstream shares its client with the tools served straight from the spec. #}
 {% set openers = {
     "upstream": "open_upstream(http, upstream)" if openapi else "open_upstream(upstream, transport)",
     "persistence": "open_persistence()",

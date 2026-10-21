@@ -74,9 +74,11 @@ def test_rejects_a_url_that_is_not_postgres() -> None:
         PostgresSettings(url=SecretStr("mysql://dummy-user:dummy-password@db/app"))
 
 
-def test_rejects_an_unknown_sslmode_in_the_url() -> None:
-    with pytest.raises(ValidationError, match="Unsupported sslmode=sometimes"):
+def test_rejects_an_unknown_sslmode_in_the_url_without_showing_it() -> None:
+    with pytest.raises(ValidationError, match="Unsupported sslmode in DB_URL") as error:
         PostgresSettings(url=SecretStr(f"{CNPG_URL}?sslmode=sometimes"))
+
+    assert "sometimes" not in str(error.value)
 
 
 def test_moves_sslmode_and_application_name_from_the_url_into_connect_args() -> None:
@@ -109,6 +111,17 @@ def test_the_url_sslrootcert_wins_over_the_mounted_ca(tmp_path: Path) -> None:
     settings = PostgresSettings(
         url=SecretStr(f"{CNPG_URL}?sslmode=verify-full&sslrootcert={unreadable_ca}"),
         ssl_root_cert=tmp_path / "absent.crt",
+    )
+
+    with pytest.raises(ssl.SSLError):
+        _ = settings.connect_args
+
+
+def test_require_verifies_against_a_mounted_ca(tmp_path: Path) -> None:
+    unreadable_ca = tmp_path / "ca.crt"
+    unreadable_ca.write_text("not a certificate")
+    settings = PostgresSettings(
+        url=SecretStr(f"{CNPG_URL}?sslmode=require"), ssl_root_cert=unreadable_ca
     )
 
     with pytest.raises(ssl.SSLError):

@@ -97,8 +97,14 @@ def test_a_missing_importlinter_table_is_a_finding(tmp_path: Path) -> None:
             "[tool.ruff] replaces or narrows the code style with ['extend-ignore']. Remove "
             "them, and name the rule in a `# noqa: <rule>` on the line that needs it.",
         ),
+        (
+            '[tool.ruff]\nextend = "../../packages/mcp-architecture/src/mcp_architecture/'
+            'code_style.toml"\nexclude = [".venv", "src"]\n',
+            "[tool.ruff] replaces or narrows the code style with ['exclude']. Remove "
+            "them, and name the rule in a `# noqa: <rule>` on the line that needs it.",
+        ),
     ],
-    ids=["no extend", "an ignored rule"],
+    ids=["no extend", "an ignored rule", "an excluded folder"],
 )
 def test_a_loosened_ruff_table_is_a_finding(tmp_path: Path, ruff: str, expected: str) -> None:
     basedpyright = SHARED[SHARED.index("[tool.basedpyright]") :]
@@ -113,6 +119,7 @@ def test_a_loosened_ruff_table_is_a_finding(tmp_path: Path, ruff: str, expected:
         ('reportAny = "warning"\n', "reportAny"),
         ("reportPrivateUsage = false\n", "reportPrivateUsage"),
         ('ignore = ["src/kiosk/legacy"]\n', "ignore"),
+        ('include = ["tests"]\n', "include"),
         (
             'executionEnvironments = [{ root = "src", reportUnknownMemberType = false }]\n',
             "reportUnknownMemberType",
@@ -135,9 +142,28 @@ def test_a_loosened_basedpyright_table_is_a_finding(
     ]
 
 
-def test_a_pyrightconfig_json_is_a_finding(tmp_path: Path) -> None:
-    (tmp_path / "pyrightconfig.json").write_text("{}")
+@pytest.mark.parametrize(
+    "path",
+    [
+        "pyrightconfig.json",
+        ".importlinter",
+        "setup.cfg",
+        "ruff.toml",
+        "src/kiosk/contexts/.ruff.toml",
+        "src/kiosk/contexts/pyproject.toml",
+    ],
+)
+def test_a_configuration_file_beside_pyproject_toml_is_a_finding(tmp_path: Path, path: str) -> None:
+    (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / path).write_text("")
 
     assert findings(tmp_path, SHARED + render_importlinter("kiosk")) == [
-        "Remove pyrightconfig.json: it replaces [tool.basedpyright]."
+        f"Remove ['{path}']: each replaces a tool table of pyproject.toml."
     ]
+
+
+def test_a_configuration_file_inside_the_venv_passes(tmp_path: Path) -> None:
+    (tmp_path / ".venv" / "lib").mkdir(parents=True)
+    (tmp_path / ".venv" / "lib" / "pyproject.toml").write_text("")
+
+    assert findings(tmp_path, SHARED + render_importlinter("kiosk")) == []
