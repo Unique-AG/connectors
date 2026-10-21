@@ -120,7 +120,8 @@ The MCP's `pyproject.toml` holds each tool's configuration, and the scaffold wri
   in. A contract of your own, stricter than these, is fine to add after them.
 
 `uv run mcp-architecture-check` fails when a table drops or loosens what the shared files and
-`render_importlinter` give. A ruff `per-file-ignores` entry is the one loosening it lets
+`render_importlinter` give, and when a `ruff.toml`, `.ruff.toml`, nested `pyproject.toml`,
+`.importlinter` or `setup.cfg` would be read in place of a table. A ruff `per-file-ignores` entry is the one loosening it lets
 through, so review keeps it to generated code: every change to a service's `pyproject.toml`
 goes through the code owners. What ruff cannot check is left to review as well:
 import modules rather than names where the guide asks it, keep functions short, and avoid the

@@ -16,7 +16,14 @@ from mcp_openapi.retry import RetryPolicy
 
 
 class UpstreamError(ToolError):
-    """An upstream call failed, or its body does not fit the expected model."""
+    """An upstream call failed, or its body does not fit the expected model.
+
+    `status_code` is the status of an error response, and None for any other failure.
+    """
+
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code: int | None = status_code
 
 
 class LockTimeoutError(UpstreamError):
@@ -113,7 +120,9 @@ class OperationClient:
             status = f"{exc.response.status_code} {exc.response.reason_phrase}"
             message = f"{status} for {exc.request.method} {url}"
             body = exc.response.text[:200]
-            raise UpstreamError(f"{message}: {body}" if body else message) from exc
+            raise UpstreamError(
+                f"{message}: {body}" if body else message, status_code=exc.response.status_code
+            ) from exc
         except httpx2.HTTPError as exc:
             raise UpstreamError(str(exc) or type(exc).__name__) from exc
 

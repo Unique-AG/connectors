@@ -14,7 +14,9 @@ from architecture_demo_mcp.mcp import http_app
 from architecture_demo_mcp.persistence import list_positions
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import UpstreamSettings
+from tests.conftest import ACME_META
 from tests.conftest import CallTool
+from tests.conftest import daily_bar
 from tests.conftest import FakeTiingo
 from tests.offline_server import build_server
 
@@ -31,6 +33,34 @@ ACME_PERFORMANCE = {
     "period_high": 122.0,
     "period_low": 98.0,
 }
+
+
+def _tiingo_with_a_zero_close(request: httpx2.Request) -> httpx2.Response:
+    match request.url.path.split("/")[1:]:
+        case ["tiingo", "daily", "ACME"]:
+            return httpx2.Response(200, json=ACME_META)
+        case ["tiingo", "daily", "ACME", "prices"] if "startDate" in request.url.params:
+            closes = [("2026-10-14", 100), ("2026-10-15", 0), ("2026-10-16", 110)]
+            return httpx2.Response(200, json=[daily_bar(day, close) for day, close in closes])
+        case ["tiingo", "daily", "ACME", "prices"]:
+            return httpx2.Response(200, json=[daily_bar("2026-10-20", 0)])
+        case _:
+            return httpx2.Response(404, json={"detail": "Not found."})
+
+
+@pytest.fixture
+def call_tool_with_a_zero_close(
+    upstream_settings: UpstreamSettings, persistence: Persistence
+) -> CallTool:
+    server = build_server(
+        upstream_settings, persistence, httpx2.MockTransport(_tiingo_with_a_zero_close)
+    )
+
+    async def call(name: str, arguments: dict[str, object]) -> CallToolResult:
+        async with Client(server) as client:
+            return await client.call_tool(name, arguments, raise_on_error=False)
+
+    return call
 
 
 def _error_text(result: CallToolResult) -> str:
@@ -121,6 +151,18 @@ async def test_get_price_performance_needs_two_trading_days(call_tool: CallTool)
     )
 
 
+async def test_get_price_performance_skips_a_day_without_a_positive_close(
+    call_tool_with_a_zero_close: CallTool,
+) -> None:
+    result = await call_tool_with_a_zero_close(
+        "get_price_performance",
+        {"ticker": "ACME", "start_date": "2026-10-14", "end_date": "2026-10-16"},
+    )
+
+    performance = cast(dict[str, object], result.structured_content)
+    assert (performance["trading_days"], performance["total_return"]) == (2, 0.1)
+
+
 async def test_record_position_values_the_whole_portfolio(call_tool: CallTool) -> None:
     await call_tool(
         "record_position",
@@ -190,6 +232,35 @@ async def test_record_position_rejects_a_ticker_tiingo_never_priced(
         "Tiingo has no prices for UNPRX, so a position in it cannot be valued."
     )
     assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
+
+
+async def test_record_position_rejects_a_ticker_tiingo_does_not_list(
+    call_tool: CallTool, persistence: Persistence
+) -> None:
+    result = await call_tool(
+        "record_position",
+        {"portfolio": "core", "ticker": "NOPE", "quantity": 1, "cost_basis": 10},
+    )
+
+    assert _error_text(result) == (
+        "Tiingo does not list NOPE, so a position in it cannot be valued."
+    )
+    assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
+
+
+async def test_record_position_leaves_a_position_whose_latest_close_is_zero_unpriced(
+    call_tool_with_a_zero_close: CallTool,
+) -> None:
+    result = await call_tool_with_a_zero_close(
+        "record_position",
+        {"portfolio": "core", "ticker": "ACME", "quantity": 10, "cost_basis": 100},
+    )
+
+    assert not result.is_error
+    valuation = cast(dict[str, object], result.structured_content)
+    (position,) = cast(list[dict[str, object]], valuation["positions"])
+    assert (position["last_close"], position["weight"]) == (None, None)
+    assert valuation["market_value"] == 0.0
 
 
 async def test_record_position_leaves_a_ticker_it_cannot_price_unpriced(
@@ -282,3 +353,43 @@ async def test_each_signed_in_caller_sees_only_the_positions_it_records(
     owned = await list_positions(persistence=persistence, owner="owner-a", portfolio="core")
     assert [position.ticker for position in owned] == ["ACME"]
     assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
+
+
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer unknown-token"}])
+async def test_the_http_app_refuses_a_caller_without_a_known_token(
+    upstream_settings: UpstreamSettings,
+    upstream_transport: httpx2.MockTransport,
+    server_settings: ServerSettings,
+    persistence: Persistence,
+    headers: dict[str, str],
+) -> None:
+    signed_in = StaticTokenVerifier(
+        tokens={"token-a": {"client_id": "client", "scopes": [], "sub": "owner-a"}}
+    )
+    server = build_server(upstream_settings, persistence, upstream_transport, auth=signed_in)
+    app = http_app(server, server_settings)
+    call = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "record_position",
+            "arguments": {"portfolio": "core", "ticker": "ACME", "quantity": 1, "cost_basis": 100},
+        },
+    }
+
+    async with (
+        app.router.lifespan_context(app),
+        httpx2.AsyncClient(
+            transport=httpx2.ASGITransport(app=app), base_url=str(server_settings.base_url)
+        ) as client,
+    ):
+        response = await client.post(
+            "/mcp",
+            json=call,
+            headers={"Accept": "application/json, text/event-stream", **headers},
+        )
+
+    assert response.status_code == 401
+    for owner in ("owner-a", "local"):
+        assert await list_positions(persistence=persistence, owner=owner, portfolio="core") == []

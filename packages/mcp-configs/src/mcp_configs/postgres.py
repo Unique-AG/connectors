@@ -84,7 +84,9 @@ class PostgresSettings(BaseSettings):
                 raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
             sslmode = dict(parse_qsl(parts.query)).get("sslmode")
             if sslmode is not None and sslmode not in get_args(SslMode):
-                raise ValueError(f"Unsupported sslmode={sslmode} in DB_URL")
+                raise ValueError(
+                    f"Unsupported sslmode in DB_URL, expected one of {', '.join(get_args(SslMode))}"
+                )
             return self
         fields = {"DB_HOST": self.host, "DB_NAME": self.name, "DB_USER": self.user}
         missing = [name for name, value in fields.items() if not value]
@@ -125,12 +127,13 @@ class PostgresSettings(BaseSettings):
             # back to plain text: an SSLContext makes TLS mandatory.
             case "disable" | "allow" | "prefer":
                 return sslmode
-            case "require":
+            # As libpq does, "require" verifies the certificate once a root certificate is there.
+            case "require" if cafile is None:
                 context = ssl.create_default_context()
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
                 return context
-            case "verify-ca":
+            case "require" | "verify-ca":
                 context = ssl.create_default_context(cafile=cafile)
                 context.check_hostname = False
                 return context

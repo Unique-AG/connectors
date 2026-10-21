@@ -86,9 +86,11 @@ upstream and the stores.
     Only an ignore that names its rule is left.
   - `loosened_configuration(root, pyproject, package)`: each contract or import-linter option
     that differs from what `render_importlinter` writes, a missing `extend` of `code_style.toml`
-    or `type_check.json`, a ruff `select`, `ignore` or `extend-ignore`, and a basedpyright mode,
-    ignored path or report turned down. A contract of the MCP's own after the shared ones, a
-    stricter report and a ruff `per-file-ignores` entry pass.
+    or `type_check.json`, a ruff `select`, `ignore`, `extend-ignore` or narrowed `exclude`, a
+    basedpyright mode, narrowed `include`, ignored path or report turned down, and a
+    `ruff.toml`, `.ruff.toml`, nested `pyproject.toml`, `pyrightconfig.json`, `.importlinter` or
+    `setup.cfg`, which a tool reads in place of the tables. A contract of the MCP's own after the
+    shared ones, a stricter report and a ruff `per-file-ignores` entry pass.
 
 ## Working on the package from a service
 

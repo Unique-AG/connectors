@@ -1,8 +1,11 @@
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+
+from mcp_scaffold.commands import run
 
 type UseVenv = Callable[[str], None]
 
@@ -15,6 +18,23 @@ REGISTRIES = [
     ".github/workflows/release-rerun.yaml",
     "pnpm-workspace.yaml",
 ]
+# What a developer's shell may export, which a generated service's tests must not read.
+DEVELOPER_ENVIRONMENT = {
+    "HOST": "myhost.local",
+    "PORT": "9000",
+    "MCP_BASE_URL": "https://mcp.other.example.com",
+    "MCP_ALLOWED_ORIGINS": '["https://other.example.com"]',
+    "UPSTREAM_API_URL": "https://api.other.example.com",
+    "UPSTREAM_TIMEOUT_SECONDS": "1",
+    "UPSTREAM_RETRY_MAX_ATTEMPTS": "1",
+    "UPSTREAM_RETRY_MAX_WAIT_SECONDS": "60",
+}
+
+
+def copy_registries(repo: Path) -> None:
+    for registry in REGISTRIES:
+        (repo / registry).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / registry, repo / registry)
 
 
 def venvs(config: pytest.Config) -> Path:
@@ -38,6 +58,12 @@ def link_project_environment(service: Path) -> None:
     shared = Path(os.environ["UV_PROJECT_ENVIRONMENT"])
     shared.mkdir(parents=True, exist_ok=True)
     venv.symlink_to(shared, target_is_directory=True)
+
+
+def run_linked(commands: list[list[str]], service: Path) -> None:
+    """`commands.run`, with the service's `.venv` linked to UV_PROJECT_ENVIRONMENT first."""
+    link_project_environment(service)
+    run(commands, service)
 
 
 @pytest.fixture

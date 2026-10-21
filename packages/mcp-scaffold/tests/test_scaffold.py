@@ -1,7 +1,6 @@
 import ast
 import json
 import re
-import shutil
 import tomllib
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
@@ -22,7 +21,15 @@ from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import load_spec, scaffold
 from mcp_scaffold.skeleton import NAME, PACKAGE, copy_skeleton, render_templates
 from mcp_scaffold.stamp import stamped
-from tests.conftest import REGISTRIES, REPO, UseVenv, link_project_environment, venvs
+from tests.conftest import (
+    DEVELOPER_ENVIRONMENT,
+    REGISTRIES,
+    REPO,
+    UseVenv,
+    copy_registries,
+    run_linked,
+    venvs,
+)
 
 type Config = dict[str, dict[str, dict[str, object]]]
 type Scaffolded = Callable[[str], Path]
@@ -71,9 +78,7 @@ WEATHER_SPEC = {
 def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """A repository the scaffold can register in, beside the shared packages a new MCP uses."""
     repo = tmp_path_factory.mktemp("repo")
-    for registry in REGISTRIES:
-        (repo / registry).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(REPO / registry, repo / registry)
+    copy_registries(repo)
     (repo / "packages").symlink_to((REPO / "packages").resolve())
     (repo / "services").mkdir()
     (repo / "weather.json").write_text(json.dumps(WEATHER_SPEC))
@@ -121,16 +126,15 @@ NOT_THE_SCAFFOLDS = {
 
 @pytest.fixture(scope="module")
 def scaffolded(repo: Path, request: pytest.FixtureRequest) -> Iterator[Scaffolded]:
-    """Scaffolds a probe the first time a test asks for it, so each test runs alone too."""
+    """Scaffolds a probe the first time a test asks for it, so each test runs alone too. Its
+    checks run under a developer's environment, which its tests must not read."""
     built: dict[str, Path] = {}
-
-    def run_linked(commands_to_run: list[list[str]], service: Path) -> None:
-        link_project_environment(service)
-        run(commands_to_run, service)
 
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(commands, "run", run_linked)
         monkeypatch.setattr(openapi, "run", run_linked)
+        for variable, value in DEVELOPER_ENVIRONMENT.items():
+            monkeypatch.setenv(variable, value)
 
         def scaffold_probe(name: str) -> Path:
             if name not in built:
@@ -236,6 +240,17 @@ def test_a_spec_starts_from_its_first_json_operation(
     assert VendorSpec.load("spec.json", tmp_path).operation == expected
 
 
+def test_a_spec_with_extension_keys_starts_from_its_first_json_operation(
+    tmp_path: Path,
+) -> None:
+    forecast = cast(dict[str, dict[str, object]], WEATHER_PATHS["/forecasts/{city}"])["get"]
+    responses = {**cast(dict[str, object], forecast["responses"]), "x-note": "n"}
+    paths = {"x-internal": True, "/forecasts/{city}": {"get": {**forecast, "responses": responses}}}
+    (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
+
+    assert VendorSpec.load("spec.json", tmp_path).operation == "getForecast"
+
+
 def test_a_spec_without_a_json_operation_is_rejected(tmp_path: Path) -> None:
     paths = {"/health": WEATHER_PATHS["/health"]}
     (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
@@ -287,6 +302,25 @@ def test_a_description_of_only_whitespace_is_rejected() -> None:
         Options(name="probe-text-mcp", description=" \n ", persistence=frozenset())
 
 
+@pytest.mark.parametrize("description", ["Two\nlines.", "A\ttab.", "A\x7fdelete."])
+def test_a_description_with_a_control_character_is_rejected(description: str) -> None:
+    with pytest.raises(ValidationError, match="must be one line"):
+        Options(name="probe-text-mcp", description=description, persistence=frozenset())
+
+
+def test_a_name_whose_chart_names_fit_kubernetes_is_accepted() -> None:
+    name = f"{'a' * 29}-mcp"
+
+    options = Options(name=name, description="Probes.", persistence=frozenset())
+
+    assert len(f"{options.name}-kubernetes-application-alerts") == 63
+
+
+def test_a_name_too_long_for_its_chart_names_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="at most 33 characters"):
+        Options(name=f"{'a' * 30}-mcp", description="Probes.", persistence=frozenset())
+
+
 def test_the_scaffolds_registered_their_release_and_scope(
     repo: Path, scaffolded: Scaffolded
 ) -> None:
@@ -308,9 +342,7 @@ def test_the_scaffolds_registered_their_release_and_scope(
 
 
 def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
-    for registry in REGISTRIES:
-        (tmp_path / registry).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(REPO / registry, tmp_path / registry)
+    copy_registries(tmp_path)
     options = Options(
         name="probe-again-mcp",
         description="Registered twice.",

@@ -16,8 +16,9 @@ LOCAL_HOST = "127.0.0.1:8000"
 POD_IP_HOST = "10.1.2.3:8000"
 DEPLOYED = ServerSettings(
     host="0.0.0.0",
+    port=8000,
     mcp_base_url=AnyHttpUrl("https://mcp.example.com"),
-    _env_file=None,  # pyright: ignore[reportCallIssue]
+    mcp_allowed_origins=[],
 )
 
 
