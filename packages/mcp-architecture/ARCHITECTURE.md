@@ -65,7 +65,7 @@ breaks the `layers` contract.
 | A layer is imported through its top level, `from <package>.upstream import X`, never `from <package>.upstream.client import X`. Inside a layer, deep imports are fine. | import-linter `protected` contracts |
 | Outside `contexts/`, code imports the domain from `<package>.contexts` only: `from <package>.contexts import get_asset`, never `from <package>.contexts.assets import get_asset`. | import-linter `protected` contract on `contexts` |
 | Inside `contexts/`, a feature imports another through that feature's top level: `from <package>.contexts.quotes import get_quotes`. Inside a feature, deep imports are fine. | import-linter `feature_privacy` contract, the one contract type of our own |
-| Features do not import each other in a cycle (`a → b → c → a`). | import-linter `acyclic_siblings` contract |
+| No package imports its siblings in a cycle (`a → b → c → a`), at any depth: features in `contexts/`, folders in `mcp/`, modules inside a feature. | import-linter `acyclic_siblings` contract |
 | `contexts/` and `persistence/` import nothing from `fastmcp` or `mcp` themselves. | import-linter `forbidden` contract |
 | Every folder with Python code has an `__init__.py`, since import-linter does not see the others. | ruff `INP001` |
 | A context function takes keyword arguments only: `def f(*, a, b)`. | ruff `PLR0917`, which `[tool.ruff.lint.per-file-ignores]` turns off outside `contexts/` |
