@@ -1,0 +1,3103 @@
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
+# Vendored from api-evangelist/tiingo (unofficial) and patched by hand to match real
+# responses; the patches are listed in the README.
+components:
+  responses:
+    TooManyRequests:
+      description: Usage limit exceeded. Tiingo limits by hourly requests (reset every
+        hour), daily requests (reset at midnight EST), and monthly bandwidth (reset
+        the first of every month at midnight EST); there is no per-minute or per-second
+        rate limit.
+    Unauthorized:
+      description: Missing or invalid API token.
+  schemas:
+    BoatsPriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        volume:
+          description: The number of shares traded on BOATS only. This value will
+            only be exposed if explicitly passed to the "columns" request parameter.
+            E.g. ?columns=open,high,low,close, volume
+          type: integer
+      type: object
+    BoatsTopOfBook:
+      properties:
+        askPrice:
+          description: The current ask price on BOATS.
+          type: number
+        askSize:
+          description: The amount of shares at the ask price on BOATS.
+          type: number
+        bidPrice:
+          description: The current bid price on BOATS.
+          type: number
+        bidSize:
+          description: The amount of shares at the bid price on BOATS.
+          type: number
+        high:
+          description: The high price of the asset on the current day. This value
+            is calculated by Tiingo and not provided by BOATS.
+          type: number
+        last:
+          description: Last is the last trade that was executed on BOATS.
+          type: number
+        lastSaleTimestamp:
+          description: The timestamp of the last trade (last/lastSize) update from
+            BOATS.
+          format: date-time
+          type: string
+        lastSize:
+          description: The amount of shares traded (volume) at the last price on BOATS.
+          type: integer
+        low:
+          description: The low price of the asset on the current day. This value is
+            calculated by Tiingo and not provided by BOATS.
+          type: number
+        mid:
+          description: 'The mid price of the current timestamp when both "bidPrice"
+            and "askPrice" are not-null. In mathematical terms: mid = (bidPrice +
+            askPrice)/2.0 This value is calculated by Tiingo and not provided by BOATS.'
+          type: number
+        open:
+          description: The opening price of the asset on the current day. This value
+            is calculated by Tiingo and not provided by BOATS.
+          type: number
+        prevClose:
+          description: Previous day's closing price of the security. This can be from
+            any of the exchanges, NYSE, NASDAQ, IEX, etc.
+          type: number
+        quoteTimestamp:
+          description: The timestamp of the last quote (bid/ask) update from BOATS.
+          format: date-time
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+        timestamp:
+          description: The timestamp the data was last refreshed on.
+          format: date-time
+          type: string
+        tngoLast:
+          description: Tiingo Last is either the last price or mid price. The mid
+            price is only used if our algo determines it is a good proxy for the last
+            price. So if the spread is considered wide by our algo, we do not use
+            it. Also, after the official exchange print comes in, this value changes
+            to that value. This value is calculated by Tiingo and not provided by
+            BOATS .
+          type: number
+        volume:
+          description: Live BOATS session volume for the ticker. Volume is never delayed
+            on the BOATS REST endpoint.
+          type: integer
+      type: object
+    CryptoMeta:
+      properties:
+        baseCurrency:
+          description: The base pair of the cryptocurrency, e.g. "btc" for "btcusd".
+          type: string
+        description:
+          description: Long-form descripton of the asset.
+          type: string
+        name:
+          description: Full-length name of the asset.
+          type: string
+        quoteCurrency:
+          description: The quote pair of the cryptocurrency, e.g. "usd" for "btcusd".
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    CryptoPriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The datetime this data pertains to. It will be a timestamp
+            dependent upon the resampleFreq parameter. For example, if resampleFreq=5min,
+            it will be in 5 min increments.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        tradesDone:
+          description: The number of trades done on the given date.
+          type: integer
+        volume:
+          description: The volume done for the asset on the specific date in the base
+            currency.
+          type: number
+        volumeNotional:
+          description: 'The last size done for the asset on the specific date in the
+            quote currency. The volume done for the asset on the specific date in
+            the quote currency. In mathematical terms: volumeNotional = close * volume'
+          type: number
+      type: object
+    CryptoPrices:
+      properties:
+        baseCurrency:
+          description: The base pair of the cryptocurrency, e.g. "btc" for "btcusd".
+          type: string
+        exchangeData:
+          description: The underlying data for each exchange. This will only be returned
+            if the includeRawExchangeData flag is set to "true".
+          type: object
+        priceData:
+          description: Stores the top-of-book data being returned. See the table below
+            for the fields in this object.
+          items:
+            $ref: '#/components/schemas/CryptoPriceBar'
+          type: array
+        quoteCurrency:
+          description: The quote pair of the cryptocurrency, e.g. "usd" for "btcusd".
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    CryptoTopOfBook:
+      properties:
+        baseCurrency:
+          description: The base pair of the cryptocurrency, e.g. "btc" for "btcusd".
+          type: string
+        exchangeData:
+          description: The underlying data for each exchange. This will only be returned
+            if the includeRawExchangeData flag is set to "true".
+          type: object
+        quoteCurrency:
+          description: The quote pair of the cryptocurrency, e.g. "usd" for "btcusd".
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+        topOfBookData:
+          description: Stores the top-of-book data being returned. See the table below
+            for the fields in this object.
+          items:
+            $ref: '#/components/schemas/CryptoTopOfBookData'
+          type: array
+      type: object
+    CryptoTopOfBookData:
+      properties:
+        askExchange:
+          description: The full name of the exchange the "askPrice" and "askSize"
+            are located on.
+          type: string
+        askPrice:
+          description: The current ask price.
+          type: number
+        askSize:
+          description: The amount of shares at the ask price.
+          type: number
+        bidExchange:
+          description: The full name of the exchange the "bidPrice" and "bidSize"
+            are located on.
+          type: string
+        bidPrice:
+          description: The current bid price.
+          type: number
+        bidSize:
+          description: The amount of shares at the bid price.
+          type: number
+        lastExchange:
+          description: The full name of the exchange the "lastPrice" and "lastSize"
+            were executed on.
+          type: string
+        lastPrice:
+          description: Last price is the last price that was executed on any crypto
+            exchange.
+          type: number
+        lastSaleTimestamp:
+          description: The timestamp the last time the trade (last/lastSize) data
+            was received from any crypto exchange.
+          format: date-time
+          type: string
+        lastSize:
+          description: The amount of crypto volume done at the last price in the base
+            currency.
+          type: number
+        lastSizeNotional:
+          description: 'The last size done for the asset on the specific date in the
+            quote currency. The notional of the volume traded. In mathematical terms:
+            lastSizeNotional = lastPrice * lastSize'
+          type: number
+        quoteTimestamp:
+          description: The timestamp the last time the quote (bid/ask) data was received
+            from any crypto exchange.
+          format: date-time
+          type: string
+      type: object
+    DailyMeta:
+      properties:
+        description:
+          description: Long-form descripton of the asset.
+          type: string
+        endDate:
+          description: The latest date we have price data available for the asset.
+            When null it means no price data available for the given asset.
+          format: date
+          type: string
+          nullable: true
+        exchangeCode:
+          description: An identifier that maps which Exchange this asset is listed
+            on.
+          type: string
+        name:
+          description: Full-length name of the asset.
+          type: string
+        startDate:
+          description: The earliest date we have price data available for the asset.
+            When null it means no price data available for the given asset.
+          format: date
+          type: string
+          nullable: true
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    DailyPriceBar:
+      properties:
+        adjClose:
+          description: The adjusted closing price for the asset on the given date.
+          type: number
+        adjHigh:
+          description: The adjusted high price for the asset on the given date.
+          type: number
+        adjLow:
+          description: The adjusted low price for the asset on the given date.
+          type: number
+        adjOpen:
+          description: The adjusted opening price for the asset on the given date.
+          type: number
+        adjVolume:
+          description: The number of shares traded for the asset.
+          type: integer
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date
+          type: string
+        divCash:
+          description: The dividend paid out on "date" (note that "date" will be the
+            "exDate" for the dividend).
+          type: number
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        splitFactor:
+          description: The factor used to adjust prices when a company splits, reverse
+            splits, or pays a distribution.
+          type: number
+        volume:
+          description: The number of shares traded for the asset.
+          type: integer
+      type: object
+    Distribution:
+      properties:
+        declarationDate:
+          description: The declaration date of the distribution.
+          format: date-time
+          type: string
+        distribution:
+          description: The total distribution for the given date.
+          type: number
+        distributionFreqency:
+          description: 'The frequency that''s associated with this distribution. For
+            example "q" means quarterly, meaning this is a declared quarterly distribution.
+            The full list of codes is available here: w : Weekly bm : Bimonthly m
+            : Monthly tm : Trimesterly q : Quarterly sa : Semiannually a : Annually
+            ir : Irregular f : Final u : Unspecified c : Cancelled'
+          type: string
+        exDate:
+          description: The ex-Date of the distribution. In the Tiingo EOD Endpoints,
+            this is the date where "divCash" will be non-zero. This is also the date
+            used for dividend price adjustments.
+          format: date-time
+          type: string
+        paymentDate:
+          description: The payment date of the distribution.
+          format: date-time
+          type: string
+        permaTicker:
+          description: The Tiingo permaticker.
+          type: string
+        recordDate:
+          description: The record date of the distribution.
+          format: date-time
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    DistributionYield:
+      properties:
+        date:
+          description: Date associated with the yield.
+          format: date-time
+          type: string
+        trailingDiv1Y:
+          description: The trailing distribution yield for the asset based on the
+            previous 1 year of distributions.
+          type: string
+      type: object
+    EquityRealtimePriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        volume:
+          description: The consolidated number of shares traded for the interval.
+            This value will only be exposed if explicitly passed to the "columns"
+            request parameter. E.g. ?columns=open,high,low,close, volume
+          type: integer
+      type: object
+    EquityRealtimeTopOfBook:
+      properties:
+        high:
+          description: The high price of the asset on the current day This value is
+            calculated by Tiingo from the consolidated equity feed.
+          type: number
+        low:
+          description: The low price of the asset on the current day This value is
+            calculated by Tiingo from the consolidated equity feed.
+          type: number
+        lqAskPrice:
+          description: The ask price component of the liquidity risk metric. Corresponds
+            to lqAskPrice in the thresholdLevel 4 websocket liquidity risk metric.
+          type: number
+        lqAskSize:
+          description: The ask size component of the liquidity risk metric in shares.
+            Corresponds to lqAskSize in the thresholdLevel 4 websocket liquidity risk
+            metric.
+          type: integer
+        lqBidPrice:
+          description: The bid price component of the liquidity risk metric. Corresponds
+            to lqBidPrice in the thresholdLevel 4 websocket liquidity risk metric.
+          type: number
+        lqBidSize:
+          description: The bid size component of the liquidity risk metric in shares.
+            Corresponds to lqBidSize in the thresholdLevel 4 websocket liquidity risk
+            metric.
+          type: integer
+        lqRefPrice:
+          description: The same as tngoLast - mirrored for convenience/consistency
+            as it's better-named for its role in the lq spread metrics.
+          type: number
+        lqSpread:
+          description: The relative lqBid/Ask spread component of the liquidity risk
+            metric, expressed as a decimal (e.g. 0.04 means 4%). Corresponds to lqSpread
+            in the thresholdLevel 4 websocket liquidity risk metric.
+          type: number
+        open:
+          description: The opening price of the asset on the current day This value
+            is calculated by Tiingo from the consolidated equity feed.
+          type: number
+        prevClose:
+          description: Previous day's closing price of the security. This can come
+            from the supported consolidated equity market data sources.
+          type: number
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+        timestamp:
+          description: The timestamp the data was last refresh on.
+          format: date-time
+          type: string
+        tngoLast:
+          description: Tiingo Last is either the last price or mid price. The mid
+            price is only used if our algo determines it is a good proxy for the last
+            price. So if the spread is considered wide by our algo, we do not use
+            it. Also, after the official exchange print comes in, this value changes
+            to that value. This value is calculated by Tiingo from the consolidated
+            equity feed .
+          type: number
+        volume:
+          description: Volume will be consolidated intraday volume throughout the
+            day. Once the official closing price comes in, volume may reflect the
+            full official trading day. This field is available for convenience.
+          type: integer
+      type: object
+    ForexPriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    ForexTopOfBook:
+      properties:
+        askPrice:
+          description: The current ask price.
+          type: number
+        askSize:
+          description: The amount of units at the ask price.
+          type: number
+        bidPrice:
+          description: The current bid price.
+          type: number
+        bidSize:
+          description: The amount of units at the bid price.
+          type: number
+        midPrice:
+          description: 'The mid price of the current timestamp when both "bidPrice"
+            and "askPrice" are not-null. In mathematical terms: midPrice = (bidPrice
+            + askPrice)/2.0'
+          type: number
+        quoteTimestamp:
+          description: The timestamp the data was last refresh on.
+          format: date-time
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    FundFeeMetrics:
+      properties:
+        12b1:
+          description: Fund's fee related to marketing expenses.
+          type: number
+        accountFeePercent:
+          description: Fund's account fees if charged as a percentage, or the fee
+            required to maintain your account in percentage terms.
+          type: number
+        accountFeeUSD:
+          description: Fund's account fees if charged in USD, or the fee required
+            to maintain your account in USD.
+          type: number
+        acquiredFundFees:
+          description: Fund's acquired fund fees, or expenses related to underlying
+            businesses or funds.
+          type: number
+        backLoad:
+          description: Fund's back load fee, or the back-end fee charged when redeeming
+            from the fund.
+          type: number
+        customFees:
+          description: Fund's custom fees. For a full breakdown, see the table below.
+          items: &id001
+            type: object
+          type: array
+        dividendLoad:
+          description: Dividend load fee, or charges on reinvested dividends.
+          type: number
+        exchangeFeePercent:
+          description: Fund's exchange fee if charged as a percentage, or expenses
+            related to exchanging or transferring funds to another fund in the fund's
+            family.
+          type: number
+        exchangeFeeUSD:
+          description: Fund's exchange fee if charged in USD, or expenses related
+            to exchanging or transferring funds to another fund in the fund's family.
+          type: number
+        feeWaiver:
+          description: Fund's fee waiver, or discount on fees.
+          type: number
+        frontLoad:
+          description: Fund's front load fee, or the upfront fee charged when investing
+            in the fund.
+          type: number
+        grossExpense:
+          description: Fund's gross expense ratio, or the expenses related to running
+            the fund.
+          type: number
+        managementFee:
+          description: Fund's management fee, or the fees paid to the manager and/or
+            advisors.
+          type: number
+        miscFees:
+          description: Fund's miscellaneous fees.
+          type: number
+        netExpense:
+          description: Fund's net expense ratio, or the net expenses related to the
+            fund.
+          type: number
+        non12b1:
+          description: Fund's fee related to distribution and smilar non 12b-1 fees.
+          type: number
+        otherExpenses:
+          description: Fund's other expenses, or expenses related to legal, adminstrative,
+            custodial, etc.
+          type: number
+        portfolioTurnover:
+          description: Portfolio turnover.
+          type: number
+        prospectusDate:
+          description: The prospectus date when the corresponding fund expense data
+            was published.
+          format: date
+          type: string
+        redemptionFeePercent:
+          description: Fund's redemption fees as a percentage, or the fee charged
+            if funds are redeemed early (as defined by the fund company).
+          type: number
+        redemptionFeeUSD:
+          description: Fund's redemption fees if charged in USD, or the fee charged
+            if funds are redeemed early (as defined by the fund company).
+          type: number
+        shareholderFee:
+          description: Fund's shareholder fees, or the potential fees when buying/selling
+            a fund.
+          type: number
+      type: object
+    FundFees:
+      properties:
+        description:
+          description: Long-form descripton of the fund.
+          type: string
+        name:
+          description: Full-length name of the fund.
+          type: string
+        netExpense:
+          description: The top-level net expense ratio for the fund.
+          type: number
+        otherShareClasses:
+          description: An array of objects representing related share classes of the
+            given fund. See below for the object defintion table.
+          items: *id001
+          type: array
+        shareClass:
+          description: Share class of the fund as described by the parent fund company.
+          type: string
+        ticker:
+          description: Ticker related to the fund.
+          type: string
+      type: object
+    FundamentalsDaily:
+      properties:
+        date:
+          description: The date the daily data corresponds to.
+          format: date-time
+          type: string
+        enterpriseVal:
+          description: The value of the field corresponding to the enterprise value.
+          type: number
+        marketCap:
+          description: The value of the field corresponding to the market capitalization.
+          type: number
+        pbRatio:
+          description: The value of the field corresponding to the price/book ratio.
+          type: number
+        peRatio:
+          description: The value of the field corresponding to the price/earnings
+            ratio.
+          type: number
+        trailingPEG1Y:
+          description: The value of the field corresponding to the trailing 1 year
+            PEG Ratio.
+          type: number
+      type: object
+    FundamentalsDefinition:
+      properties:
+        dataCode:
+          description: An identifier representing the fundamentals field the value
+            belongs to. For example, "peRatio."
+          type: string
+        description:
+          description: A description of the field.
+          type: string
+        name:
+          description: A human-friendly readable name of the field.
+          type: string
+        statementType:
+          description: One of four values ("balanceSheet", "incomeStatement", "cashFlow",
+            "overview"), representing which statement this value belongs to. For example,
+            "netIncome" would belong to "incomeStatement".
+          type: string
+        units:
+          description: The unit the field value is in. Value is either "$", "%" or
+            blank. If blank, value may either be an integer (like shares outstanding),
+            or a ratio.
+          type: string
+      type: object
+    FundamentalsMeta:
+      properties:
+        companyWebsite:
+          description: The website of the company when available.
+          type: string
+        dailyLastUpdated:
+          description: The timestamp the daily data/endpoint was last updated for
+            the ticker.
+          format: date-time
+          type: string
+          nullable: true
+        industry:
+          description: Sector information that is derived from sicIndustry and is
+            meant to approximate GICS.
+          type: string
+        isADR:
+          description: Boolean describing whether or not the ticker is an ADR. Value
+            is true if listed ticker is an ADR.
+          type: boolean
+        isActive:
+          description: Boolean describing whether or not the ticker is still actively
+            traded. If false, this ticker is delisted.
+          type: boolean
+        location:
+          description: Location/domicile of the company. States are included for U.S.
+            companies, otherwise countries for non-US companies.
+          type: string
+        name:
+          description: Full-length name of the asset.
+          type: string
+        permaTicker:
+          description: Permanent Tiingo Ticker mapping to the security. Can be used
+            as a primary key.
+          type: string
+        reportingCurrency:
+          description: The currency the company reports their SEC statement filings
+            in.
+          type: string
+        secFilingWebsite:
+          description: A URL to where you can find the company's SEC filings directly
+            on the SEC website.
+          type: string
+        sector:
+          description: Sector information that is derived from sicSector and is meant
+            to approximate GICS.
+          type: string
+        sicCode:
+          description: SIC Code that represents company's business activities.
+          type: integer
+        sicIndustry:
+          description: Industry as determined by the SIC Code.
+          type: string
+        sicSector:
+          description: Sector as determined by the SIC Code.
+          type: string
+        statementLastUpdated:
+          description: The timestamp the statement data/endpoint was last updated
+            for the ticker.
+          format: date-time
+          type: string
+          nullable: true
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    FundamentalsStatement:
+      properties:
+        date:
+          description: The date the statement data was released to the public.
+          format: date-time
+          type: string
+        quarter:
+          description: An integer corresponding to the fiscal quarter reported. A
+            value of "0" means this is an Annual Report. A value of "1" through "4"
+            corresponds to the respective fiscal quarter.
+          type: integer
+        statementData:
+          allOf:
+          - $ref: '#/components/schemas/FundamentalsStatementData'
+          description: 'Statement data that is broken out by four different fields
+            in a JSON object. Each fields corresponds to a statement. The four fields
+            are: balanceSheet : Balance sheet data incomeStatement : Income Statement
+            Data cashFlow : Cash flow statement data overview : Metrics and ratios
+            that may be a combination of the fields from various statements Each field
+            will return an array of "dataCode" and "value" pairs that are described
+            in the "Statement Data Table" below.'
+        year:
+          description: An integer corresponding to the fiscal year reported.
+          type: integer
+      type: object
+    DataCodeValue:
+      properties:
+        dataCode:
+          description: An identifier representing the fundamentals field the value
+            belongs to. For example, "peRatio."
+          type: string
+        value:
+          description: The value of the field corresponding to the dataCode
+          nullable: true
+          type: number
+      type: object
+    FundamentalsStatementData:
+      properties:
+        overview:
+          items:
+            $ref: '#/components/schemas/DataCodeValue'
+          type: array
+        incomeStatement:
+          items:
+            $ref: '#/components/schemas/DataCodeValue'
+          type: array
+        balanceSheet:
+          items:
+            $ref: '#/components/schemas/DataCodeValue'
+          type: array
+        cashFlow:
+          items:
+            $ref: '#/components/schemas/DataCodeValue'
+          type: array
+      type: object
+    IexPriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        volume:
+          description: The number of shares traded on IEX only. This value will only
+            be exposed if explicitly passed to the "columns" request parameter. E.g.
+            ?columns=open,high,low,close, volume
+          type: integer
+      type: object
+    IexTopOfBook:
+      properties:
+        askPrice:
+          description: The current ask price. IEX entitlement required
+          type: number
+          nullable: true
+        askSize:
+          description: The amount of shares at the ask price. IEX entitlement required
+          type: number
+          nullable: true
+        bidPrice:
+          description: The current bid price. IEX entitlement required
+          type: number
+          nullable: true
+        bidSize:
+          description: The amount of shares at the bid price. IEX entitlement required
+          type: number
+          nullable: true
+        high:
+          description: The high price of the asset on the current day This value is
+            calculated by Tiingo and not provided by IEX.
+          type: number
+          nullable: true
+        last:
+          description: Last is the last trade that was executed on IEX. IEX entitlement
+            required
+          type: number
+          nullable: true
+        lastSaleTimestamp:
+          description: The timestamp the last time the trade (last/lastSize) data
+            was received from IEX. IEX entitlement required
+          format: date-time
+          type: string
+          nullable: true
+        lastSize:
+          description: The amount of shares traded (volume) at the last price on IEX.
+            IEX entitlement required
+          type: integer
+          nullable: true
+        low:
+          description: The low price of the asset on the current day This value is
+            calculated by Tiingo and not provided by IEX.
+          type: number
+          nullable: true
+        mid:
+          description: 'The mid price of the current timestamp when both "bidPrice"
+            and "askPrice" are not-null. In mathematical terms: mid = (bidPrice +
+            askPrice)/2.0 This value is calculated by Tiingo and not provided by IEX.'
+          type: number
+          nullable: true
+        open:
+          description: The opening price of the asset on the current day This value
+            is calculated by Tiingo and not provided by IEX.
+          type: number
+          nullable: true
+        prevClose:
+          description: Previous day's closing price of the security.This can be from
+            any of the exchanges, NYSE, NASDAQ, IEX, etc.
+          type: number
+          nullable: true
+        quoteTimestamp:
+          description: The timestamp the last time the quote (bid/ask) data was received
+            from IEX. IEX entitlement required
+          format: date-time
+          type: string
+          nullable: true
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+        timestamp:
+          description: The timestamp the data was last refresh on.
+          format: date-time
+          type: string
+          nullable: true
+        tngoLast:
+          description: Tiingo Last is either the last price or mid price. The mid
+            price is only used if our algo determines it is a good proxy for the last
+            price. So if the spread is considered wide by our algo, we do not use
+            it. Also, after the official exchange print comes in, this value changes
+            to that value. This value is calculated by Tiingo and not provided by
+            IEX .
+          type: number
+          nullable: true
+        volume:
+          description: Volume will be IEX Volume throughout the day, but once the
+            official closing price comes in, volume will reflect the volume done on
+            the entire day across all exchanges. This field is available for convenience.
+          type: integer
+          nullable: true
+      type: object
+    NewsArticle:
+      properties:
+        crawlDate:
+          description: The datetime the news story was added to our database in UTC.
+            This is always recorded by Tiingo and the news source has no input on
+            this date. If you note a large gap between crawlDate and publishedDate,
+            it means the news article was backfilled, which usually happens when we
+            add a new data source or gain access to historical data archives.
+          format: date-time
+          type: string
+        description:
+          description: Long-form descripton of the news story.
+          type: string
+        id:
+          description: Unique identifier specific to the news article.
+          type: integer
+        publishedDate:
+          description: The datetime the news story was published in UTC. This is usually
+            reported by the news source and not by Tiingo. If the news source does
+            not declare a published date, Tiingo will use the time the news story
+            was discovered by our crawler farm.
+          format: date-time
+          type: string
+        source:
+          description: The domain the news source is from.
+          type: string
+        tags:
+          description: Tags that are mapped and discovered by Tiingo using Tiingo's
+            proprietary tagging algo.
+          items: &id002
+            type: string
+          type: array
+        tickers:
+          description: What tickers are mentioned in the news story using Tiingo's
+            proprietary tagging algo.
+          items: *id002
+          type: array
+        title:
+          description: Title of the news article.
+          type: string
+        url:
+          description: URL of the news article.
+          type: string
+      type: object
+    NewsBulkFile:
+      properties:
+        batchType:
+          description: 'Describes what kind of batch file this is. The value will
+            either be: "base" or "incremental". base is an entire dump of the data
+            and incremental is a partial dump of the data. This should be used in
+            conjunction with the startDate and endDate parameters to identify the
+            bounds of the data dump.'
+          type: string
+        fileSizeCompressed:
+          description: The size of the file in bytes compressed using gzip.
+          type: integer
+        fileSizeUncompressed:
+          description: The size of the file in bytes uncompressed.
+          type: integer
+        filename:
+          description: The filename of the batch file.
+          type: string
+        id:
+          description: Unique identifier specific to the bulk download file. Used
+            to select which file to download.
+          type: integer
+        startDate:
+          description: The end date that was used to select the News objects to generate
+            the batch file. This is not inclusive. publishedDate < endDate.
+          format: date
+          type: string
+        url:
+          description: 'A url you can use to directly download the batch file. NOTE
+            : This url contains your Auth Token and is meant to be a "copy/paste"
+            url for your convenience'
+          type: string
+      type: object
+    SearchResult:
+      properties:
+        assetType:
+          description: The asset type of the asset (Stock, ETF, & Mutual Fund).
+          type: string
+        isActive:
+          description: True if the ticker is still actively quoted, and false if the
+            ticker is no longer actively quoted (delisted).
+          type: boolean
+        name:
+          description: The name of the asset.
+          type: string
+        openFIGI:
+          description: Placeholder for an upcoming change to the Tiingo API that allows
+            querying by the openFIGI ticker.
+          type: string
+        permaTicker:
+          description: Placeholder for an upcoming change to the Tiingo API that allows
+            querying by permaticker.
+          type: string
+        ticker:
+          description: Ticker of the given asset.
+          type: string
+      type: object
+    SmallXEodBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        openInterest:
+          description: The open interest of the contract.
+          type: integer
+        settlementPrice:
+          description: The settlement price of the contract as determined by the Small
+            Exchange.
+          type: number
+        volume:
+          description: The number of shares traded on the Small Exchange.
+          type: integer
+      type: object
+    SmallXMeta:
+      properties:
+        baseCurrency:
+          description: The currency the contract is denominated in.
+          type: string
+        baseTicker:
+          description: The base ticker for the given contract. This is the base tickers
+            that the calendar and year identifier are appended to in order to create
+            the Small Exchange ticker. E.g. "SMO"
+          type: string
+        cfiCode:
+          description: The standardized CFI code for the given contract.
+          type: string
+        expirationDate:
+          description: The date the contract expires.
+          format: date
+          type: string
+        firstTradingDate:
+          description: The first date the contract was able to be traded.
+          format: date
+          type: string
+        lastTradingDate:
+          description: The last date the contract is tradeable.
+          format: date
+          type: string
+        maturityDate:
+          description: The date the contract reaches maturity.
+          format: date
+          type: string
+        name:
+          description: Full-length name of the asset.
+          type: string
+        permaTicker:
+          description: Permanent Tiingo Ticker mapping to the security. Can be used
+            as a primary key.
+          type: string
+        tickMulitplier:
+          description: The amount you need to multiple the contract price by to get
+            the notional (in baseCurrency) of the value of the contract. E.g. a price
+            of 35.0 with a baseCurrency of USD and multiplier of 100, means each contract
+            is worth $3500.00 (35 * 100).
+          type: number
+        tickSize:
+          description: The smallest amount the contract can increment or decrement
+            by.
+          type: number
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    SmallXPriceBar:
+      properties:
+        close:
+          description: The closing price for the asset on the given date.
+          type: number
+        date:
+          description: The date this data pertains to.
+          format: date-time
+          type: string
+        high:
+          description: The high price for the asset on the given date.
+          type: number
+        low:
+          description: The low price for the asset on the given date.
+          type: number
+        open:
+          description: The opening price for the asset on the given date.
+          type: number
+        volume:
+          description: The number of shares traded on the Small Exchange.
+          type: integer
+      type: object
+    SmallXTopOfBook:
+      properties:
+        askPrice:
+          description: The current ask price.
+          type: number
+        askSize:
+          description: The amount of shares at the ask price.
+          type: number
+        bidPrice:
+          description: The current bid price.
+          type: number
+        bidSize:
+          description: The amount of shares at the bid price.
+          type: number
+        high:
+          description: The high price of the asset on the current day as set by "tngoLast"
+            in the docs. This value is calculated by Tiingo and not provided by the
+            Small Exchange.
+          type: number
+        last:
+          description: Last is the last trade that was executed on Small Exchange.
+          type: number
+        lastSaleTimestamp:
+          description: The timestamp the last time the trade (last/lastSize) data
+            was received from Small Exchange.
+          format: date-time
+          type: string
+        lastSize:
+          description: The amount of shares traded (volume) at the last price on Small
+            Exchange.
+          type: integer
+        low:
+          description: The close price of the asset on the current day as set by "tngoLast"
+            in the docs. This value is calculated by Tiingo and not provided by the
+            Small Exchange.
+          type: number
+        mid:
+          description: 'The mid price of the current timestamp when both "bidPrice"
+            and "askPrice" are not-null. In mathematical terms: mid = (bidPrice +
+            askPrice)/2.0 This value is calculated by Tiingo and not provided by the
+            Small Exchange.'
+          type: number
+        open:
+          description: The opening price of the asset on the current day as set by
+            "tngoLast" in the docs. This value is calculated by Tiingo and not provided
+            by the Small Exchange.
+          type: number
+        openInterest:
+          description: The current Open Interest for the given instrument.
+          type: integer
+        prevClose:
+          description: Previous day's closing price of the security.
+          type: number
+        quoteTimestamp:
+          description: The timestamp the last time the quote (bid/ask) data was received
+            from the Small Exchange.
+          format: date-time
+          type: string
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+        timestamp:
+          description: The timestamp the data was last refresh on.
+          format: date-time
+          type: string
+        tngoLast:
+          description: Tiingo Last is either the last price or mid price. The mid
+            price is only used if our algo determines it is a good proxy for the last
+            price. So if the spread is considered wide by our algo, we do not use
+            it. Also, after the official exchange print comes in, this value changes
+            to that value. This value is calculated by Tiingo and not provided by
+            the Small Exchange .
+          type: number
+        volume:
+          description: Total volume traded on the Small Exchange for the given instrument.
+          type: integer
+      type: object
+    Split:
+      properties:
+        exDate:
+          description: The ex-Date of the split. In the Tiingo EOD Endpoints, this
+            is the date where "splitFactor" will not be 1.0. This is also the date
+            used for split adjustments.
+          format: date-time
+          type: string
+        permaTicker:
+          description: The Tiingo permaticker.
+          type: string
+        splitFactor:
+          description: 'The ratio of splitTo from splitFrom . In other words: splitFactor
+            = splitTo/splitFrom This ratio is helpful in calculating split price adjustments.'
+          type: number
+        splitFrom:
+          description: The prior split ratio.
+          type: number
+        splitStatus:
+          description: 'A code representing the status of split a : Active c : Cancelled'
+          type: string
+        splitTo:
+          description: The new split ratio, i.e. how many shares of "splitTo" are
+            given for each share of "splitFrom".
+          type: number
+        ticker:
+          description: Ticker related to the asset.
+          type: string
+      type: object
+    YieldMetrics:
+      properties:
+        changesDetected:
+          description: The number of changes detected for any of the above variables
+            on blockchain during the resample window.
+          type: integer
+        closeAvailableLiquidityAmount:
+          description: The close total supply amount on the given date (amount that
+            can be borrowed).
+          type: number
+        closeStableBorrowRate:
+          description: The close stable borrow rate on the given date.
+          type: number
+        closeSupplyRate:
+          description: The close supply rate on the given date.
+          type: number
+        closeTotalBorrowAmount:
+          description: The close total borrow amount on the given date (total = stable
+            amount + variable amount).
+          type: number
+        closeTotalStableBorrowAmount:
+          description: The close supply rate on the given date.
+          type: number
+        closeTotalSupplyAmount:
+          description: The close total supply amount on the given date.
+          type: number
+        closeTotalVariableBorrowAmount:
+          description: The close variable borrow amount on the given date.
+          type: number
+        closeVariableBorrowRate:
+          description: The close variable borrow rate on the given date.
+          type: number
+        date:
+          description: The datetime this data pertains to. It will be a timestamp
+            dependent upon the resampleFreq parameter. For example, if resampleFreq=5min,
+            it will be in 5 min increments.
+          format: date-time
+          type: string
+        highAvailableLiquidityAmount:
+          description: The high total supply amount on the given date (amount that
+            can be borrowed).
+          type: number
+        highStableBorrowRate:
+          description: The high stable borrow rate on the given date.
+          type: number
+        highSupplyRate:
+          description: The high supply rate on the given date.
+          type: number
+        highTotalBorrowAmount:
+          description: The high total borrow amount on the given date (total = stable
+            amount + variable amount).
+          type: number
+        highTotalStableBorrowAmount:
+          description: The high supply rate on the given date.
+          type: number
+        highTotalSupplyAmount:
+          description: The high total supply amount on the given date.
+          type: number
+        highTotalVariableBorrowAmount:
+          description: The high variable borrow amount on the given date.
+          type: number
+        highVariableBorrowRate:
+          description: The high variable borrow rate on the given date.
+          type: number
+        lowAvailableLiquidityAmount:
+          description: The low total supply amount on the given date (amount that
+            can be borrowed).
+          type: number
+        lowStableBorrowRate:
+          description: The low stable borrow rate on the given date.
+          type: number
+        lowSupplyRate:
+          description: The low supply rate on the given date.
+          type: number
+        lowTotalBorrowAmount:
+          description: The low total borrow amount on the given date (total = stable
+            amount + variable amount).
+          type: number
+        lowTotalStableBorrowAmount:
+          description: The low supply rate on the given date.
+          type: number
+        lowTotalSupplyAmount:
+          description: The low total supply amount on the given date.
+          type: number
+        lowTotalVariableBorrowAmount:
+          description: The low variable borrow amount on the given date.
+          type: number
+        lowVariableBorrowRate:
+          description: The low variable borrow rate on the given date.
+          type: number
+        openAvailableLiquidityAmount:
+          description: The open total available liquidity amount on the given date
+            (amount that can be borrowed).
+          type: number
+        openStableBorrowRate:
+          description: The open stable borrow rate on the given date.
+          type: number
+        openSupplyRate:
+          description: The open supply rate on the given date.
+          type: number
+        openTotalBorrowAmount:
+          description: The open total borrow amount on the given date (total = stable
+            amount + variable amount).
+          type: number
+        openTotalStableBorrowAmount:
+          description: The open supply rate on the given date.
+          type: number
+        openTotalSupplyAmount:
+          description: The open total supply amount on the given date.
+          type: number
+        openTotalVariableBorrowAmount:
+          description: The open variable borrow amount on the given date.
+          type: number
+        openVariableBorrowRate:
+          description: The open variable borrow rate on the given date.
+          type: number
+      type: object
+    YieldPlatform:
+      properties:
+        name:
+          description: Formatted name of the Yield Platform.
+          type: string
+        network:
+          description: The network this platform belongs to. E.g. ETH for mainnet,
+            AVAX for Avalanche, SOL, for Solana.".
+          type: string
+        platformCode:
+          description: A unique identifier for the Yield Platform that can be used
+            throughout the API to map Yield Pools to the given Platform. Similar to
+            exchangeCode in the equity endpoints.
+          type: string
+      type: object
+    YieldPool:
+      properties:
+        borrowRateDenomination:
+          description: The cryptocurrency, or token, the borrow rate is denominated
+            in.
+          type: string
+        name:
+          description: Name of the yield pool.
+          type: string
+        poolCode:
+          description: A unique identifier mapped to this pool that can be used to
+            query metric and tick data throughout the API.
+          type: string
+        supplyRateDenomination:
+          description: The cryptocurrency, or token, the supply rate is denominated
+            in.
+          type: string
+        totalBorrowDenomination:
+          description: The cryptocurrency, or token, the borrow amount is denominated
+            in.
+          type: string
+        totalSupplyDenomination:
+          description: The cryptocurrency, or token, the supply amount is denominated
+            in.
+          type: string
+        yieldPlatform:
+          description: The Yield Platform this pool belongs to. The value will be
+            the platformCode of the corresponding Yield Platform..
+          type: string
+      type: object
+    YieldTick:
+      properties:
+        availableLiquidityAmount:
+          description: The amount of liquidity available that can be borrowed.
+          type: number
+        date:
+          description: The datetime this data pertains to. It will be a timestamp
+            dependent upon the resampleFreq parameter. For example, if resampleFreq=5min,
+            it will be in 5 min increments.
+          format: date-time
+          type: string
+        poolCode:
+          description: A unique identifier mapped to this pool that can be used to
+            query metric and tick data throughout the API.
+          type: string
+        supplyRate:
+          description: The supply rate (multiply by 100 for percentage).
+          type: number
+        totalBorrowAmount:
+          description: The total amount borrowed (total = stable amount + variable
+            amount)
+          type: number
+        totalStableBorrowAmount:
+          description: The stable borrow rate (multiply by 100 for percentage).
+          type: number
+        totalSupplyAmount:
+          description: The close total supply amount on the given date.
+          type: number
+        totalVariableBorrowAmount:
+          description: The amount borrowed subject to the variable borrow rate.
+          type: number
+        variableBorrowRate:
+          description: The variable borrow rate (multiply by 100 for percentage).
+          type: number
+      type: object
+  securitySchemes:
+    apiTokenHeader:
+      description: 'Pass your API token in the Authorization header as: Authorization:
+        Token <your-token>.'
+      in: header
+      name: Authorization
+      type: apiKey
+    apiTokenQuery:
+      description: Pass your API token directly in the request URL via the token query
+        parameter.
+      in: query
+      name: token
+      type: apiKey
+externalDocs:
+  description: Tiingo API documentation
+  url: https://www.tiingo.com/documentation/general/overview
+info:
+  contact:
+    email: support@tiingo.com
+    name: Tiingo Support
+    url: https://www.tiingo.com/support
+  description: 'Tiingo''s REST API for financial market data: end-of-day equity prices,
+    IEX intraday, BOATS overnight equity data, consolidated equity realtime snapshots,
+    crypto, crypto yield, forex, fundamentals, mutual fund and ETF fees, corporate
+    actions, curated news, and asset search. Most endpoints return JSON by default
+    and support CSV via the format parameter. Generated by API Evangelist from Tiingo''s
+    published documentation (https://www.tiingo.com/documentation/) - Tiingo does
+    not publish an OpenAPI itself.'
+  termsOfService: https://www.tiingo.com/about/terms
+  title: Tiingo API
+  version: 1.0.0
+  x-apievangelist:
+    generated: '2026-07-22'
+    method: generated
+    source: https://apimedia.tiingo.com/dist/src_app_api_documentation_documentation_module_ts-es2015.f5eea3d64917e26bb724.js
+openapi: 3.0.3
+paths:
+  /api/test:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/general/connecting
+      operationId: testConnection
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  message:
+                    description: Confirmation message, e.g. 'You successfully sent
+                      a request'.
+                    type: string
+                type: object
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Test API connectivity and authentication
+      tags:
+      - Utilities
+  /boats:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/boats
+      operationId: getBoatsTopOfBook
+      parameters:
+      - description: Ticker related to the asset. Pass a comma-separated list for
+          multiple tickers (for example aapl,spy).
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/BoatsTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get BOATS overnight top-of-book and last-sale quotes (beta)
+      tags:
+      - BOATS
+  /boats/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/boats
+      operationId: getBoatsHistoricalPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format. When both dates are omitted, Tiingo returns
+          the latest overnight BOATS session window (8:00 PM-3:59 AM ET).
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format. Date-only endDate values are normalized to
+          the BOATS overnight session end (3:59 AM ET).
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'This allows you to set the frequency in which you want data
+          resampled. For example "1hour" would return the data where OHLC is calculated
+          on an hourly schedule. The minimum value is "1min". Both units in minutes
+          (min) and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min"
+          or "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      - description: Accepted for request compatibility with other equity intraday
+          endpoints, but it does not widen the BOATS historical window. BOATS history
+          is limited to the overnight session (8:00 PM-3:59 AM ET) regardless of this
+          flag.
+        in: query
+        name: afterHours
+        required: false
+        schema:
+          type: boolean
+      - description: Some tickers do not have a trade/quote update for a given time
+          period. if forceFill is set to true, then the previous OHLC will be used
+          to fill the current OHLC.
+        in: query
+        name: forceFill
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/BoatsPriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get BOATS overnight historical intraday prices for a ticker (beta)
+      tags:
+      - BOATS
+  /iex:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/iex
+      operationId: getIexTopOfBook
+      parameters:
+      - description: Ticker related to the asset.
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/IexTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get IEX top-of-book and last-sale quotes
+      tags:
+      - IEX
+  /iex/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/iex
+      operationId: getIexHistoricalPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'his allows you to set the frequency in which you want data resampled.
+          For example "1hour" would return the data where OHLC is calculated on an
+          hourly schedule. The minimum value is "1min". Both units in minutes (min)
+          and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min" or
+          "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      - description: If set to true, includes pre and post market data if available.
+        in: query
+        name: afterHours
+        required: false
+        schema:
+          type: boolean
+      - description: Some tickers do not have a trade/quote update for a given time
+          period. if forceFill is set to true, then the previous OHLC will be used
+          to fill the current OHLC.
+        in: query
+        name: forceFill
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/IexPriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get IEX historical intraday prices for a ticker
+      tags:
+      - IEX
+  /smallx/meta:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/small-exchange
+      operationId: getSmallXMeta
+      parameters:
+      - description: Specific tickers to return meta data for. If no string passed,
+          will return meta data for all available tickers. Can either be a single
+          ticker, a comma-separated list of tickers, or an array of strings (string[]).
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SmallXMeta'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get Small Exchange contract metadata
+      tags:
+      - Small Exchange
+  /smallx/tops:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/small-exchange
+      operationId: getSmallXTopOfBook
+      parameters:
+      - description: Ticker related to the asset.
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SmallXTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get Small Exchange top-of-book quotes
+      tags:
+      - Small Exchange
+  /smallx/{ticker}/eod:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/small-exchange
+      operationId: getSmallXEodPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'Allows resampled values that allow you to choose the values
+          returned as daily, weekly, monthly, or annually values. Note: ONLY DAILY
+          takes into account holidays. All others use standard business days Acceptable
+          values: daily : Values returned as daily periods, with a holiday calendar.
+          weekly : Values returned as weekly data, with days ending on Friday. monthly
+          : Values returned as monthly data, with days ending on the last standard
+          business day (Mon-Fri) of each month. annually : Values returned as annual
+          data, with days ending on the last standard business day (Mon-Fri) of each
+          year. Note, that if you choose a value in-between the resample period for
+          weekly, monthly, and daily, the start date rolls back to consider the entire
+          period. For example, if you choose to resample weekly, but your "startDate"
+          parameter is set to Wednesday of that week, the startDate will be adjusted
+          to Monday, so the entire week is captured. Another example is if you send
+          a startDate mid-month, we roll back the startDate to the beginning of the
+          month. Similarly, if you provide an endDate, and it''s midway through the
+          period, we roll-forward the date to capture the whole period. In the above
+          example, if the end date is set to a wednesday with a weekly resample, the
+          end date is rolled forward to the Friday of that week.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SmallXEodBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get Small Exchange end-of-day price history
+      tags:
+      - Small Exchange
+  /smallx/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/small-exchange
+      operationId: getSmallXIntradayPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'his allows you to set the frequency in which you want data resampled.
+          For example "1hour" would return the data where OHLC is calculated on an
+          hourly schedule. The minimum value is "1min". Both units in minutes (min)
+          and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min" or
+          "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SmallXPriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get Small Exchange intraday price history
+      tags:
+      - Small Exchange
+  /tiingo/corporate-actions/distributions:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/corporate-actions/dividends
+      operationId: getBulkDistributions
+      parameters:
+      - description: This filter limits distributions that have an ex-date on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: exDate
+        required: false
+        schema:
+          format: date
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Distribution'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get dividend distributions across all tickers for an ex-date
+      tags:
+      - Corporate Actions
+  /tiingo/corporate-actions/splits:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/corporate-actions/splits
+      operationId: getBulkSplits
+      parameters:
+      - description: This filter limits distributions that have an ex-date on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: exDate
+        required: false
+        schema:
+          format: date
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Split'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get split corporate actions across all tickers for an ex-date
+      tags:
+      - Corporate Actions
+  /tiingo/corporate-actions/{ticker}/distribution-yield:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/corporate-actions/dividends
+      operationId: getDistributionYield
+      parameters:
+      - description: Ticker related to the asset you would like yield data for.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DistributionYield'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get trailing distribution yield for a ticker
+      tags:
+      - Corporate Actions
+  /tiingo/corporate-actions/{ticker}/distributions:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/corporate-actions/dividends
+      operationId: getTickerDistributions
+      parameters:
+      - description: Ticker related to the asset you would like distribution data
+          for.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: This filter limits distributions that have an ex-date >= on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startExDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: This filter limits distributions that have an ex-date <= on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: endExDate
+        required: false
+        schema:
+          format: date
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Distribution'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get dividend distributions for a ticker
+      tags:
+      - Corporate Actions
+  /tiingo/corporate-actions/{ticker}/splits:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/corporate-actions/splits
+      operationId: getTickerSplits
+      parameters:
+      - description: Ticker related to the asset you would like distribution data
+          for.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: This filter limits distributions that have an ex-date >= on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startExDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: This filter limits distributions that have an ex-date <= on the
+          date passed. Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: endExDate
+        required: false
+        schema:
+          format: date
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Split'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get split corporate actions for a ticker
+      tags:
+      - Corporate Actions
+  /tiingo/crypto:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: listCryptoMeta
+      parameters:
+      - description: 'The ticker(s) associated with the crypto pair(s). Can either
+          be a single string or an array of strings (string[]). Please note: no more
+          than 100 tickers may be requested at this time. If no ticker(s) are passed,
+          returns data for all supported crypto pairs.'
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CryptoMeta'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get metadata for crypto tickers
+      tags:
+      - Crypto
+  /tiingo/crypto-yield/platforms:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: listCryptoYieldPlatforms
+      parameters:
+      - description: A list of platform codes to constrain the output to the given
+          platforms. If passing it as a string in the URL, it can be a comma-separated
+          list.
+        in: query
+        name: platformCodes
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/YieldPlatform'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: List crypto yield platforms
+      tags:
+      - Crypto Yield
+  /tiingo/crypto-yield/pools:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: listCryptoYieldPools
+      parameters:
+      - description: The pool code(s) associated with the Yield Pool. Can either be
+          a single string or an array of strings (string[]). If no pool code(s) are
+          passed, returns data for all supported yield pools.
+        in: query
+        name: poolCodes
+        required: false
+        schema:
+          type: string
+      - description: The platform code(s) associated with the Yield Pools that you
+          would like to constrain the output by. Can either be a single string or
+          an array of strings (string[]). If no platform code(s) are passed, returns
+          data for all supported yield pools for all platforms.
+        in: query
+        name: platformCodes
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/YieldPool'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: List crypto yield pools
+      tags:
+      - Crypto Yield
+  /tiingo/crypto-yield/ticks:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: getCryptoYieldTicks
+      parameters:
+      - description: The pool code(s) associated with the Yield Pool. Can either be
+          a single string or an array of strings (string[]). If no pool code(s) are
+          passed, returns data for all supported yield pools.
+        in: query
+        name: poolCodes
+        required: false
+        schema:
+          type: string
+      - description: The platform code(s) associated with the Yield Pools that you
+          would like to constrain the output by. Can either be a single string or
+          an array of strings (string[]). If no platform code(s) are passed, returns
+          data for all supported yield pools for all platforms.
+        in: query
+        name: platformCodes
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/YieldTick'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get latest crypto yield metric ticks
+      tags:
+      - Crypto Yield
+  /tiingo/crypto-yield/{poolCode}/metrics:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: getCryptoYieldMetrics
+      parameters:
+      - description: The pool code associated with the yield pool. Must be a single
+          pool code.
+        in: path
+        name: poolCode
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or later than the startDate (>=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: f startDate or endDate is not null, historical data will be queried.
+          This filter limits metrics to on or less than the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: 'This allows you to set the frequency in which you want data
+          resampled. For example "1hour" would return the data where OHLC is calculated
+          on an hourly schedule. The minimum value is "1min". Units in minutes (min),
+          hours (hour), and days (day) are accepted. Format is # + (min/hour/dau);
+          e.g. "15min", "4hour" or "1day". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/YieldMetrics'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get historical yield metrics for a pool
+      tags:
+      - Crypto Yield
+  /tiingo/crypto/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: getCryptoPrices
+      parameters:
+      - description: 'The ticker(s) associated with the crypto pair(s). Can either
+          be a single string or an array of strings (string[]). Please note: no more
+          than 100 tickers may be requested at this time.'
+        in: query
+        name: tickers
+        required: true
+        schema:
+          type: string
+      - description: If you would like to limit the query to a subset of exchanes,
+          pass a comma-separated list of exchanged to select. E.g. "POLONIEX, GDAX".
+        in: query
+        name: exchanges
+        required: false
+        schema:
+          items: *id002
+          type: array
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or later than the startDate (>=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: f startDate or endDate is not null, historical data will be queried.
+          This filter limits metrics to on or less than the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: 'This allows you to set the frequency in which you want data
+          resampled. For example "1hour" would return the data where OHLC is calculated
+          on an hourly schedule. The minimum value is "1min". Units in minutes (min),
+          hours (hour), and days (day) are accepted. Format is # + (min/hour/dau);
+          e.g. "15min", "4hour" or "1day". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CryptoPrices'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get historical crypto price data
+      tags:
+      - Crypto
+  /tiingo/crypto/top:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/crypto
+      operationId: getCryptoTopOfBook
+      parameters:
+      - description: 'The ticker(s) associated with the crypto pair(s). Can either
+          be a single string or an array of strings (string[]). Please note: no more
+          than 100 tickers may be requested at this time.'
+        in: query
+        name: tickers
+        required: true
+        schema:
+          type: string
+      - description: If you would like to limit the query to a subset of exchanes,
+          pass a comma-separated list of exchanged to select. E.g. "POLONIEX, GDAX".
+        in: query
+        name: exchanges
+        required: false
+        schema:
+          items: *id002
+          type: array
+      - description: If True, the endpoint will return all of the underlying exchange
+          data used in the calculation. If this is set to true, there will be a new
+          field called exchangeData for each crypto. This will contain the exchange-level
+          OHLC for each asset.
+        in: query
+        name: includeRawExchangeData
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/CryptoTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get top-of-book quotes for crypto tickers
+      tags:
+      - Crypto
+  /tiingo/daily/{ticker}:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/end-of-day
+      operationId: getDailyMeta
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyMeta'
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get end-of-day metadata for a ticker
+      tags:
+      - End-of-Day
+  /tiingo/daily/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/end-of-day
+      operationId: getDailyPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'Allows resampled values that allow you to choose the values
+          returned as daily, weekly, monthly, or annually values. Note: ONLY DAILY
+          takes into account holidays. All others use standard business days Acceptable
+          values: daily : Values returned as daily periods, with a holiday calendar.
+          weekly : Values returned as weekly data, with days ending on Friday. monthly
+          : Values returned as monthly data, with days ending on the last standard
+          business day (Mon-Fri) of each month. annually : Values returned as annual
+          data, with days ending on the last standard business day (Mon-Fri) of each
+          year. Note, that if you choose a value in-between the resample period for
+          weekly, monthly, and daily, the start date rolls back to consider the entire
+          period. For example, if you choose to resample weekly, but your "startDate"
+          parameter is set to Wednesday of that week, the startDate will be adjusted
+          to Monday, so the entire week is captured. Another example is if you send
+          a startDate mid-month, we roll back the startDate to the beginning of the
+          month. Similarly, if you provide an endDate, and it''s midway through the
+          period, we roll-forward the date to capture the whole period. In the above
+          example, if the end date is set to a wednesday with a weekly resample, the
+          end date is rolled forward to the Friday of that week.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      - description: This field allows you to specify the sort direct and which column
+          to sort by. Prepend "-" if you want descending order, otherwise it will
+          be ascending. E.g. sort=date will sort by date in ascending order. sort=-date
+          will sort by date in descending order.
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+      - description: Response format. Supports "json" (default) and "csv". CSV is
+          a bare-bones return type that is often 4-5x faster than JSON.
+        in: query
+        name: format
+        required: false
+        schema:
+          enum:
+          - json
+          - csv
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DailyPriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get end-of-day price history for a ticker
+      tags:
+      - End-of-Day
+  /tiingo/equity/intraday:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/equity-realtime-stock-data
+      operationId: getEquityRealtimeTopOfBook
+      parameters:
+      - description: Ticker related to the asset.
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EquityRealtimeTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get consolidated equity realtime top-of-book snapshot (beta)
+      tags:
+      - Equity Realtime
+  /tiingo/equity/intraday/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/equity-realtime-stock-data
+      operationId: getEquityRealtimeHistoricalPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'This allows you to set the frequency in which you want data
+          resampled. For example "1hour" would return the data where OHLC is calculated
+          on an hourly schedule. The minimum value is "1min". Both units in minutes
+          (min) and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min"
+          or "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      - description: If set to true, includes pre and post market data if available.
+        in: query
+        name: afterHours
+        required: false
+        schema:
+          type: boolean
+      - description: Some tickers do not have a trade/quote update for a given time
+          period. if forceFill is set to true, then the previous OHLC will be used
+          to fill the current OHLC.
+        in: query
+        name: forceFill
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EquityRealtimePriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get consolidated equity realtime historical intraday prices (beta)
+      tags:
+      - Equity Realtime
+  /tiingo/fundamentals/definitions:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/fundamentals
+      operationId: getFundamentalsDefinitions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundamentalsDefinition'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get definitions of available fundamentals fields
+      tags:
+      - Fundamentals
+  /tiingo/fundamentals/meta:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/fundamentals
+      operationId: getFundamentalsMeta
+      parameters:
+      - description: Specific tickers to return meta data for. If no string passed,
+          will return meta data for all available tickers. Can either be a single
+          ticker, a comma-separated list of tickers, or an array of strings (string[]).
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundamentalsMeta'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get fundamentals metadata for tickers
+      tags:
+      - Fundamentals
+  /tiingo/fundamentals/{ticker}/daily:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/fundamentals
+      operationId: getFundamentalsDaily
+      parameters:
+      - description: Required. Use the ticker for active symbols, or Tiingo PermaTicker
+          (stable identifier) for delisted/recycled symbols.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: This filter limits metrics to on or after the startDate (>=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: This filter limits metrics to on or before the endDate (<=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: This field allows you to specify the sort direct and which column
+          to sort by. Prepend "-" if you want descending order, otherwise it will
+          be ascending. E.g. sort=date will sort by date in ascending order. sort=-date
+          will sort by date in descending order.
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundamentalsDaily'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get daily fundamentals metrics for a ticker
+      tags:
+      - Fundamentals
+  /tiingo/fundamentals/{ticker}/statements:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/fundamentals
+      operationId: getFundamentalsStatements
+      parameters:
+      - description: Required. Use the ticker for active symbols, or Tiingo PermaTicker
+          (stable identifier) for delisted/recycled symbols.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: When false (default), the endpoint will return the most recent
+          data, including any revisions for the reporting period. The dates will correspond
+          to the fiscal end of the quarter or year. When true, the endpoint will return
+          the data as it was reported on the release date. Similarly, the date will
+          correspond to the date the filings were posted on the SEC.
+        in: query
+        name: asReported
+        required: false
+        schema:
+          type: boolean
+      - description: This filter limits metrics to on or after the startDate (>=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: This filter limits metrics to on or before the endDate (<=).
+          Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'This field allows you to specify the sort direct and which column
+          to sort by. Prepend "-" if you want descending order, otherwise it will
+          be ascending. E.g. sort=date will sort by date in ascending order. sort=-date
+          will sort by date in descending order. NOTE: For Fundamentals statement
+          only the "date" field may be sorted upon'
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundamentalsStatement'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get financial statement history for a ticker
+      tags:
+      - Fundamentals
+  /tiingo/funds/{ticker}:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/mutual-fund-and-etf-fees
+      operationId: getFundFees
+      parameters:
+      - description: Ticker related to the fund.
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      - in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundFees'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get latest mutual fund / ETF fee data for a fund
+      tags:
+      - Fund Fees
+  /tiingo/funds/{ticker}/metrics:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/mutual-fund-and-etf-fees
+      operationId: getFundFeeMetrics
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'his allows you to set the frequency in which you want data resampled.
+          For example "1hour" would return the data where OHLC is calculated on an
+          hourly schedule. The minimum value is "1min". Both units in minutes (min)
+          and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min" or
+          "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FundFeeMetrics'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get historical fee metrics for a fund
+      tags:
+      - Fund Fees
+  /tiingo/fx/top:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/forex
+      operationId: getForexTopOfBook
+      parameters:
+      - description: Ticker related to the asset.
+        in: query
+        name: tickers
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ForexTopOfBook'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get forex top-of-book quotes
+      tags:
+      - Forex
+  /tiingo/fx/{ticker}/prices:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/forex
+      operationId: getForexPrices
+      parameters:
+      - description: Ticker related to the asset.
+        in: path
+        name: ticker
+        required: true
+        schema:
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or after the startDate (>=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits metrics to on or before the endDate (<=). Parameter
+          must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: 'his allows you to set the frequency in which you want data resampled.
+          For example "1hour" would return the data where OHLC is calculated on an
+          hourly schedule. The minimum value is "1min". Both units in minutes (min)
+          and hours (hour) are accepted. Format is # + (min/hour); e.g. "15min" or
+          "4hour". If no value is provided, defaults to 5min.'
+        in: query
+        name: resampleFreq
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ForexPriceBar'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get historical forex rates for a currency pair
+      tags:
+      - Forex
+  /tiingo/news:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/news
+      operationId: listNews
+      parameters:
+      - description: 'A comma-separated list of the tickers requested. When passing
+          via GET parameter (not in URL), use a JSON array, otherwise use a comma-separated
+          list. #Use the below format if querying directly in the URL https://api.tiingo.com/tiingo/news?tickers=aapl,googl
+          #Otherwise, if passing GET parameters via a request library, use a JSON
+          array like this: tickers : [''aapl'',''googl'']'
+        in: query
+        name: tickers
+        required: false
+        schema:
+          items: *id002
+          type: array
+      - description: 'A comma-separated list of the tags requested. When passing via
+          GET parameter (not in URL), use a JSON array, otherwise use a comma-separated
+          list. #Use the below format if querying directly in the URL https://api.tiingo.com/tiingo/news?source=bloomberg.com,reuters.com
+          #Otherwise, if passing GET parameters via a request library, use a JSON
+          array like this: source : [''bloomberg.com'',''reuters.com'']'
+        in: query
+        name: source
+        required: false
+        schema:
+          items: *id002
+          type: array
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits news stories to on or later than the publishedDate
+          (>=). Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: startDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: If startDate or endDate is not null, historical data will be
+          queried. This filter limits news stories to on or less than the publishedDate
+          (<=). Parameter must be in YYYY-MM-DD format.
+        in: query
+        name: endDate
+        required: false
+        schema:
+          format: date
+          type: string
+      - description: The maximum number of news objects to return in the array. The
+          default is 100 and the max is 1000. This is maxed to 1,000 as any more than
+          that tends to lead to longer wait times. If you would like this adjusted,
+          please contact us at support@tiingo.com .
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+      - description: 'This is a "pagination" variable that is often used alongside
+          limit. It returns an array with the results shifted by "offset". For example,
+          when limit is 0 you may get the following: 0. News Story A 1. News Story
+          B 2. News Story C 3. News Story D When offset is "2" you will receive: 0.
+          News Story C 1. News Story D 2. News Story E 3. News Story F This, when
+          used alongside "limit" allows for pagination and more efficient queries.'
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+      - description: The field can take either "publishedDate" or "crawlDate". The
+          date field specified will be used to sort the results in descending order.
+          The results can either be sorted by when the news outlet reported the publish
+          time ("datePublished") or when our feeds came across is ("crawlDate"). Defaults
+          to "publishedDate" if no value provided
+        in: query
+        name: sortBy
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewsArticle'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Get curated financial news articles
+      tags:
+      - News
+  /tiingo/news/bulk_download:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/news
+      operationId: listNewsBulkFiles
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewsBulkFile'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: List available bulk news download files
+      tags:
+      - News
+  /tiingo/news/bulk_download/{id}:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/news
+      operationId: downloadNewsBulkFile
+      parameters:
+      - description: The unique "id" that corresponds to the batch file you would
+          like to download. If none is supplied, returns a list of the available batch
+          files.
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Download a bulk news batch file
+      tags:
+      - News
+  /tiingo/utilities/search:
+    get:
+      externalDocs:
+        url: https://www.tiingo.com/documentation/utilities/search
+      operationId: searchAssets
+      parameters:
+      - description: The search query to use to look up assets.
+        in: query
+        name: query
+        required: true
+        schema:
+          type: string
+      - description: True to only include exact ticker matches based on the search
+          query. If set to true, no partial matches will be included and asset names
+          will not be searched.
+        in: query
+        name: exactTickerMatch
+        required: false
+        schema:
+          type: boolean
+      - description: True to include delisted tickers and false (default) to exclude
+          delisted tickers.
+        in: query
+        name: includeDelisted
+        required: false
+        schema:
+          type: boolean
+      - description: The maximum number of assets to return. Defaults to 10 and can
+          be set to a maximum of 100.
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+                type: array
+          description: Successful response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      summary: Search for assets by ticker or name
+      tags:
+      - Utilities
+security:
+- apiTokenHeader: []
+- apiTokenQuery: []
+servers:
+- url: https://api.tiingo.com
+tags:
+- name: End-of-Day
+- name: Corporate Actions
+- name: News
+- name: Crypto
+- name: Crypto Yield
+- name: IEX
+- name: BOATS
+- name: Equity Realtime
+- name: Small Exchange
+- name: Forex
+- name: Fundamentals
+- name: Fund Fees
+- name: Utilities
