@@ -1525,12 +1525,51 @@ dev = [
 ]
 
 [[package]]
+name = "mcp-openapi"
+version = "0.1.0"
+source = { directory = "../mcp-openapi" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "httpx2" },
+    { name = "jsonschema-path" },
+    { name = "mcp-types" },
+    { name = "pydantic" },
+    { name = "tenacity" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datamodel-code-generator", marker = "extra == 'codegen'", specifier = ">=0.83,<1" },
+    { name = "fastmcp", specifier = ">=4.1,<5" },
+    { name = "httpx2", specifier = ">=2.13,<3" },
+    { name = "jsonschema-path", specifier = ">=0.5,<1" },
+    { name = "mcp-types", specifier = ">=2.3,<3" },
+    { name = "openapi-pydantic", marker = "extra == 'codegen'", specifier = ">=0.6,<1" },
+    { name = "pydantic", specifier = ">=2.14,<3" },
+    { name = "pyyaml", marker = "extra == 'codegen'", specifier = ">=6,<7" },
+    { name = "ruff", marker = "extra == 'codegen'", specifier = ">=0.17,<1" },
+    { name = "tenacity", specifier = ">=9.1,<10" },
+]
+provides-extras = ["codegen"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.1" },
+    { name = "datamodel-code-generator", specifier = "==0.83.0" },
+    { name = "openapi-pydantic", specifier = "==0.6.0" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "ruff", specifier = "==0.17.0" },
+]
+
+[[package]]
 name = "mcp-scaffold"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
     { name = "mcp-architecture" },
+    { name = "mcp-openapi" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
@@ -1579,6 +1618,7 @@ service-redis = [
 requires-dist = [
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "mcp-architecture", directory = "../mcp-architecture" },
+    { name = "mcp-openapi", directory = "../mcp-openapi" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "pyyaml", specifier = "==6.0.3" },
 ]

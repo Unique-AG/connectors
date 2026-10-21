@@ -10,30 +10,35 @@ from typing import cast
 import httpx2
 import yaml
 
-_HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 
 
 def refresh_spec(*, spec: Path, source: str | Path) -> list[str]:
     """Write the spec at `source`, a URL or a file, over `spec`, and list the operationIds added
     (`+`) and removed (`-`).
 
-    A JSON spec is written as YAML, the way `mcp-scaffold` vendors it, so a refresh only shows
-    what the vendor changed.
+    A JSON spec is written as YAML, as `mcp-scaffold` vendors it with `as_yaml`, so a refresh
+    only shows what the vendor changed.
     """
     if isinstance(source, Path):
-        text = source.read_text()
+        text = as_yaml(source.read_text())
     else:
         response = httpx2.get(source, follow_redirects=True)
         response.raise_for_status()
-        text = response.text
-    if text.lstrip().startswith("{"):
-        text = yaml.safe_dump(json.loads(text), sort_keys=False, allow_unicode=True)
+        text = as_yaml(response.text)
     before: set[str] = _operation_ids(spec.read_text()) if spec.is_file() else set()
     after = _operation_ids(text)
     spec.write_text(text)
     return [f"+ {operation}" for operation in sorted(after - before)] + [
         f"- {operation}" for operation in sorted(before - after)
     ]
+
+
+def as_yaml(spec: str) -> str:
+    """`spec` as the YAML a vendored spec is kept in. A YAML spec is kept as the vendor wrote it."""
+    if spec.lstrip().startswith("{"):
+        return yaml.safe_dump(json.loads(spec), sort_keys=False, allow_unicode=True)
+    return spec
 
 
 def stale_outputs(outputs: list[Path], generate: Callable[[], None]) -> list[str]:
@@ -78,7 +83,7 @@ def _operation_ids(text: str) -> set[str]:
         str(operation_id)
         for item in paths.values()
         for method, operation in item.items()
-        if method in _HTTP_METHODS and isinstance(operation, dict)
+        if method in HTTP_METHODS and isinstance(operation, dict)
         for operation_id in [cast(dict[str, object], operation).get("operationId")]
         if operation_id is not None
     }

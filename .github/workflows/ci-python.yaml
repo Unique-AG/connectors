@@ -14,6 +14,11 @@ on:
       - "packages/mcp-credential-auth/**"
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
+      # What mcp-scaffold edits by matching its text when it registers a new MCP.
+      - ".gitcommitizen"
+      - "release-please-config.json"
+      - ".github/workflows/release-rerun.yaml"
+      - "pnpm-workspace.yaml"
       - "services/**"
       - "scripts/check-python-service.sh"
       - ".github/workflows/ci-python.yaml"
@@ -73,11 +78,16 @@ jobs:
               - 'packages/mcp-configs/**'
             # The MCPs the scaffold's tests generate depend on mcp-configs, run mcp-architecture's
             # rules, and use mcp-openapi for an OpenAPI upstream, so a change to any of them runs them too.
+            # The scaffold also edits the registry files below by matching their text.
             mcp_scaffold:
               - 'packages/mcp-scaffold/**'
               - 'packages/mcp-architecture/**'
               - 'packages/mcp-openapi/**'
               - 'packages/mcp-configs/**'
+              - '.gitcommitizen'
+              - 'release-please-config.json'
+              - '.github/workflows/release-rerun.yaml'
+              - 'pnpm-workspace.yaml'
             workflow:
               - '.github/workflows/ci-python.yaml'
               - 'scripts/check-python-service.sh'

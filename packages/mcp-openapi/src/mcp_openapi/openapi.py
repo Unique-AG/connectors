@@ -11,9 +11,6 @@ from fastmcp.utilities.openapi import HTTPRoute
 from mcp_types import ToolAnnotations
 
 TOOL_HINTS = ToolAnnotations(read_only_hint=True, open_world_hint=True)
-# Tags a tool served straight from the spec. mcp-architecture's description check skips it, since
-# it says what the spec says, and keeps its own copy of the value.
-PASSTHROUGH_TAG = "passthrough"
 
 
 def mcp_name(operation_id: str, *, remove_prefix: str = "") -> str:

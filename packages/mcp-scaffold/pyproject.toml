@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "jinja2==3.1.6",
     "mcp-architecture==0.1.0",
+    "mcp-openapi==0.1.0",
     "pydantic>=2.13,<3",
     "pyyaml==6.0.3",
 ]
@@ -56,6 +57,7 @@ service-redis = ["py-key-value-aio[redis]==0.4.6"]
 
 [tool.uv.sources]
 mcp-architecture = { path = "../mcp-architecture" }
+mcp-openapi = { path = "../mcp-openapi" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

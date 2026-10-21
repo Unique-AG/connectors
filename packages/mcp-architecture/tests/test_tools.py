@@ -3,18 +3,41 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, cast
 
+import httpx2
 import pytest
 from fastmcp import FastMCP
+from fastmcp.server.providers.openapi import MCPType, OpenAPIProvider, RouteMap
 from fastmcp.tools import Tool
 from pydantic import Field
 
 from mcp_architecture import (
-    PASSTHROUGH_TAG,
     masks_error_details,
     tool_surface,
     tools_with_a_root_combinator,
     undescribed_tools,
 )
+
+# An operation without a summary or a parameter description, as many vendor specs have.
+ORDERS_SPEC: dict[str, object] = {
+    "openapi": "3.0.3",
+    "info": {"title": "Orders", "version": "1"},
+    "paths": {
+        "/orders/{order_id}": {
+            "get": {
+                "operationId": "get_order",
+                "parameters": [
+                    {
+                        "name": "order_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                ],
+                "responses": {"200": {"description": "The order."}},
+            }
+        }
+    },
+}
 
 
 @pytest.fixture
@@ -30,10 +53,15 @@ def server() -> FastMCP:
     def place_order(product_id: str) -> str:
         return product_id
 
-    @mcp.tool(tags={PASSTHROUGH_TAG})
-    def get_order(order_id: str) -> str:
+    @mcp.tool(tags={"passthrough"})
+    def cancel_order(order_id: str) -> str:
         return order_id
 
+    mcp.add_provider(
+        OpenAPIProvider(
+            ORDERS_SPEC, httpx2.AsyncClient(), route_maps=[RouteMap(mcp_type=MCPType.TOOL)]
+        )
+    )
     return mcp
 
 
@@ -42,14 +70,24 @@ async def surface_of(server: FastMCP) -> dict[str, dict[str, object]]:
     return {str(tool["name"]): tool for tool in tools}
 
 
-async def test_undescribed_tools_lists_tools_and_parameters_but_skips_passthrough_ones(
+async def test_undescribed_tools_lists_tools_and_parameters_but_skips_spec_operations(
     server: FastMCP,
 ) -> None:
-    assert await undescribed_tools(server) == ["place_order", "place_order(product_id)"]
+    assert sorted(await undescribed_tools(server)) == [
+        "cancel_order",
+        "cancel_order(order_id)",
+        "place_order",
+        "place_order(product_id)",
+    ]
 
 
 async def test_tool_surface_lists_every_tool_sorted_by_name(server: FastMCP) -> None:
-    assert list(await surface_of(server)) == ["get_order", "get_product", "place_order"]
+    assert list(await surface_of(server)) == [
+        "cancel_order",
+        "get_order",
+        "get_product",
+        "place_order",
+    ]
 
 
 async def test_tool_surface_keeps_the_parameter_descriptions(server: FastMCP) -> None:
@@ -69,7 +107,7 @@ async def test_tool_surface_keeps_the_parameter_descriptions(server: FastMCP) ->
 async def test_tool_surface_keeps_only_the_tags_of_meta(server: FastMCP) -> None:
     surface = await surface_of(server)
 
-    assert surface["get_order"]["_meta"] == {"fastmcp": {"tags": [PASSTHROUGH_TAG]}}
+    assert surface["cancel_order"]["_meta"] == {"fastmcp": {"tags": ["passthrough"]}}
     assert "_meta" not in surface["get_product"]
 
 
