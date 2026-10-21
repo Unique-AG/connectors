@@ -102,6 +102,29 @@ async def test_does_not_resend_a_write_that_may_have_been_applied(
     assert len(answers.requests) == 1
 
 
+async def test_logs_the_error_body_but_does_not_return_it(
+    settings: UpstreamSettings, caplog: pytest.LogCaptureFixture
+) -> None:
+    answers = Answers(404, body={"detail": "internal"})
+
+    with pytest.raises(UpstreamError) as error:
+        await request(settings, answers)
+
+    assert str(error.value) == "404 Not Found for GET https://api.example.com/things"
+    assert [record.getMessage() for record in caplog.records] == [
+        '404 Not Found for GET https://api.example.com/things: {"detail":"internal"}'
+    ]
+
+
+async def test_resends_the_body_of_a_rate_limited_write(settings: UpstreamSettings) -> None:
+    answers = Answers(429, 200)
+
+    async with open_upstream(settings, httpx2.MockTransport(answers)) as upstream:
+        await upstream.request("POST", "/things", THING, json={"name": "anvil"})
+
+    assert [sent.read() for sent in answers.requests] == [b'{"name":"anvil"}'] * 2
+
+
 @pytest.mark.parametrize("method", ["PUT", "DELETE"])
 async def test_resends_an_idempotent_write_on_an_unavailable_upstream(
     settings: UpstreamSettings, method: str
