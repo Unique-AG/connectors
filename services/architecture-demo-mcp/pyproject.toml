@@ -9,8 +9,8 @@ dependencies = [
     "asyncpg==0.31.0",
     "fastmcp==4.1.0",
     "httpx2==2.13.1",
+    "mcp-configs==0.1.0",
     "mcp-openapi==0.1.0",
-    "mcp-runtime==0.1.0",
     "mcp-types==2.3.0",
     "py-key-value-aio[redis]==0.4.6",
     "pydantic-settings==2.15.0",
@@ -72,8 +72,8 @@ include = ["src", "tests"]
 
 [tool.uv.sources]
 mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
-mcp-runtime = { path = "../../packages/mcp-runtime" }
 
 [tool.mcp-openapi]
 spec = "src/architecture_demo_mcp/upstream/openapi.yml"

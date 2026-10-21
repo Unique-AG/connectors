@@ -1,7 +1,7 @@
 from typing import ClassVar
 
-from mcp_runtime import RetrySettings
-from mcp_runtime import shared_config
+from mcp_configs import RetrySettings
+from mcp_configs import shared_config
 from pydantic import AnyHttpUrl
 from pydantic import Field
 from pydantic import SecretStr

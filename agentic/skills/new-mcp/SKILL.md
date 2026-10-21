@@ -1,6 +1,6 @@
 ---
 name: new-mcp
-description: Starts a new Python MCP server in this repo with packages/mcp-scaffold. Use whenever the user asks to create, scaffold, bootstrap or add a new MCP, MCP server or connector service in Python. Asks what the MCP talks to (OpenAPI, plain HTTP, or another protocol such as SOAP), what it stores (Postgres, Redis or nothing) and whether it needs Unique auth, runs the scaffold, then fills in the upstream, the persistence and the first tool.
+description: Starts a new Python MCP server in this repo with packages/mcp-scaffold. Use whenever the user asks to create, scaffold, bootstrap or add a new MCP, MCP server or connector service in Python. Asks whether the MCP talks to an upstream (an OpenAPI spec, or one the agent writes a client for with the user, or none) and what it stores (Postgres, Redis or nothing), runs the scaffold, then writes the upstream client, the auth, the persistence and the first tool.
 metadata:
   internal: true
 ---
@@ -8,11 +8,13 @@ metadata:
 # Start a new MCP
 
 `mcp-scaffold` (in `packages/mcp-scaffold`) generates the service. It has the layers, the
-architecture contracts, the Dockerfile, the Helm chart, and the release and commit-scope
-registration. Your job is to find out what the MCP needs before running it, and to fill in what
-the scaffold cannot know afterwards. Read `packages/mcp-architecture/ARCHITECTURE.md` first: it
-is the contract the new service is checked against, and `services/architecture-demo-mcp` holds
-every example it names.
+architecture contracts, the server with its host and origin guard, the telemetry, the
+Dockerfile, the Helm chart, and the release and commit-scope registration. It is a command-line
+tool: never import from it. Your job is to find out what the MCP needs before running it, and to
+write what the scaffold cannot know afterwards: the upstream client when there is no OpenAPI
+spec, the auth, the persistence and the tools. Read `packages/mcp-architecture/ARCHITECTURE.md`
+first: it is the contract the new service is checked against, and
+`services/architecture-demo-mcp` holds every example it names.
 
 ## 1. Ask
 
@@ -22,20 +24,24 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 |---|---|
 | Name, kebab-case, ending in `-mcp` (the scaffold refuses any other) | `<name>`, the first argument: the service folder, package, chart and commit scope |
 | One or two sentences on what it does for the user | `--description`, the server instructions and the pyproject description |
-| What does it talk to? OpenAPI / plain HTTP without a spec / something else | `--upstream openapi\|http\|custom` |
+| Does it call an upstream, a system of its own such as a vendor API? If so, does it publish an OpenAPI 3.0 spec we can use? | `--upstream openapi` with `--spec`, `--upstream custom`, or no `--upstream` at all |
 | What does it store? Nothing, or any of Postgres and Redis (multi-select) | `--persistence none`, or every store chosen: `--persistence postgres redis` |
-| Does it need the Unique auth package? | `--auth unique\|none` |
 
 Then ask the follow-ups for what they chose, again in one round:
 
 - **OpenAPI**: where the spec is, a URL or a file; it becomes `--spec`. Only OpenAPI 3.0 is
-  read. Ask how it authenticates (bearer token, API key header, OAuth client credentials).
-- **Plain HTTP**: the base URL, how it authenticates, and the endpoints the first tools need.
-- **Something else**: the protocol, the Python library to use (for example `zeep` for SOAP),
-  where its contract lives (a WSDL, a proto file), and how it authenticates.
+  read. mcp-openapi's `OperationClient` is the typed client, so there is no client to write.
+- **No usable spec**: work out the client with the user before you write it. Ask what protocol
+  it speaks (REST without a spec, GraphQL, SOAP, gRPC, a vendor SDK), the Python library to use
+  if it is not plain HTTP (for example `zeep` for SOAP), where its contract lives (docs, a WSDL,
+  a proto file), the base URL, the endpoints the first tools need and what each returns, and
+  its rate limits. The client's auth is covered in step 4.
+- **No upstream**: nothing to ask. The MCP works over its own storage or logic alone, and
+  `upstream/` stays an empty layer until it needs one.
 - **Postgres or Redis**: what is stored, for how long, and who reads it.
-- **Auth**: the Unique auth package does not exist yet. The scaffold records the choice in the
-  new `AGENTS.md`; say so, and do not build auth yourself.
+
+Auth is not a scaffold option. Every MCP starts without it, and its `run_server` refuses to
+serve beyond loopback until the server has an auth provider. Step 4 settles it with the user.
 
 ## 2. Scaffold
 
@@ -43,8 +49,8 @@ From the repository root:
 
 ```bash
 uv run --project packages/mcp-scaffold mcp-scaffold new <name> \
-    --description "<description>" --upstream <kind> [--spec <path or URL>] \
-    --persistence <kind>... --auth <kind>
+    --description "<description>" [--upstream openapi|custom] [--spec <path or URL>] \
+    --persistence <kind>...
 ```
 
 It refuses to start unless `git status` is clean, untracked files included. Ask the user to
@@ -54,12 +60,22 @@ started from a clean tree, everything it wrote is its own: undo a failed run wit
 `git checkout -- . && git clean -fd && git clean -fdx services/<name>`. The last command also
 removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
 
+Every file it writes starts with a `mcp-scaffold-version: <version>, timestamp: <when>` comment,
+the same in every file of the run. Leave it in place on a file you edit. Never add one to a file
+you write, not even when you copy a stamped file as a starting point, and drop it from a
+scaffold file you rewrite from scratch: the stamp marks what the scaffold wrote, not what you
+did.
+
 It records the first `tests/tool_surface.generated.json`. Prefer a spec URL over a downloaded
 file: it becomes `spec-source`, so `uv run mcp-openapi-codegen --refresh-spec` can fetch the
 vendor's next version. The scaffold runs once: every file it wrote is the service's own from
-here on, `mcp/server.py` and its middleware included.
+here on, `mcp/server.py`, `mcp/http.py`, `mcp/middleware.py` and `telemetry/setup.py` included.
 
-## 3. Fill in the upstream
+## 3. Write the upstream client
+
+Skip this step for an MCP without an upstream. To add one later, write the client by these
+rules into the empty `upstream/`, open it in the lifespan in `mcp/server.py`, and add
+`get_upstream` to `mcp/dependencies.py`, mirroring how persistence is wired there.
 
 Everything here stays in `upstream/`, behind `Upstream`, `UpstreamSettings`, `open_upstream`
 and `UpstreamError`.
@@ -68,23 +84,91 @@ and `UpstreamError`.
   GET if there is one: served as a tool (`EXPOSED` in `upstream/routes.py`) and typed through
   the codegen (`operation-ids`). Tell the user which one. Then list the spec's operations as a
   table (operationId, method, path, summary) and ask which to serve as well. Add those to
-  `EXPOSED`; that is the first version, with no code. If the API does not take a bearer token,
-  change the header in `upstream/client.py` and the fields in `upstream/settings.py`.
-- **Plain HTTP**: fix the auth header in `upstream/client.py`. Add pydantic models for the
-  responses, so contexts never parse raw JSON.
-- **Something else**: `uv add` the library. Implement the four names in `upstream/`, following
-  the docstring in `upstream/__init__.py`. Then open it in the lifespan in `mcp/server.py` and
-  add `get_upstream` to `mcp/dependencies.py`, mirroring how persistence is wired there.
+  `EXPOSED`; that is the first version, with no code. Retries are `RetryAfterPolicy`, set up in
+  `open_upstream`. If the API does not take a bearer token, change the header in
+  `upstream/client.py` and the fields in `upstream/settings.py`.
+- **Custom**: `upstream/client.py` is a starting point, not a finished client: `Upstream` with
+  one `request(method, path, adapter, params=..., json=...)`, retries on `RetrySettings`, and
+  `tests/test_upstream.py` covering it. Shape it to what you worked out with the user in step 1,
+  or replace it for a protocol that is not HTTP, keeping the four names. `uv add` any library it
+  needs.
+
+### Rules for coding a client
+
+1. **Auth.** Find out how the upstream takes credentials: a bearer token, an API key header or
+   query parameter, basic auth, OAuth client credentials, a signed request, or the signed-in
+   user's own token. A credential of the MCP's own is a `SecretStr` in `UpstreamSettings`, set
+   once on the client. A credential of the user's reaches the client as step 4 describes, never
+   from a global.
+2. **Typed.** Every method the contexts call returns a pydantic model, validated before it is
+   returned: `request` parses the body with the `TypeAdapter` it is given, and a body that does
+   not fit is an `UpstreamError`. No `dict`, `Any` or raw JSON leaves `upstream/`. Put the models
+   in `upstream/` (for example `upstream/responses.py`) and export what contexts need from
+   `upstream/__init__.py`. Map vendor field names to snake_case in the contexts, as
+   ARCHITECTURE.md says.
+3. **Retries.** Base them on mcp-openapi's `RetryAfterPolicy`
+   (`packages/mcp-openapi/src/mcp_openapi/retry.py`), with `RetrySettings` from `mcp-configs`:
+   retry a status in `statuses` after its `Retry-After` (seconds or an HTTP-date) or an
+   exponential backoff with jitter, never wait past `max_wait_seconds`, stop after
+   `max_attempts`, resend any request on a 429 and only an idempotent one on another status, and
+   build a new tenacity `AsyncRetrying` per request. The custom client does this already; keep
+   it when you change the client, and check the upstream's docs for a status or header it adds,
+   such as a 502 or `X-RateLimit-Reset`.
+4. **Concurrency.** Check whether the upstream limits concurrent requests, per key or per user.
+   If it does, base the limit on mcp-openapi's `LockConfig` and `RequestLock`
+   (`packages/mcp-openapi/src/mcp_openapi/lock.py`, used in `OperationClient._attempt`): hold the
+   lock around each attempt, release it while a retry waits, time only acquiring it, and turn a
+   timeout into an `UpstreamError`. An `asyncio.Semaphore` suits one pod; a Postgres advisory
+   lock or a Redis lock suits several.
+5. **Boundary.** The client lives in `upstream/`. Everything outside imports it from
+   `<package>.upstream` only; mcp-architecture's `protected` contract fails on
+   `from <package>.upstream.client import Upstream`. `upstream/` imports neither `mcp` nor
+   `contexts`, and nothing from auth.
+6. **Tests.** Cover each rule above against `httpx2.MockTransport`, as
+   `tests/test_upstream.py` does, and give `tests/conftest.py` a fake upstream in place of the
+   404-only `upstream_transport`.
 
 Settings that every MCP shares (server, Postgres, Redis, Zitadel, retries, logging, elicitation)
-come from `packages/mcp-runtime`. Use those classes and their defaults; never copy one into the
-service. If every MCP needs something new, add it there rather than to one service.
+come from `packages/mcp-configs`. Use those classes and their defaults; never copy one into the
+service. If every MCP needs a new setting, add it there rather than to one service.
 
 Keep `.env.example` and the `env` block in `deploy/helm-charts/<name>/values.yaml` in step with
 the settings. Secrets go only in `.env.example`, with a comment in `values.yaml` that the overlay
 provides them.
 
-## 4. Fill in the persistence
+## 4. Settle the auth
+
+Ask the user, in one round: who uses the MCP and how they sign in (Unique's Zitadel, another
+OIDC or OAuth provider, a static token for a machine client, or nobody because it stays local),
+and whether the upstream needs the signed-in user's own credentials or only the MCP's.
+
+If it stays local, leave it: `run_server` keeps it on loopback. Otherwise write it.
+
+### Rules for coding auth
+
+1. **FastMCP first.** Read the installed FastMCP before writing anything
+   (`.venv/lib/python3.14/site-packages/fastmcp/server/auth/`): `JWTVerifier`,
+   `StaticTokenVerifier`, the introspection verifier, `OAuthProxy`, `OIDCProxy`, and the
+   providers under `fastmcp.server.auth.providers`. For Zitadel, use
+   `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`, configured by the environment
+   `ZitadelSettings` in `mcp-configs` reads. If one of them does the job, pass it to
+   `FastMCP(auth=...)` in `create_server` and write nothing else.
+2. **Our code in `mcp/auth/`.** Only what FastMCP and `unique_mcp` lack goes there, exported
+   from `mcp/auth/__init__.py`. Its settings are built on `shared_config` and passed in from
+   `main.py`, so tests pass their own.
+3. **The client reads it through a `Depends` function.** As the OpenAPI client gets its
+   `Upstream` from `get_upstream`, a client that needs the caller's credentials gets them in
+   `get_upstream` in `mcp/dependencies.py`, for example from
+   `fastmcp.server.dependencies.get_access_token()`.
+4. **Clear boundaries.** No auth detail reaches a context or `upstream/`. The client receives,
+   through its constructor, either the details themselves or a function that returns them,
+   whichever suits the case: the details when they are fixed for the request, a function when
+   they can change during it, such as a token that is refreshed.
+5. **Tests.** Test that a request without credentials is refused and one with them reaches the
+   tool, and that the upstream receives the caller's credential. `run_server` serving beyond
+   loopback is already covered in `tests/test_server.py`.
+
+## 5. Fill in the persistence
 
 Each store is a field of `Persistence`: `persistence.database` for Postgres, `persistence.store`
 for Redis.
@@ -99,7 +183,7 @@ The tests need neither store running: the `persistence` fixture in `tests/confte
 SQLite and a `MemoryStore` in their place, and every client a test opens shares it. Seed it
 through the functions in `persistence/__init__.py`, as the demo's `tests/test_tools.py` does.
 
-## 5. Build the first feature and tool
+## 6. Build the first feature and tool
 
 For OpenAPI, this is promoting a served operation, when the user asks for a tool the spec
 cannot give as it is: trimmed, renamed, with a rule, or merged from several operations.
@@ -112,7 +196,7 @@ model:
 
 Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with that fake.
 
-## 6. Finish
+## 7. Finish
 
 - Write `README.md`: what the MCP does, its env variables, how to run it locally. The scaffold
   does not write one.
@@ -125,4 +209,4 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
   - Registered: release-please, release-rerun and the `<name>` commit scope. Commit with that
     scope, e.g. `feat(<name>): ...`.
   - Still to do: the Argo overlay with the hostname, `MCP_BASE_URL` and the secrets, and auth
-    if they asked for it.
+    if it was left for later.

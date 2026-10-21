@@ -1,6 +1,8 @@
 import json
+import re
 import shutil
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -9,10 +11,11 @@ import pytest
 from mcp_scaffold import commands, openapi
 from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
-from mcp_scaffold.options import Auth, Options, Persistence, Upstream
-from mcp_scaffold.pins import pinned
+from mcp_scaffold.options import Options, Persistence, Upstream
+from mcp_scaffold.pins import pinned, scaffold_version
 from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import scaffold
+from mcp_scaffold.stamp import stamped
 from tests.conftest import REGISTRIES, REPO, UseVenv, link_project_environment, venvs
 
 type Config = dict[str, dict[str, dict[str, object]]]
@@ -71,30 +74,42 @@ def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return repo
 
 
-def probe(upstream: Upstream, persistence: set[Persistence], auth: Auth) -> Options:
+def probe(upstream: Upstream | None, persistence: set[Persistence]) -> Options:
     return Options(
-        name="-".join(["probe", upstream, *sorted(persistence or {"none"}), "mcp"]),
+        name="-".join(["probe", upstream or "none", *sorted(persistence or {"none"}), "mcp"]),
         description="Answers questions about the probe upstream, a stand-in for a vendor API "
         "that is long enough to wrap onto a second line of the server instructions.",
         upstream=upstream,
         spec="weather.json" if upstream is Upstream.OPENAPI else None,
         persistence=frozenset(persistence),
-        auth=auth,
     )
 
 
-# Each option appears alone once, and the stores once together. Custom with Postgres is the one
-# server that opens a resource but takes no settings with a required field. The last is every
-# option at once, as services/architecture-demo-mcp is generated.
+# Each option appears alone once, and the stores once together. The first without an upstream
+# opens nothing, so its server has no lifespan; the second opens only its store. The last is
+# every option at once, as services/architecture-demo-mcp is generated.
 PROBES = {
     options.name: options
     for options in [
-        probe(Upstream.OPENAPI, {Persistence.REDIS}, Auth.NONE),
-        probe(Upstream.HTTP, set(), Auth.UNIQUE),
-        probe(Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.NONE),
-        probe(Upstream.HTTP, {Persistence.POSTGRES, Persistence.REDIS}, Auth.NONE),
-        probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}, Auth.UNIQUE),
+        probe(None, set()),
+        probe(None, {Persistence.REDIS}),
+        probe(Upstream.OPENAPI, {Persistence.REDIS}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES, Persistence.REDIS}),
+        probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}),
     ]
+}
+STAMP = re.compile(
+    r"mcp-scaffold-version: (?P<version>[^,]+), timestamp: (?P<timestamp>[0-9T:+-]+)"
+)
+# What a tool writes rather than the scaffold: uv, the codegen, pytest and the chart's schema
+# script.
+NOT_THE_SCAFFOLDS = {
+    "uv.lock",
+    "operations.py",
+    "vendor_responses.py",
+    "tool_surface.generated.json",
+    "values.schema.json",
 }
 
 
@@ -146,7 +161,7 @@ def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(scaffolded: Scaffolded) ->
 
     pins = [*pinned("service"), *pinned("service-postgres"), *pinned("service-dev")]
     assert all(f'"{pin}",' in pyproject for pin in pins)
-    assert '"mcp-runtime==' in pyproject
+    assert '"mcp-configs==' in pyproject
     assert '"mcp-openapi' not in pyproject
 
 
@@ -160,10 +175,25 @@ def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: 
         "migrations/versions/*_create_things.py"
     )
     assert migration.read_text().startswith('"""Create things.\n')
+    assert not STAMP.search(migration.read_text())
     run(
         [["uv", "run", "ruff", "format", "--check", "."], ["uv", "run", "ruff", "check", "."]],
         service,
     )
+
+
+@pytest.mark.parametrize("name", ["probe-none-none-mcp", "probe-none-redis-mcp"])
+def test_an_mcp_without_an_upstream_keeps_the_layer_empty(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    target = scaffolded(name)
+    package = target / "src" / name.replace("-", "_")
+
+    assert [path.name for path in (package / "upstream").iterdir()] == ["__init__.py"]
+    assert "__all__: list[str] = []" in (package / "upstream" / "__init__.py").read_text()
+    assert "UPSTREAM_" not in (target / ".env.example").read_text()
+    assert "get_upstream" not in (package / "mcp" / "dependencies.py").read_text()
+    assert not (target / "tests" / "test_upstream.py").exists()
 
 
 def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
@@ -176,7 +206,7 @@ def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
     assert "GET_FORECAST = Operation[Forecast]" in (upstream / "operations.py").read_text()
     assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
-    assert (upstream / "openapi.yml").read_text().startswith("openapi: 3.0.3\n")
+    assert (upstream / "openapi.yml").read_text().splitlines()[1] == "openapi: 3.0.3"
 
 
 @pytest.mark.parametrize(
@@ -239,7 +269,6 @@ def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
         description="Registered twice.",
         upstream=Upstream.CUSTOM,
         persistence=frozenset(),
-        auth=Auth.NONE,
     )
 
     register(options, tmp_path, release=True)
@@ -248,3 +277,82 @@ def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
 
     assert {registry: (tmp_path / registry).read_text() for registry in REGISTRIES} == registered
     assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
+
+
+@pytest.mark.parametrize("name", ["probe-openapi-redis-mcp", "probe-custom-postgres-redis-mcp"])
+def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    target = scaffolded(name)
+    files = [
+        path
+        for path in target.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and not {".venv", ".ruff_cache", ".pytest_cache", "__pycache__"} & set(path.parts)
+        and path.name not in NOT_THE_SCAFFOLDS
+    ]
+
+    stamps = {
+        path.relative_to(target).as_posix(): [
+            match.groups() for match in STAMP.finditer(path.read_text())
+        ]
+        for path in files
+    }
+
+    assert {path: found for path, found in stamps.items() if len(found) != 1} == {}
+    assert {found[0][0] for found in stamps.values()} == {scaffold_version()}
+    (timestamp,) = {found[0][1] for found in stamps.values()}
+    assert abs(datetime.now(UTC) - datetime.fromisoformat(timestamp)).total_seconds() < 3600
+
+
+def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
+    target = scaffolded("probe-openapi-redis-mcp")
+    upstream = target / "src" / "probe_openapi_redis_mcp" / "upstream"
+
+    for path in [target / "uv.lock", upstream / "operations.py", upstream / "vendor_responses.py"]:
+        assert not STAMP.search(path.read_text()), path.name
+
+
+def test_the_stamp_follows_a_line_that_has_to_stay_first(tmp_path: Path) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("# syntax=docker/dockerfile:1.7\n\nFROM python\n")
+    script = tmp_path / "render.sh"
+    script.write_text("#!/bin/bash\nhelm template\n")
+
+    assert (
+        stamped(dockerfile, "stamp") == "# syntax=docker/dockerfile:1.7\n# stamp\n\nFROM python\n"
+    )
+    assert stamped(script, "stamp") == "#!/bin/bash\n# stamp\nhelm template\n"
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "expected"),
+    [
+        ("models.py", "import ast\n", "# stamp\n\nimport ast\n"),
+        ("__init__.py", "", "# stamp\n"),
+        ("AGENTS.md", "# Title\n", "<!-- stamp -->\n# Title\n"),
+        ("script.py.mako", "<% x = 1 %>\n", "## stamp\n<% x = 1 %>\n"),
+        ("_helpers.tpl", "{{/* helpers */}}\n", "{{/* stamp */}}\n{{/* helpers */}}\n"),
+        (
+            "schema.json",
+            '{\n  "type": "object"\n}\n',
+            '{\n  "$comment": "stamp",\n  "type": "object"\n}\n',
+        ),
+    ],
+)
+def test_the_stamp_is_a_comment_in_the_files_own_syntax(
+    tmp_path: Path, name: str, text: str, expected: str
+) -> None:
+    path = tmp_path / name
+    path.write_text(text)
+
+    assert stamped(path, "stamp") == expected
+
+
+def test_a_file_without_a_known_comment_syntax_fails_the_stamp(tmp_path: Path) -> None:
+    path = tmp_path / "notes.txt"
+    path.write_text("notes\n")
+
+    with pytest.raises(AssertionError, match="no comment syntax for notes.txt"):
+        stamped(path, "stamp")

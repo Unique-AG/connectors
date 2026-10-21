@@ -1,8 +1,8 @@
 """Generate a Python MCP, once. From the repository root:
 
 uv run --project packages/mcp-scaffold mcp-scaffold new <name> \\
-    --description "<what it does>" --upstream openapi|http|custom [--spec <path or URL>] \\
-    --persistence none|postgres|redis [postgres|redis] --auth none|unique
+    --description "<what it does>" [--upstream openapi|custom] [--spec <path or URL>] \\
+    --persistence none|postgres|redis [postgres|redis]
 
 The `new-mcp` skill asks for the options and runs it. The MCP owns every file it generates.
 """
@@ -15,7 +15,7 @@ from typing import cast
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from mcp_scaffold.options import Auth, Options, Persistence, Upstream
+from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.repository import name_conflict
 from mcp_scaffold.scaffold import scaffold
 
@@ -28,7 +28,12 @@ def main() -> None:
     new = commands.add_parser("new", help="generate services/<name> and register it")
     new.add_argument("name", help="kebab-case, e.g. weather-mcp")
     new.add_argument("--description", required=True)
-    new.add_argument("--upstream", type=Upstream, choices=list(Upstream), required=True)
+    new.add_argument(
+        "--upstream",
+        type=Upstream,
+        choices=list(Upstream),
+        help="what the MCP calls; leave it out for an MCP without an upstream client",
+    )
     new.add_argument(
         "--spec",
         help="the vendor's OpenAPI 3.0 spec, a path or an http(s) URL; --upstream openapi needs it",
@@ -40,7 +45,6 @@ def main() -> None:
         required=True,
         help="none, or every store the MCP owns, e.g. --persistence postgres redis",
     )
-    new.add_argument("--auth", type=Auth, choices=list(Auth), required=True)
     new.add_argument(
         "--no-release",
         dest="release",

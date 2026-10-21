@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
-from mcp_runtime import ServerSettings
+from mcp_configs import ServerSettings
 from pydantic import SecretStr
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker

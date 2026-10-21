@@ -21,15 +21,23 @@ middleware or anything else the MCP needs. Nothing regenerates them. What every 
 comes from a package it depends on instead of a copy, so a fix reaches every MCP with a version
 bump:
 
-- `packages/mcp-runtime`: the settings with their defaults, the HTTP server with its host and
-  origin guard, the telemetry setup and the retrying transport of a plain HTTP upstream.
+- `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 - `packages/mcp-architecture`: this file, the rules below and the type check the MCP extends.
 
-An MCP's own file calls into those packages, as `telemetry/setup.py` calls
-`mcp_runtime.init_telemetry`. When one MCP needs something else, change that call or replace it
-in the MCP's file. Fix something every MCP shares in one of the packages, never only in one
-service. A change to `packages/mcp-scaffold` only reaches the MCPs it makes next.
+The rest is the MCP's own code from the start: the HTTP server with its host and origin guard
+(`mcp/http.py`, `mcp/middleware.py`), the telemetry setup (`telemetry/setup.py`) and, for a
+custom upstream, the client (`upstream/client.py`). When one MCP needs something else, change
+its file. Fix a setting every MCP shares in `mcp-configs`, never only in one service. A change to
+`packages/mcp-scaffold` only reaches the MCPs it makes next. Nothing imports `mcp-scaffold`: it
+is a command-line tool, not a library.
+
+Every file the scaffold wrote starts with a comment naming the scaffold's version and the moment
+it ran, such as `# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T09:30:00+00:00`. Leave it
+on a file you edit: it tells which skeleton the file started from. A file an agent or a person
+writes never gets one, not even when it is modelled on a stamped file, and a scaffold file
+rewritten from scratch drops it. Neither does a file a tool writes, such as `uv.lock`, the
+codegen's output, an Alembic migration or the tool surface snapshot.
 
 ## Layers
 
@@ -41,7 +49,7 @@ main.py ─▶ mcp ─▶ contexts ─▶ upstream ─┐
 | Layer | Owns | May import |
 |---|---|---|
 | `main.py` | Starts telemetry, builds the server, runs it | everything |
-| `mcp/` | The FastMCP server, HTTP middleware, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `telemetry` |
+| `mcp/` | The FastMCP server, its HTTP serving and middleware, auth, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `telemetry` |
 | `contexts/` | The domain: one folder per feature, each split into commands and queries | `upstream`, `persistence`, `telemetry` |
 | `upstream/` | The system the MCP fronts: its client, settings and, for OpenAPI, the spec and generated code | `telemetry` |
 | `persistence/` | Storage the MCP owns: Postgres, Redis, a key-value store | `telemetry` |
@@ -112,7 +120,8 @@ Each layer's and each feature's `__init__.py` re-exports what others may use and
 `__all__`. Anything not listed there is internal. When another layer needs something internal,
 decide whether it belongs in the interface, and add it to `__init__.py` if it does.
 
-`upstream` and `persistence` expose the same names in every MCP, whatever is behind them:
+`upstream` and `persistence` expose the same names in every MCP that has them, whatever is
+behind them:
 
 | `upstream` | `persistence` | |
 |---|---|---|
@@ -121,10 +130,12 @@ decide whether it belongs in the interface, and add it to `__init__.py` if it do
 | `open_upstream(settings)` | `open_persistence(settings)` | An async context manager the server lifespan opens. An OpenAPI upstream takes `open_upstream(http, settings)`, the client it shares with the tools served from the spec |
 | `UpstreamError` | | A `ToolError`, so an upstream failure reaches the client as is |
 
-`Upstream` is an alias of the client's own type: `OperationClient` for OpenAPI,
-`httpx2.AsyncClient` for plain HTTP, the hand-written class for anything else. It keeps the type name the same in the code that
+`Upstream` is the client's own type: an alias of `OperationClient` for OpenAPI, and the class in
+`upstream/client.py` for a custom upstream. It keeps the type name the same in the code that
 imports it, the contexts, the tools and `mcp/dependencies.py`, in every MCP. It is not an
 abstraction: a context calls the client's own API, so changing the client changes them too.
+Nothing outside `upstream/` imports `upstream/client.py` or any other module in it: the
+`protected` contract fails on `from <package>.upstream.client import Upstream`.
 
 ## contexts
 
@@ -198,11 +209,18 @@ A context:
 - `server.py`: `create_server` builds the FastMCP app. Its lifespan opens the upstream and the
   persistence, and the tools receive them through `Depends(get_upstream)` and
   `Depends(get_persistence)` from `dependencies.py`.
-- `http_middleware` in `server.py` lists the MCP's own HTTP middleware, such as auth or a
-  request id. `mcp_runtime.run_server` serves it after the host and origin guard and CORS, and
-  `mcp_runtime.http_app` serves the same app to the tests. MCP-level middleware, which sees tool
-  calls rather than HTTP requests, goes on the server in `create_server`:
-  `mcp.add_middleware(...)`.
+- `http.py`: `run_server` serves the app over streamable HTTP at `/mcp`, stateless, and
+  `http_app` serves the same app to the tests. `run_server` refuses to bind beyond loopback
+  while the server has no auth provider, `FastMCP(auth=...)`, so an MCP without auth runs
+  locally but never in a pod.
+- `middleware.py`: `http_middleware` puts the host and origin guard first, then CORS, then the
+  MCP's own HTTP middleware, such as a request id, after `instrument(mcp)`. The guard lets a
+  request through only for a host of `MCP_BASE_URL` (or `localhost`) and, from a browser, an
+  allowed origin. `/probe`, `/health` and `/metrics` skip it, since Kubernetes and Prometheus
+  reach the pod by IP. MCP-level middleware, which sees tool calls rather than HTTP requests,
+  goes on the server in `create_server`: `mcp.add_middleware(...)`.
+- `auth/`, once the MCP has auth: what FastMCP does not provide itself, behind its own
+  `__init__.py` (see [Auth](#auth)).
 - `tools/`: `FileSystemProvider` discovers every `@tool` under it. A new tool file is picked up
   with no registration step. If one fails to import, the server refuses to start.
 - A tool starts as one file, `tools/get_asset.py`. It becomes a folder when its inputs or
@@ -227,8 +245,11 @@ A context:
 
 ## upstream
 
-What is inside depends on what the MCP talks to. `settings.py` reads the `UPSTREAM_` env
-variables either way.
+Empty when the MCP calls no system of its own: an `__init__.py` with an empty `__all__`, so the
+layers contract still sees the layer. Otherwise what is inside depends on what the MCP talks to,
+and `settings.py` reads the `UPSTREAM_` env variables either way. Adding an upstream later
+means writing the client here, opening it in `server.py` and adding `get_upstream` to
+`dependencies.py`.
 
 - **OpenAPI.** The vendor's spec is vendored as `upstream/openapi.yml`. An operation becomes a
   tool in one of two ways:
@@ -263,12 +284,17 @@ variables either way.
 
   CI runs `uv run mcp-openapi-codegen --check`, which fails when the generated code is not what
   the spec and the table generate.
-- **Plain HTTP.** `Upstream` is an `httpx2.AsyncClient` with the base URL, the auth header,
-  `mcp_runtime.RetryingTransport` and a hook that raises `UpstreamError` on an error status.
-  Parse each response into a pydantic model in `upstream/`, so the contexts still never see raw
-  JSON.
-- **Anything else** (SOAP, gRPC, a vendor SDK). Write the client by hand behind the same four
-  names, then open it in `server.py` and add `get_upstream` to `dependencies.py`.
+- **Custom.** `upstream/client.py` starts as a small HTTP client, ours to change: `Upstream` has
+  one `request(method, path, adapter, params=..., json=...)` for any method and path. It
+  validates every body with the `TypeAdapter` it is given, so a context only ever receives a
+  pydantic model, and raises `UpstreamError` on an error status, a transport error or a body
+  that does not fit. It retries with `RetrySettings` as mcp-openapi's `RetryAfterPolicy` does,
+  written out rather than imported: a status in `statuses` after its `Retry-After` or a backoff,
+  within `max_wait_seconds`, any request on a 429 and only an idempotent one on another status.
+  Put the response models in `upstream/` and export them from `upstream/__init__.py`. For
+  another protocol (SOAP, gRPC, a vendor SDK), replace the client behind the same four names.
+  When the upstream limits concurrent requests, hold a lock around each attempt and release it
+  while a retry waits, as mcp-openapi's `LockConfig` does.
 
 ## persistence
 
@@ -285,7 +311,7 @@ holds each of them as a field, so adding a store later changes no existing calle
   chart injects `DATABASE_URL`.
 - **Redis.** `persistence.store` is a `py-key-value-aio` `RedisStore`, typed as the
   `AsyncKeyValue` protocol, with `get`, `put`, `delete` and a TTL per entry. `StoreSettings` is
-  `mcp_runtime.RedisSettings`, set by `REDIS_URL`.
+  `mcp_configs.RedisSettings`, set by `REDIS_URL`.
 
 Contexts depend on what is stored, never on SQLAlchemy or Redis directly. Expose functions or
 models from `persistence/__init__.py` that say what they store, as the demo's
@@ -293,7 +319,7 @@ models from `persistence/__init__.py` that say what they store, as the demo's
 
 ## telemetry
 
-`telemetry/setup.py` passes the MCP's name to `mcp_runtime`, which sets up the rest:
+`telemetry/setup.py` sets it up under the MCP's name, with `unique_mcp` and `unique_toolkit`:
 
 - `init_telemetry(settings)` runs first in `main`, before anything logs: JSON logs in the format
   Loki expects, with trace ids, and OpenTelemetry tracing, off unless `OTEL_TRACES_EXPORTER` is
@@ -307,9 +333,9 @@ A metric of the MCP's own, such as upstream calls by route, is defined here with
 
 ## Settings
 
-What every MCP configures the same way comes from `packages/mcp-runtime`, with the defaults we
+What every MCP configures the same way comes from `packages/mcp-configs`, with the defaults we
 always use: the server, Postgres, Redis, Zitadel, upstream retries, logging and elicitation.
-Never write your own class for these. [The mcp-runtime README](../mcp-runtime/README.md) lists
+Never write your own class for these. [The mcp-configs README](../mcp-configs/README.md) lists
 each class with its env variables and defaults.
 
 A tool that elicits reads `ElicitationSettings` before it asks. It skips the question when the
@@ -320,6 +346,24 @@ What is particular to one MCP stays in the layer that owns it, such as `Upstream
 `upstream`, built on `shared_config` so it reads the environment the same way. `.env.example`
 documents every variable. `main.py` builds the settings and passes them in, so tests pass their
 own.
+
+## Auth
+
+An MCP starts without auth, and `run_server` keeps it on loopback until it has an auth provider.
+Adding one:
+
+1. Use what FastMCP provides first: `fastmcp.server.auth` has token verifiers (`JWTVerifier`,
+   `StaticTokenVerifier`, introspection), `OAuthProxy`, `OIDCProxy` and, under
+   `fastmcp.server.auth.providers`, providers for common identity services. A Zitadel sign-in is
+   `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`, configured by the same environment as
+   `ZitadelSettings` from `mcp-configs`. Write code only for what neither provides.
+2. Code of our own lives in `mcp/auth/`, exported from its `__init__.py`. `create_server` passes
+   the provider to `FastMCP(auth=...)`.
+3. The upstream never sees how the user signed in. When it needs the caller's credentials,
+   `get_upstream` in `mcp/dependencies.py` reads them, such as with
+   `fastmcp.server.dependencies.get_access_token()`, and hands the client either the values
+   themselves or a function that returns them, through its constructor. Contexts and
+   `upstream/` import nothing from auth, and no token reaches a context.
 
 ## deploy
 
@@ -345,8 +389,10 @@ own.
   `MemoryStore` in their place. That is why `Store` is typed as the `AsyncKeyValue` protocol.
   SQLite is not Postgres: a test that needs Postgres behaviour, such as a timezone or a JSON
   column, needs a real database.
-- `tests/test_server.py` covers the ops routes and the host and origin guard, through the
-  MCP's own `http_middleware`.
+- `tests/test_server.py` covers the ops routes, the host and origin guard, CORS and the refusal
+  to serve beyond loopback without auth, through the MCP's own `http_app` and `run_server`.
+- A custom upstream's `tests/test_upstream.py` covers its client: the parse into the model, the
+  auth header and each retry rule, against `httpx2.MockTransport`.
 - `mcp-architecture`'s plugin adds the architecture's checks, listed under
   `tests/mcp_architecture.py`. They use the `server` fixture in `tests/conftest.py`.
 - One of them compares every tool the server lists, its arguments, output, annotations and

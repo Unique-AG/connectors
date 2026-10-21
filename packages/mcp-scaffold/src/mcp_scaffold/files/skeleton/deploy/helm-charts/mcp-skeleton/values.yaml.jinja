@@ -100,7 +100,7 @@ postgresql:
   connection:
     sslMode: verify
     # The overlay supplies the host or URL. The base chart injects DATABASE_URL and
-    # PG_DATABASE_SSL_MODE, which mcp_runtime.PostgresSettings reads.
+    # PG_DATABASE_SSL_MODE, which mcp_configs.PostgresSettings reads.
 {% else %}
 postgresql:
   enabled: false
