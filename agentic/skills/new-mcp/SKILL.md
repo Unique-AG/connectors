@@ -198,7 +198,8 @@ through the functions in `persistence/__init__.py`.
 
 For OpenAPI, this is promoting a served operation, when the user asks for a tool the spec
 cannot give as it is: trimmed, renamed, with a rule, or merged from several operations.
-Follow `packages/mcp-architecture/ARCHITECTURE.md`:
+Follow `packages/mcp-architecture/ARCHITECTURE.md` and its guides `guides/contexts.md` and
+`guides/mcp.md`:
 1. Write a feature under `contexts/<plural noun>/`, and re-export what the tool calls from
    `contexts/__init__.py`.
 2. Write a tool under `mcp/tools/` that calls it, imported from `<package>.contexts`.

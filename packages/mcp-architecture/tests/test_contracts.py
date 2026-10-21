@@ -7,6 +7,7 @@ from importlinter.application.output import console
 from importlinter.cli import lint_imports
 
 from mcp_architecture import render_importlinter
+from mcp_architecture.contracts import restore_importlinter
 
 SHOP = {
     "__init__.py": "",
@@ -214,3 +215,51 @@ def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> N
 
     assert "Layers only import downwards" in report
     assert "shop.logic" in report
+
+
+BEFORE = '[project]\nname = "shop"\n\n# The architecture.\n'
+AFTER = '\n# Read by the codegen.\n[tool.mcp-openapi]\nspec = "openapi.yml"\n'
+OWN_CONTRACT = (
+    "# Orders and payments stay apart.\n"
+    "[[tool.importlinter.contracts]]\n"
+    'name = "Orders know nothing about payments"\n'
+    'type = "forbidden"\n'
+    'source_modules = ["shop.contexts.orders"]\n'
+    'forbidden_modules = ["shop.contexts.payments"]\n'
+)
+OWN_TYPE = '    "audited: shop_checks.AuditedContract",\n'
+
+
+def test_restoring_a_kept_table_changes_nothing() -> None:
+    pyproject = f"{BEFORE}{render_importlinter('shop')}\n{OWN_CONTRACT}{AFTER}"
+
+    assert restore_importlinter(pyproject, "shop") == pyproject
+
+
+def test_restoring_writes_back_a_loosened_table_around_the_rest_of_the_file() -> None:
+    loosened = (
+        render_importlinter("decoy")
+        .replace("exhaustive = true\n", "exhaustive = false\n")
+        .replace(
+            'type = "acyclic_siblings"\n', 'type = "acyclic_siblings"\nignore_imports = ["x"]\n'
+        )
+    )
+
+    restored = restore_importlinter(f"{BEFORE}{loosened}{AFTER}", "shop")
+
+    assert restored == f"{BEFORE}{render_importlinter('shop')}{AFTER}"
+
+
+def test_restoring_keeps_the_mcps_own_contracts_and_contract_types() -> None:
+    with_own_type = render_importlinter("shop").replace("\n]\n", f"\n{OWN_TYPE}]\n", 1)
+    dropped_last = with_own_type[: with_own_type.rindex("\n[[tool.importlinter.contracts]]")]
+
+    restored = restore_importlinter(f"{BEFORE}{dropped_last}\n\n{OWN_CONTRACT}{AFTER}", "shop")
+
+    assert restored == f"{BEFORE}{with_own_type}\n{OWN_CONTRACT}{AFTER}"
+
+
+def test_restoring_adds_a_missing_table_at_the_end() -> None:
+    assert restore_importlinter(f"{BEFORE}{AFTER}", "shop") == (
+        f"{BEFORE}{AFTER}\n{render_importlinter('shop')}"
+    )

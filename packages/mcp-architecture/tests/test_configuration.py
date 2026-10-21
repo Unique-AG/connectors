@@ -36,6 +36,10 @@ EXTEND_TYPE_CHECK = (
     "[tool.basedpyright]\n"
     'extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"\n'
 )
+RESTORE = (
+    "`uv run mcp-architecture-check --update` writes the table back as "
+    "mcp_architecture.render_importlinter gives it, keeping the MCP's own contracts."
+)
 OWN_CONTRACT = (
     "\n[[tool.importlinter.contracts]]\n"
     'name = "Orders know nothing about payments"\n'
@@ -58,20 +62,18 @@ def test_the_scaffolds_tables_with_additions_of_their_own_pass(tmp_path: Path) -
     [
         (
             ("exhaustive = true\n", "exhaustive = false\n"),
-            "[tool.importlinter] dropped or changed these contracts. Restore them as "
-            "mcp_architecture.render_importlinter writes them: ['Layers only import downwards']",
+            "[tool.importlinter] dropped or changed these contracts: "
+            f"['Layers only import downwards']. {RESTORE}",
         ),
         (
             ('type = "acyclic_siblings"\n', 'type = "acyclic_siblings"\nignore_imports = ["x"]\n'),
-            "[tool.importlinter] dropped or changed these contracts. Restore them as "
-            "mcp_architecture.render_importlinter writes them: "
-            "['No package imports its siblings in a cycle']",
+            "[tool.importlinter] dropped or changed these contracts: "
+            f"['No package imports its siblings in a cycle']. {RESTORE}",
         ),
         (
             ("include_external_packages = true\n", "exclude_type_checking_imports = true\n"),
-            "[tool.importlinter] changed options every MCP keeps. Restore them as "
-            "mcp_architecture.render_importlinter writes them: "
-            "['exclude_type_checking_imports', 'include_external_packages']",
+            "[tool.importlinter] changed options every MCP keeps: "
+            f"['exclude_type_checking_imports', 'include_external_packages']. {RESTORE}",
         ),
     ],
     ids=["a loosened contract", "an ignored import", "a changed option"],
@@ -89,16 +91,15 @@ def test_a_dropped_contract_is_a_finding(tmp_path: Path) -> None:
     without_last = rendered[: rendered.rindex("\n[[tool.importlinter.contracts]]")] + "\n"
 
     assert findings(tmp_path, SHARED + without_last) == [
-        "[tool.importlinter] dropped or changed these contracts. Restore them as "
-        "mcp_architecture.render_importlinter writes them: "
-        "['The domain and the storage know nothing about MCP']"
+        "[tool.importlinter] dropped or changed these contracts: "
+        f"['The domain and the storage know nothing about MCP']. {RESTORE}"
     ]
 
 
 def test_a_missing_importlinter_table_is_a_finding(tmp_path: Path) -> None:
     assert findings(tmp_path, SHARED) == [
         "[tool.importlinter] root_package is None, not the project's package 'kiosk', so "
-        "`lint-imports` does not check the MCP's own code."
+        f"`lint-imports` does not check the MCP's own code. {RESTORE}"
     ]
 
 

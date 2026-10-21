@@ -163,12 +163,28 @@ async def test_settings_that_would_print_their_input_are_a_finding(tmp_path: Pat
 
 
 async def test_a_root_package_other_than_the_projects_is_a_finding(tmp_path: Path) -> None:
-    service = write_service(tmp_path, root_package="decoy")
+    service = write_service(tmp_path)
+    await check_service(service, update=True)
+    pyproject = service / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text().replace('root_package = "kiosk"', 'root_package = "decoy"')
+    )
 
-    assert await check_service(service, update=True) == [
+    assert await check_service(service) == [
         "[tool.importlinter] root_package is 'decoy', not the project's package 'kiosk', "
-        "so `lint-imports` does not check the MCP's own code."
+        "so `lint-imports` does not check the MCP's own code. `uv run mcp-architecture-check "
+        "--update` writes the table back as mcp_architecture.render_importlinter gives it, "
+        "keeping the MCP's own contracts."
     ]
+
+
+async def test_update_writes_a_loosened_importlinter_table_back(tmp_path: Path) -> None:
+    service = write_service(tmp_path, root_package="decoy")
+    pyproject = service / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text().replace("exhaustive = true\n", ""))
+
+    assert await check_service(service, update=True) == []
+    assert pyproject.read_text().endswith(render_importlinter("kiosk"))
 
 
 async def test_a_file_that_changes_its_type_check_is_a_finding(tmp_path: Path) -> None:
