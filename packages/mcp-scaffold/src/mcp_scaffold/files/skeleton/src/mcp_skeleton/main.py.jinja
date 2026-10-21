@@ -1,14 +1,16 @@
 {% set settings = [
-    options.opens_upstream and "UpstreamSettings()",
+    options.opens_upstream and "from_environment(UpstreamSettings)",
     options.opens_persistence and "persistence",
 ] | select | join(", ") %}
-{# UpstreamSettings needs an API key, which pyright cannot see the environment give. #}
-{% set ignore_call = "  # pyright: ignore[reportCallIssue]" if options.opens_upstream else "" %}
 {% if options.opens_persistence %}
 from functools import partial
 
 {% endif %}
+{% if options.opens_upstream %}
+from mcp_configs import LoggingSettings, ServerSettings, from_environment
+{% else %}
 from mcp_configs import LoggingSettings, ServerSettings
+{% endif %}
 
 from mcp_skeleton.mcp import create_server, run_server
 {% if options.opens_persistence %}
@@ -25,7 +27,7 @@ def main() -> None:
 {% if options.opens_persistence %}
     persistence = partial(open_persistence, PersistenceSettings())
 {% endif %}
-    server = create_server({{ settings }}){{ ignore_call }}
+    server = create_server({{ settings }})
     run_server(server, ServerSettings())
 
 
