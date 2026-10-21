@@ -310,7 +310,8 @@ means writing the client here, opening it in `server.py` and adding `get_upstrea
   one `request(method, path, adapter, params=..., json=...)` for any method and path. It
   validates every body with the `TypeAdapter` it is given, so a context only ever receives a
   pydantic model, and raises `UpstreamError` on an error status, a transport error or a body
-  that does not fit. It retries with `RetrySettings` as mcp-openapi's `RetryAfterPolicy` does,
+  that does not fit. As in mcp-openapi, the error names the status, method and URL without its
+  query, and the start of an error body goes to the server log only. It retries with `RetrySettings` as mcp-openapi's `RetryAfterPolicy` does,
   written out rather than imported: a status in `statuses` after its `Retry-After` or a backoff,
   within `max_wait_seconds`, any request on a 429 and only an idempotent one on another status.
   Put the response models in `upstream/` and export them from `upstream/__init__.py`. For

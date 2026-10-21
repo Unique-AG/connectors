@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from datetime import UTC
 from email.utils import parsedate_to_datetime
+import logging
 
 from fastmcp.exceptions import ToolError
 import httpx2
@@ -18,6 +19,8 @@ from mcp_skeleton.upstream.settings import UpstreamSettings
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE"})
 _TOO_MANY_REQUESTS = 429
 _BACKOFF = tenacity.wait_exponential_jitter(initial=1, exp_base=2, jitter=1)
+_LOGGER = logging.getLogger(__name__)
+_LOGGED_BODY_CHARS = 200
 
 
 class UpstreamError(ToolError):
@@ -80,8 +83,9 @@ class Upstream:
             url = error.request.url.copy_with(query=None)
             status = f"{error.response.status_code} {error.response.reason_phrase}"
             message = f"{status} for {error.request.method} {url}"
-            body = error.response.text[:200]
-            raise UpstreamError(f"{message}: {body}" if body else message) from error
+            # The body may hold the upstream's internals, so only the server log sees it.
+            _LOGGER.warning("%s: %s", message, error.response.text[:_LOGGED_BODY_CHARS])
+            raise UpstreamError(message) from error
         except httpx2.HTTPError as error:
             raise UpstreamError(str(error) or type(error).__name__) from error
 
