@@ -128,3 +128,57 @@ def test_a_run_outside_the_repository_root_is_refused(
     error = refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS)
 
     assert "run mcp-scaffold from the repository root" in error
+
+
+def test_a_run_outside_a_git_repository_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shutil.copy(REPO / ".gitcommitizen", tmp_path / ".gitcommitizen")
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    monkeypatch.chdir(tmp_path)
+
+    error = refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS)
+
+    assert "git cannot tell whether the tree is clean" in error
+    assert not (tmp_path / "services" / "weather-mcp").exists()
+
+
+@pytest.mark.usefixtures("repo")
+def test_a_run_without_git_is_refused(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PATH", "")
+
+    error = refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS)
+
+    assert "git is not installed" in error
+
+
+@pytest.mark.parametrize(
+    ("spec", "content"),
+    [
+        ("missing.yml", None),
+        ("http://127.0.0.1:9/openapi.yml", None),
+        ("newer.yml", "openapi: 3.1.0\npaths: {}\n"),
+        ("broken.yml", "openapi: [\n"),
+    ],
+    ids=["a missing file", "an unreachable URL", "OpenAPI 3.1", "not YAML"],
+)
+def test_a_spec_the_scaffold_cannot_use_is_refused_before_anything_is_written(
+    repo: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    spec: str,
+    content: str | None,
+) -> None:
+    if content is not None:
+        outside = tmp_path_factory.mktemp("specs") / spec
+        outside.write_text(content)
+        spec = str(outside)
+    arguments = ["--description", "Probes.", "--upstream", "openapi", "--persistence", "none"]
+
+    error = refusal(monkeypatch, capsys, "weather-mcp", *arguments, "--spec", spec)
+
+    assert f"cannot use the spec {spec}: " in error
+    assert not (repo / "services" / "weather-mcp").exists()

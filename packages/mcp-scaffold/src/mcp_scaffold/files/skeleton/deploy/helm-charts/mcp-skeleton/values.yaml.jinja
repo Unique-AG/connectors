@@ -23,7 +23,14 @@ env:
 
 # Set per deployment in the overlay. The app refuses to start without them.
 # - MCP_BASE_URL: the public https origin, matching routes.hostname
+{% if "redis" in options.persistence %}
+# - REDIS_URL
+{% endif %}
+{% if options.opens_upstream %}
 # - every secret in .env.example, e.g. UPSTREAM_API_KEY, from a secret through envVars
+{% else %}
+# - every secret in .env.example, from a secret through envVars
+{% endif %}
 envVars: []
 
 image:

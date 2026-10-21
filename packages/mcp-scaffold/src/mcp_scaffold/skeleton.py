@@ -31,7 +31,7 @@ def render_templates(options: Options, target: Path) -> None:
     )
     for template in sorted(target.rglob("*.jinja")):
         rendered = environment.from_string(template.read_text()).render(
-            options=options, python_lines=_python_lines, quoted=json.dumps
+            options=options, python_lines=_python_lines, quoted=quoted
         )
         template.with_suffix("").write_text(rendered)
         template.unlink()
@@ -39,9 +39,14 @@ def render_templates(options: Options, target: Path) -> None:
 
 def _python_lines(text: str, width: int) -> list[str]:
     """`text` as adjacent string literals, which Python joins back into it."""
-    lines = textwrap.wrap(text, width)
+    lines = textwrap.wrap(text, width, break_on_hyphens=False, break_long_words=False)
     spaced = [f"{line} " for line in lines[:-1]] + lines[-1:]
-    return [json.dumps(line) for line in spaced]
+    return [quoted(line) for line in spaced]
+
+
+def quoted(text: str) -> str:
+    """A string literal that Python, TOML and YAML all read, which an escaped emoji is not."""
+    return json.dumps(text, ensure_ascii=False)
 
 
 def copy_root_files(kind: str, target: Path) -> None:

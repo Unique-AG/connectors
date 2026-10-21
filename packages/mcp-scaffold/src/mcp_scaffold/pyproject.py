@@ -9,7 +9,7 @@ from mcp_architecture import render_importlinter
 
 from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned, shared, source
-from mcp_scaffold.skeleton import PACKAGE
+from mcp_scaffold.skeleton import PACKAGE, quoted
 
 
 def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
@@ -17,7 +17,7 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
     text = pyproject.read_text()
     text = re.sub(
         r'^description = ".*"$',
-        f"description = {json.dumps(options.description)}",
+        lambda _: f"description = {quoted(options.description)}",
         text,
         count=1,
         flags=re.MULTILINE,

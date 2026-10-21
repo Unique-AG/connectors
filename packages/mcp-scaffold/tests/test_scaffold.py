@@ -1,20 +1,26 @@
+import ast
 import json
 import re
 import shutil
+import tomllib
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 import pytest
+import yaml
+from pydantic import ValidationError
 
 from mcp_scaffold import commands, openapi
 from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
 from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned, scaffold_version
+from mcp_scaffold.pyproject import edit_pyproject
 from mcp_scaffold.repository import register
-from mcp_scaffold.scaffold import scaffold
+from mcp_scaffold.scaffold import load_spec, scaffold
+from mcp_scaffold.skeleton import NAME, PACKAGE, copy_skeleton, render_templates
 from mcp_scaffold.stamp import stamped
 from tests.conftest import REGISTRIES, REPO, UseVenv, link_project_environment, venvs
 
@@ -85,15 +91,15 @@ def probe(upstream: Upstream | None, persistence: set[Persistence]) -> Options:
     )
 
 
-# Each option appears alone once, and the stores once together. The first without an upstream
-# opens nothing, so its server has no lifespan; the second opens only its store. The last is
-# every option at once: an OpenAPI upstream with Postgres and Redis.
+# Each upstream and each store appears at least once, and the stores once together. The first
+# opens nothing, so its server has no lifespan; the next two open only an upstream or only a
+# store. The last is every option at once: an OpenAPI upstream with Postgres and Redis.
 PROBES = {
     options.name: options
     for options in [
         probe(None, set()),
+        probe(Upstream.OPENAPI, set()),
         probe(None, {Persistence.REDIS}),
-        probe(Upstream.OPENAPI, {Persistence.REDIS}),
         probe(Upstream.CUSTOM, {Persistence.POSTGRES}),
         probe(Upstream.CUSTOM, {Persistence.POSTGRES, Persistence.REDIS}),
         probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}),
@@ -129,7 +135,7 @@ def scaffolded(repo: Path, request: pytest.FixtureRequest) -> Iterator[Scaffolde
         def scaffold_probe(name: str) -> Path:
             if name not in built:
                 monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(venvs(request.config) / name))
-                built[name] = scaffold(PROBES[name], repo)
+                built[name] = scaffold(PROBES[name], repo, spec=load_spec(PROBES[name], repo))
             return built[name]
 
         yield scaffold_probe
@@ -203,8 +209,8 @@ def test_an_mcp_without_an_upstream_keeps_the_layer_empty(
 def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
     scaffolded: Scaffolded,
 ) -> None:
-    service = scaffolded("probe-openapi-redis-mcp")
-    upstream = service / "src" / "probe_openapi_redis_mcp" / "upstream"
+    service = scaffolded("probe-openapi-none-mcp")
+    upstream = service / "src" / "probe_openapi_none_mcp" / "upstream"
 
     assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
     operations = upstream / "generated" / "operations.py"
@@ -243,6 +249,42 @@ def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="openapi"):
         VendorSpec.load("spec.json", tmp_path)
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Reads the long-range forecast of a city from the fictional weather service, as listed "
+        "at https://weather.example.com/v1/forecasts/long-range/cities/by-region/and-by-country",
+        "Answers weather questions \u26c5 and storm warnings \U0001f329 for a city.",
+    ],
+    ids=["a hyphen and a long URL", "an emoji"],
+)
+def test_the_description_reaches_every_file_as_given(tmp_path: Path, description: str) -> None:
+    options = Options(name="probe-text-mcp", description=description, persistence=frozenset())
+    target = tmp_path / "probe-text-mcp"
+    copy_skeleton(target)
+    render_templates(options, target)
+    edit_pyproject(options, target, REPO)
+
+    pyproject = tomllib.loads((target / "pyproject.toml").read_text())
+    chart = (target / "deploy" / "helm-charts" / NAME / "Chart.yaml").read_text()
+    server = ast.parse((target / "src" / PACKAGE / "mcp" / "server.py").read_text())
+    (instructions,) = [
+        node.value
+        for node in server.body
+        if isinstance(node, ast.Assign)
+        and [ast.unparse(name) for name in node.targets] == ["INSTRUCTIONS"]
+    ]
+
+    assert pyproject["project"]["description"] == description
+    assert cast(dict[str, object], yaml.safe_load(chart))["description"] == description
+    assert ast.literal_eval(instructions) == description
+
+
+def test_a_description_of_only_whitespace_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="description"):
+        Options(name="probe-text-mcp", description=" \n ", persistence=frozenset())
 
 
 def test_the_scaffolds_registered_their_release_and_scope(
@@ -284,7 +326,7 @@ def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
     assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
 
 
-@pytest.mark.parametrize("name", ["probe-openapi-redis-mcp", "probe-custom-postgres-redis-mcp"])
+@pytest.mark.parametrize("name", ["probe-openapi-none-mcp", "probe-custom-postgres-redis-mcp"])
 def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
     scaffolded: Scaffolded, name: str
 ) -> None:
@@ -313,8 +355,8 @@ def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
 
 
 def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
-    target = scaffolded("probe-openapi-redis-mcp")
-    generated = target / "src" / "probe_openapi_redis_mcp" / "upstream" / "generated"
+    target = scaffolded("probe-openapi-none-mcp")
+    generated = target / "src" / "probe_openapi_none_mcp" / "upstream" / "generated"
 
     for path in [
         target / "uv.lock",

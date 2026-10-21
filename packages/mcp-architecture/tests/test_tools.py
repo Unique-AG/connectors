@@ -1,13 +1,16 @@
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated, cast
+from typing import Annotated, cast, override
 
 import httpx2
 import pytest
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, OpenAPIProvider, RouteMap
-from fastmcp.tools import Tool
+from fastmcp.tools import Tool, ToolResult
+from mcp_types import CallToolRequestParams
 from pydantic import Field
 
 from mcp_architecture import (
@@ -141,3 +144,22 @@ async def test_masks_error_details_tells_whether_an_error_message_reaches_the_cl
         yield FastMCP(name="Shop", mask_error_details=masked)
 
     assert await masks_error_details(factory) is masked
+
+
+async def test_masks_error_details_does_not_pass_a_server_that_never_runs_the_tool() -> None:
+    class RejectEveryCall(Middleware):
+        @override
+        async def on_call_tool(
+            self,
+            context: MiddlewareContext[CallToolRequestParams],
+            call_next: CallNext[CallToolRequestParams, ToolResult],
+        ) -> ToolResult:
+            raise ToolError("Unknown tool")
+
+    @asynccontextmanager
+    async def factory() -> AsyncGenerator[FastMCP]:
+        mcp = FastMCP(name="Shop", mask_error_details=False)
+        mcp.add_middleware(RejectEveryCall())
+        yield mcp
+
+    assert await masks_error_details(factory) is False

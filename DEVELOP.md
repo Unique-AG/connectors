@@ -75,9 +75,10 @@ It runs, in this order:
 2. the generated-code drift checks, in a service that has a generator
 3. `uv run ruff format --check .`, then `pnpm exec biome check .`
 4. `uv run ruff check .` and `uv run basedpyright`
-5. in a service with `[tool.importlinter]`, one that keeps
+5. in a service that depends on `mcp-architecture`, one that keeps
    `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, then
-   `uv run mcp-architecture-check`, the checks of what a client sees and that no file carries a
+   `uv run mcp-architecture-check`, the checks of what a client sees, that the tool tables in
+   `pyproject.toml` keep every shared rule and contract, and that no file carries a
    `# pyright:` comment other than an ignore that names its rule, since basedpyright lets such a
    comment change a file's mode or turn a report down
 6. `uv run pytest`
@@ -94,7 +95,10 @@ Directly changed Python services are included in the same matrix rather than bei
 the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs` and
 `packages/mcp-architecture` work the same way. `packages/mcp-scaffold` also runs for a change to
 `packages/mcp-configs`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the MCPs its
-tests generate use all three: the last for an OpenAPI upstream.
+tests generate use all three: the last for an OpenAPI upstream. It runs as well for a change to a
+file it registers a new MCP in by matching its text: `.gitcommitizen`,
+`release-please-config.json`, `.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
+and for a change to the workflow files that list every service.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.

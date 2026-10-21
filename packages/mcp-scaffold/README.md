@@ -85,11 +85,9 @@ needs belongs in their code, put it in one of those packages instead.
 - `src/mcp_scaffold/files/layers/`: one folder per `--upstream` and `--persistence` choice.
 - `src/mcp_scaffold/files/root/`: files outside the package a choice brings, such as `alembic.ini`
   or a custom upstream's `tests/test_upstream.py`.
-- A file under `files/` named `*.jinja` depends on the combination of choices: the server,
-  `tests/conftest.py`, `tests/offline_server.py`, `.env.example`, the Dockerfile, the chart's `values.yaml` and the
-  persistence layer's `__init__.py` and `persistence.py`. Once every layer is copied,
-  `render_templates` in `skeleton.py` renders each with the `Options` as `options` and drops
-  the suffix.
+- A file under `files/` named `*.jinja` depends on the combination of choices. Once every layer
+  is copied, `render_templates` in `skeleton.py` renders each with the `Options` as `options`
+  and drops the suffix.
 - `src/mcp_scaffold/cli.py`: the `new` command.
 - `src/mcp_scaffold/scaffold.py`: `scaffold()`, the steps in order. Each step is a module named
   for what it copies, writes or edits: `upstream.py` and `persistence.py` (the layer folders),
@@ -105,5 +103,6 @@ it, and `agents.py` adds what the MCP chose.
 None of the files under `files/` is linted or type-checked here. They are checked where they
 land:
 
-- `tests/test_scaffold.py` generates one MCP per choice and runs its ruff, basedpyright and
-  pytest.
+- `tests/test_scaffold.py` generates one MCP per choice and runs every check `commands.check`
+  runs on a new MCP: ruff, the codegen's drift check, basedpyright, `lint-imports`,
+  `mcp-architecture-check` and pytest.

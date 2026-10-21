@@ -16,9 +16,9 @@ Each class reads the environment and a `.env` file the same way (`shared_config`
 |---|---|---|
 | `ServerSettings` | `HOST`, `PORT`, `MCP_BASE_URL`, `MCP_ALLOWED_ORIGINS` | `127.0.0.1:8000`; the base URL from them; the MCP Inspector's origin on localhost. A remote base URL needs https and no path. `binds_to_loopback` says whether `HOST` is loopback, which a server without auth must keep to. |
 | `RedisSettings` | `REDIS_URL` | required |
-| `PostgresSettings` | `DATABASE_URL` or `DB_URL`, or `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`; `PG_DATABASE_SSL_MODE`, `DB_SSL_ROOT_CERT`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW` | pool 5 + 10 overflow. `connection_url` and `connect_args` are ready for `create_async_engine` with asyncpg. |
+| `PostgresSettings` | `DATABASE_URL` or `DB_URL`, or `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`; `PG_DATABASE_SSL_MODE`, `DB_SSL_ROOT_CERT`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW` | pool 5 + 10 overflow. `connection_url` and `connect_args` are ready for `create_async_engine` with asyncpg: `sslmode`, `sslrootcert` and `application_name` move from the URL into `connect_args`, and the libpq parameters asyncpg rejects are dropped. With a URL, `DB_PORT` is ignored. |
 | `ZitadelSettings` | `ZITADEL_BASE_URL`, `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET`, `ZITADEL_JWT_SIGNING_KEY`, `ZITADEL_ORG_ID` | https outside localhost; a public PKCE client without a secret; `openid profile urn:zitadel:iam:user:resourceowner`, plus the organisation scope when set |
-| `RetrySettings` | `UPSTREAM_RETRY_MAX_ATTEMPTS`, `UPSTREAM_RETRY_MAX_WAIT_SECONDS`, `UPSTREAM_RETRY_STATUSES` | 5 attempts, at most 30 s apart, on 429 and 503 |
+| `RetrySettings` | `UPSTREAM_RETRY_MAX_ATTEMPTS`, `UPSTREAM_RETRY_MAX_WAIT_SECONDS`, `UPSTREAM_RETRY_STATUSES` | 5 attempts, at most 30 s apart, on 429 and 503. A `POST` or `PATCH` is sent again only on a 429. |
 | `LoggingSettings` | `LOG_LEVEL`, `LOGS_DIAGNOSTICS_DATA_POLICY` | `INFO`; identifying values concealed as `sha256:<hex>` |
 | `ElicitationSettings` | `ELICITATION_FOR_DISAMBIGUATION`, `ELICITATION_FOR_DATA_MODIFICATION`, `ELICITATION_FOR_DATA_REMOVAL` (`enabled` or `disabled`), `ELICITATION_TIMEOUT_BEFORE_CANCEL_SECONDS` | all enabled; 120 s |
 

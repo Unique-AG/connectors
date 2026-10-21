@@ -16,8 +16,11 @@ from mcp_scaffold.stamp import stamp, written_files
 from mcp_scaffold.upstream import write_upstream
 
 
-def scaffold(options: Options, repo: Path, *, release: bool = True) -> Path:
-    """Generate `services/<name>` in `repo` and register it there.
+def scaffold(
+    options: Options, repo: Path, *, spec: VendorSpec | None, release: bool = True
+) -> Path:
+    """Generate `services/<name>` in `repo` and register it there. `spec` is the vendor's spec
+    `load_spec` read from `options.spec`, for an OpenAPI upstream.
 
     Every step writes the skeleton's placeholder names, which `rename` replaces once all of them
     have run. The codegen runs after it, since it needs the service installed under its name.
@@ -26,7 +29,7 @@ def scaffold(options: Options, repo: Path, *, release: bool = True) -> Path:
     started = datetime.now(UTC)
     target = repo / "services" / options.name
     assert not target.exists(), f"{target} already exists"
-    spec = VendorSpec.load(options.spec, repo) if options.spec is not None else None
+    assert (spec is None) == (options.spec is None), "load the spec options.spec names"
 
     copy_skeleton(target)
     write_upstream(options, target)
@@ -44,3 +47,7 @@ def scaffold(options: Options, repo: Path, *, release: bool = True) -> Path:
     stamp(sorted(written), version=scaffold_version(), timestamp=started)
     check(target, openapi=spec is not None)
     return target
+
+
+def load_spec(options: Options, repo: Path) -> VendorSpec | None:
+    return VendorSpec.load(options.spec, repo) if options.spec is not None else None

@@ -12,12 +12,13 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
+import yaml
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from mcp_scaffold.options import Options, Persistence, Upstream
 from mcp_scaffold.repository import name_conflict
-from mcp_scaffold.scaffold import scaffold
+from mcp_scaffold.scaffold import load_spec, scaffold
 
 
 def main() -> None:
@@ -68,18 +69,29 @@ def main() -> None:
     if (conflict := name_conflict(options.name, repo)) is not None:
         parser.error(conflict)
     _require_clean(parser, repo)
-    target = scaffold(options, repo, release=cast(bool, arguments.release))
+    try:
+        spec = load_spec(options, repo)
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        parser.error(f"cannot use the spec {options.spec}: {error}")
+    target = scaffold(options, repo, spec=spec, release=cast(bool, arguments.release))
     print(f"{target} is ready. The new-mcp skill lists what to fill in next.")
 
 
 def _require_clean(parser: argparse.ArgumentParser, repo: Path) -> None:
-    changes = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    try:
+        changes = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except FileNotFoundError:
+        parser.error("git is not installed, and the run needs it to check the tree is clean")
+    except subprocess.CalledProcessError as error:
+        parser.error(
+            f"git cannot tell whether the tree is clean: {cast(str, error.stderr).strip()}"
+        )
     if changes:
         parser.error(
             "commit or stash every change first, untracked files too, so git alone can undo "

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from mcp_scaffold.commands import run
 from mcp_scaffold.options import Options
-from mcp_scaffold.skeleton import PACKAGE
+from mcp_scaffold.skeleton import PACKAGE, quoted
 
 
 class VendorSpec(BaseModel):
@@ -78,7 +78,7 @@ def write_spec(spec: VendorSpec, target: Path) -> None:
             (
                 target / "pyproject.toml",
                 spec_path,
-                f"{spec_path}spec-source = {json.dumps(spec.url)}\n",
+                f"{spec_path}spec-source = {quoted(spec.url)}\n",
             )
         )
     if spec.api_url is not None:

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from architecture_demo_mcp.contexts.portfolios.models import PortfolioValuation
 from architecture_demo_mcp.contexts.portfolios.models import ValuedPosition
@@ -8,6 +9,11 @@ from architecture_demo_mcp.persistence import list_positions
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.persistence import Position
 from architecture_demo_mcp.upstream import Upstream
+from architecture_demo_mcp.upstream import UpstreamError
+
+_logger = logging.getLogger(__name__)
+# Tiingo limits requests per hour, so a large portfolio is priced a few tickers at a time.
+_CONCURRENT_PRICE_REQUESTS = 4
 
 
 async def value_portfolio(
@@ -15,12 +21,19 @@ async def value_portfolio(
 ) -> PortfolioValuation:
     """Each of the owner's positions in the portfolio at its latest close, with the totals.
 
-    A position Tiingo has no price for stays listed, unpriced and out of the P&L.
+    A position Tiingo has no price for, or could not price just now, stays listed, unpriced and
+    out of the P&L.
     """
     positions = await list_positions(persistence=persistence, owner=owner, portfolio=portfolio)
+    requests = asyncio.Semaphore(_CONCURRENT_PRICE_REQUESTS)
     closes = await asyncio.gather(
         *(
-            get_latest_close(upstream=upstream, persistence=persistence, ticker=position.ticker)
+            _latest_close_or_none(
+                upstream=upstream,
+                persistence=persistence,
+                ticker=position.ticker,
+                requests=requests,
+            )
             for position in positions
         )
     )
@@ -39,6 +52,17 @@ async def value_portfolio(
         unrealized_pnl=round(market_value - priced_cost, 2),
         unrealized_return=round(market_value / priced_cost - 1, 6) if priced_cost else None,
     )
+
+
+async def _latest_close_or_none(
+    *, upstream: Upstream, persistence: Persistence, ticker: str, requests: asyncio.Semaphore
+) -> DailyClose | None:
+    async with requests:
+        try:
+            return await get_latest_close(upstream=upstream, persistence=persistence, ticker=ticker)
+        except UpstreamError:
+            _logger.warning("Left %s unpriced: Tiingo did not answer its latest close", ticker)
+            return None
 
 
 def _valued(

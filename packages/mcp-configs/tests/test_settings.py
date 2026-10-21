@@ -34,6 +34,14 @@ def test_logging_reads_the_lowercase_level_the_charts_set(monkeypatch: pytest.Mo
     assert settings.discloses_diagnostics
 
 
+def test_logging_reads_the_diagnostics_policy_in_any_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LOGS_DIAGNOSTICS_DATA_POLICY", "DISCLOSE")
+
+    assert LoggingSettings().discloses_diagnostics
+
+
 def test_logging_rejects_an_unknown_level(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", "verbose")
 
@@ -41,7 +49,7 @@ def test_logging_rejects_an_unknown_level(monkeypatch: pytest.MonkeyPatch) -> No
         LoggingSettings()
 
 
-def test_retry_defaults_match_the_openapi_client() -> None:
+def test_retry_defaults_to_five_attempts_30_seconds_apart_on_429_and_503() -> None:
     settings = RetrySettings()
 
     assert (settings.max_attempts, settings.max_wait_seconds) == (5, 30)

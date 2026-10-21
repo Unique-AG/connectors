@@ -38,6 +38,11 @@ class LoggingSettings(BaseSettings):
         """The charts set `LOG_LEVEL: info`."""
         return value.upper() if isinstance(value, str) else value
 
+    @field_validator("diagnostics_data_policy", mode="before")
+    @classmethod
+    def _lowercase(cls, value: object) -> object:
+        return value.lower() if isinstance(value, str) else value
+
     @property
     def discloses_diagnostics(self) -> bool:
         return self.diagnostics_data_policy is DiagnosticsDataPolicy.DISCLOSE
