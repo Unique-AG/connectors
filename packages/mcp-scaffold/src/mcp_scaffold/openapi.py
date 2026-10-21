@@ -108,7 +108,7 @@ def generate_operations(options: Options, target: Path) -> Path:
     upstream = target / "src" / options.package / "upstream"
     constants = [
         name.id
-        for node in ast.parse((upstream / "operations.py").read_text()).body
+        for node in ast.parse((upstream / "generated" / "operations.py").read_text()).body
         if isinstance(node, ast.Assign)
         for name in node.targets
         if isinstance(name, ast.Name)
@@ -119,7 +119,7 @@ def generate_operations(options: Options, target: Path) -> Path:
         f"""from mcp_openapi.upstream import UpstreamError
 
 from {options.package}.upstream.client import {", ".join(sorted(exported))}
-from {options.package}.upstream.operations import {", ".join(constants)}
+from {options.package}.upstream.generated.operations import {", ".join(constants)}
 from {options.package}.upstream.settings import UpstreamSettings
 
 __all__ = {json.dumps(names)}
