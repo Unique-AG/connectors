@@ -26,6 +26,7 @@ rule, and the `AGENTS.md` of every scaffolded MCP points to it.
 | An unexpected error reaches the client without its message | `masks_error_details` |
 | A settings error does not print its input | `settings_showing_input_in_errors` |
 | What a client sees matches a snapshot | `tool_surface` |
+| The MCP's tool tables keep every shared rule and contract | `loosened_configuration` |
 | `contexts` is flat, one folder per feature | review |
 
 A rule checked by a name in code, not a tool, is code of our own.
@@ -65,9 +66,9 @@ upstream and the stores.
   registers. import-linter's `protected` contract lets an allowed importer's descendants in too,
   so it cannot say that one feature only reaches another through its top level.
 - `mcp-architecture-check`: runs, in the MCP's folder, the checks of what a client sees against
-  the server `offline_server()` builds, and checks that `[tool.importlinter]`'s `root_package`
-  is the project's own package. CI runs it as a step of its own, outside pytest, so a
-  `conftest.py` cannot skip, xfail or deselect a check. `--update` writes
+  the server `offline_server()` builds, and checks the MCP's tool tables in `pyproject.toml`. CI
+  runs it as a step of its own, outside pytest, so a `conftest.py` cannot skip, xfail or deselect
+  a check. `--update` writes
   `tests/tool_surface.generated.json` instead of comparing with it. The checks it runs:
   - `undescribed_tools(server)`: each tool without a description and each parameter without one,
     skipping a tool served straight from an OpenAPI spec, which says what the spec says.
@@ -83,6 +84,11 @@ upstream and the stores.
   - `files_changing_their_type_check(root)`: each `# pyright:` comment in `src` and `tests` that
     sets a file's mode or a report, which basedpyright honours whatever the shared config says.
     Only an ignore that names its rule is left.
+  - `loosened_configuration(root, pyproject, package)`: each contract or import-linter option
+    that differs from what `render_importlinter` writes, a missing `extend` of `code_style.toml`
+    or `type_check.json`, a ruff `select`, `ignore` or `extend-ignore`, and a basedpyright mode,
+    ignored path or report turned down. A contract of the MCP's own after the shared ones, a
+    stricter report and a ruff `per-file-ignores` entry pass.
 
 ## Working on the package from a service
 

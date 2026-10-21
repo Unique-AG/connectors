@@ -66,8 +66,9 @@ check "Lint" "Run \`uv run ruff check --fix .\`, then fix by hand what it lists.
 check "Types" "Fix what \`uv run basedpyright\` lists. Never turn a report down." \
   uv run basedpyright
 
-# Only a service that keeps packages/mcp-architecture/ARCHITECTURE.md declares contracts.
-if grep -q '^\[tool\.importlinter\]' pyproject.toml; then
+# A service that depends on mcp-architecture keeps its ARCHITECTURE.md. mcp-architecture-check
+# fails when the service drops its [tool.importlinter] table or loosens a contract.
+if grep -q '"mcp-architecture==' pyproject.toml; then
   check "Imports" \
     "Move the import named above to the layer or top level ARCHITECTURE.md gives it. Never loosen a contract." \
     uv run lint-imports

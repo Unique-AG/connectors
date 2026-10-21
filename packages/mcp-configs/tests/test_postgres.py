@@ -79,12 +79,13 @@ def test_rejects_an_unknown_sslmode_in_the_url() -> None:
         PostgresSettings(url=SecretStr(f"{CNPG_URL}?sslmode=sometimes"))
 
 
-def test_moves_sslmode_from_the_url_into_connect_args() -> None:
+def test_moves_sslmode_and_application_name_from_the_url_into_connect_args() -> None:
     url = f"{CNPG_URL}?sslmode=require&channel_binding=prefer&application_name=mcp"
 
     settings = PostgresSettings(url=SecretStr(url))
 
-    assert settings.connection_url.endswith("/app?application_name=mcp")
+    assert settings.connection_url.endswith("/app")
+    assert settings.connect_args.get("server_settings") == {"application_name": "mcp"}
     context = settings.connect_args.get("ssl")
     assert isinstance(context, ssl.SSLContext)
     assert context.verify_mode == ssl.CERT_NONE
@@ -94,6 +95,7 @@ def test_drops_the_libpq_parameters_asyncpg_rejects() -> None:
     url = (
         f"{CNPG_URL}?sslmode=verify-full&sslrootcert=/certs/ca.crt&sslcert=/certs/client.crt"
         "&sslkey=/certs/client.key&sslcrl=/certs/ca.crl&sslsni=1&target_session_attrs=read-write"
+        "&connect_timeout=10&keepalives=1&options=-c%20statement_timeout%3D5000"
     )
 
     settings = PostgresSettings(url=SecretStr(url))
@@ -168,7 +170,35 @@ def test_keeps_the_password_out_of_its_repr(monkeypatch: pytest.MonkeyPatch) -> 
     assert "dummy-password" not in repr(PostgresSettings())
 
 
-def test_pool_defaults_match_backstop() -> None:
+def test_pools_five_connections_with_ten_overflow_by_default() -> None:
     settings = PostgresSettings(url=SecretStr(CNPG_URL))
 
     assert (settings.pool_size, settings.max_overflow) == (5, 10)
+
+
+def test_ignores_a_kubernetes_service_link_port_beside_a_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", CNPG_URL)
+    monkeypatch.setenv("DB_PORT", "tcp://10.0.0.1:5432")
+
+    assert PostgresSettings().connection_url.endswith("@cluster-rw.db.svc:5432/app")
+
+
+def test_rejects_a_port_that_is_not_a_number_without_a_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DB_PORT", "tcp://10.0.0.1:5432")
+
+    with pytest.raises(ValidationError, match="port"):
+        PostgresSettings(
+            host="db", name="app", user="dummy-user", password=SecretStr("dummy-password")
+        )
+
+
+def test_reads_the_chart_sslmode_in_any_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PG_DATABASE_SSL_MODE", "VERIFY-FULL")
+
+    settings = PostgresSettings(url=SecretStr(CNPG_URL))
+
+    assert settings.ssl_mode == "verify-full"

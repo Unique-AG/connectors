@@ -4,7 +4,16 @@ from pathlib import Path
 
 import pytest
 
+from mcp_architecture import render_importlinter
 from mcp_architecture.check import SNAPSHOT, check_service, main
+
+SHARED_CONFIGURATION = (
+    "[tool.ruff]\n"
+    'extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"\n\n'
+    "[tool.basedpyright]\n"
+    'extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"\n'
+    'executionEnvironments = [{ root = "tests", reportPrivateUsage = false }]\n'
+)
 
 KEPT = {
     "mask": "True",
@@ -44,8 +53,8 @@ def write_service(
 ) -> Path:
     """An MCP named after `package`, whose `tests/offline_server.py` builds `server`."""
     (root / "pyproject.toml").write_text(
-        f'[project]\nname = "{package.replace("_", "-")}"\n\n'
-        f'[tool.importlinter]\nroot_package = "{root_package}"\n'
+        f'[project]\nname = "{package.replace("_", "-")}"\n\n{SHARED_CONFIGURATION}\n'
+        + render_importlinter(root_package)
     )
     source = root / "src" / package
     source.mkdir(parents=True)

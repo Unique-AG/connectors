@@ -28,6 +28,8 @@ ACME_META = {
 GLOBEX_META = {**ACME_META, "ticker": "globex", "name": "Globex Corporation"}
 # A fund Tiingo lists but has never priced.
 UNPRICED_META = {**ACME_META, "ticker": "unprx", "startDate": None, "endDate": None}
+# Priced, but its prices fail to load.
+FAILING_META = {**ACME_META, "ticker": "initech", "name": "Initech"}
 
 
 def daily_bar(day: str, adj_close: float) -> dict[str, object]:
@@ -67,6 +69,8 @@ class FakeTiingo:
                 return httpx2.Response(200, json=GLOBEX_META)
             case ["tiingo", "daily", "UNPRX"]:
                 return httpx2.Response(200, json=UNPRICED_META)
+            case ["tiingo", "daily", "INITECH"]:
+                return httpx2.Response(200, json=FAILING_META)
             case ["tiingo", "daily", "ACME", "prices"] if "startDate" in request.url.params:
                 return httpx2.Response(200, json=self._october(request))
             case ["tiingo", "daily", ticker, "prices"] if ticker in LATEST_CLOSES:

@@ -1,6 +1,6 @@
-"""`mcp-architecture-check`: the checks of what a client sees and of the files' type check
-comments, run outside pytest, so nothing in a service's `conftest.py` can skip, xfail or deselect
-them."""
+"""`mcp-architecture-check`: the checks of what a client sees, of the MCP's tool tables and of its
+files' type check comments, run outside pytest, so nothing in a service's `conftest.py` can skip,
+xfail or deselect them."""
 
 import argparse
 import asyncio
@@ -13,6 +13,7 @@ from typing import cast
 
 from fastmcp import FastMCP
 
+from mcp_architecture.configuration import loosened_configuration
 from mcp_architecture.settings import settings_showing_input_in_errors
 from mcp_architecture.tools import (
     ServerFactory,
@@ -51,7 +52,7 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
         dict[str, dict[str, object]], tomllib.loads((root / "pyproject.toml").read_text())
     )
     package = str(pyproject["project"]["name"]).replace("-", "_")
-    findings = _root_package_findings(pyproject, package)
+    findings = loosened_configuration(root, pyproject, package)
     if comments := files_changing_their_type_check(root):
         findings.append(
             "Remove these `# pyright:` comments, so each file keeps the type check of the whole "
@@ -73,18 +74,6 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
     if shown:
         findings.append(f"Build the model_config of these with mcp_configs.shared_config: {shown}")
     return findings
-
-
-def _root_package_findings(pyproject: dict[str, dict[str, object]], package: str) -> list[str]:
-    """import-linter checks only `root_package`, so it has to be the package the project ships."""
-    tool = cast(dict[str, dict[str, object]], pyproject.get("tool", {}))
-    root_package = tool.get("importlinter", {}).get("root_package")
-    if root_package == package:
-        return []
-    return [
-        f"[tool.importlinter] root_package is {root_package!r}, not the project's package "
-        f"{package!r}, so `lint-imports` does not check the MCP's own code."
-    ]
 
 
 def _offline_server(path: Path) -> ServerFactory | None:

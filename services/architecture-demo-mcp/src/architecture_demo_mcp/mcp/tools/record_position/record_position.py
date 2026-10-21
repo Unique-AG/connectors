@@ -18,7 +18,7 @@ from architecture_demo_mcp.upstream import Upstream
 @tool(
     title="Record Position",
     annotations=ToolAnnotations(
-        read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
+        read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True
     ),
 )
 async def record_position(

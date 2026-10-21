@@ -96,7 +96,7 @@ breaks the `layers` contract.
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run mcp-architecture-check` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run mcp-architecture-check` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run mcp-architecture-check` |
-| `[tool.importlinter]`'s `root_package` is the project's own package, so the contracts check the MCP's code. | `uv run mcp-architecture-check` |
+| `[tool.importlinter]` keeps every contract and option the scaffold wrote, `[tool.ruff]` and `[tool.basedpyright]` extend the shared files and turn no rule down. | `uv run mcp-architecture-check` |
 | `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
 
 ### Where each rule is configured
@@ -119,8 +119,10 @@ The MCP's `pyproject.toml` holds each tool's configuration, and the scaffold wri
   `exclude_type_checking_imports` to make a change pass. Move the code to the layer it belongs
   in. A contract of your own, stricter than these, is fine to add after them.
 
-No tool stops an MCP from loosening its own table, so review does: every change to a service's
-`pyproject.toml` goes through the code owners. What ruff cannot check is left to review as well:
+`uv run mcp-architecture-check` fails when a table drops or loosens what the shared files and
+`render_importlinter` give. A ruff `per-file-ignores` entry is the one loosening it lets
+through, so review keeps it to generated code: every change to a service's `pyproject.toml`
+goes through the code owners. What ruff cannot check is left to review as well:
 import modules rather than names where the guide asks it, keep functions short, and avoid the
 guide's power features.
 
@@ -278,8 +280,9 @@ A context:
 - Every parameter is `Annotated[..., Field(description=...)]`. The description and the
   docstring are what the model reads, so say when to call the tool and what its ids feed into.
 - Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only, and one
-  that deletes is destructive. `record_position` writes, so it is not read-only, and replacing a
-  holding destroys nothing, so it is not destructive. The demo has no tool that deletes.
+  that deletes or overwrites is destructive: the MCP spec keeps `destructiveHint=false` for a
+  tool that only adds. `record_position` replaces a holding's quantity and cost basis, so it is
+  destructive, and idempotent, since recording the same holding twice changes nothing more.
 - Return the context's model unless the tool needs another shape.
 
 ## upstream
