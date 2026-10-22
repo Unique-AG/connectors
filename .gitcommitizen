@@ -24,6 +24,7 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
+world-check-mcp = services/world-check-mcp/**
 architecture-demo-mcp = services/architecture-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**

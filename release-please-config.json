@@ -242,6 +242,31 @@
           "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
+    },
+    "services/world-check-mcp": {
+      "release-type": "python",
+      "component": "world-check-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/world-check-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/world-check-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/world-check-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
+        }
+      ]
     }
   }
 }
