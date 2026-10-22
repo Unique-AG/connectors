@@ -23,7 +23,9 @@ def fake_upstream_settings() -> UpstreamSettings:
     """
     return UpstreamSettings(
         api_key=SecretStr("dummy-api-key"),
+        api_secret=SecretStr("dummy-api-secret"),
         api_url=AnyHttpUrl("https://api.example.com"),
+        token_url=AnyHttpUrl("https://api.example.com/auth/oauth2/v1/token"),
         timeout_seconds=30,
         retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
     )
