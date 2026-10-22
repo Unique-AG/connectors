@@ -133,6 +133,9 @@ probes:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
+    # Must stay above the app's 2s readiness check, or the probe is abandoned before the
+    # handler can answer 503 itself.
+    timeoutSeconds: 3
   startup:
     failureThreshold: 30
     httpGet:
