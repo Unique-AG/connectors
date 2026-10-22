@@ -170,7 +170,9 @@ def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract
     assert "No cycles are allowed in shop.mcp" in report
 
 
-@pytest.mark.parametrize("layer", ["contexts/orders/errors.py", "persistence/errors.py"])
+@pytest.mark.parametrize(
+    "layer", ["contexts/orders/errors.py", "persistence/errors.py", "utils/errors.py"]
+)
 @pytest.mark.parametrize(
     ("statement", "package"),
     [
@@ -178,15 +180,25 @@ def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract
         ("from mcp_types import ToolAnnotations", "mcp_types"),
     ],
 )
-def test_the_domain_or_the_storage_importing_mcp_breaks_the_contract(
+def test_the_domain_the_storage_or_utils_importing_mcp_breaks_the_contract(
     shop: Path, layer: str, statement: str, package: str
 ) -> None:
     write(shop, layer, f"{statement}\n")
 
     report = broken_contracts(shop)
 
-    assert "The domain and the storage know nothing about MCP" in report
+    assert "The domain, the storage and utils know nothing about MCP" in report
     assert f"-> {package}" in report
+
+
+def test_the_domain_reaching_mcp_through_utils_breaks_the_contract(shop: Path) -> None:
+    write(shop, "utils/__init__.py", "from fastmcp.exceptions import ToolError\n")
+    write(shop, "contexts/orders/errors.py", "from shop.utils import ToolError\n")
+
+    report = broken_contracts(shop)
+
+    assert "The domain, the storage and utils know nothing about MCP" in report
+    assert "shop.utils -> fastmcp" in report
 
 
 @pytest.mark.parametrize("layer", ["mcp", "contexts", "upstream", "persistence"])
