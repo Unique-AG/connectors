@@ -6,13 +6,17 @@ so the concurrency gate and config injection under test are the real ones.
 """
 
 import json
-from collections.abc import AsyncGenerator, Sequence
+import traceback
+from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from typing import Protocol, cast
 
 import httpx
+import pytest
 import respx
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic import SecretStr
 
 from backstop_mcp.backstop_client import (
@@ -208,6 +212,59 @@ def collection(*resources: dict[str, object]) -> dict[str, object]:
 def contact_location(id: str, **attrs: object) -> dict[str, object]:
     """A `contact-locations` resource as `?include=contactLocations` side-loads it."""
     return {"type": "contact-locations", "id": id, "attributes": {**attrs}}
+
+
+def assert_canary_absent(
+    caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter, canary: str
+) -> None:
+    """The canary is absent from every log record and every finished span.
+
+    The MCP response itself may still contain it: that is the tool result the client asked for.
+    """
+    assert_absent_from_records(caplog, canary)
+    for span in exporter.get_finished_spans():
+        assert not _span_contains_canary(span, canary), span.name
+
+
+def assert_absent_from_records(caplog: pytest.LogCaptureFixture, canary: str) -> None:
+    """In the message, every extra field, and the whole formatted traceback, chained causes too."""
+    for record in caplog.records:
+        assert not _contains_canary(record.getMessage(), canary), record.getMessage()
+        assert not _contains_canary(record.__dict__, canary), record.__dict__
+        if record.exc_info is not None and record.exc_info[1] is not None:
+            rendered = "".join(traceback.format_exception(record.exc_info[1]))
+            assert canary not in rendered, rendered
+
+
+def _span_contains_canary(span: ReadableSpan, canary: str) -> bool:
+    if _contains_canary(span.name, canary):
+        return True
+    if _contains_canary(span.attributes, canary):
+        return True
+    if span.status.description is not None and canary in span.status.description:
+        return True
+    return any(
+        _contains_canary(event.name, canary) or _contains_canary(event.attributes, canary)
+        for event in span.events
+    )
+
+
+def _contains_canary(value: object, canary: str) -> bool:
+    if isinstance(value, str):
+        return canary in value
+    if isinstance(value, bytes):
+        return canary.encode() in value
+    if isinstance(value, Mapping):
+        pairs = cast("Mapping[object, object]", value)
+        return any(
+            _contains_canary(key, canary) or _contains_canary(item, canary)
+            for key, item in pairs.items()
+        )
+    if isinstance(value, tuple | list | set | frozenset):
+        return any(_contains_canary(item, canary) for item in cast("Iterable[object]", value))
+    if value is None or isinstance(value, bool | int | float):
+        return False
+    return canary in str(value)
 
 
 def linked_to_locations(

@@ -42,6 +42,7 @@ from backstop_mcp.server.tenant_guidance import (
     compose_instructions,
     with_tool_guidance,
 )
+from backstop_mcp.server.tool_call_observability import ToolCallObservabilityMiddleware
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
 from backstop_mcp.utils import configure_identifiable_values
@@ -89,6 +90,8 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
+        # Outermost MCP middleware. `setup_ops` appends metrics inside it.
+        middleware=[ToolCallObservabilityMiddleware()],
     )
     registered = tuple(mcp.add_tool(fn) for fn in TOOLS)
     check_guidance_targets(guidance, registered)
