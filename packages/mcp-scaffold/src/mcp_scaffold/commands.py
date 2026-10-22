@@ -12,12 +12,10 @@ def check(target: Path, *, openapi: bool) -> None:
     run(
         [
             ["uv", "sync"],
-            ["uv", "run", "ruff", "format", "--quiet", "."],
-            ["uv", "run", "ruff", "check", "--fix", "--quiet", "."],
-            ["uv", "run", "ruff", "format", "--quiet", "."],
+            ["uv", "run", "mcp-architecture-lint", "--fix"],
             *([["uv", "run", "mcp-openapi-codegen", "--check"]] if openapi else []),
             ["uv", "run", "basedpyright"],
-            ["uv", "run", "lint-imports"],
+            ["uv", "run", "mcp-architecture-imports"],
             ["uv", "run", "mcp-architecture-check", "--update"],
             ["uv", "run", "pytest", "-q"],
         ],

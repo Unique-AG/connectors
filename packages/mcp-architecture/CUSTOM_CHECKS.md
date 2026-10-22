@@ -9,6 +9,8 @@ file names them, the tools we looked at instead, and why we keep the code.
 | Check | Rule it enforces | Why a tool does not do it |
 |---|---|---|
 | `FeaturePrivacyContract` | One feature imports another only through that feature's top level | import-linter's `protected` contract lets an allowed importer's descendants in too |
+| `mcp-architecture-lint` | Nothing in an MCP loosens the code style | ruff lets a project's configuration replace any setting of a file it extends, and skips a file an `.ignore` lists |
+| `mcp-architecture-imports` | Every MCP keeps the shared contracts | import-linter reads one configuration file and cannot extend a shared one |
 | `files_changing_their_type_check` | No file changes its own type check | basedpyright honours a file-level `# pyright: basic` whatever the shared config says |
 | `files_turning_rules_off` | No file turns a lint rule off beyond one line | ruff honours `# ruff: noqa: <rule>` and `# ruff: disable[<rule>]` whatever the shared config says |
 | `undescribed_tools` | Every tool and parameter has a description | MCP-specific: needs the schema the server lists |
@@ -16,9 +18,8 @@ file names them, the tools we looked at instead, and why we keep the code.
 | `masks_error_details` | An unexpected error reaches the client without its message | Needs to call a tool that raises on the built server |
 | `settings_showing_input_in_errors` | A settings error does not print its input | Needs every loaded settings class |
 | `tool_surface` | What a client sees matches a snapshot | MCP-specific: needs the tools the server lists |
-| `render_importlinter` | Every MCP declares the same contracts | import-linter cannot extend a shared file |
-| `loosened_configuration` | An MCP's ruff, basedpyright and import-linter tables only add to the shared ones | None of the three checks its own configuration |
-| `mcp-architecture-check` | The checks above run | A pytest run lets a `conftest.py` skip or rewrite a check's outcome |
+| `loosened_type_check` | An MCP's `[tool.basedpyright]` only adds to the shared type check | basedpyright lets a project's configuration turn down any setting of a file it extends |
+| `mcp-architecture-check` | The checks from `files_changing_their_type_check` on run | A pytest run lets a `conftest.py` skip or rewrite a check's outcome |
 
 ## Alternatives we looked at
 
@@ -38,13 +39,13 @@ import rules:
 | Indirect chains (`a → b → c`) | Checked | Direct imports only |
 | A contract type of our own | Python plugin | Not supported |
 
-Tach cannot extend a shared file either, so the scaffold would still render its config into each
-MCP.
+Tach cannot extend a shared file either, so `mcp-architecture-imports` would still render its
+config.
 
 Replacing import-linter loses the `fastmcp` ban, which a nested `ruff.toml` with `TID251` under
 `contexts/` and `persistence/` would have to take over. Running both means two configs per MCP,
 two CI steps, and rules that disagree when a chain is indirect, all to retire one class of about
-50 lines.
+70 lines.
 
 ### The other checks
 

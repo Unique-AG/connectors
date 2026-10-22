@@ -1,10 +1,14 @@
 [project]
 name = "mcp-skeleton"
 version = "0.0.0"
-description = "Set by mcp-scaffold"
+description = {{ quoted(options.description) }}
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+{% for dependency in dependencies.runtime %}
+    {{ quoted(dependency) }},
+{% endfor %}
+]
 
 [project.scripts]
 mcp-skeleton = "mcp_skeleton.main:main"
@@ -14,7 +18,11 @@ requires = ["uv_build>=0.12.9,<0.13"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = []
+dev = [
+{% for dependency in dependencies.dev %}
+    {{ quoted(dependency) }},
+{% endfor %}
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -24,18 +32,15 @@ pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
 
 [tool.ruff]
-# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
-# Add to it here, as for generated code, but never loosen it.
+# For the editor and a bare `ruff check`. `uv run mcp-architecture-lint` checks the code style
+# every MCP keeps with the shared file itself, whatever this table says, then with this table for
+# a rule added here with `extend-select`.
 extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
-target-version = "py314"
-exclude = [".venv"]
 
 [tool.ruff.lint.per-file-ignores]
-# A context function takes keyword arguments only, so a call names what it passes. Here and not in
-# the shared code style, since ruff reads a path there from the folder of that file.
-"!src/mcp_skeleton/contexts/**" = ["PLR0917"]
-# Generated from the vendor's spec, so its field names are the vendor's.
-"src/mcp_skeleton/upstream/generated/vendor_responses.py" = ["N815"]
+# The shared file's, which ruff reads from that file's folder through `extend`.
+"!**/src/*/contexts/**" = ["PLR0917"]
+"**/src/*/upstream/generated/**" = ["N815"]
 
 [tool.basedpyright]
 # The type check every MCP keeps. Make a report stricter here, but never turn one down.
@@ -49,16 +54,24 @@ include = ["src", "tests"]
 executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsage = false }]
 
 [tool.uv.sources]
+{% for package in dependencies.shared %}
+{{ package }} = { path = "../../packages/{{ package }}" }
+{% endfor %}
+{% if spec is not none %}
 
 [tool.mcp-openapi]
 spec = "src/mcp_skeleton/upstream/openapi.yml"
-operation-ids = []
+{% if spec.url is not none %}
+spec-source = {{ quoted(spec.url) }}
+{% endif %}
+operation-ids = [{{ quoted(spec.operation) }}]
 operation-module = "mcp_openapi.upstream"
 models-module = "mcp_skeleton.upstream.generated.vendor_responses"
 models-output = "src/mcp_skeleton/upstream/generated/vendor_responses.py"
 operations-output = "src/mcp_skeleton/upstream/generated/operations.py"
+{% endif %}
 
-# The architecture. packages/mcp-architecture/ARCHITECTURE.md explains each contract, and
-# `uv run lint-imports` checks them.
-# The scaffold writes the contracts every MCP keeps. Add a contract of the MCP's own after them.
+# The MCP's own import contracts. `uv run mcp-architecture-imports` checks the ones every MCP keeps,
+# which packages/mcp-architecture/ARCHITECTURE.md explains, then these.
 [tool.importlinter]
+root_package = "mcp_skeleton"

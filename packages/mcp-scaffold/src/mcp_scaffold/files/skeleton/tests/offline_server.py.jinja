@@ -50,7 +50,7 @@ def fake_upstream_settings() -> UpstreamSettings:
     Retries never wait."""
     return UpstreamSettings(
         api_key=SecretStr("dummy-api-key"),
-        api_url=AnyHttpUrl("https://api.example.com"),
+        api_url=AnyHttpUrl({{ quoted(api_url) }}),
         timeout_seconds=30,
         retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
     )

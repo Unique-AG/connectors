@@ -52,18 +52,15 @@ pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
 
 [tool.ruff]
-# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
-# Add to it here, as for generated code, but never loosen it.
+# For the editor and a bare `ruff check`. `uv run mcp-architecture-lint` checks the code style
+# every MCP keeps with the shared file itself, whatever this table says, then with this table for
+# a rule added here with `extend-select`.
 extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
-target-version = "py314"
-exclude = [".venv"]
 
 [tool.ruff.lint.per-file-ignores]
-# A context function takes keyword arguments only, so a call names what it passes. Here and not in
-# the shared code style, since ruff reads a path there from the folder of that file.
-"!src/architecture_demo_mcp/contexts/**" = ["PLR0917"]
-# Generated from the vendor's spec, so its field names are the vendor's.
-"src/architecture_demo_mcp/upstream/generated/vendor_responses.py" = ["N815"]
+# The shared file's, which ruff reads from that file's folder through `extend`.
+"!**/src/*/contexts/**" = ["PLR0917"]
+"**/src/*/upstream/generated/**" = ["N815"]
 
 [tool.basedpyright]
 # The type check every MCP keeps. Make a report stricter here, but never turn one down.
@@ -89,72 +86,7 @@ models-module = "architecture_demo_mcp.upstream.generated.vendor_responses"
 models-output = "src/architecture_demo_mcp/upstream/generated/vendor_responses.py"
 operations-output = "src/architecture_demo_mcp/upstream/generated/operations.py"
 
-# The architecture. packages/mcp-architecture/ARCHITECTURE.md explains each contract, and
-# `uv run lint-imports` checks them.
-# The scaffold writes the contracts every MCP keeps. Add a contract of the MCP's own after them.
+# The MCP's own import contracts. `uv run mcp-architecture-imports` checks the ones every MCP keeps,
+# which packages/mcp-architecture/ARCHITECTURE.md explains, then these.
 [tool.importlinter]
 root_package = "architecture_demo_mcp"
-include_external_packages = true
-contract_types = [
-    "feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract",
-]
-
-[[tool.importlinter.contracts]]
-name = "Layers only import downwards"
-type = "layers"
-containers = ["architecture_demo_mcp"]
-layers = ["main", "mcp", "contexts", "upstream | persistence", "utils", "telemetry"]
-exhaustive = true
-
-[[tool.importlinter.contracts]]
-name = "mcp is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.mcp.*"]
-allowed_importers = ["architecture_demo_mcp.mcp"]
-
-[[tool.importlinter.contracts]]
-name = "contexts is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.contexts.*"]
-allowed_importers = ["architecture_demo_mcp.contexts"]
-
-[[tool.importlinter.contracts]]
-name = "upstream is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.upstream.*"]
-allowed_importers = ["architecture_demo_mcp.upstream"]
-
-[[tool.importlinter.contracts]]
-name = "persistence is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.persistence.*"]
-allowed_importers = ["architecture_demo_mcp.persistence"]
-
-[[tool.importlinter.contracts]]
-name = "utils is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.utils.*"]
-allowed_importers = ["architecture_demo_mcp.utils"]
-
-[[tool.importlinter.contracts]]
-name = "telemetry is imported through its top level only"
-type = "protected"
-protected_modules = ["architecture_demo_mcp.telemetry.*"]
-allowed_importers = ["architecture_demo_mcp.telemetry"]
-
-[[tool.importlinter.contracts]]
-name = "A context feature is imported through its top level only"
-type = "feature_privacy"
-container = "architecture_demo_mcp.contexts"
-
-[[tool.importlinter.contracts]]
-name = "No package imports its siblings in a cycle"
-type = "acyclic_siblings"
-ancestors = ["architecture_demo_mcp"]
-
-[[tool.importlinter.contracts]]
-name = "The domain and the storage know nothing about MCP"
-type = "forbidden"
-source_modules = ["architecture_demo_mcp.contexts", "architecture_demo_mcp.persistence"]
-forbidden_modules = ["fastmcp", "mcp", "mcp_types"]
-allow_indirect_imports = true

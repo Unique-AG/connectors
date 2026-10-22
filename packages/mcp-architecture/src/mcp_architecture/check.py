@@ -1,6 +1,6 @@
-"""`mcp-architecture-check`: the checks of what a client sees, of the MCP's tool tables and of its
-files' type check comments, run outside pytest, so nothing in a service's `conftest.py` can skip,
-xfail or deselect them."""
+"""`mcp-architecture-check`: the checks of what a client sees, of the MCP's type check
+configuration and of its files' suppression comments, run outside pytest, so nothing in a
+service's `conftest.py` can skip, xfail or deselect them."""
 
 import argparse
 import asyncio
@@ -13,8 +13,7 @@ from typing import cast
 
 from fastmcp import FastMCP
 
-from mcp_architecture.configuration import loosened_configuration
-from mcp_architecture.contracts import restore_importlinter
+from mcp_architecture.configuration import loosened_type_check
 from mcp_architecture.settings import settings_showing_input_in_errors
 from mcp_architecture.suppression_comments import (
     files_changing_their_type_check,
@@ -40,8 +39,7 @@ def main() -> None:
     parser.add_argument(
         "--update",
         action="store_true",
-        help=f"write {SNAPSHOT} instead of comparing with it, and restore the shared contracts in "
-        "[tool.importlinter]",
+        help=f"write {SNAPSHOT} instead of comparing with it",
     )
     update = cast(bool, parser.parse_args().update)
     findings = asyncio.run(check_service(Path.cwd(), update=update))
@@ -53,18 +51,13 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
     """Each way the MCP at `root` breaks a rule, as a message that says how to fix it.
 
     The server comes from `offline_server()` in `tests/offline_server.py`, an async context
-    manager that builds it with fakes in place of the upstream and the stores. `update` also
-    writes `[tool.importlinter]` back as `render_importlinter` gives it, keeping the MCP's own
-    contracts.
+    manager that builds it with fakes in place of the upstream and the stores.
     """
-    path = root / "pyproject.toml"
-    text = path.read_text()
-    pyproject = cast(dict[str, dict[str, object]], tomllib.loads(text))
+    pyproject = cast(
+        dict[str, dict[str, object]], tomllib.loads((root / "pyproject.toml").read_text())
+    )
     package = str(pyproject["project"]["name"]).replace("-", "_")
-    if update and (restored := restore_importlinter(text, package)) != text:
-        path.write_text(restored)
-        pyproject = cast(dict[str, dict[str, object]], tomllib.loads(restored))
-    findings = loosened_configuration(root, pyproject, package)
+    findings = loosened_type_check(root, pyproject)
     if comments := files_changing_their_type_check(root):
         findings.append(
             "Remove these `# pyright:` comments, so each file keeps the type check of the whole "

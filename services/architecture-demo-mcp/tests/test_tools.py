@@ -220,6 +220,19 @@ async def test_record_position_replaces_an_earlier_holding(
     assert (position.ticker, position.quantity, position.cost_basis) == ("ACME", 4.0, 90.0)
 
 
+async def test_record_position_takes_no_owner_from_the_client(
+    call_tool: CallTool, persistence: Persistence
+) -> None:
+    result = await call_tool(
+        "record_position",
+        {"portfolio": "core", "ticker": "ACME", "quantity": 1, "cost_basis": 10, "owner": "other"},
+    )
+
+    assert "owner" in _error_text(result)
+    assert await list_positions(persistence=persistence, owner="other", portfolio="core") == []
+    assert await list_positions(persistence=persistence, owner="local", portfolio="core") == []
+
+
 async def test_record_position_rejects_a_ticker_tiingo_never_priced(
     call_tool: CallTool, persistence: Persistence
 ) -> None:

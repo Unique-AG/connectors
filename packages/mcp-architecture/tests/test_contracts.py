@@ -4,10 +4,8 @@ from pathlib import Path
 
 import pytest
 from importlinter.application.output import console
-from importlinter.cli import lint_imports
 
-from mcp_architecture import render_importlinter
-from mcp_architecture.contracts import restore_importlinter
+from mcp_architecture.imports import check_imports
 
 SHOP = {
     "__init__.py": "",
@@ -46,13 +44,18 @@ SHOP = {
     "telemetry/__init__.py": "",
 }
 
+PROJECT = '[project]\nname = "shop"\n\n'
+
 
 @pytest.fixture
 def shop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A service that keeps the contracts, its package `shop` under `src`."""
+    """A service that keeps the contracts, its package `shop` under `src`, with no contract of
+    its own."""
     for relative, text in SHOP.items():
         write(tmp_path, relative, text)
-    (tmp_path / "pyproject.toml").write_text(render_importlinter("shop"))
+    (tmp_path / "pyproject.toml").write_text(
+        f'{PROJECT}[tool.importlinter]\nroot_package = "shop"\n'
+    )
     monkeypatch.setattr(sys, "path", [str(tmp_path / "src"), *sys.path])
     importlib.invalidate_caches()
     return tmp_path
@@ -67,9 +70,7 @@ def write(root: Path, relative: str, text: str) -> None:
 def broken_contracts(root: Path) -> str:
     """import-linter's report, with its lines unwrapped, or nothing when every contract holds."""
     with console.capture() as captured:
-        exit_code = lint_imports(
-            config_filename=str(root / "pyproject.toml"), no_cache=True, no_logo=True
-        )
+        exit_code = check_imports(root)
     return "" if exit_code == 0 else " ".join(captured.get().split())
 
 
@@ -217,49 +218,49 @@ def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> N
     assert "shop.logic" in report
 
 
-BEFORE = '[project]\nname = "shop"\n\n# The architecture.\n'
-AFTER = '\n# Read by the codegen.\n[tool.mcp-openapi]\nspec = "openapi.yml"\n'
 OWN_CONTRACT = (
-    "# Orders and payments stay apart.\n"
-    "[[tool.importlinter.contracts]]\n"
+    "\n[[tool.importlinter.contracts]]\n"
     'name = "Orders know nothing about payments"\n'
     'type = "forbidden"\n'
     'source_modules = ["shop.contexts.orders"]\n'
     'forbidden_modules = ["shop.contexts.payments"]\n'
 )
-OWN_TYPE = '    "audited: shop_checks.AuditedContract",\n'
+ALWAYS_KEPT = (
+    "from importlinter.domain.contract import Contract, ContractCheck\n\n\n"
+    "class AlwaysKept(Contract):\n"
+    "    def check(self, graph, verbose):\n"
+    "        return ContractCheck(kept=True, warnings=[])\n\n"
+    "    def render_broken_contract(self, check): ...\n"
+)
 
 
-def test_restoring_a_kept_table_changes_nothing() -> None:
-    pyproject = f"{BEFORE}{render_importlinter('shop')}\n{OWN_CONTRACT}{AFTER}"
+def test_a_broken_contract_of_the_mcps_own_breaks_the_check(shop: Path) -> None:
+    pyproject = shop / "pyproject.toml"
+    pyproject.write_text(pyproject.read_text() + OWN_CONTRACT)
+    write(shop, "contexts/payments/__init__.py", "")
+    write(shop, "contexts/orders/refund.py", "import shop.contexts.payments\n")
 
-    assert restore_importlinter(pyproject, "shop") == pyproject
+    assert "Orders know nothing about payments" in broken_contracts(shop)
 
 
-def test_restoring_writes_back_a_loosened_table_around_the_rest_of_the_file() -> None:
-    loosened = (
-        render_importlinter("decoy")
-        .replace("exhaustive = true\n", "exhaustive = false\n")
-        .replace(
-            'type = "acyclic_siblings"\n', 'type = "acyclic_siblings"\nignore_imports = ["x"]\n'
-        )
+@pytest.mark.parametrize("kind", ["layers", "feature_privacy"])
+def test_an_own_contract_type_of_a_shared_name_does_not_turn_the_shared_contract_off(
+    shop: Path, kind: str
+) -> None:
+    (shop / "src" / "shop_checks.py").write_text(ALWAYS_KEPT)
+    pyproject = shop / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text() + f'contract_types = ["{kind}: shop_checks.AlwaysKept"]\n'
     )
+    write(shop, "utils/__init__.py", "import shop.mcp\n")
 
-    restored = restore_importlinter(f"{BEFORE}{loosened}{AFTER}", "shop")
-
-    assert restored == f"{BEFORE}{render_importlinter('shop')}{AFTER}"
-
-
-def test_restoring_keeps_the_mcps_own_contracts_and_contract_types() -> None:
-    with_own_type = render_importlinter("shop").replace("\n]\n", f"\n{OWN_TYPE}]\n", 1)
-    dropped_last = with_own_type[: with_own_type.rindex("\n[[tool.importlinter.contracts]]")]
-
-    restored = restore_importlinter(f"{BEFORE}{dropped_last}\n\n{OWN_CONTRACT}{AFTER}", "shop")
-
-    assert restored == f"{BEFORE}{with_own_type}\n{OWN_CONTRACT}{AFTER}"
+    assert "Layers only import downwards" in broken_contracts(shop)
 
 
-def test_restoring_adds_a_missing_table_at_the_end() -> None:
-    assert restore_importlinter(f"{BEFORE}{AFTER}", "shop") == (
-        f"{BEFORE}{AFTER}\n{render_importlinter('shop')}"
-    )
+def test_an_mcp_without_an_importlinter_table_still_keeps_the_shared_contracts(
+    shop: Path,
+) -> None:
+    (shop / "pyproject.toml").write_text(PROJECT)
+    write(shop, "utils/__init__.py", "import shop.mcp\n")
+
+    assert "Layers only import downwards" in broken_contracts(shop)

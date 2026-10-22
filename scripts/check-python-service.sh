@@ -58,23 +58,37 @@ if grep -q '^\[tool\.mcp-openapi\]' pyproject.toml; then
     uv run mcp-openapi-codegen --check
 fi
 
-check "Format" "Run \`uv run ruff format .\`." uv run ruff format --check .
+# A scaffolded MCP. Matching [tool.importlinter] too means dropping only the dependency fails
+# below instead of skipping.
+if grep -qE 'mcp-architecture|^\[tool\.importlinter\]' pyproject.toml; then
+  mcp=true
+else
+  mcp=false
+fi
+
+if $mcp; then
+  check "Format and lint" \
+    "Run \`uv run mcp-architecture-lint --fix\`, then fix by hand what it lists. The rules come from mcp_architecture/code_style.toml, whatever [tool.ruff] says." \
+    uv run mcp-architecture-lint
+else
+  check "Format" "Run \`uv run ruff format .\`." uv run ruff format --check .
+  check "Lint" "Run \`uv run ruff check --fix .\`, then fix by hand what it lists." \
+    uv run ruff check .
+fi
 check "Biome" "Run \`pnpm exec biome check --write .\`." \
   pnpm exec biome check . --no-errors-on-unmatched
-check "Lint" "Run \`uv run ruff check --fix .\`, then fix by hand what it lists." \
-  uv run ruff check .
 check "Types" "Fix what \`uv run basedpyright\` lists. Never turn a report down." \
   uv run basedpyright
 
-# Matching the contracts too means dropping only the dependency fails here instead of skipping.
-if grep -qE 'mcp-architecture|^\[tool\.importlinter\]' pyproject.toml; then
+if $mcp; then
   check "Imports" \
     "Move the import named above to the layer or top level ARCHITECTURE.md gives it. Never loosen a contract." \
-    uv run lint-imports
-  # Outside pytest, so a conftest.py cannot skip, xfail or deselect it.
+    uv run mcp-architecture-imports
   check "Architecture" \
     "Fix what \`uv run mcp-architecture-check\` lists. If only the tool surface changed and you meant it, run \`uv run mcp-architecture-check --update\`." \
     uv run mcp-architecture-check
+else
+  echo "==> Imports and Architecture: skipped, pyproject.toml names neither mcp-architecture nor [tool.importlinter]"
 fi
 
 check "Tests" "Fix the failing tests." uv run pytest

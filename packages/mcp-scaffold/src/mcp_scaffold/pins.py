@@ -12,11 +12,6 @@ _SCAFFOLD = cast(
 )
 
 
-def scaffold_version() -> str:
-    """The version every file of a generated MCP is stamped with."""
-    return cast(str, _SCAFFOLD["project"]["version"])
-
-
 def pinned(group: str) -> list[str]:
     return cast(list[str], _SCAFFOLD["dependency-groups"][group])
 
@@ -37,7 +32,3 @@ def shared(repo: Path, name: str, extra: str = "") -> str:
         tomllib.loads((repo / "packages" / name / "pyproject.toml").read_text()),
     )["project"]
     return f"{name}{extra}=={project['version']}"
-
-
-def source(name: str) -> str:
-    return f'{name} = {{ path = "../../packages/{name}" }}'

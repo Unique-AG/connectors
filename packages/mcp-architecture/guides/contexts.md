@@ -82,7 +82,9 @@ A context:
   directly (see [persistence](persistence.md)).
 - Returns its own pydantic models, never the upstream's. Map the vendor's field names to
   snake_case here, so a vendor change stops at this layer.
-- Knows nothing about MCP. It raises its own errors (`PositionRejectedError`), not `ToolError`.
+- Knows nothing about MCP. It raises its own errors for its own rules
+  (`PositionRejectedError`), never a `ToolError`. An `UpstreamError` passes through it as it is:
+  `upstream` made it a `ToolError` already.
 - May use another feature through that feature's top level: `value_portfolio` prices each
   position with `get_latest_close`, imported from `<package>.contexts.prices`. If two features
   need each other, the shared part is a third feature.

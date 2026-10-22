@@ -13,5 +13,5 @@ def write_upstream(options: Options, target: Path) -> None:
         return
     layer = target / "src" / PACKAGE / "upstream"
     shutil.copytree(LAYERS / "upstream" / options.upstream, layer, dirs_exist_ok=True)
-    shutil.copy(LAYERS / "upstream" / "settings.py", layer / "settings.py")
+    shutil.copy(LAYERS / "upstream" / "settings.py.jinja", layer / "settings.py.jinja")
     copy_root_files(options.upstream, target)
