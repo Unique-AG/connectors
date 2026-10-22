@@ -271,9 +271,8 @@ internalServices:
       `DB_SSL_ROOT_CERT`.
 - [ ] `/metrics` is not reachable from outside the cluster.
 - [ ] `LOGS_DIAGNOSTICS_DATA_POLICY` is `conceal` (the default), so tool-level events write Backstop
-      logins as a keyed `hmac-sha256:<hex>` pseudonym. The Backstop HTTP client's request and re-check events
-      (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either
-      setting, so treat logs as containing Backstop logins. API tokens are never logged.
+      logins, emails and search terms as a keyed `hmac-sha256:<hex>` pseudonym, the Backstop HTTP
+      client's events included. API tokens are never logged.
 - [ ] Database backups follow your policy for credentials. The table `backstop_credentials` holds
       encrypted API tokens.
 
