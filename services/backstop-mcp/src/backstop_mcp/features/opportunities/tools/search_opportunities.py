@@ -34,6 +34,7 @@ from backstop_mcp.features.opportunities.dependencies import (
     get_search_opportunities_query_factory,
 )
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -370,7 +371,7 @@ async def search_opportunities(
     }
     if representative is not None:
         search_fields["representative"] = identifiable_value(representative)
-    logger.info("opportunities.search.start", extra=search_fields)
+    annotate_tool_call(**search_fields)
     return await search_opportunities_query.run(
         representative=representative,
         representative_scope=representative_scope,

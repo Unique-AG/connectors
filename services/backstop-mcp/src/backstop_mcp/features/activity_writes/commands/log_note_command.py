@@ -27,6 +27,7 @@ from backstop_mcp.features.activity_writes.log_activity_input import NoteActivit
 from backstop_mcp.features.activity_writes.responses import LoggedNoteResponse
 from backstop_mcp.features.system_users import system_user_relationship
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, NoteLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +78,7 @@ class LogNoteCommand:
             ),
         )
         document = await self._client.post("/notes", schema=_NoteDocument, json=payload)
-        logger.info(
-            "activity_writes.note.created",
-            extra={"id": document.data.id, "party_id": party_id},
-        )
+        info_event(logger, "activity_writes.note.created", id=document.data.id, party_id=party_id)
         return LoggedNoteResponse(
             id=document.data.id,
             title=activity.title,

@@ -61,6 +61,7 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -187,18 +188,17 @@ class SearchOrganizationsQuery:
             span.set_attribute("rows_scanned", page.records_scanned)
             span.set_attribute("matched", len(page.rows))
             span.set_attribute("stop_reason", page.stop_reason)
-            logger.info(
+            info_event(
+                logger,
                 "org_people.search.fetched",
-                extra={
-                    "memory": should_filter_in_memory,
-                    "start_offset": start_offset,
-                    "rows_scanned": page.records_scanned,
-                    "matched": len(page.rows),
-                    "dropped": dropped,
-                    "total_count": page.total_count,
-                    "request_count": page.request_count,
-                    "stop_reason": page.stop_reason,
-                },
+                memory=should_filter_in_memory,
+                start_offset=start_offset,
+                rows_scanned=page.records_scanned,
+                matched=len(page.rows),
+                dropped=dropped,
+                total_count=page.total_count,
+                request_count=page.request_count,
+                stop_reason=page.stop_reason,
             )
             projected = fields | {"id"}
             if not exclude_custom_fields:

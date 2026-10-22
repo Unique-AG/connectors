@@ -55,6 +55,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import annotate_tool_call, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -144,36 +145,28 @@ async def get_accounts_for_party(
         return unresolved_party_response(result)
 
     party = result.value
-    logger.info(
-        "accounts.for_party.start",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "include_closed": include_closed,
-        },
-    )
+    annotate_tool_call(segment=party.search_type, entity_id=party.id, include_closed=include_closed)
     listing = await get_holdings_query.run(owner_id=party.id, include_closed=include_closed)
     if _listing_is_empty(listing) and party.name is None:
         confirmed = await _confirm_party(get_party_name_query, party)
         if confirmed is None:
-            logger.info(
+            info_event(
+                logger,
                 "accounts.for_party.unverified_party_id",
-                extra={"segment": party.search_type, "entity_id": party.id},
+                segment=party.search_type,
+                entity_id=party.id,
             )
             # `NotFoundResponse` is the shared shape and carries no free-text field; the
             # reason this check ran at all is in the module docstring and the log line above.
             return NotFoundResponse(query=party.id, scope=party.search_type)
         party = confirmed
-    logger.info(
-        "accounts.for_party.completed",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "source": listing.source,
-            "returned": len(listing.rows),
-            "closed_omitted": listing.closed_omitted,
-            "rows_dropped": listing.rows_dropped,
-        },
+    annotate_tool_call(
+        segment=party.search_type,
+        entity_id=party.id,
+        source=listing.source,
+        returned=len(listing.rows),
+        closed_omitted=listing.closed_omitted,
+        rows_dropped=listing.rows_dropped,
     )
     return PartyAccountsResolvedResponse.from_holdings(
         listing,

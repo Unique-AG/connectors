@@ -43,5 +43,5 @@ async def create_person(
     Call like: {"person": {"last_name": "Smith", "gender": "Female",
     "category_ids": ["<id from list_contact_categories>"]}}
     """
-    logger.info("org_people_writes.create_person.start")
+
     return await create_person_command.run(person=person)

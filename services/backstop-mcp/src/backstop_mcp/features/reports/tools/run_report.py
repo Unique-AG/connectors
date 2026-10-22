@@ -22,7 +22,7 @@ from backstop_mcp.features.reports import (
 from backstop_mcp.features.reports.dependencies import get_run_report_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import NonEmptyStr, published_output_schema
-from backstop_mcp.observability import span_attributes
+from backstop_mcp.observability import annotate_tool_call, span_attributes
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -118,14 +118,8 @@ async def run_report(
         span.set_attribute("as_of_date", as_of.isoformat())
         span.set_attribute("limit", limit)
         span.set_attribute("offset", offset)
-        logger.info(
-            "reports.run.start",
-            extra={
-                "report_name": logged_report_name,
-                "as_of_date": as_of.isoformat(),
-                "limit": limit,
-                "offset": offset,
-            },
+        annotate_tool_call(
+            report_name=logged_report_name, as_of_date=as_of.isoformat(), limit=limit, offset=offset
         )
         try:
             return await run_report_query.run(

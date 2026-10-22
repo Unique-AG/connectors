@@ -13,6 +13,7 @@ from backstop_mcp.features.entity_types import SearchType, map_search_type_to_re
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowResponse
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +78,12 @@ class GetTasksForPartyQuery:
             completed_count=sum(1 for row in rows if not row.is_open),
             scan_truncated=page.truncated,
         )
-        logger.info(
+        info_event(
+            logger,
             "tasks.fetched",
-            extra={
-                "entity_id": entity_id,
-                "status": status,
-                "total": result.total,
-                "returned": len(result.tasks),
-            },
+            entity_id=entity_id,
+            status=status,
+            total=result.total,
+            returned=len(result.tasks),
         )
         return result

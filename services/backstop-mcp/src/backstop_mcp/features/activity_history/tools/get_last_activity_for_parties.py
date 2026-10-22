@@ -28,6 +28,7 @@ from backstop_mcp.features.activity_history.dependencies import (
 )
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.models import CoercedId, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
@@ -136,10 +137,7 @@ async def get_last_activity_for_parties(
     distinct = tuple(dict.fromkeys(keys))
     with _tracer.start_as_current_span("activity_history.last_activity") as span:
         span.set_attribute("parties", len(distinct))
-        logger.info(
-            "activity_history.last_activity.start",
-            extra={"parties": len(distinct), "types": list(selected_types)},
-        )
+        annotate_tool_call(parties=len(distinct), types=list(selected_types))
         outcomes = await get_last_activity_for_parties_query.run(
             parties=distinct, start_date=start, end_date=end, types=selected_types
         )

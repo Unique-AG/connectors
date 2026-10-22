@@ -23,6 +23,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +72,5 @@ async def create_opportunity(
     if not isinstance(investor_result, Resolved):
         return unresolved_party_response(investor_result)
     investor = investor_result.value
-    logger.info(
-        "opportunity_writes.create_opportunity.start",
-        extra={"investor_id": investor.id, "investor_search_type": investor.search_type},
-    )
+    annotate_tool_call(investor_id=investor.id, investor_search_type=investor.search_type)
     return await create_opportunity_command.run(opportunity=opportunity, investor_id=investor.id)

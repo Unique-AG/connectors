@@ -47,6 +47,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -129,14 +130,13 @@ class GetHoldingsQuery:
                 },
             )
         rows = all_rows if include_closed else tuple(row for row in all_rows if not row.closed)
-        logger.info(
+        info_event(
+            logger,
             "accounts.holdings_table.fetched",
-            extra={
-                "entity_id": owner_id,
-                "rows": len(rows),
-                "closed_omitted": len(all_rows) - len(rows),
-                "all_count": table.all_count,
-            },
+            entity_id=owner_id,
+            rows=len(rows),
+            closed_omitted=len(all_rows) - len(rows),
+            all_count=table.all_count,
         )
         return HoldingListingDto(
             rows=rows,

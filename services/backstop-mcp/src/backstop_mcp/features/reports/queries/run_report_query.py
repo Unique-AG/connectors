@@ -14,7 +14,7 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
     ReportRunKey,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
-from backstop_mcp.observability import span_attributes
+from backstop_mcp.observability import info_event, span_attributes
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -94,13 +94,12 @@ class RunReportQuery:
             if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
-                logger.info(
+                info_event(
+                    logger,
                     "reports.run.pending",
-                    extra={
-                        "report_name": logged_report_name,
-                        "as_of_date": as_of_date.isoformat(),
-                        "running_seconds": running_seconds,
-                    },
+                    report_name=logged_report_name,
+                    as_of_date=as_of_date.isoformat(),
+                    running_seconds=running_seconds,
                 )
                 return RunReportPendingResponse(
                     report_name=report_name,
@@ -194,16 +193,15 @@ class RunReportQuery:
                 offset=offset,
                 next_offset=next_offset,
             )
-            logger.info(
+            info_event(
+                logger,
                 "reports.fetched",
-                extra={
-                    "report_name": logged_report_name,
-                    "as_of_date": as_of_date.isoformat(),
-                    "offset": offset,
-                    "limit": limit,
-                    "row_count": fetched.row_count,
-                    "total": fetched.total,
-                },
+                report_name=logged_report_name,
+                as_of_date=as_of_date.isoformat(),
+                offset=offset,
+                limit=limit,
+                row_count=fetched.row_count,
+                total=fetched.total,
             )
             return fetched
 

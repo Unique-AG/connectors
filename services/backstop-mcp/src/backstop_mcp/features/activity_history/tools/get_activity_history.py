@@ -28,6 +28,7 @@ from backstop_mcp.features.activity_history import (
 from backstop_mcp.features.activity_history.dependencies import get_activity_history_query_factory
 from backstop_mcp.features.party_resolver import ResolvePartyQuery, get_resolve_party_query_factory
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 from ._page_input import (
     ActivityHistoryFirstPageInput,
@@ -121,13 +122,8 @@ async def get_activity_history(
     if not isinstance(args, FetchArgs):
         return args
 
-    logger.info(
-        "activity_history.get.start",
-        extra={
-            "segment": args.segment,
-            "entity_id": args.entity_id,
-            "streams": list(args.continuations),
-        },
+    annotate_tool_call(
+        segment=args.segment, entity_id=args.entity_id, streams=list(args.continuations)
     )
     result = await get_activity_history_query.run(
         segment=args.segment,
@@ -139,13 +135,10 @@ async def get_activity_history(
     open_streams = [
         activity_type for activity_type, group in result.groups.items() if group.next is not None
     ]
-    logger.info(
-        "activity_history.get.completed",
-        extra={
-            "segment": args.segment,
-            "entity_id": args.entity_id,
-            "streams": list(result.groups),
-            "open_streams": open_streams,
-        },
+    annotate_tool_call(
+        segment=args.segment,
+        entity_id=args.entity_id,
+        streams=list(result.groups),
+        open_streams=open_streams,
     )
     return result

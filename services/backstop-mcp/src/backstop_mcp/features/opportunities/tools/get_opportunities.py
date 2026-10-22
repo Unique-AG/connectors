@@ -46,6 +46,7 @@ from backstop_mcp.features.resolution import (
     input_required,
 )
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -146,10 +147,7 @@ async def get_opportunities(
         return unresolved_party_response(result)
 
     party = result.value
-    logger.info(
-        "opportunities.get.start",
-        extra={"segment": party.search_type, "entity_id": party.id, "status": status},
-    )
+    annotate_tool_call(segment=party.search_type, entity_id=party.id, status=status)
     fetched = await get_opportunities_query.run(
         segment=party.search_type,
         entity_id=party.id,

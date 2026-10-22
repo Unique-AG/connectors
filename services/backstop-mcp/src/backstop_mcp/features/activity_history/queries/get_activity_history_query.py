@@ -64,6 +64,7 @@ from backstop_mcp.features.includes import (
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -260,17 +261,16 @@ class GetActivityHistoryQuery:
             )
             for resource, row_attendees in zip(resources, attendees, strict=True)
         )
-        logger.info(
+        info_event(
+            logger,
             "activity_history.activity_page.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "stream": stream,
-                "raw_count": raw_count,
-                "kept": len(items),
-                "end_of_stream": end_of_stream,
-                "offset": offset,
-            },
+            segment=segment,
+            entity_id=entity_id,
+            stream=stream,
+            raw_count=raw_count,
+            kept=len(items),
+            end_of_stream=end_of_stream,
+            offset=offset,
         )
         return items, end_of_stream
 
@@ -314,15 +314,14 @@ class GetActivityHistoryQuery:
             for resource in page.items
         )
         end_of_stream = len(page.items) < limit
-        logger.info(
+        info_event(
+            logger,
             "activity_history.email_page.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "count": len(items),
-                "end_of_stream": end_of_stream,
-                "offset": offset,
-            },
+            segment=segment,
+            entity_id=entity_id,
+            count=len(items),
+            end_of_stream=end_of_stream,
+            offset=offset,
         )
         return items, end_of_stream
 
@@ -373,16 +372,15 @@ class GetActivityHistoryQuery:
                 )
                 continue
             if effective_date < since:
-                logger.info(
+                info_event(
+                    logger,
                     "activity_history.since_truncate.cutoff",
-                    extra={
-                        "activity_id": resource.id,
-                        "stream": stream,
-                        "effective_date": effective_date.isoformat(),
-                        "since": since.isoformat(),
-                        "kept": index,
-                        "dropped": len(resources) - index,
-                    },
+                    activity_id=resource.id,
+                    stream=stream,
+                    effective_date=effective_date.isoformat(),
+                    since=since.isoformat(),
+                    kept=index,
+                    dropped=len(resources) - index,
                 )
                 return resources[:index], True
         return resources, False

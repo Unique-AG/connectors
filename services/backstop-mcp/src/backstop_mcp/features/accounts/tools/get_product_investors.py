@@ -29,6 +29,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_product_investors_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, input_required
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -167,15 +168,12 @@ async def get_product_investors(
         if not isinstance(resolved_products, tuple):
             return resolved_products
 
-        logger.info(
-            "accounts.product_investors.start",
-            extra={
-                "product_ids": [item.id for item in resolved_products],
-                "include_closed": include_closed,
-                "include_latest_value": include_latest_value,
-                "exclude_custom_fields": exclude_custom_fields,
-                "investor_id_count": len(requested_investors),
-            },
+        annotate_tool_call(
+            product_ids=[item.id for item in resolved_products],
+            include_closed=include_closed,
+            include_latest_value=include_latest_value,
+            exclude_custom_fields=exclude_custom_fields,
+            investor_id_count=len(requested_investors),
         )
         result = await get_product_investors_query.run(
             products=resolved_products,
@@ -185,18 +183,15 @@ async def get_product_investors(
             investor_ids=requested_investors,
         )
         accounts = [account for listing in result.products for account in listing.accounts]
-        logger.info(
-            "accounts.product_investors.completed",
-            extra={
-                "product_ids": [listing.product.id for listing in result.products],
-                "returned": len(accounts),
-                "closed_omitted": sum(listing.closed_omitted for listing in result.products),
-                "valued": sum(
-                    1
-                    for account in accounts
-                    if account.latest_value is not None and account.latest_value.available
-                ),
-            },
+        annotate_tool_call(
+            product_ids=[listing.product.id for listing in result.products],
+            returned=len(accounts),
+            closed_omitted=sum(listing.closed_omitted for listing in result.products),
+            valued=sum(
+                1
+                for account in accounts
+                if account.latest_value is not None and account.latest_value.available
+            ),
         )
         return result
 

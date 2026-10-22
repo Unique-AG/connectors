@@ -50,7 +50,7 @@ from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.dependencies import get_resolution_config
-from backstop_mcp.observability import warning_event
+from backstop_mcp.observability import info_event, warning_event
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -261,7 +261,7 @@ async def elicit_from_client[T](
     if not _on_streamable_http():
         return await ctx.elicit(message=message, response_type=response_type)
 
-    logger.info("resolution.elicit.standalone_stream")
+    info_event(logger, "resolution.elicit.standalone_stream")
     config = parse_elicit_response_type(response_type)
     # No related_request_id → Streamable HTTP GET stream, not the tools/call POST.
     raw = await ctx.session.elicit_form(message, config.schema)
@@ -375,7 +375,7 @@ def _apply_elicit_result[T](
         return Resolved(value=chosen.value)
     assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
     action = "declined" if isinstance(result, DeclinedElicitation) else "cancelled"
-    logger.info("resolution.elicit.dismissed", extra={**outcome_log, "action": action})
+    info_event(logger, "resolution.elicit.dismissed", **outcome_log, action=action)
     return ambiguous
 
 
@@ -417,9 +417,11 @@ async def elicit_choice[T](
         return _resolved_by_key(ambiguous, prior[key])
 
     if not client_supports_elicitation(ctx):
-        logger.info(
+        info_event(
+            logger,
             "resolution.elicit.skipped",
-            extra={**outcome_log, "reason": "client lacks elicitation capability"},
+            **outcome_log,
+            reason="client lacks elicitation capability",
         )
         return ambiguous
 
@@ -431,10 +433,7 @@ async def elicit_choice[T](
         answered = cast("Mapping[object, object]", responses).get(key)
     if isinstance(answered, ElicitResult):
         if answered.action != "accept":
-            logger.info(
-                "resolution.elicit.dismissed",
-                extra={**outcome_log, "action": answered.action},
-            )
+            info_event(logger, "resolution.elicit.dismissed", **outcome_log, action=answered.action)
             return ambiguous
         try:
             accepted = handle_elicit_accept(config, answered.content)
@@ -451,7 +450,7 @@ async def elicit_choice[T](
     # 2026-07-28: picker is this tools/call result; client retries with input_responses.
     # Handshake: mid-call elicit (GET on /mcp) via elicit_from_client.
     if asks_as_tool_result(ctx):
-        logger.info("resolution.elicit.input_required", extra=outcome_log)
+        info_event(logger, "resolution.elicit.input_required", **outcome_log)
         return InputRequiredResult(
             input_requests={
                 key: ElicitRequest(
