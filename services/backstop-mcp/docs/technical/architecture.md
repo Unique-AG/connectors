@@ -248,18 +248,22 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
 Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
 `backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
-`tenant_guidance.applied`. Tool-level events pass Backstop logins through `identifiable_value`:
-`hmac-sha256:<hex>` when `LOG_LEVEL` is info or above, plain `sha256:<hex>` at debug, and the
-original value only when `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events
-(`backstop.request.*`, `backstop.auth_recheck.*`) currently carry the username in clear. API tokens
-are never logged.
+`tenant_guidance.applied`. Backstop logins, emails and search terms go through
+`identifiable_value`: `hmac-sha256:<hex>` when `LOG_LEVEL` is info or above, plain `sha256:<hex>` at
+debug, and the original value only when `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. That includes the
+Backstop client's `backstop.request.*` and `backstop.auth_recheck.*` events, which carry the request
+`route` template, never its path or query string. A Backstop error is logged by its status and
+JSON:API `code`; its `detail` and `title` reach the caller in the tool error, not the logs. API
+tokens are never logged.
 
 Each tool call logs `tool.call.start` and one terminal line: `tool.call.completed`,
 `tool.call.failed`, or `tool.call.cancelled`, with `tool`, `argument_names`, `subject`, and
 `duration_ms`. A failure is WARNING when the caller or Backstop caused it and ERROR, with its
 stack, when it is a bug; `invalid_arguments` names the argument locations pydantic rejected, never
-their values. A tool adds its own fields to the terminal line and to the tool span with
-`add_call_fields`. FastMCP's and `unique_mcp`'s per-call lines are dropped, because they repeat
+their values. A tool does not write its own start and end lines: it adds its fields (`segment`,
+`entity_id`, `returned`) to the terminal line and to the tool span with `annotate_tool_call`.
+Queries and commands log what they learned or changed (`*.fetched`, `*.created`, `*.updated`,
+`*.deleted`) with `info_event`, so the line also lands on the span. FastMCP's and `unique_mcp`'s per-call lines are dropped, because they repeat
 these and can quote the caller's input.
 
 ### Metrics
@@ -310,7 +314,8 @@ What a line or span may carry:
 - Safe to log raw: Backstop record ids, our `subject` UUID, enum-like values defined in our code,
   counts, lengths, offsets, booleans and presence flags, HTTP status, JSON:API `code`, route
   templates, retry counts, durations, tool names, argument names, selected field names, filter
-  names, the names of figures our code asks for (`figure`), and date windows the caller asked for.
+  names, the names of figures our code asks for (`figure`), date windows the caller asked for, and
+  `time_zone` once it is validated against Backstop's time-zone catalog (a fixed IANA vocabulary).
 - Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms, and
   person names used as a filter.
 - Never, not even hashed: free text, file names and bytes, addresses, phone numbers, websites,
