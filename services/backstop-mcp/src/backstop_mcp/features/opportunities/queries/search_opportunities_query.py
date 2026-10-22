@@ -49,6 +49,7 @@ from backstop_mcp.features.opportunities.responses import (
 )
 from backstop_mcp.features.system_users import SystemUserAttributes
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -233,14 +234,13 @@ class SearchOpportunitiesQuery:
         dropped = sum(
             1 for position in unreadable_positions if start_offset <= position < consumed_end
         )
-        logger.info(
+        info_event(
+            logger,
             "opportunities.search.page",
-            extra={
-                "stop_reason": collected.stop_reason,
-                "records_scanned": collected.records_scanned,
-                "request_count": collected.request_count,
-                "rows": len(collected.rows),
-            },
+            stop_reason=collected.stop_reason,
+            records_scanned=collected.records_scanned,
+            request_count=collected.request_count,
+            rows=len(collected.rows),
         )
         return SearchOpportunitiesResolvedResponse(
             mode="rows",

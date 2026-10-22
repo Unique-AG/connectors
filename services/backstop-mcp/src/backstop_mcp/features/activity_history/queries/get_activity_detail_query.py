@@ -44,6 +44,7 @@ from backstop_mcp.features.ui_links import (
     BuildEntityLinkUtil,
     activity_link_target,
 )
+from backstop_mcp.observability import info_event
 from backstop_mcp.utils import ParsedActivityHandle
 
 logger = logging.getLogger(__name__)
@@ -130,13 +131,12 @@ class GetActivityDetailQuery:
             description=attributes.description,
             attachments=attachments_from_stored(attributes.attachments),
         )
-        logger.info(
+        info_event(
+            logger,
             "activity_history.detail.fetched",
-            extra={
-                "resource_id": resource_id,
-                "type": detail.type,
-                "has_description": detail.description is not None,
-            },
+            resource_id=resource_id,
+            type=detail.type,
+            has_description=detail.description is not None,
         )
         return detail
 
@@ -155,12 +155,11 @@ class GetActivityDetailQuery:
             location=attributes.location,
             time_zone=attributes.time_zone,
         )
-        logger.info(
+        info_event(
+            logger,
             "activity_history.meeting_specifics.fetched",
-            extra={
-                "resource_id": resource_id,
-                "has_start": specifics.start is not None,
-                "has_location": specifics.location is not None,
-            },
+            resource_id=resource_id,
+            has_start=specifics.start is not None,
+            has_location=specifics.location is not None,
         )
         return specifics

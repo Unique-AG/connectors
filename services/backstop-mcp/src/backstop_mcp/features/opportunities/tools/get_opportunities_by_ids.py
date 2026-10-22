@@ -19,6 +19,7 @@ from backstop_mcp.features.opportunities import (
 )
 from backstop_mcp.features.opportunities.dependencies import get_opportunities_by_ids_query_factory
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +95,7 @@ async def get_opportunities_by_ids(
     "custom_field_names": ["<name from list_custom_fields>"]}
     """
     opportunity_ids = coerce_ids(ids)
-    logger.info(
-        "opportunities.by_ids.start",
-        extra={"count": len(opportunity_ids), "include_stage_history": include_stage_history},
-    )
+    annotate_tool_call(count=len(opportunity_ids), include_stage_history=include_stage_history)
     result = await get_opportunities_by_ids_query.run(
         opportunity_ids=opportunity_ids,
         include_stage_history=include_stage_history,
@@ -106,12 +104,9 @@ async def get_opportunities_by_ids(
             names=tuple(custom_field_names),
         ),
     )
-    logger.info(
-        "opportunities.by_ids.completed",
-        extra={
-            "returned": len(result.opportunities),
-            "not_found": len(result.not_found),
-            "errors": len(result.errors),
-        },
+    annotate_tool_call(
+        returned=len(result.opportunities),
+        not_found=len(result.not_found),
+        errors=len(result.errors),
     )
     return result

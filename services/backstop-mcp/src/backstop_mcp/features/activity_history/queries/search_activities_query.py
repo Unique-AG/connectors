@@ -33,6 +33,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import SearchCursor, continuation
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -222,19 +223,18 @@ class SearchActivitiesQuery:
                 break
             page_num += 1
 
-        logger.info(
+        info_event(
+            logger,
             "activity_history.entity_activities.fetched",
-            extra={
-                "pages": pages_fetched,
-                "returned": len(collected),
-                "dropped": dropped,
-                "received": rows_received,
-                "total_count": total_count,
-                "start_offset": start_offset,
-                "next_offset": next_offset,
-                "ceiling_clamped": ceiling_clamped,
-                "partial_due_to_error": partial_due_to_error,
-            },
+            pages=pages_fetched,
+            returned=len(collected),
+            dropped=dropped,
+            received=rows_received,
+            total_count=total_count,
+            start_offset=start_offset,
+            next_offset=next_offset,
+            ceiling_clamped=ceiling_clamped,
+            partial_due_to_error=partial_due_to_error,
         )
         return EntityActivitiesFetchDto(
             rows=tuple(collected),
