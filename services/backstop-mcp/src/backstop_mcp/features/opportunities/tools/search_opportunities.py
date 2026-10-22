@@ -34,6 +34,7 @@ from backstop_mcp.features.opportunities.dependencies import (
     get_search_opportunities_query_factory,
 )
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 
@@ -356,21 +357,20 @@ async def search_opportunities(
     )
     products = tuple(product or ())
     predicates = _predicates(custom_fields)
-    logger.info(
-        "opportunities.search.start",
-        extra={
-            "representative": representative,
-            "representative_scope": representative_scope,
-            "mode": mode,
-            "stage": stage,
-            "product": products,
-            "entered_stage_from": entered_stage_from,
-            "entered_stage_to": entered_stage_to,
-            "custom_fields": len(predicates),
-            "exclude_custom_fields": skip_custom_fields,
-            "start_offset": start_offset,
-        },
-    )
+    search_fields: dict[str, object] = {
+        "representative_scope": representative_scope,
+        "mode": mode,
+        "has_stage": stage is not None,
+        "product_count": len(products),
+        "entered_stage_from": entered_stage_from,
+        "entered_stage_to": entered_stage_to,
+        "custom_fields": len(predicates),
+        "exclude_custom_fields": skip_custom_fields,
+        "start_offset": start_offset,
+    }
+    if representative is not None:
+        search_fields["representative"] = identifiable_value(representative)
+    logger.info("opportunities.search.start", extra=search_fields)
     return await search_opportunities_query.run(
         representative=representative,
         representative_scope=representative_scope,

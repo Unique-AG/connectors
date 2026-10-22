@@ -135,7 +135,6 @@ class GetActivityHistoryQuery:
                         "segment": segment,
                         "entity_id": entity_id,
                         "stream": activity_type,
-                        "detail": result.detail,
                     },
                 )
                 groups[activity_type] = ActivityGroupResponse(

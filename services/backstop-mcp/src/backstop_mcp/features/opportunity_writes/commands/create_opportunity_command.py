@@ -104,7 +104,7 @@ class CreateOpportunityCommand:
                 "opportunity_writes.opportunity.created",
                 extra={
                     "id": created_id,
-                    "stage": stage_name,
+                    "stage_id": stage_id,
                     "warnings": len(warnings),
                 },
             )

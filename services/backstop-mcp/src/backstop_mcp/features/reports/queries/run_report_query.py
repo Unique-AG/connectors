@@ -14,6 +14,8 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
     ReportRunKey,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
+from backstop_mcp.observability import span_attributes
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -64,8 +66,9 @@ class RunReportQuery:
     ) -> RunReportResponse | RunReportPendingResponse:
         assert 1 <= limit <= MAX_REPORT_PAGE_SIZE
         assert offset >= 0
+        logged_report_name = identifiable_value(report_name)
         with _tracer.start_as_current_span("reports.query.run") as span:
-            span.set_attribute("report_name", report_name)
+            span.set_attributes(span_attributes({"report_name": logged_report_name}))
             span.set_attribute("as_of_date", as_of_date.isoformat())
             span.set_attribute("limit", limit)
             span.set_attribute("offset", offset)
@@ -94,7 +97,7 @@ class RunReportQuery:
                 logger.info(
                     "reports.run.pending",
                     extra={
-                        "report_name": report_name,
+                        "report_name": logged_report_name,
                         "as_of_date": as_of_date.isoformat(),
                         "running_seconds": running_seconds,
                     },
@@ -142,6 +145,7 @@ class RunReportQuery:
         limit: int,
         offset: int,
     ) -> RunReportResponse:
+        logged_report_name = identifiable_value(report_name)
         with _tracer.start_as_current_span("reports.query.fetch"):
             page = await self._client.fetch_page(
                 "/reports",
@@ -167,7 +171,9 @@ class RunReportQuery:
                 for value in result.values:
                     consumed += 1
                     if not isinstance(value, dict):
-                        logger.warning("reports.row.unreadable", extra={"report_name": report_name})
+                        logger.warning(
+                            "reports.row.unreadable", extra={"report_name": logged_report_name}
+                        )
                         continue
                     records.append(cast("dict[str, object]", value))
             columns = self._columns(header, records)
@@ -191,7 +197,7 @@ class RunReportQuery:
             logger.info(
                 "reports.fetched",
                 extra={
-                    "report_name": report_name,
+                    "report_name": logged_report_name,
                     "as_of_date": as_of_date.isoformat(),
                     "offset": offset,
                     "limit": limit,

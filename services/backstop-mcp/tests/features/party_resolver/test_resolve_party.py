@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import cast
 
 import httpx
 import pytest
@@ -30,6 +31,7 @@ from backstop_mcp.features.resolution import (
     elicit_choice,
     elicit_if_ambiguous,
 )
+from backstop_mcp.utils import identifiable_value
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     FakeContext,
@@ -1378,7 +1380,9 @@ class TestElicitTimeout:
 
         record = _log_record(caplog, "resolution.elicit.timed_out")
         assert record.levelno == logging.WARNING
-        assert record.__dict__["query"] == "Northwind"
+        logged_query = cast("object", record.__dict__["query"])
+        assert str(logged_query) == str(identifiable_value("Northwind"))
+        assert "Northwind" not in str(logged_query)
         assert record.__dict__["scope"] == "organizations"
         assert record.__dict__["candidates"] == 2
         assert record.__dict__["timeout_seconds"] == 0.01

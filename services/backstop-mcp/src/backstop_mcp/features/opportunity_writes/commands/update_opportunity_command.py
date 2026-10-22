@@ -99,7 +99,7 @@ class UpdateOpportunityCommand:
                 "opportunity_writes.opportunity.updated",
                 extra={
                     "id": new_opportunity.opportunity_id,
-                    "stage": stage_name,
+                    "stage_id": stage_id,
                     "warnings": len(warnings),
                 },
             )
