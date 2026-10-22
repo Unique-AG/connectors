@@ -328,7 +328,9 @@ Levels:
   matches our schema, a failure in our own persistence. With stack trace.
 
 `LOGS_DIAGNOSTICS_DATA_POLICY=disclose` changes `identifiable_value` only. It is a local-debugging
-opt-in. `tests/test_no_payload_logging.py` checks call sites statically.
+opt-in. `tests/test_no_payload_logging.py` checks call sites statically, by argument name, so a
+payload passed under an innocent name slips past it. It fails on a new violation and on an
+allowlist entry whose call is gone.
 
 ### Traces
 

@@ -1,10 +1,4 @@
-"""No log or span call may carry a whole payload.
-
-The walk is syntactic. A value passed under an innocent name is invisible here; the runtime
-canary in `tests/test_no_payload_in_telemetry.py` covers that. Entries in `_KNOWN_VIOLATIONS`
-are the leaks that exist today. Phase 6 removes them, and the second test fails if an entry
-is left behind after the call it names is gone.
-"""
+"""No log or span call may carry a whole payload; `_KNOWN_VIOLATIONS` lists today's leaks."""
 
 import ast
 import pathlib
