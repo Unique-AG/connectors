@@ -37,6 +37,28 @@ The feature tag sets the surface. A feature with tags of two surfaces is in "Acr
 
 The tag `@uc-NN-MM` is the permanent id of a scenario. The sidecar uses it as a key. Never reuse an id.
 
+## Happy and unhappy paths
+
+Every scenario has one tag, `@happy` or `@unhappy`. A test fails when a scenario has none or both.
+
+| Tag | Meaning |
+| --- | --- |
+| `@happy` | The normal flow. The thing that Mia asks for happens as she asks. A clarifying question or an approval question that Mia accepts is part of the normal flow. A scenario for something that the connector cannot do yet is `@happy`, because the status field says whether it works. |
+| `@unhappy` | Something fails, is refused, is limited, or is hostile. Examples: Microsoft fails, is busy, or refuses; the item is gone, not found, or empty; a name is in use; a rule or a limit stops the action; a batch partly fails; Mia declines or does not answer; text from others tells the assistant to act. A busy answer that the assistant waits out is `@unhappy`, because the abnormal condition is the point. |
+
+Tie-break rules:
+
+- A scenario exactly at a limit that succeeds (a file of exactly 10 MB) is `@happy`.
+- Wrong input from Mia (a range that runs backwards, a value that is already there) is `@unhappy`,
+  whether the assistant repairs it, asks about it, or refuses it.
+- A question because the request is vague (no day, no condition, two people with one name) is
+  `@happy`. A question because an item cannot be found is `@unhappy`.
+- A warning in an approval question makes the scenario `@unhappy` only when the warning names a
+  limit or a loss. A notice of a normal fact does not.
+- A scenario for something that the connector cannot do yet is `@happy` when its steps describe the
+  normal flow, and `@unhappy` when its steps describe the refusal.
+`STATUS.md` counts both tags for each surface.
+
 ## The sidecar
 
 Each entry has these keys:

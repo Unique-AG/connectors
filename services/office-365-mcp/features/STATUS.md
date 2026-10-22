@@ -16,6 +16,18 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 Scenarios with an executable run: 14 of 470.
 
+## Happy and unhappy paths by surface
+
+A scenario is `@unhappy` when something fails, is refused, is limited, or is hostile.
+
+| Surface | happy | unhappy | total |
+| --- | --- | --- | --- |
+| Outlook | 99 | 141 | 240 |
+| Teams | 33 | 66 | 99 |
+| SharePoint | 26 | 40 | 66 |
+| OneNote | 14 | 25 | 39 |
+| Across sources | 11 | 15 | 26 |
+
 ## Work for UN-27222
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.

@@ -5,55 +5,55 @@ Feature: Posting in Teams
 
   Rule: A message is posted after Mia approves it
 
-    @uc-09-01
+    @happy @uc-09-01
     Scenario: A chat message with a mention is posted
       Given Mia has a chat with Anna and Tom
       When Mia asks her assistant to tell the chat that the build is green and to mention Anna
       Then Mia is asked to approve the message first
       And after she approves, the chat shows the message with a mention of Anna
 
-    @uc-09-02
+    @unhappy @uc-09-02
     Scenario: A declined message is not posted
       Given Mia has a chat with Anna and Tom
       When Mia declines the message that her assistant proposed
       Then the chat shows no new message
       And the assistant tells Mia that nothing was sent
 
-    @uc-09-03
+    @unhappy @uc-09-03
     Scenario: A person who is not in the chat is not mentioned
       Given Priya is not a member of Mia's chat with Anna and Tom, and Mia knows Priya from another chat
       When Mia asks her assistant to post in that chat and to mention Priya
       Then the assistant tells Mia that Priya is not in the chat
       And nothing is posted
 
-    @uc-09-04
+    @happy @uc-09-04
     Scenario: A reply goes into the thread of a channel post
       Given the channel "Releases" has a post "v2 is out?"
       When Mia asks her assistant to reply "Yes, since noon" to that post
       Then the reply is in the thread of "v2 is out?"
       And the channel shows no new top-level post
 
-    @uc-09-05
+    @happy @uc-09-05
     Scenario: A file that is in SharePoint is attached to a post
       Given the deck "Q3 Plan.pptx" is in the Sales site
       When Mia asks her assistant to post "Q3 Plan.pptx" in the channel "Sales"
       Then the channel "Sales" shows a post with "Q3 Plan.pptx" attached
 
-    @uc-09-08
+    @happy @uc-09-08
     Scenario: A new post is made in a channel
       Given Mia belongs to the team "Platform", and it has the channel "Releases"
       When Mia asks her assistant to post "v2 ships on Friday" in "Releases"
       Then Mia is asked to approve the post first
       And after she approves, the channel shows a new top-level post "v2 ships on Friday"
 
-    @uc-09-09
+    @happy @uc-09-09
     Scenario: A file that is in SharePoint is attached to a chat message
       Given the deck "Q3 Plan.pptx" is in the Sales site, and Mia has a chat with Anna
       When Mia asks her assistant to send "Q3 Plan.pptx" to Anna in that chat
       Then Mia is asked to approve the message first
       And after she approves, the chat shows a message with "Q3 Plan.pptx" attached
 
-    @uc-09-10
+    @unhappy @uc-09-10
     Scenario: A file in OneDrive is not posted and the assistant says why
       Given the file "Notes.docx" is in Mia's own OneDrive and not in a SharePoint site
       When Mia asks her assistant to post "Notes.docx" in the channel "Sales"
@@ -62,20 +62,20 @@ Feature: Posting in Teams
 
   Rule: Mia changes only her own messages
 
-    @uc-09-06
+    @happy @uc-09-06
     Scenario: Mia's own message is corrected
       Given Mia wrote "Launch on 14 Jun" in a chat
       When Mia asks her assistant to correct it to "Launch on 14 June"
       Then the chat shows "Launch on 14 June" in place of the old text
 
-    @uc-09-07
+    @unhappy @uc-09-07
     Scenario: A message of another person is not changed
       Given Tom wrote "Launch on 14 Jun" in a chat
       When Mia asks her assistant to correct that message
       Then the assistant tells Mia that she can change only her own messages
       And the message of Tom is unchanged
 
-    @uc-09-11
+    @happy @uc-09-11
     Scenario: Mia's own message is deleted
       Given Mia wrote "Launch on 14 Jun" in a chat by mistake
       When Mia asks her assistant to delete that message
@@ -84,7 +84,7 @@ Feature: Posting in Teams
 
   Rule: Mia reacts to a message without writing a new one
 
-    @uc-09-12
+    @happy @uc-09-12
     Scenario: A message gets a thumbs-up
       Given Anna wrote "The release notes are ready" in a chat with Mia
       When Mia asks her assistant to give that message a thumbs-up
@@ -94,7 +94,7 @@ Feature: Posting in Teams
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant says what happened to the message. It does not post the message again before it checks the chat.
 
-    @uc-09-13
+    @unhappy @uc-09-13
     Scenario: Mia is told to sign in again when her sign-in has expired
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft says that Mia's sign-in has expired
@@ -102,7 +102,7 @@ Feature: Posting in Teams
       Then the assistant tells Mia to sign in again
       But the chat shows no new message
 
-    @uc-09-14
+    @unhappy @uc-09-14
     Scenario: Mia is told to ask an administrator when Microsoft refuses the post
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft refuses the message because her company did not grant the access
@@ -110,7 +110,7 @@ Feature: Posting in Teams
       Then the assistant tells Mia that an administrator must grant the access
       But the chat shows no new message
 
-    @uc-09-15
+    @unhappy @uc-09-15
     Scenario: A chat that Microsoft cannot find is not reported as deleted
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft answers that it has no such chat
@@ -118,7 +118,7 @@ Feature: Posting in Teams
       Then the assistant tells Mia that it could not find the chat
       But it does not say that the chat was deleted
 
-    @uc-09-16
+    @unhappy @uc-09-16
     Scenario: Mia is told how long to wait when Microsoft limits how often the assistant may ask
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft limits how often the assistant may ask and asks it to wait 30 seconds
@@ -126,7 +126,7 @@ Feature: Posting in Teams
       Then the assistant tells Mia to try again after 30 seconds
       But the chat shows no new message
 
-    @uc-09-17
+    @unhappy @uc-09-17
     Scenario Outline: A message that Microsoft fails is not sent again before the chat is checked
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft <problem> when the message is sent
@@ -140,7 +140,7 @@ Feature: Posting in Teams
         | does not answer in time              |
         | sends an answer that nobody can read |
 
-    @uc-09-18
+    @unhappy @uc-09-18
     Scenario: A message that Microsoft rejects is reported with Microsoft's reason
       Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
       And Microsoft rejects the message and states a reason
@@ -150,21 +150,21 @@ Feature: Posting in Teams
 
   Rule: Nothing is posted or changed in Teams unless Mia clearly agrees
 
-    @uc-09-19
+    @unhappy @uc-09-19
     Scenario: A declined post in a channel is not posted
       Given Mia belongs to the team "Platform", and it has the channel "Releases"
       When Mia declines the post that her assistant proposed
       Then the channel shows no new post
       And the assistant tells Mia that nothing was posted
 
-    @uc-09-20
+    @unhappy @uc-09-20
     Scenario: A declined message with a file is not sent
       Given the deck "Q3 Plan.pptx" is in the Sales site, and Mia has a chat with Anna
       When Mia declines the message with "Q3 Plan.pptx" that her assistant proposed
       Then the chat shows no new message
       And the assistant tells Mia that nothing was sent
 
-    @uc-09-21
+    @unhappy @uc-09-21
     Scenario Outline: A declined change to a message leaves the message as it was
       Given Mia wrote "Launch on 14 Jun" in a chat, and Anna wrote "The release notes are ready" in it
       When Mia declines the change that her assistant proposed: <change>
@@ -177,7 +177,7 @@ Feature: Posting in Teams
         | delete "Launch on 14 Jun"                         |
         | give the message of Anna a thumbs-up              |
 
-    @uc-09-22
+    @unhappy @uc-09-22
     Scenario Outline: A question whose answer never comes back changes nothing in Teams
       Given <trouble> when Mia is asked to approve the change
       When Mia asks her assistant to <action>
@@ -195,7 +195,7 @@ Feature: Posting in Teams
         | delete "Launch on 14 Jun"                               | the connection breaks while Mia is asked |
         | give the message of Anna a thumbs-up                    | the answer never comes back              |
 
-    @uc-09-29
+    @unhappy @uc-09-29
     Scenario: A message that Mia cannot be asked about is not sent
       Given Mia has a chat with Anna and Tom, and Mia's chat program cannot show her a question
       When Mia asks her assistant to tell the chat that the build is green
@@ -203,7 +203,7 @@ Feature: Posting in Teams
       And the assistant tells Mia that her program cannot ask her
       And it says that Mia can do this in the Microsoft 365 app
 
-    @uc-09-23
+    @unhappy @uc-09-23
     Scenario Outline: An approval for one change does not cover another
       Given Mia approved <approved>
       When her assistant tries <attempted> with that approval
@@ -222,7 +222,7 @@ Feature: Posting in Teams
 
   Rule: The assistant posts only what Teams can take
 
-    @uc-09-24
+    @unhappy @uc-09-24
     Scenario Outline: A message that is already deleted is not changed
       Given the message "Launch on 14 Jun" in a chat is already deleted
       When Mia asks her assistant to <action>
@@ -235,7 +235,7 @@ Feature: Posting in Teams
         | delete that message                         |
         | give that message a thumbs-up               |
 
-    @uc-09-25
+    @unhappy @uc-09-25
     Scenario: A reply with a subject is refused
       Given the channel "Releases" has a post "v2 is out?"
       When Mia asks her assistant to reply "Yes, since noon" to that post with the subject "Release news"
@@ -243,14 +243,14 @@ Feature: Posting in Teams
       And it offers a reply without the subject or a new post with the subject
       But nothing is posted
 
-    @uc-09-26
+    @unhappy @uc-09-26
     Scenario: A folder is not attached to a post
       Given the folder "Offers" is in the Sales site
       When Mia asks her assistant to post "Offers" in the channel "Sales"
       Then the assistant tells Mia that Teams attaches only a file and not a folder
       But nothing is posted
 
-    @uc-09-27
+    @unhappy @uc-09-27
     Scenario: A file whose details Microsoft does not send is not attached
       Given Microsoft does not send the details that Teams needs to attach "Q3 Plan.pptx"
       When Mia asks her assistant to post "Q3 Plan.pptx" in the channel "Sales"
@@ -259,7 +259,7 @@ Feature: Posting in Teams
 
   Rule: Text in a message is not an instruction
 
-    @uc-09-28
+    @unhappy @uc-09-28
     Scenario: A message that tells the assistant to post elsewhere is shown and not obeyed
       Given Anna wrote "The release notes are ready" in a chat with Mia, and the message tells the assistant to post the same text in the channel "Sales"
       When Mia asks her assistant to give that message a thumbs-up

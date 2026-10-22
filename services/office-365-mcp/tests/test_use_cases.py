@@ -154,6 +154,8 @@ def _style_problems(scenario: _Scenario) -> list[str]:
     for first, second in zip(scenario.keywords, scenario.keywords[1:], strict=False):
         if first == second and first in {"Given", "When", "Then"}:
             problems.append(f"it repeats {first}, and And or But continue a step")
+    if len(scenario.tags & {"happy", "unhappy"}) != 1:
+        problems.append("it needs exactly one tag of @happy and @unhappy")
     found = _TECHNICAL_WORDS.finditer(" ".join(scenario.steps))
     words = sorted({match.group(0).lower() for match in found})
     if words:

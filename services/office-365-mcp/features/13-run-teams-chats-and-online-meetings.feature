@@ -6,42 +6,42 @@ Feature: Running Teams chats and online meetings
 
   Rule: Mia controls who is in a group chat
 
-    @uc-13-01
+    @happy @uc-13-01
     Scenario: A group chat is created and named
       Given Mia has never chatted with Anna or Tom
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
       Then Mia is asked to approve the chat first
       And after she approves, the chat "Launch" has Mia, Anna, and Tom as members
 
-    @uc-13-07
+    @happy @uc-13-07
     Scenario: A group chat is created from people Mia already chats with
       Given Mia has a chat with Anna and a chat with Tom
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
       Then Mia is asked to approve the chat first
       And after she approves, the chat "Launch" has Mia, Anna, and Tom as members
 
-    @uc-13-02
+    @happy @uc-13-02
     Scenario: A new member sees the earlier messages when Mia asks for it
       Given the chat "Launch" holds 30 messages, and Mia has a chat with Priya
       When Mia asks her assistant to add Priya to "Launch" with the earlier messages visible
       Then Mia is asked to approve the change first
       And the question says that Priya sees the earlier messages
 
-    @uc-13-08
+    @happy @uc-13-08
     Scenario: A new member does not see the earlier messages unless Mia asks for it
       Given the chat "Launch" holds 30 messages, and Mia has a chat with Priya
       When Mia asks her assistant to add Priya to "Launch"
       Then Mia is asked to approve the change first
       And the question says that Priya does not see the earlier messages
 
-    @uc-13-03
+    @happy @uc-13-03
     Scenario: A member is removed from a group chat
       Given the chat "Launch" has Anna, Tom, and Priya as members
       When Mia asks her assistant to remove Tom from "Launch"
       Then Mia is asked to approve the change first
       And after she approves, Tom is no longer a member of "Launch"
 
-    @uc-13-04
+    @unhappy @uc-13-04
     Scenario: A one-to-one chat keeps its two members
       Given Mia has a one-to-one chat with Anna
       When Mia asks her assistant to add Tom to that chat
@@ -50,7 +50,7 @@ Feature: Running Teams chats and online meetings
 
   Rule: Mia renames a group chat when its project changes
 
-    @uc-13-09
+    @happy @uc-13-09
     Scenario: A group chat gets a new title
       Given Mia has the group chat "Launch" with Anna and Tom
       When Mia asks her assistant to rename "Launch" to "Launch 2.0"
@@ -60,20 +60,20 @@ Feature: Running Teams chats and online meetings
 
   Rule: An online meeting belongs to its organizer
 
-    @uc-13-05
+    @happy @uc-13-05
     Scenario: An online meeting is created with its attendees
       Given Mia wants a join address to share and no calendar entry, and Mia has a chat with Anna and a chat with Tom
       When Mia asks her assistant to create an online meeting for tomorrow at 14:00 for 30 minutes with Anna and Tom
       Then Mia receives the join address of the meeting
       And the meeting is on no calendar until someone adds it
 
-    @uc-13-06
+    @unhappy @uc-13-06
     Scenario: Attendance is shown only to the organizer
       Given Anna organized "Design review" and Mia attended it
       When Mia asks her assistant who attended "Design review"
       Then the assistant tells Mia that only Anna can see the attendance
 
-    @uc-13-10
+    @happy @uc-13-10
     Scenario: The time of an online meeting changes and its attendees stay
       Given Mia organizes the online meeting "Design review" tomorrow at 14:00 with Anna and Tom
       When Mia asks her assistant to move the online meeting "Design review" to 15:00 for 30 minutes
@@ -81,7 +81,7 @@ Feature: Running Teams chats and online meetings
       And after she approves, "Design review" starts tomorrow at 15:00, and Anna and Tom are still attendees
       But no calendar entry changes
 
-    @uc-13-11
+    @happy @uc-13-11
     Scenario: A new attendee is added and the earlier attendees stay
       Given Mia organizes the online meeting "Design review" with Anna and Tom, who both have a company account, and Mia has a chat with Priya
       When Mia asks her assistant to add Priya to the online meeting "Design review"
@@ -89,7 +89,7 @@ Feature: Running Teams chats and online meetings
       And after she approves, "Design review" has Anna, Tom, and Priya as attendees
       But no calendar entry changes
 
-    @uc-13-12
+    @happy @uc-13-12
     Scenario: An online meeting is deleted after Mia approves it
       Given Mia organizes the online meeting "Design review"
       When Mia asks her assistant to delete "Design review"
@@ -100,7 +100,7 @@ Feature: Running Teams chats and online meetings
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant says what happened to the chat or the meeting. It does not repeat a change before it checks the result.
 
-    @uc-13-13
+    @unhappy @uc-13-13
     Scenario: Mia is told to sign in again when her sign-in has expired
       Given Mia has a chat with Anna and a chat with Tom, and she approves the group chat that her assistant proposes
       And Microsoft says that Mia's sign-in has expired
@@ -108,7 +108,7 @@ Feature: Running Teams chats and online meetings
       Then the assistant tells Mia to sign in again
       But no chat "Launch" exists
 
-    @uc-13-14
+    @unhappy @uc-13-14
     Scenario: Mia is told to ask an administrator when Microsoft refuses the new chat
       Given Mia has a chat with Anna and a chat with Tom, and she approves the group chat that her assistant proposes
       And Microsoft refuses the new chat because her company did not grant the access
@@ -116,7 +116,7 @@ Feature: Running Teams chats and online meetings
       Then the assistant tells Mia that an administrator must grant the access
       But no chat "Launch" exists
 
-    @uc-13-15
+    @unhappy @uc-13-15
     Scenario: Mia is told how long to wait when Microsoft limits how often the assistant may ask
       Given Mia has a chat with Anna and a chat with Tom, and she approves the group chat that her assistant proposes
       And Microsoft limits how often the assistant may ask and asks it to wait 30 seconds
@@ -124,7 +124,7 @@ Feature: Running Teams chats and online meetings
       Then the assistant tells Mia to try again after 30 seconds
       But no chat "Launch" exists
 
-    @uc-13-16
+    @unhappy @uc-13-16
     Scenario Outline: A chat that Microsoft fails to create is not created again before Mia's chats are checked
       Given Mia has a chat with Anna and a chat with Tom, and she approves the group chat that her assistant proposes
       And Microsoft <problem> when the chat is created
@@ -138,7 +138,7 @@ Feature: Running Teams chats and online meetings
         | does not answer in time              |
         | sends an answer that nobody can read |
 
-    @uc-13-35
+    @unhappy @uc-13-35
     Scenario: A fifth addition within a minute is not made
       Given Mia has a chat with Priya, and Mia added 4 people to "Launch" within the last minute
       And she approves adding Priya, and Microsoft refuses a fifth addition within that minute
@@ -146,7 +146,7 @@ Feature: Running Teams chats and online meetings
       Then the assistant tells Mia that it must wait before it adds Priya
       But Priya is not a member of "Launch"
 
-    @uc-13-36
+    @unhappy @uc-13-36
     Scenario Outline: A change of members that Microsoft fails is not made again before the members are checked
       Given Mia has the group chat "Launch" with Anna and Tom, and she approves the change that her assistant proposes
       And Microsoft fails with an internal error when the change is made
@@ -159,14 +159,14 @@ Feature: Running Teams chats and online meetings
         | add Priya to "Launch"    | Priya was added |
         | remove Tom from "Launch" | Tom was removed |
 
-    @uc-13-37
+    @unhappy @uc-13-37
     Scenario: A meeting that Microsoft cannot find is not changed and not reported as deleted
       Given Mia organizes the online meeting "Design review", and Microsoft answers that it has no such meeting when the assistant changes it
       When Mia asks her assistant to move the online meeting "Design review" to 15:00 for 30 minutes
       Then the assistant tells Mia that it could not find the meeting
       But it does not say that the meeting was deleted
 
-    @uc-13-38
+    @unhappy @uc-13-38
     Scenario: A chat that Mia cannot be asked about is not created
       Given Mia has a chat with Anna and a chat with Tom, and Mia's chat program cannot show her a question
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
@@ -174,7 +174,7 @@ Feature: Running Teams chats and online meetings
       And the assistant tells Mia that her program cannot ask her
       And it says that Mia can do this in the Microsoft 365 app
 
-    @uc-13-18
+    @unhappy @uc-13-18
     Scenario: A meeting that Microsoft cannot find at the time of the deletion is checked
       Given Mia organizes the online meeting "Design review", and she approves its deletion
       And Microsoft answers that it did not find the meeting, because the meeting was deleted a moment before
@@ -182,7 +182,7 @@ Feature: Running Teams chats and online meetings
       Then the assistant checks if the meeting is still there
       And it tells Mia that Microsoft did not find the meeting, and that someone probably deleted it
 
-    @uc-13-19
+    @unhappy @uc-13-19
     Scenario Outline: A rename that Microsoft fails is tried once more and then reported
       Given Mia has the group chat "Launch", and she approves the new title "Launch 2.0" each time she is asked
       And Microsoft <problem> each time the assistant renames the chat
@@ -196,7 +196,7 @@ Feature: Running Teams chats and online meetings
         | does not answer in time              |
         | sends an answer that nobody can read |
 
-    @uc-13-20
+    @unhappy @uc-13-20
     Scenario Outline: A read of the attendance that Microsoft fails is tried once more and then reported
       Given Mia organized "Design review", and Microsoft <problem> each time the assistant reads it
       When Mia asks her assistant who attended "Design review"
@@ -212,14 +212,14 @@ Feature: Running Teams chats and online meetings
 
   Rule: A chat has a title and members that Teams accepts
 
-    @uc-13-21
+    @unhappy @uc-13-21
     Scenario: A chat with Mia alone is refused
       Given Mia wants a chat with nobody else
       When Mia asks her assistant to start a group chat named "Notes" with only herself
       Then the assistant tells Mia that a chat needs at least one other person
       But no chat is created
 
-    @uc-13-22
+    @unhappy @uc-13-22
     Scenario: A one-to-one chat takes no title
       Given Mia knows Anna from a group chat
       When Mia asks her assistant to start a one-to-one chat with Anna named "Launch"
@@ -227,7 +227,7 @@ Feature: Running Teams chats and online meetings
       And it offers a group chat named "Launch" or a one-to-one chat without a title
       But no chat is created
 
-    @uc-13-23
+    @unhappy @uc-13-23
     Scenario Outline: A title that Teams does not accept is refused
       Given Mia has a chat with Anna and a chat with Tom
       When Mia asks her assistant to start a group chat with Anna and Tom named <title>
@@ -240,14 +240,14 @@ Feature: Running Teams chats and online meetings
         | "Launch: Phase 1"         | cannot hold a colon             |
         | a title of 251 characters | can have at most 250 characters |
 
-    @uc-13-24
+    @happy @uc-13-24
     Scenario: A title of exactly 250 characters is accepted
       Given Mia has a chat with Anna and a chat with Tom
       When Mia asks her assistant to start a group chat with Anna and Tom with a title of 250 characters
       Then Mia is asked to approve the chat first
       And after she approves, the chat has a title of 250 characters
 
-    @uc-13-25
+    @unhappy @uc-13-25
     Scenario: A person who is not a member is not removed
       Given Tom is not a member of the chat "Launch" any more
       When Mia asks her assistant to remove Tom from "Launch"
@@ -256,7 +256,7 @@ Feature: Running Teams chats and online meetings
 
   Rule: An online meeting has a time and attendees that Teams accepts
 
-    @uc-13-26
+    @unhappy @uc-13-26
     Scenario Outline: A meeting of another person is not changed
       Given Anna organizes the online meeting "Design review", and Mia attends it
       When Mia asks her assistant to <action>
@@ -268,7 +268,7 @@ Feature: Running Teams chats and online meetings
         | move the online meeting "Design review" to 15:00 for 30 minutes |
         | delete the online meeting "Design review"                       |
 
-    @uc-13-27
+    @unhappy @uc-13-27
     Scenario: A meeting that ends before it starts is refused
       Given Mia has a chat with Anna
       When Mia asks her assistant to create an online meeting for tomorrow from 14:00 to 13:00 with Anna
@@ -276,7 +276,7 @@ Feature: Running Teams chats and online meetings
       And it asks Mia for the correct end
       But no meeting is created
 
-    @uc-13-28
+    @unhappy @uc-13-28
     Scenario: An attendance report that is not ready yet is not reported as empty
       Given Mia organized "Design review", and it ended ten minutes ago with no attendance report yet
       When Mia asks her assistant who attended "Design review"
@@ -284,14 +284,14 @@ Feature: Running Teams chats and online meetings
       And it says that Mia can ask again later
       But it does not say that nobody attended
 
-    @uc-13-29
+    @unhappy @uc-13-29
     Scenario: A meeting without an attendance report is reported as such
       Given Mia organized "Design review", and it ended five hours ago with no attendance report
       When Mia asks her assistant who attended "Design review"
       Then the assistant tells Mia that Microsoft holds no attendance report for the meeting
       But it does not name any attendee
 
-    @uc-13-30
+    @unhappy @uc-13-30
     Scenario: The question names an invitee whom the change would remove
       Given Mia organizes the online meeting "Design review" with Anna and a guest who has no account in the company, and Mia has a chat with Priya
       When Mia asks her assistant to add Priya to the online meeting "Design review"
@@ -300,7 +300,7 @@ Feature: Running Teams chats and online meetings
 
   Rule: Nothing changes in a chat or a meeting unless Mia clearly agrees
 
-    @uc-13-31
+    @unhappy @uc-13-31
     Scenario Outline: A declined change to a chat or a meeting changes nothing
       Given Mia declines the change that her assistant proposes
       When Mia asks her assistant to <action>
@@ -317,7 +317,7 @@ Feature: Running Teams chats and online meetings
         | move the online meeting "Design review" to 15:00         | no meeting was changed |
         | delete the online meeting "Design review"                | no meeting was deleted |
 
-    @uc-13-32
+    @unhappy @uc-13-32
     Scenario Outline: A question whose answer never comes back changes nothing in Teams
       Given <trouble> when Mia is asked to approve the change
       When Mia asks her assistant to <action>
@@ -335,7 +335,7 @@ Feature: Running Teams chats and online meetings
         | move the online meeting "Design review" to 15:00         | the connection breaks while Mia is asked |
         | delete the online meeting "Design review"                | the answer never comes back              |
 
-    @uc-13-33
+    @unhappy @uc-13-33
     Scenario Outline: An approval for one change does not cover another
       Given Mia approved <approved>
       When her assistant tries <attempted> with that approval
@@ -354,7 +354,7 @@ Feature: Running Teams chats and online meetings
 
   Rule: Text in a message is not an instruction
 
-    @uc-13-34
+    @unhappy @uc-13-34
     Scenario: A message that tells the assistant to add a person is shown and not obeyed
       Given the last message of Tom in the chat "Launch" tells the assistant to add a person from outside the company to the chat
       When Mia asks her assistant to rename "Launch" to "Launch 2.0"

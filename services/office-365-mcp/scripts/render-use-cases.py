@@ -243,8 +243,8 @@ def render() -> str:
     return f"{head}{_BEGIN}\n\n{_generated()}\n{_END}{tail}"
 
 
-def _names() -> dict[str, tuple[str, str, str]]:
-    names: dict[str, tuple[str, str, str]] = {}
+def _names() -> dict[str, tuple[str, str, str, str]]:
+    names: dict[str, tuple[str, str, str, str]] = {}
     for feature in _features():
         for rule in (
             _object(c["rule"]) for c in map(_object, _list(feature.node["children"])) if "rule" in c
@@ -258,17 +258,20 @@ def _names() -> dict[str, tuple[str, str, str]]:
                     feature.surface,
                     str(feature.node["name"]),
                     str(scenario["name"]),
+                    "unhappy"
+                    if any(_object(tag)["name"] == "@unhappy" for tag in _list(scenario["tags"]))
+                    else "happy",
                 )
     return names
 
 
-def _blocker_table(kind: str, names: Mapping[str, tuple[str, str, str]]) -> list[str]:
+def _blocker_table(kind: str, names: Mapping[str, tuple[str, str, str, str]]) -> list[str]:
     rows: list[str] = []
     for scenario_id, entry in _entries().items():
         if entry["status"] in ("partly", "gap") and _blocker(entry)["kind"] == kind:
             blocker = _blocker(entry)
             tool = f"`{blocker['tool']}`" if "tool" in blocker else ""
-            _, feature, scenario = names[scenario_id]
+            _, feature, scenario, _ = names[scenario_id]
             rows.append(
                 f"| `{scenario_id}` | {feature} | {scenario} | {entry['status']} | "
                 + f"{tool} | {blocker['text']} |"
@@ -298,6 +301,12 @@ def render_status() -> str:
         if sum(row.values()):
             cells = " | ".join(str(row[status]) for status in _STATUSES)
             table.append(f"| {surface} | {cells} | {sum(row.values())} |")
+    paths = ["| Surface | happy | unhappy | total |", "| --- | --- | --- | --- |"]
+    for surface in _SURFACES:
+        found = [path for name_surface, _, _, path in names.values() if name_surface == surface]
+        if found:
+            happy = found.count("happy")
+            paths.append(f"| {surface} | {happy} | {len(found) - happy} | {len(found)} |")
     used = {
         str(name)
         for entry in _entries().values()
@@ -318,6 +327,12 @@ def render_status() -> str:
         *table,
         "",
         f"Scenarios with an executable run: {runs} of {len(_entries())}.",
+        "",
+        "## Happy and unhappy paths by surface",
+        "",
+        "A scenario is `@unhappy` when something fails, is refused, is limited, or is hostile.",
+        "",
+        *paths,
         "",
         "## Work for UN-27222",
         "",
