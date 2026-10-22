@@ -90,7 +90,7 @@ unused `upstream`, `persistence` or `utils` stays as an `__init__.py` with an em
 | Outside `contexts/`, code imports the domain from `<package>.contexts` only: `from <package>.contexts import get_price_performance`, never `from <package>.contexts.prices import get_price_performance`. | import-linter `protected` contract on `contexts` |
 | Inside `contexts/`, a feature imports another through that feature's top level: `from <package>.contexts.prices import get_latest_close`. Inside a feature, deep imports are fine. | import-linter `feature_privacy` contract, the one contract type of our own |
 | No package imports its siblings in a cycle (`a → b → c → a`), at any depth: features in `contexts/`, folders in `mcp/`, modules inside a feature. | import-linter `acyclic_siblings` contract |
-| `contexts/` and `persistence/` import nothing from `fastmcp`, `mcp` or `mcp_types` themselves. | import-linter `forbidden` contract |
+| `contexts/`, `persistence/` and `utils/` import nothing from `fastmcp`, `mcp` or `mcp_types` themselves. | import-linter `forbidden` contract |
 | Every folder with Python code has an `__init__.py`, since import-linter does not see the others. | ruff `INP001` |
 | A context function takes keyword arguments only: `def f(*, a, b)`. | ruff `PLR0917`, which `code_style.toml` turns off outside `contexts/` |
 | Imports are absolute. | ruff `TID252` |

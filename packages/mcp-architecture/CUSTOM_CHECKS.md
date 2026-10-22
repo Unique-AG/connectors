@@ -35,7 +35,7 @@ import rules:
 | A layer is imported through its top level | `protected` | `interfaces` |
 | Feature privacy | `FeaturePrivacyContract` | `interfaces` |
 | No cycle between siblings, at any depth | `acyclic_siblings` | `forbid_circular_dependencies`, between declared modules only |
-| `contexts` and `persistence` import nothing from `fastmcp`, `mcp` or `mcp_types` | `forbidden` | Not supported |
+| `contexts`, `persistence` and `utils` import nothing from `fastmcp`, `mcp` or `mcp_types` | `forbidden` | Not supported |
 | Indirect chains (`a → b → c`) | Checked | Direct imports only |
 | A contract type of our own | Python plugin | Not supported |
 
@@ -43,7 +43,7 @@ Tach cannot extend a shared file either, so `mcp-architecture-imports` would sti
 config.
 
 Replacing import-linter loses the `fastmcp` ban, which a nested `ruff.toml` with `TID251` under
-`contexts/` and `persistence/` would have to take over. Running both means two configs per MCP,
+`contexts/`, `persistence/` and `utils/` would have to take over. Running both means two configs per MCP,
 two CI steps, and rules that disagree when a chain is indirect, all to retire one class of about
 70 lines.
 
