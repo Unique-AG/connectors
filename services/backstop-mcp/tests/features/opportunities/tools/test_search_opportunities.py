@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Literal, TypedDict, Unpack, cast, get_args
@@ -7,6 +8,8 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import without_injected_parameters
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
@@ -20,10 +23,14 @@ from backstop_mcp.features.opportunities.tools.search_opportunities import (
     search_opportunities,
 )
 from backstop_mcp.models import CoercedId
+from backstop_mcp.observability import tool_call_scope
 from backstop_mcp.server.tools import TOOLS
+from backstop_mcp.utils import identifiable_value
 from tests.features.opportunities.conftest import VOCABULARY, make_search_opportunities_query
 from tests.helpers import (
     BASE_URL,
+    SERVICE_LOGGER,
+    assert_canary_absent,
     recorded_requests,
     resource,
     tool_client,
@@ -696,6 +703,75 @@ class TestSearchOpportunitiesProductFilter:
         product = object_dict(rows[0]["product"])
         assert product["id"] == "p-on"
         assert product["short_name"] == "NWON"
+
+
+@pytest.mark.usefixtures("keyed_pseudonyms")
+class TestSearchOpportunitiesTelemetry:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_filters_are_pseudonymized_or_reduced_to_a_flag_and_a_count(
+        self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
+    ) -> None:
+        base_url = tenant("so-telemetry")
+        representative = "zq-canary-rep-login"
+        stage = "zq-canary-stage-filter"
+        products = ["ZQCANARYPRODA", "zq-canary-product-b"]
+        route = respx.get(f"{base_url}/opportunities").mock(return_value=_product_page())
+        _stub_supporting_collections(base_url)
+
+        with (
+            caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER),
+            trace.get_tracer(__name__).start_as_current_span("tools/call search_opportunities"),
+            tool_call_scope() as call,
+        ):
+            async with tool_client(base_url) as client:
+                await search_opportunities(
+                    representative=representative,
+                    stage=stage,
+                    product=products,
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
+
+        assert route.call_count == 1
+        fields = call.fields
+        assert str(fields["representative"]) == str(identifiable_value(representative))
+        assert str(fields["representative"]).startswith("hmac-sha256:")
+        assert fields["has_stage"] is True
+        assert type(fields["product_count"]) is int
+        assert fields["product_count"] == 2
+        assert "stage" not in fields
+        assert "product" not in fields
+        (tool_span,) = [
+            span
+            for span in exporter.get_finished_spans()
+            if span.name == "tools/call search_opportunities"
+        ]
+        assert tool_span.attributes is not None
+        assert tool_span.attributes["representative"] == str(identifiable_value(representative))
+        assert tool_span.attributes["has_stage"] is True
+        assert tool_span.attributes["product_count"] == 2
+        for raw in (representative, stage, *products):
+            assert_canary_absent(caplog, exporter, raw)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_stage_filter_is_a_false_flag_and_a_zero_count(self) -> None:
+        base_url = tenant("so-telemetry-unfiltered")
+        respx.get(f"{base_url}/opportunities").mock(return_value=_product_page())
+        _stub_supporting_collections(base_url)
+
+        with tool_call_scope() as call:
+            async with tool_client(base_url) as client:
+                await search_opportunities(
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
+
+        fields = call.fields
+        assert fields["has_stage"] is False
+        assert fields["product_count"] == 0
+        assert "representative" not in fields
 
 
 def _custom_fields(*rows: tuple[str, str, str]) -> list[dict[str, object]]:
