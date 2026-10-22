@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.observability import warning_event
+from backstop_mcp.observability import failure_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +66,7 @@ def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
     try:
         return _gist(_html_to_markdown(html), max_chars=max_chars)
     except Exception as exc:
-        warning_event(
-            logger, "activity_history.gist.conversion_failed", exc=exc, html_chars=len(html)
-        )
+        failure_event(logger, "activity_history.gist.conversion_failed", exc, html_chars=len(html))
         if max_chars is None or len(html) <= max_chars:
             return Gist(text=html, truncated=False, full_length=len(html))
         return Gist(text=html[:max_chars], truncated=True, full_length=len(html))

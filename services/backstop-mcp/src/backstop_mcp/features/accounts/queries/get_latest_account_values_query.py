@@ -13,7 +13,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
-from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.observability import failure_event, info_event, most_severe
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -47,10 +47,10 @@ class GetLatestAccountValuesQuery:
                 if isinstance(result, BaseException)
             ]
             if failures:
-                warning_event(
+                failure_event(
                     logger,
                     "accounts.latest_values.series_failed",
-                    exc=failures[0][1],
+                    most_severe([failure for _, failure in failures]),
                     count=len(failures),
                     sample_ids=[account_id for account_id, _ in failures[:5]],
                 )

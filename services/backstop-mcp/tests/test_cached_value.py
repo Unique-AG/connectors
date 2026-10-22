@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
+import httpx
 import pytest
 
 from backstop_mcp.caching import CachedValue, CacheSource
@@ -226,7 +227,7 @@ class TestInMemoryTtl:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         cache = _cache()
-        fetch, _calls = _fetch_sequence({"old": "Stale Entry"}, ConnectionError("backstop down"))
+        fetch, _calls = _fetch_sequence({"old": "Stale Entry"}, httpx.ConnectError("backstop down"))
 
         await cache.get(fetch)
         _age_past_ttl(cache)
@@ -236,7 +237,28 @@ class TestInMemoryTtl:
         record = aggregated_warning(
             caplog, "test_cache.refresh_failed_serving_stale", catalog="test-cache"
         )
-        assert record.__dict__["error_type"] == "ConnectionError"
+        assert record.__dict__["error_type"] == "ConnectError"
+
+    @pytest.mark.asyncio
+    async def test_serving_stale_after_a_bug_logs_an_error_with_its_stack(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        cache = _cache()
+        fetch, _calls = _fetch_sequence({"old": "Stale Entry"}, KeyError("missing"))
+
+        await cache.get(fetch)
+        _age_past_ttl(cache)
+        with caplog.at_level(logging.WARNING):
+            served = await cache.get(fetch)
+
+        assert served == ({"old": "Stale Entry"}, "stale")
+        record = next(
+            item
+            for item in caplog.records
+            if item.getMessage() == "test_cache.refresh_failed_serving_stale"
+        )
+        assert record.levelno == logging.ERROR
+        assert record.exc_info is not None
 
     @pytest.mark.asyncio
     async def test_failed_refresh_restamps_ttl_so_the_next_get_does_not_refetch(self) -> None:

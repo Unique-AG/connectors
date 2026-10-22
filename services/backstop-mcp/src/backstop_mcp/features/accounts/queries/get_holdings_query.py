@@ -47,7 +47,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
-from backstop_mcp.observability import failure_event, info_event, warning_event
+from backstop_mcp.observability import failure_event, info_event, most_severe, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -178,10 +178,10 @@ class GetHoldingsQuery:
             series_failures.extend(failures)
         if series_failures:
             failed_rows = [row for row in rows if row.figure_errors]
-            warning_event(
+            failure_event(
                 logger,
                 "accounts.holdings.fallback_series_failed",
-                exc=series_failures[0],
+                most_severe(series_failures),
                 owner_id=owner_id,
                 count=len(series_failures),
                 sample_ids=[row.account_id for row in failed_rows[:5]],

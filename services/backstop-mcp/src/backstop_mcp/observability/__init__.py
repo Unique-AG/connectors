@@ -11,7 +11,7 @@ from backstop_mcp.observability.events import (
     info_event,
     warning_event,
 )
-from backstop_mcp.observability.failures import DeclaresFailureLevel, failure_level
+from backstop_mcp.observability.failures import DeclaresFailureLevel, failure_level, most_severe
 from backstop_mcp.observability.fields import span_attributes
 from backstop_mcp.observability.operation import OperationOutcome, operation
 from backstop_mcp.observability.redaction import install_caller_failure_redaction
@@ -26,6 +26,7 @@ __all__ = [
     "failure_level",
     "info_event",
     "install_caller_failure_redaction",
+    "most_severe",
     "operation",
     "span_attributes",
     "tool_call_scope",

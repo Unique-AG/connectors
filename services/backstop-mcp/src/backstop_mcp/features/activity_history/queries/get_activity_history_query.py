@@ -64,7 +64,7 @@ from backstop_mcp.features.includes import (
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
-from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.observability import failure_event, info_event, most_severe, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -429,10 +429,10 @@ class GetActivityHistoryQuery:
             if isinstance(result, BaseException)
         ]
         if failures:
-            warning_event(
+            failure_event(
                 logger,
                 "activity_history.attendees.join_failed",
-                exc=failures[0][1],
+                most_severe([failure for _, failure in failures]),
                 stream=stream,
                 count=len(failures),
                 sample_ids=[resource_id for resource_id, _ in failures[:5]],
