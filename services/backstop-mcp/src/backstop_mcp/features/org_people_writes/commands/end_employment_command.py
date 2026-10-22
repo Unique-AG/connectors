@@ -88,6 +88,7 @@ class EndEmploymentCommand:
                 id=relationship_id,
                 person_id=person_id,
                 organization_id=organization_id,
+                warning_count=len(warnings),
             )
             return EndedEmploymentResponse(
                 id=relationship_id,

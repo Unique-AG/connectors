@@ -76,6 +76,7 @@ class UpdatePersonCommand:
                 id=party_id,
                 search_type=search_type,
                 location_ids=location_ids,
+                deleted_location_count=len(person.delete_location_ids or ()),
             )
             return UpdatedPersonResponse(
                 id=party_id,
