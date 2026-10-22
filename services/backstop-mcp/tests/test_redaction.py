@@ -90,6 +90,74 @@ class TestNestedSpans:
         assert _has_exception_event(span)
 
 
+def _stacktrace(span: ReadableSpan) -> str:
+    event = next(item for item in span.events if item.name == "exception")
+    assert event.attributes is not None
+    stacktrace = event.attributes["exception.stacktrace"]
+    assert isinstance(stacktrace, str)
+    return stacktrace
+
+
+class TestRetainedStacks:
+    def test_a_bug_keeps_frames_and_type_but_not_its_message(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        tracer = trace.get_tracer("test")
+
+        with pytest.raises(KeyError), tracer.start_as_current_span("inner"):
+            raise KeyError(_CANARY)
+
+        span = _span(exporter, "inner")
+        stacktrace = _stacktrace(span)
+        assert 'File "' in stacktrace
+        assert stacktrace.endswith("KeyError")
+        assert _CANARY not in str(span.events)
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.status.description is None
+
+    def test_a_chained_bug_keeps_both_types_but_neither_message(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        tracer = trace.get_tracer("test")
+
+        with pytest.raises(ToolError), tracer.start_as_current_span("inner"):
+            try:
+                raise ValueError(f"1 validation error\nname\n    input_value='{_CANARY}'")
+            except ValueError as exc:
+                raise ToolError(f"Backstop response failed: {_CANARY}") from exc
+
+        stacktrace = _stacktrace(_span(exporter, "inner"))
+        assert "\nValueError\n" in stacktrace
+        assert stacktrace.endswith("fastmcp.exceptions.ToolError")
+        assert "direct cause" in stacktrace
+        assert _CANARY not in stacktrace
+
+    def test_an_exception_group_keeps_no_member_message(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        tracer = trace.get_tracer("test")
+
+        with pytest.raises(ExceptionGroup), tracer.start_as_current_span("inner"):
+            raise ExceptionGroup(_CANARY, [KeyError(_CANARY), RuntimeError(_CANARY)])
+
+        stacktrace = _stacktrace(_span(exporter, "inner"))
+        assert "| KeyError" in stacktrace
+        assert "| RuntimeError" in stacktrace
+        assert _CANARY not in stacktrace
+
+    def test_an_error_event_keeps_its_name_as_the_status_description(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        tracer = trace.get_tracer("test")
+
+        with tracer.start_as_current_span("tool"):
+            error_event(logger, "widget.broken", exc=KeyError(_CANARY))
+
+        exported = _span(exporter, "tool")
+        assert exported.status.description == "widget.broken"
+        assert _CANARY not in str(exported.events)
+
+
 class TestMarkedSpans:
     def test_a_warning_marks_the_span_and_its_exception_text_is_dropped(
         self, exporter: InMemorySpanExporter

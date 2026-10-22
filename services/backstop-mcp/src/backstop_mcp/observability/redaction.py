@@ -1,8 +1,9 @@
-"""Drop caller-caused exception text from spans before export. FastMCP records every tool exception
-on its span, and a `ToolError` often quotes the caller's input.
+"""Drop caller-caused exceptions from spans before export, and every exception's message text from
+the rest: a `ToolError` quotes the caller's input, a pydantic error quotes the record.
 """
 
 import logging
+import re
 from collections.abc import Iterable
 from typing import cast, override
 
@@ -18,11 +19,18 @@ from backstop_mcp.observability.failures import DeclaresFailureLevel
 
 _EXCEPTION_EVENT = "exception"
 _EXCEPTION_TYPE = "exception.type"
+_EXCEPTION_MESSAGE = "exception.message"
 _EXCEPTION_STACKTRACE = "exception.stacktrace"
 _CAUSE_MARKERS = (
     "The above exception was the direct cause of the following exception",
     "During handling of the above exception, another exception occurred",
 )
+_TRACEBACK_HEADER = re.compile(r"^[ +|]*(?:Exception Group )?Traceback \(most recent call last\):$")
+_GROUP_MARGIN = re.compile(r"^(?:[ ]*\| )?")
+_GROUP_SEPARATOR = re.compile(r"^[ |]*\+[-+ .\d]*$")
+_FRAME_PREFIX = '  File "'
+_CODE_PREFIX = "    "
+_EXCEPTION_TYPE_LINE = re.compile(r"^([A-Za-z_][\w.]*)(?::|$)")
 
 _installed_providers: set[int] = set()
 
@@ -30,12 +38,17 @@ _installed_providers: set[int] = set()
 class CallerFailureRedaction(SpanProcessor):
     @override
     def _on_ending(self, span: Span) -> None:
-        if not _is_expected_failure(span) and not _only_expected_exception_events(span):
+        # `set_status` is ignored once the span has ended, which it has by the time this runs.
+        if _is_expected_failure(span) or _only_expected_exception_events(span):
+            _replace_events(span, [e for e in _span_events(span) if not _is_exception_event(e)])
+            if span.status.status_code is StatusCode.ERROR:
+                span._status = Status(StatusCode.UNSET)  # pyright: ignore[reportPrivateUsage]
             return
-        _drop_exception_events(span)
-        if span.status.status_code is StatusCode.ERROR:
-            # `set_status` is ignored once the span has ended, which it has by the time this runs.
-            span._status = Status(StatusCode.UNSET)  # pyright: ignore[reportPrivateUsage]
+        events = _span_events(span)
+        _replace_events(span, [_scrubbed(e) if _is_exception_event(e) else e for e in events])
+        description = span.status.description
+        if description is not None and description not in {e.name for e in events}:
+            span._status = Status(span.status.status_code)  # pyright: ignore[reportPrivateUsage]
 
 
 def install_caller_failure_redaction() -> None:
@@ -105,12 +118,50 @@ def _span_events(span: Span) -> list[Event]:
     return list(cast("Iterable[Event]", raw))
 
 
-def _drop_exception_events(span: Span) -> None:
-    kept = [event for event in _span_events(span) if not _is_exception_event(event)]
+def _replace_events(span: Span, events: list[Event]) -> None:
     replacement = cast("BoundedList[Event]", BoundedList(None))
-    replacement.extend(kept)
+    replacement.extend(events)
     span._events = replacement  # pyright: ignore[reportPrivateUsage]
 
 
 def _is_exception_event(event: Event) -> bool:
     return event.name == _EXCEPTION_EVENT
+
+
+def _scrubbed(event: Event) -> Event:
+    attributes = {
+        key: _scrub_stacktrace(value)
+        if key == _EXCEPTION_STACKTRACE and isinstance(value, str)
+        else value
+        for key, value in (event.attributes or {}).items()
+        if key != _EXCEPTION_MESSAGE
+    }
+    return Event(event.name, attributes, event.timestamp)
+
+
+def _scrub_stacktrace(stacktrace: str) -> str:
+    """Keep the frames and each exception's type; drop each message, which can quote a payload."""
+    kept: list[str] = []
+    state = "expect_type"
+    for line in stacktrace.splitlines():
+        body = _GROUP_MARGIN.sub("", line, count=1)
+        if (
+            _TRACEBACK_HEADER.match(line)
+            or body.rstrip(":") in _CAUSE_MARKERS
+            or _GROUP_SEPARATOR.match(line)
+        ):
+            kept.append(line)
+            state = "expect_type"
+        elif state == "message":
+            continue
+        elif not body.strip():
+            kept.append(line)
+        elif body.startswith(_FRAME_PREFIX) or (state == "frame" and body.startswith(_CODE_PREFIX)):
+            kept.append(line)
+            state = "frame"
+        elif type_line := _EXCEPTION_TYPE_LINE.match(body):
+            kept.append(line[: len(line) - len(body)] + type_line.group(1))
+            state = "message"
+        else:
+            state = "message"
+    return "\n".join(kept)

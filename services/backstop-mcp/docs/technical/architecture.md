@@ -353,7 +353,11 @@ FastMCP records every exception a tool raises on its span, message and stack inc
 `ToolError` often quotes the caller's input. `observability/redaction.py` removes those exception
 events, and the status description, from a span whose failure was caller-caused: one marked by
 `warning_event` / `failure_event` at WARNING, or one whose only exceptions are `ToolError`s and
-declared-WARNING errors not chained from another exception. A bug keeps its stack. The processor
+declared-WARNING errors not chained from another exception. A bug keeps its stack, but only its
+frames and exception types: every exception's message, chained ones included, is cut from the
+stack, `exception.message` is dropped, and a status description that is not one of our event
+names is cleared. A pydantic error quotes record values and a `ToolError` can quote Backstop's
+error detail, and neither may reach the exporter. The processor
 uses the OpenTelemetry SDK's `_on_ending` hook and its private span fields, so an SDK upgrade must
 keep `tests/test_redaction.py` green.
 
