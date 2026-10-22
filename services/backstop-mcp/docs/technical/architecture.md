@@ -309,7 +309,9 @@ What a line or span may carry:
   counts, lengths, offsets, booleans and presence flags, HTTP status, JSON:API `code`, route
   templates, retry counts, durations, tool names, argument names, selected field names, filter
   names, the names of figures our code asks for (`figure`), date windows the caller asked for, and
-  `time_zone` once it is validated against Backstop's time-zone catalog (a fixed IANA vocabulary).
+  `time_zone` once it is validated against Backstop's time-zone catalog (a fixed IANA vocabulary),
+  and `failed_fields` from `failed_fields()` (pydantic error paths and types, never the input; a
+  path part that is not one of our model field names, such as a key read from the record, is `*`).
 - Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms,
   person names used as a filter, and `report_name` (Backstop addresses a report by its name, so
   there is no id to log instead).

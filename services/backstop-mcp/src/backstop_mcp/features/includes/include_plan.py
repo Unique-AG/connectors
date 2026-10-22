@@ -31,7 +31,7 @@ from backstop_mcp.features.includes.responses import (
     PersonIncludesResponse,
 )
 from backstop_mcp.features.includes.types import Include
-from backstop_mcp.observability import warning_event
+from backstop_mcp.observability import failed_fields, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +226,7 @@ def _warn_rejected(rejected: Sequence[_Rejected], planned: _PlannedInclude) -> N
             resource_type=planned.include.resource_type,
             count=len(unreadable),
             sample_ids=[item.entry_id for item in unreadable[:5]],
+            failed_fields=failed_fields(failures),
         )
 
 

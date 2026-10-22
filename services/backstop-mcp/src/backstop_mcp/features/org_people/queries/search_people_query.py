@@ -56,7 +56,7 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
-from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.observability import failed_fields, info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -220,6 +220,7 @@ class SearchPeopleQuery:
                     exc=unreadable[0][1],
                     count=dropped,
                     sample_ids=[person_id for person_id, _ in unreadable[:5]],
+                    failed_fields=failed_fields(failure for _, failure in unreadable),
                 )
             info_event(
                 logger,

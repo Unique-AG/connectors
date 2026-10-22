@@ -19,7 +19,7 @@ from backstop_mcp.features.opportunities.responses import (
     PartyOpportunitiesResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.observability import failed_fields, info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,7 @@ class GetOpportunitiesQuery:
                 entity_id=entity_id,
                 count=len(unreadable),
                 sample_ids=[opportunity_id for opportunity_id, _ in unreadable[:5]],
+                failed_fields=failed_fields(failure for _, failure in unreadable),
             )
 
         selected = tuple(

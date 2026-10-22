@@ -387,6 +387,7 @@ class TestRegularCustomFieldValues:
             caplog, "custom_fields.values.unreadable", count=7, sample_ids=ids[:5]
         )
         assert record.__dict__["error_type"] == "ValidationError"
+        assert record.__dict__["failed_fields"] == ["name (string_type)"]
 
 
 class TestJoinValues:
