@@ -44,7 +44,11 @@ class CreatePersonCommand:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, person: CreatePersonInput) -> CreatedPersonResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.create_person"):
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.create_person",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
             owner = await self._system_users_service.resolve_relationship(person.owner_login)
             attributes = omit_none_values(person_attributes(person))
             relationships = omit_none_values(

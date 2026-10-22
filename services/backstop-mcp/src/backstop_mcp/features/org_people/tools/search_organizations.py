@@ -15,7 +15,6 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from backstop_mcp.config import SearchConfig
@@ -31,7 +30,6 @@ from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 SearchOrganizationField = Literal[
     "id",
@@ -241,35 +239,33 @@ async def search_organizations(
     skip_custom_fields = exclude_custom_fields and not custom_fields
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
-    with _tracer.start_as_current_span("org_people.search") as span:
-        span.set_attribute("memory_custom_fields", len(predicates))
-        annotate_tool_call(
-            has_name=name is not None,
-            email=email is not None,
-            other_id=other_id is not None,
-            matching_domain=matching_domain is not None,
-            legal_name=legal_name is not None,
-            location_filter=location_filter is not None,
-            website=website is not None,
-            ria=ria is not None,
-            internal_organization=internal_organization is not None,
-            custom_fields=len(predicates),
-            exclude_custom_fields=skip_custom_fields,
-            cursor=cursor is not None,
-        )
-        return await search_organizations_query.run(
-            name=name,
-            email=email,
-            other_id=other_id,
-            matching_domain=matching_domain,
-            legal_name=legal_name,
-            location_filter=location_filter,
-            website=website,
-            ria=ria,
-            internal_organization=internal_organization,
-            custom_fields=predicates,
-            exclude_custom_fields=skip_custom_fields,
-            fields=chosen,
-            result_size=search_config.result_size,
-            cursor=cursor,
-        )
+    annotate_tool_call(
+        has_name=name is not None,
+        email=email is not None,
+        other_id=other_id is not None,
+        matching_domain=matching_domain is not None,
+        legal_name=legal_name is not None,
+        location_filter=location_filter is not None,
+        website=website is not None,
+        ria=ria is not None,
+        internal_organization=internal_organization is not None,
+        custom_fields=len(predicates),
+        exclude_custom_fields=skip_custom_fields,
+        cursor=cursor is not None,
+    )
+    return await search_organizations_query.run(
+        name=name,
+        email=email,
+        other_id=other_id,
+        matching_domain=matching_domain,
+        legal_name=legal_name,
+        location_filter=location_filter,
+        website=website,
+        ria=ria,
+        internal_organization=internal_organization,
+        custom_fields=predicates,
+        exclude_custom_fields=skip_custom_fields,
+        fields=chosen,
+        result_size=search_config.result_size,
+        cursor=cursor,
+    )

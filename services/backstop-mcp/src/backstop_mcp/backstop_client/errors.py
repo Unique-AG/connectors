@@ -65,8 +65,6 @@ class _JsonApiErrorBody(BaseModel):
 
 _ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
-_BODY_EXCERPT_LIMIT = 500
-
 # Mutable box on the ASGI scope (and a ContextVar of the same object for same-task tests).
 # A bool ContextVar cannot cross FastMCP's session task; this object can. See
 # `server/session_revoked.py`.
@@ -318,25 +316,9 @@ class BackstopResponseSchemaError(ToolError, DeclaresFailureLevel):
         self.cause = cause
 
 
-def unauthorized_log_fields(response: httpx.Response, *, secret: str) -> dict[str, object]:
-    """Fields for `backstop.request.unauthorized`: parsed JSON:API errors, or a redacted excerpt."""
-    fields: dict[str, object] = {"status_code": response.status_code}
-    parsed = _parse_error_details(response)
-    if parsed is not None:
-        first = parsed[0]
-        fields["detail"] = first.detail
-        fields["title"] = first.title
-        fields["code"] = first.code
-        return fields
-    fields["body_excerpt"] = _body_excerpt(response.content, secret=secret)
-    return fields
-
-
-def _body_excerpt(content: bytes, *, secret: str) -> str:
-    text = content.decode("utf-8", errors="replace")
-    if secret:
-        text = text.replace(secret, "***")
-    return text[:_BODY_EXCERPT_LIMIT]
+def error_code(response: httpx.Response) -> str | None:
+    """The JSON:API `code` of an error response, the one part of its body that is safe to log."""
+    return _first_code(_parse_error_details(response) or ())
 
 
 def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail, ...] | None:

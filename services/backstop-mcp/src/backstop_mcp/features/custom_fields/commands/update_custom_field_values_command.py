@@ -48,7 +48,11 @@ class UpdateCustomFieldValuesCommand:
         self._custom_fields_service: CustomFieldsService = custom_fields_service
 
     async def run(self, *, update: UpdateCustomFieldValuesInput) -> UpdateCustomFieldValuesResponse:
-        with _tracer.start_as_current_span("custom_fields.command.update_values") as span:
+        with _tracer.start_as_current_span(
+            "custom_fields.command.update_values",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("entity_type", update.entity_type)
             span.set_attribute("record_count", len(update.values))
             catalog, _freshness = await self._custom_fields_service.get()

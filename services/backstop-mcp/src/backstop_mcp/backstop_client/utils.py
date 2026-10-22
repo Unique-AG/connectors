@@ -18,6 +18,7 @@ from backstop_mcp.backstop_client.errors import (
     BackstopResponseSchemaError,
     BackstopUntrustedUrlError,
 )
+from backstop_mcp.observability import error_event
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,8 @@ def deserialize(content: bytes, schema: SchemaInput, *, path: str) -> object:
         return adapter_for(schema).validate_json(content)
     except ValidationError as exc:
         name = schema_label(schema)
-        logger.error(
-            "backstop.response.schema_error",
-            extra={"path": path, "schema": name},
-        )
+        # No `exc`: pydantic's text quotes the record's values.
+        error_event(logger, "backstop.response.schema_error", route=metric_route(path), schema=name)
         # `from None`: a chained cause would print pydantic's text, record values included, in
         # every traceback. The error keeps it as `.cause`.
         raise BackstopResponseSchemaError(path, name, exc) from None

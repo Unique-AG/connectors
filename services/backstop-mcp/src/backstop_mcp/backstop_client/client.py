@@ -23,7 +23,7 @@ from backstop_mcp.backstop_client.errors import (
     BackstopAuthError,
     BackstopSessionRevokedError,
     BackstopTransientAuthError,
-    unauthorized_log_fields,
+    error_code,
 )
 from backstop_mcp.backstop_client.pagination import (
     PageResult,
@@ -317,7 +317,7 @@ class BackstopClient:
             # 401 handling is outside the gate: a re-check must not hold the caller's slot, and
             # the first probe waits so in-flight requests can drain.
             if response.status_code == 401:
-                await self._handle_unauthorized(session, method, path, response)
+                await self._handle_unauthorized(session, method, route, response)
             if response.is_error:
                 # Covers 429 too — BackstopApiError.from_response returns a BackstopRateLimitError
                 # for those, which the retry predicate in retry.py inspects.
@@ -325,7 +325,7 @@ class BackstopClient:
             return response
 
         logger.debug(
-            "backstop.request.start", extra=self._log_extra(session, method=method, path=path)
+            "backstop.request.start", extra=self._log_extra(session, method=method, route=route)
         )
         # One span per logical request, retries included. `route` is the bounded template —
         # never the path, the URL, or the query string.
@@ -356,7 +356,7 @@ class BackstopClient:
                     status_code=exc.status_code,
                     code=exc.code,
                     error_count=len(exc.errors),
-                    **self._log_extra(session, method=method, path=path),
+                    **self._log_extra(session, method=method, route=route),
                 )
                 raise
             except httpx.TransportError as exc:
@@ -365,7 +365,7 @@ class BackstopClient:
                     logger,
                     "backstop.request.failed",
                     exc=exc,
-                    **self._log_extra(session, method=method, path=path),
+                    **self._log_extra(session, method=method, route=route),
                 )
                 raise
             except Exception as exc:
@@ -373,7 +373,7 @@ class BackstopClient:
                     logger,
                     "backstop.request.failed",
                     exc=exc,
-                    **self._log_extra(session, method=method, path=path),
+                    **self._log_extra(session, method=method, route=route),
                 )
                 raise
             span.set_attribute("http.response.status_code", response.status_code)
@@ -387,26 +387,27 @@ class BackstopClient:
         }
 
     async def _handle_unauthorized(
-        self, session: CallerSession, method: str, path: str, response: httpx.Response
+        self, session: CallerSession, method: str, route: str, response: httpx.Response
     ) -> NoReturn:
         """Log the 401, then either re-check (mid-session) or raise (login verification).
 
         Always raises. Login verification has no revoke hook and must fail fast. Mid-session
         probes `/system-info` with backoff and only revokes when every probe is unauthorized.
         """
-        unauthorized = unauthorized_log_fields(
-            response, secret=session.credential.api_token.get_secret_value()
-        )
+        status_code = response.status_code
+        code = error_code(response)
         logger.info(
             "backstop.request.unauthorized",
-            extra=self._log_extra(session, method=method, path=path, **unauthorized),
+            extra=self._log_extra(
+                session, method=method, route=route, status_code=status_code, code=code
+            ),
         )
         if session.on_auth_failure is None:
             raise BackstopAuthError("Backstop rejected the stored credential — please reconnect.")
-        await self._recheck_then_maybe_revoke(session, trigger_path=path)
+        await self._recheck_then_maybe_revoke(session, trigger_route=route)
 
     async def _recheck_then_maybe_revoke(
-        self, session: CallerSession, *, trigger_path: str
+        self, session: CallerSession, *, trigger_route: str
     ) -> NoReturn:
         """Re-probe `/system-info` with backoff; revoke only if every probe is unauthorized."""
         on_auth_failure = session.on_auth_failure
@@ -424,39 +425,39 @@ class BackstopClient:
             outcome = await self._probe_system_info(session, budget_seconds=leftover)
             outcomes.append(outcome)
             self._log_recheck_attempt(
-                session, trigger_path, clock, attempt=len(outcomes), outcome=outcome
+                session, trigger_route, clock, attempt=len(outcomes), outcome=outcome
             )
             if outcome == "ok":
-                self._raise_transient_auth(session, trigger_path, clock, attempts=len(outcomes))
+                self._raise_transient_auth(session, trigger_route, clock, attempts=len(outcomes))
             if not clock.another_probe_fits():
                 break
 
         if not confirmed_rejection(outcomes):
-            self._raise_transient_auth(session, trigger_path, clock, attempts=len(outcomes))
+            self._raise_transient_auth(session, trigger_route, clock, attempts=len(outcomes))
         try:
             # Confirmed rejection: revoke the stored credential.
             await on_auth_failure()
         except Exception:
             logger.exception("backstop.auth_failure_hook.failed")
             self._log_recheck_decision(
-                session, trigger_path, clock, attempts=len(outcomes), revoked=False
+                session, trigger_route, clock, attempts=len(outcomes), revoked=False
             )
             raise BackstopTransientAuthError(TRANSIENT_AUTH_MESSAGE) from None
         self._log_recheck_decision(
-            session, trigger_path, clock, attempts=len(outcomes), revoked=True
+            session, trigger_route, clock, attempts=len(outcomes), revoked=True
         )
         raise BackstopSessionRevokedError()
 
     def _raise_transient_auth(
-        self, session: CallerSession, trigger_path: str, clock: RecheckClock, *, attempts: int
+        self, session: CallerSession, trigger_route: str, clock: RecheckClock, *, attempts: int
     ) -> NoReturn:
-        self._log_recheck_decision(session, trigger_path, clock, attempts=attempts, revoked=False)
+        self._log_recheck_decision(session, trigger_route, clock, attempts=attempts, revoked=False)
         raise BackstopTransientAuthError(TRANSIENT_AUTH_MESSAGE)
 
     def _log_recheck_attempt(
         self,
         session: CallerSession,
-        trigger_path: str,
+        trigger_route: str,
         clock: RecheckClock,
         *,
         attempt: int,
@@ -466,7 +467,7 @@ class BackstopClient:
             "backstop.auth_recheck.attempt",
             extra=self._log_extra(
                 session,
-                trigger_path=trigger_path,
+                trigger_route=trigger_route,
                 attempt=attempt,
                 outcome=outcome,
                 elapsed_ms=clock.elapsed_ms,
@@ -476,7 +477,7 @@ class BackstopClient:
     def _log_recheck_decision(
         self,
         session: CallerSession,
-        trigger_path: str,
+        trigger_route: str,
         clock: RecheckClock,
         *,
         attempts: int,
@@ -486,7 +487,7 @@ class BackstopClient:
             "backstop.auth_recheck.decision",
             extra=self._log_extra(
                 session,
-                trigger_path=trigger_path,
+                trigger_route=trigger_route,
                 attempts=attempts,
                 elapsed_ms=clock.elapsed_ms,
                 revoked=revoked,

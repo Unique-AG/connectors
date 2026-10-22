@@ -59,7 +59,11 @@ class UpdateOpportunityCommand:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, new_opportunity: UpdateOpportunityInput) -> UpdatedOpportunityResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.update") as span:
+        with _tracer.start_as_current_span(
+            "opportunity_writes.command.update",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("opportunity_id", new_opportunity.opportunity_id)
             current = await self._read(new_opportunity.opportunity_id)
             catalog = await self._opportunity_stages_service.get_catalog()

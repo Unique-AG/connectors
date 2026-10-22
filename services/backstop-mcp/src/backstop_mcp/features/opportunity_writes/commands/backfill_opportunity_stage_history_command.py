@@ -64,9 +64,11 @@ class BackfillOpportunityStageHistoryCommand:
     async def run(
         self, *, backfill: BackfillOpportunityStageHistoryInput
     ) -> BackfillOpportunityStageHistoryResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.backfill_stage_history") as (
-            span
-        ):
+        with _tracer.start_as_current_span(
+            "opportunity_writes.command.backfill_stage_history",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("record_count", len(backfill.records))
             entity_type_ids: dict[str, str | None] = {}
             unreadable: dict[str, str] = {}

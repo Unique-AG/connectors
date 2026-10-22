@@ -26,7 +26,9 @@ class GetLatestAccountValuesQuery:
         self._client: BackstopClient = client
 
     async def run(self, *, account_ids: Sequence[str]) -> tuple[AccountLatestValueDto, ...]:
-        with _tracer.start_as_current_span("accounts.query.latest_values") as span:
+        with _tracer.start_as_current_span(
+            "accounts.query.latest_values", record_exception=False, set_status_on_exception=False
+        ) as span:
             span.set_attribute("requested", len(account_ids))
             settled = await asyncio.gather(
                 *(

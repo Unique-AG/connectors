@@ -33,8 +33,14 @@ _FORBIDDEN = frozenset(
         "errors",
         "data",
         "raw",
+        "path",
+        "url",
+        "next_path",
     }
 )
+# Calls whose result is safe whatever they wrap: a count, or a route template without ids or
+# query string.
+_CONCEALING_FUNCTIONS = frozenset({"len", "metric_route"})
 _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 
 # (path relative to src/backstop_mcp, event name). Each comment names the PR 2 step that
@@ -75,8 +81,8 @@ def _event_name(call: ast.Call) -> str:
     return "<dynamic>"
 
 
-def _is_len(node: ast.Call) -> bool:
-    return isinstance(node.func, ast.Name) and node.func.id == "len"
+def _conceals(node: ast.Call) -> bool:
+    return isinstance(node.func, ast.Name) and node.func.id in _CONCEALING_FUNCTIONS
 
 
 def _is_none_compare(node: ast.Compare) -> bool:
@@ -105,10 +111,10 @@ def _offends(node: ast.AST) -> bool:
     """Whether this expression logs a forbidden value.
 
     Only the last segment counts: `document.data.id` ends in `id`, so the `data` receiver is
-    not a payload. `len(...)` and `is None` hide whatever they wrap. Other calls are entered,
-    so `detail=exc.detail` inside `_log_extra(...)` is still visible.
+    not a payload. `len(...)`, `metric_route(...)` and `is None` hide whatever they wrap. Other
+    calls are entered, so `path=path` inside `_log_extra(...)` is still visible.
     """
-    if isinstance(node, ast.Call) and _is_len(node):
+    if isinstance(node, ast.Call) and _conceals(node):
         return False
     if isinstance(node, ast.Compare) and _is_none_compare(node):
         return False
@@ -132,6 +138,36 @@ def _offends(node: ast.AST) -> bool:
             or any(_comprehension_offends(item) for item in generators)
         )
     return any(_offends(child) for child in ast.iter_child_nodes(node))
+
+
+def _is_span_start(node: ast.Call) -> bool:
+    return isinstance(node.func, ast.Attribute) and node.func.attr == "start_as_current_span"
+
+
+def _keyword_is_false(call: ast.Call, name: str) -> bool:
+    return any(
+        keyword.arg == name
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is False
+        for keyword in call.keywords
+    )
+
+
+def _spans_recording_exceptions() -> list[str]:
+    """Span starts that would write `str(exc)` and its stack before the failure is classified."""
+    found: list[str] = []
+    for source in _sources():
+        tree = ast.parse(source.read_text(), filename=str(source))
+        relative = source.relative_to(_SRC).as_posix()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not _is_span_start(node):
+                continue
+            if not (
+                _keyword_is_false(node, "record_exception")
+                and _keyword_is_false(node, "set_status_on_exception")
+            ):
+                found.append(f"{relative}:{node.lineno}")
+    return found
 
 
 def _violations() -> set[tuple[str, str]]:
@@ -161,4 +197,13 @@ class TestNoPayloadLogging:
 
         assert not stale, "allowlist entry no longer matches a call:\n  " + "\n  ".join(
             f"{path} {event}" for path, event in sorted(stale)
+        )
+
+    def test_every_span_leaves_exceptions_to_the_failure_events(self) -> None:
+        offending = _spans_recording_exceptions()
+
+        assert not offending, (
+            "start_as_current_span without record_exception=False and "
+            + "set_status_on_exception=False:\n  "
+            + "\n  ".join(offending)
         )

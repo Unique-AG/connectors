@@ -62,7 +62,11 @@ class UpdateOrganizationCommand:
     async def run(
         self, *, new_organization_fields: UpdateOrganizationInput, party_id: str
     ) -> UpdatedOrganizationResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.update_organization") as span:
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.update_organization",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("party_id", party_id)
             owner = await self._system_users_service.resolve_relationship(
                 new_organization_fields.owner_login
