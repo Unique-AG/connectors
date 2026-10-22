@@ -5,8 +5,8 @@
 
 All configuration is through environment variables. Every variable this service defines is listed
 on this page, grouped the way [`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/src/backstop_mcp/config.py)
-groups them. The `FASTMCP_*` and `OTEL_*` variables read by the FastMCP and OpenTelemetry libraries
-are not covered and not supported.
+groups them. `FASTMCP_*` variables, and `OTEL_*` variables other than the three in
+[Tracing](#Tracing), are read by libraries and are not covered here.
 
 - **App default** is what the server uses when the variable is unset.
 - **Chart default** is what the Helm chart's [`values.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/deploy/helm-charts/backstop-mcp/values.yaml)
@@ -93,6 +93,16 @@ mcpConfig:
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | `conceal` | `conceal` pseudonymizes identifying values (logins, emails, search terms). At `LOG_LEVEL` info or above the pseudonym is `hmac-sha256:<hex>`, keyed from `BACKSTOP_MCP_ENCRYPTION_KEY`, so guessing a likely email does not find the line. At `LOG_LEVEL=debug` it is plain `sha256:<hex>`, which a developer can recompute locally. `LOG_LEVEL` is process-wide, so lines from before and after switching a pod to debug do not correlate, and rotating `BACKSTOP_MCP_ENCRYPTION_KEY` changes every keyed pseudonym. `disclose` writes the original, and only the exact lower-case value `disclose` turns it on. The Backstop HTTP client's request and re-check events (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either setting, so treat logs as containing Backstop logins. API tokens are never logged |
 | `PUBLIC_BASE_URL` | `http://localhost:9010` | Set per deployment in `mcpConfig.app.publicBaseUrl` | See [Required](#Required) |
 | `VERSION` | Package version | `image.tag`, falling back to the chart `appVersion` (set by the base chart) | Reported as the MCP server version and on metrics. Not meant to be set by hand |
+
+## Tracing
+
+Off unless one of these is set. The chart does not set an endpoint; an overlay does.
+
+| Variable | App default | Chart default | Description |
+|---|---|---|---|
+| `OTEL_TRACES_EXPORTER` | unset | | `console` prints spans on stderr. `otlp` sends them to a collector. Unset, or `none`, installs no exporter |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | | Collector base URL, for example `http://otel-collector:4318`. Setting it turns tracing on |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | | Traces-only collector URL. Wins over `OTEL_EXPORTER_OTLP_ENDPOINT` for traces when both are set |
 
 ## Backstop API
 

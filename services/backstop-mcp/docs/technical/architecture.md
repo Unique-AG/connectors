@@ -340,10 +340,28 @@ allowlist entry whose call is gone.
 
 ### Traces
 
-Several tools, queries, and commands open OpenTelemetry spans (for example `reports.run`,
-`accounts.product_investors`, `opportunity_writes.command.update`), and the ASGI middleware spans each
-HTTP request. The server does not install a trace exporter, so with the shipped
-image these spans are not exported anywhere.
+Tracing is off unless an `OTEL_*` variable is set (`OTEL_TRACES_EXPORTER=console` for local spans
+on stderr, or `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` for a
+collector). `configure_tracing` installs the provider; with no `OTEL_*` variable it does nothing.
+
+```
+POST /mcp                         ASGI SERVER span
+└ tools/call <tool>               FastMCP, one per tool call
+   ├ backstop <METHOD> <route>    one per Backstop request, retries included
+   └ <feature>.<operation>        a paginated walk, a report poll, a catalog refresh
+```
+
+We enrich FastMCP's tool span (attributes and events) and do not open a second one per tool.
+Tool arguments and tool results are never span attributes. `/health`, `/probe`, `/ready`, and
+`/metrics` are not traced.
+
+FastMCP records every exception a tool raises on its span, message and stack included, and a
+`ToolError` often quotes the caller's input. `observability/redaction.py` removes those exception
+events, and the status description, from a span whose failure was caller-caused: one where a
+WARNING was logged with `exc_info`, or one whose only exceptions are `ToolError`s and
+declared-WARNING errors not chained from another exception. A bug keeps its stack. The processor
+uses the OpenTelemetry SDK's `_on_ending` hook and its private span fields, so an SDK upgrade must
+keep `tests/test_redaction.py` green.
 
 ## Related Documentation
 

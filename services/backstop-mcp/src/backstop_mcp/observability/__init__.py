@@ -5,6 +5,7 @@ from backstop_mcp.observability.failures import DeclaresFailureLevel, failure_le
 from backstop_mcp.observability.fields import span_attributes
 from backstop_mcp.observability.log_handlers import install_log_handlers
 from backstop_mcp.observability.operation import OperationOutcome, operation
+from backstop_mcp.observability.redaction import install_caller_failure_redaction
 from backstop_mcp.observability.tool_call import add_call_fields, tool_call_scope
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "OperationOutcome",
     "add_call_fields",
     "failure_level",
+    "install_caller_failure_redaction",
     "install_log_handlers",
     "operation",
     "span_attributes",

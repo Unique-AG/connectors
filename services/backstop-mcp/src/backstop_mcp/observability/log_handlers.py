@@ -6,11 +6,15 @@ import logging
 from typing import cast, override
 
 from opentelemetry import trace
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import Status, StatusCode
 
 from backstop_mcp.observability.fields import span_attributes
 
 _LOGGER_NAME = "backstop_mcp"
+# Tells the redaction processor that the failure on this span was caller-caused. An ERROR on the
+# same span, before or after, wins: a bug keeps its stack.
+EXPECTED_FAILURE_ATTRIBUTE = "backstop.failure.expected"
 # What every record carries, so the rest is what the call passed in `extra`.
 _RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",
@@ -54,8 +58,18 @@ def _add_to_span(record: logging.LogRecord, exc: BaseException | None) -> None:
     if exc is not None:
         fields["error_type"] = type(exc).__qualname__
     span.add_event(event, {**span_attributes(fields), "log.severity": record.levelname})
-    if record.levelno < logging.ERROR:
+    if record.levelno >= logging.ERROR:
+        if exc is not None:
+            span.record_exception(exc)
+        span.set_status(Status(StatusCode.ERROR, event))
+        span.set_attribute(EXPECTED_FAILURE_ATTRIBUTE, False)
         return
-    if exc is not None:
-        span.record_exception(exc)
-    span.set_status(Status(StatusCode.ERROR, event))
+    if exc is not None and not _logged_an_error(span):
+        span.set_attribute(EXPECTED_FAILURE_ATTRIBUTE, True)
+
+
+def _logged_an_error(span: trace.Span) -> bool:
+    """Our own ERROR, not the span status: FastMCP sets ERROR for every exception a tool raises."""
+    if not isinstance(span, ReadableSpan) or span.attributes is None:
+        return False
+    return span.attributes.get(EXPECTED_FAILURE_ATTRIBUTE) is False
