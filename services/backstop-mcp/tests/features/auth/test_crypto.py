@@ -81,3 +81,14 @@ class TestTamperDetection:
     def test_rejects_malformed_blob(self) -> None:
         with pytest.raises(InvalidCredentialEnvelopeError):
             decrypt_credential(b"not-a-fernet-token", _random_key())
+
+    def test_rejects_an_unexpected_payload_without_chaining_its_contents(self) -> None:
+        key = _random_key()
+        blob = Fernet(key).encrypt(b'{"api_token": "zq-canary-token"}')
+
+        with pytest.raises(InvalidCredentialEnvelopeError) as exc_info:
+            decrypt_credential(blob, key)
+
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__ is True
+        assert "zq-canary-token" not in str(exc_info.value)

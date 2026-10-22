@@ -52,12 +52,13 @@ def decrypt_credential(blob: bytes, key: bytes) -> BackstopCredentialSecret:
             "Credential blob failed authentication — wrong key, tampered, or malformed data"
         ) from exc
 
+    # `from None`: pydantic's text would quote the decrypted payload, API token included.
     try:
         payload = _CredentialPayload.model_validate_json(plaintext)
-    except ValidationError as exc:
+    except ValidationError:
         raise InvalidCredentialEnvelopeError(
             "Decrypted credential payload has an unexpected shape"
-        ) from exc
+        ) from None
 
     return BackstopCredentialSecret(
         username=payload.username, api_token=SecretStr(payload.api_token)

@@ -92,6 +92,29 @@ class TestCurrentCredential:
         with pytest.raises(NotConnectedError):
             await _auth(session_factory).current_credential()
 
+    @pytest.mark.asyncio
+    async def test_raises_not_connected_when_the_stored_credential_is_unreadable(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, session_factory = db
+        async with session_factory() as session:
+            await save_credential(
+                session,
+                "user-context-wrong-key",
+                BackstopCredentialSecret(
+                    username="ctx-wrong-key.smith", api_token=SecretStr("token-1")
+                ),
+                Fernet.generate_key(),
+            )
+            await session.commit()
+        monkeypatch.setattr(
+            "backstop_mcp.features.auth.context.get_access_token",
+            lambda: _access_token("user-context-wrong-key"),
+        )
+
+        with pytest.raises(NotConnectedError, match="unreadable"):
+            await _auth(session_factory, Fernet.generate_key()).current_credential()
+
 
 class TestRevokeCurrentSubjectTokens:
     @pytest.mark.asyncio
