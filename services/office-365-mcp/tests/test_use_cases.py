@@ -45,9 +45,30 @@ _ENTRY_KEYS = {
     "chain",
     "must_not",
     "note",
+    "cassette",
+    "variants",
 }
-_STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses"}
+_RUNNER_STEP_KEYS = {"pick", "fault", "expect", "approval", "bind"}
+_STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses", *_RUNNER_STEP_KEYS}
+_APPROVALS = {"yes", "no", "silent", "unanswered"}
+_FAULTS = {"graph", "transport", "input"}
+_EXPECT_KEYS = {"tool_error", "result", "graph_calls", "retry_sleeps"}
+_GRAPH_CALL = re.compile(r"(GET|POST|PUT|PATCH|DELETE) /\S+")
+_E2E = _SERVICE_ROOT / "tests" / "e2e"
 _APPROVAL_PHRASE = "asked to approve"
+_MAX_STEPS = 5
+_TECHNICAL_WORDS = re.compile(
+    r"\b("
+    + "|".join(
+        (
+            "click|button|field|dropdown|modal|url|css|endpoint|payload|requests?|responses?",
+            "status code|json|rest|database|sql|https?|api|server|cache|queue|microservice",
+            "container|pipeline|invoke|assert|navigate|scroll|submit",
+        )
+    )
+    + r")\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -56,6 +77,8 @@ class _Scenario:
     ids: tuple[str, ...]
     tags: frozenset[str]
     steps: tuple[str, ...]
+    keywords: tuple[str, ...]
+    kinds: tuple[str, ...]
 
 
 def _object(value: object) -> Mapping[str, object]:
@@ -88,6 +111,8 @@ def _scenarios(feature_file: pathlib.Path) -> list[_Scenario]:
                 ids=tuple(sorted(tag for tag in tags if _ID.fullmatch(tag))),
                 tags=tags,
                 steps=tuple(str(_object(step)["text"]) for step in _list(node["steps"])),
+                keywords=tuple(str(_object(s)["keyword"]).strip() for s in _list(node["steps"])),
+                kinds=tuple(str(_object(s)["keywordType"]) for s in _list(node["steps"])),
             )
         )
     return found
@@ -120,10 +145,68 @@ def _scenario_with_id(stem: str, scenario_id: str) -> _Scenario:
     return next(s for s in _scenarios(_feature_named(stem)) if scenario_id in s.ids)
 
 
+def _style_problems(scenario: _Scenario) -> list[str]:
+    problems: list[str] = []
+    if scenario.kinds.count("Action") != 1:
+        problems.append(f"it has {scenario.kinds.count('Action')} When steps, and needs exactly 1")
+    if len(scenario.steps) > _MAX_STEPS:
+        problems.append(f"it has {len(scenario.steps)} steps, and {_MAX_STEPS} is the most")
+    for first, second in zip(scenario.keywords, scenario.keywords[1:], strict=False):
+        if first == second and first in {"Given", "When", "Then"}:
+            problems.append(f"it repeats {first}, and And or But continue a step")
+    found = _TECHNICAL_WORDS.finditer(" ".join(scenario.steps))
+    words = sorted({match.group(0).lower() for match in found})
+    if words:
+        problems.append(f"its steps use technical words {words}")
+    return problems
+
+
 def _step_tools(step: Mapping[str, object]) -> list[str]:
     if "any_of" in step:
         return [str(name) for name in _list(step["any_of"])]
     return [str(step["tool"])]
+
+
+def _cassettes(entry: Mapping[str, object]) -> list[str]:
+    variants = map(_object, _object(entry.get("variants", {})).values())
+    named = [entry.get("cassette"), *(variant.get("cassette") for variant in variants)]
+    return [str(name) for name in named if name is not None]
+
+
+def _run_steps(entry: Mapping[str, object]) -> Iterator[Mapping[str, object]]:
+    chain = [_object(step) for step in _list(entry["chain"])]
+    yield from chain
+    for variant in map(_object, _object(entry.get("variants", {})).values()):
+        assert "cassette" in entry or "cassette" in variant, "a run names a cassette"
+        for key, override in cast("Mapping[object, object]", variant).items():
+            if key != "cassette":
+                assert key in range(1, len(chain) + 1), f"a variant names step {key!r}"
+                assert set(_object(override)) <= _RUNNER_STEP_KEYS, set(_object(override))
+                yield {**chain[cast("int", key) - 1], **_object(override)}
+
+
+def _runner_problems(step: Mapping[str, object]) -> list[str]:
+    fault, expect = _object(step.get("fault", {})), _object(step.get("expect", {}))
+    calls = _object(expect.get("graph_calls", {})).items()
+    rules = [
+        (
+            "`pick` names a tool of `any_of`",
+            step.get("pick") in [None, *_list(step.get("any_of", []))],
+        ),
+        ("`bind` needs `tool` or `pick`", "tool" in step or "pick" in step or "bind" not in step),
+        (
+            "`approval` is a quoted yes, no, silent, or unanswered",
+            step.get("approval", "yes") in _APPROVALS,
+        ),
+        ("a fault is one of graph, transport, input", not fault or len(_FAULTS & set(fault)) == 1),
+        ("a fault holds no key but those, at, and times", set(fault) <= _FAULTS | {"at", "times"}),
+        (f"`expect` holds only {sorted(_EXPECT_KEYS)}", set(expect) <= _EXPECT_KEYS),
+        (
+            "`graph_calls` maps METHOD /path to a count",
+            all(_GRAPH_CALL.fullmatch(call) and isinstance(count, int) for call, count in calls),
+        ),
+    ]
+    return [rule for rule, holds in rules if not holds]
 
 
 def _allowed_values(schema: Mapping[str, object], argument: str) -> set[object]:
@@ -184,6 +267,12 @@ class TestFeatureFiles:
         )
 
 
+class TestGherkinStyle:
+    @pytest.mark.parametrize(("stem", "scenario_id"), _entries())
+    def test_a_scenario_follows_the_gherkin_checklist(self, stem: str, scenario_id: str) -> None:
+        assert _style_problems(_scenario_with_id(stem, scenario_id)) == []
+
+
 class TestSidecars:
     @pytest.mark.parametrize("feature_file", _FEATURE_FILES, ids=_stem)
     def test_a_sidecar_has_exactly_the_scenarios_of_its_feature(
@@ -232,6 +321,9 @@ class TestSidecars:
             assert not ("any_of" in step and {"args", "uses"} & set(step)), (
                 "`args` and `uses` belong to a step with one tool"
             )
+        for name in _cassettes(entry):
+            assert (_E2E / "cassettes" / f"{name}.json").is_file(), f"no cassette {name}"
+        assert [problem for step in _run_steps(entry) for problem in _runner_problems(step)] == []
 
     @pytest.mark.parametrize(("stem", "scenario_id"), _entries())
     def test_a_scenario_that_asks_for_approval_says_so(self, stem: str, scenario_id: str) -> None:
@@ -257,15 +349,21 @@ class TestSidecars:
             problems += [
                 f"{scenario_id}: no tool named {name}" for name in used if name not in tools
             ]
-            for step in map(_object, _list(entry["chain"])):
-                if "tool" not in step or str(step["tool"]) not in tools:
+            for step in _run_steps(entry):
+                tool = str(step.get("pick", step.get("tool")))
+                if tool not in tools:
                     continue
-                schema = tools[str(step["tool"])].input_schema
+                schema = tools[tool].input_schema
                 accepted = set(_object(_object(schema)["properties"]))
-                given = set(_object(step.get("args", {}))) | set(_object(step.get("uses", {})))
+                given = {
+                    *_object(step.get("args", {})),
+                    *_object(step.get("uses", {})),
+                    *_object(step.get("bind", {})),
+                    *_object(_object(step.get("fault", {})).get("input", {})),
+                }
                 if not given <= accepted:
                     problems.append(
-                        f"{scenario_id}: {step['tool']} has no argument {sorted(given - accepted)}"
+                        f"{scenario_id}: {tool} has no argument {sorted(given - accepted)}"
                         + f", it has {sorted(accepted)}"
                     )
                 for name, value in _object(step.get("args", {})).items():
@@ -276,6 +374,21 @@ class TestSidecars:
                             + f"from {sorted(allowed, key=str)}, not {value!r}"
                         )
 
+        assert problems == []
+
+
+class TestTheScenarioRuns:
+    def test_every_cassette_and_fixture_is_used(self) -> None:
+        sidecars = [_sidecar(feature_file) for feature_file in _FEATURE_FILES]
+        named = {name for s in sidecars for e in s.values() for name in _cassettes(_object(e))}
+        cassettes = sorted((_E2E / "cassettes").glob("*.json"))
+        text = "".join(path.read_text() for path in [*cassettes, *_FEATURES.glob("*.calls.yaml")])
+        fixtures = sorted((_E2E / "fixtures").iterdir())
+
+        problems = [
+            f"no sidecar names cassettes/{p.name}" for p in cassettes if p.stem not in named
+        ]
+        problems += [f"nothing uses fixtures/{p.name}" for p in fixtures if p.name not in text]
         assert problems == []
 
 

@@ -1,0 +1,8 @@
+{
+  "id": "01RUNREPORT",
+  "name": "Brightway Annual Report.pdf",
+  "size": 11010048,
+  "webUrl": "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf",
+  "file": { "mimeType": "application/pdf" },
+  "parentReference": { "driveId": "b!RUNDRIVE" }
+}

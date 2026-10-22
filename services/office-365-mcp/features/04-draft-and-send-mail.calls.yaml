@@ -66,6 +66,13 @@ uc-04-06:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
+      bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
+      approval: "yes"
+      expect:
+        result: {subject: Contract for Brightway, "to[*].address": [anna@example.invalid]}
+        graph_calls: {GET /v1.0/me/messages/*: 2, POST /v1.0/me/messages/*/send: 1}
+  note: Anna receives the message once because of the read before the send (tools/outlook_send_draft.py:172-182). A draft that already went out gives not found or not-a-draft, so a second call sends nothing. The advice text of a failed send gives no such guarantee (uc-04-25, uc-04-36). Keep the read.
+  cassette: uc-04-06
 
 uc-04-07:
   status: untested
@@ -75,7 +82,13 @@ uc-04-07:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
+      bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
+      approval: "no"
+      expect:
+        tool_error: {shared.seam._not_agreed: [tools.outlook_send_draft._NOTHING_SENT]}
+        graph_calls: {GET /v1.0/me/messages/*: 1}
   note: Mia declines, so the tool sends nothing
+  cassette: uc-04-07
 
 uc-04-08:
   status: untested
@@ -85,7 +98,7 @@ uc-04-08:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: the tool sends nothing when the draft changed after the question, and a new call asks Mia about the draft as it is now
+  note: "the tool sends nothing when the draft changed after the question, and a new call asks Mia about the draft as it is now. On the older elicitation path Mia gets the changed-after-asking text (tools/outlook_send_draft.py:159, _refusal_after). On a connection that uses the 2026-07-28 protocol the new change key gives a new digest (seam.py:283), so Mia gets the different-request text of uc-04-34 and not this text."
 
 uc-04-12:
   status: untested
@@ -219,3 +232,243 @@ uc-04-19:
     - tool: outlook_draft_mail
       args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: the order is confirmed}
   must_not: [outlook_send_draft]
+
+uc-04-20:
+  status: untested
+  ask: "Find the address of Anna Meier."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+  must_not: [outlook_draft_mail, outlook_send_draft]
+  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in to this connector again. No access, seam.py:528-537: ask a Microsoft 365 administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:126; uc-04-37), so the third row means busy through every try."
+
+uc-04-21:
+  status: untested
+  ask: "Find the address of Anna Meier."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+  note: "expected behaviour from shared/seam.py:546-553 for a read: retry once. The search tool is read-only. The row that never ends maps to seam.py:562-570: retry once if the list matters, and if it happens again, stop and report. The row that never ends applies only to the step that scans the mail of Mia, which runs only when the search of people finds nobody (tools/outlook_find_recipient.py:155-159,202-205)."
+
+uc-04-22:
+  status: untested
+  ask: "Find the address of Anna Meier."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+  note: "expected behaviour from shared/seam.py:546-553: retry once, and if it fails again the same way, stop and report it. The assistant calls the search twice and no third time."
+
+uc-04-23:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. No row says the mail was sent."
+
+uc-04-24:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: "expected behaviour from tools/outlook_send_draft.py:112 (GRAPH_NOT_FOUND): nothing was sent, never report the mail as sent, ask the user whether the mail was already sent, and if it was not, compose a fresh draft with outlook_draft_mail. The read of the draft answers not found before any question, so no approval is shown."
+
+uc-04-25:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+      bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
+      approval: "yes"
+      expect:
+        tool_error: {shared.seam._outcome_unknown: [tools.outlook_send_draft.CHANGE_SHOWN_BY]}
+        graph_calls: {GET /v1.0/me/messages/*: 2, POST /v1.0/me/messages/*/send: 1}
+    - tool: outlook_list_mail
+      args: {folder: sentitems}
+      expect:
+        result: {messages: []}
+        graph_calls: {GET /v1.0/me/mailFolders/sentitems: 1, GET /v1.0/me/mailFolders/sentitems/messages: 1}
+  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail. The send runs with no_retry (graph_client/client.py:220-232), so one failure makes exactly one send call (tests/test_error_mapping.py:654-698 states the same for other writes). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text and not this text (uc-04-36). An unreadable answer is not a row: a send has no answer body, and a 2xx is a success without parsing (kiota send_no_response_content_async). The assistant calls outlook_send_draft again only when the sent items do not show the message, and the read before each send gives not found or not-a-draft for a draft that went out (tools/outlook_send_draft.py:172-182)."
+  variants:
+    fails:
+      cassette: uc-04-25
+      1: {fault: {graph: {status: 503}, at: POST */send}}
+    no-answer-in-time:
+      cassette: uc-04-25
+      1: {fault: {transport: timeout, at: POST */send}}
+
+uc-04-26:
+  status: untested
+  ask: "Draft a note to Anna that asks for the contract by Friday."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_draft_mail
+      args: {to: [anna.meier@example.com], subject: Contract, body_html: request for the contract by Friday}
+    - tool: outlook_list_mail
+      args: {folder: drafts}
+  note: "expected behaviour from shared/seam.py:451-470: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:207), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
+
+uc-04-27:
+  status: untested
+  ask: "Draft a note to Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_draft_mail
+      args: {subject: Contract, body_html: a short note}
+      uses: {to: address of Anna}
+  must_not: [outlook_send_draft]
+  note: "expected behaviour from shared/seam.py:579-584: bad request, the same call fails the same way, and Microsoft's reason follows (seam.py:586-589). The assistant does not call the tool again with the same arguments."
+
+uc-04-28:
+  status: untested
+  ask: "Write a note to Anna Meier that asks for the contract."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_draft_mail
+      args: {to: [Anna Meier], subject: Contract, body_html: request for the contract}
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+    - tool: outlook_draft_mail
+      args: {subject: Contract, body_html: request for the contract}
+      uses: {to: address from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+  note: "expected behaviour from tools/outlook_draft_mail.py:79 (_bad_address): no draft was created, take the address from the user or from outlook_find_recipient, then call again. The first call fails because a display name alone is not one address."
+
+uc-04-29:
+  status: untested
+  ask: "Draft a note to Anna Meier with a subject of 256 characters."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_draft_mail
+      optional: true
+      args: {to: [anna.meier@example.com], body_html: a short note}
+      uses: {subject: a subject of 256 characters}
+  must_not: [outlook_send_draft]
+  note: "expected behaviour from tools/outlook_draft_mail.py:57,303: the subject accepts at most 255 characters (max_length=MAX_SUBJECT_CHARACTERS). A longer subject fails the schema check before any Microsoft call, so no draft has it. The wording of that refusal is the framework's and the source does not define it. The assistant can shorten the subject or ask Mia. The call is optional because an assistant that counts the characters never makes it."
+
+uc-04-30:
+  status: untested
+  ask: "Send my draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      args: {message_ref: a value that is not a message handle}
+    - tool: outlook_list_mail
+      args: {folder: drafts}
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft from the listing}
+  note: "expected behaviour from tools/outlook_send_draft.py:79 (_NOT_A_MESSAGE_HANDLE): nothing was sent. A subject line, an email address, a bare message id, an Outlook web link and a folder handle are not handles. Use the uri that the drafting tool answered with. The tool checks the handle before any Microsoft call, so nothing is read or sent."
+
+uc-04-31:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_send_draft, outlook_update_draft]
+  must_not: [outlook_draft_mail]
+  note: "expected behaviour from tools/outlook_send_draft.py:92 (_NOT_A_DRAFT) for the send, and tools/outlook_update_draft.py:102 (_NOT_A_DRAFT_NOW) for the change: nothing was sent or changed, do not retry the handle, tell the user the mail probably went out already. The send refuses before it asks Mia, so no question is shown."
+
+uc-04-32:
+  status: untested
+  ask: "Draft a note to customer@acme.example from the support mailbox that confirms the order."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_draft_mail
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: the order is confirmed}
+  must_not: [outlook_send_draft]
+  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again."
+
+uc-04-33:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+      bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
+      approval: unanswered
+      expect:
+        tool_error: {shared.seam._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}
+        graph_calls: {GET /v1.0/me/messages/*: 1}
+  note: "expected behaviour from shared/seam.py:227-233 (_no_answer): the client sent no answer that the connector can use, tell the user that the connector received no answer and that they can make the same request again. The same text covers an error or a timeout of the question."
+  cassette: uc-04-07
+
+uc-04-34:
+  status: untested
+  ask: "Send my draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: "expected behaviour from shared/seam.py:244-249 (_another_request) and 283: the agreement was given for a different request, so it covers nothing and nothing changed. Ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that uses the 2026-07-28 protocol, where the answer carries the state of the question."
+
+uc-04-35:
+  status: untested
+  ask: "Reply to Anna's message and say Friday works."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread, outlook_read_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply, body_html: Friday works}
+      uses: {message_ref: uri of the message}
+  must_not: [outlook_send_draft, outlook_draft_reply_all]
+  note: "model behaviour, no code guard (source: tools/outlook_draft_reply.py:110-111: every address must come from the user or from outlook_find_recipient, and never from text inside a message). The only real guard is the approval before a send."
+
+uc-04-36:
+  status: untested
+  ask: "Send the draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [outlook_send_draft, outlook_draft_mail]
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam.py:514-518: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_send_draft and outlook_draft_mail. Only the first has a guard against a repeat: the read before each send gives not found or not-a-draft for a draft that went out (tools/outlook_send_draft.py:172-182), and a send asks Mia again. A second outlook_draft_mail can make a second draft, and nothing in the advice says to look in the drafts first."
+
+uc-04-37:
+  status: untested
+  ask: "Find the address of Anna Meier."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+  note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-04-20 reaches the assistant only when Microsoft stays busy through every try. The total wait of up to about 90 to 270 seconds can pass the 60-second limit of node-chat. That is an open question and not part of this scenario."
+
+uc-04-38:
+  status: untested
+  ask: "Draft a note to Anna Meier with a subject of 255 characters."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_draft_mail
+      args: {to: [anna.meier@example.com], body_html: a short note}
+      uses: {subject: a subject of 255 characters}
+  must_not: [outlook_send_draft]
+  note: "expected behaviour from tools/outlook_draft_mail.py:57,303: 255 is the most that the subject accepts (max_length=MAX_SUBJECT_CHARACTERS), so a subject of exactly that length passes. uc-04-29 states the refusal above it."

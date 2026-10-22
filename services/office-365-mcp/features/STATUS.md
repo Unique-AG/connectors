@@ -8,11 +8,13 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 9 | 5 | 85 | 104 |
-| Teams | 0 | 2 | 1 | 36 | 39 |
-| SharePoint | 0 | 2 | 3 | 20 | 25 |
-| OneNote | 0 | 0 | 1 | 11 | 12 |
-| Across sources | 0 | 2 | 0 | 9 | 11 |
+| Outlook | 5 | 10 | 5 | 220 | 240 |
+| Teams | 0 | 2 | 1 | 96 | 99 |
+| SharePoint | 0 | 2 | 3 | 61 | 66 |
+| OneNote | 0 | 1 | 1 | 37 | 39 |
+| Across sources | 0 | 2 | 0 | 24 | 26 |
+
+Scenarios with an executable run: 14 of 470.
 
 ## Work for UN-27222
 
@@ -39,21 +41,23 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-04-17` | Drafting and sending mail | A blind copy is put on a draft | gap | `outlook_draft_mail` | outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients |
 | `uc-06-04` | Catching up on Teams | A channel is read with its replies | partly | `teams_browse_channel` | The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week. |
 
-### A description steers the assistant away (4)
+### A description steers the assistant away (5)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-05-23` | Organizing the mailbox | A rule without a clear condition is checked with Mia first | partly | `outlook_create_mail_rule` | the tool asks only before a rule that forwards or redirects mail, and the `conditions` field says to omit it to make a rule for every incoming message. Nothing in the description tells the model to ask the user first when the user gave no condition. |
 | `uc-06-15` | Catching up on Teams | A meeting from the calendar is summarized from its transcript | partly | `teams_list_meeting_transcripts` | The description of meeting_uri says to copy the handle verbatim from teams_list_chats, and only a meeting chat gives it. The join_url of a calendar event should be the address that the handle wraps, as teams:///meetings/ plus the percent-encoded join address, but no description says so and nobody ran it. |
 | `uc-07-09` | Scheduling and answering meetings | A meeting is booked on a calendar other than the main one | partly | `outlook_create_event_on_behalf` | outlook_create_event takes no calendar argument. The description of outlook_create_event_on_behalf says that it is only for a calendar that somebody else owns, so the assistant does not pick it for a second calendar of Mia. |
+| `uc-08-33` | Working with notes in OneNote | A section that Microsoft refuses in a section group is created in the notebook | partly | `onenote_create_section` | The tool has no GRAPH_FORBIDDEN text and the notebook is Mia's own, so a 403 gives the generic text of shared/seam.py:530-537, which says to ask an administrator and that no other arguments will succeed. The description at tools/onenote_create_section.py:73-75 says the opposite: create under the notebook, or copy a section into the group. |
 | `uc-11-01` | Mailbox preferences | An automatic reply runs for a fixed period | partly | `outlook_set_automatic_reply` | The description does not say that an unset `external_audience` keeps the stored value, or none when nothing is stored. It does not say what an `end` date without a time of day means. |
 
-### The tools sit in different presets (2)
+### The tools sit in different presets (3)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-05-10` | Organizing the mailbox | A new category is created and put on mail | partly | `outlook_create_category` | no single preset holds both outlook_create_category and outlook_mark_mail, so this needs two presets or a custom `enabled` list |
 | `uc-05-11` | Organizing the mailbox | A rule files mail from one sender | partly | `outlook_create_mail_rule` | no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs two presets or a custom `enabled` list |
+| `uc-05-38` | Organizing the mailbox | A rule that Microsoft rejects as invalid is not repeated | partly | `outlook_create_mail_rule` | no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs two presets or a custom `enabled` list |
 
 ## Microsoft Graph cannot do it
 

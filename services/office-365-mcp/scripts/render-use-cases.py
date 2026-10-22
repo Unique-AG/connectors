@@ -85,7 +85,7 @@ def _paragraph(description: object) -> str:
 
 
 def _sentence(text: str) -> str:
-    text = re.sub(r"<(\w+)>", r"`<\1>`", text).strip().rstrip(".")
+    text = re.sub(r"<([^<>]+)>", r"`<\1>`", text).strip().rstrip(".")
     return f"{text[:1].upper()}{text[1:]}."
 
 
@@ -139,7 +139,7 @@ def _outline_rows(scenario: Mapping[str, object]) -> list[dict[str, str]]:
 
 
 def _filled(text: str, row: Mapping[str, str]) -> str:
-    return re.sub(r"<(\w+)>", lambda match: row[match.group(1)], text)
+    return re.sub(r"<([^<>]+)>", lambda match: row[match.group(1)], text)
 
 
 def _scenario(scenario: Mapping[str, object], entry: Mapping[str, object]) -> list[str]:
@@ -304,6 +304,7 @@ def render_status() -> str:
         for step in map(_object, _list(entry["chain"]))
         for name in ([step["tool"]] if "tool" in step else _list(step["any_of"]))
     }
+    runs = sum(1 for entry in _entries().values() if {"cassette", "variants"} & set(entry))
     lines = [
         "# office-365-mcp use case status",
         "",
@@ -315,6 +316,8 @@ def render_status() -> str:
         "## Status by surface",
         "",
         *table,
+        "",
+        f"Scenarios with an executable run: {runs} of {len(_entries())}.",
         "",
         "## Work for UN-27222",
         "",

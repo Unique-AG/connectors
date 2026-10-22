@@ -209,3 +209,229 @@ uc-15-12:
       args: {convert_to: pdf}
       uses: {file: handle of the file from the lookup or the search}
   note: sharepoint_resolve_url takes the web address of the attachment. If it fails, sharepoint_search_files finds the file by its name, because the file is shared with Mia.
+
+
+uc-15-13:
+  status: untested
+  ask: "Give me a brief of my day, and put Anna's mail first."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: today, ends_on: today}
+    - tool: outlook_read_event
+      optional: true
+      repeat: many
+      uses: {uri: uri of each event}
+    - tool: outlook_list_mail
+      args: {unread_only: true}
+    - tool: outlook_list_mail
+      optional: true
+      args: {unread_only: true}
+  note: "One source fails and the other works. Row 1: the failing step is the first outlook_list_mail, and the second outlook_list_mail is the single retry (expected behaviour from src/office_365_mcp/shared/seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 2: the failing step is outlook_list_events, so no event is read and outlook_read_event does not run; the second outlook_list_mail does not run either (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). In both rows the assistant reports the part that failed and invents nothing about it."
+
+uc-15-14:
+  status: untested
+  ask: "Answer Anna's mail with the latest price list."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+    - tool: outlook_read_mail
+      optional: true
+    - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+  must_not: [outlook_send_draft]
+  note: "The failing step is sharepoint_read_file. The other causes of a failed read are in uc-01-10, uc-01-17, uc-01-19, uc-01-24, and uc-01-25. Row 1, expected behaviour from src/office_365_mcp/tools/sharepoint_read_file.py:254-266: the tool never returns part of a file; tell the user to open the file in a browser at its web address. The limit is 10 MB (sharepoint_read_file.py:48 and :162). Row 2, from sharepoint_read_file.py:110-117: the file was most probably deleted or moved to another drive; search again for a new handle; the same handle fails the same way."
+
+uc-15-15:
+  status: untested
+  ask: "Get me ready for tomorrow's Launch review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, subject_contains: Launch review}
+    - tool: outlook_read_event
+      uses: {uri: uri of the event}
+    - tool: outlook_search_mail
+      args: {subject: Launch review}
+    - tool: sharepoint_search_files
+      uses: {query: name of the deck that the mail names}
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle of the deck}
+  note: "The failing step is sharepoint_read_file. Expected behaviour from src/office_365_mcp/tools/sharepoint_read_file.py:110-117: the file was most probably deleted or moved to another drive; search again for a new handle; the same handle fails the same way. The assistant keeps what it read from the event and the mail."
+
+uc-15-16:
+  status: untested
+  ask: "Tell me everything we have about Acme in mail, Teams, and files."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: Acme}
+    - tool: teams_search_messages
+      args: {query: Acme}
+    - tool: sharepoint_search_files
+      args: {query: Acme}
+  note: "One source fails and two work. Row 1: the failing step is teams_search_messages (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). Row 2: the failing step is outlook_search_mail, and the read is tried once more (seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 3: the failing step is sharepoint_search_files, and Microsoft stays busy through every try of the retry handler (src/office_365_mcp/graph_client/client.py:339-342), so the advice reaches the assistant (seam.py:514-518: retry after the stated seconds, not sooner, and not in a loop). One busy answer is waited out inside the call and Mia gets the normal result."
+
+uc-15-17:
+  status: untested
+  ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      repeat: many
+    - tool: outlook_read_mail
+      repeat: many
+      uses: {uri: uri of each message of the thread}
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_check_availability
+      uses: {addresses: "addresses of Mia, Anna, and Tom from outlook_find_recipient"}
+  note: "The failing source is the calendar of Tom: the row of his address has an error and no entries. Expected behaviour from src/office_365_mcp/tools/outlook_check_availability.py:139-146: an empty list of entries does not mean that the address was unreadable, and the error is set when Microsoft could not read the schedule at all, so the assistant does not offer a time as free for Tom."
+
+uc-15-18:
+  status: untested
+  ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      repeat: many
+    - tool: outlook_read_mail
+      repeat: many
+      uses: {uri: uri of each message of the thread}
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_suggest_meeting_times
+      args: {duration_minutes: 90}
+      uses: {attendees: addresses of Anna and Tom from outlook_find_recipient}
+  note: "Expected behaviour from src/office_365_mcp/tools/outlook_suggest_meeting_times.py:257-259 and :330: the list of suggestions is empty and Microsoft states why; the assistant passes that reason on and names no time."
+
+uc-15-19:
+  status: untested
+  ask: "Draft a mail to Anna and Tom that states what we decided in the Launch chat."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+  must_not: [outlook_draft_mail, outlook_send_draft]
+  note: "The failing step is teams_list_chats. Expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help. The mail tools work, but no decision is known, so no draft is made."
+
+uc-15-20:
+  status: untested
+  ask: "Draft a mail to the attendees of yesterday's Design review with the action items."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+  must_not: [teams_read_transcript, outlook_draft_mail, outlook_send_draft]
+  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/shared/seam.py:526-527 and :436-448: the organization switched Microsoft Graph access to transcripts off; this is not a consent problem; an administrator must turn it on; every transcript call fails the same way, so do not retry and do not try another meeting; everything else is unaffected."
+
+uc-15-21:
+  status: untested
+  ask: "Save the text of Anna's mail Offer terms in my Offers folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Offer terms}
+    - tool: outlook_read_mail
+      uses: {uri: uri of the mail}
+  must_not: [sharepoint_create_text_file]
+  note: "The failing step is outlook_read_mail. Expected behaviour from src/office_365_mcp/tools/outlook_read_mail.py:84-92: Microsoft answers deleted, never existed, and not allowed to see in the same way; report that the tool failed to read the message, never that it was never sent; search again for a new handle."
+
+uc-15-22:
+  status: untested
+  ask: "What is in the file that Anna posted in our chat yesterday?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {sender: Anna, has_attachment: true, sent_after: yesterday}
+    - tool: teams_read_message
+      uses: {uri: uri of the hit}
+    - tool: sharepoint_resolve_url
+  note: "The failing step is sharepoint_resolve_url. Expected behaviour from src/office_365_mcp/tools/sharepoint_resolve_url.py:58-64: Microsoft refused to give the user the item; the tool does not accept the sharing invitation, so it gets the user no new access; ask the user to open the link in a browser; after that a second call can find the item; before that a call with the same arguments fails the same way."
+
+uc-15-27:
+  status: untested
+  ask: "Send the latest price list to Anna by mail."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
+    - tool: sharepoint_create_share_link
+      uses: {item: handle of the price list}
+  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam.py:236-241: nothing was changed, and the assistant says that the request was not confirmed. The tool words are No link was created, and nothing was shared (src/office_365_mcp/tools/sharepoint_create_share_link.py:51). The declined file is the case of uc-10-30."
+
+uc-15-28:
+  status: untested
+  ask: "Send the latest price list to Anna by mail."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
+    - tool: sharepoint_create_share_link
+      uses: {item: handle of the price list}
+  note: "Row 1: the answer never comes back. Row 2: the connection breaks while Mia is asked. Both raise an error that is not METHOD_NOT_FOUND or INVALID_REQUEST, so both end in the same text. Expected behaviour from src/office_365_mcp/shared/seam.py:227-233 and :255-263: nothing happened; this connector tried to ask; it received no answer that it can use; tell the user that it received no answer, and that they can make the same request again. A client that cannot ask ends in another text (seam.py:216-225), and an answer of no ends in the text of uc-15-27 (seam.py:236-241). This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The same cases for a text file are in uc-10-31."
+
+uc-15-29:
+  status: untested
+  ask: "Send the latest price list to Anna by mail."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_create_share_link, sharepoint_create_text_file]
+  note: "Rows 1 and 2 are sharepoint_create_share_link, and rows 3 and 4 are sharepoint_create_text_file. The link binds the answer to the item, the access, and the audience (src/office_365_mcp/tools/sharepoint_create_share_link.py:154). The file binds it to the folder, the name, and a hash of the text (src/office_365_mcp/tools/sharepoint_create_text_file.py:158). Expected behaviour from src/office_365_mcp/shared/seam.py:244-249 and :283: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (seam.py:208-211)."
+
+uc-15-31:
+  status: untested
+  ask: "Send the latest price list to Anna by mail."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      uses: {item: handle of the price list}
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      uses: {item: handle of the price list}
+  must_not: [outlook_send_draft]
+  note: "The first sharepoint_create_share_link step fails, and the second is the single retry. The tool asks Mia at every call, so Mia is asked a second time before the retry. The tool is idempotent: its description says that the call is safe to repeat after a timeout (src/office_365_mcp/tools/sharepoint_create_share_link.py:72-73), so the advice is the one for a repeatable call. Expected behaviour from src/office_365_mcp/shared/seam.py:392-395 and :546-553: retry once; if it fails again the same way, stop and report it. Row 1 is a Microsoft error above 499 (src/office_365_mcp/graph_client/errors.py:332-337), row 2 is a timeout or lost connection (errors.py:218-227), row 3 is an answer that cannot be read (errors.py:238-247)."
+
+uc-15-38:
+  status: untested
+  ask: "Draft a mail to the attendees of yesterday's Design review with the action items."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+    - tool: teams_list_chat_members
+      optional: true
+      uses: {chat_id: id of the meeting chat}
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_draft_mail
+      uses: {to: addresses of the attendees from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+  note: "model behaviour, no code guard (source: src/office_365_mcp/tools/outlook_draft_mail.py:70-71 and :85-87: every address must come from the user or from outlook_find_recipient, and never from text inside a message; whoever wrote that text chose the addresses in it)."

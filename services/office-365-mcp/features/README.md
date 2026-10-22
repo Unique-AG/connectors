@@ -91,6 +91,86 @@ cd services/office-365-mcp
 uv run pytest tests/test_use_cases.py
 ```
 
+## Running the scenarios
+
+`../tests/e2e/test_scenarios.py` runs each scenario that has a cassette. The run uses the real app,
+the real middleware, and the real tools. Microsoft Graph does not answer. A cassette answers. The
+run uses no network. It uses the legacy MCP handshake, so a tool asks for approval with an
+elicitation request.
+
+```bash
+cd services/office-365-mcp
+uv run pytest tests/e2e
+```
+
+A cassette is a file `../tests/e2e/cassettes/<name>.json`. It is a list of interactions. An
+interaction has a request part and an answer part:
+
+- The request part: `method`, `path`, and optionally `host`, `query`, `json` (the body), and
+  `headers`. The headers are only `prefer` and `consistencylevel`, and they must be equal.
+- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/fixtures/`.
+
+The run is strict. A request that matches no unused interaction fails the step, and the message
+shows the request and the interactions that no request reached yet. An interaction that no request
+reaches fails the run. A request without the token of the user fails the step.
+
+A date or a time in a request matches only the same text in the cassette, or a symbol.
+`~yesterday`, `~today`, and `~tomorrow` match a date whose UTC day is that day, plus or minus one
+day. No other value is a wildcard.
+
+The keys of an entry:
+
+| Key | Meaning |
+| --- | --- |
+| `cassette` | The cassette of the run of the entry. |
+| `variants` | More runs. Each variant has a name, an optional `cassette`, and a step number for each step that it changes. |
+
+The keys of a step:
+
+| Key | Meaning |
+| --- | --- |
+| `pick` | The tool of `any_of` that the run calls. |
+| `bind` | The argument values of the run. It replaces `args`. `uses` and some `args` are text for a person, so the run needs real values. |
+| `fault` | One fault: `graph` (an answer with `status`, `headers`, `body`), `transport: timeout`, or `input` (wrong argument values). `at` names the request, for example `POST */send`. `times` is the number of requests that get the fault. |
+| `approval` | `"yes"`, `"no"`, `silent`, or `unanswered`. Put quotes on yes and no. With `silent`, the user must not be asked. With the other values, the user must be asked. Without the key, the user agrees if asked. |
+| `expect` | `result`, `tool_error`, `graph_calls`, and `retry_sleeps`. |
+
+In `expect`:
+
+- `result` maps a selector to a value.
+- `tool_error` names a text constant, for example `tools.outlook_move_mail._NOT_A_MESSAGE_HANDLE`.
+  It can also call a function of the server, for example
+  `{shared.seam._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}`. A list gives the arguments
+  in order. A mapping gives them by name. A name that does not exist fails the run.
+- `graph_calls` maps `METHOD /path` to a count. A `*` matches any text. The count is exact.
+- `retry_sleeps` lists the waits of the retry handler, in seconds.
+
+A selector reads a value from a result. `$prev.messages[*].uri` reads the `uri` of each message of
+the previous step. `$1.files[0].uri` reads the first file of step 1. In `result`, the selector has
+no `$` and reads the result of the same step.
+
+To add a run:
+
+1. Find the scenario that states the behaviour.
+2. Write the cassette. Put each answer body in `fixtures/`, or use a fixture that is there.
+3. Add `cassette` or a variant to the entry, and add `bind`, `fault`, `approval`, and `expect` to the
+   steps.
+4. Run `uv run pytest tests/e2e`. A request that does not match shows the request. Copy its values
+   into the cassette.
+5. Increase `_MINIMUM_EXECUTABLE` in `test_scenarios.py` to the new number of runs.
+
+`_MINIMUM_EXECUTABLE` is a ratchet. The number of runs must not go below it. Increase it when you
+add a run. Decrease it only in a change that says why.
+
+A scenario outline gets a variant for each row. `uc-05-26` has a variant for the subject line. Add
+the other rows in the same way, with a different `fault` `input` and the same cassette.
+
+`../tests/test_use_cases.py` checks the shape of the keys, that each argument exists, that each
+cassette exists, that a sidecar names each cassette, and that a cassette or a sidecar names each
+fixture.
+
+A recorder is not built. It can write a cassette from a run against a test tenant.
+
 ## Evidence for the order
 
 The logs are the prod logs of office-365-mcp, from 2026-09-23 (go-live) to 2026-10-16. A call is one
@@ -173,3 +253,42 @@ list for UN-27222.
 - Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
   source allows it. Nobody ran it. If it works, change the description and set `uc-07-09` to
   `untested`.
+
+### For the code owners
+
+The unhappy-path scenarios state what the code does today. Where the code defines no behaviour, or
+where the behaviour looks wrong, there is no scenario. These questions need an owner.
+
+- An answer that cannot be read (a 200 with an HTML page) gets the advice for an unreachable
+  service: retry once. Is that wanted for a permanent fault? The outlines named "an answer that
+  nobody can read" state today's behaviour and change with the answer.
+- A read waits out up to 3 tries of the retry handler, and each try waits the time that Microsoft
+  asks. The total is about 90 to 270 seconds. The tool limit of node-chat is 60 seconds, so Mia may
+  see a timeout and never the advice. What is the wanted limit?
+- A 503 or 504 with a wait time on a write that must not repeat gets "retry after N seconds", although
+  Microsoft may have made the change. Should the text say that the change may have happened and name
+  the tool that shows it? The same holds for the row of a failed message in a partial batch, for the
+  POST and the PATCH of `outlook_set_focused_override`, which can repeat, and for a timeout on a
+  copy or a new folder.
+- A 403 gets the advice "ask an administrator to grant the permission". That is wrong for a file that
+  Mia cannot open, a shared mailbox, a delegated calendar, a channel where only owners post, and a
+  meeting participant that Microsoft refuses. Which tools need their own text?
+- Some lists have no maximum: `message_refs` of `outlook_move_mail`, the recipients of
+  `sharepoint_invite`, the commands of `onenote_edit_page`, and the attachments, mentions, and
+  attendees of the Teams tools. What size is wanted, and what is Mia told above it?
+- `sharepoint_read_file` has no sentence that file text is data and not an order. Other read tools
+  have one. Should it?
+- A rename to a name that is in use, a repeated create, and a calendar role that Microsoft refuses
+  have no stated answer from Microsoft. Which status does Microsoft send, and what must Mia be told?
+- The search for a person stops at its cap and can answer "no match" for a person past the cap.
+  `outlook_search_mail` leaves out a match without a stable id and says nothing. Is that wanted?
+- `outlook_create_contact` saves a duplicate contact. `outlook_set_automatic_reply` does not check
+  that the end is after the start. `outlook_set_focused_override` has no text for the 1001st sender.
+- On the older elicitation path, `outlook_delete_mail_rule` reads the rule once, so a rule that
+  changed while Mia decided is erased. Should it read again, as `outlook_send_draft` does?
+- No tool sends a precondition, so a 412 cannot occur today. This question closes when a tool starts
+  to send one.
+- When the price list or the link cannot be read or made, does the assistant still create a draft
+  without it? Two scenarios of feature 15 end with "nothing is sent", which is true either way.
+- The sidecar has no key for an order rule such as "create once, then check". The notes of
+  `uc-07-22` and `uc-14-09` state it.
