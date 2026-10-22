@@ -14,7 +14,7 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
     ReportRunKey,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
-from backstop_mcp.observability import info_event, span_attributes
+from backstop_mcp.observability import info_event, span_attributes, warning_event
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -165,6 +165,7 @@ class RunReportQuery:
             # Backstop's offset counts values it sent, not rows we could read; advancing by
             # len(records) would re-request each dropped slot and duplicate the rest.
             consumed = 0
+            unreadable_offsets: list[int] = []
             for report in page.items:
                 result = report.attributes.result
                 if result is None:
@@ -174,11 +175,17 @@ class RunReportQuery:
                 for value in result.values:
                     consumed += 1
                     if not isinstance(value, dict):
-                        logger.warning(
-                            "reports.row.unreadable", extra={"report_name": logged_report_name}
-                        )
+                        unreadable_offsets.append(offset + consumed - 1)
                         continue
                     records.append(cast("dict[str, object]", value))
+            if unreadable_offsets:
+                warning_event(
+                    logger,
+                    "reports.row.unreadable",
+                    report_name=logged_report_name,
+                    count=len(unreadable_offsets),
+                    sample_offsets=unreadable_offsets[:5],
+                )
             columns = self._columns(header, records)
             rows = tuple(tuple(record.get(key) for key in columns) for record in records)
             total = page.total_count

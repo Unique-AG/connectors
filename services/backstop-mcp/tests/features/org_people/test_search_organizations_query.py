@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 import respx
@@ -6,17 +8,20 @@ from fastmcp.exceptions import ToolError
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
     LocationFilter,
+    SearchOrganizationsQuery,
     SearchOrganizationsResolvedResponse,
 )
 from tests.features.org_people.conftest import make_search_organizations_query, serve_pages
 from tests.helpers import (
     BASE_URL,
+    aggregated_warning,
     contact_location,
     linked_to_locations,
     recorded_params,
     recorded_requests,
     resource,
     tool_client,
+    validation_error,
 )
 
 _FIELDS = frozenset({"id", "name", "legal_name", "email", "city", "country"})
@@ -608,3 +613,32 @@ class TestSearchOrganizationsQuery:
         assert [row.id for row in exact.rows] == ["1"]
         assert lowercase.rows == ()
         assert partial.rows == ()
+
+
+class TestUnreadableOrganizations:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_records_produce_one_warning_per_call(
+        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        base_url = f"{BASE_URL}/org-search-unreadable"
+        ids = [str(200 + index) for index in range(7)]
+        respx.get(f"{base_url}/organizations").mock(
+            return_value=_page(*(_org(i, name="Fixture Capital") for i in ids), total=len(ids))
+        )
+        monkeypatch.setattr(SearchOrganizationsQuery, "_row", _unreadable_row)
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING):
+                result = await make_search_organizations_query(client).run(
+                    result_size=_RESULT_SIZE, fields=_FIELDS
+                )
+
+        assert result.rows == ()
+        aggregated_warning(
+            caplog, "org_people.search.record.unreadable", count=7, sample_ids=ids[:5]
+        )
+
+
+def _unreadable_row(*_args: object, **_kwargs: object) -> None:
+    raise validation_error()

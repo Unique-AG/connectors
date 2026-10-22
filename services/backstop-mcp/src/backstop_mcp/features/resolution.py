@@ -370,7 +370,7 @@ def _apply_elicit_result[T](
     if isinstance(result, AcceptedElicitation):
         chosen = by_label.get(result.data)
         if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            warning_event(logger, "resolution.elicit.unknown_choice", exc=None, **outcome_log)
             return ambiguous
         return Resolved(value=chosen.value)
     assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
@@ -442,7 +442,7 @@ async def elicit_choice[T](
             return ambiguous
         chosen = by_label.get(cast("str", accepted.data))
         if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            warning_event(logger, "resolution.elicit.unknown_choice", exc=None, **outcome_log)
             return ambiguous
         _remember(ctx, key, chosen.key)
         return Resolved(value=chosen.value)
@@ -467,9 +467,12 @@ async def elicit_choice[T](
         async with asyncio.timeout(timeout_seconds):
             result = await elicit_from_client(ctx, prompt, list(by_label))
     except TimeoutError:
-        logger.warning(
+        warning_event(
+            logger,
             "resolution.elicit.timed_out",
-            extra={**outcome_log, "timeout_seconds": timeout_seconds},
+            exc=None,
+            **outcome_log,
+            timeout_seconds=timeout_seconds,
         )
         return ambiguous
     except Exception as exc:

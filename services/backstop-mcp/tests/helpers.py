@@ -18,7 +18,7 @@ import pytest
 import respx
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopClient,
@@ -277,6 +277,29 @@ def _contains_canary(value: object, canary: str) -> bool:
     if value is None or isinstance(value, bool | int | float):
         return False
     return canary in str(value)
+
+
+def validation_error() -> ValidationError:
+    """A pydantic `ValidationError`, for a fake that has to fail the way a mapping would."""
+    return ValidationError.from_exception_data(
+        "Fixture", [{"type": "missing", "loc": ("field",), "input": {}}]
+    )
+
+
+def aggregated_warning(
+    caplog: pytest.LogCaptureFixture, event: str, **fields: object
+) -> logging.LogRecord:
+    """The single stackless WARNING `event` of one call, carrying exactly these `fields` values.
+
+    Aggregated per-record failures pass `count` and the capped `sample_ids` here.
+    """
+    records = [record for record in caplog.records if record.getMessage() == event]
+    assert len(records) == 1, [record.getMessage() for record in caplog.records]
+    record = records[0]
+    assert record.levelno == logging.WARNING
+    assert record.exc_info is None
+    assert {key: record.__dict__.get(key) for key in fields} == fields
+    return record
 
 
 def linked_to_locations(

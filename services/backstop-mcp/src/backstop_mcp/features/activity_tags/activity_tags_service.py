@@ -6,6 +6,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.activity_tags.api_responses import ActivityTagAttributes
 from backstop_mcp.features.activity_tags.internal_dto import ActivityTagDto
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ async def _fetch_activity_tags(client: BackstopClient) -> dict[str, ActivityTagD
     )
 
     tags_by_id: dict[str, ActivityTagDto] = {}
+    conflicting_ids: list[str] = []
     for resource in page.items:
         tag = ActivityTagDto.from_resource(resource)
         if tag is None:
@@ -28,9 +30,14 @@ async def _fetch_activity_tags(client: BackstopClient) -> dict[str, ActivityTagD
         if existing is None:
             tags_by_id[tag.id] = tag
         elif existing != tag:
-            logger.warning(
-                "Conflicting activity tags for duplicate id %r; retaining first tag", tag.id
-            )
+            conflicting_ids.append(tag.id)
+    if conflicting_ids:
+        warning_event(
+            logger,
+            "activity_tags.catalog.duplicate_id",
+            count=len(conflicting_ids),
+            sample_ids=conflicting_ids[:5],
+        )
     return tags_by_id
 
 

@@ -24,7 +24,7 @@ from backstop_mcp.features.custom_fields import (
     RegularCustomFieldValuesAttributes,
     ResolvedCustomFieldValueResponse,
 )
-from tests.helpers import BASE_URL, client_factory, credential, resource
+from tests.helpers import BASE_URL, aggregated_warning, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
 
@@ -250,6 +250,41 @@ class TestCatalogGet:
         assert definition.layout_name == "Organization"
         assert definition.resource_type == "organizations"
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, clients: ClientBuilder, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = f"{BASE_URL}/definition-conflicts"
+        service = _service(clients(base_url))
+        ids = [str(700 + index) for index in range(7)]
+
+        def definition(definition_id: str, name: str) -> dict[str, object]:
+            return resource(
+                definition_id, "custom-field-definitions", name=name, entityType="OrganizationBean"
+            )
+
+        respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        *(definition(i, "Original") for i in ids),
+                        *(definition(i, "Changed") for i in ids),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            definitions, _cache = await service.get()
+
+        assert definitions[ids[0]].name == "Original"
+        aggregated_warning(
+            caplog, "custom_fields.catalog.duplicate_id", count=7, sample_ids=ids[:5]
+        )
+
 
 def _probability_definition() -> CustomFieldDefinitionDto:
     return CustomFieldDefinitionDto(
@@ -333,6 +368,26 @@ class TestRegularCustomFieldValues:
         )
         assert [row.value for row in parsed.regular_custom_field_values] == [0.3]
 
+    def test_unreadable_rows_produce_one_warning_per_record(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [str(800 + index) for index in range(7)]
+        with caplog.at_level(logging.WARNING):
+            parsed = RegularCustomFieldValuesAttributes.model_validate(
+                {
+                    "regularCustomFieldValues": [
+                        *({"definitionId": i, "name": ["not", "a", "name"]} for i in ids),
+                        {"definitionId": "8648265", "value": 0.3},
+                    ]
+                }
+            )
+
+        assert [row.value for row in parsed.regular_custom_field_values] == [0.3]
+        record = aggregated_warning(
+            caplog, "custom_fields.values.unreadable", count=7, sample_ids=ids[:5]
+        )
+        assert record.__dict__["error_type"] == "ValidationError"
+
 
 class TestJoinValues:
     @pytest.mark.asyncio
@@ -394,8 +449,25 @@ class TestJoinValues:
         ]
         assert len(matching) == 1
         extras = matching[0].__dict__
-        assert extras["definition_id"] == "999"
+        assert extras["count"] == 1
+        assert extras["sample_ids"] == ["999"]
         assert extras["remedy"] == "list_custom_fields(refresh=true)"
+
+    @pytest.mark.asyncio
+    async def test_missing_definitions_produce_one_warning_per_join(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        stored = _rows(*({"definitionId": str(900 + index), "value": "x"} for index in range(7)))
+        with caplog.at_level(logging.WARNING):
+            published = await _join({"8648265": _probability_definition()}, stored)
+
+        assert published == []
+        aggregated_warning(
+            caplog,
+            "custom_fields.values.definition_missing",
+            count=7,
+            sample_ids=["900", "901", "902", "903", "904"],
+        )
 
     @pytest.mark.asyncio
     async def test_empty_dump_yields_no_rows(self) -> None:
@@ -416,6 +488,29 @@ class TestLoadCatalog:
         catalog = await _service(clients(base_url)).load_catalog()
 
         assert catalog is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_backstop_failure_is_a_warning_and_a_bug_is_an_error(
+        self, clients: ClientBuilder, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = f"{BASE_URL}/catalog-levels"
+        respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(500, json={"errors": [{"detail": "down"}]})
+        )
+        service = _service(clients(base_url))
+        caplog.set_level(logging.WARNING, logger="backstop_mcp")
+
+        assert await service.load_catalog() is None
+        service.get = AsyncMock(side_effect=KeyError("definitionId"))
+        assert await service.load_catalog() is None
+
+        levels = [
+            (record.levelno, record.exc_info is not None)
+            for record in caplog.records
+            if record.message == "custom_fields.values.catalog_unavailable"
+        ]
+        assert levels == [(logging.WARNING, False), (logging.ERROR, True)]
 
 
 class TestJoinValuesCatalog:

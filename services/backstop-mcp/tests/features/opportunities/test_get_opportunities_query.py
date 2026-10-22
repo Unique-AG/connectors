@@ -1,7 +1,9 @@
 """`GetOpportunitiesQuery`: a party's pipeline walk, projected, filtered, and ordered."""
 
+import logging
 from collections.abc import Sequence
 from datetime import date
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -10,12 +12,13 @@ import respx
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
 from backstop_mcp.features.opportunities import (
+    MapOpportunityToResponseUtil,
     OpportunityStageResponse,
     OpportunityStatus,
     PartyOpportunitiesResponse,
 )
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_query
-from tests.helpers import BASE_URL, resource
+from tests.helpers import BASE_URL, aggregated_warning, resource, validation_error
 
 _ENTITY_ID = "341764767"
 _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ENTITY_ID}/opportunities"
@@ -811,3 +814,25 @@ class TestMalformedRecords:
         assert history[0].stage is None
         assert history[0].stage_id is None
         assert history[0].effective_date == date(2024, 4, 10)
+
+
+class TestUnreadableRecords:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_records_produce_one_warning_per_call(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ids = [f"deal-{index}" for index in range(7)]
+        respx.get(_OPPORTUNITIES_URL).mock(return_value=_page(*(_opportunity(i) for i in ids)))
+        monkeypatch.setattr(
+            MapOpportunityToResponseUtil, "run", AsyncMock(side_effect=validation_error())
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client)
+
+        assert result.total == 0
+        aggregated_warning(caplog, "opportunities.record.unreadable", count=7, sample_ids=ids[:5])

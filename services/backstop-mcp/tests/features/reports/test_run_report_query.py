@@ -25,6 +25,7 @@ from tests.features.reports.conftest import make_run_report_query
 from tests.helpers import (
     BASE_URL,
     SERVICE_LOGGER,
+    aggregated_warning,
     assert_canary_absent,
     client_factory,
     credential,
@@ -219,6 +220,28 @@ class TestRunReportQuery:
 
         assert result.row_count == 1
         assert result.rows == (("ok@example.com", "Ok"),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_values_produce_one_warning_per_page(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unreadable: list[object] = ["not-a-row"] * 7
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": "ok@example.com", "Company Name": "Ok"},
+                extra_values=unreadable,
+                total=30,
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client, limit=10, offset=10)
+
+        assert result.row_count == 1
+        aggregated_warning(
+            caplog, "reports.row.unreadable", count=7, sample_offsets=[11, 12, 13, 14, 15]
+        )
 
     @pytest.mark.asyncio
     @respx.mock

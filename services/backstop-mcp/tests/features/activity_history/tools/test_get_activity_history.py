@@ -7,8 +7,10 @@ streams present in `next`, that invalid `next` inputs raise pydantic `Validation
 without discarding the others.
 """
 
+import logging
 from collections.abc import Sequence
 from datetime import date
+from typing import cast
 
 import httpx
 import pytest
@@ -44,6 +46,7 @@ from tests.features.party_resolver.helpers import (
     make_resolve_party_query,
     resource,
 )
+from tests.helpers import aggregated_warning
 from tests.server.tools.helpers import object_dict, tool_model, tool_model_union, tool_payload
 
 _SETTINGS = ActivityHistorySettings(page_size=10, gist_max_chars=300)
@@ -810,6 +813,91 @@ class TestPartialFailurePropagates:
         assert result.groups["document"].items == ()
         assert result.groups["document"].next is None
         assert "19759583" in (result.groups["document"].error or "")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_forbidden_streams_produce_one_warning_per_call(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/o5").mock(
+            return_value=httpx.Response(200, json=_org_document(org_id="o5"))
+        )
+        forbidden = httpx.Response(403, json={"errors": [{"code": "AccessDeniedException"}]})
+        for activity_type in ("calls", "notes", "documents"):
+            _activities_route("organizations", "o5", activity_type).mock(return_value=forbidden)
+
+        with caplog.at_level(logging.WARNING):
+            await get_activity_history(
+                ctx_never_elicit(),
+                _first(
+                    search_type="organizations",
+                    party_id="o5",
+                    activity_types=["call", "note", "document"],
+                ),
+                resolve_party_query=make_resolve_party_query(client),
+                activity_history=_SETTINGS,
+                get_activity_history_query=make_get_activity_history_query(client),
+            )
+
+        record = aggregated_warning(
+            caplog, "activity_history.stream.forbidden", count=3, entity_id="o5"
+        )
+        assert sorted(cast("list[str]", record.__dict__["streams"])) == ["call", "document", "note"]
+        assert record.__dict__["error_type"] == "BackstopApiError"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_attendee_lookups_produce_one_warning_per_page(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/o5").mock(
+            return_value=httpx.Response(200, json=_org_document(org_id="o5"))
+        )
+        resource_ids = [str(76280400 + index) for index in range(7)]
+        for resource_id in resource_ids:
+            respx.get(f"{BASE_URL}/meeting-or-calls/{resource_id}/attendees").mock(
+                return_value=httpx.Response(404, json={"errors": [{"title": "Not Found"}]})
+            )
+        _activities_route("organizations", "o5", "meetings").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    *(
+                        resource(
+                            f"m{index}",
+                            "activities",
+                            title="Item",
+                            effectiveDate="2026-01-05",
+                            specificResource={
+                                "resourceId": resource_id,
+                                "resourceType": "meeting-or-calls",
+                            },
+                        )
+                        for index, resource_id in enumerate(resource_ids)
+                    )
+                ),
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = tool_model(
+                await get_activity_history(
+                    ctx_never_elicit(),
+                    _first(search_type="organizations", party_id="o5", activity_types=["meeting"]),
+                    resolve_party_query=make_resolve_party_query(client),
+                    activity_history=_SETTINGS,
+                    get_activity_history_query=make_get_activity_history_query(client),
+                ),
+                ActivityHistoryResolvedResponse,
+            )
+
+        assert len(result.groups["meeting"].items) == 7
+        aggregated_warning(
+            caplog,
+            "activity_history.attendees.join_failed",
+            count=7,
+            sample_ids=resource_ids[:5],
+        )
 
 
 class TestDocumentInclusion:

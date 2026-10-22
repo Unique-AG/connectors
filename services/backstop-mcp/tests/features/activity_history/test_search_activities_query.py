@@ -18,7 +18,7 @@ from tests.features.activity_history.conftest import (
     make_search_activities_query,
     serve_entity_activities,
 )
-from tests.helpers import BASE_URL, recorded_json_bodies
+from tests.helpers import BASE_URL, aggregated_warning, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
 
 _URL = f"{BASE_URL}/entity-activities"
@@ -278,6 +278,31 @@ class TestFetchEntityActivities:
 
         assert [row.id for row in result.rows] == ["9"]
         assert result.rows_dropped == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_produce_one_warning_per_walk(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unreadable: list[dict[str, object]] = [
+            {"id": 300 + index, "attendees": "not-a-list"} for index in range(7)
+        ]
+        respx.post(_URL).mock(return_value=_page(*unreadable, _meeting(9), total=8))
+
+        with caplog.at_level(logging.WARNING):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+            )
+
+        assert [row.id for row in result.rows] == ["9"]
+        assert result.rows_dropped == 7
+        aggregated_warning(
+            caplog,
+            "activity_history.entity_activities.row_unreadable",
+            count=7,
+            sample_ids=["300", "301", "302", "303", "304"],
+        )
 
     @pytest.mark.asyncio
     @respx.mock

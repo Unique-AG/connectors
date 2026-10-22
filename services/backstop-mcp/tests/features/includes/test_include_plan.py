@@ -15,6 +15,7 @@ from backstop_mcp.features.includes import (
     PersonIncludesResponse,
     include_plan,
 )
+from tests.helpers import aggregated_warning
 
 
 class _Attrs(BaseModel):
@@ -429,6 +430,35 @@ class TestAMalformedSideLoadIsDroppedNotFatal:
         assert included.email_addresses == []
         assert [record.message for record in caplog.records] == ["includes.side_load.unreadable"]
 
+    def test_unreadable_side_loads_produce_one_warning_per_include(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [f"e{index}" for index in range(7)]
+        document = _organization(
+            relationships={
+                "contactEmails": {"data": [{"type": "contact-emails", "id": i} for i in ids]}
+            },
+            included=[
+                {"type": "contact-emails", "id": i, "attributes": {"email": "x@example.com"}}
+                for i in ids
+            ],
+        )
+
+        with caplog.at_level(logging.WARNING):
+            included = include_plan(
+                OrganizationIncludesResponse, requested=["email_addresses"]
+            ).project(document=document)
+
+        assert included.email_addresses == []
+        record = aggregated_warning(
+            caplog,
+            "includes.side_load.unreadable",
+            count=7,
+            sample_ids=ids[:5],
+            include="email_addresses",
+        )
+        assert record.__dict__["error_type"] == "ValidationError"
+
 
 class TestASideLoadOfTheWrongTypeIsDropped:
     """The field's `Include` names the type its relationship returns; anything else is not it."""
@@ -467,6 +497,34 @@ class TestASideLoadOfTheWrongTypeIsDropped:
         assert [record.message for record in caplog.records] == [
             "includes.side_load.unexpected_type"
         ]
+
+    def test_mistyped_side_loads_produce_one_warning_per_include(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [f"org-{index}" for index in range(7)]
+        document = _organization(
+            relationships={
+                "contactLocations": {"data": [{"type": "organizations", "id": i} for i in ids]}
+            },
+            included=[
+                {"type": "organizations", "id": i, "attributes": {"locationTitle": "Office"}}
+                for i in ids
+            ],
+        )
+
+        with caplog.at_level(logging.WARNING):
+            included = include_plan(OrganizationIncludesResponse, requested=["locations"]).project(
+                document=document
+            )
+
+        assert included.locations == []
+        aggregated_warning(
+            caplog,
+            "includes.side_load.unexpected_type",
+            count=7,
+            sample_ids=ids[:5],
+            actual_types=["organizations"],
+        )
 
     def test_a_to_one_include_whose_only_resource_is_dropped_is_none(self) -> None:
         document = _organization(

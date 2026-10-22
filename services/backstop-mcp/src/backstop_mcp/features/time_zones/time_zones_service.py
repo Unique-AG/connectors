@@ -8,6 +8,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.time_zones.api_responses import TimeZoneAttributes
 from backstop_mcp.features.time_zones.internal_dto import TimeZoneDto
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ class TimeZonesService:
         )
 
         zones_by_id: dict[str, TimeZoneDto] = {}
+        conflicting_ids: list[str] = []
         for resource in page.items:
             zone = TimeZoneDto.from_resource(resource)
             if zone is None:
@@ -117,7 +119,12 @@ class TimeZonesService:
             if existing is None:
                 zones_by_id[zone.id] = zone
             elif existing != zone:
-                logger.warning(
-                    "Conflicting time zones for duplicate id %r; retaining first zone", zone.id
-                )
+                conflicting_ids.append(zone.id)
+        if conflicting_ids:
+            warning_event(
+                logger,
+                "time_zones.catalog.duplicate_id",
+                count=len(conflicting_ids),
+                sample_ids=conflicting_ids[:5],
+            )
         return zones_by_id

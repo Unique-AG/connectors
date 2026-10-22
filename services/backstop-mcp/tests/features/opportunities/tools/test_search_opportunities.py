@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Literal, TypedDict, Unpack, cast, get_args
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -15,6 +16,7 @@ from pydantic.fields import FieldInfo
 
 from backstop_mcp.config import SearchConfig
 from backstop_mcp.features.opportunities import (
+    MapOpportunityToResponseUtil,
     SearchOpportunitiesResolvedResponse,
 )
 from backstop_mcp.features.opportunities.tools.search_opportunities import (
@@ -30,10 +32,12 @@ from tests.features.opportunities.conftest import VOCABULARY, make_search_opport
 from tests.helpers import (
     BASE_URL,
     SERVICE_LOGGER,
+    aggregated_warning,
     assert_canary_absent,
     recorded_requests,
     resource,
     tool_client,
+    validation_error,
 )
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
@@ -470,6 +474,46 @@ class TestSearchOpportunities:
         assert [item["id"] for item in rows] == ["bad", "1"]
         assert "requested_amount" not in rows[0]
         assert result.coverage.rows_dropped == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("mode", ["rows", "aggregate"])
+    async def test_unreadable_records_produce_one_warning_per_call(
+        self,
+        mode: Literal["rows", "aggregate"],
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        base_url = tenant(f"so-unreadable-{mode}")
+        ids = [str(9000 + index) for index in range(7)]
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                *(_deal(i, name="x", stage_id="42482") for i in ids),
+                included=_included(),
+                total=len(ids),
+            )
+        )
+        _stub_supporting_collections(base_url)
+        monkeypatch.setattr(
+            MapOpportunityToResponseUtil, "run", AsyncMock(side_effect=validation_error())
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING):
+                result = tool_model(
+                    await search_opportunities(
+                        mode=mode,
+                        group_by="stage" if mode == "aggregate" else None,
+                        search_opportunities_query=make_search_opportunities_query(client),
+                        search_config=_CONFIG,
+                    ),
+                    SearchOpportunitiesResolvedResponse,
+                )
+
+        assert result.coverage.rows_dropped == 7
+        aggregated_warning(
+            caplog, "opportunities.search.record.unreadable", count=7, sample_ids=ids[:5]
+        )
 
     @pytest.mark.asyncio
     @respx.mock

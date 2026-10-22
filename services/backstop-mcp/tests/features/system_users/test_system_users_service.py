@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from typing import cast
 
 import httpx
 import pytest
@@ -13,7 +14,14 @@ from backstop_mcp.features.system_users import (
     find_system_user_by_user_name,
     get_current_caller_system_user,
 )
-from tests.helpers import BASE_URL, recorded_requests, resource, system_users_service, tool_client
+from tests.helpers import (
+    BASE_URL,
+    aggregated_warning,
+    recorded_requests,
+    resource,
+    system_users_service,
+    tool_client,
+)
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
@@ -47,6 +55,11 @@ def _user(
         disabled=False,
         **attrs,
     )
+
+
+def _sample_logins(record: logging.LogRecord) -> list[str]:
+    """The pseudonyms as they are written out."""
+    return [str(login) for login in cast("list[object]", record.__dict__["sample_logins"])]
 
 
 def _filter_params(params: httpx.QueryParams) -> list[str]:
@@ -158,12 +171,37 @@ class TestResolveByUserName:
                 result = await system_users_service(client).resolve_by_user_name("mlucas")
 
         assert result.id == "u1"
-        messages = [record.getMessage() for record in caplog.records]
-        assert any("duplicate login" in message for message in messages)
-        joined = "\n".join(messages)
-        assert "mlucas" not in joined
+        record = aggregated_warning(caplog, "system_users.catalog.duplicate_id", count=1)
         digest = hashlib.sha256(b"mlucas").hexdigest()
-        assert f"sha256:{digest}" in joined
+        assert _sample_logins(record) == [f"sha256:{digest}"]
+
+    @respx.mock
+    async def test_duplicate_logins_produce_one_warning_per_walk(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("su-resolve-dup-many")
+        logins = [f"user{index}" for index in range(7)]
+        respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(
+                *(_user(f"a{index}", user_name=login) for index, login in enumerate(logins)),
+                *(
+                    _user(f"b{index}", name="Other", user_name=login.upper())
+                    for index, login in enumerate(logins)
+                ),
+            )
+        )
+
+        with caplog.at_level(
+            logging.WARNING,
+            logger="backstop_mcp.features.system_users.system_users_service",
+        ):
+            async with tool_client(base_url) as client:
+                _ = await system_users_service(client).find_by_user_name("user0")
+
+        record = aggregated_warning(caplog, "system_users.catalog.duplicate_id", count=7)
+        assert _sample_logins(record) == [
+            f"sha256:{hashlib.sha256(login.encode()).hexdigest()}" for login in logins[:5]
+        ]
 
     @respx.mock
     async def test_resolve_relationship_returns_a_json_api_relationship(self) -> None:

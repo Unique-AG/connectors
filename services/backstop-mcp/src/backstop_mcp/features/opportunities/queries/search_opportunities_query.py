@@ -49,7 +49,7 @@ from backstop_mcp.features.opportunities.responses import (
 )
 from backstop_mcp.features.system_users import SystemUserAttributes
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +68,18 @@ type RepresentativeScope = Literal["deal", "investor", "either"]
 class _ScannedOpportunity(BaseModel):
     """One record of a Backstop page after mapping: its row, or why it has none."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     # Record offset in the server-ordered collection.
     position: int
+    opportunity_id: str
     # `None` when a custom-field predicate rejected the record or it could not be read.
     row: SearchOpportunityRowResponse | None = None
-    unreadable: bool = False
+    failure: ValidationError | None = None
+
+    @property
+    def unreadable(self) -> bool:
+        return self.failure is not None
 
 
 class SearchOpportunitiesQuery:
@@ -205,12 +210,12 @@ class SearchOpportunitiesQuery:
                 total_count=page.total_count,
             )
 
-        unreadable_positions: list[int] = []
+        unreadable_items: list[_ScannedOpportunity] = []
 
         def select(
             page: SinglePage[_ScannedOpportunity],
         ) -> list[tuple[int, SearchOpportunityRowResponse]]:
-            unreadable_positions.extend(item.position for item in page.items if item.unreadable)
+            unreadable_items.extend(item for item in page.items if item.unreadable)
             return [
                 (index, item.row)
                 for index, item in enumerate(page.items)
@@ -231,8 +236,8 @@ class SearchOpportunitiesQuery:
         # Only records this call consumed: not the head of a re-read page before the cursor,
         # nor the tail after the row that filled the page.
         consumed_end = math.inf if collected.next_offset is None else collected.next_offset
-        dropped = sum(
-            1 for position in unreadable_positions if start_offset <= position < consumed_end
+        dropped = self._warn_unreadable(
+            [item for item in unreadable_items if start_offset <= item.position < consumed_end]
         )
         info_event(
             logger,
@@ -290,7 +295,7 @@ class SearchOpportunitiesQuery:
             coverage=scan_coverage(
                 rows_scanned=len(pages.items),
                 visible_count=pages.total_count,
-                rows_dropped=sum(1 for item in scanned if item.unreadable),
+                rows_dropped=self._warn_unreadable(scanned),
                 ceiling=None,
                 ceiling_clamped=False,
                 # One `paginate` call: a failed page raises rather than returning a short list,
@@ -303,6 +308,19 @@ class SearchOpportunitiesQuery:
             ),
             custom_fields_unavailable=catalog is None,
         )
+
+    def _warn_unreadable(self, scanned: Sequence[_ScannedOpportunity]) -> int:
+        """One WARNING for every unreadable record in `scanned`; returns how many there were."""
+        failed = [item for item in scanned if item.failure is not None]
+        if failed:
+            warning_event(
+                logger,
+                "opportunities.search.record.unreadable",
+                exc=failed[0].failure,
+                count=len(failed),
+                sample_ids=[item.opportunity_id for item in failed[:5]],
+            )
+        return len(failed)
 
     async def _scan(
         self,
@@ -342,7 +360,7 @@ class SearchOpportunitiesQuery:
         predicates: Sequence[CustomFieldMatch],
     ) -> _ScannedOpportunity:
         if not satisfies_every(opportunity.attributes.regular_custom_field_values, predicates):
-            return _ScannedOpportunity(position=position)
+            return _ScannedOpportunity(position=position, opportunity_id=opportunity.id)
         try:
             opportunity_mapped = await self.map_opportunity_to_response_util.run(
                 row=opportunity,
@@ -394,13 +412,13 @@ class SearchOpportunitiesQuery:
                 or None,
             )
         except ValidationError as exc:
-            logger.warning(
-                "opportunities.search.record.unreadable",
-                extra={"opportunity_id": opportunity.id},
-                exc_info=exc,
+            logger.debug(
+                "opportunities.search.record.unreadable", extra={"opportunity_id": opportunity.id}
             )
-            return _ScannedOpportunity(position=position, unreadable=True)
-        return _ScannedOpportunity(position=position, row=row)
+            return _ScannedOpportunity(
+                position=position, opportunity_id=opportunity.id, failure=exc
+            )
+        return _ScannedOpportunity(position=position, opportunity_id=opportunity.id, row=row)
 
     def _query_params(
         self, *, representative: str, exclude_custom_fields: bool

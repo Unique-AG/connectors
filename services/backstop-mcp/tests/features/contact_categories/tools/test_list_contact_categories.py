@@ -15,6 +15,7 @@ from backstop_mcp.features.contact_categories.tools.list_contact_categories impo
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import (
     BASE_URL,
+    aggregated_warning,
     list_contact_categories_query,
     recorded_requests,
     resource,
@@ -221,12 +222,37 @@ class TestListContactCategoriesTool:
         assert first.categories[0].name == "Prospect"
         assert route.call_count == 3
         assert refreshed.categories[0].name == "Prospect"
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            f"Conflicting contact categories for duplicate id {_PROSPECT_ID!r}; "
-            + "retaining first category"
-        ]
+        aggregated_warning(
+            caplog,
+            "contact_categories.catalog.duplicate_id",
+            count=1,
+            sample_ids=[_PROSPECT_ID],
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("cc-conflict-many")
+        ids = [str(2000 + index) for index in range(7)]
+        next_url = f"{base_url}/contact-categories?page[offset]=100&page[limit]=100"
+        respx.get(f"{base_url}/contact-categories").mock(
+            side_effect=[
+                _collection_page(*(_category(i, name="Original") for i in ids), next_url=next_url),
+                _collection_page(*(_category(i, name="Changed") for i in ids)),
+            ]
+        )
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_contact_categories(
+                    refresh=True,
+                    list_contact_categories_query=list_contact_categories_query(client),
+                )
+
+        aggregated_warning(
+            caplog, "contact_categories.catalog.duplicate_id", count=7, sample_ids=ids[:5]
+        )
 
 
 class TestListContactCategoriesInput:

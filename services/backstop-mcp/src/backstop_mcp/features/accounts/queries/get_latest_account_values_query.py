@@ -13,7 +13,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -41,6 +41,19 @@ class GetLatestAccountValuesQuery:
                 self._outcome(account_id, result)
                 for account_id, result in zip(account_ids, settled, strict=True)
             )
+            failures = [
+                (account_id, result)
+                for account_id, result in zip(account_ids, settled, strict=True)
+                if isinstance(result, BaseException)
+            ]
+            if failures:
+                warning_event(
+                    logger,
+                    "accounts.latest_values.series_failed",
+                    exc=failures[0][1],
+                    count=len(failures),
+                    sample_ids=[account_id for account_id, _ in failures[:5]],
+                )
             info_event(
                 logger,
                 "accounts.latest_values.fetched",
@@ -60,11 +73,7 @@ class GetLatestAccountValuesQuery:
         if isinstance(settled, BaseException):
             if not isinstance(settled, Exception) or isinstance(settled, BATCH_ABORTING_ERRORS):
                 raise settled
-            logger.warning(
-                "accounts.latest_values.series_failed",
-                extra={"account_id": account_id},
-                exc_info=settled,
-            )
+            logger.debug("accounts.latest_values.series_failed", extra={"account_id": account_id})
             return AccountLatestValueDto(
                 account_id=account_id, error=f"{type(settled).__name__}: {settled}"
             )

@@ -47,6 +47,20 @@ _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 # removes the call.
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset()
 
+# A stack trace is for a developer, so only ERROR carries one.
+_STACKLESS_LOG_METHODS = frozenset({"debug", "info", "warning"})
+_LOOPS = (ast.For, ast.AsyncFor)
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+# (path relative to src/backstop_mcp, event name) -> why this WARNING inside a loop still fires
+# at most a handful of times per call rather than once per record.
+_ONCE_PER_CALL_LOOP_WARNINGS: dict[tuple[str, str], str] = {
+    (
+        "features/activity_history/queries/search_activities_query.py",
+        "activity_history.entity_activities.filter_ignored",
+    ): "once per ignored filter name per walk, at most four, and the walk stops on that page",
+}
+
 
 def _sources() -> list[pathlib.Path]:
     return sorted(_SRC.rglob("*.py"))
@@ -140,6 +154,65 @@ def _offends(node: ast.AST) -> bool:
     return any(_offends(child) for child in ast.iter_child_nodes(node))
 
 
+def _trees() -> list[tuple[str, ast.Module]]:
+    return [
+        (
+            source.relative_to(_SRC).as_posix(),
+            ast.parse(source.read_text(), filename=str(source)),
+        )
+        for source in _sources()
+    ]
+
+
+def _logger_method(node: ast.Call) -> str | None:
+    func = node.func
+    if isinstance(func, ast.Attribute) and _is_logger_call(func):
+        return func.attr
+    return None
+
+
+def _is_warning_call(node: ast.Call) -> bool:
+    if isinstance(node.func, ast.Name):
+        return node.func.id == "warning_event"
+    return _logger_method(node) == "warning"
+
+
+def _calls_in_loop_body(loop: ast.For | ast.AsyncFor) -> list[ast.Call]:
+    """Calls the loop body makes on each iteration, not those of a function defined in it."""
+    calls: list[ast.Call] = []
+    pending: list[ast.AST] = list(loop.body)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, _SCOPES):
+            continue
+        if isinstance(node, ast.Call):
+            calls.append(node)
+        pending.extend(ast.iter_child_nodes(node))
+    return calls
+
+
+def _stack_traces_below_error() -> set[tuple[str, str]]:
+    return {
+        (relative, _event_name(node))
+        for relative, tree in _trees()
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _logger_method(node) in _STACKLESS_LOG_METHODS
+        and any(keyword.arg == "exc_info" for keyword in node.keywords)
+    }
+
+
+def _warnings_inside_loops() -> set[tuple[str, str]]:
+    return {
+        (relative, _event_name(call))
+        for relative, tree in _trees()
+        for loop in ast.walk(tree)
+        if isinstance(loop, _LOOPS)
+        for call in _calls_in_loop_body(loop)
+        if _is_warning_call(call)
+    }
+
+
 def _is_span_start(node: ast.Call) -> bool:
     return isinstance(node.func, ast.Attribute) and node.func.attr == "start_as_current_span"
 
@@ -156,9 +229,7 @@ def _keyword_is_false(call: ast.Call, name: str) -> bool:
 def _spans_recording_exceptions() -> list[str]:
     """Span starts that would write `str(exc)` and its stack before the failure is classified."""
     found: list[str] = []
-    for source in _sources():
-        tree = ast.parse(source.read_text(), filename=str(source))
-        relative = source.relative_to(_SRC).as_posix()
+    for relative, tree in _trees():
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or not _is_span_start(node):
                 continue
@@ -172,9 +243,7 @@ def _spans_recording_exceptions() -> list[str]:
 
 def _violations() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
-    for source in _sources():
-        tree = ast.parse(source.read_text(), filename=str(source))
-        relative = source.relative_to(_SRC).as_posix()
+    for relative, tree in _trees():
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or not _is_logged_call(node):
                 continue
@@ -206,4 +275,31 @@ class TestNoPayloadLogging:
             "start_as_current_span without record_exception=False and "
             + "set_status_on_exception=False:\n  "
             + "\n  ".join(offending)
+        )
+
+
+class TestStackTracesOnlyAtError:
+    def test_no_debug_info_or_warning_call_passes_exc_info(self) -> None:
+        offending = _stack_traces_below_error()
+
+        assert not offending, "use warning_event(..., exc=exc) instead:\n  " + "\n  ".join(
+            f"{path} {event}" for path, event in sorted(offending)
+        )
+
+
+class TestNoWarningPerRecord:
+    def test_no_warning_is_logged_inside_a_loop_body(self) -> None:
+        offending = _warnings_inside_loops() - _ONCE_PER_CALL_LOOP_WARNINGS.keys()
+
+        assert not offending, (
+            "aggregate after the loop: warning_event(logger, event, count=n, sample_ids=ids[:5])"
+            + "\n  "
+            + "\n  ".join(f"{path} {event}" for path, event in sorted(offending))
+        )
+
+    def test_every_allowed_loop_warning_still_matches_a_call(self) -> None:
+        stale = _ONCE_PER_CALL_LOOP_WARNINGS.keys() - _warnings_inside_loops()
+
+        assert not stale, "allowlist entry no longer matches a call:\n  " + "\n  ".join(
+            f"{path} {event}" for path, event in sorted(stale)
         )

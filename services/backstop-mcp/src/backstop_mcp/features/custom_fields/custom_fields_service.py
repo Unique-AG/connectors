@@ -20,6 +20,7 @@ from backstop_mcp.features.custom_fields.internal_dto import (
 from backstop_mcp.features.custom_fields.responses import ResolvedCustomFieldValueResponse
 from backstop_mcp.features.entity_types import party_search_type
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
+from backstop_mcp.observability import failure_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ async def _fetch_custom_field_definitions(
     )
 
     definitions_by_id: dict[str, CustomFieldDefinitionDto] = {}
+    conflicting_ids: list[str] = []
     for resource in page.items:
         definition = CustomFieldDefinitionDto.from_resource(resource)
         if definition is None:
@@ -56,11 +58,14 @@ async def _fetch_custom_field_definitions(
         if existing is None:
             definitions_by_id[definition.id] = definition
         elif existing != definition:
-            logger.warning(
-                "Conflicting custom-field definitions for duplicate id %r; "
-                + "retaining first definition",
-                definition.id,
-            )
+            conflicting_ids.append(definition.id)
+    if conflicting_ids:
+        warning_event(
+            logger,
+            "custom_fields.catalog.duplicate_id",
+            count=len(conflicting_ids),
+            sample_ids=conflicting_ids[:5],
+        )
     return definitions_by_id
 
 
@@ -119,8 +124,12 @@ class CustomFieldsService:
         """
         try:
             catalog, _status = await self.get()
-        except Exception:
-            logger.warning("custom_fields.values.catalog_unavailable", exc_info=True)
+        except Exception as exc:
+            failure_event(
+                logger,
+                "custom_fields.values.catalog_unavailable",
+                exc,
+            )
             return None
         return catalog
 
@@ -144,8 +153,22 @@ class CustomFieldsService:
         catalog = await self.load_catalog()
         if catalog is None:
             return []
+        stored_values = regular_custom_field_values or ()
+        missing_ids = [
+            definition_id
+            for definition_id in (stored.definition_id for stored in stored_values)
+            if definition_id and definition_id not in catalog
+        ]
+        if missing_ids:
+            warning_event(
+                logger,
+                "custom_fields.values.definition_missing",
+                count=len(missing_ids),
+                sample_ids=missing_ids[:5],
+                remedy="list_custom_fields(refresh=true)",
+            )
         published: list[ResolvedCustomFieldValueResponse] = []
-        for stored in regular_custom_field_values or ():
+        for stored in stored_values:
             resolved = self._with_catalog_definition(stored, catalog)
             if resolved is None:
                 continue
@@ -164,13 +187,6 @@ class CustomFieldsService:
             return None
         definition = catalog.get(definition_id)
         if definition is None:
-            logger.warning(
-                "custom_fields.values.definition_missing",
-                extra={
-                    "definition_id": definition_id,
-                    "remedy": "list_custom_fields(refresh=true)",
-                },
-            )
             return None
         return ResolvedCustomFieldValueDto.from_definition(
             definition,

@@ -382,9 +382,8 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
     try:
         when = parsedate_to_datetime(retry_after)
     except TypeError, ValueError, IndexError:
-        logger.warning(
-            "backstop.retry_after.unparseable",
-            extra={"retry_after": retry_after},
+        warning_event(
+            logger, "backstop.retry_after.unparseable", retry_after_length=len(retry_after)
         )
         return None
     if when.tzinfo is None:
