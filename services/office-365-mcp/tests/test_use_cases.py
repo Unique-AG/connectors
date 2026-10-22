@@ -113,6 +113,26 @@ def _step_tools(step: Mapping[str, object]) -> list[str]:
     return [str(step["tool"])]
 
 
+def _allowed_values(schema: Mapping[str, object], argument: str) -> set[object]:
+    properties = _object(schema.get("properties", {}))
+    if argument not in properties:
+        return set()
+    definitions = _object(schema.get("$defs", {}))
+
+    def values(node: Mapping[str, object]) -> set[object]:
+        if "$ref" in node:
+            return values(_object(definitions[str(node["$ref"]).rsplit("/", 1)[-1]]))
+        if "enum" in node:
+            return set(_list(node["enum"]))
+        if "const" in node:
+            return {node["const"]}
+        branches = [_object(branch) for branch in _list(node.get("anyOf", []))]
+        found = [values(branch) for branch in branches if branch.get("type") != "null"]
+        return set.union(*found) if found and all(found) else set()
+
+    return values(_object(properties[argument]))
+
+
 class TestFeatureFiles:
     def test_there_are_features_to_check(self) -> None:
         assert _FEATURE_FILES, "no .feature file under features/, so every check below is vacuous"
@@ -214,6 +234,13 @@ class TestSidecars:
                         f"{scenario_id}: {step['tool']} has no argument {sorted(given - accepted)}"
                         + f", it has {sorted(accepted)}"
                     )
+                for name, value in _object(step.get("args", {})).items():
+                    allowed = _allowed_values(_object(schema), name)
+                    if allowed and value not in allowed:
+                        problems.append(
+                            f"{scenario_id}: {step['tool']} takes {name} from {sorted(allowed)}"
+                            + f", not {value!r}"
+                        )
 
         assert problems == []
 

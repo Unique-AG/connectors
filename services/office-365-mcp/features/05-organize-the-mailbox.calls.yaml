@@ -90,7 +90,7 @@ uc-05-10:
     - tool: outlook_list_categories
       optional: true
     - tool: outlook_create_category
-      args: {name: Follow-up Q4, color: red}
+      args: {name: Follow-up Q4, color: preset0}
     - tool: outlook_search_mail
       args: {sender: manager, flagged: false}
     - tool: outlook_mark_mail

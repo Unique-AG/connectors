@@ -11,7 +11,7 @@ uc-01-02:
   asks_user: false
   chain:
     - tool: sharepoint_search_files
-      args: {query: quarterly plan, sort_by: modified}
+      args: {query: quarterly plan, sort_by: last_modified}
 
 uc-01-03:
   provenance: drafted
@@ -39,7 +39,7 @@ uc-01-05:
     - tool: sharepoint_list_drives
       optional: true
     - tool: sharepoint_browse_folder
-      args: {order_by: modified}
+      args: {order_by: last_modified}
 
 uc-01-06:
   provenance: observed

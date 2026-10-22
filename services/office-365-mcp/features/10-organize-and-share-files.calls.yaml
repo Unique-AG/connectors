@@ -47,7 +47,7 @@ uc-10-06:
   chain:
     - tool: sharepoint_search_files
     - tool: sharepoint_invite
-      args: {role: edit}
+      args: {role: write}
       uses: {item: handle of the file, recipients: address of Anna}
 
 uc-10-07:
