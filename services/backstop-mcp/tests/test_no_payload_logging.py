@@ -32,11 +32,7 @@ _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 # removes the call.
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
-        # Phase 6a: the response object is an argument of the log call via the helper.
-        ("backstop_client/client.py", "backstop.request.unauthorized"),
-        # Phase 6a: str(exc) of a body that failed to parse.
-        ("backstop_client/errors.py", "backstop.error_body.schema_error"),
-        # Phase 6b: str(exc) becomes logger.warning(..., exc_info=exc).
+        # Phase 6b: str(exc) becomes warning_event(..., exc=exc).
         (
             "features/elicitation_utils/elicit_entity_deletion.py",
             "elicitation.entity_deletion.degraded",

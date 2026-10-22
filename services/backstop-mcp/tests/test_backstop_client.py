@@ -34,6 +34,7 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.observability import failure_level
+from backstop_mcp.utils import LogsDiagnosticDataPolicy, configure_identifiable_values
 from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential, recorded_params
 
@@ -61,6 +62,11 @@ async def _instant_sleep(_delay: float) -> None:
 
 @pytest.fixture
 async def factory() -> AsyncGenerator[BackstopClientFactory]:
+    configure_identifiable_values(
+        policy=LogsDiagnosticDataPolicy.CONCEAL,
+        log_level="info",
+        encryption_key=b"backstop-mcp-test-key",
+    )
     built = client_factory()
     yield built
     await built.aclose()
@@ -378,7 +384,9 @@ class TestUnauthorizedLogging:
         assert record.__dict__["detail"] == "token rejected"
         assert record.__dict__["title"] == "Unauthorized"
         assert record.__dict__["code"] == "401"
-        assert record.__dict__["username"] == "bob.smith"
+        logged_username = cast("object", record.__dict__["username"])
+        assert str(logged_username).startswith("hmac-sha256:")
+        assert "bob.smith" not in str(logged_username)
         assert record.__dict__["subject"] == "user-42"
         assert "body_excerpt" not in record.__dict__
 
@@ -1501,7 +1509,101 @@ class TestClientSpan:
 
         await factory.for_credential(_credential()).raw_request("GET", "/system-info")
 
-        assert len(_client_spans(exporter)) == 1
+        spans = _client_spans(exporter)
+        assert len(spans) == 1
+        assert any(event.name == "backstop.rate_limit.retry" for event in spans[0].events)
+
+
+class TestRequestFailureLogs:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_client_logs_pseudonymize_the_username(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+        caplog.set_level(logging.DEBUG)
+
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        client_records = [
+            record
+            for record in caplog.records
+            if record.name.startswith("backstop_mcp.backstop_client")
+        ]
+        assert client_records
+        for record in client_records:
+            assert "bob.smith" not in record.getMessage()
+            assert "bob.smith" not in str(record.__dict__)
+        usernames = [
+            str(cast("object", record.__dict__["username"]))
+            for record in client_records
+            if "username" in record.__dict__
+        ]
+        assert usernames
+        assert all(username.startswith("hmac-sha256:") for username in usernames)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("status_code", [422, 500])
+    async def test_an_api_error_is_a_warning_without_the_error_body(
+        self,
+        factory: BackstopClientFactory,
+        caplog: pytest.LogCaptureFixture,
+        status_code: int,
+    ) -> None:
+        canary = "zq-canary-api-error"
+        respx.get(f"{_BASE_URL}/people/1").mock(
+            return_value=httpx.Response(
+                status_code,
+                json={"errors": [{"detail": canary, "title": canary, "code": "invalid"}]},
+            )
+        )
+        caplog.set_level(logging.DEBUG)
+
+        with pytest.raises(BackstopApiError):
+            await factory.for_credential(_credential()).raw_request("GET", "/people/1")
+
+        failed = [
+            record
+            for record in caplog.records
+            if record.name.startswith("backstop_mcp.backstop_client")
+            and record.message == "backstop.request.failed"
+        ]
+        assert len(failed) == 1
+        record = failed[0]
+        assert record.levelno == logging.WARNING
+        assert record.exc_info is None
+        assert record.__dict__["status_code"] == status_code
+        assert record.__dict__["code"] == "invalid"
+        assert record.__dict__["error_count"] == 1
+        assert "detail" not in record.__dict__
+        assert "title" not in record.__dict__
+        assert "errors" not in record.__dict__
+        rendered = " ".join(
+            record.getMessage() + str(record.__dict__)
+            for record in caplog.records
+            if record.name.startswith("backstop_mcp.backstop_client")
+        )
+        assert canary not in rendered
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_timeout_is_a_warning_without_a_stack(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(side_effect=httpx.ReadTimeout("timed out"))
+        caplog.set_level(logging.DEBUG)
+
+        with pytest.raises(httpx.ReadTimeout):
+            await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        failed = [
+            record for record in caplog.records if record.message == "backstop.request.failed"
+        ]
+        assert len(failed) == 1
+        assert failed[0].levelno == logging.WARNING
+        assert failed[0].exc_info is None
+        assert failed[0].__dict__["error_type"] == "ReadTimeout"
 
     @pytest.mark.asyncio
     @respx.mock

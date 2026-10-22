@@ -44,6 +44,8 @@ from backstop_mcp.metrics import (
     BACKSTOP_REQUEST_DURATION,
     BACKSTOP_REQUESTS,
 )
+from backstop_mcp.observability import error_event, warning_event
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer("backstop_mcp")
@@ -346,25 +348,32 @@ class BackstopClient:
                 if exc.status_code >= 500:
                     span.set_status(Status(StatusCode.ERROR))
                 # Status and code identify the failure. `detail` / `title` / `errors` can echo
-                # the values the caller submitted, and this line also lands on the client span.
-                logger.warning(
+                # the values the caller submitted, so they stay out of the log at every level.
+                warning_event(
+                    logger,
                     "backstop.request.failed",
-                    extra=self._log_extra(
-                        session,
-                        method=method,
-                        path=path,
-                        status_code=exc.status_code,
-                        code=exc.code,
-                        error_count=len(exc.errors),
-                    ),
+                    exc=None,
+                    status_code=exc.status_code,
+                    code=exc.code,
+                    error_count=len(exc.errors),
+                    **self._log_extra(session, method=method, path=path),
+                )
+                raise
+            except httpx.TransportError as exc:
+                span.set_status(Status(StatusCode.ERROR))
+                warning_event(
+                    logger,
+                    "backstop.request.failed",
+                    exc=exc,
+                    **self._log_extra(session, method=method, path=path),
                 )
                 raise
             except Exception as exc:
-                if isinstance(exc, httpx.TransportError):
-                    span.set_status(Status(StatusCode.ERROR))
-                logger.exception(
+                error_event(
+                    logger,
                     "backstop.request.failed",
-                    extra=self._log_extra(session, method=method, path=path),
+                    exc=exc,
+                    **self._log_extra(session, method=method, path=path),
                 )
                 raise
             span.set_attribute("http.response.status_code", response.status_code)
@@ -372,7 +381,7 @@ class BackstopClient:
 
     def _log_extra(self, session: CallerSession, **fields: object) -> dict[str, object]:
         return {
-            "username": session.credential.username,
+            "username": identifiable_value(session.credential.username),
             "subject": session.subject,
             **fields,
         }
@@ -385,16 +394,12 @@ class BackstopClient:
         Always raises. Login verification has no revoke hook and must fail fast. Mid-session
         probes `/system-info` with backoff and only revokes when every probe is unauthorized.
         """
+        unauthorized = unauthorized_log_fields(
+            response, secret=session.credential.api_token.get_secret_value()
+        )
         logger.info(
             "backstop.request.unauthorized",
-            extra=self._log_extra(
-                session,
-                method=method,
-                path=path,
-                **unauthorized_log_fields(
-                    response, secret=session.credential.api_token.get_secret_value()
-                ),
-            ),
+            extra=self._log_extra(session, method=method, path=path, **unauthorized),
         )
         if session.on_auth_failure is None:
             raise BackstopAuthError("Backstop rejected the stored credential — please reconnect.")
