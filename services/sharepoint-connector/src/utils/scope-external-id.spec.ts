@@ -7,9 +7,11 @@ import {
   buildSubsiteExternalId,
   buildUnknownExternalId,
   extractRootSiteId,
+  fromPendingDeleteExternalId,
   isLegacyExternalId,
   migrateLegacyExternalId,
   parseLegacyExternalId,
+  toPendingDeleteExternalId,
 } from './scope-external-id';
 import { createSmeared } from './smeared';
 
@@ -269,6 +271,21 @@ describe('buildSitePagesExternalId', () => {
     expect(buildSitePagesExternalId('root-abc', 'site-abc').value).toBe(
       'spc:root-abc/sitePages:site-abc',
     );
+  });
+});
+
+describe('pending-delete external ids', () => {
+  it('round-trips an active external id through the pending-delete marker', () => {
+    const active = 'spc:root-abc/folder:site-abc/item-789';
+
+    expect(fromPendingDeleteExternalId(toPendingDeleteExternalId(active).value).value).toBe(active);
+  });
+
+  it('swaps only the pending-delete prefix back to spc:', () => {
+    expect(
+      fromPendingDeleteExternalId('spc:pending-delete:root-abc/unknown:/some/path-fixed-suffix')
+        .value,
+    ).toBe('spc:root-abc/unknown:/some/path-fixed-suffix');
   });
 });
 
