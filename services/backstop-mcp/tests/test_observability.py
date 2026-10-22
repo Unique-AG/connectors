@@ -12,7 +12,7 @@ from opentelemetry.trace import StatusCode
 
 from backstop_mcp.observability import (
     DeclaresFailureLevel,
-    annotate_tool_call,
+    add_call_fields,
     error_event,
     failure_level,
     info_event,
@@ -178,7 +178,7 @@ class TestOperation:
 class TestAnnotateToolCall:
     def test_inside_a_scope_the_fields_are_collected(self) -> None:
         with tool_call_scope() as call:
-            annotate_tool_call(returned=3, segment="people")
+            add_call_fields(returned=3, segment="people")
 
         assert call.fields == {"returned": 3, "segment": "people"}
 
@@ -186,6 +186,6 @@ class TestAnnotateToolCall:
         with tool_call_scope() as call:
             pass
 
-        annotate_tool_call(returned=3)
+        add_call_fields(returned=3)
 
         assert call.fields == {}

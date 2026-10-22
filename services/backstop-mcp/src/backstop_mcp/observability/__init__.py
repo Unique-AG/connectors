@@ -14,12 +14,12 @@ from backstop_mcp.observability.events import (
 from backstop_mcp.observability.failures import DeclaresFailureLevel, failure_level
 from backstop_mcp.observability.fields import span_attributes
 from backstop_mcp.observability.operation import OperationOutcome, operation
-from backstop_mcp.observability.tool_call import annotate_tool_call, tool_call_scope
+from backstop_mcp.observability.tool_call import add_call_fields, tool_call_scope
 
 __all__ = [
     "DeclaresFailureLevel",
     "OperationOutcome",
-    "annotate_tool_call",
+    "add_call_fields",
     "error_event",
     "failure_event",
     "failure_level",
