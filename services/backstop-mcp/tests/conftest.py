@@ -13,6 +13,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
+from backstop_mcp.observability import install_caller_failure_redaction
 from backstop_mcp.teardown import close_singletons
 from backstop_mcp.utils.identifiable_value import reset_identifiable_values
 
@@ -39,6 +40,7 @@ def exporter() -> Iterator[InMemorySpanExporter]:
     if not isinstance(provider, TracerProvider):
         provider = TracerProvider()
         trace.set_tracer_provider(provider)
+    install_caller_failure_redaction()
     provider.add_span_processor(SimpleSpanProcessor(attached))
     yield attached
     # A span processor cannot be removed, and the provider outlives this test: the shutdown is what
