@@ -16,7 +16,7 @@ from backstop_mcp.features.custom_fields import (
     get_update_custom_field_values_command_factory,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -53,5 +53,5 @@ async def update_custom_field_values(
     Call like: {"update": {"entity_type": "people", "entity_id": "<id from get_person>",
     "values": [{"definition_id": "<id from list_custom_fields>", "value": "Direct"}]}}
     """
-    annotate_tool_call(entity_type=update.entity_type, record_count=len(update.values))
+    add_call_fields(entity_type=update.entity_type, record_count=len(update.values))
     return await update_custom_field_values_command.run(update=update)

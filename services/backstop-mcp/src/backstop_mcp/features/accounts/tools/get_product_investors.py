@@ -28,7 +28,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_product_investors_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, input_required
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ async def get_product_investors(
     Several vehicles: {"products": ["NWON", "NWOF"]}
     """
     requested_investors = coerce_ids(investor_ids)
-    annotate_tool_call(
+    add_call_fields(
         product_count=len(products),
         include_closed=include_closed,
         include_latest_value=include_latest_value,
@@ -167,7 +167,7 @@ async def get_product_investors(
     if not isinstance(resolved_products, tuple):
         return resolved_products
 
-    annotate_tool_call(product_ids=[item.id for item in resolved_products])
+    add_call_fields(product_ids=[item.id for item in resolved_products])
     result = await get_product_investors_query.run(
         products=resolved_products,
         include_closed=include_closed,
@@ -176,7 +176,7 @@ async def get_product_investors(
         investor_ids=requested_investors,
     )
     accounts = [account for listing in result.products for account in listing.accounts]
-    annotate_tool_call(
+    add_call_fields(
         product_ids=[listing.product.id for listing in result.products],
         returned=len(accounts),
         closed_omitted=sum(listing.closed_omitted for listing in result.products),

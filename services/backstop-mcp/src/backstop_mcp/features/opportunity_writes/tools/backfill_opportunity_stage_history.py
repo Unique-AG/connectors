@@ -16,7 +16,7 @@ from backstop_mcp.features.opportunity_writes import (
     get_backfill_opportunity_stage_history_command_factory,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -51,5 +51,5 @@ async def backfill_opportunity_stage_history(
     Call like: {"backfill": {"records": [{"opportunity_id": "<id from get_opportunities>",
     "stage": "<stage name from get_opportunities>", "effective_date": "2026-02-01"}]}}
     """
-    annotate_tool_call(record_count=len(backfill.records))
+    add_call_fields(record_count=len(backfill.records))
     return await backfill_opportunity_stage_history_command.run(backfill=backfill)

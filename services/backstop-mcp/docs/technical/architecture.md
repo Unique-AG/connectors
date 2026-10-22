@@ -261,7 +261,7 @@ Each tool call logs `tool.call.start` and one terminal line: `tool.call.complete
 `duration_ms`. A failure is WARNING when the caller or Backstop caused it and ERROR, with its
 stack, when it is a bug; `invalid_arguments` names the argument locations pydantic rejected, never
 their values. A tool does not write its own start and end lines: it adds its fields (`segment`,
-`entity_id`, `returned`) to the terminal line and to the tool span with `annotate_tool_call`.
+`entity_id`, `returned`) to the terminal line and to the tool span with `add_call_fields`.
 Queries and commands log what they learned or changed (`*.fetched`, `*.created`, `*.updated`,
 `*.deleted`) with `info_event`, so the line also lands on the span. FastMCP's and `unique_mcp`'s per-call lines are dropped, because they repeat
 these and can quote the caller's input.

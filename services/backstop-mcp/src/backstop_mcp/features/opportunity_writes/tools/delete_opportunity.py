@@ -28,7 +28,7 @@ from backstop_mcp.features.opportunity_writes import (
 )
 from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call, info_event
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ async def delete_opportunity(
 
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>"}}
     """
-    annotate_tool_call(opportunity_id=opportunity.opportunity_id)
+    add_call_fields(opportunity_id=opportunity.opportunity_id)
 
     async def prompt() -> str:
         return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)

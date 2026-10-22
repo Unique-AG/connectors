@@ -31,7 +31,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_time_series_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ async def get_time_series(
             return ProductAmbiguousResponse.from_unresolved(outcome)
         resolved_id = outcome.value.id
 
-    annotate_tool_call(
+    add_call_fields(
         entity_type=entity_type,
         entity_id=resolved_id,
         series=series,
@@ -179,7 +179,7 @@ async def get_time_series(
             raise
         return NotFoundResponse(query=entity_id, scope=entity_type)
 
-    annotate_tool_call(
+    add_call_fields(
         entity_type=entity_type, entity_id=resolved_id, series=series, points=len(result.points)
     )
     return result
