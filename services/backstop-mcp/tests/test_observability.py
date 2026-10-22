@@ -14,6 +14,8 @@ from backstop_mcp.observability import (
     DeclaresFailureLevel,
     add_call_fields,
     failure_level,
+    info_event,
+    most_severe,
     operation,
     tool_call_scope,
 )
@@ -167,6 +169,18 @@ class TestFailureLevel:
 
     def test_a_declared_level_wins(self) -> None:
         assert failure_level(_Declared("quiet")) == logging.INFO
+
+
+class TestMostSevere:
+    def test_a_bug_outranks_the_timeouts_around_it(self) -> None:
+        bug = KeyError("missing")
+
+        assert most_severe([httpx.ReadTimeout("slow"), bug, ToolError("nope")]) is bug
+
+    def test_among_equals_the_first_wins(self) -> None:
+        first = httpx.ReadTimeout("slow")
+
+        assert most_severe([first, httpx.ConnectError("down")]) is first
 
 
 class TestOperation:

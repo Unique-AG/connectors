@@ -29,7 +29,7 @@ from backstop_mcp.features.activity_history.queries.search_activities_query impo
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.observability import failure_event, info_event, most_severe
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -79,10 +79,10 @@ class GetLastActivityForPartiesQuery:
                 if isinstance(result, BaseException)
             ]
             if failures:
-                warning_event(
+                failure_event(
                     logger,
                     "activity_history.last_activity.party_failed",
-                    exc=failures[0][1],
+                    most_severe([failure for _, failure in failures]),
                     count=len(failures),
                     sample_ids=[party_id for party_id, _ in failures[:5]],
                 )
