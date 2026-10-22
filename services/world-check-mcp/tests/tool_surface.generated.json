@@ -1,0 +1,54 @@
+[
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "api-info"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get information about the version of the Public API, a link to the documentation, and a date and time that can be used to verify the 'Date' header.",
+    "inputSchema": {
+      "properties": {
+        "Authorization": {
+          "description": "The authorization credentials:\n\n- For HMAC authorization: include 'keyId', 'algorithm', 'headers', and 'signature' (refer to the \"Authorization\" section of the documentation for more details).\n\n- For OAuth: use the access token in the header as: `Authorization: Bearer <access_token>`.\n",
+          "type": "string"
+        },
+        "Date": {
+          "description": "The date and time at which the message was originated in 'RFC 1123' format. \n\nThis header is required when using HMAC authentication, but should be omitted when using OAuth authorization.\n",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Authorization"
+      ],
+      "type": "object"
+    },
+    "name": "get_api_info",
+    "outputSchema": {
+      "description": "Auxiliary information about the Public API.",
+      "properties": {
+        "systemDateTime": {
+          "description": "Current system date and time.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "description": "Current API version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "systemDateTime"
+      ],
+      "type": "object",
+      "x-fastmcp-top-level-schema": "ApiInfo"
+    },
+    "title": "Get Api Info"
+  }
+]
