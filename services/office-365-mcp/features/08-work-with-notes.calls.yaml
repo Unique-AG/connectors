@@ -1,5 +1,6 @@
 uc-08-01:
   status: untested
+  ask: "Find my notes from the Acme kickoff."
   provenance: observed
   evidence: onenote_list_pages in 8 sessions
   asks_user: false
@@ -9,13 +10,19 @@ uc-08-01:
 
 uc-08-02:
   status: gap
+  ask: "Find my notes that mention Zephyr."
+  blocker:
+    kind: graph
+    tool: onenote_list_pages
+    text: Microsoft Graph has no full-text search over the words of a page for a work or school account.
+    user: The assistant can find a note by its title only, and not by words in its body.
   provenance: drafted
   asks_user: false
   chain: []
-  note: Microsoft Graph has no full-text search for OneNote, so a page is found by its title only
 
 uc-08-03:
   status: untested
+  ask: "Show me the sections of the notebook at this web address."
   provenance: observed
   evidence: onenote_find_notebook_from_url in 2 sessions
   asks_user: false
@@ -26,6 +33,7 @@ uc-08-03:
 
 uc-08-04:
   status: untested
+  ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
   chain:
@@ -37,6 +45,7 @@ uc-08-04:
 
 uc-08-05:
   status: untested
+  ask: "Add a task list at the end of my Planning page."
   provenance: drafted
   asks_user: false
   chain:
@@ -48,6 +57,7 @@ uc-08-05:
 
 uc-08-06:
   status: untested
+  ask: "Change the launch date on my Planning page to 21 June."
   provenance: drafted
   asks_user: true
   chain:
@@ -62,6 +72,7 @@ uc-08-06:
 
 uc-08-07:
   status: untested
+  ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
   chain:
@@ -71,6 +82,7 @@ uc-08-07:
 
 uc-08-08:
   status: untested
+  ask: "Add the page Retro to the notebook of the Platform team."
   provenance: drafted
   asks_user: true
   chain:
@@ -80,3 +92,49 @@ uc-08-08:
     - tool: onenote_create_page
       args: {title: Retro}
       uses: {section: handle of a section of the team notebook}
+
+uc-08-09:
+  status: untested
+  ask: "Summarize my notes from the Acme kickoff."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: the tool returns the page as markup, and the assistant reads the words from it
+
+uc-08-10:
+  status: untested
+  ask: "Which of my notebooks have Customer in the name?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customer}
+
+uc-08-11:
+  status: untested
+  ask: "Which notebooks did I open lately?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_recent_notebooks
+  note: the list is the record that Microsoft keeps of recent opens, and it is not a full list of notebooks
+
+uc-08-12:
+  status: untested
+  ask: "Create a notebook Project Falcon with the sections Plan and Risks and a section group Archive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_create_notebook
+      args: {name: Project Falcon}
+    - tool: onenote_create_section
+      repeat: many
+      uses: {parent: handle of the notebook from onenote_create_notebook}
+    - tool: onenote_create_section_group
+      args: {name: Archive}
+      uses: {parent: handle of the notebook from onenote_create_notebook}
+  note: a new notebook in the own OneNote of Mia is not shared, so the tools ask for no approval

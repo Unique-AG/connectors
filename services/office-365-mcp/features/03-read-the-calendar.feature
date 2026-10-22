@@ -62,3 +62,21 @@ Feature: Reading the calendar
       When Mia asks her assistant for the details of "Budget review"
       Then the assistant tells Mia that it could not read "Budget review"
       And it does not say that the meeting was deleted
+
+  Rule: The assistant reads a calendar that a colleague shared with Mia
+
+    @uc-03-08
+    Scenario: The shared calendar of a colleague is read
+      Given Anna shared her calendar with Mia
+      And Anna has "Design review" tomorrow at 11:00
+      When Mia asks her assistant what is on Anna's calendar tomorrow
+      Then the assistant lists "Design review" at 11:00 in Zurich time
+
+  Rule: The assistant reads the files that are attached to a meeting
+
+    @uc-03-09
+    Scenario: The agenda that is attached to an invitation is read
+      Given Anna's invitation "Launch review" holds the attached file "agenda.pdf"
+      When Mia asks her assistant what is in the agenda that is attached to "Launch review"
+      Then the assistant names "agenda.pdf" as the attachment of "Launch review"
+      And it tells Mia the first topic of the agenda

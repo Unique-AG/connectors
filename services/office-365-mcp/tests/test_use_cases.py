@@ -33,6 +33,8 @@ _FEATURE_FILES = sorted(_FEATURES.glob("*.feature"))
 _ID = re.compile(r"uc-(?P<file>\d\d)-(?P<number>\d\d)")
 _PROVENANCE = {"observed", "drafted"}
 _STATUSES = {"untested", "working", "partly", "gap"}
+_KINDS = {"tool", "parameter", "description", "preset", "graph", "unknown"}
+_BLOCKER_KEYS = {"kind", "tool", "text", "user"}
 _ENTRY_KEYS = {
     "status",
     "ask",
@@ -139,7 +141,10 @@ def _allowed_values(schema: Mapping[str, object], argument: str) -> set[object]:
             return {node["const"]}
         branches = [_object(branch) for branch in _list(node.get("anyOf", []))]
         found = [values(branch) for branch in branches if branch.get("type") != "null"]
-        return set.union(*found) if found and all(found) else set()
+        merged: set[object] = set()
+        for allowed in found:
+            merged |= allowed
+        return merged if all(found) else set()
 
     return values(_object(properties[argument]))
 
@@ -207,6 +212,20 @@ class TestSidecars:
         assert not {"working", "known-gap", "seen-failing"} & scenario.tags, (
             "status lives in the sidecar"
         )
+        ask = entry["ask"]
+        assert isinstance(ask, str) and ask.strip(), "every scenario has a prompt in `ask`"
+        assert not [name for name in TOOL_NAMES if name in ask], "an ask names no tool"
+        assert ("blocker" in entry) == (entry["status"] in {"partly", "gap"}), (
+            "a blocker is there when status is partly or gap, and only then"
+        )
+        if blocker := entry.get("blocker"):
+            blocker = _object(blocker)
+            assert set(blocker) <= _BLOCKER_KEYS and blocker["kind"] in _KINDS
+            assert str(blocker["text"]).strip() and str(blocker["user"]).strip()
+            assert not [name for name in TOOL_NAMES if name in str(blocker["user"])], (
+                "the user text of a blocker names no tool"
+            )
+            assert blocker.get("tool", next(iter(TOOL_NAMES))) in TOOL_NAMES
         for step in map(_object, chain):
             assert set(step) <= _STEP_KEYS, set(step) - _STEP_KEYS
             assert ("tool" in step) != ("any_of" in step), "a step has `tool` or `any_of`"
@@ -253,8 +272,8 @@ class TestSidecars:
                     allowed = _allowed_values(_object(schema), name)
                     if allowed and value not in allowed:
                         problems.append(
-                            f"{scenario_id}: {step['tool']} takes {name} from {sorted(allowed)}"
-                            + f", not {value!r}"
+                            f"{scenario_id}: {step['tool']} takes {name} "
+                            + f"from {sorted(allowed, key=str)}, not {value!r}"
                         )
 
         assert problems == []
@@ -265,9 +284,13 @@ class _Generator(Protocol):
     filename carries hyphens."""
 
     TARGET: pathlib.Path
+    STATUS: pathlib.Path
 
     @staticmethod
     def render() -> str: ...
+
+    @staticmethod
+    def render_status() -> str: ...
 
 
 def _generator() -> _Generator:
@@ -285,6 +308,13 @@ class TestThePageForReaders:
 
         assert generator.TARGET.read_text() == generator.render(), (
             "docs/use-cases.md is stale: run scripts/render-use-cases.py and commit the result"
+        )
+
+    def test_the_status_page_is_what_the_generator_produces(self) -> None:
+        generator = _generator()
+
+        assert generator.STATUS.read_text() == generator.render_status(), (
+            "features/STATUS.md is stale: run scripts/render-use-cases.py and commit the result"
         )
 
     def test_it_holds_no_html_tag_outside_a_code_span(self) -> None:

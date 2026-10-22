@@ -1,5 +1,6 @@
 uc-06-01:
   status: untested
+  ask: "Which of my Teams chats have unread messages?"
   provenance: observed
   evidence: teams_list_chats alone in 7 sessions; in 30 sessions in total
   asks_user: false
@@ -9,6 +10,7 @@ uc-06-01:
 
 uc-06-02:
   status: untested
+  ask: "Show me my Teams chats."
   provenance: observed
   evidence: teams_list_chats in 30 sessions
   asks_user: false
@@ -18,6 +20,7 @@ uc-06-02:
 
 uc-06-03:
   status: untested
+  ask: "Where did we talk about the pricing change in Teams?"
   provenance: observed
   evidence: teams_search_messages in 19 sessions, alone in 9
   asks_user: false
@@ -29,7 +32,13 @@ uc-06-03:
       uses: {uri: uri of a hit}
 
 uc-06-04:
-  status: untested
+  status: partly
+  ask: "What happened in the Releases channel this week?"
+  blocker:
+    kind: parameter
+    tool: teams_browse_channel
+    text: The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week.
+    user: The assistant may miss posts of a busy channel when it reads a whole week.
   provenance: drafted
   asks_user: false
   chain:
@@ -45,6 +54,7 @@ uc-06-04:
 
 uc-06-05:
   status: untested
+  ask: "Summarize yesterday's Design review with the action items."
   provenance: observed
   evidence: teams_list_chats then teams_list_meeting_transcripts then teams_read_transcript in 7 sessions
   asks_user: false
@@ -57,6 +67,7 @@ uc-06-05:
 
 uc-06-06:
   status: untested
+  ask: "What did we decide in the three-hour meeting?"
   provenance: drafted
   evidence: teams_read_transcript in 18 calls
   asks_user: false
@@ -71,6 +82,7 @@ uc-06-06:
 
 uc-06-07:
   status: untested
+  ask: "Summarize the Weekly sync."
   provenance: observed
   evidence: teams_list_meeting_transcripts in 17 calls
   asks_user: false
@@ -82,6 +94,7 @@ uc-06-07:
 
 uc-06-08:
   status: untested
+  ask: "Send me the recording of the Design review."
   provenance: observed
   evidence: teams_list_meeting_recordings in 1 call
   asks_user: false
@@ -89,3 +102,102 @@ uc-06-08:
     - tool: teams_list_chats
     - tool: teams_list_meeting_recordings
       uses: {meeting_uri: uri of the meeting}
+
+uc-06-09:
+  status: untested
+  ask: "Show me where people mentioned me in Teams."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {mentions_me: true}
+    - tool: teams_read_message
+      optional: true
+      uses: {uri: uri of a hit}
+
+uc-06-10:
+  status: untested
+  ask: "What did Tom write in Teams yesterday?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {sender: Tom, sent_after: yesterday, sent_before: yesterday}
+
+uc-06-11:
+  status: untested
+  ask: "What is new in the Launch chat?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: group, topic_contains: Launch}
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+  note: more_messages tells the assistant that older messages exist.
+
+uc-06-12:
+  status: untested
+  ask: "Read me what is new in my unread chats."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {limit: 50}
+    - tool: teams_list_chat_messages
+      repeat: many
+      uses: {chat_id: id of each unread chat}
+
+uc-06-13:
+  status: untested
+  ask: "Summarize the Weekly sync of 5 October."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Weekly sync}
+    - tool: teams_list_meeting_recordings
+      optional: true
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript of 5 October}
+  note: the started_at of each transcript row, or the content_correlation_id of a recording, tells the dates apart.
+
+uc-06-14:
+  status: untested
+  ask: "Summarize yesterday's Design review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_list_meeting_recordings
+      optional: true
+      uses: {meeting_uri: uri of the meeting}
+  must_not: [teams_read_transcript]
+  note: the refusal is the same for every meeting, so the assistant stops after the first one.
+
+uc-06-15:
+  status: partly
+  ask: "Summarize the Budget review that is on my calendar."
+  blocker:
+    kind: description
+    tool: teams_list_meeting_transcripts
+    text: The description of meeting_uri says to copy the handle verbatim from teams_list_chats, and only a meeting chat gives it. The join_url of a calendar event should be the address that the handle wraps, as teams:///meetings/ plus the percent-encoded join address, but no description says so and nobody ran it.
+    user: The assistant may not be able to read the transcript of a meeting that has no meeting chat. Nobody tested it.
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: yesterday, ends_on: yesterday, subject_contains: Budget review}
+    - tool: teams_list_chats
+      optional: true
+      args: {chat_type: meeting, topic_contains: Budget review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: "uri of the meeting chat, or teams:///meetings/ plus the percent-encoded join_url of the event"}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}

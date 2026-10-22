@@ -2,6 +2,7 @@ uc-07-01:
   status: working
   provenance: observed
   evidence: outlook_respond_to_invite in 2 calls; outlook_list_events in 5 sessions alone
+  ask: "Accept the Launch review invitation."
   asks_user: true
   chain:
     - tool: outlook_list_events
@@ -13,6 +14,7 @@ uc-07-01:
 uc-07-02:
   status: untested
   provenance: drafted
+  ask: "Decline the Launch review on Friday and tell Anna that I am on leave."
   asks_user: true
   chain:
     - tool: outlook_list_events
@@ -23,6 +25,7 @@ uc-07-02:
 uc-07-03:
   status: untested
   provenance: drafted
+  ask: "Decline the Launch review and propose Monday at 10:00 instead."
   asks_user: false
   chain:
     - tool: outlook_respond_to_invite
@@ -30,10 +33,27 @@ uc-07-03:
       uses: {uri: uri of the event}
   note: the tool proposes a time only when the organizer allows it
 
+uc-07-18:
+  status: untested
+  provenance: drafted
+  ask: "Tell Anna that I cannot make the Launch review, but that Monday at 10:00 works for me."
+  asks_user: true
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_read_event
+      optional: true
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_respond_to_invite
+      args: {response: decline, proposed_new_time: {starts_at: Monday 10:00, ends_at: Monday 10:30, time_zone: Europe/Zurich}}
+      uses: {uri: uri of the event from the listing}
+  note: the tool sends a proposal only with decline or tentative. outlook_read_event shows allow_new_time_proposals, so the assistant can check the choice of the organizer first.
+
 uc-07-04:
   status: untested
   provenance: observed
   evidence: outlook_check_availability in 3 sessions; one session ran outlook_search_mail, outlook_read_mail, and outlook_check_availability in a row
+  ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
   asks_user: false
   chain:
     - tool: outlook_check_availability
@@ -46,6 +66,7 @@ uc-07-05:
   status: untested
   provenance: observed
   evidence: outlook_create_event in 4 sessions
+  ask: "Book the Launch review on Monday at 14:00 with Anna and Tom, with a Teams meeting."
   asks_user: true
   chain:
     - tool: outlook_check_availability
@@ -56,6 +77,7 @@ uc-07-05:
 uc-07-06:
   status: untested
   provenance: drafted
+  ask: "Book a Stand-up every Monday at 09:00 for 15 minutes for 8 weeks."
   asks_user: false
   chain:
     - tool: outlook_create_event
@@ -64,6 +86,7 @@ uc-07-06:
 uc-07-07:
   status: untested
   provenance: drafted
+  ask: "Book the Workshop on Monday at 14:00 for 6 people and find a room for it."
   asks_user: true
   chain:
     - tool: outlook_find_rooms
@@ -81,20 +104,37 @@ uc-07-07:
 uc-07-08:
   status: gap
   provenance: drafted
+  ask: "Save an invitation for the Board prep as a draft, so that I can finish it later."
+  blocker:
+    kind: graph
+    tool: outlook_create_event
+    text: A Microsoft 365 calendar event has no draft state, so an event with an attendee goes out in the same call.
+    user: The assistant cannot save a meeting invitation as a draft.
   asks_user: false
   chain: []
-  note: a calendar event has no draft state, and outlook_create_event invites in the same call. A workaround is outlook_create_event with no attendee, then outlook_update_event to add the attendees after Mia approves
+  note: a workaround is outlook_create_event with no attendee, then outlook_update_event to add the attendees after Mia approves
 
 uc-07-09:
-  status: gap
+  status: partly
   provenance: drafted
+  ask: "Put the Offsite on my Team calendar."
+  blocker:
+    kind: description
+    tool: outlook_create_event_on_behalf
+    text: outlook_create_event takes no calendar argument. The description of outlook_create_event_on_behalf says that it is only for a calendar that somebody else owns, so the assistant does not pick it for a second calendar of Mia.
+    user: The assistant may not put a meeting on a second calendar of Mia. Nobody tested it.
   asks_user: true
-  chain: []
-  note: outlook_create_event_on_behalf can write to a second calendar of Mia, because it checks only that the calendar is editable. Its description limits it to a calendar that another person owns, so the assistant may not choose it. Nobody ran it.
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_create_event_on_behalf
+      args: {subject: Offsite, attendees: none}
+      uses: {calendar_ref: handle of the calendar Team}
+  note: outlook_create_event_on_behalf checks only that the calendar is editable, so it can write to a second calendar of Mia. Nobody ran it.
 
 uc-07-10:
   status: untested
   provenance: drafted
+  ask: "Move next Thursday's Team sync to Friday."
   asks_user: true
   chain:
     - tool: outlook_list_events
@@ -107,6 +147,7 @@ uc-07-11:
   status: untested
   provenance: observed
   evidence: outlook_cancel_event in 1 call, which failed
+  ask: "Cancel the whole Team sync series."
   asks_user: true
   chain:
     - tool: outlook_list_events
@@ -118,6 +159,7 @@ uc-07-11:
 uc-07-12:
   status: untested
   provenance: drafted
+  ask: "Move the Launch review to Friday."
   asks_user: false
   chain:
     - tool: outlook_read_event
@@ -126,3 +168,65 @@ uc-07-12:
       args: {starts_at: Friday at the usual time, ends_at: Friday at the usual end, time_zone: Europe/Zurich}
       uses: {uri: uri of the event}
   note: the tool refuses an event that Mia does not organize, but the listing already shows owner_is_organizer false, so the assistant can stop before the call
+
+uc-07-13:
+  status: untested
+  provenance: drafted
+  ask: "Which invitations still wait for my answer?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: today, ends_on: in 4 weeks, owner_response: notResponded}
+
+uc-07-14:
+  status: untested
+  provenance: drafted
+  ask: "Cancel my Design review with Anna tomorrow and tell her that I am sick."
+  asks_user: true
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Design review, starts_on: tomorrow, ends_on: tomorrow}
+    - tool: outlook_cancel_event
+      args: {comment: I am sick}
+      uses: {uri: uri of the event from the listing}
+
+uc-07-15:
+  status: untested
+  provenance: drafted
+  ask: "Add Priya to the Launch review."
+  asks_user: true
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_read_event
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_update_event
+      args: {attendees: "Anna, Tom, and Priya"}
+      uses: {uri: uri of the event}
+  note: the new attendee list replaces the old list, so the assistant sends Anna and Tom again
+
+uc-07-16:
+  status: untested
+  provenance: drafted
+  ask: "Block next Friday as an out of office day."
+  asks_user: false
+  chain:
+    - tool: outlook_create_event
+      args: {subject: Out of office, starts_at: next Friday 00:00, ends_at: Saturday 00:00, time_zone: Europe/Zurich, all_day: true, show_as: oof}
+
+uc-07-17:
+  status: untested
+  provenance: drafted
+  ask: "Forward the Launch review to Priya and add the note: please join."
+  asks_user: true
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_forward_event
+      args: {to: priya@example.com, comment: Please join}
+      uses: {uri: uri of the event from the listing}
+  note: no tool can show that a forward went out

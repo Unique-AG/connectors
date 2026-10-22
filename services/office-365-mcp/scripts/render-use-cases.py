@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""render-use-cases.py — render the reader's page of use cases from the Gherkin features.
+"""render-use-cases.py — render the guide and the status page from the features and sidecars.
 
 Usage:
   scripts/render-use-cases.py [--check]
 
-  --check  Verify that docs/use-cases.md matches what would be generated. Exits 1 on drift
-           (suitable for CI).
+  --check  Verify that docs/use-cases.md and features/STATUS.md match what would be generated.
+           Exits 1 on drift (suitable for CI).
 
-The script owns the text between the two markers in docs/use-cases.md. A person owns the rest of
-the page. The features in features/ are the only source of the examples.
+The script owns the text between the two markers in docs/use-cases.md, and all of
+features/STATUS.md. A person owns the rest of the guide. The features and the sidecars in
+features/ are the only source of the examples, the prompts, the limits, and the status.
 
 Requirements:
   - the service's own virtualenv, because this imports `gherkin` (`uv run python …`)
@@ -21,51 +22,52 @@ import pathlib
 import re
 import sys
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import cast
 
 import yaml
 from gherkin.parser import Parser
+
+from office_365_mcp.tools import TOOL_NAMES
 
 _INVOCATION = "scripts/render-use-cases.py"
 _ROOT = pathlib.Path(__file__).resolve().parents[1]
 _FEATURES = _ROOT / "features"
 
 TARGET = _ROOT / "docs" / "use-cases.md"
+STATUS = _FEATURES / "STATUS.md"
 
 _BEGIN = "<!-- use-cases:begin -->"
 _END = "<!-- use-cases:end -->"
 
-_AREAS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (
-        "Mail",
-        (
-            "02-find-and-read-mail",
-            "04-draft-and-send-mail",
-            "05-organize-the-mailbox",
-            "11-mailbox-preferences",
-        ),
-    ),
-    ("Files in OneDrive and SharePoint", ("01-find-and-read-files", "10-organize-and-share-files")),
-    (
-        "Microsoft Teams",
-        (
-            "06-catch-up-on-teams",
-            "09-post-in-teams",
-            "13-run-teams-chats-and-online-meetings",
-        ),
-    ),
-    (
-        "Calendar",
-        (
-            "03-read-the-calendar",
-            "07-schedule-and-answer-meetings",
-            "14-share-and-delegate-calendars",
-        ),
-    ),
-    ("Notes in OneNote", ("08-work-with-notes",)),
-    ("Contacts", ("12-manage-contacts",)),
-    ("Across mail, calendar, and files", ("15-work-across-mail-calendar-and-files",)),
-)
+_SURFACES = ("Outlook", "Teams", "SharePoint", "OneNote", "Across sources")
+_AREA_TAGS = {
+    "@outlook-mail": ("Outlook", 0),
+    "@outlook-calendar": ("Outlook", 1),
+    "@outlook-contacts": ("Outlook", 2),
+    "@teams": ("Teams", 0),
+    "@sharepoint": ("SharePoint", 0),
+    "@onenote": ("OneNote", 0),
+}
+_STATUSES = ("working", "partly", "gap", "untested")
+_KINDS = ("tool", "parameter", "description", "preset", "graph", "unknown")
+_FIXABLE = _KINDS[:4]
+_KIND_TITLES = {
+    "tool": "A tool is missing",
+    "parameter": "A parameter is missing",
+    "description": "A description steers the assistant away",
+    "preset": "The tools sit in different presets",
+    "graph": "Microsoft Graph cannot do it",
+    "unknown": "It fails in prod and the cause is not known",
+}
+
+
+@dataclass(frozen=True)
+class _Feature:
+    stem: str
+    node: Mapping[str, object]
+    surface: str
+    area: int
 
 
 def _object(value: object) -> Mapping[str, object]:
@@ -82,76 +84,101 @@ def _paragraph(description: object) -> str:
     return " ".join(line.strip() for line in str(description).splitlines() if line.strip())
 
 
-def _step_text(step: Mapping[str, object]) -> str:
-    return re.sub(r"<(\w+)>", r"`<\1>`", str(step["text"]))
+def _sentence(text: str) -> str:
+    text = re.sub(r"<(\w+)>", r"`<\1>`", text).strip().rstrip(".")
+    return f"{text[:1].upper()}{text[1:]}."
 
 
 @functools.cache
-def _statuses() -> dict[str, str]:
+def _entries() -> dict[str, Mapping[str, object]]:
     return {
-        scenario_id: str(_object(entry)["status"])
-        for sidecar in _FEATURES.glob("*.calls.yaml")
-        for scenario_id, entry in _object(yaml.safe_load(sidecar.read_text())).items()
+        scenario_id: _object(entry)
+        for sidecar in sorted(_FEATURES.glob("*.calls.yaml"))
+        for scenario_id, entry in _object(
+            cast("object", yaml.safe_load(sidecar.read_text()))
+        ).items()
     }
 
 
-def _is_gap(scenario: Mapping[str, object]) -> bool:
-    scenario_id = next(
+@functools.cache
+def _features() -> tuple[_Feature, ...]:
+    found: list[_Feature] = []
+    for path in _FEATURES.glob("*.feature"):
+        feature = _object(_object(Parser().parse(path.read_text()))["feature"])
+        names = {str(_object(tag)["name"]) for tag in _list(feature["tags"])}
+        areas = {_AREA_TAGS[name] for name in names if name in _AREA_TAGS}
+        assert areas, f"{path.name} needs an area tag from {sorted(_AREA_TAGS)}"
+        across = len({surface for surface, _ in areas}) > 1
+        surface, area = ("Across sources", 0) if across else min(areas)
+        found.append(_Feature(path.stem, feature, surface, area))
+    return tuple(sorted(found, key=lambda f: (_SURFACES.index(f.surface), f.area, f.stem)))
+
+
+def _scenario_id(scenario: Mapping[str, object]) -> str:
+    return next(
         str(_object(tag)["name"])[1:]
         for tag in _list(scenario["tags"])
         if str(_object(tag)["name"]).startswith("@uc-")
     )
-    return _statuses()[scenario_id] == "gap"
 
 
-def _scenario(scenario: Mapping[str, object]) -> list[str]:
-    lines = [f"**{scenario['name']}**", ""]
-    lines += [
-        f"- **{str(_object(step)['keyword']).strip()}** {_step_text(_object(step))}"
-        for step in _list(scenario["steps"])
-    ]
+def _blocker(entry: Mapping[str, object]) -> Mapping[str, object]:
+    return _object(entry["blocker"])
+
+
+def _outline_rows(scenario: Mapping[str, object]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
     for examples in map(_object, _list(scenario["examples"])):
         header = [
             str(_object(cell)["value"]) for cell in _list(_object(examples["tableHeader"])["cells"])
         ]
-        lines += [
-            "",
-            "| " + " | ".join(header) + " |",
-            "| " + " | ".join("---" for _ in header) + " |",
-        ]
         for row in map(_object, _list(examples["tableBody"])):
             cells = [str(_object(cell)["value"]) for cell in _list(row["cells"])]
-            lines.append("| " + " | ".join(cells) + " |")
+            rows.append(dict(zip(header, cells, strict=True)))
+    return rows
+
+
+def _filled(text: str, row: Mapping[str, str]) -> str:
+    return re.sub(r"<(\w+)>", lambda match: row[match.group(1)], text)
+
+
+def _scenario(scenario: Mapping[str, object], entry: Mapping[str, object]) -> list[str]:
+    context: list[str] = []
+    outcome: list[str] = []
+    bucket: list[str] = []
+    for step in map(_object, _list(scenario["steps"])):
+        kind = str(step["keywordType"])
+        if kind != "Conjunction":
+            bucket = context if kind == "Context" else outcome if kind == "Outcome" else []
+        bucket.append(str(step["text"]))
+    lines = [f"**{scenario['name']}**", "", f'Ask your assistant: "{entry["ask"]}"', ""]
+    if entry["status"] == "partly":
+        lines += ['!!! warning "Limit"', f"    {_blocker(entry)['user']}", ""]
+    if rows := _outline_rows(scenario):
+        lines += ["Cases:", ""]
+        lines += [
+            "- " + " ".join(_sentence(_filled(text, row)) for text in [*context, *outcome])
+            for row in rows
+        ]
+        return [*lines, ""]
+    if context:
+        lines += [f"Situation: {' '.join(_sentence(text) for text in context)}", ""]
+    lines += ["What happens:", ""] + [f"- {_sentence(text)}" for text in outcome]
+    if entry["asks_user"] and not any("approve" in text for text in outcome):
+        lines += ["- The assistant asks Mia to approve first."]
     return [*lines, ""]
 
 
-def _rule(rule: Mapping[str, object], gaps: list[str]) -> list[str]:
-    scenarios: list[Mapping[str, object]] = []
-    for child in map(_object, _list(rule["children"])):
-        if "scenario" not in child:
-            continue
-        scenario = _object(child["scenario"])
-        if _is_gap(scenario):
-            gaps.append(str(scenario["name"]))
-        else:
-            scenarios.append(scenario)
-    if not scenarios:
-        return []
-    lines = [f"#### {rule['name']}", ""]
-    if description := _paragraph(rule["description"]):
-        lines += [description, ""]
-    for scenario in scenarios:
-        lines += _scenario(scenario)
-    return lines
+def _slug(heading: str) -> str:
+    return re.sub(r"[^a-z0-9 -]", "", heading.lower()).replace(" ", "-")
 
 
-def _feature(stem: str) -> list[str]:
-    document = _object(Parser().parse((_FEATURES / f"{stem}.feature").read_text()))
-    feature = _object(document["feature"])
-    lines = [f"### {feature['name']}", ""]
-    if description := _paragraph(feature["description"]):
+def _feature(feature: _Feature) -> list[str]:
+    node = feature.node
+    lines = [f"### {node['name']}", ""]
+    if description := _paragraph(node["description"]):
         lines += [description, ""]
-    children = [_object(child) for child in _list(feature["children"])]
+    children = [_object(child) for child in _list(node["children"])]
     for child in children:
         if "background" in child:
             steps = [
@@ -159,27 +186,50 @@ def _feature(stem: str) -> list[str]:
             ]
             lines += [f"**Starting point.** {'; '.join(steps)}.", ""]
     gaps: list[str] = []
-    for child in children:
-        if "rule" in child:
-            lines += _rule(_object(child["rule"]), gaps)
+    for rule in (_object(child["rule"]) for child in children if "rule" in child):
+        titles: list[str] = []
+        shown: list[str] = []
+        for scenario in (
+            _object(c["scenario"]) for c in map(_object, _list(rule["children"])) if "scenario" in c
+        ):
+            entry = _entries()[_scenario_id(scenario)]
+            if entry["status"] == "gap":
+                gaps.append(f"- {_blocker(entry)['user']}")
+            else:
+                titles.append(str(scenario["name"]))
+                shown += _scenario(scenario, entry)
+        if shown:
+            if titles != [str(rule["name"])]:
+                lines += [f"#### {rule['name']}", ""]
+            if description := _paragraph(rule["description"]):
+                lines += [description, ""]
+            lines += shown
     if gaps:
-        lines += ["#### Not supported yet", ""] + [f"- {name}" for name in gaps] + [""]
+        lines += [f"#### Not supported yet in {str(node['name']).lower()}", "", *gaps, ""]
     return lines
 
 
+def _contents() -> list[str]:
+    lines = ["**On this page**", ""]
+    for surface in _SURFACES:
+        links = [
+            f"[{feature.node['name']}](#{_slug(str(feature.node['name']))})"
+            for feature in _features()
+            if feature.surface == surface
+        ]
+        if links:
+            lines.append(f"- {surface}: {', '.join(links)}")
+    return [*lines, ""]
+
+
 def _generated() -> str:
-    covered = [stem for _, stems in _AREAS for stem in stems]
-    on_disk = sorted(path.stem for path in _FEATURES.glob("*.feature"))
-    assert sorted(covered) == on_disk, (
-        f"every feature file belongs to exactly one area in {_INVOCATION}: "
-        f"missing {sorted(set(on_disk) - set(covered))}, "
-        f"unknown {sorted(set(covered) - set(on_disk))}"
-    )
-    lines: list[str] = []
-    for area, stems in _AREAS:
-        lines += [f"## {area}", ""]
-        for stem in stems:
-            lines += _feature(stem)
+    lines = _contents()
+    for surface in _SURFACES:
+        members = [feature for feature in _features() if feature.surface == surface]
+        if members:
+            lines += [f"## {surface}", ""]
+        for feature in members:
+            lines += _feature(feature)
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
@@ -193,6 +243,99 @@ def render() -> str:
     return f"{head}{_BEGIN}\n\n{_generated()}\n{_END}{tail}"
 
 
+def _names() -> dict[str, tuple[str, str, str]]:
+    names: dict[str, tuple[str, str, str]] = {}
+    for feature in _features():
+        for rule in (
+            _object(c["rule"]) for c in map(_object, _list(feature.node["children"])) if "rule" in c
+        ):
+            for scenario in (
+                _object(c["scenario"])
+                for c in map(_object, _list(rule["children"]))
+                if "scenario" in c
+            ):
+                names[_scenario_id(scenario)] = (
+                    feature.surface,
+                    str(feature.node["name"]),
+                    str(scenario["name"]),
+                )
+    return names
+
+
+def _blocker_table(kind: str, names: Mapping[str, tuple[str, str, str]]) -> list[str]:
+    rows: list[str] = []
+    for scenario_id, entry in _entries().items():
+        if entry["status"] in ("partly", "gap") and _blocker(entry)["kind"] == kind:
+            blocker = _blocker(entry)
+            tool = f"`{blocker['tool']}`" if "tool" in blocker else ""
+            _, feature, scenario = names[scenario_id]
+            rows.append(
+                f"| `{scenario_id}` | {feature} | {scenario} | {entry['status']} | "
+                + f"{tool} | {blocker['text']} |"
+            )
+    if not rows:
+        return []
+    head = [
+        "| Id | Feature | Scenario | Status | Tool | Cause |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    return [f"### {_KIND_TITLES[kind]} ({len(rows)})", "", *head, *rows, ""]
+
+
+def render_status() -> str:
+    names = _names()
+    counts: dict[str, dict[str, int]] = {
+        surface: {status: 0 for status in _STATUSES} for surface in _SURFACES
+    }
+    for scenario_id, entry in _entries().items():
+        counts[names[scenario_id][0]][str(entry["status"])] += 1
+    table = [
+        "| Surface | " + " | ".join(_STATUSES) + " | total |",
+        "| --- |" + " --- |" * (len(_STATUSES) + 1),
+    ]
+    for surface in _SURFACES:
+        row = counts[surface]
+        if sum(row.values()):
+            cells = " | ".join(str(row[status]) for status in _STATUSES)
+            table.append(f"| {surface} | {cells} | {sum(row.values())} |")
+    used = {
+        str(name)
+        for entry in _entries().values()
+        for step in map(_object, _list(entry["chain"]))
+        for name in ([step["tool"]] if "tool" in step else _list(step["any_of"]))
+    }
+    lines = [
+        "# office-365-mcp use case status",
+        "",
+        f"This page is generated by `{_INVOCATION}`. Do not edit it.",
+        "",
+        "A scenario is `working` when a person ran it by hand, `partly` when a limit blocks a part "
+        + "of it, `gap` when nothing meets it today, and `untested` when nobody ran it.",
+        "",
+        "## Status by surface",
+        "",
+        *table,
+        "",
+        "## Work for UN-27222",
+        "",
+        "These causes are in the connector: a tool, a parameter, a description, or a preset.",
+        "",
+        *[line for kind in _FIXABLE for line in _blocker_table(kind, names)],
+        f"## {_KIND_TITLES['graph']}",
+        "",
+        *_blocker_table("graph", names)[2:],
+        f"## {_KIND_TITLES['unknown']}",
+        "",
+        *_blocker_table("unknown", names)[2:],
+        "## Tools in no chain",
+        "",
+        "No scenario calls these tools.",
+        "",
+        *[f"- `{name}`" for name in sorted(set(TOOL_NAMES) - used)],
+    ]
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -202,25 +345,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    expected = render()
+    expected = {TARGET: render(), STATUS: render_status()}
     if not cast("bool", args.check):
-        TARGET.write_text(expected)
-        print(f"wrote {TARGET.relative_to(_ROOT)}")
+        for target, text in expected.items():
+            target.write_text(text)
+            print(f"wrote {target.relative_to(_ROOT)}")
         return 0
 
-    committed = TARGET.read_text()
-    if committed == expected:
-        return 0
-    sys.stderr.writelines(
-        difflib.unified_diff(
-            committed.splitlines(keepends=True),
-            expected.splitlines(keepends=True),
-            fromfile=str(TARGET.relative_to(_ROOT)),
-            tofile="generated",
+    stale = [target for target, text in expected.items() if target.read_text() != text]
+    for target in stale:
+        sys.stderr.writelines(
+            difflib.unified_diff(
+                target.read_text().splitlines(keepends=True),
+                expected[target].splitlines(keepends=True),
+                fromfile=str(target.relative_to(_ROOT)),
+                tofile="generated",
+            )
         )
-    )
-    sys.stderr.write(f"\n{TARGET.name} is stale. Run {_INVOCATION} and commit the result.\n")
-    return 1
+        sys.stderr.write(f"\n{target.name} is stale. Run {_INVOCATION} and commit the result.\n")
+    return 1 if stale else 0
 
 
 if __name__ == "__main__":

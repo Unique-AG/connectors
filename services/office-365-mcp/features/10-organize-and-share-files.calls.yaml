@@ -1,5 +1,6 @@
 uc-10-01:
   status: untested
+  ask: "Move the 4 signed contracts from Contracts into a new folder called 2026 Signed."
   provenance: drafted
   asks_user: true
   chain:
@@ -13,23 +14,33 @@ uc-10-01:
   note: the folder and each of the 4 moves ask for approval, so 5 approvals are expected
 
 uc-10-02:
-  status: untested
+  status: partly
+  ask: "Copy my Template folder into the Sales site."
+  blocker:
+    kind: tool
+    tool: sharepoint_list_drives
+    text: No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns.
+    user: The assistant can copy into the Sales site only when it can find a folder there.
   provenance: drafted
   asks_user: true
   chain:
+    - tool: sharepoint_search_files
+      args: {query: Template}
     - tool: sharepoint_search_sites
       args: {query: Sales}
     - tool: sharepoint_search_files
+      args: {query: Documents}
       uses: {path: web address of the Sales site from sharepoint_search_sites}
     - tool: sharepoint_copy_item
-      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site from the search}
+      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site from the second search}
     - tool: sharepoint_browse_folder
       optional: true
       uses: {folder: handle of the destination folder}
-  note: No tool lists the top folder of a site library. The destination is a folder that the search returns. A site with no indexed folder gives no destination. Microsoft runs the copy after the call returns, so a listing shows the copy only after some time.
+  note: the second query is a guess at a folder name of the site, and Microsoft runs the copy after the call returns, so a listing shows the copy only after some time
 
 uc-10-03:
   status: untested
+  ask: "Delete the file Old draft.docx."
   provenance: drafted
   asks_user: true
   chain:
@@ -39,6 +50,7 @@ uc-10-03:
 
 uc-10-04:
   status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
   chain:
@@ -49,13 +61,19 @@ uc-10-04:
 
 uc-10-05:
   status: gap
+  ask: "Replace the content of Plan.docx with this new text."
+  blocker:
+    kind: tool
+    tool: sharepoint_create_text_file
+    text: The tool creates new text files only and cannot replace a file or write a Word file.
+    user: The assistant cannot replace the content of an existing file.
   provenance: drafted
   asks_user: false
   chain: []
-  note: sharepoint_create_text_file creates new files only and cannot replace a file
 
 uc-10-06:
   status: untested
+  ask: "Give Anna edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
   chain:
@@ -69,6 +87,7 @@ uc-10-06:
 
 uc-10-07:
   status: untested
+  ask: "Give me a view-only sharing link to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
   chain:
@@ -80,7 +99,36 @@ uc-10-07:
 
 uc-10-08:
   status: gap
+  ask: "Stop sharing Q3 Plan.pptx with Anna."
+  blocker:
+    kind: tool
+    tool: sharepoint_invite
+    text: No tool removes a permission, and the description of sharepoint_invite says so.
+    user: The assistant cannot take back access to a file.
   provenance: drafted
   asks_user: false
   chain: []
-  note: no tool removes a permission
+
+uc-10-09:
+  status: untested
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_rename_item
+      args: {name: Plan v2.docx}
+      uses: {item: handle of the file Plan v1.docx}
+  note: the new name carries the extension, and the tool asks for approval every time
+
+uc-10-10:
+  status: gap
+  ask: "Save the file attached to Anna's mail in my Tenders folder."
+  blocker:
+    kind: tool
+    tool: sharepoint_create_text_file
+    text: No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file.
+    user: The assistant cannot save an attached file in a folder.
+  provenance: drafted
+  asks_user: false
+  chain: []

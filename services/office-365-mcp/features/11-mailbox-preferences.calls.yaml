@@ -1,5 +1,11 @@
 uc-11-01:
-  status: untested
+  status: partly
+  ask: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
+  blocker:
+    kind: description
+    tool: outlook_set_automatic_reply
+    text: The description does not say that an unset `external_audience` keeps the stored value, or none when nothing is stored. It does not say what an `end` date without a time of day means.
+    user: The assistant can leave outside senders without a reply. It can also stop the reply a day early or use the wrong time zone.
   provenance: drafted
   asks_user: true
   chain:
@@ -12,6 +18,7 @@ uc-11-01:
 
 uc-11-02:
   status: untested
+  ask: "Turn on my out-of-office reply until I say otherwise."
   provenance: drafted
   asks_user: false
   chain:
@@ -20,6 +27,7 @@ uc-11-02:
 
 uc-11-03:
   status: untested
+  ask: "Turn off my out-of-office reply."
   provenance: drafted
   asks_user: false
   chain:
@@ -28,6 +36,7 @@ uc-11-03:
 
 uc-11-04:
   status: untested
+  ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
   chain:
@@ -35,3 +44,33 @@ uc-11-04:
       optional: true
     - tool: outlook_set_focused_override
       args: {sender: ada@acme.example, classify_as: focused}
+
+uc-11-07:
+  status: untested
+  ask: "Is my out-of-office reply on?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+  note: the tool reads status, the scheduled end, and the messages
+
+uc-11-05:
+  status: untested
+  ask: "Turn on my out-of-office reply from Monday to Friday."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: scheduled, start: Monday 00:00, end: Saturday 00:00}
+  note: the tool writes nothing before Mia agrees
+
+uc-11-06:
+  status: untested
+  ask: "Turn on my out-of-office reply from Monday to Friday."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: scheduled, start: Monday 00:00, end: Saturday 00:00}
+  note: when Mia declines, the tool raises that the automatic reply was not changed

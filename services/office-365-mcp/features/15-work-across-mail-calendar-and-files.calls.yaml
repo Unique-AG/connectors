@@ -1,5 +1,6 @@
 uc-15-01:
   status: untested
+  ask: "Give me a brief of my day, and put Anna's mail first."
   provenance: observed
   evidence: outlook_list_events then outlook_list_mail 17 times; the 2 longest sessions repeat the loop list_mail, search_mail, read_event, list_events
   asks_user: false
@@ -15,6 +16,7 @@ uc-15-01:
 
 uc-15-02:
   status: untested
+  ask: "Go through my inbox."
   provenance: observed
   evidence: a session of 20 calls on 2026-09-30 ran outlook_list_mail, outlook_move_mail, outlook_read_event, outlook_respond_to_invite, outlook_mark_mail
   asks_user: false
@@ -22,10 +24,11 @@ uc-15-02:
     - tool: outlook_list_mail
       args: {unread_only: true}
   must_not: [outlook_respond_to_invite]
-  note: the observed session did answer 2 invitations. The server logs do not show whether Mia was asked first. outlook_respond_to_invite asks Mia, unless send_response is false. Filing the newsletters is the case of uc-05-01, and answering an invitation is the case of uc-07-01.
+  note: the observed session did answer 2 invitations, and the logs do not show whether Mia was asked first, but outlook_respond_to_invite asks Mia unless send_response is false. Filing the newsletters is the case of uc-05-01, and answering an invitation is the case of uc-07-01.
 
 uc-15-03:
   status: untested
+  ask: "Answer Anna's mail with the latest price list."
   provenance: observed
   evidence: a session of 22 calls on 2026-10-09 ran outlook_search_mail, sharepoint_read_file, outlook_read_thread, outlook_draft_reply, outlook_move_mail
   asks_user: false
@@ -44,6 +47,7 @@ uc-15-03:
 
 uc-15-04:
   status: untested
+  ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
   provenance: drafted
   evidence: a session of 19 calls on 2026-10-13 ran outlook_search_mail 10 times, outlook_read_mail 8 times, and outlook_check_availability
   asks_user: false
@@ -66,4 +70,142 @@ uc-15-04:
     - tool: outlook_check_availability
       optional: true
       uses: {addresses: "addresses of Mia, Anna, and Tom from outlook_find_recipient"}
-  note: an address never comes from the text of a message. outlook_suggest_meeting_times includes Mia. outlook_check_availability gives free and busy status, and the assistant compares it with the working hours.
+  note: an address never comes from the text of a message, and outlook_suggest_meeting_times includes Mia. outlook_check_availability gives free and busy status, and the assistant compares it with the working hours.
+
+uc-15-05:
+  status: untested
+  ask: "Get me ready for tomorrow's Launch review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, subject_contains: Launch review}
+    - tool: outlook_read_event
+      uses: {uri: uri of the event}
+    - tool: outlook_search_mail
+      args: {subject: Launch review}
+    - tool: outlook_read_thread
+      optional: true
+      uses: {uri: uri of a message of the thread}
+    - tool: sharepoint_search_files
+      uses: {query: name of the deck that the mail names}
+    - tool: sharepoint_read_file
+      optional: true
+      args: {convert_to: pdf}
+      uses: {file: handle of the deck}
+
+uc-15-06:
+  status: untested
+  ask: "Draft a mail to Anna and Tom that states what we decided in the Launch chat."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_draft_mail
+      uses: {to: addresses of Anna and Tom from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+  note: an address never comes from the text of a message.
+
+uc-15-07:
+  status: untested
+  ask: "Tell me everything we have about Acme in mail, Teams, and files."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: Acme}
+    - tool: teams_search_messages
+      args: {query: Acme}
+    - tool: sharepoint_search_files
+      args: {query: Acme}
+    - tool: outlook_read_thread
+      optional: true
+      uses: {uri: uri of a message of the thread}
+    - tool: teams_read_message
+      optional: true
+      uses: {uri: uri of a hit}
+
+uc-15-09:
+  status: untested
+  ask: "Draft a mail to the attendees of yesterday's Design review with the action items."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+    - tool: teams_list_chat_members
+      optional: true
+      uses: {chat_id: id of the meeting chat}
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_draft_mail
+      uses: {to: addresses of the attendees from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+  note: an address never comes from the text of a transcript.
+
+uc-15-10:
+  status: partly
+  ask: "Send the latest price list to Anna by mail."
+  blocker:
+    kind: tool
+    tool: outlook_draft_mail
+    text: The draft tools write text only and cannot add a file, so the assistant puts a sharing link in the draft and not the file.
+    user: The assistant cannot attach the file to the mail. It puts a link to the file in the draft.
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      uses: {item: handle of the price list}
+    - tool: outlook_find_recipient
+    - tool: outlook_draft_mail
+      uses: {to: address of Anna from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+
+uc-15-11:
+  status: untested
+  ask: "Save the text of Anna's mail Offer terms in my Offers folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Offer terms}
+    - tool: outlook_read_mail
+      uses: {uri: uri of the mail}
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Offer terms.txt}
+      uses: {folder: handle of the folder Offers, content: text of the mail}
+  note: a file attached to the mail is not copied, which is the gap of uc-10-10.
+
+uc-15-12:
+  status: partly
+  ask: "What is in the file that Anna posted in our chat yesterday?"
+  blocker:
+    kind: unknown
+    tool: sharepoint_resolve_url
+    text: The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known.
+    user: The assistant may not be able to open a file that someone posted in Teams.
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {sender: Anna, has_attachment: true, sent_after: yesterday}
+    - tool: teams_read_message
+      uses: {uri: uri of the hit}
+    - any_of: [sharepoint_resolve_url, sharepoint_search_files]
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle of the file from the lookup or the search}
+  note: sharepoint_resolve_url takes the web address of the attachment. If it fails, sharepoint_search_files finds the file by its name, because the file is shared with Mia.

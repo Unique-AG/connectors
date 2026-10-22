@@ -1,5 +1,6 @@
 uc-01-01:
   status: untested
+  ask: "Find the Brightway agreement as a Word document."
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
   asks_user: false
@@ -9,6 +10,7 @@ uc-01-01:
 
 uc-01-02:
   status: untested
+  ask: "Show me the quarterly plan that was edited last, and who edited it."
   provenance: drafted
   asks_user: false
   chain:
@@ -17,6 +19,7 @@ uc-01-02:
 
 uc-01-03:
   status: untested
+  ask: "Find the NDA template on the Legal site only."
   provenance: drafted
   asks_user: false
   chain:
@@ -28,6 +31,7 @@ uc-01-03:
 
 uc-01-04:
   status: untested
+  ask: "Find the Zephyr budget."
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
   asks_user: false
@@ -37,6 +41,7 @@ uc-01-04:
 
 uc-01-05:
   status: untested
+  ask: "What is in the folder 2026 Contracts, newest first?"
   provenance: drafted
   evidence: sharepoint_browse_folder alone in 8 sessions
   asks_user: false
@@ -49,6 +54,7 @@ uc-01-05:
 
 uc-01-06:
   status: untested
+  ask: "What is the launch date in the Brightway launch plan?"
   provenance: observed
   evidence: sharepoint_search_files then sharepoint_read_file in 9 sessions; sharepoint_read_file alone in 27 sessions
   asks_user: false
@@ -58,10 +64,11 @@ uc-01-06:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search or the folder}
-  note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows and leaves it out for the PDF and text rows
+  note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows
 
 uc-01-07:
   status: untested
+  ask: "Summarize the Q3 plan that Anna sent me a sharing link to."
   provenance: drafted
   asks_user: false
   chain:
@@ -72,6 +79,7 @@ uc-01-07:
 
 uc-01-08:
   status: untested
+  ask: "Which of the 6 offers in the Tenders folder has the lowest price?"
   provenance: observed
   evidence: 18 runs of 5 to 14 consecutive sharepoint_read_file calls, between searches and folder listings
   asks_user: false
@@ -83,6 +91,7 @@ uc-01-08:
 
 uc-01-10:
   status: untested
+  ask: "Summarize the Brightway annual report PDF."
   provenance: drafted
   asks_user: false
   chain:
@@ -91,6 +100,12 @@ uc-01-10:
 
 uc-01-11:
   status: partly
+  ask: "Summarize the Brightway Master Agreement."
+  blocker:
+    kind: unknown
+    tool: sharepoint_read_file
+    text: When Microsoft answers 406 to `convert_to` pdf, the tool returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known.
+    user: The assistant may not be able to read some files that Microsoft cannot convert.
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
   asks_user: false
@@ -99,4 +114,65 @@ uc-01-11:
       args: {convert_to: pdf}
     - tool: sharepoint_read_file
       optional: true
-  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call reads the file in its own format
+  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format; no run shows that the assistant reads it
+
+uc-01-16:
+  status: untested
+  ask: "Which Brightway files on the Sales site changed this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: Sales}
+    - tool: sharepoint_search_files
+      args: {query: Brightway, modified_after: start of this week, sort_by: last_modified}
+      uses: {path: web address of the Sales site from sharepoint_search_sites}
+  note: the tool needs a word in query, so the topic Brightway stays in the ask
+
+uc-01-12:
+  status: untested
+  ask: "What is the launch date in the Brightway launch notes?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      optional: true
+    - tool: sharepoint_read_file
+      uses: {file: handle of the file from the search or the folder}
+  note: a PDF and a text file are not on the convert list of the tool, so the call leaves convert_to out
+
+uc-01-13:
+  status: untested
+  ask: "What is in my OneDrive?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_browse_folder
+
+uc-01-14:
+  status: untested
+  ask: "Summarize the Q3 plan at this web address from my browser."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_resolve_url
+    - tool: sharepoint_search_files
+      optional: true
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle from sharepoint_resolve_url or from the search}
+  note: Microsoft documents the lookup for sharing links, so an address from a browser can fail and then the assistant searches by the file name
+
+uc-01-15:
+  status: untested
+  ask: "What files are in the Launch channel of the Platform team?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team Platform}
+    - tool: teams_get_channel_files_folder
+      uses: {team_id: id of the team Platform, channel_id: id of the channel Launch}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the channel folder from teams_get_channel_files_folder}

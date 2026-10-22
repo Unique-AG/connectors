@@ -1,5 +1,6 @@
 uc-09-01:
   status: untested
+  ask: "Tell the chat with Anna and Tom that the build is green, and mention Anna."
   provenance: drafted
   asks_user: true
   chain:
@@ -12,6 +13,7 @@ uc-09-01:
 
 uc-09-02:
   status: untested
+  ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
   chain:
@@ -21,6 +23,7 @@ uc-09-02:
 
 uc-09-03:
   status: untested
+  ask: "Tell the chat with Anna and Tom to review the plan, and mention Priya."
   provenance: drafted
   asks_user: false
   chain:
@@ -30,10 +33,11 @@ uc-09-03:
       optional: true
       args: {mentions: Priya}
       uses: {chat_id: id of the chat}
-  note: the member list shows that Priya is absent, so the assistant needs no send call. If it sends, the tool refuses a mention of a person who is not a member, before it asks. The id of Priya comes from another chat, because no tool turns a name into an id.
+  note: the member list shows that Priya is absent, so the assistant needs no send call. If it sends, the tool refuses the mention before it asks, and the id of Priya comes from another chat.
 
 uc-09-04:
   status: untested
+  ask: "Reply to the post 'v2 is out?' in Releases with 'Yes, since noon'."
   provenance: drafted
   asks_user: true
   chain:
@@ -48,6 +52,7 @@ uc-09-04:
 
 uc-09-05:
   status: untested
+  ask: "Post Q3 Plan.pptx in the Sales channel."
   provenance: drafted
   asks_user: true
   chain:
@@ -61,6 +66,7 @@ uc-09-05:
 
 uc-09-06:
   status: untested
+  ask: "Correct my message 'Launch on 14 Jun' to 'Launch on 14 June'."
   provenance: drafted
   asks_user: true
   chain:
@@ -72,6 +78,7 @@ uc-09-06:
 
 uc-09-07:
   status: untested
+  ask: "Correct the message 'Launch on 14 Jun' that Tom wrote."
   provenance: drafted
   asks_user: false
   chain:
@@ -80,3 +87,72 @@ uc-09-07:
     - tool: teams_edit_message
       uses: {uri: uri of the message}
   note: the tool refuses a message of another person, before it asks
+
+uc-09-08:
+  status: untested
+  ask: "Post 'v2 ships on Friday' in the Releases channel."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: teams_send_channel_message
+      args: {message: v2 ships on Friday}
+      uses: {team_id: id of the team, channel_id: id of the channel}
+  note: without reply_to_id the tool makes a new top-level post.
+
+uc-09-09:
+  status: untested
+  ask: "Send Q3 Plan.pptx to Anna in our chat."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: sharepoint_search_files
+      args: {query: Q3 Plan}
+    - tool: teams_send_chat_message_with_files
+      uses: {chat_id: id of the chat, attachments: uri of the file from the search}
+
+uc-09-10:
+  status: untested
+  ask: "Post Notes.docx in the Sales channel."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: sharepoint_search_files
+      args: {query: Notes}
+    - tool: teams_send_channel_message_with_files
+      uses: {team_id: id of the team, channel_id: id of the channel, attachments: uri of the file from the search}
+  note: the tool refuses a file in a personal OneDrive, before it asks.
+
+uc-09-11:
+  status: untested
+  ask: "Delete my message 'Launch on 14 Jun' from the chat."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+    - tool: teams_delete_message
+      uses: {uri: uri of the message}
+  note: the delete is soft, and this connector offers no undo.
+
+uc-09-12:
+  status: untested
+  ask: "Give Anna's message about the release notes a thumbs-up."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+    - tool: teams_react_to_message
+      args: {reaction: thumbs-up emoji}
+      uses: {uri: uri of the message}

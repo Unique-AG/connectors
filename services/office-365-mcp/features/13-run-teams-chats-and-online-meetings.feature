@@ -48,6 +48,16 @@ Feature: Running Teams chats and online meetings
       Then the assistant tells Mia that a one-to-one chat takes no new member
       And it offers a new group chat with Mia, Anna, and Tom
 
+  Rule: Mia renames a group chat when its project changes
+
+    @uc-13-09
+    Scenario: A group chat gets a new title
+      Given Mia has the group chat "Launch" with Anna and Tom
+      When Mia asks her assistant to rename "Launch" to "Launch 2.0"
+      Then Mia is asked to approve the new title first
+      And after she approves, the chat is titled "Launch 2.0"
+      And Anna and Tom are still members
+
   Rule: An online meeting belongs to its organizer
 
     @uc-13-05
@@ -62,3 +72,28 @@ Feature: Running Teams chats and online meetings
       Given Anna organized "Design review" and Mia attended it
       When Mia asks her assistant who attended "Design review"
       Then the assistant tells Mia that only Anna can see the attendance
+
+    @uc-13-10
+    Scenario: The time of an online meeting changes and its attendees stay
+      Given Mia organizes the online meeting "Design review" tomorrow at 14:00 with Anna and Tom
+      When Mia asks her assistant to move the online meeting "Design review" to 15:00 for 30 minutes
+      Then Mia is asked to approve the change first
+      And after she approves, "Design review" starts tomorrow at 15:00
+      And Anna and Tom are still attendees
+      But no calendar entry changes
+
+    @uc-13-11
+    Scenario: A new attendee is added and the earlier attendees stay
+      Given Mia organizes the online meeting "Design review" with Anna and Tom, and Mia has a chat with Priya
+      When Mia asks her assistant to add Priya to the online meeting "Design review"
+      Then Mia is asked to approve the change first
+      And after she approves, "Design review" has Anna, Tom, and Priya as attendees
+      But no calendar entry changes
+
+    @uc-13-12
+    Scenario: An online meeting is deleted after Mia approves it
+      Given Mia organizes the online meeting "Design review"
+      When Mia asks her assistant to delete "Design review"
+      Then Mia is asked to approve the deletion first
+      And after she approves, the meeting "Design review" no longer exists
+      And the assistant says that it changed no calendar entry

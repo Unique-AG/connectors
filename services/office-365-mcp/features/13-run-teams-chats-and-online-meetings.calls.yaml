@@ -1,12 +1,19 @@
 uc-13-01:
   status: gap
+  ask: "Start a group chat named Launch with Anna and Tom."
+  blocker:
+    kind: tool
+    tool: teams_create_chat
+    text: No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from get_me, a chat member row, or a message sender.
+    user: The assistant cannot start a chat with a person it has never chatted with.
   provenance: drafted
   asks_user: true
   chain: []
-  note: the cause is the tool. teams_create_chat needs the Entra id of each member. No tool turns a name into that id, and the id comes only from get_me, a chat member row, or a message sender. outlook_find_recipient gives an address and no id.
+  note: outlook_find_recipient gives an address and no id.
 
 uc-13-07:
   status: untested
+  ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
   chain:
@@ -18,6 +25,7 @@ uc-13-07:
 
 uc-13-02:
   status: untested
+  ask: "Add Priya to the Launch chat and let her see the earlier messages."
   provenance: drafted
   asks_user: true
   chain:
@@ -32,6 +40,7 @@ uc-13-02:
 
 uc-13-08:
   status: untested
+  ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
   chain:
@@ -46,6 +55,7 @@ uc-13-08:
 
 uc-13-03:
   status: untested
+  ask: "Remove Tom from the Launch chat."
   provenance: drafted
   asks_user: true
   chain:
@@ -56,16 +66,18 @@ uc-13-03:
 
 uc-13-04:
   status: untested
+  ask: "Add Tom to my chat with Anna."
   provenance: drafted
   asks_user: false
   chain:
     - tool: teams_list_chats
       args: {chat_type: oneOnOne}
   must_not: [teams_add_chat_member]
-  note: teams_add_chat_member does not check the chat type. It asks Mia, and then Microsoft refuses. The assistant reads the chat type first and does not call the tool.
+  note: teams_add_chat_member does not check the chat type, so it asks Mia and then Microsoft refuses. The assistant reads the chat type first and does not call the tool.
 
 uc-13-05:
   status: untested
+  ask: "Create an online meeting for tomorrow at 14:00 for 30 minutes with Anna and Tom, and give me the join link."
   provenance: drafted
   asks_user: true
   chain:
@@ -74,10 +86,11 @@ uc-13-05:
     - tool: teams_create_meeting
       args: {subject: Design review, starts_at: tomorrow 14:00, ends_at: tomorrow 14:30}
       uses: {attendees: user id and name of Anna and Tom from the member rows}
-  note: the meeting is standalone. It is on no calendar, and the tool sends no invitation. outlook_create_event with an online meeting sends one.
+  note: the meeting is standalone, so it is on no calendar and the tool sends no invitation. outlook_create_event with an online meeting sends one.
 
 uc-13-06:
   status: untested
+  ask: "Who attended Anna's Design review?"
   provenance: drafted
   asks_user: false
   chain:
@@ -85,3 +98,64 @@ uc-13-06:
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
   note: Microsoft Graph gives attendance to the organizer only
+
+uc-13-09:
+  status: untested
+  ask: "Rename the Launch chat to Launch 2.0."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: group, topic_contains: Launch}
+    - tool: teams_rename_chat
+      args: {topic: Launch 2.0}
+      uses: {chat_id: id of the chat}
+  note: Microsoft lets the tool rename a group chat only, not a one-to-one chat or a meeting chat.
+
+uc-13-10:
+  status: untested
+  ask: "Move the online meeting Design review to 15:00 for 30 minutes."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_read_meeting
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_update_meeting
+      args: {starts_at: tomorrow 15:00, ends_at: tomorrow 15:30}
+      uses: {meeting_uri: uri of the meeting}
+  must_not: [outlook_update_event]
+  note: the call has no attendees argument, so the attendee list stays. The tool needs starts_at and ends_at together. The tool never changes a calendar event, so a meeting that sits on the calendar moves with outlook_update_event, which is the case of uc-07-10.
+
+uc-13-11:
+  status: untested
+  ask: "Add Priya to the online meeting Design review."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: teams_read_meeting
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_update_meeting
+      uses: {meeting_uri: uri of the meeting, attendees: "user id and name of Anna, Tom, and Priya"}
+  must_not: [outlook_update_event]
+  note: the new list replaces the current list, so the assistant sends the current attendees from teams_read_meeting and Priya. The tool never changes a calendar event, so a meeting that sits on the calendar gets its new attendee with outlook_update_event, which is the case of uc-07-15.
+
+uc-13-12:
+  status: untested
+  ask: "Delete the online meeting Design review."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_read_meeting
+      optional: true
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_delete_meeting
+      uses: {meeting_uri: uri of the meeting}
+  note: the tool deletes the Teams meeting only, never a calendar event, and nothing can restore the meeting.

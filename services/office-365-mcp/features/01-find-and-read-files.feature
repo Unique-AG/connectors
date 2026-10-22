@@ -30,6 +30,13 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant shows the Legal copy
       But it does not show the Sales copy
 
+    @uc-01-16
+    Scenario: Files that changed in a time window are found
+      Given the Sales site holds "Brightway Pricing.xlsx", which Priya changed yesterday, and "Brightway Offer.docx", which Tom changed two months ago
+      When Mia asks her assistant for the Brightway files that changed this week
+      Then the assistant shows "Brightway Pricing.xlsx"
+      But it does not show "Brightway Offer.docx"
+
     @uc-01-04
     Scenario: A missing file is reported as missing
       Given no file that Mia can open mentions "Zephyr"
@@ -45,11 +52,24 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant lists the 12 files and the 3 subfolders, newest first
       But it does not list what is inside the subfolders
 
+    @uc-01-13
+    Scenario: The top of OneDrive is listed
+      Given Mia's OneDrive holds 5 files and 4 folders at its top level
+      When Mia asks her assistant what is in her OneDrive
+      Then the assistant lists the 5 files and the 4 folders
+      But it does not list what is inside the folders
+
+    @uc-01-15
+    Scenario: The files of a Teams channel are listed
+      Given Mia belongs to the team "Platform", and its channel "Launch" holds 8 files
+      When Mia asks her assistant what files the channel "Launch" of "Platform" holds
+      Then the assistant lists the 8 files of the channel "Launch"
+
   Rule: The assistant answers from the content of one file
 
     @uc-01-06
     Scenario Outline: The answer comes from the content of the file
-      Given Mia has a <kind> that states "the launch date is 14 June"
+      Given Mia has a file of the type <kind> that states "the launch date is 14 June"
       When Mia asks her assistant for the launch date in that file
       Then the assistant answers "14 June"
 
@@ -58,6 +78,15 @@ Feature: Finding and reading files in OneDrive and SharePoint
         | Word document   |
         | Excel workbook  |
         | PowerPoint deck |
+
+    @uc-01-12
+    Scenario Outline: A file that needs no conversion is read as it is
+      Given Mia has a <kind> that states "the launch date is 14 June"
+      When Mia asks her assistant for the launch date in that file
+      Then the assistant answers "14 June"
+
+      Examples:
+        | kind            |
         | PDF             |
         | plain text file |
 
@@ -65,6 +94,12 @@ Feature: Finding and reading files in OneDrive and SharePoint
     Scenario: A file that opens through a sharing link is read
       Given Anna sent Mia a sharing link to the deck "Q3 Plan.pptx"
       When Mia asks her assistant to summarize what the sharing link opens
+      Then the assistant summarizes "Q3 Plan.pptx"
+
+    @uc-01-14
+    Scenario: A file is opened from a web address that Mia pastes
+      Given Mia copied the web address of "Q3 Plan.pptx" from the address bar of her browser
+      When Mia pastes the address and asks her assistant to summarize the file
       Then the assistant summarizes "Q3 Plan.pptx"
 
     @uc-01-08
@@ -83,7 +118,7 @@ Feature: Finding and reading files in OneDrive and SharePoint
       But it does not summarize only a part of the file
 
     @uc-01-11
-    Scenario: A file that Microsoft cannot convert is read in its own format or reported
+    Scenario: A file that Microsoft cannot convert is read as it is or reported
       Given Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF
       When Mia asks her assistant to summarize that agreement
       Then the assistant reads the file in its own format or tells Mia that it cannot read the file

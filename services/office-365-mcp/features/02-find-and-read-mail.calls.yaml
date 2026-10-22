@@ -1,5 +1,6 @@
 uc-02-01:
   status: untested
+  ask: "Which of my messages since yesterday are unread?"
   provenance: observed
   evidence: outlook_list_mail alone in 18 sessions
   asks_user: false
@@ -9,6 +10,7 @@ uc-02-01:
 
 uc-02-02:
   status: untested
+  ask: "Find the March invoice from Brightway that has a PDF."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -18,6 +20,7 @@ uc-02-02:
 
 uc-02-03:
   status: untested
+  ask: "Show me the messages that Anna sent me in March."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -27,6 +30,7 @@ uc-02-03:
 
 uc-02-04:
   status: untested
+  ask: "Which of my messages are flagged?"
   provenance: drafted
   asks_user: false
   chain:
@@ -35,6 +39,7 @@ uc-02-04:
 
 uc-02-05:
   status: untested
+  ask: "Show me every message that mentions invoice."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -44,6 +49,7 @@ uc-02-05:
 
 uc-02-06:
   status: untested
+  ask: "Read the Contract draft message to me and tell me what is attached."
   provenance: observed
   evidence: outlook_search_mail then outlook_read_mail in 4 sessions; outlook_list_mail then outlook_read_mail in 4 sessions
   asks_user: false
@@ -53,14 +59,24 @@ uc-02-06:
       uses: {uri: uri of the message from the previous step}
 
 uc-02-07:
-  status: gap
+  status: partly
+  ask: "What is the total in the last row of the Excel file that Anna attached?"
+  blocker:
+    kind: unknown
+    tool: outlook_read_attachment
+    text: The tool returns the workbook in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read an Excel file in that form, so the cause is not known.
+    user: The assistant may not be able to read the numbers inside an Excel attachment.
   provenance: drafted
   asks_user: false
-  chain: []
-  note: outlook_read_attachment returns the file itself and does not turn a document into text, so no tool gives the total of a workbook
+  chain:
+    - any_of: [outlook_list_attachments, outlook_read_mail]
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the workbook}
+  note: the same limit as the file read in the SharePoint feature, where no tool gives a document as text
 
 uc-02-08:
   status: untested
+  ask: "Read the PDF that Anna attached to her message."
   provenance: drafted
   asks_user: false
   chain:
@@ -72,6 +88,7 @@ uc-02-08:
 
 uc-02-09:
   status: untested
+  ask: "What did we decide in the conversation about the launch?"
   provenance: drafted
   asks_user: false
   chain:
@@ -85,6 +102,7 @@ uc-02-09:
 
 uc-02-10:
   status: untested
+  ask: "Show me the unread messages in support@example.com."
   provenance: drafted
   asks_user: false
   chain:
@@ -93,7 +111,67 @@ uc-02-10:
 
 uc-02-11:
   status: gap
+  ask: "Show me the unread messages in the finance mailbox."
+  blocker:
+    kind: tool
+    tool: outlook_list_mail
+    text: The tool has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia.
+    user: The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
   provenance: drafted
   asks_user: false
   chain: []
-  note: outlook_list_mail has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia
+
+uc-02-12:
+  status: untested
+  ask: "What did I send to Tom about the offer?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {to: Tom, query: offer}
+
+uc-02-13:
+  status: untested
+  ask: "How many of my messages are unread, and which 5 are the newest?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {unread_only: true, limit: 5}
+  note: the count is unread_items of the folder, not the number of rows listed
+
+uc-02-14:
+  status: untested
+  ask: "Show me the last message from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: outlook_list_mail
+      args: {limit: 1}
+      uses: {from_address: address of the person}
+  note: outlook_search_mail does not return newest first, and outlook_list_mail takes an address and not a name
+
+uc-02-16:
+  status: untested
+  ask: "Did the invoice from Brightway go to junk?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: junkemail}
+  note: the tool lists one folder, so the assistant names the folder in the answer
+
+uc-02-15:
+  status: untested
+  ask: "What is the amount due on the invoice that Brightway sent as a PDF?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {sender: Brightway, attachment_name: .pdf}
+    - any_of: [outlook_list_attachments, outlook_read_mail]
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the PDF}
+  note: the tool returns the PDF as a file, and the model reads the file itself

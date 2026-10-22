@@ -24,6 +24,29 @@ Feature: Working with notes in OneNote
       When Mia asks her assistant for the sections of that notebook
       Then the assistant lists the sections of "Customers"
 
+  Rule: The assistant finds a notebook from what Mia remembers about it
+
+    @uc-08-10
+    Scenario: Notebooks are found by a word in their name
+      Given Mia has the notebooks "Customers", "Customer Archive", and "Personal"
+      When Mia asks her assistant which of her notebooks have "Customer" in the name
+      Then the assistant lists "Customers" and "Customer Archive" with their sections
+      But it does not list "Personal"
+
+    @uc-08-11
+    Scenario: The notebooks that Mia opened lately are listed
+      Given Mia opened the notebook "Platform" today and the notebook "Customers" last week
+      When Mia asks her assistant which notebooks she opened lately
+      Then the assistant lists "Platform" first and "Customers" second
+
+  Rule: The assistant reads one page and answers from it
+
+    @uc-08-09
+    Scenario: A page is read and summarized
+      Given Mia has the page "Acme kickoff" with notes on 3 decisions
+      When Mia asks her assistant to summarize her notes from the Acme kickoff
+      Then the assistant names the 3 decisions
+
   Rule: The assistant captures and changes notes
 
     @uc-08-04
@@ -39,6 +62,13 @@ Feature: Working with notes in OneNote
       When Mia asks her assistant to add a task list at the end of "Planning"
       Then "Planning" ends with the task list
       But its 2 paragraphs are unchanged
+
+    @uc-08-12
+    Scenario: A project notebook is set up with sections
+      Given Mia has no notebook "Project Falcon"
+      When Mia asks her assistant to create the notebook "Project Falcon" with the sections "Plan" and "Risks" and the section group "Archive"
+      Then Mia has the notebook "Project Falcon"
+      And it holds the sections "Plan" and "Risks" and the section group "Archive"
 
     @uc-08-06
     Scenario: A sentence is changed in place

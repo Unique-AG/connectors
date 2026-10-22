@@ -20,6 +20,14 @@ Feature: Drafting and sending mail
       Then the assistant asks Mia which Anna Meier she means
       But it does not create the draft yet
 
+    @uc-04-14
+    Scenario: A name that matches no one closely leads to a question
+      Given Anna Meier works in Legal and has the address "anna.meier@example.com"
+      And nobody in the directory is named "Anna Mayer"
+      When Mia asks her assistant to draft a note to Anna Mayer
+      Then the assistant asks Mia whether she means Anna Meier
+      But it does not create the draft yet
+
     @uc-04-03
     Scenario: Mia asks whether Anna is away
       Given Anna works in Mia's organization and has an automatic reply turned on
@@ -43,6 +51,22 @@ Feature: Drafting and sending mail
       Then the assistant tells Mia that Tom is already on the draft
       But the draft stays as it is until Mia chooses
 
+    @uc-04-17
+    Scenario: A blind copy is put on a draft
+      Given Mia has a draft addressed to Anna
+      When Mia asks her assistant to put Priya on the draft as a blind copy
+      Then Priya is on the draft as a blind copy
+      But Anna cannot see Priya on the message
+
+    @uc-04-18
+    Scenario: The subject, the importance, and a recipient of a draft change
+      Given Mia has a draft with the subject "Contract" addressed to Anna and Priya
+      When Mia asks her assistant to take Priya off the draft, to call it "Contract for signature", and to mark it important
+      Then the same draft is addressed to Anna only
+      And its subject is "Contract for signature"
+      And it is marked important
+      But Mia's mailbox holds no second draft
+
   Rule: Nothing is sent without Mia's approval
 
     @uc-04-06
@@ -54,9 +78,10 @@ Feature: Drafting and sending mail
 
     @uc-04-07
     Scenario: A declined draft stays a draft
-      Given Mia read her draft to Anna
-      When Mia declines that the draft is sent
-      Then Anna receives nothing
+      Given Mia has a draft about the contract addressed to Anna
+      When Mia asks her assistant to send the draft
+      Then Mia is asked to approve the send, and she declines
+      And Anna receives nothing
       And the draft is still in Mia's drafts
 
     @uc-04-08
@@ -66,6 +91,7 @@ Feature: Drafting and sending mail
       When Mia approves
       Then Anna receives nothing
       And the assistant tells Mia that the draft changed
+      And Mia is asked to approve the draft as it is now
 
     @uc-04-12
     Scenario: Mia is warned about an automatic reply before a send
@@ -75,6 +101,32 @@ Feature: Drafting and sending mail
       Then the assistant tells Mia about the automatic reply of Anna
       And Mia is asked to approve that the draft is sent
 
+    @uc-04-15
+    Scenario: A send that Mia cannot approve sends nothing
+      Given Mia has a draft addressed to Anna
+      And Mia's chat program cannot show her a question
+      When Mia asks her assistant to send the draft
+      Then Anna receives nothing
+      And the assistant tells Mia that her program cannot ask her
+      And the draft is still in Mia's drafts
+
+    @uc-04-16
+    Scenario: A draft that Mia wrote in Outlook is sent
+      Given Mia wrote a draft to Tom in Outlook and left it in her drafts
+      When Mia asks her assistant to send the draft she just wrote
+      Then Mia is asked to approve that the draft is sent
+      And after she approves, Tom receives it
+
+  Rule: A draft in a shared mailbox needs Mia's approval
+    Other people use a shared mailbox, so the assistant changes it only after Mia approves.
+
+    @uc-04-19
+    Scenario: A draft in a shared mailbox needs Mia's approval
+      Given Mia has access to the shared mailbox "support@example.com"
+      When Mia asks her assistant to draft a note to "customer@acme.example" from "support@example.com" that confirms the order
+      Then Mia is asked to approve the draft first
+      And after she approves, the draft is in the drafts of "support@example.com"
+
   Rule: A reply keeps the conversation
 
     @uc-04-09
@@ -83,6 +135,13 @@ Feature: Drafting and sending mail
       When Mia asks her assistant for a reply to everyone
       Then the draft is addressed to Anna, Tom, and Priya
       But it is not addressed to Mia
+
+    @uc-04-13
+    Scenario: A plain reply goes to the sender only
+      Given Anna wrote to Mia and Tom
+      When Mia asks her assistant for a reply to the message of Anna that says "Friday works"
+      Then the draft is addressed to Anna
+      But it is not addressed to Tom
 
     @uc-04-10
     Scenario: A forward carries the original attachments

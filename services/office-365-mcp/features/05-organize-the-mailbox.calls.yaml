@@ -1,5 +1,6 @@
 uc-05-01:
   status: working
+  ask: "File the 8 newsletters from last month in my Newsletters folder."
   provenance: drafted
   evidence: outlook_list_mail then outlook_move_mail in 3 sessions; one session made 20 consecutive outlook_move_mail calls
   asks_user: false
@@ -9,10 +10,11 @@ uc-05-01:
       repeat: many
     - tool: outlook_move_mail
       uses: {message_refs: all uri values from the previous listing, folder_ref: uri of Newsletters from outlook_browse_folders}
-  note: the tool takes many handles in one call. 20 consecutive calls may mean one call for each message. The server logs hold no arguments, so this is not checked.
+  note: the tool takes many handles in one call, so 20 consecutive calls may mean one call for each message. The server logs hold no arguments, so this is not checked.
 
 uc-05-02:
   status: working
+  ask: "Mark all 8 newsletters from last month as read."
   provenance: observed
   evidence: outlook_mark_mail in 12 sessions; outlook_mark_mail then outlook_move_mail 11 times
   asks_user: false
@@ -24,17 +26,24 @@ uc-05-02:
 
 uc-05-03:
   status: partly
+  ask: "File these 5 messages in my Archive folder."
   provenance: observed
   evidence: 17 failures in 15 sessions; the 4 newest passed a value that is not a message handle, and nothing moved
   asks_user: false
+  blocker:
+    kind: unknown
+    tool: outlook_move_mail
+    text: the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle. The message_refs field says "`uri` values from a search, list, or thread result". But MailSummary.uri says only to pass it to outlook_read_mail, and listings also show folder_id and web_link.
+    user: The assistant sometimes cannot move mail at first, because it names a message in the wrong way. It then searches again and moves the messages.
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_move_mail
       uses: {message_refs: uri values from the previous listing and never a subject}
-  note: a value that is not a handle stops the whole batch before any move
+  note: the tool checks every handle before it moves a message, so one wrong value stops the whole batch
 
 uc-05-16:
   status: untested
+  ask: "File these 5 messages in my Archive folder."
   provenance: drafted
   asks_user: false
   chain:
@@ -46,6 +55,7 @@ uc-05-16:
 
 uc-05-04:
   status: untested
+  ask: "Delete the 3 old messages from the vendor."
   provenance: drafted
   asks_user: false
   chain:
@@ -56,6 +66,7 @@ uc-05-04:
 
 uc-05-05:
   status: untested
+  ask: "File the message Refund question of the support mailbox in its Handled folder."
   provenance: drafted
   asks_user: true
   chain:
@@ -69,6 +80,7 @@ uc-05-05:
 
 uc-05-06:
   status: working
+  ask: "Create a folder Alpha inside Projects."
   provenance: drafted
   asks_user: false
   chain:
@@ -79,6 +91,7 @@ uc-05-06:
 
 uc-05-07:
   status: working
+  ask: "Rename the folder Old to Archive 2025."
   provenance: drafted
   asks_user: false
   chain:
@@ -89,6 +102,7 @@ uc-05-07:
 
 uc-05-08:
   status: untested
+  ask: "Delete the folder Temp."
   provenance: drafted
   asks_user: true
   chain:
@@ -98,6 +112,7 @@ uc-05-08:
 
 uc-05-09:
   status: untested
+  ask: "Delete my Inbox folder."
   provenance: drafted
   asks_user: false
   chain:
@@ -108,37 +123,48 @@ uc-05-09:
 
 uc-05-10:
   status: partly
+  ask: "Create a red category Follow-up Q4 and put it on my unread messages from Tom Berger."
   provenance: drafted
   asks_user: false
+  blocker:
+    kind: preset
+    tool: outlook_create_category
+    text: no single preset holds both outlook_create_category and outlook_mark_mail, so this needs two presets or a custom `enabled` list
+    user: The assistant creates the category and puts it on mail only when the administrator has turned on both groups of tools.
   chain:
     - tool: outlook_list_categories
       optional: true
     - tool: outlook_create_category
       args: {name: Follow-up Q4, color: preset0}
     - tool: outlook_find_recipient
-      args: {query: manager}
+      args: {query: Tom Berger}
     - tool: outlook_list_mail
       args: {unread_only: true}
-      uses: {from_address: address of the manager from outlook_find_recipient}
+      uses: {from_address: address of Tom Berger from outlook_find_recipient}
     - tool: outlook_mark_mail
       args: {add_categories: Follow-up Q4}
       uses: {message_refs: uri values from the listing}
-  note: no preset holds both outlook_create_category and outlook_mark_mail, so this needs a custom `enabled` list
 
 uc-05-11:
   status: partly
+  ask: "Make a rule that moves mail from billing@example.com to my Finance folder."
   provenance: drafted
   asks_user: false
+  blocker:
+    kind: preset
+    tool: outlook_create_mail_rule
+    text: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs two presets or a custom `enabled` list
+    user: The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
   chain:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_browse_folders
     - tool: outlook_create_mail_rule
       args: {display_name: Billing to Finance, conditions: sender billing}
       uses: {sequence: next free sequence from outlook_get_mailbox_settings, actions: move_to_folder is the uri of Finance from outlook_browse_folders}
-  note: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs a custom `enabled` list
 
 uc-05-12:
   status: untested
+  ask: "Turn off my Receipts rule."
   provenance: observed
   evidence: outlook_disable_mail_rule in 1 session
   asks_user: false
@@ -149,6 +175,7 @@ uc-05-12:
 
 uc-05-13:
   status: untested
+  ask: "Make a rule that forwards mail from ceo@example.com to anna@example.com and tom@example.com."
   provenance: drafted
   asks_user: true
   chain:
@@ -157,6 +184,7 @@ uc-05-13:
 
 uc-05-14:
   status: untested
+  ask: "Delete my Receipts rule."
   provenance: drafted
   asks_user: true
   chain:
@@ -166,8 +194,131 @@ uc-05-14:
 
 uc-05-15:
   status: untested
+  ask: "Make a rule that deletes mail from spam@example.com."
   provenance: drafted
   asks_user: false
   chain:
     - tool: outlook_create_mail_rule
       args: {actions: delete}
+
+uc-05-17:
+  status: untested
+  ask: "Archive the 6 messages from last month in my inbox."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_move_mail
+      args: {destination: archive}
+      uses: {message_refs: all uri values from the previous listing}
+
+uc-05-18:
+  status: untested
+  ask: "Keep a copy of the message Signed contract in my Contracts folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_browse_folders
+      repeat: many
+    - tool: outlook_copy_mail
+      uses: {message_refs: uri of the message from the previous listing, folder_ref: uri of Contracts from outlook_browse_folders}
+  must_not: [outlook_move_mail]
+  note: the answer has one row for each message, and a row that succeeded has the handle of the copy
+
+uc-05-19:
+  status: untested
+  ask: "Flag the 3 messages from Tom for follow-up by Friday."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_get_mailbox_settings
+      args: {include: preferences}
+      optional: true
+    - tool: outlook_mark_mail
+      uses: {message_refs: all uri values from the previous listing, flag_starts_at: today, flag_due_at: Friday, flag_time_zone: time zone from the settings or from Mia}
+  note: the tool refuses a due date without a start date, and it tells the model to ask the user when the time zone is unknown
+
+uc-05-20:
+  status: untested
+  ask: "File these 3 invoices in my Finance folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+      repeat: many
+  must_not: [outlook_move_mail]
+  note: the tool lists one level of folders only, so two folders with one name show up at different levels
+
+uc-05-21:
+  status: untested
+  ask: "Empty my Deleted Items."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+    - tool: outlook_delete_folder
+      uses: {folder_ref: folder handle of Deleted Items}
+  note: the limit is deliberate, because this connector erases no mail for good. The tool refuses Deleted Items and tells the model to tell the user to empty it in Outlook.
+
+uc-05-22:
+  status: partly
+  ask: "Rename my category Follow-up Q4 to Follow-up Q1."
+  provenance: drafted
+  asks_user: false
+  blocker:
+    kind: graph
+    tool: outlook_create_category
+    text: the `name` field of outlook_create_category says the name cannot change after the call, and no tool renames or deletes a category
+    user: The assistant cannot rename a category. It makes a new category with the new name and moves the 4 messages to it. The old category stays in the list.
+  chain:
+    - tool: outlook_create_category
+      args: {name: Follow-up Q1}
+    - any_of: [outlook_list_mail, outlook_search_mail]
+    - tool: outlook_mark_mail
+      args: {add_categories: [Follow-up Q1], remove_categories: [Follow-up Q4]}
+      uses: {message_refs: uri values of the messages that carry Follow-up Q4}
+  note: no preset holds both outlook_create_category and outlook_mark_mail, so this also needs two presets or a custom `enabled` list
+
+uc-05-23:
+  status: partly
+  ask: "Make a rule that moves the mail I do not need to my Archive folder."
+  provenance: drafted
+  asks_user: false
+  blocker:
+    kind: description
+    tool: outlook_create_mail_rule
+    text: the tool asks only before a rule that forwards or redirects mail, and the `conditions` field says to omit it to make a rule for every incoming message. Nothing in the description tells the model to ask the user first when the user gave no condition.
+    user: The assistant may create a rule for every new message without asking which mail Mia means.
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_create_mail_rule
+      args: {display_name: Mail I do not need, actions: {move_to_folder: archive}}
+      uses: {sequence: next free sequence from outlook_get_mailbox_settings, conditions: the mail that Mia names after the assistant asks}
+  note: the assistant calls the create tool only after Mia names the mail or agrees. The tool creates a rule with no condition when `conditions` is omitted.
+
+uc-05-24:
+  status: untested
+  ask: "Change my rule Billing to Finance so that it moves only mail with invoice in the subject."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      uses: {rule_ref: uri of the rule Billing to Finance from outlook_get_mailbox_settings, conditions: the full set with the sender billing@example.com and the subject word invoice}
+  must_not: [outlook_create_mail_rule]
+  note: the tool replaces the whole set of conditions, so the assistant gives the sender again
+
+uc-05-25:
+  status: untested
+  ask: "Turn my Receipts rule on again."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {is_enabled: true}
+      uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
+  must_not: [outlook_create_mail_rule, outlook_disable_mail_rule]
+  note: outlook_disable_mail_rule cannot turn a rule on

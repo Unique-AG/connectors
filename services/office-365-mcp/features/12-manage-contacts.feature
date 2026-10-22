@@ -11,6 +11,13 @@ Feature: Managing contacts
       When Mia asks her assistant for the telephone number of Anna Meier
       Then the assistant answers "+41 44 555 01 01"
 
+    @uc-12-05
+    Scenario: The email address of a contact is found
+      Given Mia has the contact Anna Meier with the address "anna.meier@acme.example" and the contact Anna Weber with the address "anna.weber@acme.example"
+      When Mia asks her assistant for the email address of Anna Meier
+      Then the assistant answers "anna.meier@acme.example"
+      But it does not answer "anna.weber@acme.example"
+
     @uc-12-02
     Scenario: A person who is only in the company directory is found
       Given Tom Berger is in the company directory and not in Mia's contacts

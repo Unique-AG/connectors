@@ -2,6 +2,7 @@ uc-03-01:
   status: untested
   provenance: observed
   evidence: outlook_list_events alone in 5 sessions
+  ask: "What is on my calendar tomorrow?"
   asks_user: false
   chain:
     - tool: outlook_list_events
@@ -10,6 +11,7 @@ uc-03-01:
 uc-03-02:
   status: untested
   provenance: drafted
+  ask: "What do I have on my calendar next week?"
   asks_user: false
   chain:
     - tool: outlook_list_events
@@ -18,6 +20,7 @@ uc-03-02:
 uc-03-03:
   status: untested
   provenance: drafted
+  ask: "Do I have a clash in my calendar tomorrow?"
   asks_user: false
   chain:
     - tool: outlook_list_events
@@ -27,6 +30,7 @@ uc-03-04:
   status: untested
   provenance: observed
   evidence: outlook_list_events then outlook_read_event 20 times, 15 of them in 2 automated sessions; 233 of 244 read_event calls sit in those 2 sessions
+  ask: "Who is coming to the Launch review, and who has answered?"
   asks_user: false
   chain:
     - tool: outlook_list_events
@@ -37,6 +41,7 @@ uc-03-04:
 uc-03-05:
   status: untested
   provenance: drafted
+  ask: "When is my next meeting with Tom?"
   asks_user: false
   chain:
     - tool: outlook_find_recipient
@@ -52,6 +57,7 @@ uc-03-06:
   status: untested
   provenance: drafted
   evidence: outlook_search_mail then outlook_read_event 22 times, 21 of them in 2 automated sessions
+  ask: "What are the details of the meeting in Anna's invitation mail?"
   asks_user: false
   chain:
     - tool: outlook_search_mail
@@ -65,8 +71,35 @@ uc-03-07:
   status: untested
   provenance: observed
   evidence: 11 failures in 2 automated sessions, Microsoft 404 item not found
+  ask: "Give me the details of the Budget review."
   asks_user: false
   chain:
     - tool: outlook_list_events
     - tool: outlook_read_event
       uses: {uri: uri of the event from the listing}
+
+uc-03-08:
+  status: untested
+  provenance: drafted
+  ask: "What is on Anna's calendar tomorrow?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
+      uses: {calendar_ref: handle of Anna's calendar}
+  note: if Anna shared only free or busy times, the rows show the time and no subject
+
+uc-03-09:
+  status: untested
+  provenance: drafted
+  ask: "What is in the agenda that is attached to the Launch review?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_list_event_attachments
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_read_event_attachment
+      uses: {uri: uri of the attachment}
+  note: the tool returns the file and converts nothing, so a Word or Excel file gives the assistant no text

@@ -29,6 +29,22 @@ Feature: Scheduling and answering meetings
       And Mia's own answer stays unchanged
       And the assistant offers to decline without a new time
 
+    @uc-07-18
+    Scenario: A new time is proposed when the organizer allows it
+      Given Anna allows new time proposals for "Launch review"
+      When Mia asks her assistant to decline it and propose Monday at 10:00
+      Then Mia is asked to approve the answer first
+      And after she approves, Anna sees Mia as declined
+      And Anna sees the proposal of Monday at 10:00
+
+    @uc-07-13
+    Scenario: The invitations that wait for an answer are listed
+      Given Anna invited Mia to "Launch review" and Tom invited Mia to "Budget review"
+      And Mia already accepted "Team sync"
+      When Mia asks her assistant which invitations still wait for her answer
+      Then the assistant names "Launch review" and "Budget review"
+      But it does not name "Team sync"
+
   Rule: Mia finds a time before she books
 
     @uc-07-04
@@ -76,6 +92,17 @@ Feature: Scheduling and answering meetings
       Then "Offsite" is on the calendar "Team"
       But it is not on Mia's main calendar
 
+  Rule: Mia blocks time for herself without an approval step
+    A block with no other person goes onto the calendar at once, because nobody else is told.
+
+    @uc-07-16
+    Scenario: A day is blocked as out of office
+      When Mia asks her assistant to block next Friday as an out of office day
+      Then next Friday holds an all-day entry on Mia's calendar
+      And the entry is created without an approval step
+      And Mia shows as out of office on that day
+      But nobody receives an invitation
+
   Rule: Only the organizer changes or cancels a meeting
 
     @uc-07-10
@@ -101,3 +128,29 @@ Feature: Scheduling and answering meetings
       Then the assistant tells Mia that only Anna can change "Launch review"
       And "Launch review" stays on its time
       And the assistant offers to decline "Launch review" and propose Friday
+
+    @uc-07-14
+    Scenario: One meeting is cancelled with a note for the attendee
+      Given Mia organizes "Design review" with Anna tomorrow
+      When Mia asks her assistant to cancel "Design review" with the note "I am sick"
+      Then Mia is asked to approve the cancellation first
+      And after she approves, "Design review" is no longer on Mia's calendar
+      And Anna receives a cancellation with the note "I am sick"
+
+    @uc-07-15
+    Scenario: A person is added to a meeting and the others stay
+      Given Mia organizes "Launch review" on Monday with Anna and Tom
+      When Mia asks her assistant to add Priya to "Launch review"
+      Then Mia is asked to approve the change first
+      And after she approves, "Launch review" has Anna, Tom, and Priya as attendees
+      And Priya receives an invitation
+
+  Rule: A meeting invitation is forwarded after Mia approves it
+
+    @uc-07-17
+    Scenario: An invitation is forwarded to a colleague
+      Given Anna invited Mia to "Launch review"
+      When Mia asks her assistant to forward "Launch review" to Priya with the note "Please join"
+      Then Mia is asked to approve the forward first
+      And after she approves, Priya receives the invitation to "Launch review"
+      And Anna, as the organizer, is told that Priya was added

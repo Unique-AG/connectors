@@ -11,28 +11,31 @@ the parameters, and the docs to match. For the tool reference, read `../docs/REA
 | File | What it holds |
 | --- | --- |
 | `NN-name.feature` | The capability, as scenarios. It names no tool and no argument. |
-| `NN-name.calls.yaml` | For each scenario, the chain of tools that the assistant calls. |
-| `../tests/test_use_cases.py` | The check that the two files agree, and that the chains use real tools and real arguments. It also checks the page below. |
-| `../docs/use-cases.md` | The page for readers. The text between its two markers comes from the feature files. A person writes the rest. |
-| `../scripts/render-use-cases.py` | Writes that text. Run `uv run python scripts/render-use-cases.py`, or add `--check` to find drift. |
+| `NN-name.calls.yaml` | For each scenario, the status, the prompt, the limit, and the chain of tools that the assistant calls. |
+| `STATUS.md` | The status of every scenario, by surface. It lists the work for UN-27222. A script writes it. |
+| `../tests/test_use_cases.py` | The check that the files agree, that the chains use real tools, arguments, and values, and that the two generated pages are current. |
+| `../docs/use-cases.md` | The guide for readers. The text between its two markers comes from the features and the sidecars. A person writes the rest. |
+| `../scripts/render-use-cases.py` | Writes the guide and `STATUS.md`. Run `uv run python scripts/render-use-cases.py`, or add `--check` to find drift. |
 
 The number `NN` is a name and not a rank. The rank is in the table below.
 
-The page for readers shows no tool, no tag, and no status. It lists a scenario with `@known-gap` as
-"Not supported yet". `../docs/.mdignore` keeps the page out of the Confluence publish until the page
+The guide shows no tool and no status. It shows the prompt and the result of each scenario. It
+shows the limit of a scenario with status `partly`. It lists a scenario with status `gap` as "Not
+supported yet". `../docs/.mdignore` keeps the guide out of the Confluence publish until the guide
 has a Confluence page id.
 
-## Tags
+## Surfaces
 
-| Tag | Meaning |
+The feature tag sets the surface. A feature with tags of two surfaces is in "Across sources".
+
+| Tag | Surface |
 | --- | --- |
-| `@uc-NN-MM` | The permanent id of a scenario. The sidecar uses it as a key. Never reuse an id. |
-| `@outlook-mail`, `@outlook-calendar`, `@outlook-contacts`, `@teams`, `@sharepoint`, `@onenote` | The Microsoft 365 area of the feature. |
-| `@working` | A person ran this by hand in a real mailbox, and it did what the scenario says. No recorded run exists. |
-| `@known-gap` | A tool description or the code already states a limit that blocks the scenario. Nobody ran it. |
-| `@seen-failing` | The prod logs show this kind of task failing. The cause is not always known. |
+| `@outlook-mail`, `@outlook-calendar`, `@outlook-contacts` | Outlook |
+| `@teams` | Teams |
+| `@sharepoint` | SharePoint |
+| `@onenote` | OneNote |
 
-A scenario with none of the last three tags is untested.
+The tag `@uc-NN-MM` is the permanent id of a scenario. The sidecar uses it as a key. Never reuse an id.
 
 ## The sidecar
 
@@ -40,12 +43,39 @@ Each entry has these keys:
 
 | Key | Meaning |
 | --- | --- |
+| `status` | `untested`, `working`, `partly`, or `gap`. See below. |
+| `ask` | What Mia types to the assistant, in her words. It names no tool. |
+| `blocker` | The limit. It is there when the status is `partly` or `gap`, and only then. See below. |
 | `provenance` | `observed` when the chain is a pattern in the prod logs. `drafted` when it comes from the tool descriptions. |
 | `evidence` | What the logs show. A drafted chain keeps it when the logs show only a part of the chain. |
 | `asks_user` | True when a tool in the chain asks the user to approve. |
 | `chain` | The steps, in order. A step has `tool`, or `any_of` for a choice. It can have `optional`, `repeat: many`, `args`, and `uses`. |
 | `must_not` | Tools that the assistant must not call. |
-| `note` | A limit or an open point. |
+| `note` | An extra fact or an open point. |
+
+The status:
+
+| Status | Meaning |
+| --- | --- |
+| `untested` | Nobody ran the scenario. |
+| `working` | A person ran it by hand in a real mailbox, and it did what the scenario says. No recorded run exists. |
+| `partly` | A limit blocks a part of it, or the prod logs show this kind of task failing. |
+| `gap` | Nothing meets the scenario today. The chain is empty. |
+
+The blocker has these keys: `kind`, `tool` (optional), `text` (the cause, for a developer), and
+`user` (what the user is told, with no tool name).
+
+| Kind | Meaning |
+| --- | --- |
+| `tool` | No tool does it. |
+| `parameter` | A tool lacks a parameter that the scenario needs. |
+| `description` | The tool can do it, but its description steers the assistant away or hides an input. |
+| `preset` | The tools that the scenario needs sit in different presets. |
+| `graph` | Microsoft Graph cannot do it. |
+| `unknown` | It fails in prod and the cause is not known. |
+
+UN-27222 can fix a cause of the kind `tool`, `parameter`, `description`, or `preset`. It cannot fix a
+cause of the kind `graph`. `STATUS.md` lists them.
 
 The key `uses` maps an argument to the earlier step that gives its value. This records a data
 dependency. For example, `outlook_move_mail` takes its `message_refs` from a listing. The 17 failed
@@ -53,8 +83,6 @@ moves in prod broke this dependency.
 
 A chain does not fix one path. Two tools can both be right, and `any_of` says so. A test can check
 the required tools, the forbidden tools, the approval, and the data dependencies.
-
-A known gap has an empty chain, because no chain meets the scenario today.
 
 The check runs with the other tests:
 
@@ -129,31 +157,10 @@ The real flows that the sidecars use:
   `teams_read_transcript`, in 7 sessions.
 - Work across sources: one session of 22 calls read mail and files, drafted a reply, and filed mail.
 
-## Known gaps
+## Known gaps and work for UN-27222
 
-| Scenario | Id | Cause |
-| --- | --- | --- |
-| A number in an Excel attachment is read | `uc-02-07` | tool: `outlook_read_attachment` returns the file and does not turn it into text |
-| A refused shared mailbox is explained | `uc-02-11` | tool: `outlook_list_mail` has no advice for a refused mailbox |
-| A new file is attached to a draft | `uc-04-11` | tool: the draft tools write text only |
-| An invitation is drafted before it goes out | `uc-07-08` | graph: a calendar event has no draft state |
-| A meeting is booked on a second calendar | `uc-07-09` | tool: `outlook_create_event` writes to the default calendar, and the description of `outlook_create_event_on_behalf` limits it to the calendar of another person |
-| A page is found by a word in its body | `uc-08-02` | graph: OneNote has no full-text search |
-| The content of an existing file is replaced | `uc-10-05` | tool: the tool creates new text files only |
-| Access is taken back | `uc-10-08` | tool: no tool removes a permission |
-| A person only in the company directory is found | `uc-12-02` | tool: `outlook_find_recipient` gives an address and no telephone number |
-| A chat is started with a person named by name | `uc-13-01` | tool: no tool turns a name into the Entra id that `teams_create_chat` needs |
-| A person is added to a chat by name | `uc-13-02` | tool: no tool turns a name into the Entra id that `teams_add_chat_member` needs |
-
-The scenario `uc-03-05` is not a gap. The assistant opens events one by one, because
-`outlook_list_events` has no attendee filter.
-
-Two scenarios need tools that no preset holds together. `uc-05-10` needs `outlook_create_category`
-and `outlook_mark_mail`. `uc-05-11` needs `outlook_browse_folders` and `outlook_create_mail_rule`.
-The cause is preset.
-
-UN-27222 can fix a cause of the kind tool, parameter, or preset. It cannot fix a cause of the kind
-graph.
+`STATUS.md` lists every scenario with status `partly` or `gap`, with its blocker. It is the work
+list for UN-27222.
 
 ## Open questions
 
@@ -164,5 +171,5 @@ graph.
   so the cause is not known. Does the assistant send one message in each call? 20 consecutive calls
   in one session suggest it.
 - Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
-  source allows it. Nobody ran it. If it works, change its description and remove `@known-gap`
-  from `uc-07-09`.
+  source allows it. Nobody ran it. If it works, change the description and set `uc-07-09` to
+  `untested`.

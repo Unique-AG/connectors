@@ -1,6 +1,7 @@
 uc-14-01:
   status: untested
   provenance: drafted
+  ask: "Give Anna read access to my calendar."
   asks_user: true
   chain:
     - tool: outlook_find_recipient
@@ -16,6 +17,7 @@ uc-14-01:
 uc-14-02:
   status: untested
   provenance: drafted
+  ask: "Stop sharing my calendar with Anna."
   asks_user: true
   chain:
     - tool: outlook_list_calendars
@@ -29,6 +31,7 @@ uc-14-03:
   status: untested
   provenance: observed
   evidence: outlook_create_event_on_behalf in 1 call
+  ask: "Book the Budget review with Anna on Lena's calendar."
   asks_user: true
   chain:
     - tool: outlook_list_calendars
@@ -39,6 +42,7 @@ uc-14-03:
 uc-14-04:
   status: untested
   provenance: drafted
+  ask: "Book the Budget review on Lena's calendar."
   asks_user: false
   chain:
     - tool: outlook_list_calendars
@@ -48,6 +52,12 @@ uc-14-05:
   status: partly
   provenance: observed
   evidence: outlook_list_group_events in 1 call, which failed
+  ask: "What is on the calendar of the Platform team this week?"
+  blocker:
+    kind: unknown
+    tool: outlook_list_group_events
+    text: The only call in prod failed and the logs give no cause, and the tool declares the permission Calendars.Read only.
+    user: The assistant may not be able to read a team calendar. One attempt failed, and the cause is not known.
   asks_user: false
   chain:
     - tool: teams_list_my_teams

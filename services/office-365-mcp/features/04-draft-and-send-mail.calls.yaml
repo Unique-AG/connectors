@@ -1,5 +1,6 @@
 uc-04-01:
   status: untested
+  ask: "Draft a note to Anna Meier that asks for the contract by Friday."
   provenance: drafted
   evidence: outlook_find_recipient in 13 sessions, alone in 7; outlook_draft_mail in 18 sessions
   asks_user: false
@@ -13,6 +14,7 @@ uc-04-01:
 
 uc-04-02:
   status: untested
+  ask: "Write a note to Anna Meier."
   provenance: drafted
   asks_user: false
   chain:
@@ -22,6 +24,7 @@ uc-04-02:
 
 uc-04-03:
   status: untested
+  ask: "Is Anna away right now?"
   provenance: drafted
   asks_user: false
   chain:
@@ -32,6 +35,7 @@ uc-04-03:
 
 uc-04-04:
   status: untested
+  ask: "Make the draft shorter."
   provenance: drafted
   asks_user: false
   chain:
@@ -44,6 +48,7 @@ uc-04-04:
 
 uc-04-05:
   status: untested
+  ask: "Copy Tom on the draft as well."
   provenance: drafted
   asks_user: false
   chain:
@@ -55,6 +60,7 @@ uc-04-05:
 
 uc-04-06:
   status: untested
+  ask: "Send the draft to Anna."
   provenance: drafted
   asks_user: true
   chain:
@@ -63,6 +69,7 @@ uc-04-06:
 
 uc-04-07:
   status: untested
+  ask: "Send the contract draft to Anna."
   provenance: drafted
   asks_user: true
   chain:
@@ -72,15 +79,17 @@ uc-04-07:
 
 uc-04-08:
   status: untested
+  ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: the tool sends nothing when the draft changed after the question
+  note: the tool sends nothing when the draft changed after the question, and a new call asks Mia about the draft as it is now
 
 uc-04-12:
   status: untested
+  ask: "Send Anna the draft now."
   provenance: drafted
   asks_user: true
   chain:
@@ -93,6 +102,7 @@ uc-04-12:
 
 uc-04-09:
   status: untested
+  ask: "Reply to everyone on Anna's message."
   provenance: drafted
   asks_user: false
   chain:
@@ -103,20 +113,109 @@ uc-04-09:
 
 uc-04-10:
   status: untested
+  ask: "Forward the mail Contract draft to Tom with a short note."
   provenance: drafted
   evidence: outlook_draft_reply 36 calls, used for replies
   asks_user: false
   chain:
     - any_of: [outlook_read_mail, outlook_search_mail]
+    - tool: outlook_find_recipient
+      args: {query: Tom}
     - tool: outlook_draft_reply
-      args: {mode: forward, to: Tom, body_html: short note}
-      uses: {message_ref: uri of the message}
+      args: {mode: forward, body_html: short note}
+      uses: {message_ref: uri of the message, to: address of Tom from outlook_find_recipient}
     - tool: outlook_list_attachments
       uses: {uri: uri of the forward draft}
 
 uc-04-11:
   status: gap
+  ask: "Mail Report.pdf to Anna as an attachment."
   provenance: drafted
   asks_user: false
+  blocker:
+    kind: tool
+    tool: outlook_draft_mail
+    text: the draft tools write text only, and no other tool adds a file to a message
+    user: The assistant cannot attach a file to a draft yet.
   chain: []
-  note: the draft tools write text only and cannot add a file
+
+uc-04-13:
+  status: untested
+  ask: "Reply to Anna's message and say Friday works."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread]
+    - tool: outlook_draft_reply
+      args: {mode: reply, body_html: Friday works}
+      uses: {message_ref: uri of the message}
+  must_not: [outlook_draft_reply_all, outlook_send_draft]
+  note: the tool refuses a Cc address that the reply already goes to
+
+uc-04-14:
+  status: untested
+  ask: "Write a note to Anna Mayer."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Mayer}
+  must_not: [outlook_draft_mail, outlook_send_draft]
+  note: the tool says never to draft to a fuzzy match without asking
+
+uc-04-15:
+  status: untested
+  ask: "Please send my draft to Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: the tool needs Mia's approval, so no question is shown here, and it sends nothing when the client cannot ask and tells the model to say so
+
+uc-04-16:
+  status: untested
+  ask: "Send the draft I just wrote to Tom."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: drafts}
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft from the listing}
+  note: the tool refuses a message that is no longer a draft
+
+uc-04-17:
+  status: gap
+  ask: "Put Priya on blind copy on my draft to Anna."
+  provenance: drafted
+  asks_user: false
+  blocker:
+    kind: parameter
+    tool: outlook_draft_mail
+    text: outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients
+    user: The assistant cannot add a blind copy to a draft yet.
+  chain: []
+
+uc-04-18:
+  status: untested
+  ask: "Take Priya off my draft, call it Contract for signature, and mark it important."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_list_mail, outlook_read_mail]
+    - tool: outlook_update_draft
+      args: {subject: Contract for signature, importance: high}
+      uses: {message_ref: uri of the draft, to: every address of the draft except Priya}
+  must_not: [outlook_draft_mail]
+  note: the tool replaces the whole To list, so the assistant gives every address that stays
+
+uc-04-19:
+  status: untested
+  ask: "Draft a note to customer@acme.example from the support mailbox that confirms the order."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_draft_mail
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: the order is confirmed}
+  must_not: [outlook_send_draft]

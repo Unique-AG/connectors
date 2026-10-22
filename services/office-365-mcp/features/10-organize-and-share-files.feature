@@ -39,7 +39,22 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       When Mia asks her assistant to replace the content of "Plan.docx" with a new text
       Then "Plan.docx" holds the new text
 
-  Rule: Mia gives access to a colleague and can take it back
+    @uc-10-09
+    Scenario: A file is renamed and stays in its folder
+      Given Mia has the file "Plan v1.docx" in the folder "Projects"
+      When Mia asks her assistant to rename "Plan v1.docx" to "Plan v2.docx"
+      Then Mia is asked to approve the change first
+      And after she approves, "Projects" holds "Plan v2.docx"
+      But "Projects" no longer holds "Plan v1.docx"
+
+    @uc-10-10
+    Scenario: A file attached to a mail is saved in a folder
+      Given Anna sent Mia a mail with the attached file "Offer.pdf"
+      And Mia has the folder "Tenders"
+      When Mia asks her assistant to save the attached file in "Tenders"
+      Then "Tenders" holds "Offer.pdf"
+
+  Rule: Mia gives access to a colleague
 
     @uc-10-06
     Scenario: A colleague gets edit access

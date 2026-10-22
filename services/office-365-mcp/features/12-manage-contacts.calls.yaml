@@ -1,5 +1,6 @@
 uc-12-01:
   status: untested
+  ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
   chain:
@@ -12,13 +13,19 @@ uc-12-01:
 
 uc-12-02:
   status: gap
+  ask: "What is the telephone number of Tom Berger?"
+  blocker:
+    kind: tool
+    tool: outlook_find_recipient
+    text: The tool gives an address, a job title, and a department, and no telephone number. No other tool reads a person of the company directory.
+    user: The assistant cannot look up the telephone number of a colleague who is not in Mia's contacts.
   provenance: drafted
   asks_user: false
   chain: []
-  note: outlook_find_recipient gives an address and no telephone number, and the contact tools read only the default Contacts folder
 
 uc-12-03:
   status: untested
+  ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
   provenance: drafted
   asks_user: false
   chain:
@@ -27,6 +34,7 @@ uc-12-03:
 
 uc-12-04:
   status: untested
+  ask: "Add the office number +41 44 555 01 03 to Tom Berger."
   provenance: drafted
   asks_user: false
   chain:
@@ -34,3 +42,15 @@ uc-12-04:
     - tool: outlook_update_contact
       args: {add_business_phones: office number}
       uses: {uri: uri of the contact}
+
+uc-12-05:
+  status: untested
+  ask: "What is the email address of Anna Meier?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_find_recipient, outlook_list_contacts]
+    - tool: outlook_read_contact
+      optional: true
+      uses: {uri: uri of the contact}
+  note: outlook_find_recipient ranks Anna Meier exact and Anna Weber fuzzy, and its description sends the assistant there for an address. The contact listing has no name filter, so the assistant reads the names and checks that capped is false

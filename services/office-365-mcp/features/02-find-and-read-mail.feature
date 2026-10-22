@@ -39,6 +39,35 @@ Feature: Finding and reading mail
       Then the assistant shows the messages that the search returns
       And it tells Mia that more matching messages may exist
 
+    @uc-02-12
+    Scenario: Mail that Mia sent to one person about a topic is found
+      Given Mia sent Tom "Offer for Brightway" and sent Anna "Offer draft"
+      And Tom sent Mia "Offer questions"
+      When Mia asks her assistant what she sent to Tom about the offer
+      Then the assistant shows "Offer for Brightway"
+      But it does not show "Offer draft" or "Offer questions"
+
+    @uc-02-13
+    Scenario: The number of unread messages is given with the newest ones
+      Given Mia's inbox holds 120 unread messages
+      When Mia asks her assistant how many messages are unread, and which 5 are the newest
+      Then the assistant tells Mia that 120 messages are unread
+      And it lists the 5 newest unread messages
+
+    @uc-02-14
+    Scenario: The latest message from one person is shown
+      Given Anna sent Mia a message on Monday, one on Tuesday, and one on Wednesday
+      When Mia asks her assistant for the last message from Anna
+      Then the assistant shows the message of Wednesday
+      But it does not show the messages of Monday and Tuesday
+
+    @uc-02-16
+    Scenario: Mail that went to Junk is found
+      Given Brightway sent "March invoice", which landed in Mia's Junk Email folder, and Mia's inbox holds 20 other messages
+      When Mia asks her assistant whether the invoice from Brightway went to junk
+      Then the assistant shows "March invoice" and says that it is in Junk Email
+      But it does not list messages of Mia's inbox
+
   Rule: The assistant reads a message and its attachments
 
     @uc-02-06
@@ -49,7 +78,7 @@ Feature: Finding and reading mail
       And it names "Draft v2.docx" with its size
 
     @uc-02-07
-    Scenario: The content of an attachment answers a question
+    Scenario: The content of an Excel attachment answers a question
       Given Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row
       When Mia asks her assistant for the total in the last row of that workbook
       Then the assistant answers 4,200
@@ -60,6 +89,12 @@ Feature: Finding and reading mail
       When Mia asks her assistant to read that PDF
       Then the assistant tells Mia that the attachment is too large to read
       And it tells Mia to open the message in Outlook
+
+    @uc-02-15
+    Scenario: The content of a PDF attachment answers a question
+      Given Brightway sent "March invoice" with a 1 MB PDF that gives an amount due of 3,150
+      When Mia asks her assistant for the amount due on the invoice from Brightway
+      Then the assistant answers 3,150
 
   Rule: The assistant follows a conversation from first message to last
 
@@ -79,7 +114,7 @@ Feature: Finding and reading mail
       But it does not list messages of Mia's own mailbox
 
     @uc-02-11
-    Scenario: A mailbox without access is refused
+    Scenario: A mailbox that Mia cannot open is explained as missing access
       Given Mia has no access to the shared mailbox "finance"
       When Mia asks her assistant for the unread messages in "finance"
       Then the assistant tells Mia that she has no access to "finance"
