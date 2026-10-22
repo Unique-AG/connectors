@@ -4,18 +4,21 @@ import re
 import tomllib
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 from typing import cast
 
 import pytest
 import yaml
-from pydantic import ValidationError
+from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
 
 from mcp_scaffold import commands, openapi
 from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
 from mcp_scaffold.options import Options, Persistence, Upstream
-from mcp_scaffold.pins import pinned, scaffold_version
+from mcp_scaffold.pins import pinned
 from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import load_spec, scaffold
 from mcp_scaffold.stamp import stamped
@@ -108,8 +111,10 @@ PROBES = {
         probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}),
     ]
 }
+# The commit a run is stamped with, which the CLI reads from git.
+COMMIT = "3f2a9c1e5b7d"
 STAMP = re.compile(
-    r"mcp-scaffold-version: (?P<version>[^,]+), timestamp: (?P<timestamp>[0-9T:+-]+)"
+    r"mcp-scaffold-commit: (?P<commit>[0-9a-f]+), timestamp: (?P<timestamp>[0-9T:+-]+)"
 )
 # What a tool writes rather than the scaffold: uv, the codegen, pytest and the chart's schema
 # script.
@@ -137,7 +142,9 @@ def scaffolded(repo: Path, request: pytest.FixtureRequest) -> Iterator[Scaffolde
         def scaffold_probe(name: str) -> Path:
             if name not in built:
                 monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(venvs(request.config) / name))
-                built[name] = scaffold(PROBES[name], repo, spec=load_spec(PROBES[name], repo))
+                built[name] = scaffold(
+                    PROBES[name], repo, spec=load_spec(PROBES[name], repo), commit=COMMIT
+                )
             return built[name]
 
         yield scaffold_probe
@@ -166,14 +173,18 @@ def test_a_scaffolded_mcp_passes_its_own_checks(scaffolded: Scaffolded, name: st
 
 
 def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(scaffolded: Scaffolded) -> None:
-    pyproject = (scaffolded("probe-custom-postgres-mcp") / "pyproject.toml").read_text()
+    pyproject = cast(
+        dict[str, dict[str, object]],
+        tomllib.loads((scaffolded("probe-custom-postgres-mcp") / "pyproject.toml").read_text()),
+    )
+    runtime = cast(list[str], pyproject["project"]["dependencies"])
+    dev = cast(list[str], pyproject["dependency-groups"]["dev"])
 
-    pins = [*pinned("service"), *pinned("service-postgres"), *pinned("service-dev")]
-    assert all(f'"{pin}",' in pyproject for pin in pins)
-    assert '"mcp-configs==' in pyproject
-    assert '"mcp-openapi==' in pyproject
-    assert "mcp-openapi[codegen]" not in pyproject
-    assert "[tool.mcp-openapi]" not in pyproject
+    assert set(pinned("service")) | set(pinned("service-postgres")) <= set(runtime)
+    assert set(pinned("service-dev")) <= set(dev)
+    assert {"mcp-configs==0.1.0", "mcp-openapi==0.1.0"} <= set(runtime)
+    assert not [pin for pin in dev if pin.startswith("mcp-openapi")]
+    assert "mcp-openapi" not in pyproject["tool"]
 
 
 def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: UseVenv) -> None:
@@ -219,6 +230,8 @@ def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
     assert "GET_FORECAST = Operation[Forecast]" in operations.read_text()
     assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
+    offline_server = (service / "tests" / "offline_server.py").read_text()
+    assert 'AnyHttpUrl("https://weather.example.com/v1")' in offline_server
     assert (upstream / "openapi.yml").read_text().splitlines()[1] == "openapi: 3.0.3"
 
 
@@ -249,6 +262,13 @@ def test_a_spec_with_extension_keys_starts_from_its_first_json_operation(
     assert VendorSpec.load("spec.json", tmp_path).operation == "getForecast"
 
 
+def test_a_spec_vendored_from_another_mcp_loses_its_stamp(tmp_path: Path) -> None:
+    stamp = "# mcp-scaffold-commit: 3f2a9c1e5b7d, timestamp: 2026-10-21T09:30:00+00:00\n"
+    (tmp_path / "spec.yml").write_text(stamp + yaml.safe_dump(WEATHER_SPEC))
+
+    assert VendorSpec.load("spec.yml", tmp_path).text == yaml.safe_dump(WEATHER_SPEC)
+
+
 def test_a_spec_without_a_json_operation_is_rejected(tmp_path: Path) -> None:
     paths = {"/health": WEATHER_PATHS["/health"]}
     (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
@@ -262,6 +282,85 @@ def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="openapi"):
         VendorSpec.load("spec.json", tmp_path)
+
+
+def scaffold_offline(repo: Path, options: Options) -> Path:
+    """Scaffold `options` without uv: the codegen leaves an empty `operations.py`, and nothing is
+    checked."""
+
+    def codegen_only(commands: list[list[str]], service: Path) -> None:
+        if ["uv", "run", "mcp-openapi-codegen"] in commands:
+            generated = service / "src" / options.package / "upstream" / "generated"
+            (generated / "operations.py").write_text("")
+
+    copy_registries(repo)
+    (repo / "packages").symlink_to((REPO / "packages").resolve())
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(commands, "run", codegen_only)
+        monkeypatch.setattr(openapi, "run", codegen_only)
+        return scaffold(options, repo, spec=load_spec(options, repo), commit=COMMIT, release=False)
+
+
+def openapi_probe(spec: str) -> Options:
+    return Options(
+        name="probe-spec-mcp",
+        description="Probes.",
+        upstream=Upstream.OPENAPI,
+        spec=spec,
+        persistence=frozenset(),
+    )
+
+
+@pytest.fixture
+def vendor(tmp_path: Path) -> Iterator[str]:
+    """The URL of an HTTP server on loopback that serves `tmp_path / "vendor"`, as a vendor
+    serves its spec."""
+    (tmp_path / "vendor").mkdir()
+    handler = partial(SimpleHTTPRequestHandler, directory=tmp_path / "vendor")
+    with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
+        Thread(target=server.serve_forever, daemon=True).start()
+        yield f"http://127.0.0.1:{server.server_port}"
+        server.shutdown()
+
+
+def test_a_spec_fetched_from_a_url_is_fetched_from_it_again(tmp_path: Path, vendor: str) -> None:
+    (tmp_path / "vendor" / "weather.json").write_text(json.dumps(WEATHER_SPEC))
+    url = f"{vendor}/weather.json"
+
+    target = scaffold_offline(tmp_path / "repo", openapi_probe(url))
+
+    pyproject = cast(Config, tomllib.loads((target / "pyproject.toml").read_text()))
+    assert pyproject["tool"]["mcp-openapi"]["spec-source"] == url
+    assert (target / "src" / "probe_spec_mcp" / "upstream" / "openapi.yml").is_file()
+
+
+def test_values_from_the_spec_reach_code_and_config_escaped(tmp_path: Path) -> None:
+    forecast = cast(dict[str, dict[str, object]], WEATHER_PATHS["/forecasts/{city}"])["get"]
+    server = 'https://weather.example.com/v1"); import os  #'
+    spec = {
+        **WEATHER_SPEC,
+        "servers": [{"url": server}],
+        "paths": {"/forecasts/{city}": {"get": {**forecast, "operationId": 'get"Forecast'}}},
+    }
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "weather.json").write_text(json.dumps(spec))
+
+    target = scaffold_offline(repo, openapi_probe("weather.json"))
+
+    pyproject = cast(Config, tomllib.loads((target / "pyproject.toml").read_text()))
+    assert pyproject["tool"]["mcp-openapi"]["operation-ids"] == ['get"Forecast']
+    settings = ast.parse(
+        (target / "src" / "probe_spec_mcp" / "upstream" / "settings.py").read_text()
+    )
+    (default,) = [
+        node.value
+        for node in ast.walk(settings)
+        if isinstance(node, ast.AnnAssign) and ast.unparse(node.target) == "api_url"
+    ]
+    assert isinstance(default, ast.Call)
+    assert ast.literal_eval(default.args[0]) == str(TypeAdapter(AnyHttpUrl).validate_python(server))
+    assert not [node for node in ast.walk(settings) if isinstance(node, ast.Import)]
 
 
 @pytest.mark.parametrize(
@@ -283,7 +382,7 @@ def test_the_description_reaches_every_file_as_given(
     monkeypatch.setattr(commands, "run", run_nothing)
     options = Options(name="probe-text-mcp", description=description, persistence=frozenset())
 
-    target = scaffold(options, tmp_path, spec=None, release=False)
+    target = scaffold(options, tmp_path, spec=None, commit=COMMIT, release=False)
 
     pyproject = tomllib.loads((target / "pyproject.toml").read_text())
     chart = (target / "deploy" / "helm-charts" / options.name / "Chart.yaml").read_text()
@@ -344,7 +443,7 @@ def test_the_scaffolds_registered_their_release_and_scope(
         assert f'"!services/{name}"' in (repo / "pnpm-workspace.yaml").read_text()
 
 
-def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
+def test_a_name_a_removed_service_left_its_scope_under_is_listed_once(tmp_path: Path) -> None:
     copy_registries(tmp_path)
     options = Options(
         name="probe-again-mcp",
@@ -353,9 +452,9 @@ def test_registering_a_name_again_lists_it_once(tmp_path: Path) -> None:
         persistence=frozenset(),
     )
 
-    register(options, tmp_path, release=True)
+    register(options, tmp_path, release=False)
     registered = {registry: (tmp_path / registry).read_text() for registry in REGISTRIES}
-    register(options, tmp_path, release=True)
+    register(options, tmp_path, release=False)
 
     assert {registry: (tmp_path / registry).read_text() for registry in REGISTRIES} == registered
     assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
@@ -384,7 +483,7 @@ def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
     }
 
     assert {path: found for path, found in stamps.items() if len(found) != 1} == {}
-    assert {found[0][0] for found in stamps.values()} == {scaffold_version()}
+    assert {found[0][0] for found in stamps.values()} == {COMMIT}
     (timestamp,) = {found[0][1] for found in stamps.values()}
     assert abs(datetime.now(UTC) - datetime.fromisoformat(timestamp)).total_seconds() < 3600
 

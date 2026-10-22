@@ -19,8 +19,8 @@ def copy_skeleton(target: Path) -> None:
     shutil.copytree(FILES / "skeleton", target, symlinks=True)
 
 
-def render_templates(options: Options, target: Path) -> None:
-    """Render each `*.jinja` file the skeleton copied for `options`, in place of the template.
+def render_templates(target: Path, **context: object) -> None:
+    """Render each `*.jinja` file copied to `target` with `context`, in place of the template.
     Layout is left to the ruff format that `commands.check` runs afterwards."""
     environment = Environment(
         autoescape=False,
@@ -31,7 +31,7 @@ def render_templates(options: Options, target: Path) -> None:
     )
     for template in sorted(target.rglob("*.jinja")):
         rendered = environment.from_string(template.read_text()).render(
-            options=options, python_lines=_python_lines, quoted=quoted
+            python_lines=_python_lines, quoted=quoted, **context
         )
         template.with_suffix("").write_text(rendered)
         template.unlink()

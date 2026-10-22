@@ -15,9 +15,9 @@
   auth header and each retry rule, against `httpx2.MockTransport`.
 - `uv run mcp-architecture-check` runs the checks of what a client sees against the server
   `offline_server()` in `tests/offline_server.py` builds: the descriptions, the input schemas,
-  the masked errors and the settings that keep their input out of an error. CI runs it as a step
-  of its own, outside pytest, so nothing in `tests/conftest.py` can skip, xfail or deselect a
-  check. The `server` fixture builds the same server with `build_server`.
+  the masked errors and the settings that keep their input out of an error. It runs outside
+  pytest, for the reason [`CUSTOM_CHECKS.md`](../CUSTOM_CHECKS.md) gives. The `server` fixture
+  builds the same server with `build_server`.
 - One of them compares every tool the server lists, its arguments, output, annotations and
   tags, with `tests/tool_surface.generated.json`. A change to what a client sees is a diff of
   that file in review. Accept a change you meant with `uv run mcp-architecture-check --update`.

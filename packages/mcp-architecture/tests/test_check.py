@@ -4,12 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from mcp_architecture import render_importlinter
 from mcp_architecture.check import SNAPSHOT, check_service, main
 
-SHARED_CONFIGURATION = (
-    "[tool.ruff]\n"
-    'extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"\n\n'
+TYPE_CHECK = (
     "[tool.basedpyright]\n"
     'extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"\n'
     'executionEnvironments = [{ root = "tests", reportPrivateUsage = false }]\n'
@@ -47,14 +44,12 @@ def write_service(
     root: Path,
     *,
     package: str = "kiosk",
-    root_package: str = "kiosk",
     settings: str = HIDDEN_SETTINGS,
     server: dict[str, str] | None = None,
 ) -> Path:
     """An MCP named after `package`, whose `tests/offline_server.py` builds `server`."""
     (root / "pyproject.toml").write_text(
-        f'[project]\nname = "{package.replace("_", "-")}"\n\n{SHARED_CONFIGURATION}\n'
-        + render_importlinter(root_package)
+        f'[project]\nname = "{package.replace("_", "-")}"\n\n{TYPE_CHECK}'
     )
     source = root / "src" / package
     source.mkdir(parents=True)
@@ -152,39 +147,12 @@ async def test_settings_that_would_print_their_input_are_a_finding(tmp_path: Pat
     shown = (
         "from pydantic_settings import BaseSettings\n\n\nclass KioskSettings(BaseSettings): ...\n"
     )
-    service = write_service(
-        tmp_path, package="leaky_kiosk", root_package="leaky_kiosk", settings=shown
-    )
+    service = write_service(tmp_path, package="leaky_kiosk", settings=shown)
 
     assert await check_service(service, update=True) == [
         "Build the model_config of these with mcp_configs.shared_config: "
         "['leaky_kiosk.settings.KioskSettings']"
     ]
-
-
-async def test_a_root_package_other_than_the_projects_is_a_finding(tmp_path: Path) -> None:
-    service = write_service(tmp_path)
-    await check_service(service, update=True)
-    pyproject = service / "pyproject.toml"
-    pyproject.write_text(
-        pyproject.read_text().replace('root_package = "kiosk"', 'root_package = "decoy"')
-    )
-
-    assert await check_service(service) == [
-        "[tool.importlinter] root_package is 'decoy', not the project's package 'kiosk', "
-        "so `lint-imports` does not check the MCP's own code. `uv run mcp-architecture-check "
-        "--update` writes the table back as mcp_architecture.render_importlinter gives it, "
-        "keeping the MCP's own contracts."
-    ]
-
-
-async def test_update_writes_a_loosened_importlinter_table_back(tmp_path: Path) -> None:
-    service = write_service(tmp_path, root_package="decoy")
-    pyproject = service / "pyproject.toml"
-    pyproject.write_text(pyproject.read_text().replace("exhaustive = true\n", ""))
-
-    assert await check_service(service, update=True) == []
-    assert pyproject.read_text().endswith(render_importlinter("kiosk"))
 
 
 async def test_a_file_that_changes_its_type_check_is_a_finding(tmp_path: Path) -> None:

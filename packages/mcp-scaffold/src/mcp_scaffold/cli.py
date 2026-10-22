@@ -70,18 +70,27 @@ def main() -> None:
     if (conflict := name_conflict(options.name, repo)) is not None:
         parser.error(conflict)
     _require_clean(parser, repo, options.spec)
+    commit = _head_commit(parser, repo)
     try:
         spec = load_spec(options, repo)
     except (OSError, ValueError, yaml.YAMLError) as error:
         parser.error(f"cannot use the spec {options.spec}: {error}")
+    undo = (
+        "Undo the run from the repository root:\n"
+        f"  git checkout . && git clean -fdx services/{options.name}"
+    )
     try:
-        target = scaffold(options, repo, spec=spec, release=cast(bool, arguments.release))
+        target = scaffold(
+            options, repo, spec=spec, commit=commit, release=cast(bool, arguments.release)
+        )
     except subprocess.CalledProcessError as error:
         command = " ".join(cast(list[str], error.cmd))
-        sys.exit(
-            f"`{command}` failed in services/{options.name}, as printed above. Undo the run from "
-            f"the repository root:\n  git checkout . && git clean -fdx services/{options.name}"
+        sys.exit(f"`{command}` failed in services/{options.name}, as printed above. {undo}")
+    except BaseException:
+        print(
+            f"The run stopped in services/{options.name}, as printed below. {undo}", file=sys.stderr
         )
+        raise
     print(f"{target} is ready. The new-mcp skill lists what to fill in next.")
 
 
@@ -104,6 +113,23 @@ def _require_clean(parser: argparse.ArgumentParser, repo: Path, spec: str | None
         parser.error(
             "commit or stash every change first, untracked files too, so git alone can undo "
             f"the run:\n{changes}{_untracked_spec_hint(repo, spec, changes)}"
+        )
+
+
+def _head_commit(parser: argparse.ArgumentParser, repo: Path) -> str:
+    """The commit every file the run writes is stamped with, short enough for the stamp to fit
+    in a line. The tree is clean, so it is exact."""
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short=12", "HEAD"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError as error:
+        parser.error(
+            f"git has no commit to stamp the files with: {cast(str, error.stderr).strip()}"
         )
 
 

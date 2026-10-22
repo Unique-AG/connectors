@@ -1,6 +1,10 @@
 # The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
 # packages/mcp-architecture/ARCHITECTURE.md lists where it departs from the guide.
+# `mcp-architecture-lint` passes this file to ruff with --config, so nothing in an MCP changes it.
 line-length = 100
+target-version = "py314"
+# A committed .ignore, or a .gitignore matching a committed file, would hide it from ruff.
+respect-gitignore = false
 
 [lint]
 # Only for the preview rules selected by their full code below.
@@ -34,13 +38,22 @@ select = [
     "ISC003",            # a long string is split by implicit concatenation, not +
     "S701",              # Jinja2 escapes what it renders
     "TRY400",            # an error logged in an except block keeps its traceback
-    "PLR0917",           # keyword arguments only, in the folders a service's per-file-ignores leave it on
+    "PLR0917",           # keyword arguments only, in contexts/ (per-file-ignores below)
 ]
 ignore = [
     "D1",                # a docstring only for what the code cannot say
     "TD002",             # Google's TODO names a link, not an author
     "D205",              # a docstring's summary may run onto a second line
 ]
+
+# With --config, ruff reads these from the folder it runs in, and the leading `**/` matches from
+# the repository root or the MCP's folder alike. Through an MCP's `extend` it reads them from this
+# file's folder, where they match nothing, so the MCP's [tool.ruff] repeats them for its editor.
+[lint.per-file-ignores]
+# A context function takes keyword arguments only, so a call names what it passes.
+"!**/src/*/contexts/**" = ["PLR0917"]
+# Generated from the vendor's spec, so its field names are the vendor's.
+"**/src/*/upstream/generated/**" = ["N815"]
 
 [lint.pydocstyle]
 convention = "google"

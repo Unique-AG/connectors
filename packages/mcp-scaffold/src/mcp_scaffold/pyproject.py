@@ -1,31 +1,25 @@
-"""`pyproject.toml`: the description, the dependencies the choices bring and the import
-contracts."""
+"""What `pyproject.toml` depends on, for the choices of a new MCP."""
 
-import json
-import re
 from pathlib import Path
 
-from mcp_architecture import render_importlinter
+from pydantic import BaseModel
 
 from mcp_scaffold.options import Options, Persistence, Upstream
-from mcp_scaffold.pins import pinned, shared, source
-from mcp_scaffold.skeleton import PACKAGE, quoted
+from mcp_scaffold.pins import pinned, shared
 
 
-def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
-    pyproject = target / "pyproject.toml"
-    text = pyproject.read_text()
-    text = re.sub(
-        r'^description = ".*"$',
-        lambda _: f"description = {quoted(options.description)}",
-        text,
-        count=1,
-        flags=re.MULTILINE,
-    )
+class Dependencies(BaseModel):
+    runtime: list[str]
+    dev: list[str]
+    shared: list[str]
+    """The packages from `packages/`, each a `[tool.uv.sources]` path."""
+
+
+def dependencies(options: Options, repo: Path) -> Dependencies:
     openapi = options.upstream is Upstream.OPENAPI
     # Every upstream client retries with mcp-openapi's RetryAfterPolicy.
     uses_mcp_openapi = options.opens_upstream
-    dependencies = [
+    runtime = [
         *pinned("service"),
         shared(repo, "mcp-configs"),
         *([shared(repo, "mcp-openapi")] if uses_mcp_openapi else []),
@@ -38,24 +32,8 @@ def edit_pyproject(options: Options, target: Path, repo: Path) -> None:
         *([shared(repo, "mcp-openapi", "[codegen]")] if openapi else []),
         *(pinned("service-postgres-dev") if Persistence.POSTGRES in options.persistence else []),
     ]
-    packages = ["mcp-architecture", "mcp-configs", *(["mcp-openapi"] if uses_mcp_openapi else [])]
-    for old, new in [
-        ("dependencies = []\n", dependency_array("dependencies", dependencies)),
-        ("dev = []\n", dependency_array("dev", dev)),
-        (
-            "[tool.uv.sources]\n",
-            "[tool.uv.sources]\n" + "".join(f"{source(p)}\n" for p in packages),
-        ),
-        ("[tool.importlinter]\n", render_importlinter(PACKAGE)),
-    ]:
-        assert old in text, f"the skeleton's pyproject.toml no longer has {old!r}"
-        text = text.replace(old, new, 1)
-    if not openapi:
-        text = re.sub(r"\n\[tool\.mcp-openapi\]\n(?:[^\n]+\n)*", "", text)
-        text = re.sub(r"# Generated from the vendor's spec.*\n.*vendor_responses.*\n", "", text)
-    pyproject.write_text(text)
-
-
-def dependency_array(key: str, dependencies: list[str]) -> str:
-    listed = "".join(f"    {json.dumps(dependency)},\n" for dependency in sorted(dependencies))
-    return f"{key} = [\n{listed}]\n"
+    return Dependencies(
+        runtime=sorted(runtime),
+        dev=sorted(dev),
+        shared=["mcp-architecture", "mcp-configs", *(["mcp-openapi"] if uses_mcp_openapi else [])],
+    )

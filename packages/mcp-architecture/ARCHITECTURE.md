@@ -42,7 +42,8 @@ version bump:
 A change to `packages/mcp-scaffold` only reaches the MCPs it makes next.
 
 A file the scaffold wrote starts with a comment such as
-`# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T09:30:00+00:00`. Leave it on a file you
+`# mcp-scaffold-commit: 3f2a9c1e5b7d, timestamp: 2026-10-21T09:30:00+00:00`, the commit the
+scaffold ran from. Leave it on a file you
 edit, and drop it from a scaffold file you rewrite from scratch. Never add one to a file you
 write, even one modelled on a stamped file, nor to a file a tool writes, such as `uv.lock`, the
 codegen's output, an Alembic migration or the tool surface snapshot.
@@ -91,7 +92,7 @@ unused `upstream`, `persistence` or `utils` stays as an `__init__.py` with an em
 | No package imports its siblings in a cycle (`a → b → c → a`), at any depth: features in `contexts/`, folders in `mcp/`, modules inside a feature. | import-linter `acyclic_siblings` contract |
 | `contexts/` and `persistence/` import nothing from `fastmcp`, `mcp` or `mcp_types` themselves. | import-linter `forbidden` contract |
 | Every folder with Python code has an `__init__.py`, since import-linter does not see the others. | ruff `INP001` |
-| A context function takes keyword arguments only: `def f(*, a, b)`. | ruff `PLR0917`, which `[tool.ruff.lint.per-file-ignores]` turns off outside `contexts/` |
+| A context function takes keyword arguments only: `def f(*, a, b)`. | ruff `PLR0917`, which `code_style.toml` turns off outside `contexts/` |
 | Imports are absolute. | ruff `TID252` |
 | What a past fix replaced stays replaced: a pydantic model, not a `dataclass`; `httpx2.URL` or `HttpUrl`, not `urllib.parse`; `mcp_configs.PostgresSettings`, not `ssl.create_default_context`; a Jinja2 template, not `html.escape`; `cryptography.fernet`, not `cryptography.hazmat`. | ruff `TID251` |
 | The [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), as far as ruff checks it, with three departures: lines run to 100 characters, a docstring is only for what the code cannot say, and its summary may run onto a second line. Besides it: no `print`, `pathlib` over `os.path`, no `else` after `return`, a long string split by implicit concatenation rather than `+`, and an error logged in an `except` with its traceback. | ruff, with `code_style.toml` |
@@ -103,7 +104,8 @@ unused `upstream`, `persistence` or `utils` stays as an `__init__.py` with an em
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run mcp-architecture-check` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run mcp-architecture-check` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run mcp-architecture-check` |
-| `[tool.importlinter]` keeps every contract and option the scaffold wrote. `[tool.ruff]` and `[tool.basedpyright]` extend the shared files, set only the keys [`guides/configuration.md`](guides/configuration.md) lists and turn no rule down. No `.basedpyright/` baseline. | `uv run mcp-architecture-check` |
+| Nothing in the MCP loosens the code style or the shared import contracts: CI passes ruff `code_style.toml` and import-linter the shared contracts itself, whatever `[tool.ruff]` or `[tool.importlinter]` says. | `uv run mcp-architecture-lint`, `uv run mcp-architecture-imports` |
+| `[tool.basedpyright]` extends the shared file, sets only the keys [`guides/configuration.md`](guides/configuration.md) lists and turns no report down. No `pyrightconfig.json`, no `.basedpyright/` baseline. | `uv run mcp-architecture-check` |
 | `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
 
 Never loosen a rule to make a change pass. Move the code to where it belongs, or name the rule in
@@ -128,7 +130,7 @@ behind them:
 | `Upstream` | `Persistence` | What the contexts receive |
 | `UpstreamSettings` | `PersistenceSettings` | Its settings, read from the environment |
 | `open_upstream(settings, transport)` | `open_persistence(settings)` | An async context manager the server lifespan opens. `transport` stands in for the upstream in tests. An OpenAPI upstream takes `open_upstream(http, settings)`, the client it shares with the tools served from the spec |
-| `UpstreamError` | | A `ToolError`, so an upstream failure reaches the client as is |
+| `UpstreamError` | | A `ToolError`, so it passes through a context and reaches the client with the status, method and URL. [`guides/upstream.md`](guides/upstream.md) says where the error body goes |
 
 `Upstream` is the client's own type: an alias of `OperationClient` for OpenAPI, and the class in
 `upstream/client.py` for a custom upstream. It is not an abstraction: a context calls the
@@ -142,10 +144,10 @@ uv sync
 # every check CI runs, in its order
 bash ../../scripts/check-python-service.sh .
 # or one at a time
-uv run ruff format . && uv run ruff check .
+uv run mcp-architecture-lint --fix      # ruff format and check, with the shared code style
 uv run basedpyright
-uv run lint-imports
-uv run mcp-architecture-check            # --update records the tool surface and restores [tool.importlinter]
+uv run mcp-architecture-imports          # the shared import contracts, then the MCP's own
+uv run mcp-architecture-check            # --update records the tool surface
 uv run pytest
 # serve on http://127.0.0.1:8000/mcp, after cp .env.example .env
 uv run <name>

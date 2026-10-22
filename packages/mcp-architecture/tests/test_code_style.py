@@ -6,30 +6,27 @@ from typing import cast
 import pytest
 from ruff.__main__ import find_ruff_bin
 
-import mcp_architecture
-
-CODE_STYLE = Path(mcp_architecture.__file__).parent / "code_style.toml"
+from mcp_architecture.lint import CODE_STYLE
 
 
-@pytest.fixture
-def service(tmp_path: Path) -> Path:
-    """A service whose [tool.ruff] is the one the scaffold writes."""
-    (tmp_path / "pyproject.toml").write_text(
-        f'[tool.ruff]\nextend = "{CODE_STYLE}"\n\n'
-        '[tool.ruff.lint.per-file-ignores]\n"!src/shop/contexts/**" = ["PLR0917"]\n'
-    )
-    return tmp_path
-
-
-def findings(service: Path, relative: str, text: str) -> list[str]:
-    """The codes ruff finds in `relative`, a module of `shop` in its own package."""
-    path = service / "src" / "shop" / relative
+def findings(tmp_path: Path, relative: str, text: str) -> list[str]:
+    """The codes ruff finds in `relative`, a module of `shop` in its own package, with the code
+    style passed as `mcp-architecture-lint` passes it."""
+    path = tmp_path / "src" / "shop" / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     (path.parent / "__init__.py").write_text("")
     path.write_text(text)
     result = subprocess.run(
-        [find_ruff_bin(), "check", "--no-cache", "--output-format=json", str(path)],
-        cwd=service,
+        [
+            find_ruff_bin(),
+            "check",
+            "--no-cache",
+            "--output-format=json",
+            "--config",
+            CODE_STYLE,
+            str(path),
+        ],
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         check=False,
@@ -49,24 +46,24 @@ def findings(service: Path, relative: str, text: str) -> list[str]:
         "from cryptography.hazmat.primitives.ciphers.aead import AESGCM\n",
     ],
 )
-def test_an_api_a_past_fix_replaced_is_banned(service: Path, source: str) -> None:
-    assert "TID251" in findings(service, "upstream/client.py", source)
+def test_an_api_a_past_fix_replaced_is_banned(tmp_path: Path, source: str) -> None:
+    assert "TID251" in findings(tmp_path, "upstream/client.py", source)
 
 
-def test_a_context_function_takes_keyword_arguments_only(service: Path) -> None:
+def test_a_context_function_takes_keyword_arguments_only(tmp_path: Path) -> None:
     source = "def get_product(product_id: str) -> str:\n    return product_id\n"
 
-    assert findings(service, "contexts/products/get_product.py", source) == ["PLR0917"]
-    assert findings(service, "mcp/tools/get_product.py", source) == []
+    assert findings(tmp_path, "contexts/products/get_product.py", source) == ["PLR0917"]
+    assert findings(tmp_path, "mcp/tools/get_product.py", source) == []
 
 
-def test_a_string_split_with_a_plus_breaks_the_style(service: Path) -> None:
+def test_a_string_split_with_a_plus_breaks_the_style(tmp_path: Path) -> None:
     source = 'NOTE = (\n    "first half, "\n    + "second half"\n)\n'
 
-    assert findings(service, "telemetry/notes.py", source) == ["ISC003"]
+    assert findings(tmp_path, "telemetry/notes.py", source) == ["ISC003"]
 
 
-def test_a_docstring_summary_may_run_onto_a_second_line(service: Path) -> None:
+def test_a_docstring_summary_may_run_onto_a_second_line(tmp_path: Path) -> None:
     source = (
         "def total() -> int:\n"
         '    """Adds up every order the shop took today, including the ones it refunded\n'
@@ -75,4 +72,4 @@ def test_a_docstring_summary_may_run_onto_a_second_line(service: Path) -> None:
         "    return 0\n"
     )
 
-    assert findings(service, "telemetry/totals.py", source) == []
+    assert findings(tmp_path, "telemetry/totals.py", source) == []

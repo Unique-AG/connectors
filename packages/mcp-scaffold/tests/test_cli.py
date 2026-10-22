@@ -262,6 +262,25 @@ def test_a_failed_check_prints_how_to_undo_the_run(monkeypatch: pytest.MonkeyPat
     )
 
 
+@pytest.mark.usefixtures("repo")
+def test_any_other_failure_prints_how_to_undo_the_run_and_is_raised(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def failing_scaffold(*_arguments: object, **_options: object) -> Path:
+        raise AssertionError("pnpm-workspace.yaml excludes no Python service")
+
+    monkeypatch.setattr(cli, "scaffold", failing_scaffold)
+    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "new", "weather-mcp", *VALID_ARGUMENTS])
+
+    with pytest.raises(AssertionError, match="excludes no Python service"):
+        main()
+
+    assert capsys.readouterr().err == (
+        "The run stopped in services/weather-mcp, as printed below. Undo the run from the "
+        "repository root:\n  git checkout . && git clean -fdx services/weather-mcp\n"
+    )
+
+
 def test_a_run_without_a_release_registers_the_mcp_but_no_release(
     repo: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -289,3 +308,12 @@ def test_a_run_without_a_release_registers_the_mcp_but_no_release(
     }
     assert "probe-cli-mcp = services/probe-cli-mcp/**" in after[".gitcommitizen"]
     assert '"!services/probe-cli-mcp"' in after["pnpm-workspace.yaml"]
+    head = subprocess.run(
+        ["git", "rev-parse", "--short=12", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    pyproject = (repo / "services" / "probe-cli-mcp" / "pyproject.toml").read_text()
+    assert pyproject.startswith(f"# mcp-scaffold-commit: {head}, timestamp: ")
