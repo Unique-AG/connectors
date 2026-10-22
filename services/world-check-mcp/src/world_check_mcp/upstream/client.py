@@ -105,7 +105,15 @@ def _without_signed_headers(spec: dict[str, object]) -> dict[str, object]:
     if not isinstance(paths, dict):
         return spec
     items = cast(dict[object, object], paths)
-    return {**spec, "paths": {str(path): _path_item(item) for path, item in items.items()}}
+    return {
+        **spec,
+        "paths": {_callable_path(str(path)): _path_item(item) for path, item in items.items()},
+    }
+
+
+def _callable_path(path: str) -> str:
+    """Drop the catch-all marker so `{*caseId}` lines up with the parameter `caseId`."""
+    return path.replace("{*", "{")
 
 
 def _path_item(item: object) -> object:

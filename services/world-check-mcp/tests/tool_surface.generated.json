@@ -39,5 +39,589 @@
       "x-fastmcp-top-level-schema": "ApiInfo"
     },
     "title": "Get Api Info"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get a saved case by its internal caseSystemId or its exact external caseId.\n\nAn internal id is tried first. Use the returned case_system_id with the other case tools.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "lifecycle_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "type": "string"
+        },
+        "provider_types": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "provider_types"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Translate an external caseId into the internal caseSystemId the other tools use.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "description": "External caseId. `get_case_reference` returns its caseSystemId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_reference",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "type": "string"
+        },
+        "case_system_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Reference"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening\nor resolving a match.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_group_settings",
+    "outputSchema": {
+      "$defs": {
+        "Group": {
+          "properties": {
+            "child_groups": {
+              "items": {
+                "$ref": "#/$defs/Group"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "type": "object"
+        },
+        "ResolutionOption": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "status_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ],
+          "type": "object"
+        },
+        "ResolutionToolkit": {
+          "properties": {
+            "provider_type": {
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            },
+            "risks": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            },
+            "statuses": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "provider_type",
+            "statuses",
+            "risks",
+            "reasons"
+          ],
+          "type": "object"
+        },
+        "SecondaryField": {
+          "properties": {
+            "entity_type": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "type_id": {
+              "type": "string"
+            },
+            "value_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "entity_type",
+            "type_id",
+            "label",
+            "value_type",
+            "required"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/Group"
+        },
+        "mandatory_provider_types": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "screening_type": {
+          "type": "string"
+        },
+        "secondary_fields": {
+          "items": {
+            "$ref": "#/$defs/SecondaryField"
+          },
+          "type": "array"
+        },
+        "toolkits": {
+          "items": {
+            "$ref": "#/$defs/ResolutionToolkit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "group",
+        "screening_type",
+        "mandatory_provider_types",
+        "secondary_fields",
+        "toolkits"
+      ],
+      "type": "object"
+    },
+    "title": "Get Group Settings"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get the World-Check record for a match: its names and categories.\n\nPass the match's referenceId, not its resultId.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reference_id": {
+          "description": "World-Check record referenceId from a screening match, not its resultId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_profile",
+    "outputSchema": {
+      "properties": {
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reference_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id",
+        "entity_type",
+        "names",
+        "categories"
+      ],
+      "type": "object"
+    },
+    "title": "Get Profile"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Look up country codes, passport nationalities, providers, case-search filters, or API info.\n\nWATCHLIST nationality and residence use countries. Passport issuing state and nationality\nuse nationalities.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "countries for WATCHLIST ISO alpha-3 codes. nationalities for passport ICAO codes. providers, search_filters, or api_info.",
+          "enum": [
+            "countries",
+            "nationalities",
+            "providers",
+            "search_filters",
+            "api_info"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "name": "get_reference_data",
+    "outputSchema": {
+      "properties": {
+        "api_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "countries",
+            "nationalities",
+            "providers",
+            "search_filters",
+            "api_info"
+          ],
+          "type": "string"
+        },
+        "names_by_code": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "providers": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "code",
+                  "identifier",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "search_filters": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "fields": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "query",
+                      "custom",
+                      "filter"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "fields"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "system_date_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "title": "Get Reference Data"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List the LSEG groups this service account can screen in, including descendant groups.\n\nCall it before screening, then pass a group id to `get_group_settings`.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_groups",
+    "outputSchema": {
+      "$defs": {
+        "Group": {
+          "properties": {
+            "child_groups": {
+              "items": {
+                "$ref": "#/$defs/Group"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "result": {
+          "items": {
+            "$ref": "#/$defs/Group"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List Groups"
   }
 ]

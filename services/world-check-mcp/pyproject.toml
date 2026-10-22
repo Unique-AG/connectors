@@ -79,7 +79,19 @@ mcp-openapi = { path = "../../packages/mcp-openapi" }
 
 [tool.mcp-openapi]
 spec = "src/world_check_mcp/upstream/openapi.yml"
-operation-ids = ["getApiInfo"]
+operation-ids = [
+    "getApiInfo",
+    "getCaseReference",
+    "getCaseTemplateForGroup",
+    "getCountries",
+    "getGroupById",
+    "getGroups",
+    "getNationalities",
+    "getProviders",
+    "getRecord",
+    "getResolutionToolkitsForGroup",
+    "getSearchFilters",
+]
 operation-module = "mcp_openapi.upstream"
 models-module = "world_check_mcp.upstream.generated.vendor_responses"
 models-output = "src/world_check_mcp/upstream/generated/vendor_responses.py"
