@@ -7,8 +7,12 @@ testing `create_app` itself, which is where the wiring lives that is easiest to 
 These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
 """
 
+import asyncio
 import json
-from collections.abc import Iterator
+import logging
+import time
+from collections.abc import AsyncGenerator, Iterator
+from contextlib import asynccontextmanager
 from typing import Protocol, cast
 
 import pytest
@@ -24,6 +28,7 @@ from backstop_mcp.backstop_client import SYSTEM_INFO_PATH
 from backstop_mcp.config import BackstopConfig
 from backstop_mcp.dependencies import (
     get_backstop_client_factory,
+    get_engine,
     retry_settings,
     transport_settings,
 )
@@ -304,6 +309,62 @@ class TestReadyReportsDatabaseUnreachable:
         body = response.json()
         assert body["status"] == "unhealthy"
         assert _checks(body)["database"] is False
+
+
+@asynccontextmanager
+async def _hang_connect(_engine: object) -> AsyncGenerator[None]:
+    await asyncio.sleep(10)
+    yield None
+
+
+class TestReadyTransitions:
+    def test_a_hung_check_returns_503_within_the_budget(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        app = create_app()
+        engine = get_engine()
+
+        with TestClient(app) as client:
+            monkeypatch.setattr(type(engine), "connect", _hang_connect)
+            started = time.monotonic()
+            response = _get(client, "/ready")
+            elapsed = time.monotonic() - started
+
+        assert response.status_code == 503
+        assert _checks(response.json())["database"] is False
+        assert elapsed < 3
+
+    def test_two_failures_log_one_warning_and_recovery_logs_info(
+        self,
+        postgres_container: PostgresContainer,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        app = create_app()
+        engine = get_engine()
+        original = type(engine).connect
+
+        caplog.set_level(logging.INFO)
+        with TestClient(app) as client:
+            monkeypatch.setattr(type(engine), "connect", _hang_connect)
+            assert _get(client, "/ready").status_code == 503
+            assert _get(client, "/ready").status_code == 503
+            monkeypatch.setattr(type(engine), "connect", original)
+            recovered = _get(client, "/ready")
+
+        assert recovered.status_code == 200
+        unreachable = [
+            item for item in caplog.records if item.message == "ready.database_unreachable"
+        ]
+        assert len(unreachable) == 1
+        assert unreachable[0].levelno == logging.WARNING
+        assert unreachable[0].exc_info is None
+        assert any(
+            item.message == "ready.database_recovered" and item.levelno == logging.INFO
+            for item in caplog.records
+        )
 
 
 class TestToolRegistration:
