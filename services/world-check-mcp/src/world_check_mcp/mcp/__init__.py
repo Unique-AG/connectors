@@ -1,7 +1,17 @@
 # mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
 
+from world_check_mcp.mcp.auth import AuthMode
+from world_check_mcp.mcp.auth import AuthSettings
+from world_check_mcp.mcp.auth import create_auth
 from world_check_mcp.mcp.http import http_app
 from world_check_mcp.mcp.http import run_server
 from world_check_mcp.mcp.server import create_server
 
-__all__ = ["create_server", "http_app", "run_server"]
+__all__ = [
+    "AuthMode",
+    "AuthSettings",
+    "create_auth",
+    "create_server",
+    "http_app",
+    "run_server",
+]
