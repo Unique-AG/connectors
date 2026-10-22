@@ -26,7 +26,7 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ async def attach_file(
     secondary_party_id = (
         activity.secondary_party_id if isinstance(activity, DocumentFileInput) else None
     )
-    annotate_tool_call(kind=activity.kind, search_type=party.search_type, party_id=party.id)
+    add_call_fields(kind=activity.kind, search_type=party.search_type, party_id=party.id)
     return await attach_file_command.run(
         activity=activity,
         party_id=party.id,

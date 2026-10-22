@@ -32,7 +32,7 @@ from backstop_mcp.features.elicitation_utils import (
 )
 from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call, info_event
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ async def delete_activity(
 
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>"}}
     """
-    annotate_tool_call(kind=activity.kind, activity_id=activity.activity_id)
+    add_call_fields(kind=activity.kind, activity_id=activity.activity_id)
 
     async def prompt() -> str:
         return await _deletion_prompt(

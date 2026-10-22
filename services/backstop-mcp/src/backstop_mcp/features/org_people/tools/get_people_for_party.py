@@ -42,7 +42,7 @@ from backstop_mcp.features.resolution import (
     input_required,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ async def get_people_for_party(
         return unresolved_party_response(result)
 
     party = result.value
-    annotate_tool_call(entity_id=party.id, include_former=include_former)
+    add_call_fields(entity_id=party.id, include_former=include_former)
     try:
         listing = await get_people_for_organization_query.run(
             organization_id=party.id,
@@ -142,7 +142,7 @@ async def get_people_for_party(
         if exc.status_code == HTTPStatus.NOT_FOUND:
             return NotFoundResponse(query=party.id, scope="organizations")
         raise
-    annotate_tool_call(
+    add_call_fields(
         entity_id=party.id,
         returned=len(listing.people),
         former_omitted=listing.former_omitted,

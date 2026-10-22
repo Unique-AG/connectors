@@ -29,7 +29,7 @@ from backstop_mcp.features.org_people import (
 from backstop_mcp.features.org_people.dependencies import get_search_people_query_factory
 from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +295,7 @@ async def search_people(
     skip_custom_fields = exclude_custom_fields and not custom_fields
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
-    annotate_tool_call(
+    add_call_fields(
         has_name=name is not None,
         last_name=last_name is not None,
         email=email is not None,

@@ -30,7 +30,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import Resolved, input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call, info_event
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ async def delete_organization(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    annotate_tool_call(search_type=party.search_type, party_id=party.id)
+    add_call_fields(search_type=party.search_type, party_id=party.id)
 
     async def prompt() -> str:
         return await delete_party_with_locations_command.preview(

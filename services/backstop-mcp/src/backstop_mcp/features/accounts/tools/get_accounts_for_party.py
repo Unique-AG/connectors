@@ -55,7 +55,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call, info_event
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ async def get_accounts_for_party(
         return unresolved_party_response(result)
 
     party = result.value
-    annotate_tool_call(segment=party.search_type, entity_id=party.id, include_closed=include_closed)
+    add_call_fields(segment=party.search_type, entity_id=party.id, include_closed=include_closed)
     listing = await get_holdings_query.run(owner_id=party.id, include_closed=include_closed)
     if _listing_is_empty(listing) and party.name is None:
         confirmed = await _confirm_party(get_party_name_query, party)
@@ -160,7 +160,7 @@ async def get_accounts_for_party(
             # reason this check ran at all is in the module docstring and the log line above.
             return NotFoundResponse(query=party.id, scope=party.search_type)
         party = confirmed
-    annotate_tool_call(
+    add_call_fields(
         segment=party.search_type,
         entity_id=party.id,
         source=listing.source,

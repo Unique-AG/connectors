@@ -16,7 +16,7 @@ from backstop_mcp.features.activity_writes import (
     get_update_activity_command_factory,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -49,5 +49,5 @@ async def update_activity(
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>",
     "title": "Corrected title"}}
     """
-    annotate_tool_call(kind=activity.kind, activity_id=activity.activity_id)
+    add_call_fields(kind=activity.kind, activity_id=activity.activity_id)
     return await update_activity_command.run(activity=activity)

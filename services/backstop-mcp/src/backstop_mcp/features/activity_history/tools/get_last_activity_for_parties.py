@@ -27,7 +27,7 @@ from backstop_mcp.features.activity_history.dependencies import (
 )
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.models import CoercedId, published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ async def get_last_activity_for_parties(
     selected_types = tuple(types) if types else _SUBSTANTIVE_TYPES
     keys: list[tuple[str, SearchType]] = [(party.party_id, party.search_type) for party in parties]
     distinct = tuple(dict.fromkeys(keys))
-    annotate_tool_call(parties=len(distinct), types=list(selected_types))
+    add_call_fields(parties=len(distinct), types=list(selected_types))
     outcomes = await get_last_activity_for_parties_query.run(
         parties=distinct, start_date=start, end_date=end, types=selected_types
     )

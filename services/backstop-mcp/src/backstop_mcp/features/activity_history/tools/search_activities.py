@@ -51,7 +51,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import CoercedId, published_output_schema
-from backstop_mcp.observability import annotate_tool_call, failure_event
+from backstop_mcp.observability import add_call_fields, failure_event
 from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
@@ -446,7 +446,7 @@ async def search_activities(
         },
     )
 
-    annotate_tool_call(
+    add_call_fields(
         mode=mode,
         include_description=include_description,
         party=None if resolved_party is None else resolved_party.id,

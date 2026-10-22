@@ -35,7 +35,7 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.features.activity_history.dependencies import get_activity_detail_query_factory
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -87,14 +87,14 @@ async def get_activity_detail(
     """
     _ = ctx
     handle = parse_activity_detail_handle(activity_id)
-    annotate_tool_call(
+    add_call_fields(
         activity_id=activity_id,
         resource_type=handle.resource_type,
         resource_id=handle.resource_id,
         meeting_or_call=handle.resource_type == "meeting-or-calls",
     )
     result = await get_activity_detail_query.run(activity_id=activity_id, handle=handle)
-    annotate_tool_call(
+    add_call_fields(
         activity_id=activity_id,
         type=result.type,
         attendees=len(result.attendees),
