@@ -175,7 +175,7 @@ class TestOperation:
         assert not any(item.message == "reports.fetch.completed" for item in caplog.records)
 
 
-class TestAnnotateToolCall:
+class TestAddCallFields:
     def test_inside_a_scope_the_fields_are_collected(self) -> None:
         with tool_call_scope() as call:
             add_call_fields(returned=3, segment="people")
