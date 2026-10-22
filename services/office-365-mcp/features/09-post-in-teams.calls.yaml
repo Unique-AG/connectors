@@ -24,9 +24,10 @@ uc-09-03:
     - tool: teams_list_chat_members
       uses: {chat_id: id of the chat}
     - tool: teams_send_chat_message
+      optional: true
       args: {mentions: Priya}
       uses: {chat_id: id of the chat}
-  note: the tool refuses a mention of a person who is not a member, before it asks
+  note: the member list shows that Priya is absent, so the assistant needs no send call. If it sends, the tool refuses a mention of a person who is not a member, before it asks. The id of Priya comes from another chat, because no tool turns a name into an id.
 
 uc-09-04:
   provenance: drafted
@@ -45,10 +46,13 @@ uc-09-05:
   provenance: drafted
   asks_user: true
   chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
     - tool: sharepoint_search_files
       args: {query: Q3 Plan}
     - tool: teams_send_channel_message_with_files
-      uses: {attachments: handle of the file from the search}
+      uses: {team_id: id of the team, channel_id: id of the channel, attachments: uri of the file from the search}
 
 uc-09-06:
   provenance: drafted

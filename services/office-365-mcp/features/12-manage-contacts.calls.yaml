@@ -3,9 +3,11 @@ uc-12-01:
   asks_user: false
   chain:
     - tool: outlook_list_contacts
-      args: {limit: 20}
+      args: {limit: 200}
     - tool: outlook_read_contact
+      optional: true
       uses: {uri: uri of the contact}
+  note: the listing has no name filter and already holds the numbers, so the assistant reads the names and checks that capped is false
 
 uc-12-02:
   provenance: drafted

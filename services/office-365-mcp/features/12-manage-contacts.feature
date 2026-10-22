@@ -7,7 +7,7 @@ Feature: Managing contacts
 
     @uc-12-01
     Scenario: A phone number is found in a contact
-      Given Mia has the contact Anna Meier with the telephone number "+41 44 555 01 01"
+      Given Mia has 120 contacts, and one is Anna Meier with the telephone number "+41 44 555 01 01"
       When Mia asks her assistant for the telephone number of Anna Meier
       Then the assistant answers "+41 44 555 01 01"
 

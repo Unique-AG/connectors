@@ -44,7 +44,8 @@ Feature: Working with notes in OneNote
     Scenario: A sentence is changed in place
       Given the page "Planning" states "Launch on 14 June" in its second paragraph
       When Mia asks her assistant to change that date to 21 June
-      Then the second paragraph states "Launch on 21 June"
+      Then Mia is asked to approve the change first
+      And after she approves, the second paragraph states "Launch on 21 June"
       But the other paragraphs are unchanged
 
     @uc-08-07

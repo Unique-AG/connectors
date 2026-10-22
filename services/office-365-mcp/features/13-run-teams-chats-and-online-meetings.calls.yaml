@@ -1,12 +1,18 @@
 uc-13-01:
   provenance: drafted
   asks_user: true
+  chain: []
+  note: the cause is the tool. teams_create_chat needs the Entra id of each member. No tool turns a name into that id, and the id comes only from get_me, a chat member row, or a message sender. outlook_find_recipient gives an address and no id.
+
+uc-13-07:
+  provenance: drafted
+  asks_user: true
   chain:
-    - tool: outlook_find_recipient
-      optional: true
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
     - tool: teams_create_chat
       args: {chat_type: group, topic: Launch}
-      uses: {members: user id and name of Anna and Tom}
+      uses: {members: user id and name of Anna and Tom from the member rows}
 
 uc-13-02:
   provenance: drafted
@@ -14,9 +20,25 @@ uc-13-02:
   chain:
     - tool: teams_list_chats
       args: {topic_contains: Launch}
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
     - tool: teams_add_chat_member
       args: {share_history: true}
-      uses: {chat_id: id of the chat, member: user id and name of Priya}
+      uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
+  note: with share_history true, the question states that the new member sees all earlier messages. A person with no shared chat is the gap of uc-13-01.
+
+uc-13-08:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: teams_add_chat_member
+      args: {share_history: false}
+      uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
+  note: the default is share_history false. The question states that the new member does not see the earlier messages, and the answer repeats that choice.
 
 uc-13-03:
   provenance: drafted
@@ -33,16 +55,19 @@ uc-13-04:
   chain:
     - tool: teams_list_chats
       args: {chat_type: oneOnOne}
-    - tool: teams_add_chat_member
-      uses: {chat_id: id of the chat}
-  note: Microsoft refuses an addition to a one-to-one chat
+  must_not: [teams_add_chat_member]
+  note: teams_add_chat_member does not check the chat type. It asks Mia, and then Microsoft refuses. The assistant reads the chat type first and does not call the tool.
 
 uc-13-05:
   provenance: drafted
   asks_user: true
   chain:
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
     - tool: teams_create_meeting
-      args: {subject: Design review, starts_at: tomorrow 14:00, ends_at: tomorrow 14:30, attendees: Anna and Tom}
+      args: {subject: Design review, starts_at: tomorrow 14:00, ends_at: tomorrow 14:30}
+      uses: {attendees: user id and name of Anna and Tom from the member rows}
+  note: the meeting is standalone. It is on no calendar, and the tool sends no invitation. outlook_create_event with an online meeting sends one.
 
 uc-13-06:
   provenance: drafted

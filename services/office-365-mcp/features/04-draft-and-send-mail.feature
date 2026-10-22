@@ -21,8 +21,8 @@ Feature: Drafting and sending mail
       But it does not create the draft yet
 
     @uc-04-03
-    Scenario: A person who is away is announced before the draft is sent
-      Given Anna has an automatic reply turned on
+    Scenario: Mia asks whether Anna is away
+      Given Anna works in Mia's organization and has an automatic reply turned on
       When Mia asks her assistant whether Anna is away
       Then the assistant tells Mia the text of the automatic reply of Anna
 
@@ -33,6 +33,7 @@ Feature: Drafting and sending mail
       Given Mia has a draft to Anna with 4 paragraphs
       When Mia asks her assistant to make the draft shorter
       Then the same draft has fewer words
+      And the shorter text still names the same facts
       But Mia's mailbox holds no second draft
 
     @uc-04-05
@@ -40,6 +41,7 @@ Feature: Drafting and sending mail
       Given Mia has a draft addressed to Tom
       When Mia asks her assistant to copy Tom on the draft as well
       Then the assistant tells Mia that Tom is already on the draft
+      But the draft stays as it is until Mia chooses
 
   Rule: Nothing is sent without Mia's approval
 
@@ -65,6 +67,14 @@ Feature: Drafting and sending mail
       Then Anna receives nothing
       And the assistant tells Mia that the draft changed
 
+    @uc-04-12
+    Scenario: Mia is warned about an automatic reply before a send
+      Given Mia has a draft addressed to Anna
+      And Anna works in Mia's organization and has an automatic reply turned on
+      When Mia asks her assistant to send the draft
+      Then the assistant tells Mia about the automatic reply of Anna
+      And Mia is asked to approve that the draft is sent
+
   Rule: A reply keeps the conversation
 
     @uc-04-09
@@ -77,7 +87,7 @@ Feature: Drafting and sending mail
     @uc-04-10
     Scenario: A forward carries the original attachments
       Given Anna sent Mia "Contract draft" with the attachment "Draft v2.docx"
-      When Mia asks her assistant to forward "Contract draft" to Tom
+      When Mia asks her assistant to forward "Contract draft" to Tom with a short note
       Then the draft to Tom holds "Draft v2.docx"
 
     @known-gap @uc-04-11

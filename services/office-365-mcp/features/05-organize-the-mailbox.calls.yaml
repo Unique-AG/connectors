@@ -1,13 +1,13 @@
 uc-05-01:
-  provenance: observed
+  provenance: drafted
   evidence: outlook_list_mail then outlook_move_mail in 3 sessions; one session made 20 consecutive outlook_move_mail calls
   asks_user: false
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_browse_folders
-      optional: true
+      repeat: many
     - tool: outlook_move_mail
-      uses: {message_refs: all uri values from the previous listing}
+      uses: {message_refs: all uri values from the previous listing, folder_ref: uri of Newsletters from outlook_browse_folders}
   note: the tool takes many handles in one call. 20 consecutive calls may mean one call for each message. The server logs hold no arguments, so this is not checked.
 
 uc-05-02:
@@ -28,6 +28,17 @@ uc-05-03:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_move_mail
       uses: {message_refs: uri values from the previous listing and never a subject}
+  note: a value that is not a handle stops the whole batch before any move
+
+uc-05-16:
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_move_mail
+      args: {destination: archive}
+      uses: {message_refs: uri values from the previous listing}
+  note: the tool moves each message on its own, and it reports an error only when no message moved
 
 uc-05-04:
   provenance: drafted
@@ -43,10 +54,12 @@ uc-05-05:
   asks_user: true
   chain:
     - tool: outlook_list_mail
-      args: {mailbox: support}
+      args: {mailbox: support@example.com}
+    - tool: outlook_browse_folders
+      args: {mailbox: support@example.com}
     - tool: outlook_move_mail
-      args: {mailbox: support}
-      uses: {message_refs: uri values from the previous listing}
+      args: {mailbox: support@example.com}
+      uses: {message_refs: uri values from the previous listing, folder_ref: uri of Handled from outlook_browse_folders}
 
 uc-05-06:
   provenance: drafted
@@ -91,23 +104,26 @@ uc-05-10:
       optional: true
     - tool: outlook_create_category
       args: {name: Follow-up Q4, color: preset0}
-    - tool: outlook_search_mail
-      args: {sender: manager, flagged: false}
+    - tool: outlook_find_recipient
+      args: {query: manager}
+    - tool: outlook_list_mail
+      args: {unread_only: true}
+      uses: {from_address: address of the manager from outlook_find_recipient}
     - tool: outlook_mark_mail
       args: {add_categories: Follow-up Q4}
-      uses: {message_refs: uri values from the search}
-  note: no preset holds both outlook_create_category and outlook_mark_mail
+      uses: {message_refs: uri values from the listing}
+  note: no preset holds both outlook_create_category and outlook_mark_mail, so this needs a custom `enabled` list
 
 uc-05-11:
   provenance: drafted
   asks_user: false
   chain:
     - tool: outlook_get_mailbox_settings
-      optional: true
     - tool: outlook_browse_folders
     - tool: outlook_create_mail_rule
-      args: {display_name: Billing to Finance, conditions: sender billing, actions: move to Finance}
-  note: no preset holds both outlook_browse_folders and outlook_create_mail_rule
+      args: {display_name: Billing to Finance, conditions: sender billing}
+      uses: {sequence: next free sequence from outlook_get_mailbox_settings, actions: move_to_folder is the uri of Finance from outlook_browse_folders}
+  note: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs a custom `enabled` list
 
 uc-05-12:
   provenance: observed
@@ -116,14 +132,14 @@ uc-05-12:
   chain:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_disable_mail_rule
-      uses: {rule_ref: id of the rule Receipts}
+      uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
 
 uc-05-13:
   provenance: drafted
   asks_user: true
   chain:
     - tool: outlook_create_mail_rule
-      args: {actions: forward to Anna and Tom}
+      uses: {actions: forward_to holds the two addresses from the request}
 
 uc-05-14:
   provenance: drafted
@@ -131,7 +147,7 @@ uc-05-14:
   chain:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_delete_mail_rule
-      uses: {rule_ref: id of the rule Receipts}
+      uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
 
 uc-05-15:
   provenance: drafted

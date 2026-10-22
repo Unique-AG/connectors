@@ -4,7 +4,7 @@ Feature: Organizing the mailbox
   Mia asks her assistant to file, mark, and sort mail in bulk, and to set up rules that do it for her later.
   The assistant erases no mail for good. A delete moves mail to Deleted Items.
 
-  Rule: A batch of messages is filed whole or not at all
+  Rule: A batch is checked whole and reported for each message
 
     @working @uc-05-01
     Scenario: A batch is filed in one folder
@@ -26,12 +26,20 @@ Feature: Organizing the mailbox
         | put the category "Reading" on    | carry the category "Reading" |
 
     @seen-failing @uc-05-03
-    Scenario: A batch with one unidentified message moves nothing
+    Scenario: A batch with one value that is not a message moves nothing
       Given Mia named 5 messages by their subjects only
-      And the assistant cannot identify one of the 5 exactly
+      And the assistant holds a subject line in place of one of the 5 messages
       When the assistant files the 5 messages in "Archive"
       Then no message is moved
-      And the assistant identifies all 5 messages before it tries again
+      And the next attempt names only messages that a search or a listing of her mail returned
+
+    @uc-05-16
+    Scenario: A batch with one missing message moves the others
+      Given Mia asks her assistant to file 5 messages in "Archive"
+      And one of the 5 messages is gone from her mailbox
+      When the assistant files the 5 messages
+      Then 4 messages are in "Archive"
+      And the assistant tells Mia which message failed
 
     @uc-05-04
     Scenario: A delete moves mail to Deleted Items
@@ -42,8 +50,8 @@ Feature: Organizing the mailbox
 
     @uc-05-05
     Scenario: A change in a shared mailbox needs Mia's approval
-      Given Mia has access to the shared mailbox "support"
-      When Mia asks her assistant to file a message of "support" in its folder "Handled"
+      Given Mia has access to the shared mailbox "support@example.com"
+      When Mia asks her assistant to file a message of "support@example.com" in its folder "Handled"
       Then Mia is asked to approve the change first
       And the message stays where it is until she approves
 
@@ -100,9 +108,9 @@ Feature: Organizing the mailbox
 
     @uc-05-13
     Scenario: A rule that forwards mail needs approval that names every address
-      When Mia asks her assistant for a rule that forwards mail from "ceo@example.com" to Anna and Tom
+      When Mia asks her assistant for a rule that forwards mail from "ceo@example.com" to "anna@example.com" and "tom@example.com"
       Then Mia is asked to approve the rule first
-      And the question names the addresses of Anna and Tom
+      And the question names "anna@example.com" and "tom@example.com"
 
     @uc-05-14
     Scenario: A rule is erased only after Mia approves

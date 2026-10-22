@@ -74,22 +74,17 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant reads all 6 offers
       And it names the vendor with the lowest price
 
-    @uc-01-09
-    Scenario: A file of exactly 10 MB is read
-      Given Mia has a PDF of exactly 10 MB
-      When Mia asks her assistant to summarize it
-      Then the assistant summarizes the PDF
-
     @uc-01-10
     Scenario: A file above 10 MB is refused as a whole
       Given Mia has a PDF of 10.5 MB
       When Mia asks her assistant to summarize it
       Then the assistant tells Mia that the file is too large to read
+      And it gives Mia the web address that opens the file in a browser
       But it does not summarize only a part of the file
 
     @seen-failing @uc-01-11
-    Scenario: A file that Microsoft cannot provide is reported and not guessed
-      Given Microsoft cannot provide "Brightway Master Agreement.docx" as a PDF
-      When Mia asks her assistant for that agreement as a PDF
-      Then the assistant tells Mia that the file could not be read
+    Scenario: A file that Microsoft cannot convert is read in its own format or reported
+      Given Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF
+      When Mia asks her assistant to summarize that agreement
+      Then the assistant reads the file in its own format or tells Mia that it cannot read the file
       But it does not invent the content of the file

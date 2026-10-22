@@ -10,14 +10,14 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
     Scenario: Signed contracts move into a new folder
       Given the folder "Contracts" holds 4 signed contracts
       When Mia asks her assistant to move them into a new folder "2026 Signed"
-      Then Mia is asked to approve the change first
+      Then Mia is asked to approve each change first
       And after she approves, "2026 Signed" holds the 4 contracts with their names
 
     @uc-10-02
     Scenario: A folder is copied to another drive
       Given Mia has the folder "Template" of 20 files in her OneDrive
       When Mia asks her assistant to copy "Template" into the Sales site
-      Then the Sales site holds a copy of "Template" with 20 files
+      Then the Sales site holds a copy of "Template" with 20 files once the copy is done
       And "Template" stays in Mia's OneDrive
 
     @uc-10-03
@@ -47,11 +47,12 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       When Mia asks her assistant to give Anna edit access to "Q3 Plan.pptx"
       Then Mia is asked to approve the access first
       And after she approves, Anna can edit "Q3 Plan.pptx"
+      And Anna receives an invitation by mail
 
     @uc-10-07
     Scenario: A sharing link is created and sent to nobody
       Given Mia has the file "Q3 Plan.pptx"
-      When Mia asks her assistant for a sharing link to "Q3 Plan.pptx"
+      When Mia asks her assistant for a view-only sharing link to "Q3 Plan.pptx"
       Then the assistant gives Mia the sharing link
       But nobody receives it from the assistant
 

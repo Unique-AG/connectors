@@ -31,18 +31,21 @@ uc-04-04:
   provenance: drafted
   asks_user: false
   chain:
+    - any_of: [outlook_list_mail, outlook_read_mail]
     - tool: outlook_update_draft
       args: {body_html: shorter text}
-      uses: {message_ref: uri of the draft}
+      uses: {message_ref: uri of the draft from the listing or the earlier drafting answer}
   must_not: [outlook_draft_mail]
+  note: the tool replaces the whole body, so the assistant sends the full shorter text
 
 uc-04-05:
   provenance: drafted
   asks_user: false
   chain:
+    - tool: outlook_read_mail
+      optional: true
     - tool: outlook_update_draft
-      args: {cc: Tom}
-      uses: {message_ref: uri of the draft}
+      uses: {message_ref: uri of the draft, cc: address of Tom from the to list of the draft}
   note: the tool refuses an address in both To and Cc
 
 uc-04-06:
@@ -68,6 +71,17 @@ uc-04-08:
       uses: {message_ref: uri of the draft}
   note: the tool sends nothing when the draft changed after the question
 
+uc-04-12:
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: outlook_get_mail_tips
+      uses: {addresses: address from outlook_find_recipient}
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+
 uc-04-09:
   provenance: drafted
   asks_user: false
@@ -84,8 +98,10 @@ uc-04-10:
   chain:
     - any_of: [outlook_read_mail, outlook_search_mail]
     - tool: outlook_draft_reply
-      args: {mode: forward, to: Tom}
+      args: {mode: forward, to: Tom, body_html: short note}
       uses: {message_ref: uri of the message}
+    - tool: outlook_list_attachments
+      uses: {uri: uri of the forward draft}
 
 uc-04-11:
   provenance: drafted

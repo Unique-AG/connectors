@@ -2,9 +2,14 @@ uc-14-01:
   provenance: drafted
   asks_user: true
   chain:
+    - tool: outlook_find_recipient
+      optional: true
     - tool: outlook_list_calendars
     - tool: outlook_share_calendar
       args: {address: anna@example.com, role: read}
+      uses: {calendar_ref: handle of Mia's calendar}
+    - tool: outlook_list_calendar_shares
+      optional: true
       uses: {calendar_ref: handle of Mia's calendar}
 
 uc-14-02:
@@ -16,6 +21,7 @@ uc-14-02:
       uses: {calendar_ref: handle of Mia's calendar}
     - tool: outlook_unshare_calendar
       uses: {share_ref: handle of the share with Anna}
+  note: the row My Organization cannot be removed, so Anna may still see when Mia is free or busy if she works in Mia's company
 
 uc-14-03:
   provenance: observed
@@ -24,7 +30,7 @@ uc-14-03:
   chain:
     - tool: outlook_list_calendars
     - tool: outlook_create_event_on_behalf
-      args: {subject: Budget review}
+      args: {subject: Budget review, attendees: Anna}
       uses: {calendar_ref: handle of Lena's calendar}
 
 uc-14-04:

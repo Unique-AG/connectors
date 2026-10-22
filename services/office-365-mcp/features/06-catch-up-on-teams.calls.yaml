@@ -33,6 +33,7 @@ uc-06-04:
     - tool: teams_list_channels
       uses: {team_id: id of the team}
     - tool: teams_browse_channel
+      args: {include_window_completeness: true}
       uses: {team_id: id of the team, channel_id: id of the channel}
     - tool: teams_list_message_replies
       optional: true

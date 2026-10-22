@@ -41,7 +41,7 @@ Each entry has these keys:
 | Key | Meaning |
 | --- | --- |
 | `provenance` | `observed` when the chain is a pattern in the prod logs. `drafted` when it comes from the tool descriptions. |
-| `evidence` | For an observed chain, what the logs show. |
+| `evidence` | What the logs show. A drafted chain keeps it when the logs show only a part of the chain. |
 | `asks_user` | True when a tool in the chain asks the user to approve. |
 | `chain` | The steps, in order. A step has `tool`, or `any_of` for a choice. It can have `optional`, `repeat: many`, `args`, and `uses`. |
 | `must_not` | Tools that the assistant must not call. |
@@ -95,6 +95,11 @@ tool. Check the deployed tool list before you drop one of these files.
 
 The QA logs hold 65 events in 24 sessions, all test traffic. They do not set the order.
 
+Prod turned on 60 of the 121 tools until 2026-10-14 (monorepo PR 32074), and all 121 after that
+date. Most of the window above ran with 60 tools. In that period, 3 of the 6 tools of `01`, 2 of 10
+in `10`, 1 of 3 in `11`, 0 of 4 in `12`, and 2 of 8 in `13` were on. A zero count for these files
+does not show that nobody wants the capability.
+
 ## What the usage shows
 
 The facts:
@@ -128,14 +133,20 @@ The real flows that the sidecars use:
 
 | Scenario | Id | Cause |
 | --- | --- | --- |
-| The next meeting with a given person is found | `uc-03-05` | parameter: no attendee filter, and no attendees in a listing |
+| A number in an Excel attachment is read | `uc-02-07` | tool: `outlook_read_attachment` returns the file and does not turn it into text |
+| A refused shared mailbox is explained | `uc-02-11` | tool: `outlook_list_mail` has no advice for a refused mailbox |
 | A new file is attached to a draft | `uc-04-11` | tool: the draft tools write text only |
 | An invitation is drafted before it goes out | `uc-07-08` | graph: a calendar event has no draft state |
-| A meeting is booked on a second calendar | `uc-07-09` | parameter: `outlook_create_event` writes to the default calendar only |
+| A meeting is booked on a second calendar | `uc-07-09` | tool: `outlook_create_event` writes to the default calendar, and the description of `outlook_create_event_on_behalf` limits it to the calendar of another person |
 | A page is found by a word in its body | `uc-08-02` | graph: OneNote has no full-text search |
 | The content of an existing file is replaced | `uc-10-05` | tool: the tool creates new text files only |
 | Access is taken back | `uc-10-08` | tool: no tool removes a permission |
 | A person only in the company directory is found | `uc-12-02` | tool: `outlook_find_recipient` gives an address and no telephone number |
+| A chat is started with a person named by name | `uc-13-01` | tool: no tool turns a name into the Entra id that `teams_create_chat` needs |
+| A person is added to a chat by name | `uc-13-02` | tool: no tool turns a name into the Entra id that `teams_add_chat_member` needs |
+
+The scenario `uc-03-05` is not a gap. The assistant opens events one by one, because
+`outlook_list_events` has no attendee filter.
 
 Two scenarios need tools that no preset holds together. `uc-05-10` needs `outlook_create_category`
 and `outlook_mark_mail`. `uc-05-11` needs `outlook_browse_folders` and `outlook_create_mail_rule`.
@@ -146,11 +157,12 @@ graph.
 
 ## Open questions
 
-- Which tools does prod turn on? The answer decides what the zero counts mean.
-- Does `sharepoint_read_file` give the assistant text that it can read for each file type? The
-  scenario outline in `01` lists the types to test.
+- Does Microsoft convert each file type to a PDF that `sharepoint_read_file` can give the assistant?
+  The assistant must set `convert_to` to `pdf` to read an Office file as text. The scenario outline
+  in `01` lists the types to test.
 - Why does `outlook_move_mail` get a value that is not a handle? The server logs hold no arguments,
   so the cause is not known. Does the assistant send one message in each call? 20 consecutive calls
   in one session suggest it.
-- Do `outlook_update_event` and `outlook_cancel_event` ask Mia to approve when attendees exist? The
-  sidecars say no, and mark it as not verified.
+- Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
+  source allows it. Nobody ran it. If it works, change its description and remove `@known-gap`
+  from `uc-07-09`.

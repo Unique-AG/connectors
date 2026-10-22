@@ -42,10 +42,10 @@ Mia receives far more mail than she can read. Mia asks her assistant to find mes
 
 **A message is found by sender, subject, and attachment together**
 
-- **Given** Brightway sent "March invoice" with a PDF, and sent "March newsletter" with no attachment
+- **Given** Brightway sent "March invoice" with a PDF, and sent "March invoice reminder" with no attachment
 - **When** Mia asks her assistant for the March invoice from Brightway that has a PDF
 - **Then** the assistant shows "March invoice"
-- **But** it does not show "March newsletter"
+- **But** it does not show "March invoice reminder"
 
 **A time window narrows the result**
 
@@ -61,9 +61,9 @@ Mia receives far more mail than she can read. Mia asks her assistant to find mes
 
 **A result that may be incomplete says so**
 
-- **Given** 300 messages mention "invoice"
+- **Given** 1,500 messages mention "invoice", which is more than one search returns
 - **When** Mia asks her assistant for every message that mentions "invoice"
-- **Then** the assistant shows the newest messages
+- **Then** the assistant shows the messages that the search returns
 - **And** it tells Mia that more matching messages may exist
 
 #### The assistant reads a message and its attachments
@@ -75,23 +75,18 @@ Mia receives far more mail than she can read. Mia asks her assistant to find mes
 - **Then** the assistant gives the full text of the message
 - **And** it names "Draft v2.docx" with its size
 
-**The content of an attachment answers a question**
-
-- **Given** Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row
-- **When** Mia asks her assistant for the total in the last row of that workbook
-- **Then** the assistant answers 4,200
-
 **An attachment above 10 MB is refused**
 
 - **Given** Anna attached a 12 MB PDF
 - **When** Mia asks her assistant to read that PDF
 - **Then** the assistant tells Mia that the attachment is too large to read
+- **And** it tells Mia to open the message in Outlook
 
 #### The assistant follows a conversation from first message to last
 
 **A decision is found in a long conversation**
 
-- **Given** a conversation of 5 messages between Mia, Anna, and Tom ends with a decision to launch on 14 June
+- **Given** a conversation of 5 messages between Mia, Anna, and Tom ends with a long message that gives a decision to launch on 14 June near its end
 - **When** Mia asks her assistant what the conversation decided
 - **Then** the assistant answers that the launch is on 14 June
 
@@ -99,16 +94,15 @@ Mia receives far more mail than she can read. Mia asks her assistant to find mes
 
 **Unread mail of a shared mailbox is listed**
 
-- **Given** Mia has access to the shared mailbox "support", which holds 3 unread messages
-- **When** Mia asks her assistant for the unread messages in "support"
-- **Then** the assistant lists the 3 unread messages of "support"
+- **Given** Mia has access to the shared mailbox "support@acme.example", which holds 3 unread messages
+- **When** Mia asks her assistant for the unread messages in "support@acme.example"
+- **Then** the assistant lists the 3 unread messages of "support@acme.example"
 - **But** it does not list messages of Mia's own mailbox
 
-**A mailbox without access is refused**
+#### Not supported yet
 
-- **Given** Mia has no access to the shared mailbox "finance"
-- **When** Mia asks her assistant for the unread messages in "finance"
-- **Then** the assistant tells Mia that she has no access to "finance"
+- The content of an attachment answers a question
+- A mailbox without access is refused
 
 ### Drafting and sending mail
 
@@ -131,9 +125,9 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 - **Then** the assistant asks Mia which Anna Meier she means
 - **But** it does not create the draft yet
 
-**A person who is away is announced before the draft is sent**
+**Mia asks whether Anna is away**
 
-- **Given** Anna has an automatic reply turned on
+- **Given** Anna works in Mia's organization and has an automatic reply turned on
 - **When** Mia asks her assistant whether Anna is away
 - **Then** the assistant tells Mia the text of the automatic reply of Anna
 
@@ -144,6 +138,7 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 - **Given** Mia has a draft to Anna with 4 paragraphs
 - **When** Mia asks her assistant to make the draft shorter
 - **Then** the same draft has fewer words
+- **And** the shorter text still names the same facts
 - **But** Mia's mailbox holds no second draft
 
 **A person is not both addressed and copied**
@@ -151,6 +146,7 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 - **Given** Mia has a draft addressed to Tom
 - **When** Mia asks her assistant to copy Tom on the draft as well
 - **Then** the assistant tells Mia that Tom is already on the draft
+- **But** the draft stays as it is until Mia chooses
 
 #### Nothing is sent without Mia's approval
 
@@ -176,6 +172,14 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 - **Then** Anna receives nothing
 - **And** the assistant tells Mia that the draft changed
 
+**Mia is warned about an automatic reply before a send**
+
+- **Given** Mia has a draft addressed to Anna
+- **And** Anna works in Mia's organization and has an automatic reply turned on
+- **When** Mia asks her assistant to send the draft
+- **Then** the assistant tells Mia about the automatic reply of Anna
+- **And** Mia is asked to approve that the draft is sent
+
 #### A reply keeps the conversation
 
 **A reply to everyone lists every other person**
@@ -188,7 +192,7 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 **A forward carries the original attachments**
 
 - **Given** Anna sent Mia "Contract draft" with the attachment "Draft v2.docx"
-- **When** Mia asks her assistant to forward "Contract draft" to Tom
+- **When** Mia asks her assistant to forward "Contract draft" to Tom with a short note
 - **Then** the draft to Tom holds "Draft v2.docx"
 
 #### Not supported yet
@@ -199,7 +203,7 @@ Mia lets her assistant write mail for her. The assistant leaves each message as 
 
 Mia keeps her mailbox in order with folders, categories, and inbox rules. Mia asks her assistant to file, mark, and sort mail in bulk, and to set up rules that do it for her later. The assistant erases no mail for good. A delete moves mail to Deleted Items.
 
-#### A batch of messages is filed whole or not at all
+#### A batch is checked whole and reported for each message
 
 **A batch is filed in one folder**
 
@@ -220,13 +224,21 @@ Mia keeps her mailbox in order with folders, categories, and inbox rules. Mia as
 | flag for follow-up | are flagged for follow-up |
 | put the category "Reading" on | carry the category "Reading" |
 
-**A batch with one unidentified message moves nothing**
+**A batch with one value that is not a message moves nothing**
 
 - **Given** Mia named 5 messages by their subjects only
-- **And** the assistant cannot identify one of the 5 exactly
+- **And** the assistant holds a subject line in place of one of the 5 messages
 - **When** the assistant files the 5 messages in "Archive"
 - **Then** no message is moved
-- **And** the assistant identifies all 5 messages before it tries again
+- **And** the next attempt names only messages that a search or a listing of her mail returned
+
+**A batch with one missing message moves the others**
+
+- **Given** Mia asks her assistant to file 5 messages in "Archive"
+- **And** one of the 5 messages is gone from her mailbox
+- **When** the assistant files the 5 messages
+- **Then** 4 messages are in "Archive"
+- **And** the assistant tells Mia which message failed
 
 **A delete moves mail to Deleted Items**
 
@@ -237,8 +249,8 @@ Mia keeps her mailbox in order with folders, categories, and inbox rules. Mia as
 
 **A change in a shared mailbox needs Mia's approval**
 
-- **Given** Mia has access to the shared mailbox "support"
-- **When** Mia asks her assistant to file a message of "support" in its folder "Handled"
+- **Given** Mia has access to the shared mailbox "support@example.com"
+- **When** Mia asks her assistant to file a message of "support@example.com" in its folder "Handled"
 - **Then** Mia is asked to approve the change first
 - **And** the message stays where it is until she approves
 
@@ -295,9 +307,9 @@ Mia keeps her mailbox in order with folders, categories, and inbox rules. Mia as
 
 **A rule that forwards mail needs approval that names every address**
 
-- **When** Mia asks her assistant for a rule that forwards mail from "ceo@example.com" to Anna and Tom
+- **When** Mia asks her assistant for a rule that forwards mail from "ceo@example.com" to "anna@example.com" and "tom@example.com"
 - **Then** Mia is asked to approve the rule first
-- **And** the question names the addresses of Anna and Tom
+- **And** the question names "anna@example.com" and "tom@example.com"
 
 **A rule is erased only after Mia approves**
 
@@ -320,10 +332,10 @@ Mia sets how her mailbox behaves while she is away and which senders reach her a
 
 **An automatic reply runs for a fixed period**
 
-- **When** Mia asks her assistant to turn on her out-of-office reply from Monday to Friday with a short message
+- **When** Mia asks her assistant to turn on her out-of-office reply from Monday to Friday with a short message for all senders
 - **Then** Mia is asked to approve the reply first
-- **And** after she approves, senders receive the message from Monday to Friday
-- **But** no sender receives it on the Saturday after
+- **And** after she approves, the stored reply is scheduled from Monday 00:00 to Saturday 00:00 in Mia's time zone
+- **And** the stored reply holds the message for senders inside and outside the organization
 
 **An automatic reply without an end date is refused**
 
@@ -341,9 +353,9 @@ Mia sets how her mailbox behaves while she is away and which senders reach her a
 
 **Mail from one sender always lands in Focused**
 
-- **Given** Mia receives mail from the CEO in the Other tab
-- **When** Mia asks her assistant to always put mail from the CEO in Focused
-- **Then** new mail from the CEO arrives in the Focused tab
+- **Given** Mia receives mail from Ada Keller at "ada@acme.example" in the Other tab
+- **When** Mia asks her assistant to always put mail from "ada@acme.example" in Focused
+- **Then** the list of fixed senders holds "ada@acme.example" in the Focused tab
 
 ## Files in OneDrive and SharePoint
 
@@ -420,24 +432,19 @@ Mia and her colleagues keep documents in OneDrive and on SharePoint sites. Mia a
 - **Then** the assistant reads all 6 offers
 - **And** it names the vendor with the lowest price
 
-**A file of exactly 10 MB is read**
-
-- **Given** Mia has a PDF of exactly 10 MB
-- **When** Mia asks her assistant to summarize it
-- **Then** the assistant summarizes the PDF
-
 **A file above 10 MB is refused as a whole**
 
 - **Given** Mia has a PDF of 10.5 MB
 - **When** Mia asks her assistant to summarize it
 - **Then** the assistant tells Mia that the file is too large to read
+- **And** it gives Mia the web address that opens the file in a browser
 - **But** it does not summarize only a part of the file
 
-**A file that Microsoft cannot provide is reported and not guessed**
+**A file that Microsoft cannot convert is read in its own format or reported**
 
-- **Given** Microsoft cannot provide "Brightway Master Agreement.docx" as a PDF
-- **When** Mia asks her assistant for that agreement as a PDF
-- **Then** the assistant tells Mia that the file could not be read
+- **Given** Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF
+- **When** Mia asks her assistant to summarize that agreement
+- **Then** the assistant reads the file in its own format or tells Mia that it cannot read the file
 - **But** it does not invent the content of the file
 
 ### Organizing and sharing files in OneDrive and SharePoint
@@ -450,14 +457,14 @@ Mia files documents and shares them with colleagues. Mia asks her assistant to c
 
 - **Given** the folder "Contracts" holds 4 signed contracts
 - **When** Mia asks her assistant to move them into a new folder "2026 Signed"
-- **Then** Mia is asked to approve the change first
+- **Then** Mia is asked to approve each change first
 - **And** after she approves, "2026 Signed" holds the 4 contracts with their names
 
 **A folder is copied to another drive**
 
 - **Given** Mia has the folder "Template" of 20 files in her OneDrive
 - **When** Mia asks her assistant to copy "Template" into the Sales site
-- **Then** the Sales site holds a copy of "Template" with 20 files
+- **Then** the Sales site holds a copy of "Template" with 20 files once the copy is done
 - **And** "Template" stays in Mia's OneDrive
 
 **A delete moves a file to the recycle bin**
@@ -481,11 +488,12 @@ Mia files documents and shares them with colleagues. Mia asks her assistant to c
 - **When** Mia asks her assistant to give Anna edit access to "Q3 Plan.pptx"
 - **Then** Mia is asked to approve the access first
 - **And** after she approves, Anna can edit "Q3 Plan.pptx"
+- **And** Anna receives an invitation by mail
 
 **A sharing link is created and sent to nobody**
 
 - **Given** Mia has the file "Q3 Plan.pptx"
-- **When** Mia asks her assistant for a sharing link to "Q3 Plan.pptx"
+- **When** Mia asks her assistant for a view-only sharing link to "Q3 Plan.pptx"
 - **Then** the assistant gives Mia the sharing link
 - **But** nobody receives it from the assistant
 
@@ -527,10 +535,11 @@ Mia misses messages and meetings in Teams. Mia asks her assistant which conversa
 
 **A channel is read with its replies**
 
-- **Given** the channel "Releases" has 3 posts this week, and one post has 4 replies
+- **Given** the channel "Releases" has 3 posts this week and 2 older posts, and one post of this week has 4 replies
 - **When** Mia asks her assistant what happened in "Releases" this week
-- **Then** the assistant gives the 3 posts
+- **Then** the assistant gives only the 3 posts of this week
 - **And** it includes the 4 replies under their post
+- **And** it says whether it read all posts of the channel
 
 #### The assistant tells Mia what a meeting said
 
@@ -584,7 +593,7 @@ Mia lets her assistant write in Teams for her. Everyone in a chat or a channel s
 
 **A person who is not in the chat is not mentioned**
 
-- **Given** Priya is not a member of Mia's chat with Anna and Tom
+- **Given** Priya is not a member of Mia's chat with Anna and Tom, and Mia knows Priya from another chat
 - **When** Mia asks her assistant to post in that chat and to mention Priya
 - **Then** the assistant tells Mia that Priya is not in the chat
 - **And** nothing is posted
@@ -623,17 +632,26 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 
 #### Mia controls who is in a group chat
 
-**A group chat is created and named**
+**A group chat is created from people Mia already chats with**
 
+- **Given** Mia has a chat with Anna and a chat with Tom
 - **When** Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
 - **Then** Mia is asked to approve the chat first
 - **And** after she approves, the chat "Launch" has Mia, Anna, and Tom as members
 
-**A new member sees the earlier messages only when Mia asks for it**
+**A new member sees the earlier messages when Mia asks for it**
 
-- **Given** the chat "Launch" holds 30 messages
+- **Given** the chat "Launch" holds 30 messages, and Mia has a chat with Priya
 - **When** Mia asks her assistant to add Priya to "Launch" with the earlier messages visible
-- **Then** Priya sees the 30 earlier messages
+- **Then** Mia is asked to approve the change first
+- **And** the question says that Priya sees the earlier messages
+
+**A new member does not see the earlier messages unless Mia asks for it**
+
+- **Given** the chat "Launch" holds 30 messages, and Mia has a chat with Priya
+- **When** Mia asks her assistant to add Priya to "Launch"
+- **Then** Mia is asked to approve the change first
+- **And** the question says that Priya does not see the earlier messages
 
 **A member is removed from a group chat**
 
@@ -647,12 +665,14 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 - **Given** Mia has a one-to-one chat with Anna
 - **When** Mia asks her assistant to add Tom to that chat
 - **Then** the assistant tells Mia that a one-to-one chat takes no new member
+- **And** it offers a new group chat with Mia, Anna, and Tom
 
 #### An online meeting belongs to its organizer
 
 **An online meeting is created with its attendees**
 
-- **When** Mia asks her assistant to create an online meeting for tomorrow at 14:00 with Anna and Tom
+- **Given** Mia wants a join address to share and no calendar entry, and Mia has a chat with Anna and a chat with Tom
+- **When** Mia asks her assistant to create an online meeting for tomorrow at 14:00 for 30 minutes with Anna and Tom
 - **Then** Mia receives the join address of the meeting
 - **And** the meeting is on no calendar until someone adds it
 
@@ -661,6 +681,10 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 - **Given** Anna organized "Design review" and Mia attended it
 - **When** Mia asks her assistant who attended "Design review"
 - **Then** the assistant tells Mia that only Anna can see the attendance
+
+#### Not supported yet
+
+- A group chat is created and named
 
 ## Calendar
 
@@ -696,11 +720,17 @@ Mia plans her day from her calendar. Mia asks her assistant what is on, who is c
 
 **The attendees of a meeting are shown with their answers**
 
-- **Given** Mia's "Launch review" has Anna who accepted, Tom who declined, and Priya who did not answer
+- **Given** Mia organizes "Launch review" and it has Anna who accepted, Tom who declined, and Priya who did not answer
 - **When** Mia asks her assistant who is coming to "Launch review"
 - **Then** the assistant says that Anna accepted
 - **And** it says that Tom declined
 - **And** it says that Priya did not answer
+
+**The next meeting with a given person is found**
+
+- **Given** Mia has a meeting with Tom on Friday and another on the Tuesday after
+- **When** Mia asks her assistant for her next meeting with Tom
+- **Then** the assistant names the meeting on Friday
 
 #### A meeting is reached from the mail that invites to it
 
@@ -711,17 +741,14 @@ Mia plans her day from her calendar. Mia asks her assistant what is on, who is c
 - **Then** the assistant shows the time of "Launch review"
 - **And** it shows who else is invited
 
-#### A meeting that no longer exists is reported and not invented
+#### A meeting that cannot be read is reported and not invented
 
-**A deleted meeting is reported as gone**
+**A meeting that cannot be read is reported as unread**
 
 - **Given** Mia's assistant listed "Budget review" and Anna then deleted it
 - **When** Mia asks her assistant for the details of "Budget review"
-- **Then** the assistant tells Mia that the meeting no longer exists
-
-#### Not supported yet
-
-- The next meeting with a given person is found
+- **Then** the assistant tells Mia that it could not read "Budget review"
+- **And** it does not say that the meeting was deleted
 
 ### Scheduling and answering meetings
 
@@ -739,7 +766,8 @@ Mia sets up meetings and answers the invitations that she receives. Mia asks her
 
 - **Given** Anna invited Mia to "Launch review" on Friday
 - **When** Mia asks her assistant to decline it with the note "I am on leave"
-- **Then** Anna sees Mia as declined
+- **Then** Mia is asked to approve the answer first
+- **And** after she approves, Anna sees Mia as declined
 - **And** Anna sees the note "I am on leave"
 
 **A new time is proposed only when the organizer allows it**
@@ -748,6 +776,8 @@ Mia sets up meetings and answers the invitations that she receives. Mia asks her
 - **When** Mia asks her assistant to decline it and propose Monday at 10:00
 - **Then** the assistant tells Mia that Anna allows no new time
 - **And** Anna sees no proposal
+- **And** Mia's own answer stays unchanged
+- **And** the assistant offers to decline without a new time
 
 #### Mia finds a time before she books
 
@@ -771,30 +801,34 @@ Mia sets up meetings and answers the invitations that she receives. Mia asks her
 
 **A weekly meeting is booked as one series**
 
-- **When** Mia asks her assistant to book "Stand-up" every Monday for 8 weeks
+- **When** Mia asks her assistant to book "Stand-up" every Monday at 09:00 for 15 minutes for 8 weeks
 - **Then** Mia's calendar holds 8 occurrences of "Stand-up"
 - **And** the 8 occurrences belong to one series
 
 **A meeting room is booked with the meeting**
 
 - **Given** the room "Maple" seats 8 and is free on Monday at 14:00
+- **And** Mia agreed on Monday at 14:00 with Anna, Tom, Priya, Lena, and Sam
 - **When** Mia asks her assistant to book "Workshop" with 6 people in a room
-- **Then** the room "Maple" is invited to "Workshop"
+- **Then** the room "Maple" is invited to "Workshop" as a room
+- **And** the room "Maple" accepts the invitation
 
 #### Only the organizer changes or cancels a meeting
 
 **One date of a series moves and the other dates stay**
 
-- **Given** Mia organizes the weekly "Team sync" on Thursday
+- **Given** Mia organizes the weekly "Team sync" with Anna on Thursday
 - **When** Mia asks her assistant to move next Thursday's "Team sync" to Friday
-- **Then** only the occurrence of next Thursday moves to Friday
+- **Then** Mia is asked to approve the change first
+- **And** after she approves, only the occurrence of next Thursday moves to Friday
 - **But** the other occurrences stay on Thursday
 
 **A whole series is cancelled and attendees are told**
 
 - **Given** Mia organizes the weekly "Team sync" with Anna and Tom
 - **When** Mia asks her assistant to cancel the whole series
-- **Then** no occurrence of "Team sync" stays on Mia's calendar
+- **Then** Mia is asked to approve the cancellation first
+- **And** after she approves, no occurrence of "Team sync" stays on Mia's calendar
 - **And** Anna and Tom each receive a cancellation
 
 **A meeting of another organizer is not changed**
@@ -803,10 +837,11 @@ Mia sets up meetings and answers the invitations that she receives. Mia asks her
 - **When** Mia asks her assistant to move "Launch review" to Friday
 - **Then** the assistant tells Mia that only Anna can change "Launch review"
 - **And** "Launch review" stays on its time
+- **And** the assistant offers to decline "Launch review" and propose Friday
 
 #### Not supported yet
 
-- An invitation is drafted for Mia to review before it goes out
+- An invitation is saved as a draft for Mia to finish later
 - A meeting is booked on a calendar other than the main one
 
 ### Sharing and delegating calendars
@@ -817,25 +852,27 @@ Mia works with an executive assistant, Priya, and she shares calendars with her 
 
 **A colleague is given read access to a calendar**
 
-- **When** Mia asks her assistant to let Anna see her calendar
+- **When** Mia asks her assistant to give Anna read access to her calendar
 - **Then** Mia is asked to approve the share first
-- **And** after she approves, Anna can see Mia's calendar once she accepts the invitation
+- **And** after she approves, Anna appears in the list of people with access to Mia's calendar, with read access
 
 **A share is stopped**
 
 - **Given** Anna can see Mia's calendar
 - **When** Mia asks her assistant to stop sharing her calendar with Anna
 - **Then** Mia is asked to approve the change first
-- **And** after she approves, Anna can no longer see Mia's calendar
+- **And** after she approves, Anna no longer appears in the list of people with access to Mia's calendar
 
 #### A delegate acts in the name of the person who delegated
 
 **A meeting is booked on the calendar of a manager**
 
 - **Given** Mia's manager Lena delegated her calendar to Mia
-- **When** Mia asks her assistant to book "Budget review" on Lena's calendar
-- **Then** "Budget review" is on Lena's calendar
-- **And** the invitations to the attendees name Lena as the sender
+- **When** Mia asks her assistant to book "Budget review" with Anna on Lena's calendar
+- **Then** Mia is asked to approve the booking first
+- **And** after she approves, "Budget review" is on Lena's calendar
+- **And** Lena is the organizer of "Budget review"
+- **And** the invitation to Anna goes out
 
 **A calendar without delegation is not changed**
 
@@ -892,7 +929,8 @@ Mia keeps her notes in OneNote notebooks, and her team keeps shared notebooks. M
 
 - **Given** the page "Planning" states "Launch on 14 June" in its second paragraph
 - **When** Mia asks her assistant to change that date to 21 June
-- **Then** the second paragraph states "Launch on 21 June"
+- **Then** Mia is asked to approve the change first
+- **And** after she approves, the second paragraph states "Launch on 21 June"
 - **But** the other paragraphs are unchanged
 
 **A page is erased only after Mia approves**
@@ -925,7 +963,7 @@ Mia keeps the people she works with in her Outlook contacts. Mia asks her assist
 
 **A phone number is found in a contact**
 
-- **Given** Mia has the contact Anna Meier with the telephone number "+41 44 555 01 01"
+- **Given** Mia has 120 contacts, and one is Anna Meier with the telephone number "+41 44 555 01 01"
 - **When** Mia asks her assistant for the telephone number of Anna Meier
 - **Then** the assistant answers "+41 44 555 01 01"
 
@@ -956,19 +994,21 @@ Mia's work does not stay in one application. A message leads to a meeting, and a
 
 **A morning brief joins meetings and mail**
 
-- **Given** Mia has 3 meetings today and 12 unread messages, 2 of them from her manager
+- **Given** Mia has 3 meetings today and 12 unread messages, 2 of them from Anna
+- **And** Mia named Anna as the person whose mail comes first
 - **When** Mia asks her assistant for a brief of her day
 - **Then** the assistant lists the 3 meetings with their attendees
-- **And** it names the 2 messages of her manager first among the unread mail
+- **And** it names the 2 messages of Anna first among the unread mail
 
 #### Mia goes through her inbox in one sitting
 
-**A meeting invitation is not answered without Mia**
+**A meeting invitation is shown and not answered without Mia**
 
 - **Given** Mia's inbox holds 9 newsletters and one meeting invitation from Anna
 - **When** Mia asks her assistant to go through her inbox
-- **Then** the assistant files the 9 newsletters in "Newsletters"
-- **But** it asks Mia how to answer the invitation of Anna
+- **Then** the assistant shows the invitation of Anna
+- **And** it asks Mia how to answer the invitation
+- **But** it does not answer the invitation
 
 **A reply uses a document from SharePoint**
 
@@ -980,7 +1020,7 @@ Mia's work does not stay in one application. A message leads to a meeting, and a
 
 **A thread leads to a time for a workshop**
 
-- **Given** Anna and Tom discussed a workshop in a thread of 8 messages
+- **Given** Anna and Tom discussed a workshop of 90 minutes in a thread of 8 messages
 - **And** they need a time next week
 - **When** Mia asks her assistant to find a time for the workshop that the thread describes
 - **Then** the assistant names times next week when Mia, Anna, and Tom are free

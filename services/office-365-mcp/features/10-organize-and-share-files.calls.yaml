@@ -9,14 +9,22 @@ uc-10-01:
     - tool: sharepoint_move_item
       repeat: many
       uses: {item: handle of each contract, to_folder: handle of 2026 Signed}
+  note: the folder and each of the 4 moves ask for approval, so 5 approvals are expected
 
 uc-10-02:
   provenance: drafted
   asks_user: true
   chain:
-    - tool: sharepoint_list_drives
+    - tool: sharepoint_search_sites
+      args: {query: Sales}
+    - tool: sharepoint_search_files
+      uses: {path: web address of the Sales site from sharepoint_search_sites}
     - tool: sharepoint_copy_item
-      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site}
+      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site from the search}
+    - tool: sharepoint_browse_folder
+      optional: true
+      uses: {folder: handle of the destination folder}
+  note: No tool lists the top folder of a site library. The destination is a folder that the search returns. A site with no indexed folder gives no destination. Microsoft runs the copy after the call returns, so a listing shows the copy only after some time.
 
 uc-10-03:
   provenance: drafted
@@ -30,7 +38,7 @@ uc-10-04:
   provenance: drafted
   asks_user: true
   chain:
-    - tool: sharepoint_browse_folder
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
@@ -46,9 +54,12 @@ uc-10-06:
   asks_user: true
   chain:
     - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna}
     - tool: sharepoint_invite
       args: {role: write}
-      uses: {item: handle of the file, recipients: address of Anna}
+      uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
+  note: Anna gets an invitation mail that cannot be recalled
 
 uc-10-07:
   provenance: drafted
@@ -56,7 +67,9 @@ uc-10-07:
   chain:
     - tool: sharepoint_search_files
     - tool: sharepoint_create_share_link
+      args: {access: view}
       uses: {item: handle of the file}
+  must_not: [sharepoint_invite, outlook_send_draft, teams_send_chat_message]
 
 uc-10-08:
   provenance: drafted

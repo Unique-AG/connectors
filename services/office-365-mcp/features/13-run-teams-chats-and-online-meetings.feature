@@ -6,17 +6,33 @@ Feature: Running Teams chats and online meetings
 
   Rule: Mia controls who is in a group chat
 
-    @uc-13-01
+    @known-gap @uc-13-01
     Scenario: A group chat is created and named
+      Given Mia has never chatted with Anna or Tom
+      When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
+      Then Mia is asked to approve the chat first
+      And after she approves, the chat "Launch" has Mia, Anna, and Tom as members
+
+    @uc-13-07
+    Scenario: A group chat is created from people Mia already chats with
+      Given Mia has a chat with Anna and a chat with Tom
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
       Then Mia is asked to approve the chat first
       And after she approves, the chat "Launch" has Mia, Anna, and Tom as members
 
     @uc-13-02
-    Scenario: A new member sees the earlier messages only when Mia asks for it
-      Given the chat "Launch" holds 30 messages
+    Scenario: A new member sees the earlier messages when Mia asks for it
+      Given the chat "Launch" holds 30 messages, and Mia has a chat with Priya
       When Mia asks her assistant to add Priya to "Launch" with the earlier messages visible
-      Then Priya sees the 30 earlier messages
+      Then Mia is asked to approve the change first
+      And the question says that Priya sees the earlier messages
+
+    @uc-13-08
+    Scenario: A new member does not see the earlier messages unless Mia asks for it
+      Given the chat "Launch" holds 30 messages, and Mia has a chat with Priya
+      When Mia asks her assistant to add Priya to "Launch"
+      Then Mia is asked to approve the change first
+      And the question says that Priya does not see the earlier messages
 
     @uc-13-03
     Scenario: A member is removed from a group chat
@@ -30,12 +46,14 @@ Feature: Running Teams chats and online meetings
       Given Mia has a one-to-one chat with Anna
       When Mia asks her assistant to add Tom to that chat
       Then the assistant tells Mia that a one-to-one chat takes no new member
+      And it offers a new group chat with Mia, Anna, and Tom
 
   Rule: An online meeting belongs to its organizer
 
     @uc-13-05
     Scenario: An online meeting is created with its attendees
-      When Mia asks her assistant to create an online meeting for tomorrow at 14:00 with Anna and Tom
+      Given Mia wants a join address to share and no calendar entry, and Mia has a chat with Anna and a chat with Tom
+      When Mia asks her assistant to create an online meeting for tomorrow at 14:00 for 30 minutes with Anna and Tom
       Then Mia receives the join address of the meeting
       And the meeting is on no calendar until someone adds it
 

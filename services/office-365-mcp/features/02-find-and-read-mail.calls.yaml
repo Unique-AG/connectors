@@ -35,7 +35,7 @@ uc-02-05:
   asks_user: false
   chain:
     - tool: outlook_search_mail
-      args: {query: invoice, limit: 50}
+      args: {query: invoice, limit: 1000}
 
 uc-02-06:
   provenance: observed
@@ -49,22 +49,18 @@ uc-02-06:
 uc-02-07:
   provenance: drafted
   asks_user: false
-  chain:
-    - any_of: [outlook_search_mail, outlook_list_mail]
-    - tool: outlook_list_attachments
-      uses: {uri: uri of the message}
-    - tool: outlook_read_attachment
-      uses: {uri: uri of the attachment}
+  chain: []
+  note: outlook_read_attachment returns the file itself and does not turn a document into text, so no tool gives the total of a workbook
 
 uc-02-08:
   provenance: drafted
   asks_user: false
   chain:
-    - tool: outlook_list_attachments
-      uses: {uri: uri of the message}
+    - any_of: [outlook_list_attachments, outlook_read_mail]
     - tool: outlook_read_attachment
+      optional: true
       uses: {uri: uri of the attachment}
-  note: the tool refuses above 10 MB
+  note: the listing gives the size, so the assistant can refuse before it reads. The tool refuses above 10 MB
 
 uc-02-09:
   provenance: drafted
@@ -73,18 +69,20 @@ uc-02-09:
     - tool: outlook_search_mail
     - tool: outlook_read_thread
       uses: {uri: uri of a message of the conversation}
+    - tool: outlook_read_mail
+      repeat: many
+      uses: {uri: uri of the last message of the thread}
+  note: the thread gives only the first 255 characters of each message
 
 uc-02-10:
   provenance: drafted
   asks_user: false
   chain:
     - tool: outlook_list_mail
-      args: {mailbox: support, unread_only: true}
+      args: {mailbox: support@acme.example, unread_only: true}
 
 uc-02-11:
   provenance: drafted
   asks_user: false
-  chain:
-    - tool: outlook_list_mail
-      args: {mailbox: finance}
-  note: Microsoft answers that Mia has no access
+  chain: []
+  note: outlook_list_mail has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia

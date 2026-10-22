@@ -11,7 +11,7 @@ uc-03-02:
   asks_user: false
   chain:
     - tool: outlook_list_events
-      args: {starts_on: next Monday, ends_on: next Sunday}
+      args: {starts_on: next Monday, ends_on: next Sunday, time_zone: Europe/Zurich}
 
 uc-03-03:
   provenance: drafted
@@ -28,23 +28,32 @@ uc-03-04:
     - tool: outlook_list_events
     - tool: outlook_read_event
       uses: {uri: uri of the event from the listing}
+  note: a person's answer is in the attendee list of outlook_read_event, and is accepted, declined, tentativelyAccepted, notResponded, none, or organizer
 
 uc-03-05:
   provenance: drafted
   asks_user: false
-  chain: []
-  note: no attendee filter on outlook_list_events and no attendees in a listing row, so the assistant must open each upcoming event
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: outlook_list_events
+      args: {starts_on: today, ends_on: in 4 weeks}
+    - tool: outlook_read_event
+      repeat: many
+      uses: {uri: uri of an event with more than one attendee}
+  note: outlook_list_events has no attendee filter, so the assistant opens the events one by one until it finds Tom
 
 uc-03-06:
-  provenance: observed
+  provenance: drafted
   evidence: outlook_search_mail then outlook_read_event 22 times, 21 of them in 2 automated sessions
   asks_user: false
   chain:
     - tool: outlook_search_mail
     - tool: outlook_list_events
-      optional: true
+      args: {subject_contains: Launch review, starts_on: day of the meeting in the mail, ends_on: day of the meeting in the mail}
     - tool: outlook_read_event
       uses: {uri: uri of the event}
+  note: no tool links a mail to an event, so if the event is not on Mia's calendar, the assistant answers from the text of the mail
 
 uc-03-07:
   provenance: observed

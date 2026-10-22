@@ -22,14 +22,14 @@ uc-08-03:
       uses: {parent: handle of the notebook}
 
 uc-08-04:
-  provenance: observed
-  evidence: one session ran onenote_list_notebooks, onenote_create_notebook, onenote_create_section_group 15 times, and onenote_create_page
+  provenance: drafted
   asks_user: false
   chain:
-    - tool: onenote_list_sections
+    - any_of: [onenote_list_notebooks, onenote_list_sections]
     - tool: onenote_create_page
       args: {title: Weekly sync, body_html: three notes}
       uses: {section: handle of the section Work}
+  note: the tool asks for approval only when the notebook is shared or belongs to somebody else
 
 uc-08-05:
   provenance: drafted
@@ -43,7 +43,7 @@ uc-08-05:
 
 uc-08-06:
   provenance: drafted
-  asks_user: false
+  asks_user: true
   chain:
     - tool: onenote_list_pages
     - tool: onenote_read_page
@@ -52,6 +52,7 @@ uc-08-06:
     - tool: onenote_edit_page
       args: {commands: replace the second paragraph}
       uses: {page: handle of the page}
+  note: a replace needs the generated id of the paragraph, and the tool always asks for approval before a replace
 
 uc-08-07:
   provenance: drafted

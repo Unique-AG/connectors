@@ -31,10 +31,11 @@ Feature: Catching up on Teams
 
     @uc-06-04
     Scenario: A channel is read with its replies
-      Given the channel "Releases" has 3 posts this week, and one post has 4 replies
+      Given the channel "Releases" has 3 posts this week and 2 older posts, and one post of this week has 4 replies
       When Mia asks her assistant what happened in "Releases" this week
-      Then the assistant gives the 3 posts
+      Then the assistant gives only the 3 posts of this week
       And it includes the 4 replies under their post
+      And it says whether it read all posts of the channel
 
   Rule: The assistant tells Mia what a meeting said
 

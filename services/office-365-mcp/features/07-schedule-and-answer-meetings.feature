@@ -16,7 +16,8 @@ Feature: Scheduling and answering meetings
     Scenario: An invitation is declined with a note
       Given Anna invited Mia to "Launch review" on Friday
       When Mia asks her assistant to decline it with the note "I am on leave"
-      Then Anna sees Mia as declined
+      Then Mia is asked to approve the answer first
+      And after she approves, Anna sees Mia as declined
       And Anna sees the note "I am on leave"
 
     @uc-07-03
@@ -25,6 +26,8 @@ Feature: Scheduling and answering meetings
       When Mia asks her assistant to decline it and propose Monday at 10:00
       Then the assistant tells Mia that Anna allows no new time
       And Anna sees no proposal
+      And Mia's own answer stays unchanged
+      And the assistant offers to decline without a new time
 
   Rule: Mia finds a time before she books
 
@@ -48,20 +51,22 @@ Feature: Scheduling and answering meetings
 
     @uc-07-06
     Scenario: A weekly meeting is booked as one series
-      When Mia asks her assistant to book "Stand-up" every Monday for 8 weeks
+      When Mia asks her assistant to book "Stand-up" every Monday at 09:00 for 15 minutes for 8 weeks
       Then Mia's calendar holds 8 occurrences of "Stand-up"
       And the 8 occurrences belong to one series
 
     @uc-07-07
     Scenario: A meeting room is booked with the meeting
       Given the room "Maple" seats 8 and is free on Monday at 14:00
+      And Mia agreed on Monday at 14:00 with Anna, Tom, Priya, Lena, and Sam
       When Mia asks her assistant to book "Workshop" with 6 people in a room
-      Then the room "Maple" is invited to "Workshop"
+      Then the room "Maple" is invited to "Workshop" as a room
+      And the room "Maple" accepts the invitation
 
     @known-gap @uc-07-08
-    Scenario: An invitation is drafted for Mia to review before it goes out
-      When Mia asks her assistant to prepare an invitation for "Board prep" without sending it
-      Then Mia sees the invitation
+    Scenario: An invitation is saved as a draft for Mia to finish later
+      When Mia asks her assistant to save an invitation for "Board prep" as a draft
+      Then Mia can open the invitation in Outlook to finish it
       But nobody receives it until Mia sends it
 
     @known-gap @uc-07-09
@@ -75,16 +80,18 @@ Feature: Scheduling and answering meetings
 
     @uc-07-10
     Scenario: One date of a series moves and the other dates stay
-      Given Mia organizes the weekly "Team sync" on Thursday
+      Given Mia organizes the weekly "Team sync" with Anna on Thursday
       When Mia asks her assistant to move next Thursday's "Team sync" to Friday
-      Then only the occurrence of next Thursday moves to Friday
+      Then Mia is asked to approve the change first
+      And after she approves, only the occurrence of next Thursday moves to Friday
       But the other occurrences stay on Thursday
 
     @uc-07-11
     Scenario: A whole series is cancelled and attendees are told
       Given Mia organizes the weekly "Team sync" with Anna and Tom
       When Mia asks her assistant to cancel the whole series
-      Then no occurrence of "Team sync" stays on Mia's calendar
+      Then Mia is asked to approve the cancellation first
+      And after she approves, no occurrence of "Team sync" stays on Mia's calendar
       And Anna and Tom each receive a cancellation
 
     @uc-07-12
@@ -93,3 +100,4 @@ Feature: Scheduling and answering meetings
       When Mia asks her assistant to move "Launch review" to Friday
       Then the assistant tells Mia that only Anna can change "Launch review"
       And "Launch review" stays on its time
+      And the assistant offers to decline "Launch review" and propose Friday

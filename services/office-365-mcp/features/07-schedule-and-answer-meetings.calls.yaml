@@ -1,17 +1,17 @@
 uc-07-01:
   provenance: observed
   evidence: outlook_respond_to_invite in 2 calls; outlook_list_events in 5 sessions alone
-  asks_user: false
+  asks_user: true
   chain:
     - tool: outlook_list_events
-      args: {owner_response: notResponded}
+      args: {subject_contains: Launch review}
     - tool: outlook_respond_to_invite
       args: {response: accept}
       uses: {uri: uri of the event from the listing}
 
 uc-07-02:
   provenance: drafted
-  asks_user: false
+  asks_user: true
   chain:
     - tool: outlook_list_events
     - tool: outlook_respond_to_invite
@@ -23,7 +23,7 @@ uc-07-03:
   asks_user: false
   chain:
     - tool: outlook_respond_to_invite
-      args: {response: decline, proposed_new_time: Monday 10:00}
+      args: {response: decline, proposed_new_time: {starts_at: Monday 10:00, ends_at: Monday 10:30, time_zone: Europe/Zurich}}
       uses: {uri: uri of the event}
   note: the tool proposes a time only when the organizer allows it
 
@@ -53,7 +53,7 @@ uc-07-06:
   asks_user: false
   chain:
     - tool: outlook_create_event
-      args: {subject: Stand-up, recurrence: weekly for 8 weeks}
+      args: {subject: Stand-up, starts_at: Monday 09:00, ends_at: Monday 09:15, recurrence: weekly for 8 weeks}
 
 uc-07-07:
   provenance: drafted
@@ -61,43 +61,48 @@ uc-07-07:
   chain:
     - tool: outlook_find_rooms
       args: {min_capacity: 6}
+    - tool: outlook_check_availability
+      args: {starts_at: Monday 14:00, ends_at: Monday 14:30}
+      uses: {addresses: address of the room from outlook_find_rooms}
     - tool: outlook_create_event
-      args: {subject: Workshop}
+      args: {subject: Workshop, attendees: Anna and 4 others}
       uses: {room_addresses: address of the room from outlook_find_rooms}
+    - tool: outlook_read_event
+      optional: true
+      uses: {uri: uri of the event from outlook_create_event}
 
 uc-07-08:
   provenance: drafted
   asks_user: false
   chain: []
-  note: a calendar event has no draft state, and outlook_create_event invites in the same call
+  note: a calendar event has no draft state, and outlook_create_event invites in the same call. A workaround is outlook_create_event with no attendee, then outlook_update_event to add the attendees after Mia approves
 
 uc-07-09:
   provenance: drafted
-  asks_user: false
+  asks_user: true
   chain: []
-  note: outlook_create_event has no calendar argument and writes to the default calendar only
+  note: outlook_create_event_on_behalf can write to a second calendar of Mia, because it checks only that the calendar is editable. Its description limits it to a calendar that another person owns, so the assistant may not choose it. Nobody ran it.
 
 uc-07-10:
   provenance: drafted
-  asks_user: false
+  asks_user: true
   chain:
     - tool: outlook_list_events
       args: {subject_contains: Team sync}
     - tool: outlook_update_event
-      args: {starts_at: Friday}
+      args: {starts_at: Friday at the usual time, ends_at: Friday at the usual end, time_zone: Europe/Zurich}
       uses: {uri: uri of the occurrence and not of the series master}
-  note: whether the tool asks Mia when attendees exist is not verified
 
 uc-07-11:
   provenance: observed
   evidence: outlook_cancel_event in 1 call, which failed
-  asks_user: false
+  asks_user: true
   chain:
     - tool: outlook_list_events
       args: {subject_contains: Team sync}
     - tool: outlook_cancel_event
-      uses: {uri: uri of the series master}
-  note: whether the tool asks Mia when attendees exist is not verified
+      uses: {uri: series_master_uri of the listing row}
+  note: the logs give no cause for the failed call
 
 uc-07-12:
   provenance: drafted
@@ -105,6 +110,7 @@ uc-07-12:
   chain:
     - tool: outlook_read_event
     - tool: outlook_update_event
-      args: {starts_at: Friday}
+      optional: true
+      args: {starts_at: Friday at the usual time, ends_at: Friday at the usual end, time_zone: Europe/Zurich}
       uses: {uri: uri of the event}
-  note: the tool refuses an event that Mia does not organize
+  note: the tool refuses an event that Mia does not organize, but the listing already shows owner_is_organizer false, so the assistant can stop before the call

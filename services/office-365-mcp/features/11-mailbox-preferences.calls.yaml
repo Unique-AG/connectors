@@ -2,8 +2,12 @@ uc-11-01:
   provenance: drafted
   asks_user: true
   chain:
+    - tool: outlook_get_mailbox_settings
+      optional: true
+      args: {include: preferences}
     - tool: outlook_set_automatic_reply
-      args: {status: scheduled, start: Monday, end: Friday, internal_message: short message}
+      args: {status: scheduled, start: Monday 00:00, end: Saturday 00:00, internal_message: short message, external_message: short message, external_audience: all}
+      uses: {time_zone: time zone of the preferences}
 
 uc-11-02:
   provenance: drafted
@@ -26,4 +30,4 @@ uc-11-04:
     - tool: outlook_list_focused_overrides
       optional: true
     - tool: outlook_set_focused_override
-      args: {sender: CEO, classify_as: focused}
+      args: {sender: ada@acme.example, classify_as: focused}

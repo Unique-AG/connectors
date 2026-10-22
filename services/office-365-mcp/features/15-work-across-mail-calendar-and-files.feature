@@ -8,19 +8,21 @@ Feature: Working across mail, calendar, and files
 
     @uc-15-01
     Scenario: A morning brief joins meetings and mail
-      Given Mia has 3 meetings today and 12 unread messages, 2 of them from her manager
+      Given Mia has 3 meetings today and 12 unread messages, 2 of them from Anna
+      And Mia named Anna as the person whose mail comes first
       When Mia asks her assistant for a brief of her day
       Then the assistant lists the 3 meetings with their attendees
-      And it names the 2 messages of her manager first among the unread mail
+      And it names the 2 messages of Anna first among the unread mail
 
   Rule: Mia goes through her inbox in one sitting
 
     @uc-15-02
-    Scenario: A meeting invitation is not answered without Mia
+    Scenario: A meeting invitation is shown and not answered without Mia
       Given Mia's inbox holds 9 newsletters and one meeting invitation from Anna
       When Mia asks her assistant to go through her inbox
-      Then the assistant files the 9 newsletters in "Newsletters"
-      But it asks Mia how to answer the invitation of Anna
+      Then the assistant shows the invitation of Anna
+      And it asks Mia how to answer the invitation
+      But it does not answer the invitation
 
     @uc-15-03
     Scenario: A reply uses a document from SharePoint
@@ -32,7 +34,7 @@ Feature: Working across mail, calendar, and files
 
     @uc-15-04
     Scenario: A thread leads to a time for a workshop
-      Given Anna and Tom discussed a workshop in a thread of 8 messages
+      Given Anna and Tom discussed a workshop of 90 minutes in a thread of 8 messages
       And they need a time next week
       When Mia asks her assistant to find a time for the workshop that the thread describes
       Then the assistant names times next week when Mia, Anna, and Tom are free

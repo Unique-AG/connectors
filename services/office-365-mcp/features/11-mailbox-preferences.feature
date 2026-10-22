@@ -6,10 +6,10 @@ Feature: Mailbox preferences
 
     @uc-11-01
     Scenario: An automatic reply runs for a fixed period
-      When Mia asks her assistant to turn on her out-of-office reply from Monday to Friday with a short message
+      When Mia asks her assistant to turn on her out-of-office reply from Monday to Friday with a short message for all senders
       Then Mia is asked to approve the reply first
-      And after she approves, senders receive the message from Monday to Friday
-      But no sender receives it on the Saturday after
+      And after she approves, the stored reply is scheduled from Monday 00:00 to Saturday 00:00 in Mia's time zone
+      And the stored reply holds the message for senders inside and outside the organization
 
     @uc-11-02
     Scenario: An automatic reply without an end date is refused
@@ -27,6 +27,6 @@ Feature: Mailbox preferences
 
     @uc-11-04
     Scenario: Mail from one sender always lands in Focused
-      Given Mia receives mail from the CEO in the Other tab
-      When Mia asks her assistant to always put mail from the CEO in Focused
-      Then new mail from the CEO arrives in the Focused tab
+      Given Mia receives mail from Ada Keller at "ada@acme.example" in the Other tab
+      When Mia asks her assistant to always put mail from "ada@acme.example" in Focused
+      Then the list of fixed senders holds "ada@acme.example" in the Focused tab

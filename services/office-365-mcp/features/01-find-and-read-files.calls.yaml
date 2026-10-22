@@ -18,10 +18,10 @@ uc-01-03:
   asks_user: false
   chain:
     - tool: sharepoint_search_sites
-      optional: true
+      args: {query: Legal}
     - tool: sharepoint_search_files
       args: {query: NDA Template}
-      uses: {path: web address of the site that Mia names}
+      uses: {path: web address of the Legal site from sharepoint_search_sites}
 
 uc-01-04:
   provenance: observed
@@ -32,14 +32,15 @@ uc-01-04:
       args: {query: Zephyr}
 
 uc-01-05:
-  provenance: observed
+  provenance: drafted
   evidence: sharepoint_browse_folder alone in 8 sessions
   asks_user: false
   chain:
-    - tool: sharepoint_list_drives
-      optional: true
+    - tool: sharepoint_search_files
+      args: {query: 2026 Contracts}
     - tool: sharepoint_browse_folder
       args: {order_by: last_modified}
+      uses: {folder: handle of the folder 2026 Contracts from the search}
 
 uc-01-06:
   provenance: observed
@@ -49,7 +50,9 @@ uc-01-06:
     - tool: sharepoint_search_files
       optional: true
     - tool: sharepoint_read_file
+      args: {convert_to: pdf}
       uses: {file: handle of the file from the search or the folder}
+  note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows and leaves it out for the PDF and text rows
 
 uc-01-07:
   provenance: drafted
@@ -57,6 +60,7 @@ uc-01-07:
   chain:
     - tool: sharepoint_resolve_url
     - tool: sharepoint_read_file
+      args: {convert_to: pdf}
       uses: {file: handle from sharepoint_resolve_url}
 
 uc-01-08:
@@ -68,12 +72,6 @@ uc-01-08:
     - tool: sharepoint_read_file
       repeat: many
       uses: {file: handle of each file}
-
-uc-01-09:
-  provenance: drafted
-  asks_user: false
-  chain:
-    - tool: sharepoint_read_file
 
 uc-01-10:
   provenance: drafted
@@ -89,3 +87,6 @@ uc-01-11:
   chain:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
+    - tool: sharepoint_read_file
+      optional: true
+  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call reads the file in its own format

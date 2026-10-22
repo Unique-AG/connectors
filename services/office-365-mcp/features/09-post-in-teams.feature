@@ -20,7 +20,7 @@ Feature: Posting in Teams
 
     @uc-09-03
     Scenario: A person who is not in the chat is not mentioned
-      Given Priya is not a member of Mia's chat with Anna and Tom
+      Given Priya is not a member of Mia's chat with Anna and Tom, and Mia knows Priya from another chat
       When Mia asks her assistant to post in that chat and to mention Priya
       Then the assistant tells Mia that Priya is not in the chat
       And nothing is posted

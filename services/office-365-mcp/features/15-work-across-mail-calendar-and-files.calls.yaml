@@ -6,11 +6,11 @@ uc-15-01:
     - tool: outlook_list_events
       args: {starts_on: today, ends_on: today}
     - tool: outlook_read_event
-      optional: true
       repeat: many
       uses: {uri: uri of each event}
     - tool: outlook_list_mail
       args: {unread_only: true}
+  note: a listing row has only the number of attendees, so outlook_read_event gives their names. No tool gives the manager of the user, so Mia names the person.
 
 uc-15-02:
   provenance: observed
@@ -19,12 +19,8 @@ uc-15-02:
   chain:
     - tool: outlook_list_mail
       args: {unread_only: true}
-    - tool: outlook_move_mail
-      uses: {message_refs: uri values of the newsletters}
-    - tool: outlook_read_event
-      optional: true
   must_not: [outlook_respond_to_invite]
-  note: the observed session did answer 2 invitations. The server logs do not show whether Mia was asked first.
+  note: the observed session did answer 2 invitations. The server logs do not show whether Mia was asked first. outlook_respond_to_invite asks Mia, unless send_response is false. Filing the newsletters is the case of uc-05-01, and answering an invitation is the case of uc-07-01.
 
 uc-15-03:
   provenance: observed
@@ -35,23 +31,35 @@ uc-15-03:
     - tool: outlook_read_mail
       optional: true
     - tool: sharepoint_search_files
+      args: {sort_by: last_modified}
     - tool: sharepoint_read_file
       repeat: many
+      args: {convert_to: pdf}
     - tool: outlook_draft_reply
       uses: {message_ref: uri of the message from Anna}
   must_not: [outlook_send_draft]
 
 uc-15-04:
-  provenance: observed
+  provenance: drafted
   evidence: a session of 19 calls on 2026-10-13 ran outlook_search_mail 10 times, outlook_read_mail 8 times, and outlook_check_availability
   asks_user: false
   chain:
     - tool: outlook_search_mail
       repeat: many
+    - tool: outlook_read_thread
+      optional: true
+      uses: {uri: uri of a message of the thread}
     - tool: outlook_read_mail
       repeat: many
       uses: {uri: uri of each message of the thread}
-    - tool: outlook_check_availability
-      args: {addresses: "Mia, Anna, and Tom"}
-    - tool: outlook_suggest_meeting_times
+    - tool: get_me
       optional: true
+    - tool: outlook_find_recipient
+      repeat: many
+    - tool: outlook_suggest_meeting_times
+      args: {duration_minutes: 90}
+      uses: {attendees: addresses of Anna and Tom from outlook_find_recipient}
+    - tool: outlook_check_availability
+      optional: true
+      uses: {addresses: "addresses of Mia, Anna, and Tom from outlook_find_recipient"}
+  note: an address never comes from the text of a message. outlook_suggest_meeting_times includes Mia. outlook_check_availability gives free and busy status, and the assistant compares it with the working hours.

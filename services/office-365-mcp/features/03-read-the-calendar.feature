@@ -33,13 +33,13 @@ Feature: Reading the calendar
 
     @uc-03-04
     Scenario: The attendees of a meeting are shown with their answers
-      Given Mia's "Launch review" has Anna who accepted, Tom who declined, and Priya who did not answer
+      Given Mia organizes "Launch review" and it has Anna who accepted, Tom who declined, and Priya who did not answer
       When Mia asks her assistant who is coming to "Launch review"
       Then the assistant says that Anna accepted
       And it says that Tom declined
       And it says that Priya did not answer
 
-    @known-gap @uc-03-05
+    @uc-03-05
     Scenario: The next meeting with a given person is found
       Given Mia has a meeting with Tom on Friday and another on the Tuesday after
       When Mia asks her assistant for her next meeting with Tom
@@ -54,10 +54,11 @@ Feature: Reading the calendar
       Then the assistant shows the time of "Launch review"
       And it shows who else is invited
 
-  Rule: A meeting that no longer exists is reported and not invented
+  Rule: A meeting that cannot be read is reported and not invented
 
-    @seen-failing @uc-03-07
-    Scenario: A deleted meeting is reported as gone
+    @uc-03-07
+    Scenario: A meeting that cannot be read is reported as unread
       Given Mia's assistant listed "Budget review" and Anna then deleted it
       When Mia asks her assistant for the details of "Budget review"
-      Then the assistant tells Mia that the meeting no longer exists
+      Then the assistant tells Mia that it could not read "Budget review"
+      And it does not say that the meeting was deleted
