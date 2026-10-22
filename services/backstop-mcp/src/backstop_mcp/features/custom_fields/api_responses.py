@@ -13,7 +13,7 @@ from pydantic import (
 from backstop_mcp.features.bulk_writes import BulkLoadSummaryAttributes
 from backstop_mcp.lenient import LenientBool, LenientInt
 from backstop_mcp.models import StrippedStr
-from backstop_mcp.observability import warning_event
+from backstop_mcp.observability import failed_fields, warning_event
 
 __all__ = [
     "BulkCustomFieldValuesAttributes",
@@ -132,6 +132,7 @@ def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttribut
             exc=failures[0],
             count=len(failures),
             sample_ids=unreadable_ids[:5],
+            failed_fields=failed_fields(failures),
         )
     return rows
 

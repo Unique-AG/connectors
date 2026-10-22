@@ -23,7 +23,7 @@ from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import warning_event
+from backstop_mcp.observability import failed_fields, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -195,4 +195,6 @@ class GetOpportunitiesByIdsQuery:
                 exc=failed[0].failure,
                 count=len(failed),
                 sample_ids=[item.opportunity_id for item in failed[:5]],
+                failed_fields=failed_fields(item.failure for item in failed if item.failure)
+                or None,
             )
