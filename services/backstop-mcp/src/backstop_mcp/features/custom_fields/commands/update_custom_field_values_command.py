@@ -87,6 +87,7 @@ class UpdateCustomFieldValuesCommand:
                 logger,
                 "custom_fields.values.updated",
                 entity_type=update.entity_type,
+                entity_id=update.entity_id,
                 total_count=len(outcomes),
                 applied_count=applied_count,
                 failed_count=len(outcomes) - applied_count,

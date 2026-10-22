@@ -1,5 +1,6 @@
 """`DeleteOpportunityCommand` hard-deletes an opportunity with no body."""
 
+import logging
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
@@ -47,3 +48,22 @@ class TestDeleteOpportunityCommand:
         assert request.method == "DELETE"
         assert request.content in (b"", b"null")
         spy.assert_awaited_once_with(f"/opportunities/{_ID}")
+
+    @respx.mock
+    async def test_successful_delete_is_logged_at_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.delete(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=httpx.Response(204))
+
+        with caplog.at_level(logging.INFO):
+            await get_delete_opportunity_command_factory(client).run(
+                opportunity=DeleteOpportunityInput(opportunity_id=_ID)
+            )
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "opportunity_writes.opportunity.deleted"
+        )
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["id"] == _ID
