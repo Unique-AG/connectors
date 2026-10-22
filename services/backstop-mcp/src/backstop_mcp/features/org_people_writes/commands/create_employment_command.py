@@ -55,7 +55,11 @@ class CreateEmploymentCommand:
         organization_id: str,
         start_date: date,
     ) -> CreatedEmploymentResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.create_employment") as span:
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.create_employment",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("person_id", person_id)
             span.set_attribute("organization_id", organization_id)
             employment_type = await self._entity_relationship_types_service.get_employment_type()

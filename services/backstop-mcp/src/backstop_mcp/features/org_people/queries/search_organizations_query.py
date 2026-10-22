@@ -174,7 +174,11 @@ class SearchOrganizationsQuery:
             dropped += page_dropped
             return matches
 
-        with _tracer.start_as_current_span("org_people.query.search_organizations") as span:
+        with _tracer.start_as_current_span(
+            "org_people.query.search_organizations",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("memory", should_filter_in_memory)
             span.set_attribute("start_offset", start_offset)
             page = await collect_page(

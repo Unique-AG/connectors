@@ -146,7 +146,7 @@ class GetCapitalFlowsQuery:
             logger.warning(
                 "accounts.capital_flows.scan_ceiling_reached",
                 extra={
-                    "path": path,
+                    "kind": kind,
                     "ceiling": MAX_CAPITAL_FLOW_SCAN_RECORDS,
                     "total_count": page.total_count,
                 },

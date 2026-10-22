@@ -60,7 +60,11 @@ class CreateOpportunityCommand:
     async def run(
         self, *, opportunity: CreateOpportunityInput, investor_id: str
     ) -> CreatedOpportunityResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.create") as span:
+        with _tracer.start_as_current_span(
+            "opportunity_writes.command.create",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("investor_id", investor_id)
             requested_stage = None
             if opportunity.stage is not None:

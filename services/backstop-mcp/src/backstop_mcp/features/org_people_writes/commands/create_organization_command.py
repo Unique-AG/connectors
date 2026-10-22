@@ -46,7 +46,11 @@ class CreateOrganizationCommand:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, organization: CreateOrganizationInput) -> CreatedOrganizationResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.create_organization"):
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.create_organization",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
             owner = await self._system_users_service.resolve_relationship(organization.owner_login)
             attributes = omit_none_values(organization_attributes(organization))
             relationships = omit_none_values(

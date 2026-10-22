@@ -39,7 +39,11 @@ class ModifyContactLocationCommand:
         locations: tuple[ContactLocationInput, ...] = (),
         delete_location_ids: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
-        with _tracer.start_as_current_span("org_people_writes.command.modify_contact_location"):
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.modify_contact_location",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
             deleted: list[str] = []
             for delete_location_id in delete_location_ids:
                 try:

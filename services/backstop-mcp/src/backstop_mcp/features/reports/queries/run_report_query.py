@@ -67,7 +67,9 @@ class RunReportQuery:
         assert 1 <= limit <= MAX_REPORT_PAGE_SIZE
         assert offset >= 0
         logged_report_name = identifiable_value(report_name)
-        with _tracer.start_as_current_span("reports.query.run") as span:
+        with _tracer.start_as_current_span(
+            "reports.query.run", record_exception=False, set_status_on_exception=False
+        ) as span:
             span.set_attributes(span_attributes({"report_name": logged_report_name}))
             span.set_attribute("as_of_date", as_of_date.isoformat())
             span.set_attribute("limit", limit)
@@ -145,7 +147,9 @@ class RunReportQuery:
         offset: int,
     ) -> RunReportResponse:
         logged_report_name = identifiable_value(report_name)
-        with _tracer.start_as_current_span("reports.query.fetch"):
+        with _tracer.start_as_current_span(
+            "reports.query.fetch", record_exception=False, set_status_on_exception=False
+        ):
             page = await self._client.fetch_page(
                 "/reports",
                 schema=ReportResource,

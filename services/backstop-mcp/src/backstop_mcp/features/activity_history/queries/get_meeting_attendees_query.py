@@ -24,7 +24,11 @@ class GetMeetingAttendeesQuery:
         self._client: BackstopClient = client
 
     async def run(self, *, resource_id: str) -> tuple[AttendeeDto, ...]:
-        with _tracer.start_as_current_span("activity_history.query.meeting_attendees") as span:
+        with _tracer.start_as_current_span(
+            "activity_history.query.meeting_attendees",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("resource_id", resource_id)
             logger.debug("activity_history.attendees.fetch", extra={"resource_id": resource_id})
             page = await self._client.paginate(

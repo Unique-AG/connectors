@@ -17,7 +17,6 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from backstop_mcp.config import SearchConfig
@@ -33,7 +32,6 @@ from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
 from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 SearchPersonField = Literal[
     "id",
@@ -297,41 +295,39 @@ async def search_people(
     skip_custom_fields = exclude_custom_fields and not custom_fields
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
-    with _tracer.start_as_current_span("org_people.search_people") as span:
-        span.set_attribute("memory_custom_fields", len(predicates))
-        annotate_tool_call(
-            has_name=name is not None,
-            last_name=last_name is not None,
-            email=email is not None,
-            other_id=other_id is not None,
-            email_domain=email_domain is not None,
-            first_name=first_name is not None,
-            job_title=job_title is not None,
-            company_name=company_name is not None,
-            department=department is not None,
-            location_filter=location_filter is not None,
-            website=website is not None,
-            custom_fields=len(predicates),
-            min_current_organizations=min_current_organizations,
-            exclude_custom_fields=skip_custom_fields,
-            cursor=cursor is not None,
-        )
-        return await search_people_query.run(
-            name=name,
-            last_name=last_name,
-            email=email,
-            other_id=other_id,
-            email_domain=email_domain,
-            first_name=first_name,
-            job_title=job_title,
-            company_name=company_name,
-            department=department,
-            location_filter=location_filter,
-            website=website,
-            custom_fields=predicates,
-            min_current_organizations=min_current_organizations,
-            exclude_custom_fields=skip_custom_fields,
-            fields=chosen,
-            result_size=search_config.result_size,
-            cursor=cursor,
-        )
+    annotate_tool_call(
+        has_name=name is not None,
+        last_name=last_name is not None,
+        email=email is not None,
+        other_id=other_id is not None,
+        email_domain=email_domain is not None,
+        first_name=first_name is not None,
+        job_title=job_title is not None,
+        company_name=company_name is not None,
+        department=department is not None,
+        location_filter=location_filter is not None,
+        website=website is not None,
+        custom_fields=len(predicates),
+        min_current_organizations=min_current_organizations,
+        exclude_custom_fields=skip_custom_fields,
+        cursor=cursor is not None,
+    )
+    return await search_people_query.run(
+        name=name,
+        last_name=last_name,
+        email=email,
+        other_id=other_id,
+        email_domain=email_domain,
+        first_name=first_name,
+        job_title=job_title,
+        company_name=company_name,
+        department=department,
+        location_filter=location_filter,
+        website=website,
+        custom_fields=predicates,
+        min_current_organizations=min_current_organizations,
+        exclude_custom_fields=skip_custom_fields,
+        fields=chosen,
+        result_size=search_config.result_size,
+        cursor=cursor,
+    )

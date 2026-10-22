@@ -49,7 +49,11 @@ class GetLastActivityForPartiesQuery:
         end_date: date,
         types: Sequence[EntityActivityType],
     ) -> tuple[PartyLastActivityDto, ...]:
-        with _tracer.start_as_current_span("activity_history.query.last_activity") as span:
+        with _tracer.start_as_current_span(
+            "activity_history.query.last_activity",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("requested", len(parties))
             settled = await asyncio.gather(
                 *(

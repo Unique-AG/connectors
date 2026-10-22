@@ -51,7 +51,11 @@ class EndEmploymentCommand:
         organization_id: str,
         end_date: date,
     ) -> EndedEmploymentResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.end_employment") as span:
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.end_employment",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("person_id", person_id)
             span.set_attribute("organization_id", organization_id)
             relationship_id = await open_employment_id(

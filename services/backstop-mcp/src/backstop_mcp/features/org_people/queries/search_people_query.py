@@ -194,7 +194,9 @@ class SearchPeopleQuery:
             projected = projected | {"employments"}
         if not exclude_custom_fields:
             projected = projected | {"custom_field_values"}
-        with _tracer.start_as_current_span("org_people.query.search_people") as span:
+        with _tracer.start_as_current_span(
+            "org_people.query.search_people", record_exception=False, set_status_on_exception=False
+        ) as span:
             span.set_attribute("memory", should_filter_in_memory)
             span.set_attribute("start_offset", start_offset)
             page = await collect_page(
