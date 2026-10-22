@@ -7,6 +7,8 @@ from typing import NoReturn, cast, overload
 
 import httpx
 from fastmcp.exceptions import ToolError
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 from backstop_mcp.backstop_client.auth_recheck import (
     TRANSIENT_AUTH_MESSAGE,
@@ -19,7 +21,6 @@ from backstop_mcp.backstop_client.credential import CallerSession, CallerSession
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
-    BackstopErrorDetail,
     BackstopSessionRevokedError,
     BackstopTransientAuthError,
     unauthorized_log_fields,
@@ -45,6 +46,7 @@ from backstop_mcp.metrics import (
 )
 
 logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer("backstop_mcp")
 
 # GET /system-info takes no parameters and returns no business data — the cheapest real
 # Backstop call that still requires a valid credential. Login verification and mid-session
@@ -56,10 +58,6 @@ SYSTEM_INFO_PATH = "/system-info"
 # report-sized page default; everything else gets the ordinary CRUD profile. Each slow call
 # holds a per-user slot for as long as it runs; only `run_report` collects one in the background.
 _SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
-
-
-def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
-    return [error.model_dump() for error in errors]
 
 
 type HttpClientProvider = Callable[[], Awaitable[httpx.AsyncClient]]
@@ -327,36 +325,50 @@ class BackstopClient:
         logger.debug(
             "backstop.request.start", extra=self._log_extra(session, method=method, path=path)
         )
-        try:
-            response: httpx.Response = await retrying(make_request)
-        except BackstopAuthError, BackstopTransientAuthError:
-            # Logged at the 401 site (`backstop.request.unauthorized` / re-check events). A
-            # rejected credential is an ordinary outcome rather than a fault, so no traceback.
-            raise
-        except BackstopApiError as exc:
-            # Expected upstream failures — surface the full JSON:API `errors[]` in the
-            # console without a traceback. Unexpected transport errors still use
-            # `logger.exception` below.
-            logger.error(
-                "backstop.request.failed",
-                extra=self._log_extra(
-                    session,
-                    method=method,
-                    path=path,
-                    status_code=exc.status_code,
-                    detail=exc.detail,
-                    code=exc.code,
-                    errors=_errors_for_log(exc.errors),
-                ),
-            )
-            raise
-        except Exception:
-            logger.exception(
-                "backstop.request.failed",
-                extra=self._log_extra(session, method=method, path=path),
-            )
-            raise
-        return response
+        # One span per logical request, retries included. `route` is the bounded template —
+        # never the path, the URL, or the query string.
+        with _tracer.start_as_current_span(
+            f"backstop {method} {route}",
+            kind=SpanKind.CLIENT,
+            attributes={"http.request.method": method, "url.template": route},
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                response: httpx.Response = await retrying(make_request)
+            except BackstopAuthError, BackstopTransientAuthError:
+                # Logged at the 401 site (`backstop.request.unauthorized` / re-check events). A
+                # rejected credential is an ordinary outcome rather than a fault, so no traceback.
+                span.set_attribute("http.response.status_code", 401)
+                raise
+            except BackstopApiError as exc:
+                span.set_attribute("http.response.status_code", exc.status_code)
+                if exc.status_code >= 500:
+                    span.set_status(Status(StatusCode.ERROR))
+                # Status and code identify the failure. `detail` / `title` / `errors` can echo
+                # the values the caller submitted, and this line also lands on the client span.
+                logger.warning(
+                    "backstop.request.failed",
+                    extra=self._log_extra(
+                        session,
+                        method=method,
+                        path=path,
+                        status_code=exc.status_code,
+                        code=exc.code,
+                        error_count=len(exc.errors),
+                    ),
+                )
+                raise
+            except Exception as exc:
+                if isinstance(exc, httpx.TransportError):
+                    span.set_status(Status(StatusCode.ERROR))
+                logger.exception(
+                    "backstop.request.failed",
+                    extra=self._log_extra(session, method=method, path=path),
+                )
+                raise
+            span.set_attribute("http.response.status_code", response.status_code)
+            return response
 
     def _log_extra(self, session: CallerSession, **fields: object) -> dict[str, object]:
         return {

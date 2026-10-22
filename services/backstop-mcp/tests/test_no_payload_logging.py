@@ -32,8 +32,6 @@ _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 # removes the call.
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
-        # Phase 6a: drop detail/title/errors from the failed-request line.
-        ("backstop_client/client.py", "backstop.request.failed"),
         # Phase 6a: the response object is an argument of the log call via the helper.
         ("backstop_client/client.py", "backstop.request.unauthorized"),
         # Phase 6a: str(exc) of a body that failed to parse.
