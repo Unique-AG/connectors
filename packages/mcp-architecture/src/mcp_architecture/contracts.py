@@ -56,9 +56,9 @@ def _contracts(package: str) -> list[dict[str, object]]:
         {
             # Indirect imports are allowed: contexts reach fastmcp through upstream, whose
             # UpstreamError is a ToolError.
-            "name": "The domain and the storage know nothing about MCP",
+            "name": "The domain, the storage and utils know nothing about MCP",
             "type": "forbidden",
-            "source_modules": [contexts, f"{package}.persistence"],
+            "source_modules": [contexts, f"{package}.persistence", f"{package}.utils"],
             "forbidden_modules": ["fastmcp", "mcp", "mcp_types"],
             "allow_indirect_imports": True,
         },
