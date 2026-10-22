@@ -50,6 +50,8 @@ from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.dependencies import get_resolution_config
+from backstop_mcp.observability import warning_event
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 
@@ -288,10 +290,7 @@ def client_supports_elicitation(ctx: Context) -> bool:
             )
         )
     except Exception as exc:
-        logger.warning(
-            "resolution.elicit.capability_check_failed",
-            extra={"error": str(exc)},
-        )
+        warning_event(logger, "resolution.elicit.capability_check_failed", exc=exc)
         return False
 
 
@@ -375,13 +374,8 @@ def _apply_elicit_result[T](
             return ambiguous
         return Resolved(value=chosen.value)
     assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
-    logger.info(
-        "resolution.elicit.dismissed",
-        extra={
-            **outcome_log,
-            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
-        },
-    )
+    action = "declined" if isinstance(result, DeclinedElicitation) else "cancelled"
+    logger.info("resolution.elicit.dismissed", extra={**outcome_log, "action": action})
     return ambiguous
 
 
@@ -413,7 +407,7 @@ async def elicit_choice[T](
         timeout_seconds = get_resolution_config().elicit_timeout_seconds
 
     outcome_log: dict[str, object] = {
-        "query": ambiguous.query,
+        "query": identifiable_value(ambiguous.query),
         "scope": ambiguous.scope,
         "candidates": len(ambiguous.candidates),
     }
@@ -445,7 +439,7 @@ async def elicit_choice[T](
         try:
             accepted = handle_elicit_accept(config, answered.content)
         except Exception as exc:
-            logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
+            warning_event(logger, "resolution.elicit.degraded", exc=exc, **outcome_log)
             return ambiguous
         chosen = by_label.get(cast("str", accepted.data))
         if chosen is None:
@@ -480,7 +474,7 @@ async def elicit_choice[T](
         )
         return ambiguous
     except Exception as exc:
-        logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
+        warning_event(logger, "resolution.elicit.degraded", exc=exc, **outcome_log)
         return ambiguous
 
     return _apply_elicit_result(ambiguous, by_label, result, outcome_log)

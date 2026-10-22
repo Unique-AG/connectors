@@ -30,34 +30,7 @@ _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 
 # (path relative to src/backstop_mcp, event name). Each comment names the PR 2 step that
 # removes the call.
-_KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
-    {
-        # Phase 6b: str(exc) becomes warning_event(..., exc=exc).
-        (
-            "features/elicitation_utils/elicit_entity_deletion.py",
-            "elicitation.entity_deletion.degraded",
-        ),
-        ("features/resolution.py", "resolution.elicit.degraded"),
-        ("features/resolution.py", "resolution.elicit.capability_check_failed"),
-        ("features/auth/provider.py", "auth.login.backstop_unreachable"),
-        # Phase 6b: `detail` is Backstop error text.
-        (
-            "features/activity_history/queries/get_activity_history_query.py",
-            "activity_history.stream.forbidden",
-        ),
-        # Phase 6b: bool(result.body) still names `body`; `is not None` does not.
-        (
-            "features/activity_history/tools/get_activity_detail.py",
-            "activity_history.detail.get.completed",
-        ),
-        # Phase 6b: isinstance(result, ...) moves out of the log call. `result` is the variable.
-        (
-            "features/elicitation_utils/elicit_entity_deletion.py",
-            "elicitation.entity_deletion.dismissed",
-        ),
-        ("features/resolution.py", "resolution.elicit.dismissed"),
-    }
-)
+_KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset()
 
 
 def _sources() -> list[pathlib.Path]:

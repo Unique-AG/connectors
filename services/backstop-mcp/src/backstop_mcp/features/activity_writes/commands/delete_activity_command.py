@@ -10,6 +10,7 @@ from backstop_mcp.features.activity_writes.commands._write_error_utils import (
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.delete_activity_input import DeleteActivityInput
 from backstop_mcp.features.activity_writes.responses import DeletedActivityResponse
+from backstop_mcp.observability import warning_event
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -29,12 +30,11 @@ class DeleteActivityCommand:
             await self._client.delete(path)
         except BackstopApiError as exc:
             reraise_activity_write_error(exc)
-        logger.warning(
+        warning_event(
+            logger,
             "activity_writes.activity.deleted",
-            extra={
-                "id": resource_id,
-                "kind": activity.kind,
-                "collection": collection,
-            },
+            id=resource_id,
+            kind=activity.kind,
+            collection=collection,
         )
         return DeletedActivityResponse(id=resource_id, resource_type=collection)

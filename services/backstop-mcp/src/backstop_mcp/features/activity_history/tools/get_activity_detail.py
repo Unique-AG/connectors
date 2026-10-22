@@ -102,7 +102,7 @@ async def get_activity_detail(
             "activity_id": activity_id,
             "type": result.type,
             "attendees": len(result.attendees),
-            "has_body": bool(result.body),
+            "has_body": len(result.body) > 0,
         },
     )
     return result

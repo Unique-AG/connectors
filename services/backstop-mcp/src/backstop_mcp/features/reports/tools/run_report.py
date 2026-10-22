@@ -22,6 +22,8 @@ from backstop_mcp.features.reports import (
 from backstop_mcp.features.reports.dependencies import get_run_report_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import NonEmptyStr, published_output_schema
+from backstop_mcp.observability import span_attributes
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -110,15 +112,16 @@ async def run_report(
     "offset": 100}
     """
     as_of = as_of_date if as_of_date is not None else date.today()
+    logged_report_name = identifiable_value(report_name)
     with _tracer.start_as_current_span("reports.run") as span:
-        span.set_attribute("report_name", report_name)
+        span.set_attributes(span_attributes({"report_name": logged_report_name}))
         span.set_attribute("as_of_date", as_of.isoformat())
         span.set_attribute("limit", limit)
         span.set_attribute("offset", offset)
         logger.info(
             "reports.run.start",
             extra={
-                "report_name": report_name,
+                "report_name": logged_report_name,
                 "as_of_date": as_of.isoformat(),
                 "limit": limit,
                 "offset": offset,
