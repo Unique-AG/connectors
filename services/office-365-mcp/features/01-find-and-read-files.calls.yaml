@@ -110,7 +110,7 @@ uc-01-11:
   blocker:
     kind: unknown
     tool: sharepoint_read_file
-    text: When Microsoft answers 406 to `convert_to` pdf, the tool returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known.
+    text: When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known.
     user: The assistant may not be able to read some files that Microsoft cannot convert.
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
