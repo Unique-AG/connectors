@@ -60,11 +60,11 @@ It refuses to start unless `git status` is clean, untracked files included. Ask 
 commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff, the
 codegen's drift check for an OpenAPI upstream, basedpyright, import-linter,
 `mcp-architecture-check` and pytest in the new service, and fails loudly if any of them does. Since it
-started from a clean tree, everything it wrote is its own: undo a failed run with
-`git checkout -- . && git clean -fd && git clean -fdx services/<name>`. The last command also
-removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
+started from a clean tree, everything it wrote is its own: a failed run prints the command that
+undoes it, `git checkout . && git clean -fdx services/<name>`, to run from the repository root. It
+also removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
 
-Every file it writes starts with a `mcp-scaffold-version: <version>, timestamp: <when>` comment,
+Every file it writes starts with a `mcp-scaffold-commit: <commit>, timestamp: <when>` comment,
 the same in every file of the run. Leave it in place on a file you edit. Never add one to a file
 you write, not even when you copy a stamped file as a starting point, and drop it from a
 scaffold file you rewrite from scratch: the stamp marks what the scaffold wrote, not what you

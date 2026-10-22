@@ -30,55 +30,36 @@ extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
 extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
 ```
 
-The scaffold writes this, the `[tool.importlinter]` table from `render_importlinter`, and
+The scaffold writes this, a `[tool.importlinter]` for the MCP's own contracts, and
 `tests/offline_server.py`, whose `offline_server()` builds the server with fakes in place of the
 upstream and the stores.
 
 ## What it gives
 
 - `code_style.toml`: the code style every MCP keeps, the Google Python Style Guide as far as ruff
-  checks it, plus the APIs a past fix replaced. An MCP's `[tool.ruff]` extends it.
+  checks it, plus the APIs a past fix replaced.
 - `type_check.json`: basedpyright's `all` mode, with the reports every MCP turns off. An MCP's
   `[tool.basedpyright]` extends it.
-- `render_importlinter(package)`: `[tool.importlinter]` with the contracts every MCP keeps, as
-  TOML. import-linter cannot extend a shared file, so the scaffold writes it into each MCP, and
-  `mcp-architecture-check --update` writes it back into an existing one.
-- `FeaturePrivacyContract`: the one contract type of our own, which the rendered table
-  registers. import-linter's `protected` contract lets an allowed importer's descendants in too,
-  so it cannot say that one feature only reaches another through its top level.
-- `mcp-architecture-check`: runs, in the MCP's folder, the checks of what a client sees against
-  the server `offline_server()` builds, and checks the MCP's tool tables in `pyproject.toml`. CI
-  runs it as a step of its own, outside pytest, so a `conftest.py` cannot skip, xfail or deselect
-  a check. `--update` writes
-  `tests/tool_surface.generated.json` instead of comparing with it, and writes
-  `[tool.importlinter]` back as `render_importlinter` gives it, keeping the MCP's own contracts
-  and contract types. The checks it runs:
-  - `undescribed_tools(server)`: each tool without a description and each parameter without one,
-    skipping a tool served straight from an OpenAPI spec, which says what the spec says.
-  - `tool_surface(server)`: the tools the server lists (name, title, description, input and
-    output schema, annotations and tags) as JSON, compared with the snapshot.
-  - `tools_with_a_root_combinator(server)`: each tool whose input schema has `anyOf`, `oneOf`,
-    `allOf` or `not` at its root.
-  - `masks_error_details(factory)`: whether an unexpected error reaches the client without its
-    message. It adds a tool that raises to a server of its own from `offline_server`, and calls
-    it.
-  - `settings_showing_input_in_errors(package)`: each settings class whose validation error
-    would print the value it was given.
-  - `files_changing_their_type_check(root)`: each `# pyright:` comment in `src` and `tests` that
-    sets a file's mode or a report, which basedpyright honours whatever the shared config says.
-    Only an ignore that names its rule is left.
-  - `files_turning_rules_off(root, package)`: each `# ruff: noqa` or `# ruff: disable` comment in
-    `src` and `tests`, which turns a rule off for the rest of the file, as a `per-file-ignores`
-    entry would. The codegen's output in `src/<package>/upstream/generated/` may have one.
-  - `loosened_configuration(root, pyproject, package)`: each way the MCP's tool tables, or a file
-    read in their place, drop or loosen what the shared files and `render_importlinter` give.
-    [Where each rule is configured](guides/configuration.md) lists what a table may set.
+- `render_importlinter(package)`: the contracts every MCP keeps, as TOML.
+- `FeaturePrivacyContract`: the one contract type of our own, which the rendered contracts
+  register.
+- Three commands, which CI runs in the MCP's folder:
+  - `mcp-architecture-lint [--fix]`: ruff with `code_style.toml` as `--config`, then with the
+    MCP's own configuration.
+  - `mcp-architecture-imports`: import-linter on the rendered contracts, then on the MCP's own.
+  - `mcp-architecture-check [--update]`: the checks no tool runs. `--update` writes
+    `tests/tool_surface.generated.json` instead of comparing with it.
+
+[Where each rule is configured](guides/configuration.md) explains the first two,
+[the rules in `ARCHITECTURE.md`](ARCHITECTURE.md#the-rules) list what each command enforces, and
+[`CUSTOM_CHECKS.md`](CUSTOM_CHECKS.md) why the code is ours.
 
 ## Working on the package from a service
 
-ruff and basedpyright read `code_style.toml` and `type_check.json` from this folder, so an edit
-there reaches a service at once. A service installs the Python code as a copy, so an edit to it
-is not seen until `uv sync --reinstall-package mcp-architecture` in the service.
+basedpyright reads `type_check.json` from this folder, so an edit there reaches a service at once.
+A service installs the rest as a copy, `code_style.toml` and the contracts included, so an edit
+to them reaches its commands only after `uv sync --reinstall-package mcp-architecture` in the
+service.
 
 ## Checks
 

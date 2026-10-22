@@ -47,11 +47,12 @@ user and has the agent write it.
 Every file the scaffold writes starts with the same comment, in the file's own syntax:
 
 ```
-# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T09:30:00+00:00
+# mcp-scaffold-commit: 3f2a9c1e5b7d, timestamp: 2026-10-21T09:30:00+00:00
 ```
 
-The version is this package's, and the timestamp the moment the run started, the same in every
-file of one run, so a file tells which scaffold wrote it. A Dockerfile's `# syntax=` line and a
+The commit is the one the scaffold ran from, which the clean tree it requires makes exact, and
+the timestamp the moment the run started, the same in every file of one run, so a file tells
+which scaffold wrote it. A Dockerfile's `# syntax=` line and a
 shebang stay first, and a JSON schema takes it as `"$comment"`. What a tool writes is not
 stamped: `uv.lock`, the codegen's `upstream/generated/` modules, the tool surface
 snapshot and the chart's `values.schema.json`, which `scripts/render-values-schema.sh`
@@ -68,9 +69,9 @@ bump rather than a copy:
 
 - `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-architecture`: `ARCHITECTURE.md`, which the generated `AGENTS.md` points to, the
-  code style the MCP's `[tool.ruff]` extends, the type check its `[tool.basedpyright]` extends,
-  the import contracts its `[tool.importlinter]` holds, and `mcp-architecture-check`, which
-  checks what a client sees of the server `tests/offline_server.py` builds.
+  code style and import contracts its commands check, the type check its `[tool.basedpyright]`
+  extends, and `mcp-architecture-check`, which checks what a client sees of the server
+  `tests/offline_server.py` builds.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 
 The server with its host and origin guard (`mcp/http.py`, `mcp/middleware.py`) and the
@@ -93,23 +94,24 @@ needs belongs in their code, put it in one of those packages instead.
 - `src/mcp_scaffold/files/root/`: files outside the package a choice brings, such as `alembic.ini`
   or a custom upstream's `tests/test_upstream.py`.
 - A file under `files/` named `*.jinja` depends on the combination of choices. Once every layer
-  is copied, `render_templates` in `skeleton.py` renders each with the `Options` as `options`
-  and drops the suffix.
+  is copied, `render_templates` in `skeleton.py` renders each and drops the suffix, with the
+  `Options` as `options`, the `VendorSpec` as `spec`, the upstream's `api_url` and the
+  `Dependencies` from `pyproject.py` as `dependencies`.
 - `src/mcp_scaffold/cli.py`: the `new` command.
 - `src/mcp_scaffold/scaffold.py`: `scaffold()`, the steps in order. Each step is a module named
   for what it copies, writes or edits: `upstream.py` and `persistence.py` (the layer folders),
-  `openapi.py` (the spec, its first operation, the codegen), `pyproject.py` (with `pins.py`),
-  `agents.py`, `repository.py` and `stamp.py`. `skeleton.py` copies, renders and renames the
+  `openapi.py` (the spec, its first operation, the codegen), `pyproject.py` (the dependencies,
+  with `pins.py`), `repository.py` and `stamp.py`. `skeleton.py` copies, renders and renames the
   skeleton, `commands.py` runs uv in the new service, and `options.py` holds what a new MCP
   asks for.
 
 The architecture, its explanation and the checks the skeleton's tests run are in
 `packages/mcp-architecture`, not copied into each MCP. The skeleton's `AGENTS.md` only points to
-it, and `agents.py` adds what the MCP chose.
+it, and says what the MCP chose.
 
 None of the files under `files/` is linted or type-checked here. They are checked where they
 land:
 
 - `tests/test_scaffold.py` generates one MCP per choice and runs every check `commands.check`
-  runs on a new MCP: ruff, the codegen's drift check, basedpyright, `lint-imports`,
-  `mcp-architecture-check` and pytest.
+  runs on a new MCP: `mcp-architecture-lint`, the codegen's drift check, basedpyright,
+  `mcp-architecture-imports`, `mcp-architecture-check` and pytest.

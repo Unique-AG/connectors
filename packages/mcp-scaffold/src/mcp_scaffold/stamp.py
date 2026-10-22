@@ -1,9 +1,16 @@
-"""The line at the top of every file the scaffold writes: the scaffold's version and the moment
-the run started, the same in every file of one run."""
+"""The line at the top of every file the scaffold writes: the commit the scaffold ran from and the
+moment the run started, the same in every file of one run."""
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
+
+
+def unstamped(text: str) -> str:
+    """`text` without the stamp comments a file the scaffold wrote carries, such as a spec
+    vendored from another MCP, so the run stamps it once."""
+    return _STAMP_COMMENT.sub("", text)
 
 
 def written_files(target: Path) -> list[Path]:
@@ -12,8 +19,8 @@ def written_files(target: Path) -> list[Path]:
     return sorted(path for path in target.rglob("*") if path.is_file() and not path.is_symlink())
 
 
-def stamp(files: list[Path], *, version: str, timestamp: datetime) -> None:
-    line = f"mcp-scaffold-version: {version}, timestamp: {timestamp.isoformat(timespec='seconds')}"
+def stamp(files: list[Path], *, commit: str, timestamp: datetime) -> None:
+    line = f"mcp-scaffold-commit: {commit}, timestamp: {timestamp.isoformat(timespec='seconds')}"
     for path in files:
         if path.name not in _REGENERATED:
             path.write_text(stamped(path, line))
@@ -57,3 +64,4 @@ _BY_SUFFIX = {
 _FIRST_LINE_ONLY = ("#!", "# syntax=")
 # scripts/render-values-schema.sh writes it from the base chart's, and CI fails on any other line.
 _REGENERATED = {"values.schema.json"}
+_STAMP_COMMENT = re.compile(r"^# mcp-scaffold-[a-z]+: .*\n", flags=re.MULTILINE)

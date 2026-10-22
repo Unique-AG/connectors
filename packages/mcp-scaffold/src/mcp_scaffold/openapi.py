@@ -9,11 +9,12 @@ from typing import Annotated, Self, cast
 
 import yaml
 from mcp_openapi.vendoring import HTTP_METHODS, as_yaml
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import AnyHttpUrl, BaseModel, BeforeValidator, Field, TypeAdapter, ValidationError
 
 from mcp_scaffold.commands import run
 from mcp_scaffold.options import Options
-from mcp_scaffold.skeleton import PACKAGE, quoted
+from mcp_scaffold.skeleton import PACKAGE
+from mcp_scaffold.stamp import unstamped
 
 
 class VendorSpec(BaseModel):
@@ -46,13 +47,9 @@ class VendorSpec(BaseModel):
         if not operations:
             raise ValueError("the spec has no operation with an operationId that answers JSON")
         reads = [operation for method, operation in operations if method == "get"]
-        servers = [
-            server.url
-            for server in spec.servers
-            if server.url.startswith(("http://", "https://")) and "{" not in server.url
-        ]
+        servers = [api for server in spec.servers if (api := _http_url(server.url)) is not None]
         return cls(
-            text=as_yaml(text),
+            text=as_yaml(unstamped(text)),
             operation=(reads or [operation for _, operation in operations])[0],
             api_url=servers[0].rstrip("/") if servers else None,
             url=url,
@@ -60,42 +57,21 @@ class VendorSpec(BaseModel):
 
 
 def write_spec(spec: VendorSpec, target: Path) -> None:
-    """Vendor the spec, and start from its first operation, served and typed both."""
+    """Vendor the spec, and serve its first operation. `pyproject.toml.jinja` types it."""
     layer = target / "src" / PACKAGE / "upstream"
     (layer / "openapi.yml").write_text(spec.text)
     (layer / "routes.py").write_text(_ROUTES.format(exposed=json.dumps([spec.operation])))
-    operation_ids = "operation-ids = []"
-    spec_path = f'spec = "src/{PACKAGE}/upstream/openapi.yml"\n'
-    edits = [
-        (
-            target / "pyproject.toml",
-            operation_ids,
-            operation_ids.replace("[]", f'["{spec.operation}"]'),
-        )
-    ]
-    if spec.url is not None:
-        edits.append(
-            (
-                target / "pyproject.toml",
-                spec_path,
-                f"{spec_path}spec-source = {quoted(spec.url)}\n",
-            )
-        )
-    if spec.api_url is not None:
-        default_url = f'AnyHttpUrl("{_EXAMPLE_API_URL}")'
-        env_url = f"UPSTREAM_API_URL={_EXAMPLE_API_URL}"
-        edits += [
-            (
-                layer / "settings.py",
-                default_url,
-                default_url.replace(_EXAMPLE_API_URL, spec.api_url),
-            ),
-            (target / ".env.example", env_url, env_url.replace(_EXAMPLE_API_URL, spec.api_url)),
-        ]
-    for path, old, new in edits:
-        text = path.read_text()
-        assert old in text, f"{path.name} no longer has {old!r}"
-        path.write_text(text.replace(old, new))
+
+
+def _http_url(url: str) -> str | None:
+    """`url` as pydantic writes it, or None for a server URL with a variable, or one that is
+    not http(s)."""
+    if "{" in url:
+        return None
+    try:
+        return str(_HTTP_URL.validate_python(url))
+    except ValidationError:
+        return None
 
 
 def generate_operations(options: Options, target: Path) -> Path:
@@ -179,5 +155,4 @@ _ROUTES = """\
 # Every other one is hidden.
 EXPOSED: list[str] = {exposed}
 """
-# The upstream settings' default, replaced by the spec's server.
-_EXAMPLE_API_URL = "https://api.example.com"
+_HTTP_URL = TypeAdapter(AnyHttpUrl)

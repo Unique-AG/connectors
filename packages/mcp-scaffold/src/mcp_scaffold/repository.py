@@ -46,8 +46,8 @@ def name_conflict(name: str, repo: Path) -> str | None:
 def register(options: Options, repo: Path, *, release: bool) -> None:
     """Commit scope, release, and the pnpm workspace exclusion every Python service has.
 
-    Each entry is added once, so a name registered before, by a service since removed and
-    generated again, is not listed twice.
+    A scope and an exclusion that a service since removed left under the same name are not
+    listed twice. `name_conflict` has refused a name with a release entry left.
     """
     name = options.name
 
@@ -89,18 +89,14 @@ def _register_release(name: str, repo: Path) -> None:
     }
     config = repo / _RELEASE_CONFIG
     text = config.read_text()
-    packages = cast(dict[str, dict[str, object]], json.loads(text))["packages"]
-    if f"services/{name}" not in packages:
-        closing = "    }\n  }\n}\n"
-        assert text.endswith(closing), (
-            "release-please-config.json does not end with the packages map"
-        )
-        entry = textwrap.indent(f'"services/{name}": {json.dumps(package, indent=2)}', "    ")
-        config.write_text(f"{text[: -len(closing)]}    }},\n{entry}\n  }}\n}}\n")
+    closing = "    }\n  }\n}\n"
+    assert text.endswith(closing), "release-please-config.json does not end with the packages map"
+    entry = textwrap.indent(f'"services/{name}": {json.dumps(package, indent=2)}', "    ")
+    config.write_text(f"{text[: -len(closing)]}    }},\n{entry}\n  }}\n}}\n")
 
     manifest = repo / _RELEASE_MANIFEST
     versions = cast(dict[str, str], json.loads(manifest.read_text()))
-    versions.setdefault(f"services/{name}", "0.0.0")
+    versions[f"services/{name}"] = "0.0.0"
     manifest.write_text(json.dumps(versions, indent=2) + "\n")
 
     rerun = repo / ".github" / "workflows" / "release-rerun.yaml"

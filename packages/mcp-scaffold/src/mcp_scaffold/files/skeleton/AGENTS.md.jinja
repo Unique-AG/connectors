@@ -1,0 +1,31 @@
+# MCP Skeleton
+
+@../../packages/mcp-architecture/ARCHITECTURE.md
+
+This MCP keeps the architecture every Python MCP in this repo shares. Read
+[`packages/mcp-architecture/ARCHITECTURE.md`](../../packages/mcp-architecture/ARCHITECTURE.md)
+before you write code here: ruff, basedpyright and import-linter check most of it.
+
+Its [Commands](../../packages/mcp-architecture/ARCHITECTURE.md#commands) install, check and
+serve this MCP, with `mcp-skeleton` for `<name>`.
+
+## This MCP
+
+{{ options.description }}
+
+{% if options.upstream == "openapi" %}
+- Upstream: OpenAPI, from the vendor's spec in `upstream/openapi.yml`. `upstream/routes.py` lists the operations served as tools straight from the spec, and `operation-ids` in `[tool.mcp-openapi]` the ones our tools call through `Upstream`.
+{% elif options.upstream == "custom" %}
+- Upstream: A client of our own in `upstream/client.py`, started from the scaffold's HTTP client: one `request` for any method and path, retried by `RetrySettings`, parsing every body into a pydantic model. The `new-mcp` skill's rules for coding a client apply.
+{% else %}
+- Upstream: None. `upstream/` stays empty until the MCP calls a system of its own; the `new-mcp` skill's rules for coding a client say how to add one.
+{% endif %}
+{% if not options.stores %}
+- Persistence: None.
+{% else %}
+- Persistence:
+{%- if "postgres" in options.stores %} Postgres through SQLAlchemy, as `Persistence.database`. Models subclass `persistence.Base`; `uv run alembic revision --autogenerate -m '...'` writes a migration, which the chart's migration hook applies.{% endif %}
+{%- if "redis" in options.stores %} Redis as a key-value store (`py-key-value-aio`), as `Persistence.store`.{% endif %}
+
+{% endif %}
+- Auth: Not implemented. `run_server` refuses to serve beyond loopback until the server has an auth provider, `FastMCP(auth=...)`. The `new-mcp` skill's rules for coding auth say how to add one.

@@ -24,7 +24,9 @@ two ways:
   in `upstream/generated/`; never edit that package by hand. Export the operation's constant
   from `upstream/__init__.py`, then write a context that calls `upstream.call(GET_X, ...)` and a
   tool over it. `Upstream` is mcp-openapi's `OperationClient`, which validates arguments
-  against the spec and parses each response into its generated model.
+  against the spec and parses each response into its generated model. On an error status it
+  raises `UpstreamError` with the status, method and URL, followed by the first 200 characters
+  of the error body, which reach the client.
 
 A new MCP starts with its spec's first JSON operation, a GET if there is one, in both lists:
 served, and typed for when it is promoted. Serve more operations to grow the first version.

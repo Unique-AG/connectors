@@ -73,11 +73,12 @@ It runs, in this order:
 
 1. `uv sync --locked`
 2. the generated-code drift checks, in a service that has a generator
-3. `uv run ruff format --check .`, then `pnpm exec biome check .`
-4. `uv run ruff check .` and `uv run basedpyright`
-5. in a service whose `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one
-   that keeps `packages/mcp-architecture/ARCHITECTURE.md`: `uv run lint-imports`, then
-   `uv run mcp-architecture-check`. `ARCHITECTURE.md` lists what each enforces
+3. `uv run ruff format --check .` and `uv run ruff check .`, or, in a service whose
+   `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one that keeps
+   `packages/mcp-architecture/ARCHITECTURE.md`, `uv run mcp-architecture-lint`
+4. `pnpm exec biome check .` and `uv run basedpyright`
+5. in such a service, `uv run mcp-architecture-imports`, then `uv run mcp-architecture-check`.
+   `ARCHITECTURE.md` lists what each enforces
 6. `uv run pytest`
 
 Every check runs even after one fails, and the run ends with the list of those that failed, so one
