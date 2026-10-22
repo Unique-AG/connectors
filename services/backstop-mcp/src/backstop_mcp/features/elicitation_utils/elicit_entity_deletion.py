@@ -22,6 +22,7 @@ from backstop_mcp.features.resolution import (
     client_supports_elicitation,
     elicit_from_client,
 )
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ async def elicit_entity_deletion(
         try:
             accepted = handle_elicit_accept(config, answered.content)
         except Exception as exc:
-            logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
+            warning_event(logger, "elicitation.entity_deletion.degraded", exc=exc)
             return EntityDeletion.DECLINED
         data = cast("object", accepted.data)
         if isinstance(data, DeletionChoice) and data.choice == DELETE:
@@ -143,7 +144,7 @@ async def elicit_entity_deletion(
         )
         return EntityDeletion.DECLINED
     except Exception as exc:
-        logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
+        warning_event(logger, "elicitation.entity_deletion.degraded", exc=exc)
         return EntityDeletion.DECLINED
 
     if isinstance(result, AcceptedElicitation) and result.data.choice == DELETE:
@@ -152,10 +153,6 @@ async def elicit_entity_deletion(
         logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
         return EntityDeletion.DECLINED
 
-    logger.info(
-        "elicitation.entity_deletion.dismissed",
-        extra={
-            "action": "cancelled" if isinstance(result, CancelledElicitation) else "declined",
-        },
-    )
+    action = "cancelled" if isinstance(result, CancelledElicitation) else "declined"
+    logger.info("elicitation.entity_deletion.dismissed", extra={"action": action})
     return EntityDeletion.DECLINED

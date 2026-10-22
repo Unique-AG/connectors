@@ -20,6 +20,7 @@ from backstop_mcp.features.org_people_writes.api_responses import (
 from backstop_mcp.features.org_people_writes.commands.modify_contact_location_command import (
     ModifyContactLocationCommand,
 )
+from backstop_mcp.observability import warning_event
 
 type PersonCollection = Literal["people", "contacts", "employees"]
 type PartyCollection = PersonCollection | Literal["organizations"]
@@ -76,13 +77,12 @@ class DeletePartyWithLocationsCommand:
             location_ids=location_ids,
         )
         await self._client.delete(f"/{collection}/{quote(party_id, safe='')}")
-        logger.warning(
+        warning_event(
+            logger,
             "org_people_writes.party.deleted",
-            extra={
-                "id": party_id,
-                "collection": collection,
-                "deleted_location_ids": deleted_location_ids,
-            },
+            id=party_id,
+            collection=collection,
+            deleted_location_ids=deleted_location_ids,
         )
         return deleted_location_ids
 
