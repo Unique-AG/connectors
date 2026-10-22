@@ -53,9 +53,21 @@
               "description": "Which tools this deployment runs, as a named surface such as 'teams', or as several presets in a comma-separated list such as 'teams-write,outlook-read'. The tools of all named presets turn on."
             },
             "enabled": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Which tools this deployment runs, as a comma-separated list of tool names."
+              "oneOf": [
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ],
+              "description": "Which tools this deployment runs, as a list of tool names or as one comma-separated string of tool names."
             }
           },
           "oneOf": [

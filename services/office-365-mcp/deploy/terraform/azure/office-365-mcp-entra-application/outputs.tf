@@ -53,8 +53,8 @@ output "deployment_env" {
   description = <<-EOT
     Per confidential-client key, the pod's whole non-secret configuration in the chart's own
     `mcpConfig` shape. Copy these into the Argo overlay rather than assembling them by hand.
-    `mcpConfig.tools.enabled` carries the resolved expansion and there is deliberately no `preset`
-    key: an overlay pinned to a preset name widens itself on a chart bump, past a registration
+    `mcpConfig.tools.enabled` carries the resolved expansion as a list, and there is deliberately no
+    `preset` key: an overlay pinned to a preset name widens itself on a chart bump, past a registration
     nobody re-applied. `mcpConfig.entra.tenantId` is `organizations` under `AzureADMultipleOrgs`: the
     pod then validates each token against its own tenant's issuer and calls Graph in that tenant, so
     no single consenting tenant's id is needed, and this module could not know it. `mcpConfig.entra.clientSecret` is
@@ -73,7 +73,7 @@ output "deployment_env" {
           clientId = azuread_application.office_365_mcp.client_id
         }
         tools = {
-          enabled = join(",", local.tools)
+          enabled = local.tools
         }
       }
     }

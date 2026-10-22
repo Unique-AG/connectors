@@ -27,7 +27,7 @@ key, the resolved values in the chart's own `mcpConfig` shape; copy them across:
 | `mcpConfig.app.publicBaseUrl` | `mcpConfig.app.publicBaseUrl` |
 | `mcpConfig.entra.tenantId` | `mcpConfig.entra.tenantId` |
 | `mcpConfig.entra.clientId` | `mcpConfig.entra.clientId` |
-| `mcpConfig.tools.enabled` | `mcpConfig.tools.enabled` (leave `mcpConfig.tools.preset` unset) |
+| `mcpConfig.tools.enabled` | `mcpConfig.tools.enabled`, a list of tool names (leave `mcpConfig.tools.preset` unset) |
 
 It carries the resolved tool list and never a preset name on purpose: an overlay pinned to a preset
 can widen itself on a chart bump, past a registration nobody re-applied. `mcpConfig.entra.clientSecret`

@@ -56,6 +56,6 @@ one) containers.
 {{- end }}
 {{- if .Values.mcpConfig.tools.enabled }}
 - name: TOOLS_ENABLED
-  value: {{ .Values.mcpConfig.tools.enabled | quote }}
+  value: {{ ternary (join "," .Values.mcpConfig.tools.enabled) .Values.mcpConfig.tools.enabled (kindIs "slice" .Values.mcpConfig.tools.enabled) | quote }}
 {{- end }}
 {{- end -}}
