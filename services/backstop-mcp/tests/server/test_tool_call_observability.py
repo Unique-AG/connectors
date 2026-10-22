@@ -19,7 +19,7 @@ from unique_toolkit.monitoring import get_metrics
 
 from backstop_mcp.config import AppConfig
 from backstop_mcp.logging import configure_logging
-from backstop_mcp.observability import annotate_tool_call
+from backstop_mcp.observability import add_call_fields
 from backstop_mcp.server.tool_call_observability import ToolCallObservabilityMiddleware
 from tests.helpers import assert_absent_from_records
 
@@ -44,7 +44,7 @@ def _build_server() -> FastMCP:
 
     @server.tool
     async def echo_email(email: str) -> str:
-        annotate_tool_call(returned=3 if email else 0)
+        add_call_fields(returned=3 if email else 0)
         return "ok"
 
     @server.tool
