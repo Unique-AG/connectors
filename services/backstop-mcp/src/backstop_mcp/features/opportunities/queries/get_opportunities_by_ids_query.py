@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
 from http import HTTPStatus
+from typing import ClassVar
 from urllib.parse import quote
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -23,19 +23,23 @@ from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
 MAX_OPPORTUNITY_IDS = 50
 
 
-@dataclass(frozen=True)
-class _FetchedOne:
+class _FetchedOne(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
     opportunity_id: str
     opportunity_response: OpportunityResponse | None = None
     included: tuple[dict[str, object], ...] = ()
     error: str | None = None
     not_found: bool = False
+    # The coped-with exception behind `error`, for the one aggregated warning per call.
+    failure: ValidationError | httpx.RequestError | None = None
 
 
 class GetOpportunitiesByIdsQuery:
@@ -104,6 +108,8 @@ class GetOpportunitiesByIdsQuery:
             if isinstance(result, BaseException):
                 raise result
             fetched.append(result)
+        self._warn_failures(fetched, "opportunities.by_ids.record.unreadable", ValidationError)
+        self._warn_failures(fetched, "opportunities.by_ids.request_failed", httpx.RequestError)
 
         opportunities: list[OpportunityResponse] = []
         not_found: list[str] = []
@@ -162,21 +168,31 @@ class GetOpportunitiesByIdsQuery:
             return _FetchedOne(
                 opportunity_id=opportunity_id, error="unreadable opportunity document"
             )
-        except ValidationError:
-            logger.warning(
-                "opportunities.by_ids.record.unreadable",
-                extra={"opportunity_id": opportunity_id},
-                exc_info=True,
+        except ValidationError as exc:
+            return _FetchedOne(
+                opportunity_id=opportunity_id, error="unreadable opportunity record", failure=exc
             )
-            return _FetchedOne(opportunity_id=opportunity_id, error="unreadable opportunity record")
-        except httpx.RequestError:
+        except httpx.RequestError as exc:
             # Only a 429 classified as `concurrency` is retried, so a timeout on one of 50 ids
             # arrives here. Failing the batch over it would cost the caller the other 49.
-            logger.warning(
-                "opportunities.by_ids.request_failed",
-                extra={"opportunity_id": opportunity_id},
-                exc_info=True,
-            )
             return _FetchedOne(
-                opportunity_id=opportunity_id, error="Backstop did not answer for this id"
+                opportunity_id=opportunity_id,
+                error="Backstop did not answer for this id",
+                failure=exc,
+            )
+
+    def _warn_failures(
+        self,
+        fetched: Sequence[_FetchedOne],
+        event: str,
+        kind: type[ValidationError] | type[httpx.RequestError],
+    ) -> None:
+        failed = [item for item in fetched if isinstance(item.failure, kind)]
+        if failed:
+            warning_event(
+                logger,
+                event,
+                exc=failed[0].failure,
+                count=len(failed),
+                sample_ids=[item.opportunity_id for item in failed[:5]],
             )

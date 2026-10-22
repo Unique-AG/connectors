@@ -47,7 +47,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import failure_event, info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +101,11 @@ class GetHoldingsQuery:
             # counts-versus-rows contradiction, and a 401 that re-verified
             # (`BackstopTransientAuthError`) all mean the same thing here — the unsupported
             # endpoint did not answer usably, so use the documented one.
-            logger.warning(
+            failure_event(
+                logger,
                 "accounts.holdings.table_unavailable_using_documented_walk",
-                extra={"owner_id": owner_id},
-                exc_info=exc,
+                exc,
+                owner_id=owner_id,
             )
         return await self._documented_holdings(owner_id=owner_id, include_closed=include_closed)
 
@@ -121,13 +122,12 @@ class GetHoldingsQuery:
         )
         rows_dropped = len(table.accounts) - len(all_rows)
         if rows_dropped:
-            logger.warning(
+            warning_event(
+                logger,
                 "accounts.holdings_table.rows_without_account_id",
-                extra={
-                    "entity_id": owner_id,
-                    "dropped": rows_dropped,
-                    "returned": len(table.accounts),
-                },
+                entity_id=owner_id,
+                dropped=rows_dropped,
+                returned=len(table.accounts),
             )
         rows = all_rows if include_closed else tuple(row for row in all_rows if not row.closed)
         info_event(
@@ -169,10 +169,26 @@ class GetHoldingsQuery:
             return_exceptions=True,
         )
         rows: list[HoldingRowDto] = []
+        series_failures: list[BaseException] = []
         for result in settled:
             if isinstance(result, BaseException):
                 raise result
-            rows.append(result)
+            row, failures = result
+            rows.append(row)
+            series_failures.extend(failures)
+        if series_failures:
+            failed_rows = [row for row in rows if row.figure_errors]
+            warning_event(
+                logger,
+                "accounts.holdings.fallback_series_failed",
+                exc=series_failures[0],
+                owner_id=owner_id,
+                count=len(series_failures),
+                sample_ids=[row.account_id for row in failed_rows[:5]],
+                figures=sorted(
+                    {error.figure for row in failed_rows for error in row.figure_errors}
+                ),
+            )
         return HoldingListingDto(
             rows=tuple(rows),
             closed_omitted=listing.closed_omitted,
@@ -218,7 +234,10 @@ class GetHoldingsQuery:
             closed_omitted=len(records) - len(open_accounts),
         )
 
-    async def _row_with_figures(self, account: AccountRecordDto) -> HoldingRowDto:
+    async def _row_with_figures(
+        self, account: AccountRecordDto
+    ) -> tuple[HoldingRowDto, tuple[BaseException, ...]]:
+        """The row, and the series failures it coped with."""
         settled = await asyncio.gather(
             fetch_series(self._client, f"/accounts/{account.id}/values"),
             fetch_series(self._client, f"/accounts/{account.id}/percentageOfFundHistory"),
@@ -230,7 +249,8 @@ class GetHoldingsQuery:
         share_series, share_error = self._series_or_figure_error(
             settled[1], account_id=account.id, field="percentage_of_product"
         )
-        return HoldingRowDto(
+        failures = tuple(result for result in settled if isinstance(result, BaseException))
+        row = HoldingRowDto(
             account_id=account.id,
             product_id=account.product.id if account.product else None,
             product_short_name=account.product.short_name if account.product else None,
@@ -253,6 +273,7 @@ class GetHoldingsQuery:
                 error for error in (balance_error, share_error) if error is not None
             ),
         )
+        return row, failures
 
     def _series_or_figure_error(
         self,
@@ -269,10 +290,9 @@ class GetHoldingsQuery:
             # no share-of-fund is still the answer to "what do they hold". The reason is
             # carried so the omission does not read as "Backstop publishes no number".
             message = f"{type(settled).__name__}: {settled}"
-            logger.warning(
+            logger.debug(
                 "accounts.holdings.fallback_series_failed",
                 extra={"account_id": account_id, "figure": field},
-                exc_info=settled,
             )
             return None, HoldingFigureErrorDto(figure=field, message=message)
         return settled, None

@@ -10,6 +10,7 @@ rows under `data[0].attributes.accounts`, a `null` element id, `meta.totalResour
 and `included` empty.
 """
 
+import logging
 from collections.abc import Sequence
 from datetime import date
 
@@ -29,7 +30,14 @@ from backstop_mcp.features.accounts import (
     TenureRunDto,
 )
 from tests.features.accounts.conftest import make_get_holdings_query
-from tests.helpers import BASE_URL, client_factory, credential, recorded_params, resource
+from tests.helpers import (
+    BASE_URL,
+    aggregated_warning,
+    client_factory,
+    credential,
+    recorded_params,
+    resource,
+)
 
 _ORG = "341764767"
 _ACCOUNT = "27871657"
@@ -995,6 +1003,37 @@ _EXPECTED_FIELDS = {
 
 
 class TestDocumentedWalk:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_series_produce_one_warning_per_call(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        account_ids = [str(8000 + index) for index in range(7)]
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                *(_account(account_id, owner_id=_OWNER_ID) for account_id in account_ids),
+                included=[_owner(_OWNER_ID, name="Tailspin Investments")],
+            )
+        )
+        _empty_series(*account_ids)
+        for account_id in account_ids:
+            respx.get(f"{BASE_URL}/accounts/{account_id}/values").mock(
+                return_value=httpx.Response(500, json={"errors": []})
+            )
+
+        with caplog.at_level(logging.WARNING):
+            listing = await _documented_holdings(client, owner_id=_OWNER_ID)
+
+        assert [row.account_id for row in listing.rows] == account_ids
+        record = aggregated_warning(
+            caplog,
+            "accounts.holdings.fallback_series_failed",
+            count=7,
+            sample_ids=account_ids[:5],
+            figures=["balance"],
+        )
+        assert record.__dict__["error_type"] == "BackstopApiError"
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_walks_accounts_with_product_include_and_no_owner_filter(

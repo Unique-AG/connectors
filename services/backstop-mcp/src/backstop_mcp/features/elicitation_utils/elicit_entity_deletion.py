@@ -136,9 +136,8 @@ async def elicit_entity_deletion(
         async with asyncio.timeout(timeout_seconds):
             result = await elicit_from_client(ctx, message, DeletionChoice)
     except TimeoutError:
-        logger.warning(
-            "elicitation.entity_deletion.timed_out",
-            extra={"timeout_seconds": timeout_seconds},
+        warning_event(
+            logger, "elicitation.entity_deletion.timed_out", timeout_seconds=timeout_seconds
         )
         return EntityDeletion.DECLINED
     except Exception as exc:

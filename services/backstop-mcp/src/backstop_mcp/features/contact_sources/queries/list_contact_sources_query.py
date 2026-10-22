@@ -9,6 +9,7 @@ from backstop_mcp.features.contact_sources.responses import (
     ContactSourceResponse,
     ListContactSourcesResponse,
 )
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class ListContactSourcesQuery:
         )
 
         sources_by_id: dict[str, ContactSourceDto] = {}
+        conflicting_ids: list[str] = []
         for resource in page.items:
             source = ContactSourceDto.from_resource(resource)
             if source is None:
@@ -71,8 +73,12 @@ class ListContactSourcesQuery:
             if existing is None:
                 sources_by_id[source.id] = source
             elif existing != source:
-                logger.warning(
-                    "Conflicting contact sources for duplicate id %r; retaining first source",
-                    source.id,
-                )
+                conflicting_ids.append(source.id)
+        if conflicting_ids:
+            warning_event(
+                logger,
+                "contact_sources.catalog.duplicate_id",
+                count=len(conflicting_ids),
+                sample_ids=conflicting_ids[:5],
+            )
         return sources_by_id

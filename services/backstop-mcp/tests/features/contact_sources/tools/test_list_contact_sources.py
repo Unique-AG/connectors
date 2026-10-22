@@ -12,6 +12,7 @@ from backstop_mcp.features.contact_sources.tools.list_contact_sources import lis
 from backstop_mcp.server.tools import TOOLS
 from tests.helpers import (
     BASE_URL,
+    aggregated_warning,
     list_contact_sources_query,
     recorded_requests,
     resource,
@@ -228,12 +229,33 @@ class TestListContactSourcesTool:
         assert first.sources[0].description == "Referral"
         assert route.call_count == 3
         assert refreshed.sources[0].description == "Referral"
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            f"Conflicting contact sources for duplicate id {_LIVE_SOURCE_ID!r}; "
-            + "retaining first source"
-        ]
+        aggregated_warning(
+            caplog, "contact_sources.catalog.duplicate_id", count=1, sample_ids=[_LIVE_SOURCE_ID]
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("cs-conflict-many")
+        ids = [str(3000 + index) for index in range(7)]
+        next_url = f"{base_url}/contact-sources?page[offset]=100&page[limit]=100"
+        respx.get(f"{base_url}/contact-sources").mock(
+            side_effect=[
+                _collection_page(*(_source(i, name="Original") for i in ids), next_url=next_url),
+                _collection_page(*(_source(i, name="Changed") for i in ids)),
+            ]
+        )
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_contact_sources(
+                    refresh=True, list_contact_sources_query=list_contact_sources_query(client)
+                )
+
+        aggregated_warning(
+            caplog, "contact_sources.catalog.duplicate_id", count=7, sample_ids=ids[:5]
+        )
 
 
 class TestListContactSourcesInput:

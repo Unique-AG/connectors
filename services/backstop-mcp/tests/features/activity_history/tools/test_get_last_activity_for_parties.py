@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Mapping
 from datetime import date
 from typing import cast
@@ -25,7 +26,7 @@ from backstop_mcp.features.activity_history.tools.get_last_activity_for_parties 
 )
 from backstop_mcp.server.tools import TOOLS
 from tests.features.activity_history.conftest import make_search_activities_query
-from tests.helpers import BASE_URL, recorded_json_bodies
+from tests.helpers import BASE_URL, aggregated_warning, recorded_json_bodies
 from tests.server.tools.helpers import object_dict, object_list, tool_model
 
 _URL = f"{BASE_URL}/entity-activities"
@@ -218,6 +219,32 @@ class TestGetLastActivityForParties:
 
         assert result.fallback_tool == "get_activity_history"
         assert "not 'no activity'" in result.message
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_parties_produce_one_warning_per_call(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=httpx.Response(404, json={"errors": [{"title": "Not Found"}]})
+        )
+        party_ids = [str(500 + index) for index in range(7)]
+
+        with caplog.at_level(logging.WARNING):
+            outcomes = await _query(client).run(
+                parties=[(party_id, "organizations") for party_id in party_ids],
+                start_date=_START,
+                end_date=_END,
+                types=("meeting",),
+            )
+
+        assert all(outcome.error is not None for outcome in outcomes)
+        aggregated_warning(
+            caplog,
+            "activity_history.last_activity.party_failed",
+            count=7,
+            sample_ids=party_ids[:5],
+        )
 
     @pytest.mark.asyncio
     @respx.mock

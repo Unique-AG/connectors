@@ -13,7 +13,7 @@ from backstop_mcp.features.entity_types import SearchType, map_search_type_to_re
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
 from backstop_mcp.features.tasks.responses import PartyTasksResponse, TaskRowResponse
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +51,12 @@ class GetTasksForPartyQuery:
             page_size=200,
         )
         if page.truncated:
-            logger.warning(
+            warning_event(
+                logger,
                 "tasks.party.scan_ceiling_reached",
-                extra={
-                    "entity_id": entity_id,
-                    "ceiling": MAX_TASK_SCAN_RECORDS,
-                    "total_count": page.total_count,
-                },
+                entity_id=entity_id,
+                ceiling=MAX_TASK_SCAN_RECORDS,
+                total_count=page.total_count,
             )
         rows = tuple(
             TaskRowResponse.from_resource(

@@ -56,10 +56,13 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
+
+# A person record that failed to map: its id, and why.
+type _Unreadable = tuple[str, ValidationError]
 
 _PAGE_SIZE = 500
 # The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
@@ -161,13 +164,12 @@ class SearchPeopleQuery:
             ),
             **location_filter_params(location_filter),
         }
-        dropped = 0
+        unreadable: list[_Unreadable] = []
 
         def select(
             resources: Sequence[PersonResource], included: Included
         ) -> tuple[tuple[int, SearchPersonRowResponse], ...]:
-            nonlocal dropped
-            matches, page_dropped = self._select(
+            matches, page_unreadable = self._select(
                 resources,
                 included,
                 employments=self._employments_by_person(included) if with_employments else None,
@@ -181,7 +183,7 @@ class SearchPeopleQuery:
                 website=website,
                 predicates=predicates,
             )
-            dropped += page_dropped
+            unreadable.extend(page_unreadable)
             return matches
 
         async def read_at(offset: int) -> SinglePage[PersonResource]:
@@ -210,6 +212,15 @@ class SearchPeopleQuery:
             span.set_attribute("rows_scanned", page.records_scanned)
             span.set_attribute("matched", len(page.rows))
             span.set_attribute("stop_reason", page.stop_reason)
+            dropped = len(unreadable)
+            if unreadable:
+                warning_event(
+                    logger,
+                    "org_people.search_people.record.unreadable",
+                    exc=unreadable[0][1],
+                    count=dropped,
+                    sample_ids=[person_id for person_id, _ in unreadable[:5]],
+                )
             info_event(
                 logger,
                 "org_people.search_people.fetched",
@@ -318,10 +329,10 @@ class SearchPeopleQuery:
         location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[tuple[int, SearchPersonRowResponse], ...], int]:
-        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+    ) -> tuple[tuple[tuple[int, SearchPersonRowResponse], ...], tuple[_Unreadable, ...]]:
+        """`(index, row)` for each match in `resources`, and `(id, error)` for each unreadable."""
         selected: list[tuple[int, SearchPersonRowResponse]] = []
-        dropped = 0
+        unreadable: list[_Unreadable] = []
         for index, resource in enumerate(resources):
             try:
                 row = self._row(
@@ -339,16 +350,14 @@ class SearchPeopleQuery:
                     predicates=predicates,
                 )
             except ValidationError as exc:
-                dropped += 1
-                logger.warning(
-                    "org_people.search_people.record.unreadable",
-                    extra={"person_id": resource.id},
-                    exc_info=exc,
+                logger.debug(
+                    "org_people.search_people.record.unreadable", extra={"person_id": resource.id}
                 )
+                unreadable.append((resource.id, exc))
                 continue
             if row is not None:
                 selected.append((index, row))
-        return tuple(selected), dropped
+        return tuple(selected), tuple(unreadable)
 
     def _row(
         self,

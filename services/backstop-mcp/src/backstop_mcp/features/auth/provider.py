@@ -186,7 +186,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         # token, so the legitimate case — a user whose cookie expired while the form sat open —
         # recovers by simply submitting again.
         if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
-            logger.warning("auth.login.csrf_mismatch")
+            warning_event(logger, "auth.login.csrf_mismatch")
             return self._form_response(
                 request_id,
                 status_code=400,

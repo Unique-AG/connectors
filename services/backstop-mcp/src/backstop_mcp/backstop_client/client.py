@@ -44,7 +44,7 @@ from backstop_mcp.metrics import (
     BACKSTOP_REQUEST_DURATION,
     BACKSTOP_REQUESTS,
 )
-from backstop_mcp.observability import error_event, warning_event
+from backstop_mcp.observability import error_event, info_event, warning_event
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -396,9 +396,10 @@ class BackstopClient:
         """
         status_code = response.status_code
         code = error_code(response)
-        logger.info(
+        info_event(
+            logger,
             "backstop.request.unauthorized",
-            extra=self._log_extra(
+            **self._log_extra(
                 session, method=method, route=route, status_code=status_code, code=code
             ),
         )
@@ -437,8 +438,8 @@ class BackstopClient:
         try:
             # Confirmed rejection: revoke the stored credential.
             await on_auth_failure()
-        except Exception:
-            logger.exception("backstop.auth_failure_hook.failed")
+        except Exception as exc:
+            error_event(logger, "backstop.auth_failure_hook.failed", exc=exc)
             self._log_recheck_decision(
                 session, trigger_route, clock, attempts=len(outcomes), revoked=False
             )
@@ -463,9 +464,10 @@ class BackstopClient:
         attempt: int,
         outcome: ProbeOutcome,
     ) -> None:
-        logger.info(
+        info_event(
+            logger,
             "backstop.auth_recheck.attempt",
-            extra=self._log_extra(
+            **self._log_extra(
                 session,
                 trigger_route=trigger_route,
                 attempt=attempt,
@@ -483,9 +485,10 @@ class BackstopClient:
         attempts: int,
         revoked: bool,
     ) -> None:
-        logger.info(
+        info_event(
+            logger,
             "backstop.auth_recheck.decision",
-            extra=self._log_extra(
+            **self._log_extra(
                 session,
                 trigger_route=trigger_route,
                 attempts=attempts,

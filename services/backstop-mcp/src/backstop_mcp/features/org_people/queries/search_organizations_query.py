@@ -61,10 +61,13 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
+
+# An organization record that failed to map: its id, and why.
+type _Unreadable = tuple[str, ValidationError]
 
 _PAGE_SIZE = 500
 # The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
@@ -146,7 +149,7 @@ class SearchOrganizationsQuery:
             ),
             **location_filter_params(location_filter),
         }
-        dropped = 0
+        unreadable: list[_Unreadable] = []
 
         async def read_at(offset: int) -> SinglePage[OrganizationResource]:
             return await self._client.fetch_page(
@@ -160,8 +163,7 @@ class SearchOrganizationsQuery:
         def select(
             page: SinglePage[OrganizationResource],
         ) -> tuple[tuple[int, SearchOrganizationRowResponse], ...]:
-            nonlocal dropped
-            matches, page_dropped = self._select(
+            matches, page_unreadable = self._select(
                 page.items,
                 Included(page.included),
                 legal_name=legal_name,
@@ -171,7 +173,7 @@ class SearchOrganizationsQuery:
                 internal_organization=internal_organization,
                 predicates=predicates,
             )
-            dropped += page_dropped
+            unreadable.extend(page_unreadable)
             return matches
 
         with _tracer.start_as_current_span(
@@ -192,6 +194,15 @@ class SearchOrganizationsQuery:
             span.set_attribute("rows_scanned", page.records_scanned)
             span.set_attribute("matched", len(page.rows))
             span.set_attribute("stop_reason", page.stop_reason)
+            dropped = len(unreadable)
+            if unreadable:
+                warning_event(
+                    logger,
+                    "org_people.search.record.unreadable",
+                    exc=unreadable[0][1],
+                    count=dropped,
+                    sample_ids=[organization_id for organization_id, _ in unreadable[:5]],
+                )
             info_event(
                 logger,
                 "org_people.search.fetched",
@@ -280,10 +291,10 @@ class SearchOrganizationsQuery:
         ria: bool | None,
         internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[tuple[int, SearchOrganizationRowResponse], ...], int]:
-        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+    ) -> tuple[tuple[tuple[int, SearchOrganizationRowResponse], ...], tuple[_Unreadable, ...]]:
+        """`(index, row)` for each match in `resources`, and `(id, error)` for each unreadable."""
         selected: list[tuple[int, SearchOrganizationRowResponse]] = []
-        dropped = 0
+        unreadable: list[_Unreadable] = []
         for index, resource in enumerate(resources):
             try:
                 row = self._row(
@@ -297,16 +308,14 @@ class SearchOrganizationsQuery:
                     predicates=predicates,
                 )
             except ValidationError as exc:
-                dropped += 1
-                logger.warning(
-                    "org_people.search.record.unreadable",
-                    extra={"organization_id": resource.id},
-                    exc_info=exc,
+                logger.debug(
+                    "org_people.search.record.unreadable", extra={"organization_id": resource.id}
                 )
+                unreadable.append((resource.id, exc))
                 continue
             if row is not None:
                 selected.append((index, row))
-        return tuple(selected), dropped
+        return tuple(selected), tuple(unreadable)
 
     def _row(
         self,

@@ -36,6 +36,7 @@ from backstop_mcp.features.resolution import (
     from_candidates,
     input_required,
 )
+from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -180,13 +181,12 @@ async def _index_products(client: BackstopClient) -> tuple[ResolvedProductDto, .
         for resource in page.items
     )
     if len(products) > _LARGE_CATALOG:
-        logger.warning(
+        warning_event(
+            logger,
             "accounts.products.index_large",
-            extra={
-                "returned": len(products),
-                "total_count": page.total_count,
-                "threshold": _LARGE_CATALOG,
-            },
+            returned=len(products),
+            total_count=page.total_count,
+            threshold=_LARGE_CATALOG,
         )
     return products
 
