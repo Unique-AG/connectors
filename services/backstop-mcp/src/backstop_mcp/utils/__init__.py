@@ -5,6 +5,8 @@ from backstop_mcp.utils.date_window import date_window
 from backstop_mcp.utils.identifiable_value import (
     IdentifiableValue,
     LogsDiagnosticDataPolicy,
+    PseudonymMode,
+    configure_identifiable_values,
     identifiable_value,
     is_disclosure_active,
 )
@@ -14,6 +16,8 @@ __all__ = [
     "IdentifiableValue",
     "LogsDiagnosticDataPolicy",
     "ParsedActivityHandle",
+    "PseudonymMode",
+    "configure_identifiable_values",
     "date_window",
     "first_item",
     "identifiable_value",

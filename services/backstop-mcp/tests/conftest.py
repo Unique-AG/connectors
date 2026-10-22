@@ -1,19 +1,49 @@
 import logging
 import os
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator, Iterator
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.teardown import close_singletons
+from backstop_mcp.utils.identifiable_value import reset_identifiable_values
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 _SERVICE_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _reset_pseudonym_mode() -> Iterator[None]:
+    """`create_app` configures keyed pseudonyms. The next test must not inherit that mode."""
+    reset_identifiable_values()
+    yield
+    reset_identifiable_values()
+
+
+@pytest.fixture
+def exporter() -> Iterator[InMemorySpanExporter]:
+    """The tracer provider is process-wide and settable only once, so the exporter attaches to
+    whichever is already in play.
+    """
+    attached = InMemorySpanExporter()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+    provider.add_span_processor(SimpleSpanProcessor(attached))
+    yield attached
+    # A span processor cannot be removed, and the provider outlives this test: the shutdown is what
+    # stops the exporter collecting every span the rest of the session emits.
+    attached.shutdown()
 
 
 @pytest.fixture(autouse=True)

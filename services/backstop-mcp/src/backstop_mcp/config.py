@@ -153,7 +153,7 @@ class AppConfig(BaseSettings):
     version: str = PKG_VERSION
     port: int = Field(default=9010, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
-    # conceal (default): IdentifiableValue logs as sha256:<hex>. disclose: the original.
+    # conceal (default): keyed hmac-sha256 at info+, plain sha256 at debug. disclose: the original.
     logs_diagnostics_data_policy: LogsDiagnosticDataPolicy = LogsDiagnosticDataPolicy.CONCEAL
 
     # The externally-reachable URL of this service — used as the OAuth issuer/base URL
