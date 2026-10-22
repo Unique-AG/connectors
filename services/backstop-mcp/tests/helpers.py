@@ -6,6 +6,7 @@ so the concurrency gate and config injection under test are the real ones.
 """
 
 import json
+import logging
 import traceback
 from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
@@ -212,6 +213,17 @@ def collection(*resources: dict[str, object]) -> dict[str, object]:
 def contact_location(id: str, **attrs: object) -> dict[str, object]:
     """A `contact-locations` resource as `?include=contactLocations` side-loads it."""
     return {"type": "contact-locations", "id": id, "attributes": {**attrs}}
+
+
+# Unit tests capture this logger at DEBUG, not the root. A unit test never runs
+# `configure_logging`, so `httpx` would log every request URL at INFO, which production quiets to
+# WARNING. `tests/test_no_payload_in_telemetry.py` covers the real logging configuration.
+SERVICE_LOGGER = "backstop_mcp"
+
+
+def logged_field(record: logging.LogRecord, key: str) -> str:
+    """An `extra` field as the pino-json handler renders it (`json.dumps(..., default=str)`)."""
+    return str(cast("object", record.__dict__[key]))
 
 
 def assert_canary_absent(

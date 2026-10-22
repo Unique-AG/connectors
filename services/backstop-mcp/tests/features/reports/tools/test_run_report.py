@@ -1,8 +1,11 @@
+import logging
 from datetime import date
 
 import httpx
 import pytest
 import respx
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.reports import (
@@ -11,9 +14,17 @@ from backstop_mcp.features.reports import (
 )
 from backstop_mcp.features.reports.tools.run_report import run_report
 from backstop_mcp.features.resolution import NotFoundResponse
+from backstop_mcp.observability import tool_call_scope
 from backstop_mcp.server.tools import TOOLS
+from backstop_mcp.utils import identifiable_value
 from tests.features.reports.conftest import make_run_report_query
-from tests.helpers import BASE_URL, recorded_params, tool_client
+from tests.helpers import (
+    BASE_URL,
+    SERVICE_LOGGER,
+    assert_canary_absent,
+    recorded_params,
+    tool_client,
+)
 from tests.server.tools.helpers import tool_model, tool_payload
 
 _REPORT_NAME = "Quarterly Registrants"
@@ -177,3 +188,43 @@ class TestRunReportTool:
 
         assert exc_info.value.status_code == 400
         assert "reportDefinition" in exc_info.value.detail
+
+
+@pytest.mark.usefixtures("keyed_pseudonyms")
+class TestRunReportToolTelemetry:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_tool_call_fields_and_spans_carry_the_keyed_report_name(
+        self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
+    ) -> None:
+        base_url = tenant("rr-telemetry")
+        report_name = "zq-canary-report-tool"
+        respx.get(f"{base_url}/reports").mock(
+            return_value=_page({"Email": report_name, "Company Name": report_name})
+        )
+
+        with (
+            caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER),
+            trace.get_tracer(__name__).start_as_current_span("tools/call run_report"),
+            tool_call_scope() as call,
+        ):
+            async with tool_client(base_url) as client:
+                await run_report(
+                    report_name=report_name,
+                    as_of_date=_AS_OF,
+                    run_report_query=make_run_report_query(client),
+                )
+
+        pseudonym = str(identifiable_value(report_name))
+        assert pseudonym.startswith("hmac-sha256:")
+        assert str(call.fields["report_name"]) == pseudonym
+        spans_with_report_name = [
+            span
+            for span in exporter.get_finished_spans()
+            if span.attributes is not None and "report_name" in span.attributes
+        ]
+        assert spans_with_report_name
+        for span in spans_with_report_name:
+            assert span.attributes is not None
+            assert span.attributes["report_name"] == pseudonym, span.name
+        assert_canary_absent(caplog, exporter, report_name)
