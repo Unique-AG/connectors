@@ -150,6 +150,7 @@ _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "backstop_mcp.features.tasks",
     "backstop_mcp.features.time_zones",
     "backstop_mcp.features.ui_links",
+    "backstop_mcp.observability",
     "backstop_mcp.server.tools",
 )
 

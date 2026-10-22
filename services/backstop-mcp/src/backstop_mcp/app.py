@@ -23,6 +23,7 @@ from backstop_mcp.dependencies import (
     get_auth_config,
     get_auth_provider,
     get_backstop_client_factory,
+    get_encryption_key,
     get_engine,
     get_session_factory,
     get_tenant_guidance_config,
@@ -40,6 +41,7 @@ from backstop_mcp.server.tenant_guidance import (
 )
 from backstop_mcp.server.tools import TOOLS
 from backstop_mcp.teardown import close_singletons
+from backstop_mcp.utils import configure_identifiable_values
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,11 @@ def create_app() -> Starlette:
     auth_config = get_auth_config()
 
     configure_logging(config)
+    configure_identifiable_values(
+        policy=config.logs_diagnostics_data_policy,
+        log_level=config.log_level.value,
+        encryption_key=get_encryption_key(),
+    )
     configure_metrics(config)
 
     engine = get_engine()
