@@ -36,7 +36,7 @@ def tool_call_scope() -> Generator[ToolCallFields]:
         _CURRENT.reset(token)
 
 
-def annotate_tool_call(**fields: object) -> None:
+def add_call_fields(**fields: object) -> None:
     """Attach `fields` to the current tool call's span and its completion line.
 
     No-op outside one.

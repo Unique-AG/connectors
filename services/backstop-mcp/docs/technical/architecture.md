@@ -283,7 +283,7 @@ in `server_filter_ignored`.
 `backstop_mcp.observability` is the only way to log a major event or open a nested span.
 `info_event`, `warning_event`, `error_event`, and `failure_event` write the log line and add the
 same event to the current span. `operation` wraps one noisy sub-step (a paginated walk, a report
-poll, a catalog refresh) in a child span with an INFO line at each end. `annotate_tool_call` adds
+poll, a catalog refresh) in a child span with an INFO line at each end. `add_call_fields` adds
 fields to the current tool call. `failure_level` picks the level of a failure.
 
 What a line or span may carry:

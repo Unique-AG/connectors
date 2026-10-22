@@ -13,7 +13,7 @@ _EVENT_FUNCTIONS = frozenset(
         "error_event",
         "failure_event",
         "operation",
-        "annotate_tool_call",
+        "add_call_fields",
     }
 )
 _SPAN_METHODS = frozenset({"set_attribute", "set_attributes", "add_event"})
