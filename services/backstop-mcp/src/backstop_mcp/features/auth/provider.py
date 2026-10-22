@@ -297,13 +297,12 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             if previous is None
             else previous.api_token.get_secret_value() != api_token
         )
-        logger.info(
+        info_event(
+            logger,
             "auth.login.succeeded",
-            extra={
-                "username": identifiable_value(username),
-                "had_previous_credential": had_previous_credential,
-                "credential_changed": credential_changed,
-            },
+            username=identifiable_value(username),
+            had_previous_credential=had_previous_credential,
+            credential_changed=credential_changed,
         )
 
         async def save_subject(session: AsyncSession) -> str:

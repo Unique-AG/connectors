@@ -20,6 +20,7 @@ from backstop_mcp.features.org_people_writes.create_person_input import CreatePe
 from backstop_mcp.features.org_people_writes.responses import CreatedPersonResponse
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -62,7 +63,7 @@ class CreatePersonCommand:
             written = await self._client.get(
                 f"/{_RESOURCE_TYPE}/{quote(created_id, safe='')}", schema=_Document
             )
-            logger.info("org_people_writes.person.created", extra={"id": created_id})
+            info_event(logger, "org_people_writes.person.created", id=created_id)
             return CreatedPersonResponse(
                 id=created_id,
                 resource_type=_RESOURCE_TYPE,

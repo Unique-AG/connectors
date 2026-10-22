@@ -41,6 +41,7 @@ from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes i
 from backstop_mcp.features.opportunity_writes.responses import (
     BackfillOpportunityStageHistoryResponse,
 )
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -129,14 +130,13 @@ class BackfillOpportunityStageHistoryCommand:
                 posted_outcomes=posted_outcomes,
             )
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
-            logger.info(
+            info_event(
+                logger,
                 "opportunity_writes.stage_history.backfilled",
-                extra={
-                    "total_count": len(outcomes),
-                    "applied_count": applied_count,
-                    "failed_count": len(outcomes) - applied_count,
-                    "warning_count": len(warnings),
-                },
+                total_count=len(outcomes),
+                applied_count=applied_count,
+                failed_count=len(outcomes) - applied_count,
+                warning_count=len(warnings),
             )
             return BackfillOpportunityStageHistoryResponse(
                 total_count=len(outcomes),

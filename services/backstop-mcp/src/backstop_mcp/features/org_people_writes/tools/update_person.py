@@ -26,6 +26,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +73,7 @@ async def update_person(
         return unresolved_party_response(result)
     party = result.value
     search_type = as_person_collection(party.search_type)
-    logger.info(
-        "org_people_writes.update_person.start",
-        extra={"search_type": search_type, "party_id": party.id},
-    )
+    annotate_tool_call(search_type=search_type, party_id=party.id)
     return await update_person_command.run(
         person=person, party_id=party.id, search_type=search_type
     )

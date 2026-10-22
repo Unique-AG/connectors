@@ -24,6 +24,7 @@ from backstop_mcp.features.activity_writes.commands._json_api_utils import (
 from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.responses import AttachedFileResponse
 from backstop_mcp.features.system_users import system_user_relationship
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,5 @@ class AttachEmailCommand:
             ),
         )
         document = await self._client.post("/emails", schema=_EmailDocument, json=payload)
-        logger.info(
-            "activity_writes.email.imported", extra={"id": document.data.id, "party_id": party_id}
-        )
+        info_event(logger, "activity_writes.email.imported", id=document.data.id, party_id=party_id)
         return AttachedFileResponse(id=document.data.id, kind="email")

@@ -30,6 +30,7 @@ from backstop_mcp.features.org_people import (
 from backstop_mcp.features.org_people.dependencies import get_search_people_query_factory
 from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
+from backstop_mcp.observability import annotate_tool_call
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -298,25 +299,22 @@ async def search_people(
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
     with _tracer.start_as_current_span("org_people.search_people") as span:
         span.set_attribute("memory_custom_fields", len(predicates))
-        logger.info(
-            "org_people.search_people.start",
-            extra={
-                "has_name": name is not None,
-                "last_name": last_name is not None,
-                "email": email is not None,
-                "other_id": other_id is not None,
-                "email_domain": email_domain is not None,
-                "first_name": first_name is not None,
-                "job_title": job_title is not None,
-                "company_name": company_name is not None,
-                "department": department is not None,
-                "location_filter": location_filter is not None,
-                "website": website is not None,
-                "custom_fields": len(predicates),
-                "min_current_organizations": min_current_organizations,
-                "exclude_custom_fields": skip_custom_fields,
-                "cursor": cursor is not None,
-            },
+        annotate_tool_call(
+            has_name=name is not None,
+            last_name=last_name is not None,
+            email=email is not None,
+            other_id=other_id is not None,
+            email_domain=email_domain is not None,
+            first_name=first_name is not None,
+            job_title=job_title is not None,
+            company_name=company_name is not None,
+            department=department is not None,
+            location_filter=location_filter is not None,
+            website=website is not None,
+            custom_fields=len(predicates),
+            min_current_organizations=min_current_organizations,
+            exclude_custom_fields=skip_custom_fields,
+            cursor=cursor is not None,
         )
         return await search_people_query.run(
             name=name,

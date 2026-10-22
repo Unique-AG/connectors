@@ -29,6 +29,7 @@ from backstop_mcp.features.activity_history.queries.search_activities_query impo
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -68,17 +69,16 @@ class GetLastActivityForPartiesQuery:
                 self._outcome(party_id, search_type, result)
                 for (party_id, search_type), result in zip(parties, settled, strict=True)
             )
-            logger.info(
+            info_event(
+                logger,
                 "activity_history.last_activity.fetched",
-                extra={
-                    "requested": len(parties),
-                    "failed": sum(1 for outcome in outcomes if outcome.error is not None),
-                    "without_activity": sum(
-                        1
-                        for outcome in outcomes
-                        if outcome.fetch is not None and not outcome.fetch.rows
-                    ),
-                },
+                requested=len(parties),
+                failed=sum(1 for outcome in outcomes if outcome.error is not None),
+                without_activity=sum(
+                    1
+                    for outcome in outcomes
+                    if outcome.fetch is not None and not outcome.fetch.rows
+                ),
             )
             return outcomes
 

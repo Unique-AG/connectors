@@ -19,6 +19,7 @@ from backstop_mcp.features.activity_writes.responses import UpdatedActivityRespo
 from backstop_mcp.features.activity_writes.update_activity_input import UpdateTaskInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
+from backstop_mcp.observability import info_event
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class UpdateTaskCommand:
             or None,
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
-        logger.info("activity_writes.task.updated", extra={"id": document.data.id})
+        info_event(logger, "activity_writes.task.updated", id=document.data.id)
         return UpdatedActivityResponse(
             id=document.data.id,
             resource_type="tasks",

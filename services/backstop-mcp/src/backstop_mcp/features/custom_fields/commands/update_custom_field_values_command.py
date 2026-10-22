@@ -32,6 +32,7 @@ from backstop_mcp.features.custom_fields.update_custom_field_values_input import
     UpdateCustomFieldValueInput,
     UpdateCustomFieldValuesInput,
 )
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -82,15 +83,14 @@ class UpdateCustomFieldValuesCommand:
             )
             outcomes, warnings = self._outcomes(update.values, document.data.attributes)
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
-            logger.info(
+            info_event(
+                logger,
                 "custom_fields.values.updated",
-                extra={
-                    "entity_type": update.entity_type,
-                    "total_count": len(outcomes),
-                    "applied_count": applied_count,
-                    "failed_count": len(outcomes) - applied_count,
-                    "warning_count": len(warnings),
-                },
+                entity_type=update.entity_type,
+                total_count=len(outcomes),
+                applied_count=applied_count,
+                failed_count=len(outcomes) - applied_count,
+                warning_count=len(warnings),
             )
             return UpdateCustomFieldValuesResponse(
                 total_count=len(outcomes),

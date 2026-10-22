@@ -32,6 +32,7 @@ from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunit
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import info_event
 from backstop_mcp.utils import first_item, identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -95,13 +96,12 @@ class UpdateOpportunityCommand:
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
-            logger.info(
+            info_event(
+                logger,
                 "opportunity_writes.opportunity.updated",
-                extra={
-                    "id": new_opportunity.opportunity_id,
-                    "stage_id": stage_id,
-                    "warnings": len(warnings),
-                },
+                id=new_opportunity.opportunity_id,
+                stage_id=stage_id,
+                warnings=len(warnings),
             )
             return UpdatedOpportunityResponse(
                 id=new_opportunity.opportunity_id,
@@ -200,7 +200,7 @@ class UpdateOpportunityCommand:
                 )
                 skipped.append(login)
                 continue
-            logger.info(
+            logger.debug(
                 "opportunity_writes.login.resolved",
                 extra={"login": identifiable_value(login), "id": user.id},
             )

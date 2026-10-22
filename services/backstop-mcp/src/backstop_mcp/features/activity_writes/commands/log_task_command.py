@@ -25,6 +25,7 @@ from backstop_mcp.features.activity_writes.log_activity_input import TaskActivit
 from backstop_mcp.features.activity_writes.responses import LoggedTaskResponse
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, TaskLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +80,12 @@ class LogTaskCommand:
             },
         )
         document = await self._client.post("/tasks", schema=_TaskDocument, json=payload)
-        logger.info(
+        info_event(
+            logger,
             "activity_writes.task.created",
-            extra={
-                "id": document.data.id,
-                "party_id": party_id,
-                "send_notification": activity.send_notification,
-            },
+            id=document.data.id,
+            party_id=party_id,
+            send_notification=activity.send_notification,
         )
         return LoggedTaskResponse(
             id=document.data.id,

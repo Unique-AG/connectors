@@ -47,5 +47,5 @@ async def create_organization(
     Call like: {"organization": {"name": "Acme Advisors",
     "category_ids": ["<id from list_contact_categories>"]}}
     """
-    logger.info("org_people_writes.create_organization.start")
+
     return await create_organization_command.run(organization=organization)

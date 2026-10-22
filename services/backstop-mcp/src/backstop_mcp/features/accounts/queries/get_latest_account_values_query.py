@@ -13,6 +13,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -38,17 +39,16 @@ class GetLatestAccountValuesQuery:
                 self._outcome(account_id, result)
                 for account_id, result in zip(account_ids, settled, strict=True)
             )
-            logger.info(
+            info_event(
+                logger,
                 "accounts.latest_values.fetched",
-                extra={
-                    "requested": len(account_ids),
-                    "valued": sum(
-                        1
-                        for value in latest
-                        if value.figure is not None and value.figure.valued is not None
-                    ),
-                    "failed": sum(1 for value in latest if value.error is not None),
-                },
+                requested=len(account_ids),
+                valued=sum(
+                    1
+                    for value in latest
+                    if value.figure is not None and value.figure.valued is not None
+                ),
+                failed=sum(1 for value in latest if value.error is not None),
             )
             return latest
 

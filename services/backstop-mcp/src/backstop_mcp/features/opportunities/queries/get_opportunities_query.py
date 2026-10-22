@@ -19,6 +19,7 @@ from backstop_mcp.features.opportunities.responses import (
     PartyOpportunitiesResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -107,15 +108,14 @@ class GetOpportunitiesQuery:
             ),
             custom_fields_unavailable=catalog is None,
         )
-        logger.info(
+        info_event(
+            logger,
             "opportunities.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "status": status,
-                "total": result.total,
-                "returned": len(result.opportunities),
-            },
+            segment=segment,
+            entity_id=entity_id,
+            status=status,
+            total=result.total,
+            returned=len(result.opportunities),
         )
         return result
 

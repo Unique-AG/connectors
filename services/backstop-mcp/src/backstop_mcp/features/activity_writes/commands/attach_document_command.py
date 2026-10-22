@@ -21,6 +21,7 @@ from backstop_mcp.features.activity_writes.internal_dto import AuthorDto
 from backstop_mcp.features.activity_writes.responses import AttachedFileResponse
 from backstop_mcp.features.system_users import system_user_relationship
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, DocumentLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,8 @@ class AttachDocumentCommand:
             ),
         )
         document = await self._client.post("/documents", schema=_DocumentDocument, json=payload)
-        logger.info(
-            "activity_writes.document.created",
-            extra={"id": document.data.id, "party_id": party_id},
+        info_event(
+            logger, "activity_writes.document.created", id=document.data.id, party_id=party_id
         )
         return AttachedFileResponse(
             id=document.data.id,
