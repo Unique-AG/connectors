@@ -6,6 +6,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
 
@@ -21,7 +22,9 @@ INSTRUCTIONS = (
 
 
 def create_server(
-    upstream: UpstreamSettings, transport: httpx2.AsyncBaseTransport | None = None
+    upstream: UpstreamSettings,
+    transport: httpx2.AsyncBaseTransport | None = None,
+    auth: AuthProvider | None = None,
 ) -> FastMCP:
     http = upstream_http(upstream, transport)
 
@@ -40,6 +43,7 @@ def create_server(
         # tool's name alone. A ToolError still reaches it as raised.
         mask_error_details=True,
         lifespan=lifespan,
+        auth=auth,
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
