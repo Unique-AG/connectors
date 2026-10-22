@@ -41,7 +41,7 @@ from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes i
 from backstop_mcp.features.opportunity_writes.responses import (
     BackfillOpportunityStageHistoryResponse,
 )
-from backstop_mcp.observability import info_event
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -70,15 +70,31 @@ class BackfillOpportunityStageHistoryCommand:
             span.set_attribute("record_count", len(backfill.records))
             entity_type_ids: dict[str, str | None] = {}
             unreadable: dict[str, str] = {}
+            lookup_failures: list[str] = []
+            lookup_error: httpx.RequestError | None = None
             for requested_row in backfill.records:
                 opportunity_id = requested_row.opportunity_id
                 if opportunity_id in entity_type_ids or opportunity_id in unreadable:
                     continue
-                entity_type_id, error = await self._entity_type_lookup(opportunity_id)
+                entity_type_id, error, transport_error = await self._entity_type_lookup(
+                    opportunity_id
+                )
+                if transport_error is not None:
+                    lookup_failures.append(opportunity_id)
+                    if lookup_error is None:
+                        lookup_error = transport_error
                 if error is not None:
                     unreadable[opportunity_id] = error
                 else:
                     entity_type_ids[opportunity_id] = entity_type_id
+            if lookup_error is not None:
+                warning_event(
+                    logger,
+                    "opportunity_writes.stage_history.opportunity_lookup_failed",
+                    exc=lookup_error,
+                    count=len(lookup_failures),
+                    sample_ids=tuple(lookup_failures[:5]),
+                )
             posted_indexes: list[int] = []
             posted_rows: list[OpportunityStageHistoryRecordInput] = []
             stage_ids: list[str] = []
@@ -145,7 +161,9 @@ class BackfillOpportunityStageHistoryCommand:
                 warnings=warnings,
             )
 
-    async def _entity_type_lookup(self, opportunity_id: str) -> tuple[str | None, str | None]:
+    async def _entity_type_lookup(
+        self, opportunity_id: str
+    ) -> tuple[str | None, str | None, httpx.RequestError | None]:
         try:
             document = await self._client.get(
                 f"/opportunities/{quote(opportunity_id, safe='')}",
@@ -165,18 +183,13 @@ class BackfillOpportunityStageHistoryCommand:
             ):
                 raise
             if exc.status_code == HTTPStatus.NOT_FOUND:
-                return None, f"Opportunity {opportunity_id} was not found."
-            return None, exc.detail
+                return None, f"Opportunity {opportunity_id} was not found.", None
+            return None, exc.detail, None
         except BackstopResponseSchemaError:
-            return None, f"Opportunity {opportunity_id} was unreadable."
-        except httpx.RequestError:
-            logger.warning(
-                "opportunity_writes.stage_history.opportunity_lookup_failed",
-                extra={"opportunity_id": opportunity_id},
-                exc_info=True,
-            )
-            return None, f"Backstop did not answer for opportunity {opportunity_id}."
-        return opportunity_entity_type_id(document), None
+            return None, f"Opportunity {opportunity_id} was unreadable.", None
+        except httpx.RequestError as exc:
+            return None, f"Backstop did not answer for opportunity {opportunity_id}.", exc
+        return opportunity_entity_type_id(document), None, None
 
     def _merge_outcomes(
         self,

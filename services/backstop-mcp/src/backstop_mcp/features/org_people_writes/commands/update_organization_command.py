@@ -79,6 +79,7 @@ class UpdateOrganizationCommand:
                 "org_people_writes.organization.updated",
                 id=party_id,
                 location_ids=location_ids,
+                deleted_location_count=len(new_organization_fields.delete_location_ids or ()),
             )
             return UpdatedOrganizationResponse(
                 id=party_id,

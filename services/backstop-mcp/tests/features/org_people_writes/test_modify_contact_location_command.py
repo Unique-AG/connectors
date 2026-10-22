@@ -1,5 +1,6 @@
 """`ModifyContactLocationCommand`: create as `contacts`, collision, delete body."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -61,6 +62,53 @@ async def _run(
 
 
 class TestModifyContactLocationCommand:
+    @respx.mock
+    async def test_writes_and_deletes_are_logged_without_the_address(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(f"{BASE_URL}/contact-locations").mock(return_value=_created_document("loc-1"))
+        respx.delete(f"{BASE_URL}/contact-locations/{_LOCATION_ID}").mock(
+            return_value=httpx.Response(204)
+        )
+
+        with caplog.at_level(logging.INFO):
+            location_ids = await _run(
+                client,
+                locations=(
+                    _LOCATION.validate_python(
+                        {
+                            "location_title": "Office",
+                            "city": "Chicago",
+                            "phone_number": "555-0100",
+                        }
+                    ),
+                ),
+                delete_location_ids=(_LOCATION_ID,),
+            )
+
+        assert location_ids == ("loc-1",)
+        written = next(
+            record
+            for record in caplog.records
+            if record.message == "org_people_writes.contact_location.written"
+        )
+        deleted = next(
+            record
+            for record in caplog.records
+            if record.message == "org_people_writes.contact_location.deleted"
+        )
+        assert written.levelno == logging.INFO
+        assert written.__dict__["created_count"] == 1
+        assert written.__dict__["updated_count"] == 0
+        assert written.__dict__["ids"] == ("loc-1",)
+        assert deleted.levelno == logging.WARNING
+        assert deleted.__dict__["count"] == 1
+        assert deleted.__dict__["ids"] == (_LOCATION_ID,)
+        logged = " ".join(record.getMessage() + str(record.__dict__) for record in caplog.records)
+        assert "Chicago" not in logged
+        assert "555-0100" not in logged
+        assert "Office" not in logged
+
     @respx.mock
     async def test_location_create_links_the_contact_as_type_contacts(
         self, client: BackstopClient
