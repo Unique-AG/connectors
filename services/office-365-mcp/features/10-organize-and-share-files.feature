@@ -33,7 +33,7 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       When Mia asks her assistant to save these meeting notes as "Sync 14 June.txt" in "Notes"
       Then "Notes" holds "Sync 14 June.txt" with the notes
 
-    @known-gap @uc-10-05
+    @uc-10-05
     Scenario: The content of an existing file is replaced
       Given Mia has the file "Plan.docx" with an old text
       When Mia asks her assistant to replace the content of "Plan.docx" with a new text
@@ -56,7 +56,7 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       Then the assistant gives Mia the sharing link
       But nobody receives it from the assistant
 
-    @known-gap @uc-10-08
+    @uc-10-08
     Scenario: Access is taken back
       Given Anna has edit access to "Q3 Plan.pptx"
       When Mia asks her assistant to stop sharing "Q3 Plan.pptx" with Anna

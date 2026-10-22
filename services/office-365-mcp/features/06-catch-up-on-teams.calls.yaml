@@ -1,4 +1,5 @@
 uc-06-01:
+  status: untested
   provenance: observed
   evidence: teams_list_chats alone in 7 sessions; in 30 sessions in total
   asks_user: false
@@ -7,6 +8,7 @@ uc-06-01:
       args: {limit: 50}
 
 uc-06-02:
+  status: untested
   provenance: observed
   evidence: teams_list_chats in 30 sessions
   asks_user: false
@@ -15,6 +17,7 @@ uc-06-02:
       args: {include_member_emails: true}
 
 uc-06-03:
+  status: untested
   provenance: observed
   evidence: teams_search_messages in 19 sessions, alone in 9
   asks_user: false
@@ -26,6 +29,7 @@ uc-06-03:
       uses: {uri: uri of a hit}
 
 uc-06-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -40,6 +44,7 @@ uc-06-04:
       uses: {uri: uri of a post}
 
 uc-06-05:
+  status: untested
   provenance: observed
   evidence: teams_list_chats then teams_list_meeting_transcripts then teams_read_transcript in 7 sessions
   asks_user: false
@@ -51,6 +56,7 @@ uc-06-05:
       uses: {uri: uri of the transcript}
 
 uc-06-06:
+  status: untested
   provenance: drafted
   evidence: teams_read_transcript in 18 calls
   asks_user: false
@@ -64,6 +70,7 @@ uc-06-06:
       uses: {uri: uri of the transcript}
 
 uc-06-07:
+  status: untested
   provenance: observed
   evidence: teams_list_meeting_transcripts in 17 calls
   asks_user: false
@@ -74,6 +81,7 @@ uc-06-07:
   must_not: [teams_read_transcript]
 
 uc-06-08:
+  status: untested
   provenance: observed
   evidence: teams_list_meeting_recordings in 1 call
   asks_user: false

@@ -1,4 +1,5 @@
 uc-07-01:
+  status: working
   provenance: observed
   evidence: outlook_respond_to_invite in 2 calls; outlook_list_events in 5 sessions alone
   asks_user: true
@@ -10,6 +11,7 @@ uc-07-01:
       uses: {uri: uri of the event from the listing}
 
 uc-07-02:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -19,6 +21,7 @@ uc-07-02:
       uses: {uri: uri of the event from the listing}
 
 uc-07-03:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -28,6 +31,7 @@ uc-07-03:
   note: the tool proposes a time only when the organizer allows it
 
 uc-07-04:
+  status: untested
   provenance: observed
   evidence: outlook_check_availability in 3 sessions; one session ran outlook_search_mail, outlook_read_mail, and outlook_check_availability in a row
   asks_user: false
@@ -39,6 +43,7 @@ uc-07-04:
       args: {attendees: Anna and Tom, duration_minutes: 30}
 
 uc-07-05:
+  status: untested
   provenance: observed
   evidence: outlook_create_event in 4 sessions
   asks_user: true
@@ -49,6 +54,7 @@ uc-07-05:
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom, online_meeting: true}
 
 uc-07-06:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -56,6 +62,7 @@ uc-07-06:
       args: {subject: Stand-up, starts_at: Monday 09:00, ends_at: Monday 09:15, recurrence: weekly for 8 weeks}
 
 uc-07-07:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -72,18 +79,21 @@ uc-07-07:
       uses: {uri: uri of the event from outlook_create_event}
 
 uc-07-08:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []
   note: a calendar event has no draft state, and outlook_create_event invites in the same call. A workaround is outlook_create_event with no attendee, then outlook_update_event to add the attendees after Mia approves
 
 uc-07-09:
+  status: gap
   provenance: drafted
   asks_user: true
   chain: []
   note: outlook_create_event_on_behalf can write to a second calendar of Mia, because it checks only that the calendar is editable. Its description limits it to a calendar that another person owns, so the assistant may not choose it. Nobody ran it.
 
 uc-07-10:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -94,6 +104,7 @@ uc-07-10:
       uses: {uri: uri of the occurrence and not of the series master}
 
 uc-07-11:
+  status: untested
   provenance: observed
   evidence: outlook_cancel_event in 1 call, which failed
   asks_user: true
@@ -105,6 +116,7 @@ uc-07-11:
   note: the logs give no cause for the failed call
 
 uc-07-12:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:

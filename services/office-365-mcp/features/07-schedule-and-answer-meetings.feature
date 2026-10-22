@@ -6,7 +6,7 @@ Feature: Scheduling and answering meetings
 
   Rule: Mia answers an invitation in her own words
 
-    @working @uc-07-01
+    @uc-07-01
     Scenario: An invitation is accepted
       Given Anna invited Mia to "Launch review"
       When Mia asks her assistant to accept "Launch review"
@@ -63,13 +63,13 @@ Feature: Scheduling and answering meetings
       Then the room "Maple" is invited to "Workshop" as a room
       And the room "Maple" accepts the invitation
 
-    @known-gap @uc-07-08
+    @uc-07-08
     Scenario: An invitation is saved as a draft for Mia to finish later
       When Mia asks her assistant to save an invitation for "Board prep" as a draft
       Then Mia can open the invitation in Outlook to finish it
       But nobody receives it until Mia sends it
 
-    @known-gap @uc-07-09
+    @uc-07-09
     Scenario: A meeting is booked on a calendar other than the main one
       Given Mia has a second calendar named "Team"
       When Mia asks her assistant to put "Offsite" on the calendar "Team"

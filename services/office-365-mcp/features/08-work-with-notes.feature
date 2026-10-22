@@ -12,7 +12,7 @@ Feature: Working with notes in OneNote
       When Mia asks her assistant for her notes from the Acme kickoff
       Then the assistant shows the page "Acme kickoff"
 
-    @known-gap @uc-08-02
+    @uc-08-02
     Scenario: A page is found by a word that is only in its body
       Given Mia has the page "Kickoff" that mentions "Zephyr" only in its body
       When Mia asks her assistant for the notes that mention "Zephyr"

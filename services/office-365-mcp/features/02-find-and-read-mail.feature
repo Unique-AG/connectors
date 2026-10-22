@@ -48,7 +48,7 @@ Feature: Finding and reading mail
       Then the assistant gives the full text of the message
       And it names "Draft v2.docx" with its size
 
-    @known-gap @uc-02-07
+    @uc-02-07
     Scenario: The content of an attachment answers a question
       Given Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row
       When Mia asks her assistant for the total in the last row of that workbook
@@ -73,12 +73,12 @@ Feature: Finding and reading mail
 
     @uc-02-10
     Scenario: Unread mail of a shared mailbox is listed
-      Given Mia has access to the shared mailbox "support@acme.example", which holds 3 unread messages
-      When Mia asks her assistant for the unread messages in "support@acme.example"
-      Then the assistant lists the 3 unread messages of "support@acme.example"
+      Given Mia has access to the shared mailbox "support@example.com", which holds 3 unread messages
+      When Mia asks her assistant for the unread messages in "support@example.com"
+      Then the assistant lists the 3 unread messages of "support@example.com"
       But it does not list messages of Mia's own mailbox
 
-    @known-gap @uc-02-11
+    @uc-02-11
     Scenario: A mailbox without access is refused
       Given Mia has no access to the shared mailbox "finance"
       When Mia asks her assistant for the unread messages in "finance"

@@ -1,4 +1,5 @@
 uc-08-01:
+  status: untested
   provenance: observed
   evidence: onenote_list_pages in 8 sessions
   asks_user: false
@@ -7,12 +8,14 @@ uc-08-01:
       args: {title_contains: Acme kickoff}
 
 uc-08-02:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []
   note: Microsoft Graph has no full-text search for OneNote, so a page is found by its title only
 
 uc-08-03:
+  status: untested
   provenance: observed
   evidence: onenote_find_notebook_from_url in 2 sessions
   asks_user: false
@@ -22,6 +25,7 @@ uc-08-03:
       uses: {parent: handle of the notebook}
 
 uc-08-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -32,6 +36,7 @@ uc-08-04:
   note: the tool asks for approval only when the notebook is shared or belongs to somebody else
 
 uc-08-05:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -42,6 +47,7 @@ uc-08-05:
       uses: {page: handle of the page}
 
 uc-08-06:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -55,6 +61,7 @@ uc-08-06:
   note: a replace needs the generated id of the paragraph, and the tool always asks for approval before a replace
 
 uc-08-07:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -63,6 +70,7 @@ uc-08-07:
       uses: {page: handle of the page}
 
 uc-08-08:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:

@@ -16,12 +16,14 @@ Requirements:
 
 import argparse
 import difflib
+import functools
 import pathlib
 import re
 import sys
 from collections.abc import Mapping, Sequence
 from typing import cast
 
+import yaml
 from gherkin.parser import Parser
 
 _INVOCATION = "scripts/render-use-cases.py"
@@ -32,7 +34,6 @@ TARGET = _ROOT / "docs" / "use-cases.md"
 
 _BEGIN = "<!-- use-cases:begin -->"
 _END = "<!-- use-cases:end -->"
-_GAP_TAG = "@known-gap"
 
 _AREAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -85,8 +86,22 @@ def _step_text(step: Mapping[str, object]) -> str:
     return re.sub(r"<(\w+)>", r"`<\1>`", str(step["text"]))
 
 
+@functools.cache
+def _statuses() -> dict[str, str]:
+    return {
+        scenario_id: str(_object(entry)["status"])
+        for sidecar in _FEATURES.glob("*.calls.yaml")
+        for scenario_id, entry in _object(yaml.safe_load(sidecar.read_text())).items()
+    }
+
+
 def _is_gap(scenario: Mapping[str, object]) -> bool:
-    return any(_object(tag)["name"] == _GAP_TAG for tag in _list(scenario["tags"]))
+    scenario_id = next(
+        str(_object(tag)["name"])[1:]
+        for tag in _list(scenario["tags"])
+        if str(_object(tag)["name"]).startswith("@uc-")
+    )
+    return _statuses()[scenario_id] == "gap"
 
 
 def _scenario(scenario: Mapping[str, object]) -> list[str]:

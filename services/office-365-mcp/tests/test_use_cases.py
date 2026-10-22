@@ -32,7 +32,18 @@ _PAGE_END = "<!-- use-cases:end -->"
 _FEATURE_FILES = sorted(_FEATURES.glob("*.feature"))
 _ID = re.compile(r"uc-(?P<file>\d\d)-(?P<number>\d\d)")
 _PROVENANCE = {"observed", "drafted"}
-_ENTRY_KEYS = {"provenance", "evidence", "asks_user", "chain", "must_not", "note"}
+_STATUSES = {"untested", "working", "partly", "gap"}
+_ENTRY_KEYS = {
+    "status",
+    "ask",
+    "blocker",
+    "provenance",
+    "evidence",
+    "asks_user",
+    "chain",
+    "must_not",
+    "note",
+}
 _STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses"}
 _APPROVAL_PHRASE = "asked to approve"
 
@@ -189,8 +200,12 @@ class TestSidecars:
         )
         assert isinstance(entry["asks_user"], bool)
         chain = _list(entry["chain"])
-        assert (chain == []) == ("known-gap" in scenario.tags), (
-            "a known gap has no chain, and a chain means the gap is not known"
+        assert entry["status"] in _STATUSES
+        assert (chain == []) == (entry["status"] == "gap"), (
+            "a gap has no chain, and a chain means the gap is not known"
+        )
+        assert not {"working", "known-gap", "seen-failing"} & scenario.tags, (
+            "status lives in the sidecar"
         )
         for step in map(_object, chain):
             assert set(step) <= _STEP_KEYS, set(step) - _STEP_KEYS

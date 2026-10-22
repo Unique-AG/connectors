@@ -82,7 +82,7 @@ Feature: Finding and reading files in OneDrive and SharePoint
       And it gives Mia the web address that opens the file in a browser
       But it does not summarize only a part of the file
 
-    @seen-failing @uc-01-11
+    @uc-01-11
     Scenario: A file that Microsoft cannot convert is read in its own format or reported
       Given Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF
       When Mia asks her assistant to summarize that agreement

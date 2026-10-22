@@ -1,4 +1,5 @@
 uc-12-01:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -10,12 +11,14 @@ uc-12-01:
   note: the listing has no name filter and already holds the numbers, so the assistant reads the names and checks that capped is false
 
 uc-12-02:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []
   note: outlook_find_recipient gives an address and no telephone number, and the contact tools read only the default Contacts folder
 
 uc-12-03:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -23,6 +26,7 @@ uc-12-03:
       args: {given_name: Tom, surname: Berger, company_name: Acme, email_addresses: tom@acme.example}
 
 uc-12-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:

@@ -38,7 +38,7 @@ Feature: Sharing and delegating calendars
 
   Rule: A team calendar shows the events of the whole team
 
-    @seen-failing @uc-14-05
+    @uc-14-05
     Scenario: The events of a team calendar are listed for a week
       Given the team "Platform" has 4 events on its calendar this week
       When Mia asks her assistant what is on the calendar of "Platform" this week

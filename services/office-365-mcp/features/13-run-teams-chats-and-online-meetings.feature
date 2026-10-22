@@ -6,7 +6,7 @@ Feature: Running Teams chats and online meetings
 
   Rule: Mia controls who is in a group chat
 
-    @known-gap @uc-13-01
+    @uc-13-01
     Scenario: A group chat is created and named
       Given Mia has never chatted with Anna or Tom
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"

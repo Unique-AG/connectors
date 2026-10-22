@@ -1,4 +1,5 @@
 uc-05-01:
+  status: working
   provenance: drafted
   evidence: outlook_list_mail then outlook_move_mail in 3 sessions; one session made 20 consecutive outlook_move_mail calls
   asks_user: false
@@ -11,6 +12,7 @@ uc-05-01:
   note: the tool takes many handles in one call. 20 consecutive calls may mean one call for each message. The server logs hold no arguments, so this is not checked.
 
 uc-05-02:
+  status: working
   provenance: observed
   evidence: outlook_mark_mail in 12 sessions; outlook_mark_mail then outlook_move_mail 11 times
   asks_user: false
@@ -21,6 +23,7 @@ uc-05-02:
       uses: {message_refs: all uri values from the previous listing}
 
 uc-05-03:
+  status: partly
   provenance: observed
   evidence: 17 failures in 15 sessions; the 4 newest passed a value that is not a message handle, and nothing moved
   asks_user: false
@@ -31,6 +34,7 @@ uc-05-03:
   note: a value that is not a handle stops the whole batch before any move
 
 uc-05-16:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -41,6 +45,7 @@ uc-05-16:
   note: the tool moves each message on its own, and it reports an error only when no message moved
 
 uc-05-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -50,6 +55,7 @@ uc-05-04:
       uses: {message_refs: uri values from the previous listing}
 
 uc-05-05:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -62,6 +68,7 @@ uc-05-05:
       uses: {message_refs: uri values from the previous listing, folder_ref: uri of Handled from outlook_browse_folders}
 
 uc-05-06:
+  status: working
   provenance: drafted
   asks_user: false
   chain:
@@ -71,6 +78,7 @@ uc-05-06:
       uses: {parent_ref: folder handle of Projects}
 
 uc-05-07:
+  status: working
   provenance: drafted
   asks_user: false
   chain:
@@ -80,6 +88,7 @@ uc-05-07:
       uses: {folder_ref: folder handle of Old}
 
 uc-05-08:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -88,6 +97,7 @@ uc-05-08:
       uses: {folder_ref: folder handle of Temp}
 
 uc-05-09:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -97,6 +107,7 @@ uc-05-09:
   note: the tool refuses a folder that Outlook creates for every mailbox
 
 uc-05-10:
+  status: partly
   provenance: drafted
   asks_user: false
   chain:
@@ -115,6 +126,7 @@ uc-05-10:
   note: no preset holds both outlook_create_category and outlook_mark_mail, so this needs a custom `enabled` list
 
 uc-05-11:
+  status: partly
   provenance: drafted
   asks_user: false
   chain:
@@ -126,6 +138,7 @@ uc-05-11:
   note: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs a custom `enabled` list
 
 uc-05-12:
+  status: untested
   provenance: observed
   evidence: outlook_disable_mail_rule in 1 session
   asks_user: false
@@ -135,6 +148,7 @@ uc-05-12:
       uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
 
 uc-05-13:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -142,6 +156,7 @@ uc-05-13:
       uses: {actions: forward_to holds the two addresses from the request}
 
 uc-05-14:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -150,6 +165,7 @@ uc-05-14:
       uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
 
 uc-05-15:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:

@@ -1,4 +1,5 @@
 uc-15-01:
+  status: untested
   provenance: observed
   evidence: outlook_list_events then outlook_list_mail 17 times; the 2 longest sessions repeat the loop list_mail, search_mail, read_event, list_events
   asks_user: false
@@ -13,6 +14,7 @@ uc-15-01:
   note: a listing row has only the number of attendees, so outlook_read_event gives their names. No tool gives the manager of the user, so Mia names the person.
 
 uc-15-02:
+  status: untested
   provenance: observed
   evidence: a session of 20 calls on 2026-09-30 ran outlook_list_mail, outlook_move_mail, outlook_read_event, outlook_respond_to_invite, outlook_mark_mail
   asks_user: false
@@ -23,6 +25,7 @@ uc-15-02:
   note: the observed session did answer 2 invitations. The server logs do not show whether Mia was asked first. outlook_respond_to_invite asks Mia, unless send_response is false. Filing the newsletters is the case of uc-05-01, and answering an invitation is the case of uc-07-01.
 
 uc-15-03:
+  status: untested
   provenance: observed
   evidence: a session of 22 calls on 2026-10-09 ran outlook_search_mail, sharepoint_read_file, outlook_read_thread, outlook_draft_reply, outlook_move_mail
   asks_user: false
@@ -40,6 +43,7 @@ uc-15-03:
   must_not: [outlook_send_draft]
 
 uc-15-04:
+  status: untested
   provenance: drafted
   evidence: a session of 19 calls on 2026-10-13 ran outlook_search_mail 10 times, outlook_read_mail 8 times, and outlook_check_availability
   asks_user: false

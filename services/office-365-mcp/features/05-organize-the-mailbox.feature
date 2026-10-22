@@ -6,14 +6,14 @@ Feature: Organizing the mailbox
 
   Rule: A batch is checked whole and reported for each message
 
-    @working @uc-05-01
+    @uc-05-01
     Scenario: A batch is filed in one folder
       Given Mia has 8 newsletters from last month in her inbox
       When Mia asks her assistant to file them in the folder "Newsletters"
       Then all 8 newsletters are in "Newsletters"
       And her inbox holds none of them
 
-    @working @uc-05-02
+    @uc-05-02
     Scenario Outline: A batch is marked in one step
       Given Mia has 8 newsletters from last month in her inbox
       When Mia asks her assistant to <action> all 8 newsletters
@@ -25,7 +25,7 @@ Feature: Organizing the mailbox
         | flag for follow-up               | are flagged for follow-up    |
         | put the category "Reading" on    | carry the category "Reading" |
 
-    @seen-failing @uc-05-03
+    @uc-05-03
     Scenario: A batch with one value that is not a message moves nothing
       Given Mia named 5 messages by their subjects only
       And the assistant holds a subject line in place of one of the 5 messages
@@ -57,13 +57,13 @@ Feature: Organizing the mailbox
 
   Rule: Mia keeps her folders as she names them
 
-    @working @uc-05-06
+    @uc-05-06
     Scenario: A folder is created inside another folder
       Given Mia has the folder "Projects"
       When Mia asks her assistant to create the folder "Alpha" inside "Projects"
       Then "Projects" holds the folder "Alpha"
 
-    @working @uc-05-07
+    @uc-05-07
     Scenario: A folder is renamed and keeps its mail
       Given the folder "Old" holds 40 messages
       When Mia asks her assistant to rename "Old" to "Archive 2025"
@@ -84,7 +84,7 @@ Feature: Organizing the mailbox
 
   Rule: A category names a kind of mail across all folders
 
-    @working @uc-05-10
+    @uc-05-10
     Scenario: A new category is created and put on mail
       Given Mia has 4 unread messages from her manager
       When Mia asks her assistant to create the red category "Follow-up Q4" and put it on those messages
@@ -93,7 +93,7 @@ Feature: Organizing the mailbox
 
   Rule: An inbox rule acts on new mail without Mia
 
-    @working @uc-05-11
+    @uc-05-11
     Scenario: A rule files mail from one sender
       When Mia asks her assistant for a rule that moves mail from "billing@example.com" to "Finance"
       Then Mia's rules include a rule with that sender and that folder

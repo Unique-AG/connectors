@@ -1,4 +1,5 @@
 uc-04-01:
+  status: untested
   provenance: drafted
   evidence: outlook_find_recipient in 13 sessions, alone in 7; outlook_draft_mail in 18 sessions
   asks_user: false
@@ -11,6 +12,7 @@ uc-04-01:
   must_not: [outlook_send_draft]
 
 uc-04-02:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -19,6 +21,7 @@ uc-04-02:
   must_not: [outlook_draft_mail, outlook_send_draft]
 
 uc-04-03:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -28,6 +31,7 @@ uc-04-03:
       uses: {addresses: address from outlook_find_recipient}
 
 uc-04-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -39,6 +43,7 @@ uc-04-04:
   note: the tool replaces the whole body, so the assistant sends the full shorter text
 
 uc-04-05:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -49,6 +54,7 @@ uc-04-05:
   note: the tool refuses an address in both To and Cc
 
 uc-04-06:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -56,6 +62,7 @@ uc-04-06:
       uses: {message_ref: uri of the draft}
 
 uc-04-07:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -64,6 +71,7 @@ uc-04-07:
   note: Mia declines, so the tool sends nothing
 
 uc-04-08:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -72,6 +80,7 @@ uc-04-08:
   note: the tool sends nothing when the draft changed after the question
 
 uc-04-12:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -83,6 +92,7 @@ uc-04-12:
       uses: {message_ref: uri of the draft}
 
 uc-04-09:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -92,6 +102,7 @@ uc-04-09:
   must_not: [outlook_send_draft]
 
 uc-04-10:
+  status: untested
   provenance: drafted
   evidence: outlook_draft_reply 36 calls, used for replies
   asks_user: false
@@ -104,6 +115,7 @@ uc-04-10:
       uses: {uri: uri of the forward draft}
 
 uc-04-11:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []

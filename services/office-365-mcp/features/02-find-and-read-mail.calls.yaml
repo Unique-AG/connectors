@@ -1,4 +1,5 @@
 uc-02-01:
+  status: untested
   provenance: observed
   evidence: outlook_list_mail alone in 18 sessions
   asks_user: false
@@ -7,6 +8,7 @@ uc-02-01:
       args: {unread_only: true, received_after: yesterday}
 
 uc-02-02:
+  status: untested
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -15,6 +17,7 @@ uc-02-02:
       args: {sender: Brightway, subject: March invoice, has_attachments: true}
 
 uc-02-03:
+  status: untested
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -23,6 +26,7 @@ uc-02-03:
       args: {sender: Anna, received_after: March start, received_before: March end}
 
 uc-02-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -30,6 +34,7 @@ uc-02-04:
       args: {flagged: true}
 
 uc-02-05:
+  status: untested
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
   asks_user: false
@@ -38,6 +43,7 @@ uc-02-05:
       args: {query: invoice, limit: 1000}
 
 uc-02-06:
+  status: untested
   provenance: observed
   evidence: outlook_search_mail then outlook_read_mail in 4 sessions; outlook_list_mail then outlook_read_mail in 4 sessions
   asks_user: false
@@ -47,12 +53,14 @@ uc-02-06:
       uses: {uri: uri of the message from the previous step}
 
 uc-02-07:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []
   note: outlook_read_attachment returns the file itself and does not turn a document into text, so no tool gives the total of a workbook
 
 uc-02-08:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -63,6 +71,7 @@ uc-02-08:
   note: the listing gives the size, so the assistant can refuse before it reads. The tool refuses above 10 MB
 
 uc-02-09:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -75,13 +84,15 @@ uc-02-09:
   note: the thread gives only the first 255 characters of each message
 
 uc-02-10:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
     - tool: outlook_list_mail
-      args: {mailbox: support@acme.example, unread_only: true}
+      args: {mailbox: support@example.com, unread_only: true}
 
 uc-02-11:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []

@@ -11,7 +11,7 @@ Feature: Managing contacts
       When Mia asks her assistant for the telephone number of Anna Meier
       Then the assistant answers "+41 44 555 01 01"
 
-    @known-gap @uc-12-02
+    @uc-12-02
     Scenario: A person who is only in the company directory is found
       Given Tom Berger is in the company directory and not in Mia's contacts
       When Mia asks her assistant for the telephone number of Tom Berger

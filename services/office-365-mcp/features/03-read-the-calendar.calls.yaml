@@ -1,4 +1,5 @@
 uc-03-01:
+  status: untested
   provenance: observed
   evidence: outlook_list_events alone in 5 sessions
   asks_user: false
@@ -7,6 +8,7 @@ uc-03-01:
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
 
 uc-03-02:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -14,6 +16,7 @@ uc-03-02:
       args: {starts_on: next Monday, ends_on: next Sunday, time_zone: Europe/Zurich}
 
 uc-03-03:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -21,6 +24,7 @@ uc-03-03:
       args: {starts_on: tomorrow, ends_on: tomorrow}
 
 uc-03-04:
+  status: untested
   provenance: observed
   evidence: outlook_list_events then outlook_read_event 20 times, 15 of them in 2 automated sessions; 233 of 244 read_event calls sit in those 2 sessions
   asks_user: false
@@ -31,6 +35,7 @@ uc-03-04:
   note: a person's answer is in the attendee list of outlook_read_event, and is accepted, declined, tentativelyAccepted, notResponded, none, or organizer
 
 uc-03-05:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -44,6 +49,7 @@ uc-03-05:
   note: outlook_list_events has no attendee filter, so the assistant opens the events one by one until it finds Tom
 
 uc-03-06:
+  status: untested
   provenance: drafted
   evidence: outlook_search_mail then outlook_read_event 22 times, 21 of them in 2 automated sessions
   asks_user: false
@@ -56,6 +62,7 @@ uc-03-06:
   note: no tool links a mail to an event, so if the event is not on Mia's calendar, the assistant answers from the text of the mail
 
 uc-03-07:
+  status: untested
   provenance: observed
   evidence: 11 failures in 2 automated sessions, Microsoft 404 item not found
   asks_user: false

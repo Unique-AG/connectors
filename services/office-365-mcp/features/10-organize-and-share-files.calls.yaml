@@ -1,4 +1,5 @@
 uc-10-01:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -12,6 +13,7 @@ uc-10-01:
   note: the folder and each of the 4 moves ask for approval, so 5 approvals are expected
 
 uc-10-02:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -27,6 +29,7 @@ uc-10-02:
   note: No tool lists the top folder of a site library. The destination is a folder that the search returns. A site with no indexed folder gives no destination. Microsoft runs the copy after the call returns, so a listing shows the copy only after some time.
 
 uc-10-03:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -35,6 +38,7 @@ uc-10-03:
       uses: {item: handle of the file}
 
 uc-10-04:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -44,12 +48,14 @@ uc-10-04:
       uses: {folder: handle of the folder Notes}
 
 uc-10-05:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []
   note: sharepoint_create_text_file creates new files only and cannot replace a file
 
 uc-10-06:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -62,6 +68,7 @@ uc-10-06:
   note: Anna gets an invitation mail that cannot be recalled
 
 uc-10-07:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -72,6 +79,7 @@ uc-10-07:
   must_not: [sharepoint_invite, outlook_send_draft, teams_send_chat_message]
 
 uc-10-08:
+  status: gap
   provenance: drafted
   asks_user: false
   chain: []

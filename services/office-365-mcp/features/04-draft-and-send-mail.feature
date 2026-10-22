@@ -90,7 +90,7 @@ Feature: Drafting and sending mail
       When Mia asks her assistant to forward "Contract draft" to Tom with a short note
       Then the draft to Tom holds "Draft v2.docx"
 
-    @known-gap @uc-04-11
+    @uc-04-11
     Scenario: A new file is attached to a draft
       Given Mia has "Report.pdf" in her OneDrive
       When Mia asks her assistant to mail "Report.pdf" to Anna as an attachment

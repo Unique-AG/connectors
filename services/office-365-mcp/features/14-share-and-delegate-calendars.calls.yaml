@@ -1,4 +1,5 @@
 uc-14-01:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -13,6 +14,7 @@ uc-14-01:
       uses: {calendar_ref: handle of Mia's calendar}
 
 uc-14-02:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -24,6 +26,7 @@ uc-14-02:
   note: the row My Organization cannot be removed, so Anna may still see when Mia is free or busy if she works in Mia's company
 
 uc-14-03:
+  status: untested
   provenance: observed
   evidence: outlook_create_event_on_behalf in 1 call
   asks_user: true
@@ -34,6 +37,7 @@ uc-14-03:
       uses: {calendar_ref: handle of Lena's calendar}
 
 uc-14-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -41,6 +45,7 @@ uc-14-04:
   must_not: [outlook_create_event_on_behalf]
 
 uc-14-05:
+  status: partly
   provenance: observed
   evidence: outlook_list_group_events in 1 call, which failed
   asks_user: false

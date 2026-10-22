@@ -94,9 +94,9 @@ Mia receives far more mail than she can read. Mia asks her assistant to find mes
 
 **Unread mail of a shared mailbox is listed**
 
-- **Given** Mia has access to the shared mailbox "support@acme.example", which holds 3 unread messages
-- **When** Mia asks her assistant for the unread messages in "support@acme.example"
-- **Then** the assistant lists the 3 unread messages of "support@acme.example"
+- **Given** Mia has access to the shared mailbox "support@example.com", which holds 3 unread messages
+- **When** Mia asks her assistant for the unread messages in "support@example.com"
+- **Then** the assistant lists the 3 unread messages of "support@example.com"
 - **But** it does not list messages of Mia's own mailbox
 
 #### Not supported yet

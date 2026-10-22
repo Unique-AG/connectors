@@ -1,4 +1,5 @@
 uc-01-01:
+  status: untested
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
   asks_user: false
@@ -7,6 +8,7 @@ uc-01-01:
       args: {query: Brightway agreement, file_type: docx}
 
 uc-01-02:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -14,6 +16,7 @@ uc-01-02:
       args: {query: quarterly plan, sort_by: last_modified}
 
 uc-01-03:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -24,6 +27,7 @@ uc-01-03:
       uses: {path: web address of the Legal site from sharepoint_search_sites}
 
 uc-01-04:
+  status: untested
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
   asks_user: false
@@ -32,6 +36,7 @@ uc-01-04:
       args: {query: Zephyr}
 
 uc-01-05:
+  status: untested
   provenance: drafted
   evidence: sharepoint_browse_folder alone in 8 sessions
   asks_user: false
@@ -43,6 +48,7 @@ uc-01-05:
       uses: {folder: handle of the folder 2026 Contracts from the search}
 
 uc-01-06:
+  status: untested
   provenance: observed
   evidence: sharepoint_search_files then sharepoint_read_file in 9 sessions; sharepoint_read_file alone in 27 sessions
   asks_user: false
@@ -55,6 +61,7 @@ uc-01-06:
   note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows and leaves it out for the PDF and text rows
 
 uc-01-07:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -64,6 +71,7 @@ uc-01-07:
       uses: {file: handle from sharepoint_resolve_url}
 
 uc-01-08:
+  status: untested
   provenance: observed
   evidence: 18 runs of 5 to 14 consecutive sharepoint_read_file calls, between searches and folder listings
   asks_user: false
@@ -74,6 +82,7 @@ uc-01-08:
       uses: {file: handle of each file}
 
 uc-01-10:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -81,6 +90,7 @@ uc-01-10:
   note: the tool refuses above 10 MB and sends no part of the file
 
 uc-01-11:
+  status: partly
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
   asks_user: false

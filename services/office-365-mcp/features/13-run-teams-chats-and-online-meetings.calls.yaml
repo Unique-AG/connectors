@@ -1,10 +1,12 @@
 uc-13-01:
+  status: gap
   provenance: drafted
   asks_user: true
   chain: []
   note: the cause is the tool. teams_create_chat needs the Entra id of each member. No tool turns a name into that id, and the id comes only from get_me, a chat member row, or a message sender. outlook_find_recipient gives an address and no id.
 
 uc-13-07:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -15,6 +17,7 @@ uc-13-07:
       uses: {members: user id and name of Anna and Tom from the member rows}
 
 uc-13-02:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -28,6 +31,7 @@ uc-13-02:
   note: with share_history true, the question states that the new member sees all earlier messages. A person with no shared chat is the gap of uc-13-01.
 
 uc-13-08:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -41,6 +45,7 @@ uc-13-08:
   note: the default is share_history false. The question states that the new member does not see the earlier messages, and the answer repeats that choice.
 
 uc-13-03:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -50,6 +55,7 @@ uc-13-03:
       uses: {chat_id: id of the chat, membership_id: membership id of Tom}
 
 uc-13-04:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
@@ -59,6 +65,7 @@ uc-13-04:
   note: teams_add_chat_member does not check the chat type. It asks Mia, and then Microsoft refuses. The assistant reads the chat type first and does not call the tool.
 
 uc-13-05:
+  status: untested
   provenance: drafted
   asks_user: true
   chain:
@@ -70,6 +77,7 @@ uc-13-05:
   note: the meeting is standalone. It is on no calendar, and the tool sends no invitation. outlook_create_event with an online meeting sends one.
 
 uc-13-06:
+  status: untested
   provenance: drafted
   asks_user: false
   chain:
