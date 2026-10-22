@@ -10,6 +10,9 @@ env:
   LOG_LEVEL: info
   PORT: "8000"
   WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
+  # CA the database certificate is verified against, mounted from pg-cluster-ca below. When the
+  # file is absent (no CloudNativePG cluster), the system trust store is used instead.
+  DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
 
 # Overlay secrets: WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY, PUBLIC_BASE_URL, and DB_URL unless postgresql.enabled injects DATABASE_URL.
 envVars: []
@@ -60,14 +63,26 @@ serviceAccount:
   enabled: true
 
 # Base chart defaults to readOnlyRootFilesystem: true.
+# pg-cluster-ca: CloudNativePG CA for the server and migration Job; optional for managed Postgres.
+# An overlay that sets volumes or volumeMounts replaces these lists and must repeat it.
 volumes:
   - name: tmp
     emptyDir:
       sizeLimit: 64Mi
+  - name: pg-cluster-ca
+    secret:
+      secretName: with-intelligence-mcp-pg-cluster-ca
+      optional: true
+      items:
+        - key: ca.crt
+          path: ca.crt
 
 volumeMounts:
   - name: tmp
     mountPath: /tmp
+  - name: pg-cluster-ca
+    mountPath: /etc/postgresql-ca
+    readOnly: true
 
 postgresql:
   enabled: true

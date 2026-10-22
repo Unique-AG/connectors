@@ -115,6 +115,10 @@ class AppConfig(BaseSettings):
 
     public_base_url: HttpUrl = HttpUrl("http://localhost:9544")
 
+    admin_consent_redirect_uri: HttpUrl = HttpUrl(
+        "https://www.unique.ai/setup/consent-completed/entra-id"
+    )
+
     session_idle_timeout_seconds: float = Field(default=3600.0, gt=0, allow_inf_nan=False)
 
     graph_request_timeout_seconds: float = Field(default=30.0, gt=0)
@@ -157,26 +161,53 @@ class AppConfig(BaseSettings):
         return str(self.public_base_url).rstrip("/")
 
 
+def _split_comma_list(value: str) -> tuple[str, ...]:
+    return tuple(name.strip() for name in value.split(",") if name.strip())
+
+
 class SurfaceConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(hide_input_in_errors=True)
 
-    tools_preset: ToolsPreset | None = None
+    tools_preset: Annotated[tuple[ToolsPreset, ...] | None, NoDecode] = None
     tools_enabled: Annotated[tuple[str, ...] | None, NoDecode] = None
 
     @field_validator("tools_enabled", mode="before")
     @classmethod
     def _split_the_list_an_operator_writes(cls, value: object) -> object:
+        return _split_comma_list(value) if isinstance(value, str) else value
+
+    @field_validator("tools_preset", mode="before")
+    @classmethod
+    def _split_and_name_the_preset_that_is_not_one(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
-        return tuple(name.strip() for name in value.split(",") if name.strip())
+        entries = tuple(entry.strip() for entry in value.split(","))
+        names = tuple(entry for entry in entries if entry)
+        if names and len(names) != len(entries):
+            raise ValueError(
+                "TOOLS_PRESET has an empty entry, from a stray comma. "
+                + "Write the presets with one comma between each pair"
+            )
+        unknown = [name for name in names if name not in set(ToolsPreset)]
+        if unknown:
+            raise ValueError(
+                f"TOOLS_PRESET names {', '.join(unknown)}, which is not a preset. "
+                + f"The presets are: {', '.join(ToolsPreset)}"
+            )
+        return names
 
     @model_validator(mode="after")
     def _require_exactly_one_selection(self) -> Self:
         if self.tools_preset is not None and self.tools_enabled is not None:
             raise ValueError(
                 "TOOLS_PRESET and TOOLS_ENABLED are alternatives and both are set: remove one. "
-                + f"Keep TOOLS_PRESET={self.tools_preset} for that named surface, or keep "
-                + "TOOLS_ENABLED to name the tools yourself"
+                + f"Keep TOOLS_PRESET={','.join(self.tools_preset)} for those named surfaces, "
+                + "or keep TOOLS_ENABLED to name the tools yourself"
+            )
+        if self.tools_preset is not None and not self.tools_preset:
+            raise ValueError(
+                "TOOLS_PRESET is set but names no preset. Give it a comma-separated list of "
+                + f"presets from: {', '.join(ToolsPreset)}"
             )
         if self.tools_enabled is not None and not self.tools_enabled:
             raise ValueError(
@@ -185,10 +216,11 @@ class SurfaceConfig(BaseSettings):
             )
         if self.tools_preset is None and self.tools_enabled is None:
             raise ValueError(
-                "this deployment has no tool surface: set TOOLS_PRESET to one of "
-                + f"{', '.join(ToolsPreset)}, or TOOLS_ENABLED to a comma-separated list of tool "
-                + "names. There is deliberately no default, because the tools enabled decide which "
-                + "delegated Graph permissions every user of this connector consents to"
+                "this deployment has no tool surface: set TOOLS_PRESET to a comma-separated list "
+                + f"of presets from {', '.join(ToolsPreset)}, or TOOLS_ENABLED to a "
+                + "comma-separated list of tool names. There is deliberately no default, because "
+                + "the tools enabled decide which delegated Graph permissions every user of this "
+                + "connector consents to"
             )
         return self
 

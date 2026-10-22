@@ -10,6 +10,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "packages/mcp-credential-auth/**"
+      - "packages/mcp-openapi/**"
       - "services/**"
       - ".github/workflows/ci-python.yaml"
       - ".github/workflows/_template-containerize.yaml"
@@ -38,6 +39,7 @@ jobs:
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
+      mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,6 +56,8 @@ jobs:
               - 'services/**'
             shared_auth:
               - 'packages/mcp-credential-auth/**'
+            mcp_openapi:
+              - 'packages/mcp-openapi/**'
             workflow:
               - '.github/workflows/ci-python.yaml'
               - '.github/workflows/_template-containerize.yaml'
@@ -70,6 +74,7 @@ jobs:
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
+          MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -114,6 +119,10 @@ jobs:
               consumers=$(grep -l '"mcp-credential-auth' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
+            if [ "$MCP_OPENAPI_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-openapi' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
           fi
 
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
@@ -138,7 +147,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.11.33"
           enable-cache: true
@@ -193,6 +202,47 @@ jobs:
     defaults:
       run:
         working-directory: packages/mcp-credential-auth
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-openapi:
+    name: Test mcp-openapi
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-openapi-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-openapi
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

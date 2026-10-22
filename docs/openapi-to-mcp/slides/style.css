@@ -1,0 +1,233 @@
+/* Unique palette. --accent colors text, --accent-line colors borders, --accent-tint colors fills.
+   Slides marked `class: tiingo` switch to Tiingo's purple (their logo and link color) and carry a label. */
+:root {
+  --accent: #225168; /* accentLight */
+  --accent-line: #7ecac6; /* primaryDark */
+  --accent-tint: #95d7d1; /* primaryCTA */
+  --slidev-theme-primary: var(--accent);
+  --slidev-code-background: #fff;
+}
+
+.tiingo,
+.ti {
+  --tint-pct: 12%;
+  --accent: #6912de;
+  --accent-line: #6912de;
+  --accent-tint: #6912de;
+}
+
+.slidev-layout {
+  background: #f7f7f5; /* backgroundLight */
+  color: #1f1f1f; /* secondaryDark */
+}
+
+.slidev-layout h1 {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.slidev-layout h2 {
+  color: #525252; /* dimmedLight */
+}
+
+.slidev-layout :not(pre) > code {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-tint) 25%, white);
+}
+
+.slidev-code-wrapper {
+  border: 1px solid #dcdcdc; /* dimmedDark */
+  border-left: 4px solid var(--accent-line);
+  border-radius: 6px;
+}
+
+.slidev-layout table th {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent-line);
+}
+
+.slidev-layout.tiingo::after {
+  content: "Tiingo example";
+  position: absolute;
+  bottom: 2.6rem;
+  right: 3.5rem;
+  padding: 0.1rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.pipeline .col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pipeline .col:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  top: 2.2rem;
+  right: -1.6rem;
+  width: 1.2rem;
+  font-size: 1.3rem;
+  text-align: center;
+  color: var(--accent);
+}
+
+.pipeline .step {
+  min-height: 5.2rem;
+  padding: 1.4rem 0.3rem;
+  text-align: center;
+  border: 2px solid var(--accent-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-tint) var(--tint-pct, 25%), white);
+}
+
+.pipeline .step b {
+  display: block;
+  font-size: 1rem;
+  color: var(--accent);
+  text-wrap: balance;
+}
+
+.pipeline .step small {
+  display: block;
+  text-wrap: balance;
+  margin-top: 0.4rem;
+  opacity: 0.7;
+}
+
+/* purple slides use the soft purple border too, as on the pipeline slide */
+.tiingo .pipeline .step {
+  --accent-line: #b48cec;
+}
+
+.tiingo .card {
+  border-color: #b48cec;
+}
+
+.pipeline.flow .col:not(:last-child)::after {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pipeline .down {
+  text-align: center;
+  color: #6912de;
+}
+
+/* a soft purple border, as light as the teal one, so the two rows match */
+.pipeline .step.ti,
+.tag.ti {
+  --accent-line: #b48cec;
+}
+
+.pipeline .step.ti {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 0.5rem;
+}
+
+.pipeline .step.ti small {
+  margin-top: 0;
+}
+
+.tag {
+  padding: 0.05rem 0.55rem;
+  color: var(--accent);
+  border: 2px solid var(--accent-line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-tint) var(--tint-pct, 25%), white);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-top: 1.2rem;
+}
+
+.cards.one {
+  grid-template-columns: 1fr;
+}
+
+.card {
+  padding: 1rem 1.2rem;
+  border: 1px solid #dcdcdc; /* dimmedDark */
+  border-radius: 10px;
+  background: #fff;
+}
+
+.card h3 {
+  margin-top: 0;
+  color: var(--accent);
+}
+
+.slidev-layout.two-columns .col-left {
+  padding-right: 1.5rem;
+}
+
+.slidev-layout h1 + p {
+  opacity: 1;
+  color: #525252; /* dimmedLight */
+}
+
+.slidev-layout td:first-child {
+  white-space: nowrap;
+}
+
+.deck-footer {
+  position: absolute;
+  right: 3.5rem;
+  bottom: 0.9rem;
+  left: 3.5rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #525252; /* dimmedLight */
+}
+
+.deck-footer b {
+  color: var(--accent);
+}
+
+/* slides that carry a table or long code plus text */
+.dense .slidev-code-wrapper {
+  font-size: 0.85em;
+}
+
+.dense table td,
+.dense table th {
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+.caption {
+  color: #525252; /* dimmedLight */
+}
+
+/* the theme's comment grey is too pale to project */
+.slidev-code span[style*="#A0ADA0"] {
+  --shiki-light: #4a544a !important;
+}
+
+.slidev-layout table {
+  margin-bottom: 1rem;
+}
+
+.pipeline.flow .step {
+  flex: 1;
+  padding-right: 0.8rem;
+  padding-left: 0.8rem;
+}

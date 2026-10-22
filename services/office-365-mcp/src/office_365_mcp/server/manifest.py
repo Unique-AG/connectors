@@ -62,7 +62,7 @@ async def surface_manifest(server: FastMCP, selection: Selection, *, version: st
     rows = [
         (
             "selection",
-            f"TOOLS_PRESET={selection.preset}" if selection.preset is not None else "TOOLS_ENABLED",
+            f"TOOLS_PRESET={','.join(selection.presets)}" if selection.presets else "TOOLS_ENABLED",
         ),
         (f"tools ({len(selection.tools)})", ", ".join(_marked(selection.tools))),
         (f"permissions ({len(selection.permissions)})", ", ".join(selection.permissions)),

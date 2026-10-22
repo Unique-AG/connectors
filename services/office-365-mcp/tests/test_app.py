@@ -9,10 +9,11 @@ import logging
 import os
 import pathlib
 import re
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from types import ModuleType, UnionType
 from typing import Protocol, cast, final, get_args, get_origin, get_type_hints, override
 from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
@@ -102,11 +103,17 @@ class _HttpResponse(Protocol):
     def status_code(self) -> int: ...
     @property
     def text(self) -> str: ...
+    @property
+    def headers(self) -> Mapping[str, str]: ...
     def json(self) -> dict[str, object]: ...
 
 
 def _get(client: TestClient, path: str) -> _HttpResponse:
     return cast("_HttpResponse", client.get(path))
+
+
+def _get_without_following(client: TestClient, path: str) -> _HttpResponse:
+    return cast("_HttpResponse", client.get(path, follow_redirects=False))
 
 
 def _request(client: TestClient, method: str, path: str) -> _HttpResponse:
@@ -256,6 +263,22 @@ class TestRoutes:
         assert "resolved tool surface" in response.text
         assert f"{ALWAYS_ON} (always on)" in response.text
 
+    def test_admin_consent_redirects_to_the_scope_matched_consent_url(
+        self, app_client: TestClient
+    ) -> None:
+        response = _get_without_following(app_client, "/admin/consent")
+
+        assert response.status_code == 307
+        location = urlsplit(response.headers["location"])
+        assert (location.scheme, location.netloc) == ("https", "login.microsoftonline.com")
+        assert location.path == "/8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81/v2.0/adminconsent"
+        query = parse_qs(location.query)
+        assert query["client_id"] == ["1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"]
+        assert query["scope"] == [
+            " ".join(resolve(presets=[ToolsPreset.TEAMS], enabled=None).graph_scopes)
+        ]
+        assert query["redirect_uri"] == ["https://www.unique.ai/setup/consent-completed/entra-id"]
+
     def test_the_resolved_surface_is_logged_once_at_startup(
         self, postgres_container: PostgresContainer, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -317,14 +340,14 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_the_widest_surface_has_something_to_contribute(self) -> None:
         """Guards the guard: against an empty registry every assertion below holds vacuously."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         assert selection.tools, "the widest preset resolves to no tools at all"
         assert selection.graph_scopes, "the widest preset derives no scopes"
 
     def test_the_scope_list_follows_the_tools_it_was_resolved_from(self) -> None:
         """Read off the tool *files*, so this is not the registry compared with itself."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
         # `TOOL_NAME`, not the file stem: the two agree today and nothing makes them.
         by_name = {module.TOOL_NAME: module for _stem, module in _tool_modules()}
 
@@ -344,7 +367,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
 
     def test_every_tool_file_has_its_permissions_on_that_list(self) -> None:
         """Catches a tool file never added to `_TOOL_MODULES`: it registers and asks for nothing."""
-        asked_for = set(resolve(preset=None, enabled=list(TOOL_NAMES)).graph_scopes)
+        asked_for = set(resolve(presets=None, enabled=list(TOOL_NAMES)).graph_scopes)
 
         missing = {
             f"{name}: {permission}"
@@ -728,7 +751,7 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
 
     def test_the_sentinel_is_not_a_tool_this_server_registers(self) -> None:
         """Otherwise a bogus call would not just be counted as a real tool — it would run one."""
-        assert UNRESOLVED_NAME not in resolve(preset=ToolsPreset.TEAMS, enabled=None).tools
+        assert UNRESOLVED_NAME not in resolve(presets=[ToolsPreset.TEAMS], enabled=None).tools
 
     async def test_this_server_registers_no_resource_and_no_prompt_today(self) -> None:
         """Not a decision: empty only means the resolve-first branch on those two paths is never

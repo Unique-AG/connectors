@@ -54,7 +54,7 @@ def retry_sleeps(monkeypatch: pytest.MonkeyPatch) -> RecordedSleeps:
 async def every_tool() -> AsyncIterator[Client[FastMCPTransport]]:
     server = FastMCP[None](name="every-tool")
     transport = httpx.AsyncClient()
-    register_tools(server, transport, resolve(preset=None, enabled=list(TOOL_NAMES)))
+    register_tools(server, transport, resolve(presets=None, enabled=list(TOOL_NAMES)))
     async with Client(FastMCPTransport(server)) as client:
         yield client
     await transport.aclose()

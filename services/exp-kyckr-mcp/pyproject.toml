@@ -1,0 +1,73 @@
+[project]
+name = "kyckr-mcp"
+version = "0.1.0"
+description = "Experimental Kyckr MCP built on a vendored copy of the Companies V2 OpenAPI spec"
+classifiers = ["Development Status :: 3 - Alpha"]
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==4.1.0",
+    "httpx2==2.13.1",
+    "mcp-openapi==0.1.0",
+    "mcp-types==2.3.0",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.15.0",
+    "pyyaml==6.0.3",
+    "starlette==1.8.0",
+    "unique-mcp==2026.44.0.dev1",
+    "unique-toolkit==2026.44.0.dev2",
+]
+
+[project.scripts]
+kyckr-mcp = "kyckr_mcp.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.1",
+    "mcp-openapi[codegen]==0.1.0",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.CurrentContext"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+typeCheckingMode = "recommended"
+include = ["src"]
+reportMissingTypeStubs = "none"
+reportAny = "none"
+reportExplicitAny = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportCallInDefaultInitializer = "none"
+reportUnusedCallResult = "none"
+reportImplicitStringConcatenation = "none"
+reportDeprecated = "none"
+reportUnannotatedClassAttribute = "none"
+
+[tool.uv.sources]
+mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/kyckr_mcp/openapi/kyckr-openapi.yml"
+operation-ids = "kyckr_mcp.openapi.routes:CLIENT_BACKED"
+fields = "kyckr_mcp.openapi.fields:RESPONSE_FIELDS"
+allow-extra-fields = true
+operation-module = "mcp_openapi.upstream"
+models-module = "kyckr_mcp.models.vendor_responses"
+models-output = "src/kyckr_mcp/models/vendor_responses.py"
+operations-output = "src/kyckr_mcp/models/operations.py"

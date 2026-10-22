@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2760507523 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# office-365-mcp
+# Office 365 MCP
 
 !!! danger "Documentation Disclaimer"
     This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
@@ -9,285 +9,1148 @@
 
 ## Overview
 
-office-365-mcp is a Python MCP server, built on FastMCP, that connects Microsoft 365 to MCP
-clients through the Microsoft Graph API. It reaches Outlook mail, calendar, and contacts,
-Microsoft Teams, SharePoint and OneDrive, OneNote, and user identity. The server has 121 tools in
-total. A deployment turns on a fixed subset of these 121 tools (never all of them, unless a preset
-or a list names every one). This document explains what each tool does, how a deployment picks
-its tools, and how sign-in and consent work.
+office-365-mcp is a Python MCP server, built on FastMCP. It connects Microsoft 365 to MCP clients
+through the Microsoft Graph API.
 
-## Tools
+- **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
+  OneNote. The identity of the signed-in user.
+- **Size:** 121 tools in total.
+- **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
+  **presets**, which are named bundles of tools, or an exact **list** of tools.
+- **Always on:** The tool `get_me` is on in every deployment.
+- **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
+  messages. It stores only an OAuth token.
 
-office-365-mcp has 121 tools, across seven areas: identity, Microsoft Teams, Outlook mail, Outlook
-calendar, Outlook contacts, SharePoint and OneDrive, and OneNote. One tool, `get_me`, is always
-on, in every configuration. The Kind column is a hint to the calling client about the kind of
-change a tool makes. It does not control access to the tool.
+## Choose a preset
 
-The same hint also sets the error text that the model gets when Microsoft 365 fails or does not
-answer. For a tool that makes a change that is not safe to repeat, this text tells the model to
-make sure that the change is not already there. If a tool of the deployment can show the change,
-the text names that tool. If not, the text tells the model to ask the user.
+1. Find your area in the index below: Teams, Outlook, SharePoint and OneDrive, or OneNote.
+2. Pick the smallest preset that does the job. A preset that builds on another preset holds all of
+   its tools. To cover more than one area, pick one preset for each area.
+3. Read the Admin consent column. If it says Yes, a tenant administrator must grant consent before
+   any user signs in.
+4. Set the preset in the Helm values. See [Deployment](#deployment).
 
-### Identity
+Rules for the selection:
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `get_me` | Read | `User.Read` | No | The answer is the signed-in user's own Microsoft 365 profile. It holds the id, display name, given name, surname, email address, sign-in name, job title, office location, telephone numbers, and preferred language. |
+- A deployment sets exactly one of `preset` or `enabled`. It never sets both, and it never sets
+  neither. The Helm chart schema, the Terraform module, and the startup check of the server enforce
+  this rule.
+- A deployment can name several presets in a comma-separated list, for example
+  `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
+  needs admin consent when at least one of the presets needs it.
+- A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
+  preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
+- Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
+  `onenote-delete`. Each one is a base preset plus the tools that remove an item, write an inbox
+  rule, forward an event, or share a calendar. No other preset holds these tools. A list of presets
+  gets them only when the list names one of these four.
 
-### Microsoft Teams
+## Preset index
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `teams_list_chats` | Read | `Chat.Read` | No | The signed-in user's Teams chats (1:1, group, meeting), newest last message first. Each chat shows a body of its last message, as Microsoft 365 sends it, the sender, and whether the user read it. An unnamed chat also shows its members, each with a user id. |
-| `teams_list_chat_messages` | Read | `Chat.Read` | No | The newest messages of one Teams chat, newest first, by the `chat_id` that `teams_list_chats` reported. Each message has a handle that `teams_read_message` accepts. |
-| `teams_list_chat_members` | Read | `Chat.Read` | No | The members of one Teams chat, by the `chat_id` that `teams_list_chats` reported. Each member has a user id, a display name, an email address, and roles. The tool reads one page, and `more_members` is true when the chat has more. |
-| `teams_list_my_teams` | Read | `Team.ReadBasic.All` | No | The teams that the signed-in user is a member of. |
-| `teams_list_channels` | Read | `Channel.ReadBasic.All` | No | The channels of one team that the signed-in user can access. |
-| `teams_get_channel_files_folder` | Read | `Files.Read.All` | No | The SharePoint folder that holds the files of one Teams channel. The answer is the folder and not its contents. `sharepoint_browse_folder` lists what the folder holds. |
-| `teams_browse_channel` | Read | `ChannelMessage.Read.All` | Yes | One Teams channel's posts, with their replies. |
-| `teams_list_message_replies` | Read | `ChannelMessage.Read.All` | Yes | The replies to one Teams channel post, oldest first, by the `uri` of that post. The tool reads at most 50 replies, and `more_replies` is true when the list is not the whole thread. |
-| `teams_search_messages` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | A full-text search across every Teams message, in chats and channels, that the signed-in user can see. |
-| `teams_read_message` | Read | `Chat.Read`, `ChannelMessage.Read.All` | Yes | One Microsoft Teams message in full, from a handle that another tool minted. The `body` is as Microsoft 365 sent it, and `body_is_plain_text` says whether it is HTML. |
-| `teams_list_meeting_transcripts` | Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | Yes | Whether a Teams meeting has a transcript, and a handle for each one. |
-| `teams_read_transcript` | Read | `OnlineMeetingTranscript.Read.All` | Yes | One page of a Teams meeting transcript, as timestamped turns with the speaker named, not the whole file at once. |
-| `teams_list_meeting_recordings` | Read | `User.Read`, `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All` | Yes | Whether a meeting recording exists, how long it runs, and who can download it. The answer is metadata only, never the video itself. |
-| `teams_read_meeting` | Read | `OnlineMeetings.Read`, `OnlineMeetingArtifact.Read.All`, `User.Read` | No | One Teams meeting of the signed-in user, from the `meeting_uri` that `teams_list_chats` or `teams_create_meeting` reports, with its attendance reports. The answer names who attended the newest session, and for how long. Microsoft Graph gives attendance reports to the meeting organizer only. For any other user, the answer has the meeting details and the status `not_organizer`, with no attendance. |
-| `teams_send_chat_message` | Write, adds | `ChatMessage.Send`, `Chat.Read` | No | Posts one message to an existing Teams chat, after the user approves it. The `message` text is plain text. The message can @mention people, can have a subject, and can have an importance of `normal`, `high`, or `urgent`. The tool reads the members of the chat. It refuses a mention of a person that is not a member of the chat. The question shows the Microsoft Entra object id of each mentioned member. The question and the message show the name that Microsoft 365 gives that member. |
-| `teams_send_channel_message` | Write, adds | `ChannelMessage.Send` | No | Posts one message to an existing Teams channel, after the user approves it. The message can @mention people, can have a subject, and can have an importance of `normal` or `high`. With `reply_to_id`, the tool replies in the thread of an existing post. The tool refuses a `subject` together with `reply_to_id`. The question shows the Microsoft Entra object id of each mentioned person. The name of a mention is only a label from the request, and the message shows that label. |
-| `teams_send_chat_message_with_files` | Write, adds | `ChatMessage.Send`, `Files.Read.All`, `Chat.Read` | No | Posts one message to an existing Teams chat, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_chat_message` posts a message with no file. The message can @mention a member of the chat, and the tool reads the members of the chat. The question shows the Microsoft Entra object id of each mentioned member. The question and the message show the name that Microsoft 365 gives that member. |
-| `teams_send_channel_message_with_files` | Write, adds | `ChannelMessage.Send`, `Files.Read.All` | No | Posts one message to an existing Teams channel, after the user approves it. The message attaches files that are already in SharePoint, by their handles. The tool uploads nothing. `teams_send_channel_message` posts a message with no file. The message can @mention people. The question shows the Microsoft Entra object id of each mentioned person. The name of a mention is only a label from the request, and the message shows that label. |
-| `teams_react_to_message` | Write, changes or removes | `ChatMessage.Send`, `ChannelMessage.Send`, `Chat.Read`, `Channel.ReadBasic.All`, `Team.ReadBasic.All` | No | Adds or removes one reaction on one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of a chat message, or the channel and the team of a channel message. |
-| `teams_edit_message` | Write, changes or removes, safe to repeat | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | Yes | Replaces all of the text of one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. The tool changes only a message that the signed-in user sent. It refuses any other message before it asks. The new text can @mention people. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of the message, and the attachments that the change can remove. The question shows the Microsoft Entra object id of each mentioned person. For a chat message, the tool reads the members of the chat. It refuses a mention of a person that is not a member of the chat. The question and the message show the name that Microsoft 365 gives that member. For a channel message, the name of a mention is only a label from the request, and the message shows that label. |
-| `teams_delete_message` | Write, changes or removes | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | Yes | Deletes one Teams message, as the signed-in user. The message can be a chat message, a channel post, or a reply. This is a soft delete, and Teams shows the message as deleted. This connector cannot restore a deleted message. The tool changes only a message that the signed-in user sent. It refuses any other message before it asks. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question names the sender and the text of the message. |
-| `teams_create_meeting` | Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | Creates one Teams online meeting as the signed-in user, with the attendees that the user names. The meeting is on no calendar, and the tool sends no invitation. A repeat of the same request returns the same meeting. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each attendee. The name in the question is only a label. |
-| `teams_update_meeting` | Write, changes or removes, safe to repeat | `OnlineMeetings.ReadWrite`, `User.Read` | No | Changes the subject, the time, or the attendee list of one Teams online meeting that the signed-in user organizes. The change goes to the Teams online meeting only, and never to a calendar event. A new attendee list replaces the current list. An empty list removes every attendee. An invitee without a Microsoft Entra id cannot stay on a new list. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each person on the new list. The name of that person in the question is only a label. The question also names each person that the change removes. |
-| `teams_delete_meeting` | Write, changes or removes | `OnlineMeetings.ReadWrite`, `User.Read` | No | Deletes one Teams online meeting that the signed-in user organizes. The tool deletes only the Teams online meeting, and never a calendar event. This connector cannot restore a deleted meeting. The tool asks the user to approve each change. |
-| `teams_create_chat` | Write, adds | `Chat.Create`, `User.Read` | No | Creates one Teams chat, one-to-one or group, for the signed-in user and the people that the user names. Each person has a Microsoft Entra id and a name, and the tool sends only the id to Microsoft 365. The tool adds the signed-in user to the chat, and it posts no message. If the one-to-one chat exists already, Microsoft returns that chat and creates no new chat. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of each person. The name in the question is only a label. |
-| `teams_add_chat_member` | Write, adds | `ChatMember.ReadWrite`, `Chat.Read` | Yes | Adds one person to an existing Teams chat, as the signed-in user, with the `owner` role. The person has a Microsoft Entra id and a name, and the tool sends only the id to Microsoft 365. Microsoft accepts no in-tenant guest as an owner. With `share_history`, the new member can see all earlier messages of the chat. Microsoft refuses an addition to a one-to-one chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. The question shows the Microsoft Entra object id of the person. The name of the person in the question is only a label. The question names the chat by its topic, or by its members when the chat has no topic. |
-| `teams_remove_chat_member` | Write, changes or removes | `ChatMember.ReadWrite`, `Chat.Read` | Yes | Removes one member from an existing Teams chat, as the signed-in user, by the `membership_id` that `teams_list_chat_members` reported. Microsoft refuses a removal from a one-to-one chat. Everyone in the conversation can see the change. The tool reads the member first, and it refuses a member that Microsoft 365 does not find. The tool asks the user to approve each change. The question gives the name and the email address of the member, as Microsoft 365 holds them. It also names the chat, by its topic or, when the chat has no topic, by its other members. |
-| `teams_rename_chat` | Write, changes or removes, safe to repeat | `Chat.ReadWrite` | No | Changes the topic of one Teams group chat, as the signed-in user. The topic is the title of the chat. Microsoft 365 accepts a new topic only for a group chat, never for a one-to-one chat or a meeting chat. Everyone in the conversation can see the change. The tool asks the user to approve each change. |
+Each row links to the section of that preset. The count of tools does not include `get_me`, which every deployment turns on.
 
-### Outlook mail
+**Teams.** Chats, channels, meetings, transcripts, and the files of a channel.
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `outlook_search_mail` | Read | `Mail.Read`, `Mail.Read.Shared`, `User.Read` | No | Finds a message anywhere in the signed-in user's own mailbox, or, with `mailbox`, a shared or delegated one. Each row gives `importance`, `flag`, `categories`, `is_draft`, `sent_by`, and `reply_to`. The filter `importance` narrows the KQL query. The filters `has_attachments`, `flagged`, and `category` apply to the returned rows. The tool computes `more_may_exist` before it applies them. |
-| `outlook_read_mail` | Read | `Mail.Read`, `Mail.Read.Shared` | No | One message's full text, from a handle that another tool minted, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The answer gives the name, size, content type, and inline status of each attachment, but never its bytes. It also gives `importance`, `flag`, `categories`, `is_draft`, `sent_by`, `reply_to`, and `internet_message_headers`. The sender side and each server on the path wrote the headers, so they are untrusted data. If `attachments_capped` is true, more attachments exist than the answer lists. |
-| `outlook_list_attachments` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The attachments of one message, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. Each row gives the name, size, content type, and inline status of one attachment, and a handle for it. The answer holds no bytes. |
-| `outlook_read_attachment` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The file of one mail attachment, as an embedded resource with its real media type, never as base64 text. The tool refuses a file above 10 MB, an attached Outlook item, and a link to a file in cloud storage. |
-| `outlook_browse_folders` | Read | `Mail.Read`, `Mail.Read.Shared` | No | One level of the mail folder tree, and a handle for each folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. |
-| `outlook_find_recipient` | Read | `Mail.Read`, `People.Read`, `User.Read` | No | The email address behind a display name. A draft therefore goes to the real address, not a guess. |
-| `outlook_read_thread` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The messages of one conversation, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. Each message has only a short preview of its body. Each message also gives `importance`, `flag`, `categories`, `is_draft`, `sent_by`, and `reply_to`. |
-| `outlook_list_mail` | Read | `Mail.Read`, `Mail.Read.Shared` | No | The newest messages of one folder, in receipt order, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. Each row gives `importance`, `flag`, `categories`, `is_draft`, `sent_by`, and `reply_to`. The filters `importance`, `flagged`, `has_attachments`, and `category` apply to the rows that the tool reads. A row with no flag matches neither value of `flagged`. If `capped` is true, more rows can match beyond the result. |
-| `outlook_get_mail_tips` | Read | `Mail.Read` | No | The MailTips of one or more recipients, for example an automatic reply, a full mailbox, or a recipient outside the organization. The tool sends nothing and changes nothing. |
-| `outlook_list_focused_overrides` | Read | `Mail.Read` | No | The senders that have a fixed inbox tab, Focused or Other, in the signed-in user's own mailbox. |
-| `outlook_get_mailbox_settings` | Read | `MailboxSettings.Read` | No | The inbox rules, with the conditions, the exceptions, and every action of each rule. A rule shows only the conditions and exceptions that it sets. The answer also gives the automatic reply, the category names, the time zone, the working hours, the language, and the archive folder. It says what this tool cannot show. |
-| `outlook_list_categories` | Read | `MailboxSettings.Read` | No | Every category that this mailbox can use to tag mail, events, and contacts, with each category's name and color. |
-| `outlook_list_time_zones` | Read | `User.Read` | No | The time zones that the mailbox server of the signed-in user supports, as Windows names or as IANA names, each with a display label. |
-| `outlook_mark_mail` | Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | The read status, the follow-up flag, the importance, and the categories, on one or more messages. The tool can also mark a follow-up complete, or give a flag a start date and a due date. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_move_mail` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This connector erases mail only by moving it to Deleted Items. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_copy_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Copies messages into another folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The original stays where it is. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_create_folder` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Creates one mail folder, at the top level or inside another folder. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_rename_folder` | Write, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Changes the name of one mail folder, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The folder keeps its mail and its subfolders. The tool asks the user to approve a change to a shared or delegated mailbox. It refuses a folder that Outlook creates for every mailbox, such as Inbox. |
-| `outlook_delete_folder` | Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Moves one mail folder, with all of its items and subfolders, to Deleted Items. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. It never erases anything. The tool always asks the user to approve this first, also for the user's own mailbox. It refuses a folder that Outlook creates for every mailbox, such as Inbox. |
-| `outlook_set_focused_override` | Write, safe to repeat | `Mail.ReadWrite` | No | Sets the inbox tab, Focused or Other, for all future mail from one sender, in the signed-in user's own mailbox. If the sender already has a fixed tab, the tool changes that tab and keeps the name that Outlook stored with the address. |
-| `outlook_draft_mail` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A new message, composed into Drafts, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The draft can have Cc recipients, an importance, and categories. The tool cannot send it. The tool cannot add files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_draft_reply` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply or a forward, composed into Drafts and left there, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. A forward carries the original message's attachments. The draft can have Cc recipients, an importance, and categories. The tool cannot add new files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_draft_reply_all` | Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | A reply to everyone on one message, composed into Drafts and left there. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The draft lists every recipient. An address in `cc` that is already on the draft is not added again. The tool cannot add files, so the user adds a file in Outlook before they send the draft. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_update_draft` | Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | Changes the subject, text, recipients, importance, or categories of one mail draft. The mailbox is the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool cannot send the draft. It refuses an address in both To and Cc. The tool asks the user to approve a change to a shared or delegated mailbox. |
-| `outlook_send_draft` | Write, changes or removes | `Mail.Send`, `Mail.ReadBasic`, `Mail.Send.Shared`, `Mail.Read.Shared` | No | The only tool in this connector that puts mail on the wire. It sends a draft, in the signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. The tool asks the user to approve every send. It sends nothing when the draft changed after the user was asked. |
-| `outlook_set_automatic_reply` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns the out-of-office reply on for a fixed period, or off. The reply never runs with no end date. The tool asks the user to approve turning it on. |
-| `outlook_disable_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite` | No | Turns one existing inbox rule off, and nothing else. It cannot turn a rule on or create one. |
-| `outlook_create_mail_rule` | Write, adds | `MailboxSettings.ReadWrite`, `Mail.ReadBasic` | No | Creates one inbox rule in the signed-in user's own mailbox. The tool asks the user to approve a rule that forwards or redirects mail, and names every address. The rule cannot erase mail permanently, and its delete action moves mail to Deleted Items. |
-| `outlook_update_mail_rule` | Write, safe to repeat | `MailboxSettings.ReadWrite`, `Mail.ReadBasic` | No | Changes the name, the order, the state, the conditions, the exceptions, or the actions of one inbox rule, and keeps the other parts. A given action replaces the same action of the rule. The rule keeps every action that the call does not give, unless `remove_actions` names it. The tool asks the user to approve a change after which the rule runs and forwards or redirects mail. The approval covers the rule as the user saw it. If the rule changes after the question, the tool changes nothing. |
-| `outlook_delete_mail_rule` | Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | Erases one inbox rule. A rule holds no mail, so no message is erased. The tool always asks the user to approve this first, and this connector cannot restore the rule. The approval covers the rule as the user saw it. If the rule changes after the question, the tool deletes nothing. |
-| `outlook_create_category` | Write, adds | `MailboxSettings.ReadWrite` | No | Creates one category, with a name and a color, in the signed-in user's own list of categories. The new category is on no message until `outlook_mark_mail` puts it there. |
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`teams`](#teams) | Read chats, channels, messages, transcripts, and recordings. | 12 | ⚠️ Yes |
+| [`teams-chat`](#teams-chat) | List chats and the members of one chat. | 2 | No |
+| [`teams-messages`](#teams-messages) | Find and read Teams messages. | 5 | ⚠️ Yes |
+| [`teams-channels`](#teams-channels) | Walk teams and read channel posts. | 4 | ⚠️ Yes |
+| [`teams-transcripts`](#teams-transcripts) | Find a meeting and read its transcript. | 3 | ⚠️ Yes |
+| [`teams-recordings`](#teams-recordings) | See whether a meeting was recorded. | 2 | ⚠️ Yes |
+| [`teams-meetings`](#teams-meetings) | Read transcripts and recording details of a meeting. | 4 | ⚠️ Yes |
+| [`teams-write`](#teams-write) | Post messages and reactions in chats and channels. | 8 | No |
+| [`teams-write-files`](#teams-write-files) | Post messages with files from SharePoint. | 13 | ⚠️ Yes |
+| [`teams-edit`](#teams-edit) | Edit and delete your own Teams messages. | 12 | ⚠️ Yes |
+| [`teams-meetings-write`](#teams-meetings-write) | Create, change, and delete Teams online meetings. | 6 | No |
+| [`teams-chat-admin`](#teams-chat-admin) | Create chats, and manage their members and names. | 6 | ⚠️ Yes |
+| [`teams-files`](#teams-files) | Find and read the files of a channel. | 7 | ⚠️ Yes |
 
-### Outlook calendar
+**Outlook mail.** Messages, folders, drafts, and sending.
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `outlook_list_calendars` | Read | `Calendars.Read`, `Calendars.Read.Shared`, `User.Read` | No | Every calendar that this mailbox reaches — the user's own and each one delegated — and a handle for each one. |
-| `outlook_list_calendar_groups` | Read | `Calendars.ReadBasic`, `User.Read` | No | The calendar groups of the signed-in user, with the calendars in each group and a handle for each calendar. Each calendar row gives `is_mine`, which is true when the signed-in user owns the calendar. |
-| `outlook_list_calendar_shares` | Read | `Calendars.ReadBasic` | No | The people who can see one calendar that the signed-in user owns, with the role of each person and a handle for each share. For a calendar that another person shares with the user, the list is empty. |
-| `outlook_list_events` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One calendar's occurrences over a window, never a recurrence rule. Each row gives the categories and the importance. A row of a recurring series also gives a handle for the series master. |
-| `outlook_list_event_instances` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | The dates of one recurring series over a window, from the handle of the series master. Each row is an occurrence, or an exception that somebody changed. |
-| `outlook_read_event` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | One event in full, from a handle that another tool minted, with every attendee and each one's reply. The answer also gives the categories and the importance. For one date of a series, it gives a handle for the series master. For a series master, it gives the recurrence rule. |
-| `outlook_list_event_attachments` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | The attachments of one event in the signed-in user's mailbox. Each row gives the name, size, content type, and inline status of one attachment, and a handle for it. The answer holds no bytes. |
-| `outlook_read_event_attachment` | Read | `Calendars.Read`, `Calendars.Read.Shared` | No | The file of one event attachment, as an embedded resource with its real media type, never as base64 text. The tool refuses a file above 10 MB, an attached Outlook item, and a link to a file in cloud storage. |
-| `outlook_list_reminders` | Read | `Calendars.ReadBasic` | No | The reminders that the signed-in user has on calendar events over a window. Each row gives the subject, the times, and the location of the event, and the time when the reminder fires. A row has no event handle. |
-| `outlook_list_group_events` | Read | `Calendars.Read` | No | The events on the calendar of one Microsoft 365 group over a window, with one row for each occurrence of a series. A team is a group, so the `team_id` from `teams_list_my_teams` is the group id. A row has no handle, so `outlook_read_event` cannot open it. |
-| `outlook_check_availability` | Read | `Calendars.ReadBasic` | No | Reads free/busy status for one or more mailboxes over a time window. The answer also gives the standing working hours of each mailbox. It does not book, invite, or change anything. |
-| `outlook_suggest_meeting_times` | Read | `Calendars.Read.Shared` | No | Asks Microsoft to suggest meeting times for the signed-in user and one or more attendees. With a room requirement, each suggestion also lists rooms. It does not book, invite, or hold a time or a room. |
-| `outlook_find_rooms` | Read | `Place.Read.All` | Yes | The meeting rooms of the organization, with the address, the capacity, the building, the floor, and the equipment of each room. Microsoft lists rooms only after an administrator turns on buildings in the Places settings. |
-| `outlook_create_event` | Write, adds | `Calendars.ReadWrite` | No | One new event on the user's own calendar. The tool creates it and sends invitations in one call. The event can repeat as a series, and it can book rooms as resource attendees. It can also set the free/busy status, the categories, the importance, the sensitivity, and the reminder. Other arguments set whether the attendees see the attendee list, send a response, or propose a new time. |
-| `outlook_update_event` | Write, adds | `Calendars.ReadWrite` | No | Changes the subject, time, location, body, or attendee list of one event that the signed-in user organizes. It can also change the free/busy status, the categories, the importance, the sensitivity, and the reminder, or add a Teams meeting. Other arguments set whether the attendees see the attendee list and whether they send a response. The new body is HTML, and it replaces the whole body. On an online meeting, the new body must keep all of the stored body, and can add HTML before or after it. If it does not, the tool changes nothing. The refusal quotes the stored HTML body when it has 16000 characters or fewer. A series-master handle changes every occurrence of the series. The handle of one occurrence changes only that date. A change that reaches an attendee can mail the attendee a notice. The tool refuses `body_html` and `online_meeting` in one call. When the attendee lists change, the tool keeps each room of the event once. |
-| `outlook_forward_event` | Write, adds | `Calendars.Read` | No | Forwards the meeting request of one event to new recipients, after the user approves it. When an attendee forwards it, Microsoft also tells the organizer and adds each recipient to the event. This connector cannot recall a forward. |
-| `outlook_cancel_event` | Write, changes or removes | `Calendars.ReadWrite` | No | Cancels one event that the signed-in user organizes, moves the event to Deleted Items, and mails any attendees a cancellation. A series-master handle cancels every occurrence of the series. The handle of one occurrence cancels only that date. The answer has `series_master` true when the cancel reached the whole series. Refuses an event that the signed-in user did not organize. |
-| `outlook_delete_event` | Write, changes or removes, safe to repeat | `Calendars.ReadWrite` | No | Removes one event that the signed-in user organizes from its calendar. If the event has attendees, Microsoft sends each attendee a cancellation. A series-master handle deletes every occurrence of the series. The handle of one occurrence deletes only that date. The tool always asks the user to approve this first, because Microsoft does not document whether a removed event can be restored. |
-| `outlook_respond_to_invite` | Write, adds | `Calendars.ReadWrite` | No | Accepts, declines, or tentatively accepts a calendar invitation that the signed-in user received. By default, it notifies the organizer. If the organizer allows new time proposals, a decline or a tentative response can also propose a new time. |
-| `outlook_share_calendar` | Write, adds | `Calendars.ReadWrite` | No | Shares one calendar of the signed-in user with one other person, with a role that sets what that person can see and do. The tool asks the user to approve every share. After the user agrees, Microsoft can refuse a role for that address. Then the tool shares nothing. It cannot make a delegate. Microsoft documents that the share takes effect only after the person accepts an invitation or adds the calendar in an Outlook client. It asks for `Calendars.ReadWrite`, because Microsoft lists no ranking for the share call, and unshare needs `Calendars.ReadWrite`. |
-| `outlook_unshare_calendar` | Write, changes or removes, safe to repeat | `Calendars.ReadWrite` | No | Stops one share of a calendar of the signed-in user, also the share of a delegate. The tool always asks the user to approve this first. It refuses the `My Organization` row, and any other share that Microsoft marks as not removable. |
-| `outlook_delete_calendar` | Write, changes or removes, safe to repeat | `Calendars.ReadWrite`, `User.Read` | No | Removes one calendar that the signed-in user owns, only when the calendar holds no event. The tool always asks the user to approve this first. It looks for an event again after the user agrees. It refuses the default calendar, and a calendar that another person owns. |
-| `outlook_create_event_on_behalf` | Write, adds | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadWrite.Shared` | No | One event on a calendar delegated by another person, sent under that person's own name. The event can repeat as a series, and it can book rooms as resource attendees. It takes the same other arguments as `outlook_create_event`. |
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`outlook-read`](#outlook-read) | Read and search mail. No change to the mailbox. | 10 | No |
+| [`outlook-write`](#outlook-write) | Mark, file, and copy mail. Create and change drafts. | 20 | No |
+| [`outlook-delete`](#outlook-delete) | `outlook-write`, plus moving a folder to Deleted Items. | 21 | No |
+| [`outlook-send`](#outlook-send) | `outlook-write`, plus sending a draft. | 21 | No |
 
-### Outlook contacts
+**Outlook mailbox settings.** Inbox rules, the automatic reply, and categories.
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `outlook_list_contacts` | Read | `Contacts.Read` | No | The contacts in the default Contacts folder of the signed-in user. Each contact gives the names, the email addresses, the telephone numbers, the company, and the job title. With one email address, the list holds only the contacts that hold this address. |
-| `outlook_read_contact` | Read | `Contacts.Read` | No | One contact in full, from a handle that `outlook_list_contacts` minted. The answer also gives the department, the postal addresses, the birthday, the categories, and the notes about the person. |
-| `outlook_create_contact` | Write, adds | `Contacts.ReadWrite` | No | Creates one contact in the default Contacts folder of the signed-in user. The contact has the names, the email addresses, the telephone numbers, the company, and the job title that the call gives. The tool never asks the user to agree, because the contact is in the user's own mailbox. |
-| `outlook_update_contact` | Write, changes or removes, safe to repeat | `Contacts.ReadWrite` | No | Changes only the given fields of one contact, from a handle that `outlook_list_contacts` minted. It adds or removes single email addresses and telephone numbers, and keeps the other entries. The tool never asks the user to agree, because the contact is in the user's own mailbox. |
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`outlook-mailbox`](#outlook-mailbox) | Read inbox rules, the automatic reply, and categories. | 3 | No |
+| [`outlook-automate`](#outlook-automate) | Set the automatic reply, turn off a rule, create a category. | 6 | No |
+| [`outlook-rules`](#outlook-rules) | Create, change, and erase inbox rules. | 9 | No |
 
-### SharePoint and OneDrive
+**Outlook calendar.** Calendars, events, availability, rooms, and sharing.
 
-Each write tool in this table asks the user to agree before it changes anything, every time.
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`outlook-calendar`](#outlook-calendar) | Read calendars, events, and free time. | 12 | No |
+| [`outlook-calendar-write`](#outlook-calendar-write) | Create, change, and cancel events. Answer invitations. | 16 | No |
+| [`outlook-calendar-manage`](#outlook-calendar-manage) | `outlook-calendar-write`, plus forward, delete, and share. | 21 | No |
+| [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events for another person. | 17 | No |
+| [`outlook-calendar-rooms`](#outlook-calendar-rooms) | `outlook-calendar-write`, plus finding meeting rooms. | 17 | ⚠️ Yes |
+| [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | No |
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `sharepoint_search_files` | Read | `Files.Read.All` | Yes | Searches the files and folders that the signed-in user can see, across OneDrive and SharePoint. The default order is relevance. The `sort_by` argument sorts the matches by date, name, or size. |
-| `sharepoint_browse_folder` | Read | `Files.Read.All` | Yes | Lists every item directly inside one folder, in OneDrive or SharePoint, one level only. The `order_by` argument sorts that level by name, date, or size, and covers up to 1000 items. |
-| `sharepoint_list_drives` | Read | `Files.Read.All` | Yes | The drives of the signed-in user. Each drive has a name, a type, an owner, a web address, and a handle for `sharepoint_browse_folder`. |
-| `sharepoint_read_file` | Read | `Files.Read.All` | Yes | The answer is the content of one file, in its original format, or converted to PDF. |
-| `sharepoint_resolve_url` | Read | `Files.ReadWrite.All` | Yes | The handle of the file or folder that a sharing link opens. The tool changes nothing. Microsoft names `Files.ReadWrite` as the least privileged permission for this lookup. That permission covers only the files of the signed-in user. This connector uses `Files.ReadWrite.All`, the permission of the write tools, which covers all files that the user can open. |
-| `sharepoint_create_folder` | Write, adds | `Files.ReadWrite.All` | Yes | Creates one new, empty folder inside a folder in OneDrive or SharePoint. |
-| `sharepoint_create_text_file` | Write, adds | `Files.ReadWrite.All` | Yes | Creates one new text file in a folder in OneDrive or SharePoint. The tool cannot replace a file or upload a binary file. |
-| `sharepoint_rename_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Changes the name of one file or folder. The item stays in the same folder. |
-| `sharepoint_move_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Moves one file or folder into a different folder of the same drive. The item keeps its name. |
-| `sharepoint_copy_item` | Write, adds | `Files.ReadWrite.All` | Yes | Starts a copy of one file or folder into a folder of the same drive or of another drive. Microsoft makes the copy after the call returns. The copy has only the latest version of a file. The answer gives the web address of the original and of the destination folder. |
-| `sharepoint_delete_item` | Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | Yes | Moves one file or folder to the recycle bin. This connector never erases a file or a folder permanently. |
-| `sharepoint_create_share_link` | Write, safe to repeat | `Files.ReadWrite.All` | Yes | Creates a sharing link to one file or folder, and returns the link in `share_url`. The tool sends the link to nobody. |
-| `sharepoint_invite` | Write, adds | `Files.ReadWrite.All` | Yes | Gives read access or edit access to one file or folder to the people that the user names. By default, each person gets an invitation immediately. No tool here can take the access back. The answer gives the web address of the item. |
-| `sharepoint_search_sites` | Read | `Sites.Read.All` | Yes | Finds the SharePoint sites that match some text. Each row gives the web address of a site. Pass that address as `path` to `sharepoint_search_files` to search only that site. The tool does not find files. |
+**Outlook contacts.** The default Contacts folder.
 
-In the answer of `sharepoint_search_files` and `sharepoint_browse_folder`, each file or folder has
-`created_by` and `last_modified_by`. Each field holds the display name of a person. The field is
-null when an application made the item or the change, or when Graph recorded no name.
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`outlook-contacts`](#outlook-contacts) | Read your contacts. | 2 | No |
+| [`outlook-contacts-write`](#outlook-contacts-write) | Create and change contacts. | 4 | No |
 
-### OneNote
+**SharePoint and OneDrive.** Files, folders, sharing, and sites.
 
-| Tool | Kind | Permission | Admin consent | What it does |
-| --- | --- | --- | --- | --- |
-| `onenote_list_notebooks` | Read | `Notes.Read` | No | Every notebook that the user owns, or that is shared with the user, with each notebook's sections. With `group`, the notebooks of one Microsoft 365 group or team. With `site`, the notebooks of one SharePoint site. Each notebook and each section shows `created_at` and `created_by`. The `created_by` argument keeps only the notebooks of one creator. `order_by` sorts the notebooks and their sections by name, by `created_at`, or by `last_modified_at`. |
-| `onenote_list_pages` | Read | `Notes.Read` | No | Finds pages by title, or by the app that created them, across notebooks or in one section. With `group` or `site`, it searches the notebooks of one group or one SharePoint site. Microsoft Graph has no full-text search for OneNote. |
-| `onenote_read_page` | Read | `Notes.Read` | No | Reads the HTML of one page, exactly as Microsoft stores it. |
-| `onenote_create_page` | Write, adds | `Notes.Create` | No | Writes a new page into the signed-in user's OneNote, or into a section of a group or site notebook. No attachments or images. |
-| `onenote_append_to_page` | Write, adds | `Notes.ReadWrite` | No | Adds HTML to the end of one page. It cannot insert, edit, or erase existing content. |
-| `onenote_preview_page` | Read | `Notes.Read` | No | A short snippet, up to 300 characters, of one page, plus a preview image address. |
-| `onenote_read_resource` | Read | `Notes.Read` | No | Fetches the bytes of one image or file that is embedded in a page, with its real media type. |
-| `onenote_find_notebook_from_url` | Read | `Notes.Read` | No | Resolves a OneNote web address into a notebook handle. With `group` or `site`, it resolves the address of a group or site notebook. |
-| `onenote_list_recent_notebooks` | Read | `Notes.Read` | No | Notebooks that the signed-in user opened recently, per Microsoft's own record. |
-| `onenote_list_sections` | Read | `Notes.Read` | No | Sections and section groups directly under one notebook or section group, one level at a time. Each row shows `created_at` and `created_by`. The `created_by` argument keeps only the rows of one creator. `order_by` sorts the rows by name, by `created_at`, or by `last_modified_at`. |
-| `onenote_create_notebook` | Write, adds | `Notes.Create` | No | Creates a new, empty notebook for the signed-in user. With `group` or `site`, the notebook belongs to a Microsoft 365 group or a SharePoint site. The tool asks the user to agree before it creates a notebook in a group or a site. |
-| `onenote_create_section` | Write, adds | `Notes.Create` | No | Creates a new, empty section directly under a notebook or section group. |
-| `onenote_create_section_group` | Write, adds | `Notes.Create` | No | Creates a new, empty section group directly under a notebook or another section group. |
-| `onenote_edit_page` | Write, changes or removes | `Notes.ReadWrite` | No | Adds content next to an element on one page, or replaces one, through 1 to 20 batched commands. |
-| `onenote_rename_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Changes the title of one page, and nothing else. |
-| `onenote_copy_page` | Write, adds | `Notes.Read`, `Notes.Create` | No | Starts a copy of one page into another section, on Microsoft's own systems. The page and the section can be in a group notebook. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
-| `onenote_copy_section` | Write, adds | `Notes.Create` | No | Starts a copy of one section into another notebook or section group. The section and the destination can be in a group notebook. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
-| `onenote_copy_notebook` | Write, adds | `Notes.Create` | No | Starts a copy of a whole notebook into the user's own OneDrive, on Microsoft's own systems. With `to_group`, the copy goes into a Microsoft 365 group, and the tool asks the user to agree first. The tool cannot copy from or into a notebook of a SharePoint site. The answer is a handle for the operation. |
-| `onenote_get_operation` | Read | `Notes.Read` | No | Polls a copy operation, started by `onenote_copy_page`, `onenote_copy_section`, or `onenote_copy_notebook`, for its result. |
-| `onenote_delete_page` | Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | Erases one page outright. The tool always asks the user to approve this first, because Microsoft Graph keeps no recycle bin for OneNote. |
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`sharepoint-search`](#sharepoint-search) | Find files and list folders. | 3 | ⚠️ Yes |
+| [`sharepoint-read`](#sharepoint-read) | `sharepoint-search`, plus reading a file. | 4 | ⚠️ Yes |
+| [`sharepoint-write`](#sharepoint-write) | Create, rename, move, copy, and delete files and folders. | 11 | ⚠️ Yes |
+| [`sharepoint-share`](#sharepoint-share) | `sharepoint-write`, plus sharing links and invitations. | 13 | ⚠️ Yes |
+| [`sharepoint-sites`](#sharepoint-sites) | `sharepoint-read`, plus finding SharePoint sites. | 5 | ⚠️ Yes |
 
-The handles of a notebook that a Microsoft 365 group or team owns start with
-`onenote:///groups/{group}/`. The handles of a notebook that a SharePoint site owns start with
-`onenote:///sites/{site}/`. Every write into a group or site notebook asks the user to agree first.
+**OneNote.** Notebooks, sections, and pages.
 
-The OneNote tools hold no permission to read groups or sites. As a result, the questions of
-`onenote_create_notebook` and `onenote_copy_notebook` name the group or the site only by its id. The
-other OneNote writes name the notebook and say that it belongs to a group or a site.
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`onenote-read`](#onenote-read) | Read notebooks, sections, and pages. | 8 | No |
+| [`onenote-write`](#onenote-write) | Create, edit, and copy notebooks, sections, and pages. | 19 | No |
+| [`onenote-delete`](#onenote-delete) | `onenote-write`, plus erasing a page. | 20 | No |
 
-`teams_list_my_teams` gives the id and the name of each team that the user is a member of. A team id
-is a group id. No OneNote preset includes this tool. In a deployment with only OneNote tools, the
-user gives the group id. No tool of this connector finds the id of a site, so the user gives it.
+## How to read a preset section
 
-Microsoft can refuse a call for a group or site notebook with HTTP 403. Then the tool tells the
-model to ask the user to get access.
+Each preset section has the same parts, in this order.
 
-## Presets
+| Part | What it gives |
+| --- | --- |
+| Header line | The count of tools, the admin consent rule, and the preset that this preset builds on. The count does not include `get_me`. |
+| You can | What a user can do with the preset. |
+| Tools | The tools of the preset. A preset that builds on another preset lists only the new tools. |
+| What it needs | The Graph permissions, the admin consent rule, and the user approval rule. |
 
-A deployment turns tools on in one of two ways:
+The tables use these symbols.
 
-- **A preset.** One of the 36 named bundles in the table below.
-- **An exact list.** The `TOOLS_ENABLED` configuration, which names every wanted tool.
-
-A deployment must pick exactly one way:
-
-- It must not set both, and it must not leave both unset.
-- Three places enforce this rule: the Helm chart schema, the Terraform module, and the server's
-  own startup check.
-- This is not a preset plus an add-on. It is two ways to name one choice.
-- The tool `get_me` is always on, in every configuration, so no preset or list needs to name it.
-- A deployment cannot start from a preset and then add or remove one tool. For a mix of tools
-  that no preset covers, name every wanted tool in the exact list instead.
-
-There are 36 presets. This table names each preset's tools, besides `get_me`, and gives a short
-description.
-
-| Preset | Tools | Description |
+| Column | Symbol | Meaning |
 | --- | --- | --- |
-| `teams` | `teams_list_chats`, `teams_list_chat_messages`, `teams_list_chat_members`, `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_list_message_replies`, `teams_search_messages`, `teams_read_message`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Every Teams tool of the Read kind, except `teams_get_channel_files_folder` and `teams_read_meeting`. |
-| `teams-chat` | `teams_list_chats`, `teams_list_chat_members` | The signed-in user's Teams chats, and the members of one chat. It cannot read a chat message. |
-| `teams-messages` | `teams_list_chats`, `teams_list_chat_messages`, `teams_search_messages`, `teams_read_message`, `teams_list_message_replies` | Finds a message anywhere, and reads it in full. It also lists the newest messages of a chat, and the replies to a channel post. |
-| `teams-channels` | `teams_list_my_teams`, `teams_list_channels`, `teams_browse_channel`, `teams_list_message_replies` | Walks a team's channels, and reads the posts in one channel. It also lists the replies to one post. |
-| `teams-transcripts` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript` | Finds a meeting, and reads the transcript of it. |
-| `teams-recordings` | `teams_list_chats`, `teams_list_meeting_recordings` | Says whether a meeting was recorded, and who can get the recording. |
-| `teams-meetings` | `teams_list_chats`, `teams_list_meeting_transcripts`, `teams_read_transcript`, `teams_list_meeting_recordings` | Both transcripts and recordings, for one meeting. |
-| `teams-write` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members` | Finds a chat or a channel, and posts a new message to either. It also adds or removes a reaction, and lists the messages and members of a chat. |
-| `teams-write-files` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives` | Everything in `teams-write`, plus a message with files that are already in SharePoint. It also finds a file in SharePoint to attach, and lists the drives that hold it. |
-| `teams-edit` | `teams_list_chats`, `teams_list_my_teams`, `teams_list_channels`, `teams_send_chat_message`, `teams_send_channel_message`, `teams_list_chat_messages`, `teams_react_to_message`, `teams_list_chat_members`, `teams_browse_channel`, `teams_list_message_replies`, `teams_edit_message`, `teams_delete_message` | Everything in `teams-write`. It also edits and deletes a message. It reads the posts of a channel and the replies to a post, to find a channel message to change. |
-| `teams-meetings-write` | `teams_list_chats`, `teams_list_chat_members`, `teams_read_meeting`, `teams_create_meeting`, `teams_update_meeting`, `teams_delete_meeting` | Finds a meeting chat, and reads one meeting and its attendance. It also creates a Teams online meeting, and changes or deletes one that the signed-in user organizes. It also lists the members of a chat, to find the id of an attendee. |
-| `teams-chat-admin` | `teams_list_chats`, `teams_list_chat_members`, `teams_create_chat`, `teams_add_chat_member`, `teams_remove_chat_member`, `teams_rename_chat` | Everything in `teams-chat`. It also creates a chat, adds or removes a member, and renames a group chat. |
-| `teams-files` | `teams_list_my_teams`, `teams_list_channels`, `teams_get_channel_files_folder`, `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file` | Finds a channel, finds the folder that holds its files, lists that folder, and reads one file. It also searches for a file and lists the drives. |
-| `outlook-read` | `outlook_search_mail`, `outlook_read_mail`, `outlook_list_attachments`, `outlook_read_attachment`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_get_mail_tips`, `outlook_list_focused_overrides` | Finds a message, reads it in full, walks the folder tree, reads a thread, lists a folder, and resolves a name to an address. It also lists and reads attachments, reads MailTips, and lists the senders that have a fixed inbox tab. |
-| `outlook-write` | `outlook_search_mail`, `outlook_read_mail`, `outlook_list_attachments`, `outlook_read_attachment`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_get_mail_tips`, `outlook_list_focused_overrides`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_set_focused_override`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft` | Everything in `outlook-read`, plus marking, filing, and copying mail, and drafting or changing a draft. It also creates and renames mail folders, and sets the inbox tab of a sender. |
-| `outlook-delete` | `outlook_search_mail`, `outlook_read_mail`, `outlook_list_attachments`, `outlook_read_attachment`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_get_mail_tips`, `outlook_list_focused_overrides`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_set_focused_override`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`, `outlook_delete_folder` | Everything in `outlook-write`, plus moving a mail folder, with all of its items and subfolders, to Deleted Items. |
-| `outlook-send` | `outlook_search_mail`, `outlook_read_mail`, `outlook_list_attachments`, `outlook_read_attachment`, `outlook_browse_folders`, `outlook_find_recipient`, `outlook_read_thread`, `outlook_list_mail`, `outlook_get_mail_tips`, `outlook_list_focused_overrides`, `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_set_focused_override`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`, `outlook_send_draft` | Everything in `outlook-write`, plus sending a draft. |
-| `outlook-mailbox` | `outlook_get_mailbox_settings`, `outlook_list_categories`, `outlook_list_time_zones` | Shows the rules and the automatic reply that quietly act on the mailbox. It also lists every category with its name and color, and the time zones that the mailbox supports. |
-| `outlook-automate` | `outlook_get_mailbox_settings`, `outlook_list_categories`, `outlook_list_time_zones`, `outlook_set_automatic_reply`, `outlook_disable_mail_rule`, `outlook_create_category` | Everything in `outlook-mailbox`, plus setting the automatic reply, and turning off an inbox rule. It also creates a category. |
-| `outlook-rules` | `outlook_get_mailbox_settings`, `outlook_list_categories`, `outlook_list_time_zones`, `outlook_set_automatic_reply`, `outlook_disable_mail_rule`, `outlook_create_category`, `outlook_create_mail_rule`, `outlook_update_mail_rule`, `outlook_delete_mail_rule` | Everything in `outlook-automate`, plus creating, changing, and erasing an inbox rule. A rule can forward or redirect mail to other people. The tools ask the user to approve such a rule, and every erasure. The tools `outlook_create_mail_rule` and `outlook_update_mail_rule` also need `Mail.ReadBasic`, to read the folder that a rule names. This permission needs no admin consent. |
-| `outlook-calendar` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment` | Names every calendar that the mailbox reaches, reads what sits on one, and checks or suggests free time. It also lists the time zones that the mailbox supports, the dates of a series, the reminders, and the calendar groups. It shows who can see a calendar, and lists and reads the attachments of an event. |
-| `outlook-calendar-write` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite` | Everything in `outlook-calendar`, plus creating, changing, and canceling an event, and responding to an invitation. |
-| `outlook-calendar-manage` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_forward_event`, `outlook_delete_event`, `outlook_share_calendar`, `outlook_unshare_calendar`, `outlook_delete_calendar` | Everything in `outlook-calendar-write`, plus forwarding an event, and removing an event from its calendar. It also shares a calendar, stops a share, and removes an empty calendar. |
-| `outlook-calendar-delegate` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_create_event_on_behalf` | Everything in `outlook-calendar-write`, plus creating an event on a calendar delegated by another person. |
-| `outlook-calendar-rooms` | `outlook_list_calendars`, `outlook_list_events`, `outlook_read_event`, `outlook_check_availability`, `outlook_suggest_meeting_times`, `outlook_list_time_zones`, `outlook_list_event_instances`, `outlook_list_reminders`, `outlook_list_calendar_groups`, `outlook_list_calendar_shares`, `outlook_list_event_attachments`, `outlook_read_event_attachment`, `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`, `outlook_find_rooms` | Everything in `outlook-calendar-write`, plus finding a meeting room and its address. This preset needs admin consent for `Place.Read.All`. |
-| `outlook-group-calendar` | `teams_list_my_teams`, `outlook_list_group_events` | Finds a team, and lists the events on the calendar of the Microsoft 365 group of that team. |
-| `outlook-contacts` | `outlook_list_contacts`, `outlook_read_contact` | Lists the contacts in the default Contacts folder, and reads one contact in full. |
-| `outlook-contacts-write` | `outlook_list_contacts`, `outlook_read_contact`, `outlook_create_contact`, `outlook_update_contact` | Everything in `outlook-contacts`, plus creating a contact and changing one. |
-| `sharepoint-search` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives` | Finds a file in OneDrive or on a SharePoint site, lists one level of a folder, and lists the drives of the user. |
-| `sharepoint-read` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file` | Everything in `sharepoint-search`, plus reading one file itself, or its PDF form. |
-| `sharepoint-write` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_resolve_url`, `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item` | Everything in `sharepoint-read`, plus finding the item behind a sharing link and creating a folder or a text file. It also renames, moves, and copies an item, or moves it to the recycle bin. |
-| `sharepoint-share` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_resolve_url`, `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item`, `sharepoint_create_share_link`, `sharepoint_invite` | Everything in `sharepoint-write`, plus creating a sharing link to an item and giving the people that the user names access to an item. |
-| `sharepoint-sites` | `sharepoint_search_files`, `sharepoint_browse_folder`, `sharepoint_list_drives`, `sharepoint_read_file`, `sharepoint_search_sites` | Everything in `sharepoint-read`, plus finding a SharePoint site by free text. This preset adds the permission `Sites.Read.All`. No other `sharepoint-` preset needs it. |
-| `onenote-read` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections` | Lists notebooks, sections, and pages, and reads or previews a page. |
-| `onenote-write` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation` | Everything in `onenote-read`, plus creating, editing, and copying notebooks, sections, and pages. |
-| `onenote-delete` | `onenote_list_notebooks`, `onenote_list_pages`, `onenote_read_page`, `onenote_preview_page`, `onenote_read_resource`, `onenote_find_notebook_from_url`, `onenote_list_recent_notebooks`, `onenote_list_sections`, `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`, `onenote_get_operation`, `onenote_delete_page` | Everything in `onenote-write`, plus erasing one page outright. |
+| Kind | 🟢 Read | The tool reads data. |
+| Kind | 🟠 Add | The tool adds data, or the change is safe to repeat. |
+| Kind | 🔴 Change | The tool changes or removes data. |
+| Admin consent | ⚠️ | An administrator must grant consent. |
+| User approval | ✋ | The tool asks the user every time. |
+| User approval | 🤝 | The tool asks the user in some cases only. The text next to the symbol gives the case. |
+| User approval | — | The tool never asks the user. |
 
-Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and `onenote-delete`. Each one is a base preset plus the tools that remove an item, forward an event, share a calendar, or write an inbox rule. No other preset holds these tools, so a deployment gets them only when it names one of these four presets.
+Two facts about these columns:
 
-**Note:** Terraform (in another repository) writes the Entra application registration, and Argo
-(in another repository) writes the pod's active tool selection. Nothing compares the two on its
-own.
+- The Kind column is a hint to the calling client. It does not control access to the tool.
+- A tool that acts on things that belong to other people asks the user to approve first. The question
+  shows what will happen. If the user declines, the tool changes nothing.
+
+The Kind hint also sets the error text that the model gets when Microsoft 365 fails or does not
+answer. For a change that is not safe to repeat, the text tells the model to make sure that the
+change is not already there. If a tool of the deployment can show the change, the text names that
+tool. If not, the text tells the model to ask the user.
+
+## Teams presets
+
+Chats, channels, meetings, transcripts, and the files of a channel.
+
+### `teams`
+
+**12 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a chat, and read its newest messages and members.
+- Walk the channels of a team, and read the posts and replies of a channel.
+- Search every Teams message that you can see.
+- Read the transcript of a meeting, and see whether a recording exists.
+
+**Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder` and `teams_read_meeting`.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_chat_messages` | 🟢 Read | — | Reads the newest messages of one chat. Can go further back with `sent_before`. |
+| `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
+| `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
+| `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
+| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
+| `teams_search_messages` | 🟢 Read | — | Searches the text of every chat and channel message that you can see. |
+| `teams_read_message` | 🟢 Read | — | Reads one message in full, from a handle that another tool gave. |
+| `teams_list_meeting_transcripts` | 🟢 Read | — | Says whether a meeting has a transcript. Gives a handle for each transcript. |
+| `teams_read_transcript` | 🟢 Read | — | Reads one page of a transcript, as timestamped turns with the speaker named. |
+| `teams_list_meeting_recordings` | 🟢 Read | — | Says whether a recording exists, how long it runs, and who can download it. Never returns the video. |
+
+**What it needs**
+
+- **Graph permissions (8):** `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `ChannelMessage.Read.All`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-chat`
+
+**2 tools** · Admin consent: **not required**
+
+**You can**
+
+- List your Teams chats.
+- List the members of one chat.
+
+**Note:** This preset cannot read a chat message.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Chat.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-messages`
+
+**5 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Search for a message anywhere, and read it in full.
+- List the newest messages of a chat.
+- Read the replies to a channel post.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_chat_messages` | 🟢 Read | — | Reads the newest messages of one chat. Can go further back with `sent_before`. |
+| `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
+| `teams_search_messages` | 🟢 Read | — | Searches the text of every chat and channel message that you can see. |
+| `teams_read_message` | 🟢 Read | — | Reads one message in full, from a handle that another tool gave. |
+
+**What it needs**
+
+- **Graph permissions (3):** `ChannelMessage.Read.All`, `Chat.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `ChannelMessage.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-channels`
+
+**4 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- List your teams and their channels.
+- Read the posts in one channel.
+- Read the replies to one post.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
+| `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
+| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `ChannelMessage.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-transcripts`
+
+**3 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a meeting from its chat.
+- See whether the meeting has a transcript.
+- Read the transcript, one page at a time.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_meeting_transcripts` | 🟢 Read | — | Says whether a meeting has a transcript. Gives a handle for each transcript. |
+| `teams_read_transcript` | 🟢 Read | — | Reads one page of a transcript, as timestamped turns with the speaker named. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Chat.Read`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `OnlineMeetingTranscript.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-recordings`
+
+**2 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a meeting from its chat.
+- See whether a recording exists, how long it runs, and who can download it.
+
+**Note:** The preset never returns the video.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_meeting_recordings` | 🟢 Read | — | Says whether a recording exists, how long it runs, and who can download it. Never returns the video. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetings.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `OnlineMeetingRecording.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-meetings`
+
+**4 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a meeting from its chat.
+- Read the transcript of the meeting.
+- See whether a recording exists, and who can download it.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_meeting_transcripts` | 🟢 Read | — | Says whether a meeting has a transcript. Gives a handle for each transcript. |
+| `teams_read_transcript` | 🟢 Read | — | Reads one page of a transcript, as timestamped turns with the speaker named. |
+| `teams_list_meeting_recordings` | 🟢 Read | — | Says whether a recording exists, how long it runs, and who can download it. Never returns the video. |
+
+**What it needs**
+
+- **Graph permissions (5):** `Chat.Read`, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-write`
+
+**8 tools** · Admin consent: **not required**
+
+**You can**
+
+- Find a chat or a channel.
+- Post a new message to a chat or to a channel, or reply in a thread.
+- Add or remove a reaction.
+- List the messages and the members of a chat.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_chat_messages` | 🟢 Read | — | Reads the newest messages of one chat. Can go further back with `sent_before`. |
+| `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
+| `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
+| `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
+| `teams_send_chat_message` | 🟠 Add | ✋ Always | Posts a plain-text message to a chat. Supports mentions, a subject, and an importance. |
+| `teams_send_channel_message` | 🟠 Add | ✋ Always | Posts a message to a channel, or a reply in a thread. Supports mentions, a subject, and an importance. |
+| `teams_react_to_message` | 🔴 Change | ✋ Always | Adds or removes one reaction on a chat message, a channel post, or a reply. |
+
+**What it needs**
+
+- **Graph permissions (6):** `Channel.ReadBasic.All`, `ChannelMessage.Send`, `Chat.Read`, `ChatMessage.Send`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `teams_send_chat_message`, `teams_send_channel_message`, `teams_react_to_message`.
+
+### `teams-write-files`
+
+**13 tools** · Admin consent: ⚠️ **required** · Builds on [`teams-write`](#teams-write)
+
+**You can**
+
+- Do everything in `teams-write`.
+- Post a message with files that are already in SharePoint.
+- Find the file to attach, and list the drives that hold it.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_send_chat_message_with_files` | 🟠 Add | ✋ Always | Posts a message to a chat with files that are already in SharePoint. Uploads nothing. |
+| `teams_send_channel_message_with_files` | 🟠 Add | ✋ Always | Posts a message to a channel with files that are already in SharePoint. Uploads nothing. |
+| `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
+| `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+
+**What it needs**
+
+- **Graph permissions (7):** `Channel.ReadBasic.All`, `ChannelMessage.Send`, `Chat.Read`, `ChatMessage.Send`, `Files.Read.All`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `teams_send_chat_message`, `teams_send_channel_message`, `teams_send_chat_message_with_files`, `teams_send_channel_message_with_files`, `teams_react_to_message`.
+
+### `teams-edit`
+
+**12 tools** · Admin consent: ⚠️ **required** · Builds on [`teams-write`](#teams-write)
+
+**You can**
+
+- Do everything in `teams-write`.
+- Edit or delete a message that you sent.
+- Read the posts of a channel and the replies to a post, to find the message to change.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
+| `teams_edit_message` | 🔴 Change | ✋ Always | Replaces the text of one message that you sent. |
+| `teams_delete_message` | 🔴 Change | ✋ Always | Deletes one message that you sent. Teams shows it as deleted. This connector cannot restore it. |
+
+**What it needs**
+
+- **Graph permissions (9):** `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `ChannelMessage.ReadWrite`, `ChannelMessage.Send`, `Chat.Read`, `Chat.ReadWrite`, `ChatMessage.Send`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `ChannelMessage.Read.All`, `ChannelMessage.ReadWrite`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `teams_send_chat_message`, `teams_send_channel_message`, `teams_react_to_message`, `teams_edit_message`, `teams_delete_message`.
+
+### `teams-meetings-write`
+
+**6 tools** · Admin consent: **not required**
+
+**You can**
+
+- Find a meeting chat, and read one meeting with its attendance.
+- Create a Teams online meeting.
+- Change or delete a meeting that you organize.
+- List the members of a chat, to find the id of an attendee.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
+| `teams_read_meeting` | 🟢 Read | — | Reads one meeting and its attendance reports. Only the organizer gets attendance. |
+| `teams_create_meeting` | 🟠 Add | ✋ Always | Creates a Teams online meeting with the attendees that you name. It sends no invitation and uses no calendar. |
+| `teams_update_meeting` | 🔴 Change | ✋ Always | Changes the subject, the time, or the attendees of a meeting that you organize. |
+| `teams_delete_meeting` | 🔴 Change | ✋ Always | Deletes a Teams online meeting that you organize. It never deletes a calendar event. |
+
+**What it needs**
+
+- **Graph permissions (5):** `Chat.Read`, `OnlineMeetingArtifact.Read.All`, `OnlineMeetings.Read`, `OnlineMeetings.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `teams_create_meeting`, `teams_update_meeting`, `teams_delete_meeting`.
+
+### `teams-chat-admin`
+
+**6 tools** · Admin consent: ⚠️ **required** · Builds on [`teams-chat`](#teams-chat)
+
+**You can**
+
+- Do everything in `teams-chat`.
+- Create a one-to-one chat or a group chat.
+- Add a member to a chat, or remove one.
+- Rename a group chat.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_create_chat` | 🟠 Add | ✋ Always | Creates a one-to-one chat or a group chat. It posts no message. |
+| `teams_add_chat_member` | 🟠 Add | ✋ Always | Adds one person to a chat, with the `owner` role. Microsoft refuses this for a one-to-one chat. |
+| `teams_remove_chat_member` | 🔴 Change | ✋ Always | Removes one member from a chat. Microsoft refuses this for a one-to-one chat. |
+| `teams_rename_chat` | 🔴 Change | ✋ Always | Changes the topic of a group chat. |
+
+**What it needs**
+
+- **Graph permissions (5):** `Chat.Create`, `Chat.Read`, `Chat.ReadWrite`, `ChatMember.ReadWrite`, `User.Read`
+- **Admin consent:** ⚠️ Required for `ChatMember.ReadWrite`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `teams_create_chat`, `teams_add_chat_member`, `teams_remove_chat_member`, `teams_rename_chat`.
+
+### `teams-files`
+
+**7 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a channel, and the SharePoint folder that holds its files.
+- List that folder, and read one file.
+- Search for a file, and list your drives.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
+| `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
+| `teams_get_channel_files_folder` | 🟢 Read | — | Gives the SharePoint folder of one channel. It does not list the files. |
+| `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
+| `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_read_file` | 🟢 Read | — | Reads one file of 10 MB or less, in its original format or as PDF. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Channel.ReadBasic.All`, `Files.Read.All`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+## Outlook mail presets
+
+Messages, folders, drafts, and sending.
+
+### `outlook-read`
+
+**10 tools** · Admin consent: **not required**
+
+**You can**
+
+- Find a message, and read it in full.
+- Walk the folder tree, list a folder, and read a whole thread.
+- List and read attachments.
+- Find the email address behind a name.
+- Read MailTips, and list the senders that have a fixed inbox tab.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_search_mail` | 🟢 Read | — | Searches your mailbox, or a shared mailbox, with a KQL query. Filters by importance, flag, category, and attachments. |
+| `outlook_read_mail` | 🟢 Read | — | Reads one message in full. Lists its attachments and headers, but never their bytes. |
+| `outlook_list_attachments` | 🟢 Read | — | Lists the attachments of one message, with name, size, and type. |
+| `outlook_read_attachment` | 🟢 Read | — | Reads one mail attachment of 10 MB or less, with its real media type. |
+| `outlook_browse_folders` | 🟢 Read | — | Lists one level of the mail folder tree, with a handle for each folder. |
+| `outlook_find_recipient` | 🟢 Read | — | Finds the email address behind a display name. |
+| `outlook_read_thread` | 🟢 Read | — | Reads the messages of one conversation, with a short preview of each body. |
+| `outlook_list_mail` | 🟢 Read | — | Lists the newest messages of one folder. Filters by importance, flag, attachments, and category. |
+| `outlook_get_mail_tips` | 🟢 Read | — | Reads the MailTips of recipients, for example an automatic reply or a full mailbox. Sends nothing. |
+| `outlook_list_focused_overrides` | 🟢 Read | — | Lists the senders that have a fixed inbox tab, Focused or Other. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Mail.Read`, `Mail.Read.Shared`, `People.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `outlook-write`
+
+**20 tools** · Admin consent: **not required** · Builds on [`outlook-read`](#outlook-read)
+
+**You can**
+
+- Do everything in `outlook-read`.
+- Mark mail read, flag it, set its importance, and set its categories.
+- Move mail, and copy mail, between folders.
+- Create and rename mail folders.
+- Draft a new message, a reply, a reply to all, or a forward, and change a draft.
+- Set the inbox tab of a sender.
+
+**Note:** This preset cannot send mail.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_mark_mail` | 🔴 Change | 🤝 Shared mailbox | Sets the read status, the follow-up flag, the importance, and the categories of messages. |
+| `outlook_move_mail` | 🔴 Change | 🤝 Shared mailbox | Moves messages into another folder. Moving to Deleted Items is the only way to erase mail. |
+| `outlook_copy_mail` | 🟠 Add | 🤝 Shared mailbox | Copies messages into another folder. The original stays. |
+| `outlook_create_folder` | 🟠 Add | 🤝 Shared mailbox | Creates one mail folder, at the top level or inside another folder. |
+| `outlook_rename_folder` | 🟠 Add | 🤝 Shared mailbox | Renames one mail folder. Refused for a folder that every mailbox has, such as Inbox. |
+| `outlook_set_focused_override` | 🟠 Add | — | Sets the inbox tab, Focused or Other, for all future mail from one sender. |
+| `outlook_draft_mail` | 🟠 Add | 🤝 Shared mailbox | Composes a new message into Drafts. It cannot send it and cannot add files. |
+| `outlook_draft_reply` | 🟠 Add | 🤝 Shared mailbox | Composes a reply or a forward into Drafts. A forward keeps the attachments of the original. |
+| `outlook_draft_reply_all` | 🟠 Add | 🤝 Shared mailbox | Composes a reply to everyone on one message into Drafts. |
+| `outlook_update_draft` | 🔴 Change | 🤝 Shared mailbox | Changes the subject, text, recipients, importance, or categories of one draft. |
+
+**What it needs**
+
+- **Graph permissions (6):** `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `People.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks 🤝 in some cases for `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`.
+
+### `outlook-delete`
+
+**21 tools** · Admin consent: **not required** · Builds on [`outlook-write`](#outlook-write)
+
+**You can**
+
+- Do everything in `outlook-write`.
+- Move a mail folder, with all of its items and subfolders, to Deleted Items.
+
+**Note:** Opt-in preset. No other preset holds this tool.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_delete_folder` | 🔴 Change | ✋ Always | Moves one mail folder, with its items and subfolders, to Deleted Items. Never erases anything. |
+
+**What it needs**
+
+- **Graph permissions (6):** `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `People.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_delete_folder`. Asks 🤝 in some cases for `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`.
+
+### `outlook-send`
+
+**21 tools** · Admin consent: **not required** · Builds on [`outlook-write`](#outlook-write)
+
+**You can**
+
+- Do everything in `outlook-write`.
+- Send a draft, after the user approves the send.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. |
+
+**What it needs**
+
+- **Graph permissions (9):** `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadBasic`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `Mail.Send`, `Mail.Send.Shared`, `People.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_send_draft`. Asks 🤝 in some cases for `outlook_mark_mail`, `outlook_move_mail`, `outlook_copy_mail`, `outlook_create_folder`, `outlook_rename_folder`, `outlook_draft_mail`, `outlook_draft_reply`, `outlook_draft_reply_all`, `outlook_update_draft`.
+
+## Outlook mailbox settings presets
+
+Inbox rules, the automatic reply, and categories.
+
+### `outlook-mailbox`
+
+**3 tools** · Admin consent: **not required**
+
+**You can**
+
+- See the rules and the automatic reply that act on the mailbox.
+- List every category, with its name and color.
+- List the time zones that the mailbox supports.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_get_mailbox_settings` | 🟢 Read | — | Reads the inbox rules, the automatic reply, the category names, the time zone, and the working hours. |
+| `outlook_list_categories` | 🟢 Read | — | Lists every category of the mailbox, with its name and color. |
+| `outlook_list_time_zones` | 🟢 Read | — | Lists the time zones that the mailbox server supports. |
+
+**What it needs**
+
+- **Graph permissions (2):** `MailboxSettings.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `outlook-automate`
+
+**6 tools** · Admin consent: **not required** · Builds on [`outlook-mailbox`](#outlook-mailbox)
+
+**You can**
+
+- Do everything in `outlook-mailbox`.
+- Turn the automatic reply on for a fixed period, or off.
+- Turn one inbox rule off.
+- Create a category.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_set_automatic_reply` | 🟠 Add | 🤝 When it turns the reply on | Turns the out-of-office reply on for a fixed period, or off. It never runs with no end date. |
+| `outlook_disable_mail_rule` | 🟠 Add | — | Turns one inbox rule off. It cannot turn a rule on or create one. |
+| `outlook_create_category` | 🟠 Add | — | Creates one category, with a name and a color. |
+
+**What it needs**
+
+- **Graph permissions (3):** `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks 🤝 in some cases for `outlook_set_automatic_reply`.
+
+### `outlook-rules`
+
+**9 tools** · Admin consent: **not required** · Builds on [`outlook-automate`](#outlook-automate)
+
+**You can**
+
+- Do everything in `outlook-automate`.
+- Create, change, and erase an inbox rule.
+
+**Note:** A rule can forward or redirect mail to other people. The tools ask the user to approve such a rule, and every erasure. Opt-in preset.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_create_mail_rule` | 🟠 Add | 🤝 A forward or redirect rule | Creates one inbox rule. The delete action of a rule moves mail to Deleted Items. |
+| `outlook_update_mail_rule` | 🟠 Add | 🤝 An enabled forward or redirect rule | Changes the name, order, state, conditions, exceptions, or actions of one inbox rule. |
+| `outlook_delete_mail_rule` | 🔴 Change | ✋ Always | Erases one inbox rule. This connector cannot restore it. No mail is erased. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Mail.ReadBasic`, `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_delete_mail_rule`. Asks 🤝 in some cases for `outlook_set_automatic_reply`, `outlook_create_mail_rule`, `outlook_update_mail_rule`.
+
+## Outlook calendar presets
+
+Calendars, events, availability, rooms, and sharing.
+
+### `outlook-calendar`
+
+**12 tools** · Admin consent: **not required**
+
+**You can**
+
+- List every calendar that the mailbox reaches, and read what sits on one.
+- Check free time, and ask for suggested meeting times.
+- List the dates of a series, the reminders, and the calendar groups.
+- See who can see a calendar.
+- List and read the attachments of an event.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_list_time_zones` | 🟢 Read | — | Lists the time zones that the mailbox server supports. |
+| `outlook_list_calendars` | 🟢 Read | — | Lists every calendar that the mailbox reaches, with a handle for each. |
+| `outlook_list_calendar_groups` | 🟢 Read | — | Lists your calendar groups, with the calendars in each group. |
+| `outlook_list_calendar_shares` | 🟢 Read | — | Lists the people who can see one calendar that you own, with their roles. |
+| `outlook_list_events` | 🟢 Read | — | Lists the occurrences on one calendar over a time window. |
+| `outlook_list_event_instances` | 🟢 Read | — | Lists the dates of one recurring series over a time window. |
+| `outlook_read_event` | 🟢 Read | — | Reads one event in full, with every attendee and each reply. |
+| `outlook_list_event_attachments` | 🟢 Read | — | Lists the attachments of one event, with name, size, and type. |
+| `outlook_read_event_attachment` | 🟢 Read | — | Reads one event attachment of 10 MB or less, with its real media type. |
+| `outlook_list_reminders` | 🟢 Read | — | Lists your event reminders over a time window. |
+| `outlook_check_availability` | 🟢 Read | — | Reads free and busy status, and working hours, of one or more mailboxes. Books nothing. |
+| `outlook_suggest_meeting_times` | 🟢 Read | — | Asks Microsoft for meeting times that fit you and the attendees. Books nothing. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `outlook-calendar-write`
+
+**16 tools** · Admin consent: **not required** · Builds on [`outlook-calendar`](#outlook-calendar)
+
+**You can**
+
+- Do everything in `outlook-calendar`.
+- Create an event, with attendees, rooms, or a series.
+- Change an event that you organize, or add a Teams meeting to it.
+- Cancel an event that you organize.
+- Accept, decline, or tentatively accept an invitation.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_create_event` | 🟠 Add | 🤝 The event has attendees, a room, or a location | Creates one event on your own calendar and sends the invitations. Supports series and rooms. |
+| `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, location, body, attendees, and more. |
+| `outlook_cancel_event` | 🔴 Change | 🤝 The event has attendees | Cancels one event that you organize. Mails a cancellation to the attendees. |
+| `outlook_respond_to_invite` | 🟠 Add | 🤝 When it sends a response | Accepts, declines, or tentatively accepts an invitation that you received. |
+
+**What it needs**
+
+- **Graph permissions (5):** `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks 🤝 in some cases for `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`.
+
+### `outlook-calendar-manage`
+
+**21 tools** · Admin consent: **not required** · Builds on [`outlook-calendar-write`](#outlook-calendar-write)
+
+**You can**
+
+- Do everything in `outlook-calendar-write`.
+- Forward an event.
+- Remove an event from its calendar.
+- Share a calendar, and stop a share.
+- Remove an empty calendar.
+
+**Note:** Opt-in preset. No other preset holds these tools.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_forward_event` | 🟠 Add | ✋ Always | Forwards the meeting request of one event to new recipients. This connector cannot recall it. |
+| `outlook_delete_event` | 🔴 Change | ✋ Always | Removes one event that you organize from its calendar. Attendees get a cancellation. |
+| `outlook_share_calendar` | 🟠 Add | ✋ Always | Shares one of your calendars with one person, with a role. |
+| `outlook_unshare_calendar` | 🔴 Change | ✋ Always | Stops one share of a calendar of yours, also the share of a delegate. |
+| `outlook_delete_calendar` | 🔴 Change | ✋ Always | Removes one calendar that you own, only if it holds no event. |
+
+**What it needs**
+
+- **Graph permissions (5):** `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_forward_event`, `outlook_delete_event`, `outlook_share_calendar`, `outlook_unshare_calendar`, `outlook_delete_calendar`. Asks 🤝 in some cases for `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`.
+
+### `outlook-calendar-delegate`
+
+**17 tools** · Admin consent: **not required** · Builds on [`outlook-calendar-write`](#outlook-calendar-write)
+
+**You can**
+
+- Do everything in `outlook-calendar-write`.
+- Create an event on a calendar that another person delegated to you.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on a calendar that another person delegated, sent under that person's name. |
+
+**What it needs**
+
+- **Graph permissions (6):** `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `Calendars.ReadWrite.Shared`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_create_event_on_behalf`. Asks 🤝 in some cases for `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`.
+
+### `outlook-calendar-rooms`
+
+**17 tools** · Admin consent: ⚠️ **required** · Builds on [`outlook-calendar-write`](#outlook-calendar-write)
+
+**You can**
+
+- Do everything in `outlook-calendar-write`.
+- Find a meeting room, with its address, capacity, and equipment.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_find_rooms` | 🟢 Read | — | Lists the meeting rooms of the organization, with address, capacity, floor, and equipment. |
+
+**What it needs**
+
+- **Graph permissions (6):** `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadBasic`, `Calendars.ReadWrite`, `Place.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Place.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks 🤝 in some cases for `outlook_create_event`, `outlook_update_event`, `outlook_cancel_event`, `outlook_respond_to_invite`.
+
+### `outlook-group-calendar`
+
+**2 tools** · Admin consent: **not required**
+
+**You can**
+
+- Find a team.
+- List the events on the calendar of the Microsoft 365 group of that team.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
+| `outlook_list_group_events` | 🟢 Read | — | Lists the events on the calendar of one Microsoft 365 group over a time window. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Calendars.Read`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+## Outlook contacts presets
+
+The default Contacts folder.
+
+### `outlook-contacts`
+
+**2 tools** · Admin consent: **not required**
+
+**You can**
+
+- List the contacts in your default Contacts folder.
+- Read one contact in full.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_list_contacts` | 🟢 Read | — | Lists the contacts in your default Contacts folder. Can filter by one email address. |
+| `outlook_read_contact` | 🟢 Read | — | Reads one contact in full, including postal addresses, birthday, and notes. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Contacts.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `outlook-contacts-write`
+
+**4 tools** · Admin consent: **not required** · Builds on [`outlook-contacts`](#outlook-contacts)
+
+**You can**
+
+- Do everything in `outlook-contacts`.
+- Create a contact.
+- Change a contact.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_create_contact` | 🟠 Add | — | Creates one contact with names, email addresses, phone numbers, company, and job title. |
+| `outlook_update_contact` | 🔴 Change | — | Changes only the given fields of one contact. Cannot clear a name, company, job title, or mobile number. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Contacts.Read`, `Contacts.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+## SharePoint and OneDrive presets
+
+Files, folders, sharing, and sites.
+
+### `sharepoint-search`
+
+**3 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a file in OneDrive or on a SharePoint site.
+- List one level of a folder.
+- List your drives.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
+| `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Files.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-read`
+
+**4 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-search`](#sharepoint-search)
+
+**You can**
+
+- Do everything in `sharepoint-search`.
+- Read one file, in its own format or as PDF.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_read_file` | 🟢 Read | — | Reads one file of 10 MB or less, in its original format or as PDF. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Files.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-write`
+
+**11 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-read`](#sharepoint-read)
+
+**You can**
+
+- Do everything in `sharepoint-read`.
+- Find the item behind a sharing link.
+- Create a folder or a text file.
+- Rename, move, and copy an item.
+- Move an item to the recycle bin.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_resolve_url` | 🟢 Read | — | Finds the file or folder that a sharing link opens. Changes nothing. |
+| `sharepoint_create_folder` | 🟠 Add | ✋ Always | Creates one empty folder inside a folder. |
+| `sharepoint_create_text_file` | 🟠 Add | ✋ Always | Creates one new text file. It cannot replace a file or upload a binary file. |
+| `sharepoint_rename_item` | 🔴 Change | ✋ Always | Renames one file or folder. The item stays in its folder. |
+| `sharepoint_move_item` | 🔴 Change | ✋ Always | Moves one file or folder into another folder of the same drive. |
+| `sharepoint_copy_item` | 🟠 Add | ✋ Always | Starts a copy of one file or folder, in the same drive or another drive. |
+| `sharepoint_delete_item` | 🔴 Change | ✋ Always | Moves one file or folder to the recycle bin. Never erases it permanently. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Files.Read.All`, `Files.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`, `Files.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item`.
+
+### `sharepoint-share`
+
+**13 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-write`](#sharepoint-write)
+
+**You can**
+
+- Do everything in `sharepoint-write`.
+- Create a sharing link to an item.
+- Give the people that you name access to an item.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_create_share_link` | 🟠 Add | ✋ Always | Creates a sharing link to one file or folder. Sends the link to nobody. |
+| `sharepoint_invite` | 🟠 Add | ✋ Always | Gives read or edit access to one file or folder to the people that you name. No tool takes access back. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Files.Read.All`, `Files.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`, `Files.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_folder`, `sharepoint_create_text_file`, `sharepoint_rename_item`, `sharepoint_move_item`, `sharepoint_copy_item`, `sharepoint_delete_item`, `sharepoint_create_share_link`, `sharepoint_invite`.
+
+### `sharepoint-sites`
+
+**5 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-read`](#sharepoint-read)
+
+**You can**
+
+- Do everything in `sharepoint-read`.
+- Find a SharePoint site by free text.
+
+**Note:** This preset adds the permission `Sites.Read.All`. No other `sharepoint-` preset needs it.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_search_sites` | 🟢 Read | — | Finds SharePoint sites by free text. It does not find files. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Files.Read.All`, `Sites.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Files.Read.All`, `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+## OneNote presets
+
+Notebooks, sections, and pages.
+
+### `onenote-read`
+
+**8 tools** · Admin consent: **not required**
+
+**You can**
+
+- List notebooks, sections, and pages.
+- Read or preview a page.
+- Open a notebook from its web address.
+- Fetch an image or a file that a page embeds.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `onenote_list_notebooks` | 🟢 Read | — | Lists the notebooks that you own or that are shared with you, with their sections. |
+| `onenote_list_pages` | 🟢 Read | — | Finds pages by title, across notebooks or in one section. It does not search page text. |
+| `onenote_read_page` | 🟢 Read | — | Reads the HTML of one page, as Microsoft stores it. |
+| `onenote_preview_page` | 🟢 Read | — | Gives a snippet of up to 300 characters of one page, and a preview image address. |
+| `onenote_read_resource` | 🟢 Read | — | Fetches one image or file that a page embeds. |
+| `onenote_find_notebook_from_url` | 🟢 Read | — | Turns a OneNote web address into a notebook handle. |
+| `onenote_list_recent_notebooks` | 🟢 Read | — | Lists the notebooks that you opened recently. |
+| `onenote_list_sections` | 🟢 Read | — | Lists the sections and section groups directly under a notebook or section group. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Notes.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `onenote-write`
+
+**19 tools** · Admin consent: **not required** · Builds on [`onenote-read`](#onenote-read)
+
+**You can**
+
+- Do everything in `onenote-read`.
+- Create notebooks, sections, section groups, and pages.
+- Add to a page, edit it, and rename it.
+- Copy a page, a section, or a notebook, and poll the copy.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `onenote_create_page` | 🟠 Add | 🤝 Shared notebook | Writes a new page into a section. No attachments or images. |
+| `onenote_append_to_page` | 🟠 Add | 🤝 Shared notebook | Adds HTML to the end of one page. It cannot edit or erase existing content. |
+| `onenote_create_notebook` | 🟠 Add | 🤝 A group or site notebook | Creates an empty notebook, for you, a Microsoft 365 group, or a SharePoint site. |
+| `onenote_create_section` | 🟠 Add | 🤝 Shared notebook | Creates an empty section under a notebook or section group. |
+| `onenote_create_section_group` | 🟠 Add | 🤝 Shared notebook | Creates an empty section group under a notebook or section group. |
+| `onenote_edit_page` | 🔴 Change | 🤝 Shared notebook, or always for a replace | Adds content next to an element of one page, or replaces one, with 1 to 20 commands. |
+| `onenote_rename_page` | 🔴 Change | 🤝 Shared notebook | Changes the title of one page. |
+| `onenote_copy_page` | 🟠 Add | 🤝 Shared notebook | Starts a copy of one page into another section. |
+| `onenote_copy_section` | 🟠 Add | 🤝 Shared notebook | Starts a copy of one section into another notebook or section group. |
+| `onenote_copy_notebook` | 🟠 Add | 🤝 A copy into a group | Starts a copy of a whole notebook into your OneDrive or a Microsoft 365 group. |
+| `onenote_get_operation` | 🟢 Read | — | Polls a copy operation for its result. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
+
+### `onenote-delete`
+
+**20 tools** · Admin consent: **not required** · Builds on [`onenote-write`](#onenote-write)
+
+**You can**
+
+- Do everything in `onenote-write`.
+- Erase one page outright.
+
+**Note:** Opt-in preset. OneNote has no recycle bin, so an erased page is gone.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `onenote_delete_page` | 🔴 Change | ✋ Always | Erases one page outright. OneNote has no recycle bin. |
+
+**What it needs**
+
+- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `onenote_delete_page`. Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
 
 ## Permissions
 
-Each tool needs one or more Microsoft Graph permissions, and the Tools section names each one.
+Each tool needs one or more Microsoft Graph permissions. The preset sections and the
+[tool reference](#reference-every-tool) name them.
 [Microsoft's own reference](https://learn.microsoft.com/en-us/graph/permissions-reference) lists
-what each permission grants. A deployment asks for the union of every active tool's permissions,
-one time, at sign-in. It never asks again per call, and it never asks later for a permission that
-no tool requested at sign-in. After sign-in, each call draws the one permission it needs from this
-already-granted set, for the signed-in user. It does not ask again.
+what each permission grants.
+
+Sign-in asks for permissions in this way:
+
+- A deployment asks for the union of the permissions of every active tool.
+- It asks one time, at sign-in. It never asks again for each call.
+- It never asks later for a permission that no tool requested at sign-in.
+- After sign-in, each call uses the one permission that it needs, for the signed-in user.
+
+For the exact permission list of a deployment, run `curl $PUBLIC_BASE_URL/manifest`. For a
+deployment with the `enabled` key, merge the permissions of the named tools.
 
 ## Admin consent
 
-Some permissions need a tenant administrator to grant them, before any user in that tenant can
-sign in. The Tools section marks these. The marks show the rule of this deployment. For some
-permissions, this rule differs from the default consent rule that Microsoft lists.
+Some permissions need a tenant administrator to grant them before any user in that tenant can sign
+in. The preset sections and the tool reference mark these permissions with ⚠️. The marks show the
+rule of this deployment. For some permissions, this rule differs from the default consent rule that
+Microsoft lists.
 [Microsoft's own overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview)
 explains this step in more detail.
 
-Three tenants matter here:
+Two tenant roles matter here:
 
 - **Tenant D, or Tenant U.** The tenant that owns the Entra App registration. Unique supports
   both: a customer's own dedicated tenant (Tenant D), or Unique's own shared tenant (Tenant U).
@@ -318,7 +1181,12 @@ A customer's own administrator, in Tenant C, must always grant admin consent:
   the tenant that owns the App registration. It cannot reach Tenant C.
 - To grant it, Tenant C's own administrator uses
   [the Entra portal](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent),
-  or the module's own `admin_consent_url` output, which works for any tenant.
+  or the `/admin/consent` endpoint of the deployed server. The module's own `admin_consent_url`
+  output gives the same link and works for any tenant.
+- `GET /admin/consent` needs no sign-in. It redirects to the Microsoft admin-consent page for this
+  deployment's own `ENTRA_TENANT_ID`, client, and tool permissions. The redirect target is
+  `ADMIN_CONSENT_REDIRECT_URI`, which defaults to the default `admin_consent_redirect_uri` of the
+  module. If you change it in the module, change it here to the same value.
 - The administrator sees the result as a new Enterprise Application in Tenant C. This is separate
   from the App registration, which stays in Tenant D or Tenant U.
 
@@ -331,18 +1199,21 @@ unset.
 ```yaml
 mcpConfig:
   tools:
-    preset: teams        # or: enabled: get_me,teams_list_chats
+    preset: teams        # or: enabled: [get_me, teams_list_chats]
 ```
 
-The `preset` key names one of the 36 presets in the Presets table. The `enabled` key names an
-exact, comma-separated list of tool names instead. A deployment that needs a mix that no preset
-covers uses `enabled`, and names every wanted tool. Granting admin consent is a separate step,
-covered in Admin consent.
+The `preset` key names one of the 36 presets in the [preset index](#preset-index), or several of
+them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
+exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
+The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment
+that needs a mix that no presets cover uses `enabled`, and names every wanted tool. Granting admin
+consent is a separate step, covered in [Admin consent](#admin-consent).
 
-Terraform writes the Entra application registration. Argo writes the deployed pod's tool
-selection, through the chart values in this section. No automatic step compares these two. A
-mismatch is possible, and it produces no warning. A registration narrower than the pod fails
-every sign-in at the authorize step, with nothing in the pod's own logs to explain why.
+Terraform (in another repository) writes the Entra application registration. Argo (in another
+repository) writes the deployed pod's tool selection, through the chart values in this section. No
+automatic step compares these two. A mismatch is possible, and it produces no warning. A
+registration narrower than the pod fails every sign-in at the authorize step, with nothing in the
+pod's own logs to explain why.
 
 The check is manual, and it is repeatable:
 
@@ -360,35 +1231,310 @@ Two things can go wrong:
 - If the Terraform output names more permissions than the pod uses, the tenant carries standing
   access that no tool spends.
 
+## Reference: every tool
+
+This reference lists all 121 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+
+### Identity
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `get_me` | 🟢 Read | `User.Read` | No | — |
+
+### Microsoft Teams
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | `Chat.Read` | No | — |
+| `teams_list_chat_messages` | 🟢 Read | `Chat.Read` | No | — |
+| `teams_list_chat_members` | 🟢 Read | `Chat.Read` | No | — |
+| `teams_list_my_teams` | 🟢 Read | `Team.ReadBasic.All` | No | — |
+| `teams_list_channels` | 🟢 Read | `Channel.ReadBasic.All` | No | — |
+| `teams_get_channel_files_folder` | 🟢 Read | `Files.Read.All` | ⚠️ Yes | — |
+| `teams_browse_channel` | 🟢 Read | `ChannelMessage.Read.All` | ⚠️ Yes | — |
+| `teams_list_message_replies` | 🟢 Read | `ChannelMessage.Read.All` | ⚠️ Yes | — |
+| `teams_search_messages` | 🟢 Read | `Chat.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | — |
+| `teams_read_message` | 🟢 Read | `Chat.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | — |
+| `teams_send_chat_message` | 🟠 Write, adds | `ChatMessage.Send`, `Chat.Read` | No | ✋ Always |
+| `teams_send_channel_message` | 🟠 Write, adds | `ChannelMessage.Send` | No | ✋ Always |
+| `teams_send_chat_message_with_files` | 🟠 Write, adds | `ChatMessage.Send`, `Files.Read.All`, `Chat.Read` | ⚠️ Yes | ✋ Always |
+| `teams_send_channel_message_with_files` | 🟠 Write, adds | `ChannelMessage.Send`, `Files.Read.All` | ⚠️ Yes | ✋ Always |
+| `teams_react_to_message` | 🔴 Write, changes or removes | `ChatMessage.Send`, `ChannelMessage.Send`, `Chat.Read`, `Channel.ReadBasic.All`, `Team.ReadBasic.All` | No | ✋ Always |
+| `teams_edit_message` | 🔴 Write, changes or removes, safe to repeat | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | ✋ Always |
+| `teams_delete_message` | 🔴 Write, changes or removes | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | ✋ Always |
+| `teams_list_meeting_transcripts` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
+| `teams_read_transcript` | 🟢 Read | `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
+| `teams_list_meeting_recordings` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All`, `User.Read` | ⚠️ Yes | — |
+| `teams_read_meeting` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingArtifact.Read.All`, `User.Read` | No | — |
+| `teams_create_meeting` | 🟠 Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | ✋ Always |
+| `teams_update_meeting` | 🔴 Write, changes or removes, safe to repeat | `OnlineMeetings.ReadWrite`, `User.Read` | No | ✋ Always |
+| `teams_delete_meeting` | 🔴 Write, changes or removes | `OnlineMeetings.ReadWrite`, `User.Read` | No | ✋ Always |
+| `teams_create_chat` | 🟠 Write, adds | `Chat.Create`, `User.Read` | No | ✋ Always |
+| `teams_add_chat_member` | 🟠 Write, adds | `ChatMember.ReadWrite`, `Chat.Read` | ⚠️ Yes | ✋ Always |
+| `teams_remove_chat_member` | 🔴 Write, changes or removes | `ChatMember.ReadWrite`, `Chat.Read` | ⚠️ Yes | ✋ Always |
+| `teams_rename_chat` | 🔴 Write, changes or removes, safe to repeat | `Chat.ReadWrite` | No | ✋ Always |
+
+### Outlook mail
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `outlook_search_mail` | 🟢 Read | `Mail.Read`, `User.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_read_mail` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_list_attachments` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_read_attachment` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_browse_folders` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_find_recipient` | 🟢 Read | `People.Read`, `Mail.Read`, `User.Read` | No | — |
+| `outlook_read_thread` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_list_mail` | 🟢 Read | `Mail.Read`, `Mail.Read.Shared` | No | — |
+| `outlook_get_mail_tips` | 🟢 Read | `Mail.Read` | No | — |
+| `outlook_list_focused_overrides` | 🟢 Read | `Mail.Read` | No | — |
+| `outlook_get_mailbox_settings` | 🟢 Read | `MailboxSettings.Read` | No | — |
+| `outlook_mark_mail` | 🔴 Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_move_mail` | 🔴 Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_copy_mail` | 🟠 Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_create_folder` | 🟠 Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_rename_folder` | 🟠 Write, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_delete_folder` | 🔴 Write, changes or removes | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | ✋ Always |
+| `outlook_set_focused_override` | 🟠 Write, safe to repeat | `Mail.ReadWrite` | No | — |
+| `outlook_draft_mail` | 🟠 Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_draft_reply` | 🟠 Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_draft_reply_all` | 🟠 Write, adds | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_update_draft` | 🔴 Write, changes or removes, safe to repeat | `Mail.ReadWrite`, `Mail.ReadWrite.Shared` | No | 🤝 Shared mailbox |
+| `outlook_send_draft` | 🔴 Write, changes or removes | `Mail.Send`, `Mail.ReadBasic`, `Mail.Send.Shared`, `Mail.Read.Shared` | No | ✋ Always |
+| `outlook_set_automatic_reply` | 🟠 Write, safe to repeat | `MailboxSettings.ReadWrite` | No | 🤝 When it turns the reply on |
+| `outlook_disable_mail_rule` | 🟠 Write, safe to repeat | `MailboxSettings.ReadWrite` | No | — |
+| `outlook_create_mail_rule` | 🟠 Write, adds | `MailboxSettings.ReadWrite`, `Mail.ReadBasic` | No | 🤝 A forward or redirect rule |
+| `outlook_update_mail_rule` | 🟠 Write, safe to repeat | `MailboxSettings.ReadWrite`, `Mail.ReadBasic` | No | 🤝 An enabled forward or redirect rule |
+| `outlook_delete_mail_rule` | 🔴 Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | ✋ Always |
+| `outlook_list_categories` | 🟢 Read | `MailboxSettings.Read` | No | — |
+| `outlook_create_category` | 🟠 Write, adds | `MailboxSettings.ReadWrite` | No | — |
+| `outlook_list_time_zones` | 🟢 Read | `User.Read` | No | — |
+
+### Outlook calendar
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `outlook_list_calendars` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared`, `User.Read` | No | — |
+| `outlook_list_calendar_groups` | 🟢 Read | `Calendars.ReadBasic`, `User.Read` | No | — |
+| `outlook_list_calendar_shares` | 🟢 Read | `Calendars.ReadBasic` | No | — |
+| `outlook_list_events` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
+| `outlook_list_event_instances` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
+| `outlook_read_event` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
+| `outlook_list_event_attachments` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
+| `outlook_read_event_attachment` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
+| `outlook_list_reminders` | 🟢 Read | `Calendars.ReadBasic` | No | — |
+| `outlook_list_group_events` | 🟢 Read | `Calendars.Read` | No | — |
+| `outlook_check_availability` | 🟢 Read | `Calendars.ReadBasic` | No | — |
+| `outlook_suggest_meeting_times` | 🟢 Read | `Calendars.Read.Shared` | No | — |
+| `outlook_find_rooms` | 🟢 Read | `Place.Read.All` | ⚠️ Yes | — |
+| `outlook_create_event` | 🟠 Write, adds | `Calendars.ReadWrite` | No | 🤝 The event has attendees, a room, or a location |
+| `outlook_create_event_on_behalf` | 🟠 Write, adds | `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadWrite.Shared` | No | ✋ Always |
+| `outlook_update_event` | 🟠 Write, adds | `Calendars.ReadWrite` | No | 🤝 The event has attendees, or the change sets a location |
+| `outlook_forward_event` | 🟠 Write, adds | `Calendars.Read` | No | ✋ Always |
+| `outlook_cancel_event` | 🔴 Write, changes or removes | `Calendars.ReadWrite` | No | 🤝 The event has attendees |
+| `outlook_delete_event` | 🔴 Write, changes or removes, safe to repeat | `Calendars.ReadWrite` | No | ✋ Always |
+| `outlook_respond_to_invite` | 🟠 Write, adds | `Calendars.ReadWrite` | No | 🤝 When it sends a response |
+| `outlook_share_calendar` | 🟠 Write, adds | `Calendars.ReadWrite` | No | ✋ Always |
+| `outlook_unshare_calendar` | 🔴 Write, changes or removes, safe to repeat | `Calendars.ReadWrite` | No | ✋ Always |
+| `outlook_delete_calendar` | 🔴 Write, changes or removes, safe to repeat | `Calendars.ReadWrite`, `User.Read` | No | ✋ Always |
+
+### Outlook contacts
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `outlook_list_contacts` | 🟢 Read | `Contacts.Read` | No | — |
+| `outlook_read_contact` | 🟢 Read | `Contacts.Read` | No | — |
+| `outlook_create_contact` | 🟠 Write, adds | `Contacts.ReadWrite` | No | — |
+| `outlook_update_contact` | 🔴 Write, changes or removes, safe to repeat | `Contacts.ReadWrite` | No | — |
+
+### SharePoint and OneDrive
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `sharepoint_search_files` | 🟢 Read | `Files.Read.All` | ⚠️ Yes | — |
+| `sharepoint_browse_folder` | 🟢 Read | `Files.Read.All` | ⚠️ Yes | — |
+| `sharepoint_list_drives` | 🟢 Read | `Files.Read.All` | ⚠️ Yes | — |
+| `sharepoint_read_file` | 🟢 Read | `Files.Read.All` | ⚠️ Yes | — |
+| `sharepoint_resolve_url` | 🟢 Read | `Files.ReadWrite.All` | ⚠️ Yes | — |
+| `sharepoint_create_folder` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_create_text_file` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_rename_item` | 🔴 Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_move_item` | 🔴 Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_copy_item` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_delete_item` | 🔴 Write, changes or removes, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_create_share_link` | 🟠 Write, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_invite` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_search_sites` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+
+### OneNote
+
+| Tool | Kind | Graph permissions | Admin consent | User approval |
+| --- | --- | --- | --- | --- |
+| `onenote_list_notebooks` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_list_pages` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_read_page` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_create_page` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
+| `onenote_append_to_page` | 🟠 Write, adds | `Notes.ReadWrite` | No | 🤝 Shared notebook |
+| `onenote_preview_page` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_read_resource` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_find_notebook_from_url` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_list_recent_notebooks` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_list_sections` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_create_notebook` | 🟠 Write, adds | `Notes.Create` | No | 🤝 A group or site notebook |
+| `onenote_create_section` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
+| `onenote_create_section_group` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
+| `onenote_edit_page` | 🔴 Write, changes or removes | `Notes.ReadWrite` | No | 🤝 Shared notebook, or always for a replace |
+| `onenote_rename_page` | 🔴 Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | 🤝 Shared notebook |
+| `onenote_copy_page` | 🟠 Write, adds | `Notes.Read`, `Notes.Create` | No | 🤝 Shared notebook |
+| `onenote_copy_section` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
+| `onenote_copy_notebook` | 🟠 Write, adds | `Notes.Create` | No | 🤝 A copy into a group |
+| `onenote_get_operation` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_delete_page` | 🔴 Write, changes or removes, safe to repeat | `Notes.ReadWrite` | No | ✋ Always |
+
 ## Limitations
 
-office-365-mcp is meant to replace two other services: teams-mcp and outlook-semantic-mcp. It
-works differently: every tool call reaches Microsoft Graph directly, and it stores nothing
-beyond an OAuth token. The tables below name what a reader gains and loses against each service.
-Neither service has a formal deprecation date yet, and both remain in active development. This
-section is a comparison of the current state, not a finished handover. A comment in teams-mcp's
-message data states that its fields were "shaped to match the fields" office-365-mcp uses for
-the same resource.
+office-365-mcp replaces two other services: teams-mcp and outlook-semantic-mcp. The tables below
+name what a user gains and loses against each service. They list only differences that change
+the work of a user. Neither service has a formal deprecation date yet, and both remain in active
+development. This section compares the current state. It is not a finished handover.
+
+Every call of office-365-mcp goes to Microsoft Graph at once. The server keeps no copy of mail or
+messages. It stores only an OAuth token.
 
 ### Compared to teams-mcp
 
+#### Only in teams-mcp
+
+| Capability | teams-mcp | office-365-mcp |
+| --- | --- | --- |
+| Capture a transcript or a recording into the knowledge base of Unique | Yes, as an opt-in. It needs a database, a message queue, and a public webhook. | No |
+
+#### Only in office-365-mcp
+
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
-| Capture a transcript into Unique's knowledge base | No | Yes, opt-in, needs a database |
-| Read the replies inside a channel thread | Yes, with limits. `teams_list_message_replies` reads up to 50 replies of one post in one call. `teams_browse_channel` reads the replies of each post on one page of the channel. Neither tool uses the cursor from Microsoft. | No, root posts only |
-| Read a transcript, or a recording's metadata, live, with no configuration | Yes | No, ingest only |
+| Read a transcript in the chat | Yes, live. Microsoft erases a one-off transcript after about 60 days. | No, ingest only |
+| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives metadata only. Only the organizer reads attendance. | No |
+| Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
+| Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
+| Filter the list of chats by type or by topic | Yes | No |
+| Send a message with a mention, a subject, an importance, or a thread reply | Yes | No, plain text only |
+| Send a message with a file | Yes, if the file is already in SharePoint | No |
+| Edit, delete, or react to a message | Yes, edit and delete for own messages only | No |
+| Create a chat, change its members, or rename it | Yes | No |
+| Create, change, or delete a Teams meeting | Yes | No |
+| Find the SharePoint folder of a channel | Yes | No |
+
+#### Different in both
+
+| Topic | office-365-mcp | teams-mcp |
+| --- | --- | --- |
+| Approval before a send | Yes, every time | No |
+| What the server needs | A token store only | A database and a message queue. Ingestion also needs a knowledge base and a public webhook. |
 
 ### Compared to outlook-semantic-mcp
 
+#### Only in outlook-semantic-mcp
+
+| Capability | outlook-semantic-mcp | office-365-mcp |
+| --- | --- | --- |
+| Search mail by meaning, ranked by relevance | Yes, in the mode that ingests mail | No, keyword search only. Microsoft sets the order of the results. |
+| Search the words inside an attachment | Yes, for PDF, Office, text, HTML, and Markdown files | No, the file name only |
+| Add a file to a draft | Yes, a file of the knowledge base, or inline content | No, the user adds it in Outlook |
+| Search several mailboxes in one call | Yes, the own mailbox and the delegated ones | No, one mailbox in each call |
+
+#### Only in office-365-mcp
+
 | Capability | office-365-mcp | outlook-semantic-mcp |
 | --- | --- | --- |
-| Read a shared or delegated mailbox | Yes, one mailbox per call | Yes, own and delegated in one search |
-| Search the words inside an attachment | No, file name only | Yes |
-| List the attachments of a message, and get one file in its own format | Yes, a file of 10 MB or less | No, only the attachment text that a search matches |
-| Change an event's agenda or add a Teams meeting | Yes | Yes |
-| Add a file to a draft | No, the user adds it in Outlook | Yes, a Unique knowledge-base file by reference, or inline content |
-| Send a message outright | Yes | No, draft only |
-| Mark a message read or unread, set its flag or importance, or move it | Yes | No |
-| Read a whole conversation across folders, in one call | Yes | No, one message at a time |
-| Read and change the automatic reply | Yes | No |
-| Read an inbox rule, or create, change, turn off, or erase one | Yes | No |
+| Send a message | Yes, after the user approves it | No, draft only |
+| Reply, forward, or edit a draft | Yes | No, a new draft or a reply to all only |
+| Read an attachment file | Yes, a file of 10 MB or less | No, only the attachment text that a search matches |
+| Read a whole conversation across folders | Yes, in one call | No, one message at a time |
+| Mark a message, flag it, set its importance, move it, or copy it | Yes | No |
+| Create, rename, or delete a mail folder | Yes | No |
+| Read and change inbox rules, the automatic reply, and categories | Yes | No, categories are a search filter only |
+| Read and change contacts | Yes | No, a name lookup only |
+| Create a recurring event or an all-day event | Yes | No |
+| Add optional attendees or a meeting room to an event | Yes | No |
+| Delete or forward an event, or share a calendar | Yes | No |
+
+#### Different in both
+
+| Topic | office-365-mcp | outlook-semantic-mcp |
+| --- | --- | --- |
+| Setup | A token store only. The user can work at once after sign-in. | A database, a message queue, and for ingestion a knowledge base and a public webhook |
+| Wait after sign-in | None | Results are incomplete until the first sync of the mailbox ends |
+| Copy of the mail | None. Every call reads live data. | A copy in the knowledge base for the retention window |
+| Write in a shared mailbox | Yes, with approval | A draft only |
+| Read a shared mailbox | Yes, with the `mailbox` argument | Yes, if an administrator turns on the scan of delegated access |
+| Calendar tools | On, with the tool set of the deployment | Off by default. An administrator turns them on with a switch. |
+
+### Limits that a user can meet
+
+The tables in this section name limits that change what a user sees in a chat. A limit that
+only the server sees, such as a timeout or a retry count, is not in the tables. A limit that more
+calls can get around is not in the tables. When a tool reaches a limit, it tells the model. The
+model then tells the user.
+
+#### SharePoint and OneDrive
+
+| Limit | What the user sees |
+| --- | --- |
+| A file is larger than 10 MB | The tool refuses the file. It never sends part of a file. The model gives the user a link to open the file. |
+| A user wants a file that is not plain text | The tool creates only text files, such as `txt`, `md`, `csv`, `json`, and `html`. It cannot create a Word, Excel, PowerPoint, or PDF file. |
+| A file with the same name exists | The tool cannot replace a file. No tool uploads a file. |
+| A user shares a file | A link gives view access or edit access, to the organization or to anyone. The tool sets no expiry and no password. No tool removes a link or an invitation. |
+
+#### Outlook mail
+
+| Limit | What the user sees |
+| --- | --- |
+| An attachment of a message or an event is larger than 10 MB | The tool refuses the attachment. It never sends part of a file. The user opens the message in Outlook. |
+| An attachment is a message, an event, or a cloud link | The tool refuses the attachment. The user opens it in Outlook. |
+| A user wants to send a message with a file | No tool adds a file to a draft. The user adds the file in Outlook before the send. A forward keeps the files of the original message. |
+| A user searches for the words inside an attachment | The search matches the file name only. A read returns the file in its own format, not as text. |
+| A mailbox forwards its mail | The tools cannot see a forward that is set on the mailbox. A list of rules with no forward does not prove that nobody forwards the mail. |
+
+#### Outlook calendar
+
+| Limit | What the user sees |
+| --- | --- |
+| A user cannot view the details of a shared calendar | Each event shows the time only. The subject and the body are empty. |
+| An event has a Teams meeting | A tool can add a Teams meeting to an event, but cannot remove it. A tool cannot change the existing text in the body of such an event. The user does this in Outlook. |
+
+#### Outlook contacts
+
+| Limit | What the user sees |
+| --- | --- |
+| A contact is in a folder other than the default folder | The tools do not reach it. They use the default Contacts folder only. |
+| A contact has a department, an address, a birthday, or a note | A tool reads these fields. A tool cannot write them. |
+| A user clears a name, a company, a job title, or a mobile number | The tool cannot clear them. The user clears them in Outlook. |
+
+#### Microsoft Teams
+
+| Limit | What the user sees |
+| --- | --- |
+| A channel has more than 50 posts | The tool reads the newest 50 posts. Microsoft limits channel reads to about one request each second, so older posts are out of reach. |
+| A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
+| A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
+| A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
+| A tenant turns off transcripts | The tool cannot read them. A Teams administrator must turn them on. |
+| A transcript is larger than 100 MB | The tool refuses the transcript. |
+
+#### OneNote
+
+| Limit | What the user sees |
+| --- | --- |
+| A page is larger than 1 MB | The tool refuses the page. The model gives the user a link to open the page. |
+| An image or a file in a page is larger than 10 MB | The tool refuses it. The model gives the user a link to open the page. |
+| A user searches for a page | The search matches the page title only. It does not search the text of a page. |
+| A page is new | Microsoft can show an empty title for the page for days. The model finds the page by its section or its creation time. |
+| A notebook is on a SharePoint site or in a team | The tools reach it only with the id of the team or the site. A copy into or out of a site notebook is refused. |
+
+#### All tools
+
+| Limit | What the user sees |
+| --- | --- |
+| The chat client cannot ask the user | The tool refuses the actions that need approval. The user does them in the Microsoft 365 app. |
+| Microsoft limits the request rate | Microsoft limits requests for each tenant. The model waits, then tries again. |

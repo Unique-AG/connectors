@@ -444,7 +444,7 @@ class TestGraphFailures:
             )
         )
         advice = GraphAdviceMiddleware(
-            graph_advice(resolve(preset=None, enabled=[deleter.TOOL_NAME]))
+            graph_advice(resolve(presets=None, enabled=[deleter.TOOL_NAME]))
         )
         server: FastMCP[None] = FastMCP("deleter", middleware=[advice])
 

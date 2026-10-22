@@ -1,0 +1,78 @@
+[project]
+name = "tiingo-mcp"
+version = "0.1.0"
+description = "Experimental Tiingo market data MCP generated from an OpenAPI spec with FastMCP"
+classifiers = ["Development Status :: 3 - Alpha"]
+authors = [
+    { name = "Sanzio Monti", email = "sanzio.monti@unique.ai" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==4.1.0",
+    "httpx2==2.13.1",
+    "mcp-openapi==0.1.0",
+    "py-key-value-aio[memory]==0.4.6",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.15.0",
+    "pyyaml==6.0.3",
+    "starlette==1.7.0",
+    "unique-mcp==2026.44.0.dev1",
+]
+
+[project.scripts]
+tiingo-mcp = "tiingo_mcp.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.1",
+    "mcp-openapi[codegen]==0.1.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.CurrentContext"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+typeCheckingMode = "recommended"
+include = ["src"]
+reportMissingTypeStubs = "none"
+reportAny = "none"
+reportExplicitAny = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportCallInDefaultInitializer = "none"
+reportUnusedCallResult = "none"
+reportUnusedFunction = "none"
+reportImplicitStringConcatenation = "none"
+reportDeprecated = "none"
+reportUnannotatedClassAttribute = "none"
+
+[tool.uv.sources]
+mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/tiingo_mcp/openapi/tiingo-openapi.yml"
+# Operations whose responses get a model.
+response-operation-ids = "tiingo_mcp.openapi.routes:RESPONSE_MODELS"
+# Operations the tools call through `OperationClient`, one `Operation` constant each.
+operation-ids = "tiingo_mcp.openapi.routes:CLIENT_BACKED"
+fields = "tiingo_mcp.openapi.fields:RESPONSE_FIELDS"
+operation-module = "mcp_openapi.upstream"
+models-module = "tiingo_mcp.models.vendor_responses"
+models-output = "src/tiingo_mcp/models/vendor_responses.py"
+operations-output = "src/tiingo_mcp/models/operations.py"

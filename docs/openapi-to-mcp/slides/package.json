@@ -1,0 +1,17 @@
+{
+  "name": "tiingo-mcp-slides",
+  "private": true,
+  "scripts": {
+    "dev": "slidev --open",
+    "build": "slidev build",
+    "export": "slidev export --format pdf --output openapi-to-mcp.pdf"
+  },
+  "dependencies": {
+    "@slidev/cli": "53.0.0",
+    "@slidev/theme-default": "0.25.0",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "playwright-chromium": "1.64.0"
+  }
+}

@@ -49,50 +49,25 @@
           "properties": {
             "preset": {
               "type": "string",
-              "enum": [
-                "teams",
-                "teams-chat",
-                "teams-messages",
-                "teams-channels",
-                "teams-transcripts",
-                "teams-recordings",
-                "teams-meetings",
-                "teams-write",
-                "teams-write-files",
-                "teams-edit",
-                "teams-meetings-write",
-                "teams-chat-admin",
-                "teams-files",
-                "outlook-read",
-                "outlook-mailbox",
-                "outlook-write",
-                "outlook-delete",
-                "outlook-send",
-                "outlook-automate",
-                "outlook-rules",
-                "outlook-calendar",
-                "outlook-calendar-write",
-                "outlook-calendar-manage",
-                "outlook-calendar-delegate",
-                "outlook-calendar-rooms",
-                "outlook-group-calendar",
-                "outlook-contacts",
-                "outlook-contacts-write",
-                "sharepoint-search",
-                "sharepoint-read",
-                "sharepoint-write",
-                "sharepoint-share",
-                "sharepoint-sites",
-                "onenote-read",
-                "onenote-write",
-                "onenote-delete"
-              ],
-              "description": "Which tools this deployment runs, as a named surface such as 'teams'."
+              "pattern": "^\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|onenote-read|onenote-write|onenote-delete)(\\s*,\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|onenote-read|onenote-write|onenote-delete))*\\s*$",
+              "description": "Which tools this deployment runs, as a named surface such as 'teams', or as several presets in a comma-separated list such as 'teams-write,outlook-read'. The tools of all named presets turn on."
             },
             "enabled": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Which tools this deployment runs, as a comma-separated list of tool names."
+              "oneOf": [
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ],
+              "description": "Which tools this deployment runs, as a list of tool names or as one comma-separated string of tool names."
             }
           },
           "oneOf": [

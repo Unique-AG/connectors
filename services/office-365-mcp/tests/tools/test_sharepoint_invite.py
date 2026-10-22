@@ -971,7 +971,7 @@ class TestGraphFailures:
             raise AssertionError("Graph refused the invite, and the call still answered")
 
         middleware = GraphAdviceMiddleware(
-            graph_advice(resolve(preset=None, enabled=(inviter.TOOL_NAME,)))
+            graph_advice(resolve(presets=None, enabled=(inviter.TOOL_NAME,)))
         )
         context = MiddlewareContext(
             message=CallToolRequestParams(name=inviter.TOOL_NAME, arguments={})

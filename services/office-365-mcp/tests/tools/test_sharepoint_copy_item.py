@@ -171,7 +171,7 @@ async def _advised_copy(client: GraphServiceClient) -> str:
         raise AssertionError("Graph refused the copy, and the call still answered")
 
     middleware = GraphAdviceMiddleware(
-        graph_advice(resolve(preset=None, enabled=(copier.TOOL_NAME,)))
+        graph_advice(resolve(presets=None, enabled=(copier.TOOL_NAME,)))
     )
     context = MiddlewareContext(message=CallToolRequestParams(name=copier.TOOL_NAME, arguments={}))
     with pytest.raises(ToolError) as raised:

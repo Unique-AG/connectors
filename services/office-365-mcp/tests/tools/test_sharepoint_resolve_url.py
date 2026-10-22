@@ -238,7 +238,7 @@ class TestGraphFailures:
             raise AssertionError("Graph refused the link, and the call still answered")
 
         middleware = GraphAdviceMiddleware(
-            graph_advice(resolve(preset=None, enabled=(resolver.TOOL_NAME,)))
+            graph_advice(resolve(presets=None, enabled=(resolver.TOOL_NAME,)))
         )
         context = MiddlewareContext(
             message=CallToolRequestParams(name=resolver.TOOL_NAME, arguments={})

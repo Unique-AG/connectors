@@ -137,6 +137,27 @@ run "preset_teams_chat_costs_no_administrator" {
   }
 }
 
+run "several_presets_are_the_union_of_their_tools" {
+  variables {
+    tools_preset = "teams-chat,outlook-read"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Mail.Read,Mail.Read.Shared,People.Read"
+    error_message = "teams-chat,outlook-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "teams-chat,outlook-read resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "teams-chat,outlook-read should need no administrator, needs ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_teams_messages" {
   variables {
     tools_preset = "teams-messages"
@@ -872,6 +893,26 @@ run "an_unknown_preset_is_refused" {
   expect_failures = [var.tools_preset]
 }
 
+run "one_unknown_preset_in_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat,outlook"
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "an_empty_preset_in_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = "teams-chat,"
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
 run "a_public_base_url_with_a_path_is_refused" {
   command = plan
 
@@ -999,6 +1040,17 @@ run "a_composed_secret_name_over_127_characters_is_refused" {
   expect_failures = [var.secret_name_prefix]
 }
 
+run "registrations_may_share_a_display_name" {
+  variables {
+    tools_preset = "teams-chat"
+  }
+
+  assert {
+    condition     = azuread_application.office_365_mcp.prevent_duplicate_names != true
+    error_message = "a second registration with the same display name must not be refused"
+  }
+}
+
 run "a_blank_display_name_is_refused" {
   command = plan
 
@@ -1038,6 +1090,17 @@ run "an_unsupported_sign_in_audience_is_refused" {
   }
 
   expect_failures = [var.sign_in_audience]
+}
+
+run "the_overlay_gets_the_tools_as_a_list" {
+  variables {
+    tools_preset = "teams-chat"
+  }
+
+  assert {
+    condition     = output.deployment_env["unique-qa"].mcpConfig.tools.enabled == local.tools
+    error_message = "the overlay carries ${jsonencode(output.deployment_env["unique-qa"].mcpConfig.tools.enabled)} as its tools, not the list of tool names that the registration resolved"
+  }
 }
 
 run "a_single_tenant_registration_emits_a_tenant_id" {

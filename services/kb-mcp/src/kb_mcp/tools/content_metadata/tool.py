@@ -34,6 +34,7 @@ from unique_toolkit.experimental.components.content_tree import ContentTree
 
 from kb_mcp.common.cached_walk import resolve_filtered_snapshot
 from kb_mcp.common.correlation import correlation_id
+from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.metadata_filter import (
     DEFAULT_METADATA_FILTER_STATEMENT,
     merge_request_metadata_filter,
@@ -209,7 +210,7 @@ def _flatten_metadata_value(value: Any) -> list[Any]:
 
 _META = merge_tool_meta(
     {
-        "unique.app/icon": "tags",
+        "unique.app/icon": "IconScrollText",
         "unique.app/system-prompt": (
             "Discover what metadata fields and values exist on the "
             "knowledge base's visible content, so a caller can build a "
@@ -237,6 +238,7 @@ _META = merge_tool_meta(
     name="content_metadata",
     output_schema=ContentMetadataOutput.model_json_schema(),
     meta=_META,
+    icons=tool_icons("tags"),
     annotations=ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,

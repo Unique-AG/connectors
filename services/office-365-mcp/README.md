@@ -13,7 +13,7 @@ src/office_365_mcp/
   graph_client/          Microsoft Graph transport (official SDK).
   shared/                Code that two or more tools must share.
   tools/                 One file per tool, plus the registry that selects and unions them.
-  server/                /ready and /manifest endpoints (not tools).
+  server/                /ready, /manifest and /admin/consent endpoints (not tools).
 ```
 
 This service owns no database schema and no migrations. The OAuth store creates the service's
@@ -254,6 +254,8 @@ Once the service runs, it exposes these endpoints:
 - **Manifest**, `GET /manifest`. Returns the resolved tool surface and the exact permissions that
   sign-in asks for. It needs no authentication, and it leaks nothing: the authorize URL already
   carries the same scopes.
+- **Admin consent**, `GET /admin/consent`. Redirects to the Microsoft admin-consent page for this
+  deployment. It needs no authentication. See "Admin consent" in `docs/README.md`.
 - **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
   series, four metrics report what this connector asked Microsoft Graph for:
   - `graph_requests_total{operation,status}`

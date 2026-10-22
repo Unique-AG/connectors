@@ -43,7 +43,9 @@ mcpConfig:
     #     secretKey: <client_secrets[key].key_vault_secret_name output>
   # Set exactly one. Neither is defaulted on purpose — see values.additional.schema.json.
   #   preset: teams
-  #   enabled: get_me,teams_list_chats
+  #   enabled:
+  #     - get_me
+  #     - teams_list_chats
   tools: {}
 
 # DB_URL must be supplied here unless postgresql.enabled.
@@ -52,7 +54,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/office-365-mcp
-  tag: 0.2.4 # x-release-please-version
+  tag: 0.3.2 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:

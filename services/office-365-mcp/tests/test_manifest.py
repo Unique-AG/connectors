@@ -80,14 +80,21 @@ class TestTheTableAnswersForEveryPermissionAToolCanDeclare:
 
 class TestWhatTheManifestSays:
     async def test_it_names_the_variable_that_produced_the_surface(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         manifest = await _manifest_of(selection)
 
         assert f"TOOLS_PRESET={ToolsPreset.TEAMS}" in manifest
 
+    async def test_several_presets_are_named_as_the_comma_list_the_pod_reads(self) -> None:
+        selection = resolve(presets=["teams-chat", "outlook-read"], enabled=None)
+
+        manifest = await _manifest_of(selection)
+
+        assert "TOOLS_PRESET=teams-chat,outlook-read" in manifest
+
     async def test_a_hand_written_list_is_named_as_one(self) -> None:
-        selection = resolve(preset=None, enabled=[ALWAYS_ON])
+        selection = resolve(presets=None, enabled=[ALWAYS_ON])
 
         manifest = await _manifest_of(selection)
 
@@ -95,7 +102,7 @@ class TestWhatTheManifestSays:
         assert "TOOLS_PRESET" not in manifest
 
     async def test_it_lists_the_resolved_tools_and_marks_the_one_nobody_asked_for(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         manifest = await _manifest_of(selection)
 
@@ -103,7 +110,7 @@ class TestWhatTheManifestSays:
         assert f"{ALWAYS_ON} (always on)" in manifest
 
     async def test_it_lists_the_permissions_in_entras_own_spelling(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         manifest = await _manifest_of(selection)
 
@@ -114,7 +121,7 @@ class TestWhatTheManifestSays:
 
     async def test_it_says_which_permissions_need_an_administrator(self) -> None:
         selection = Selection(
-            preset=None,
+            presets=(),
             tools=(ALWAYS_ON,),
             permissions=("User.Read", "ChannelMessage.Read.All"),
             graph_scopes=(),
@@ -125,7 +132,7 @@ class TestWhatTheManifestSays:
         assert re.search(r"admin consent\s+ChannelMessage\.Read\.All", manifest)
 
     async def test_it_says_so_when_none_of_them_do(self) -> None:
-        selection = resolve(preset=None, enabled=[ALWAYS_ON])
+        selection = resolve(presets=None, enabled=[ALWAYS_ON])
 
         manifest = await _manifest_of(selection)
 
@@ -136,7 +143,7 @@ class TestWhatTheManifestSays:
         deployment's ask, and a scope-matched admin-consent URL needs a registered `redirect_uri` —
         the only one here is FastMCP's OAuth callback, which renders a successful consent as an
         error."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         manifest = await _manifest_of(selection)
 
@@ -145,7 +152,7 @@ class TestWhatTheManifestSays:
         assert "https://" not in manifest
 
     async def test_it_carries_the_version_that_resolved_it(self) -> None:
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
 
         manifest = await _manifest_of(selection)
 
@@ -161,7 +168,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_pointing_at_a_tool_this_deployment_lacks_is_reported(self) -> None:
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
+            presets=(), tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
         )
 
         manifest = await _manifest_of(
@@ -177,7 +184,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     @pytest.mark.usefixtures("registry_of_three")
     async def test_an_argument_description_is_scanned_too(self) -> None:
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
+            presets=(), tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
         )
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
 
@@ -196,7 +203,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
     async def test_a_deployment_that_exposes_everything_is_told_nothing(self) -> None:
         """The real registry, because a note here would be a note in production."""
-        selection = resolve(preset=ToolsPreset.TEAMS, enabled=None)
+        selection = resolve(presets=[ToolsPreset.TEAMS], enabled=None)
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
 
         async with httpx.AsyncClient() as transport:
@@ -212,7 +219,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     async def test_a_onenote_deployment_is_told_nothing_about_teams_tools(
         self, preset: ToolsPreset
     ) -> None:
-        selection = resolve(preset=preset, enabled=None)
+        selection = resolve(presets=[preset], enabled=None)
         mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
 
         async with httpx.AsyncClient() as transport:
@@ -226,7 +233,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
+            presets=(), tools=(ALWAYS_ON, _SECOND), permissions=("User.Read",), graph_scopes=()
         )
 
         manifest = await _manifest_of(
@@ -237,7 +244,7 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
 
     @pytest.mark.usefixtures("registry_of_three")
     async def test_a_reference_to_the_always_on_tool_is_never_a_warning(self) -> None:
-        selection = resolve(preset=None, enabled=[ALWAYS_ON])
+        selection = resolve(presets=None, enabled=[ALWAYS_ON])
 
         manifest = await _manifest_of(
             selection, tools={ALWAYS_ON: f"Who you are. Correlate with {ALWAYS_ON}."}
@@ -251,7 +258,7 @@ class TestTheManifestRefusesToGuess:
         assert _NO_VERDICT not in NEEDS_ADMIN_CONSENT
         assert _NO_VERDICT not in REQUESTABLE_PERMISSIONS
         selection = Selection(
-            preset=None, tools=(ALWAYS_ON,), permissions=(_NO_VERDICT,), graph_scopes=()
+            presets=(), tools=(ALWAYS_ON,), permissions=(_NO_VERDICT,), graph_scopes=()
         )
 
         with pytest.raises(

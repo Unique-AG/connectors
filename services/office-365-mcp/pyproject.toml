@@ -1,6 +1,6 @@
 [project]
 name = "office-365-mcp"
-version = "0.2.4"
+version = "0.3.2"
 description = "Office 365 FastMCP server"
 requires-python = ">=3.14"
 dependencies = [
@@ -16,11 +16,11 @@ dependencies = [
     # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
     # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
     "msgraph-sdk==1.62.0",
-    "uvicorn[standard]==0.53.0",
+    "uvicorn[standard]==0.54.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
     "starlette==1.7.0",
-    "pydantic==2.13.5",
+    "pydantic==2.14.1",
     "pydantic-settings==2.15.0",
     "python-dotenv==1.2.3",
     # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
@@ -31,7 +31,7 @@ dependencies = [
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-prometheus==0.65b0",
     "opentelemetry-instrumentation-asgi==0.65b0",
-    "asyncpg==0.31.0",
+    "asyncpg==0.32.0",
     "cryptography==50.0.2",
     "unique-mcp==2026.38.0",
     # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
@@ -62,7 +62,7 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "hatchling==1.32.4",
-    "ruff==0.16.10",
+    "ruff==0.17.0",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
