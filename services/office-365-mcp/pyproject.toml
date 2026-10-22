@@ -66,7 +66,7 @@ dev = [
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
-    "certifi==2026.7.22",
+    "certifi==2026.10.19",
 ]
 
 [tool.pytest.ini_options]
