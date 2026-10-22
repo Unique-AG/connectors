@@ -248,11 +248,14 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
 Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
 `backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
-`tenant_guidance.applied`. Tool-level events conceal Backstop logins as `sha256:<hex>` unless
-`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events (`backstop.request.*`,
+`tenant_guidance.applied`. Backstop client events (`backstop.request.*`,
 `backstop.auth_recheck.*`) currently carry the username in clear. API tokens are never logged.
 
-Each tool call also logs one completion line with its name, status, and duration.
+Each tool call logs `tool.call.start` and one terminal line: `tool.call.completed`,
+`tool.call.failed`, or `tool.call.cancelled`. Tools add fields to that terminal line with
+`annotate_tool_call` rather than writing their own start and end lines. Identifying values go
+through `identifiable_value`: `hmac-sha256:<hex>` when `LOG_LEVEL` is info or above, plain
+`sha256:<hex>` at debug, and the original value only when `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`.
 
 ### Metrics
 
@@ -276,12 +279,50 @@ The chart's `BackstopFilterIgnored` alert fires when `backstop_filter_ignored_to
 15 minutes. In `search_activities`, rows that contradict a filter are dropped and the filter is named
 in `server_filter_ignored`.
 
+### Helpers
+
+`backstop_mcp.observability` is the only way to log a major event or open a nested span.
+`info_event`, `warning_event`, `error_event`, and `failure_event` write the log line and add the
+same event to the current span. `operation` wraps one noisy sub-step (a paginated walk, a report
+poll, a catalog refresh) in a child span with an INFO line at each end. `failure_level` chooses
+WARNING when the caller or upstream caused the failure and ERROR when a developer has to act.
+
+What a line or span may carry:
+
+- Data that travels through the MCP — tool arguments, tool results, Backstop requests and
+  responses, elicitation answers, login form fields — is never logged or traced as a whole, at any
+  level, DEBUG included. A line may carry individual fields picked one by one, and only when the
+  field is certainly non-sensitive. If it is not, log a count or a presence flag, or pass it
+  through `identifiable_value`.
+- Safe to log raw: Backstop record ids, our `subject` UUID, enum-like values defined in our code,
+  counts, lengths, offsets, booleans and presence flags, HTTP status, JSON:API `code`, route
+  templates, durations, tool names, argument names, selected field names, filter names, and date
+  windows the caller asked for.
+- Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms, and
+  person names used as a filter.
+- Never, not even hashed: free text, file names and bytes, addresses, phone numbers, websites,
+  monetary figures, custom-field values, tenant-defined labels (use their ids), dates read from
+  records, Backstop error `detail` / `title` / `errors[]`, `ToolError` text, and argument values or
+  tool results as a whole.
+- A field that is not in that list is never logged until this doc gains a row for it, in the same
+  change, with a one-line reason.
+- `extra` keys must not be `LogRecord` attributes (`name`, `msg`, `message`, and the rest). Use
+  `tool`, `report_name`, `entity_type`.
+
+`LOGS_DIAGNOSTICS_DATA_POLICY=disclose` changes `identifiable_value` only. It is a local-debugging
+opt-in.
+
 ### Traces
 
-Several tools, queries, and commands open OpenTelemetry spans (for example `reports.run`,
-`accounts.product_investors`, `opportunity_writes.command.update`), and the ASGI middleware spans each
-HTTP request. The server does not install a trace exporter, so with the shipped
-image these spans are not exported anywhere.
+Tracing is off unless an `OTEL_*` variable is set (`OTEL_TRACES_EXPORTER=console` for local spans
+on stderr, or `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` for a
+collector). `configure_tracing` installs the provider; with no `OTEL_*` variable it does nothing.
+
+One span per tool call, FastMCP's `tools/call <tool>`, parented under the ASGI `POST /mcp` span.
+We enrich that span (attributes and events) and do not open a second one. Nested spans are only
+for a sub-operation worth timing on its own: one Backstop HTTP request (`backstop <METHOD>
+<route>`), a paginated walk, a report poll, a catalog refresh. Tool arguments and tool results are
+never span attributes. `/health`, `/probe`, `/ready`, and `/metrics` are not traced.
 
 ## Related Documentation
 

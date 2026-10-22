@@ -19,11 +19,13 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Literal, cast
+from typing import ClassVar, Literal, cast
 
 import httpx
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, TypeAdapter, ValidationError
+
+from backstop_mcp.observability import DeclaresFailureLevel
 
 logger = logging.getLogger(__name__)
 
@@ -129,32 +131,46 @@ def _flag_from_http_request() -> _SessionRevokedFlag | None:
     return boxed if isinstance(boxed, _SessionRevokedFlag) else None
 
 
-class BackstopAuthError(Exception):
+class BackstopAuthError(Exception, DeclaresFailureLevel):
     """Raised when Backstop rejects the stored credential (401) while calling a real endpoint.
+
+    Logged at WARNING: a rejected credential is an ordinary outcome, not a bug in this service.
 
     Login-form verification catches this (a failed `/system-info` probe). Mid-session 401s
     re-check first and then raise `BackstopTransientAuthError` or `BackstopSessionRevokedError`
     instead of this base type, so a single 401 cannot log the user out.
     """
 
+    failure_level: ClassVar[int] = logging.WARNING
 
-class BackstopTransientAuthError(ToolError):
+
+class BackstopTransientAuthError(ToolError, DeclaresFailureLevel):
     """Mid-session 401 that re-verified as still valid. Session kept; the client should retry."""
+
+    failure_level: ClassVar[int] = logging.WARNING
 
 
 class BackstopSessionRevokedError(BackstopAuthError):
-    """Credential confirmed dead and MCP tokens revoked. The HTTP layer turns this into 401."""
+    """Credential confirmed dead and MCP tokens revoked. The HTTP layer turns this into 401.
+
+    INFO: the service did what it should (revoke and ask the client to reconnect).
+    """
+
+    failure_level: ClassVar[int] = logging.INFO
 
     def __init__(self) -> None:
         mark_mcp_session_revoked()
         super().__init__("Backstop rejected the stored credential — please reconnect.")
 
 
-class BackstopUnreachableError(Exception):
+class BackstopUnreachableError(Exception, DeclaresFailureLevel):
     """Credential check got any status other than 401/403, or the network failed.
 
     Distinct from invalid credentials — the caller should retry rather than blame the token.
+    WARNING: Backstop or the network caused it.
     """
+
+    failure_level: ClassVar[int] = logging.WARNING
 
 
 class BackstopApiError(ToolError):
@@ -241,14 +257,17 @@ BATCH_ABORTING_ERRORS: tuple[type[Exception], ...] = (
 )
 
 
-class BackstopUntrustedUrlError(ToolError):
+class BackstopUntrustedUrlError(ToolError, DeclaresFailureLevel):
     """Raised when an upstream-supplied absolute URL points somewhere other than Backstop.
 
     Pagination follows `links.next` verbatim. Since every request carries
     `Authorization: Basic ...`, a `links.next` pointing at another origin — or the same
     host over a different scheme — would leak the caller's Backstop credential there, so
     scheme and host are pinned to the configured `base_url`.
+    WARNING: the upstream supplied the URL; refusing it is the service doing its job.
     """
+
+    failure_level: ClassVar[int] = logging.WARNING
 
     url: str
     expected_host: str
@@ -262,14 +281,17 @@ class BackstopUntrustedUrlError(ToolError):
         self.expected_host = expected_host
 
 
-class BackstopResponseSchemaError(ToolError):
+class BackstopResponseSchemaError(ToolError, DeclaresFailureLevel):
     """Raised when a successful Backstop response body fails caller-supplied schema validation.
 
     Unlike `BackstopApiError`, this isn't an HTTP-level failure — the request succeeded,
     but the response body doesn't match the shape the caller expected. Wraps the underlying
     `pydantic.ValidationError` as `cause`, along with the request `path` and `schema_name`,
     so the failure can be logged with enough context to diagnose.
+    ERROR: the response no longer matches the schema we coded against.
     """
+
+    failure_level: ClassVar[int] = logging.ERROR
 
     path: str
     schema_name: str

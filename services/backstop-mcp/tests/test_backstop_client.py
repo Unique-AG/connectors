@@ -10,6 +10,9 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client import (
@@ -28,6 +31,7 @@ from backstop_mcp.backstop_client import (
     SinglePage,
 )
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.observability import failure_level
 from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential, recorded_params
 
@@ -1407,3 +1411,92 @@ class TestVerifyCredential:
         sent_request = route.calls.last.request
         assert sent_request.headers["authorization"] == _BASIC_AUTH
         assert sent_request.headers["token"] == "true"
+
+
+def _client_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
+    return [span for span in exporter.get_finished_spans() if span.name.startswith("backstop ")]
+
+
+class TestClientSpan:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_one_request_is_one_client_span(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        spans = _client_spans(exporter)
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "backstop GET /system-info"
+        assert span.kind == SpanKind.CLIENT
+        attributes = span.attributes
+        assert attributes is not None
+        assert attributes["http.response.status_code"] == 200
+        assert attributes["url.template"] == "/system-info"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_string_and_path_ids_stay_off_the_span(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(url__regex=r".*/people/123").mock(return_value=httpx.Response(200, json={}))
+
+        await factory.for_credential(_credential()).raw_request(
+            "GET", "/people/123", params={"filter[lastName][eq]": "SecretName"}
+        )
+
+        spans = _client_spans(exporter)
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "backstop GET /people/:id"
+        rendered = str(span.attributes)
+        assert "SecretName" not in rendered
+        assert "123" not in rendered
+        assert "/people/123" not in rendered
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_retry_is_still_one_span(
+        self,
+        factory: BackstopClientFactory,
+        exporter: InMemorySpanExporter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
+        respx.get(f"{_BASE_URL}/system-info").mock(
+            side_effect=[
+                httpx.Response(
+                    429,
+                    json={
+                        "errors": [{"detail": "Concurrency limit exceeded", "code": "concurrency"}]
+                    },
+                    headers={"Retry-After": "0.01"},
+                ),
+                httpx.Response(200, json={"version": "1.0"}),
+            ]
+        )
+
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        assert len(_client_spans(exporter)) == 1
+
+
+class TestDeclaredFailureLevels:
+    def test_each_backstop_error_declares_its_level(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Record.model_validate({})
+        schema_error = BackstopResponseSchemaError("/system-info", "_Record", caught.value)
+
+        assert failure_level(BackstopAuthError("rejected")) == logging.WARNING
+        assert failure_level(BackstopTransientAuthError("retry")) == logging.WARNING
+        assert failure_level(BackstopSessionRevokedError()) == logging.INFO
+        assert failure_level(BackstopUnreachableError("down")) == logging.WARNING
+        assert (
+            failure_level(BackstopUntrustedUrlError("http://evil", "api.example"))
+            == logging.WARNING
+        )
+        assert failure_level(schema_error) == logging.ERROR
+        assert failure_level(BackstopApiError(422, "nope")) == logging.WARNING

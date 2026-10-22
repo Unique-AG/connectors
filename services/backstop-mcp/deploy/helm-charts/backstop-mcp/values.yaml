@@ -35,9 +35,11 @@ podLabels:
 env:
   APP_ENV: production
   LOG_LEVEL: info
-  # conceal (default): identifying strings in logs become sha256:<hex> so they can
-  # be correlated without leaking. disclose: print the original (local debugging).
+  # conceal (default): hmac-sha256 at info+, plain sha256 at debug. disclose: the original.
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+  # Tracing stays off until an overlay sets one of these. No default endpoint in this chart.
+  # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  # OTEL_TRACES_EXPORTER: otlp
   PORT: "8000"
   # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL, the employment relationship
   # types and BACKSTOP_MCP_TENANT_GUIDANCE are set through mcpConfig above.
@@ -131,6 +133,9 @@ probes:
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
+    # Must stay above the app's 2s readiness check, or the probe is abandoned before the
+    # handler can answer 503 itself.
+    timeoutSeconds: 3
   startup:
     failureThreshold: 30
     httpGet:
