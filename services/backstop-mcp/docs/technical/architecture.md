@@ -310,10 +310,11 @@ What a line or span may carry:
   templates, retry counts, durations, tool names, argument names, selected field names, filter
   names, the names of figures our code asks for (`figure`), date windows the caller asked for, and
   `time_zone` once it is validated against Backstop's time-zone catalog (a fixed IANA vocabulary).
-- Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms, and
-  person names used as a filter.
+- Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms,
+  person names used as a filter, and `report_name` (Backstop addresses a report by its name, so
+  there is no id to log instead).
 - Never, not even hashed: free text, file names and bytes, addresses, phone numbers, websites,
-  monetary figures, custom-field values, tenant-defined labels (use their ids), dates read from
+  monetary figures, custom-field values, other tenant-defined labels (use their ids), dates read from
   records, Backstop error `detail` / `title` / `errors[]`, `ToolError` text, and argument values or
   tool results as a whole.
 - Never, anywhere: API tokens, passwords, CSRF tokens, `Authorization` headers, cookies, and URLs
