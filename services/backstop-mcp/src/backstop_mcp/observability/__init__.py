@@ -15,7 +15,7 @@ from backstop_mcp.observability.failures import DeclaresFailureLevel, failure_le
 from backstop_mcp.observability.fields import span_attributes
 from backstop_mcp.observability.operation import OperationOutcome, operation
 from backstop_mcp.observability.redaction import install_caller_failure_redaction
-from backstop_mcp.observability.tool_call import annotate_tool_call, tool_call_scope
+from backstop_mcp.observability.tool_call import add_call_fields, tool_call_scope
 
 __all__ = [
     "DeclaresFailureLevel",
