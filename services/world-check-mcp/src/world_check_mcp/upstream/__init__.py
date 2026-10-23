@@ -29,6 +29,11 @@ from world_check_mcp.upstream.generated.vendor_responses import ResolutionField
 from world_check_mcp.upstream.generated.vendor_responses import ResolutionToolkitResponse
 from world_check_mcp.upstream.generated.vendor_responses import SearchParameterCollection
 from world_check_mcp.upstream.generated.vendor_responses import StatusResolutionField
+from world_check_mcp.upstream.queries import GET_CASE_AUDIT_EVENTS
+from world_check_mcp.upstream.queries import GET_RESULTS
+from world_check_mcp.upstream.queries import GET_SCREENING_STATUS
+from world_check_mcp.upstream.queries import next_page
+from world_check_mcp.upstream.queries import SEARCH_CASES
 from world_check_mcp.upstream.settings import UpstreamSettings
 
 __all__ = [
@@ -39,6 +44,7 @@ __all__ = [
     "Entity",
     "GET_API_INFO",
     "GET_CASE",
+    "GET_CASE_AUDIT_EVENTS",
     "GET_CASE_REFERENCE",
     "GET_CASE_TEMPLATE_FOR_GROUP",
     "GET_COUNTRIES",
@@ -47,6 +53,8 @@ __all__ = [
     "GET_NATIONALITIES",
     "GET_PROVIDERS",
     "GET_RECORD",
+    "GET_RESULTS",
+    "GET_SCREENING_STATUS",
     "GroupSummary",
     "GET_RESOLUTION_TOOLKITS_FOR_GROUP",
     "GET_SEARCH_FILTERS",
@@ -54,10 +62,12 @@ __all__ = [
     "ResolutionField",
     "ResolutionToolkitResponse",
     "StatusResolutionField",
+    "SEARCH_CASES",
     "SearchParameterCollection",
     "Upstream",
     "UpstreamError",
     "UpstreamSettings",
+    "next_page",
     "open_upstream",
     "upstream_http",
     "upstream_tools",
