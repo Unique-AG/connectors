@@ -77,3 +77,15 @@ TOGGLE_ONGOING_SCREENING = Operation[BulkResultWire | None](
 GET_OGS_UPDATES = Operation[OgsUpdatesWire](
     "getOngoingScreeningUpdates", TypeAdapter(OgsUpdatesWire)
 )
+
+
+class MrzWire(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    lines: list[str] = []
+    conforms_with_icao: bool | None = Field(default=None, alias="conformWithICAO")
+
+
+GET_MRZ = Operation[MrzWire]("getMrzData", TypeAdapter(MrzWire))
+VERIFY_PASSPORT = Operation[None]("mrzDataValidation", TypeAdapter(None))
+RESOLVE_RESULTS = Operation[None]("resolveResults", TypeAdapter(None))

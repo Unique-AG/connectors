@@ -2,12 +2,15 @@
 
 from mcp_openapi.upstream import UpstreamError
 
+from world_check_mcp.upstream.actions import GET_MRZ
 from world_check_mcp.upstream.actions import GET_OGS_UPDATES
 from world_check_mcp.upstream.actions import OgsUpdateWire
 from world_check_mcp.upstream.actions import PARTIAL_UPDATE_CASE
+from world_check_mcp.upstream.actions import RESOLVE_RESULTS
 from world_check_mcp.upstream.actions import SAVE_AND_SCREEN
 from world_check_mcp.upstream.actions import ScreenedCaseWire
 from world_check_mcp.upstream.actions import TOGGLE_ONGOING_SCREENING
+from world_check_mcp.upstream.actions import VERIFY_PASSPORT
 from world_check_mcp.upstream.case import CaseWire
 from world_check_mcp.upstream.case import GET_CASE
 from world_check_mcp.upstream.client import open_upstream
@@ -59,6 +62,7 @@ __all__ = [
     "GET_COUNTRIES",
     "GET_GROUP_BY_ID",
     "GET_GROUPS",
+    "GET_MRZ",
     "GET_NATIONALITIES",
     "GET_OGS_UPDATES",
     "OgsUpdateWire",
@@ -73,6 +77,7 @@ __all__ = [
     "ProviderDetail",
     "ResolutionField",
     "ResolutionToolkitResponse",
+    "RESOLVE_RESULTS",
     "ResultWire",
     "SAVE_AND_SCREEN",
     "ScreenedCaseWire",
@@ -80,6 +85,7 @@ __all__ = [
     "SEARCH_CASES",
     "SearchParameterCollection",
     "TOGGLE_ONGOING_SCREENING",
+    "VERIFY_PASSPORT",
     "Upstream",
     "UpstreamError",
     "UpstreamSettings",

@@ -24,11 +24,29 @@ from world_check_mcp.contexts.monitoring import MonitoringError
 from world_check_mcp.contexts.monitoring import OgsPage
 from world_check_mcp.contexts.monitoring import OngoingScreening
 from world_check_mcp.contexts.monitoring import UpdateMode
+from world_check_mcp.contexts.passport import apply_passport_verification
+from world_check_mcp.contexts.passport import generate_passport_mrz
+from world_check_mcp.contexts.passport import Mrz
+from world_check_mcp.contexts.passport import Passport
+from world_check_mcp.contexts.passport import passport_check
+from world_check_mcp.contexts.passport import PassportCheck
+from world_check_mcp.contexts.passport import PassportError
+from world_check_mcp.contexts.passport import PassportVerification
+from world_check_mcp.contexts.passport import PassportVerificationPlan
+from world_check_mcp.contexts.passport import PassportVerificationRequest
+from world_check_mcp.contexts.passport import prepare_passport_verification
 from world_check_mcp.contexts.references import get_profile
 from world_check_mcp.contexts.references import get_reference_data
 from world_check_mcp.contexts.references import Profile
 from world_check_mcp.contexts.references import ReferenceData
 from world_check_mcp.contexts.references import ReferenceKind
+from world_check_mcp.contexts.resolution import apply_resolution
+from world_check_mcp.contexts.resolution import prepare_resolution
+from world_check_mcp.contexts.resolution import ResolutionChoice
+from world_check_mcp.contexts.resolution import ResolutionError
+from world_check_mcp.contexts.resolution import ResolutionOutcome
+from world_check_mcp.contexts.resolution import ResolutionPlan
+from world_check_mcp.contexts.resolution import ResolutionRequest
 from world_check_mcp.contexts.screening import EntityType
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import Gender
@@ -52,6 +70,18 @@ __all__ = [
     "MonitoringError",
     "OgsPage",
     "OngoingScreening",
+    "Mrz",
+    "Passport",
+    "PassportCheck",
+    "PassportError",
+    "PassportVerification",
+    "PassportVerificationPlan",
+    "PassportVerificationRequest",
+    "ResolutionChoice",
+    "ResolutionError",
+    "ResolutionOutcome",
+    "ResolutionPlan",
+    "ResolutionRequest",
     "Profile",
     "ReferenceData",
     "ReferenceKind",
@@ -60,17 +90,23 @@ __all__ = [
     "ScreeningStatus",
     "SearchMode",
     "UpdateMode",
+    "apply_passport_verification",
+    "apply_resolution",
     "enable_ongoing_screening",
     "get_case",
     "get_case_audit_events",
     "get_case_reference",
     "get_case_results",
     "get_group_settings",
+    "generate_passport_mrz",
     "get_ogs_updates",
     "get_profile",
     "get_reference_data",
     "get_screening_status",
     "list_groups",
+    "passport_check",
+    "prepare_passport_verification",
+    "prepare_resolution",
     "rescreen_case",
     "screen_entity",
     "search_cases",

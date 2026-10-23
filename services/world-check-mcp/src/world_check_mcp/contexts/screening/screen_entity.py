@@ -45,7 +45,7 @@ async def screen_entity(
         gender=gender,
         case_id=case_id,
     )
-    await _refuse_duplicate(upstream=upstream, case_id=case_id)
+    await refuse_existing_case(upstream=upstream, case_id=case_id)
     template = await upstream.call(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
     countries = await upstream.call(GET_COUNTRIES)
     nationalities = await upstream.call(GET_NATIONALITIES)
@@ -72,7 +72,7 @@ async def screen_entity(
     return outcome(screened=saved, limit=limit)
 
 
-async def _refuse_duplicate(*, upstream: Upstream, case_id: str | None) -> None:
+async def refuse_existing_case(*, upstream: Upstream, case_id: str | None) -> None:
     if case_id is None:
         return
     try:

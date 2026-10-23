@@ -10,6 +10,7 @@ from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
 
+from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
 from world_check_mcp.upstream import upstream_tools
@@ -33,7 +34,7 @@ def create_server(
         async with (
             open_upstream(http, upstream) as upstream_resource,
         ):
-            yield {"upstream": upstream_resource}
+            yield {"upstream": upstream_resource, "approvals": ApprovalGate()}
 
     mcp = FastMCP(
         name="World Check MCP",

@@ -84,13 +84,13 @@ def screening_arguments(
         "groupId": group_id,
         "providerTypes": ["WATCHLIST"],
         "caseScreeningState": {"WATCHLIST": "INITIAL"},
-        "secondaryFields": _validate(
+        "secondaryFields": validate_fields(
             fields=provided,
             definitions=definitions,
             countries=countries,
             nationalities=nationalities,
         ),
-        "customFields": _validate(
+        "customFields": validate_fields(
             fields=custom_fields,
             definitions=template.customFields or [],
             countries=countries,
@@ -165,7 +165,7 @@ def _with_named_fields(
     return [*secondary_fields, *added]
 
 
-def _validate(
+def validate_fields(
     *,
     fields: list[FieldValue],
     definitions: list[FieldDefinition],
