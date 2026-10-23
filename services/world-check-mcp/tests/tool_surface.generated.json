@@ -122,6 +122,141 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
+    "description": "Read audit events for one case, newest first, including passport verification decisions.\n\nThis does not record an audit action.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Events per page, at most 250.",
+          "maximum": 250,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the query and limit."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "description": "Optional FIQL query. Without eventDate, LSEG returns the last seven days.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional FIQL query. Without eventDate, the last seven days."
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_audit_events",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "properties": {
+              "action_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "actioned_by": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "action_type",
+              "event_date",
+              "actioned_by"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "events",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Audit Events"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
     "description": "Translate an external caseId into the internal caseSystemId the other tools use.",
     "inputSchema": {
       "additionalProperties": false,
@@ -154,6 +289,152 @@
       "type": "object"
     },
     "title": "Get Case Reference"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get paginated match facts by internal caseSystemId or exact external caseId.\n\nreference_id identifies a profile. result_id identifies the match on this case.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "description": "Optional FIQL filter, such as matchStrength==EXACT.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional FIQL filter, such as matchStrength==EXACT."
+        },
+        "limit": {
+          "default": 50,
+          "description": "Matches per page.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the case, filter, and limit."
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_results",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "matches",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Results"
   },
   {
     "annotations": {
@@ -566,6 +847,231 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
+    "description": "Check WATCHLIST and Passport Check progress without screening the case again.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_screening_status",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "providers": {
+          "items": {
+            "properties": {
+              "provider_type": {
+                "type": "string"
+              },
+              "review_required": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "total_matches": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unresolved": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "provider_type",
+              "total_matches",
+              "review_required",
+              "unresolved"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "screening_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "screening_status",
+        "providers"
+      ],
+      "type": "object"
+    },
+    "title": "Get Screening Status"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List saved cases in one group, newest first.\n\nPass next_page back as page_reference with the same group and limit.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Cases per page. LSEG allows 1 to 100.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the same group and limit."
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_cases",
+    "outputSchema": {
+      "properties": {
+        "cases": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lifecycle_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "name",
+              "entity_type",
+              "group_id",
+              "lifecycle_state"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cases",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "List Cases"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
     "description": "List the LSEG groups this service account can screen in, including descendant groups.\n\nCall it before screening, then pass a group id to `get_group_settings`.",
     "inputSchema": {
       "additionalProperties": false,
@@ -623,5 +1129,177 @@
       "x-fastmcp-wrap-result": true
     },
     "title": "List Groups"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved\ncharacters. EXACT is the mode for an exact caseId. The group filter is always added.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "anyOf": [
+            {
+              "description": "LSEG FIQL expression.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra FIQL filter. The group filter is always added."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Cases per page. LSEG allows 1 to 100.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep every search criterion."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "description": "LSEG FIQL expression.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "FIQL query, such as primaryName==\"Ada\"."
+        },
+        "search_mode": {
+          "default": "DEFAULT",
+          "description": "DEFAULT, BEGINS_WITH, EXACT, or CONTAINS. EXACT matches a caseId.",
+          "enum": [
+            "DEFAULT",
+            "BEGINS_WITH",
+            "EXACT",
+            "CONTAINS"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "search_cases",
+    "outputSchema": {
+      "properties": {
+        "cases": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lifecycle_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "name",
+              "entity_type",
+              "group_id",
+              "lifecycle_state"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cases",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Search Cases"
   }
 ]
