@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1-alpha.1](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.1-alpha...kyckr-mcp@0.1.1-alpha.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **confluence-connector,kyckr-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,temenos-mcp:** bump node to 26.12.1 security release ([#1269](https://github.com/Unique-AG/connectors/issues/1269)) ([c57480f](https://github.com/Unique-AG/connectors/commit/c57480fbd576cbae8a53d35975e01db345f65c7b))
+
+
+### Dependencies
+
+* bump node in /services/*/deploy ([#1142](https://github.com/Unique-AG/connectors/issues/1142)) ([336dd69](https://github.com/Unique-AG/connectors/commit/336dd694053576d07366c6f0adbf30f45ed95988))
+* bump node in /services/*/deploy ([#1232](https://github.com/Unique-AG/connectors/issues/1232)) ([fd0e934](https://github.com/Unique-AG/connectors/commit/fd0e934ec3ad1e9d9cb38a2e5003d6bfae46a4b2))
+
 ## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.0...kyckr-mcp@0.1.1-alpha) (2026-09-21)
 
 
