@@ -3,6 +3,7 @@ import json
 from fastmcp import Client
 from fastmcp import FastMCP
 import httpx2
+from pydantic import TypeAdapter
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
@@ -14,6 +15,13 @@ def _token(request: httpx2.Request) -> httpx2.Response | None:
     return httpx2.Response(
         200, json={"access_token": "access-token", "token_type": "Bearer", "expires_in": 3600}
     )
+
+
+_OBJECT = TypeAdapter(dict[str, object])
+
+
+def _body(request: httpx2.Request) -> dict[str, object]:
+    return _OBJECT.validate_json(request.content)
 
 
 def _json(status: int, body: object) -> httpx2.Response:
@@ -114,6 +122,75 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         )
     if path.endswith("/apiInfo"):
         return _json(200, {"version": "3.9.0", "systemDateTime": "2026-10-22T06:47:00Z"})
+    if path.endswith("/cases/search"):
+        body = _body(request)
+        assert body["sort"] == [{"columnName": "creationDate", "order": "DESCENDING"}]
+        if body.get("query"):
+            assert body["query"] == 'primaryName=="Ada"'
+            assert body["filter"] == '(lifecycleState==UNARCHIVED);groupId=="g1"'
+        else:
+            assert body["filter"] == 'groupId=="g1"'
+        return _json(
+            200,
+            {
+                "results": [
+                    {
+                        "caseId": "ext-1",
+                        "caseSystemId": "sys-1",
+                        "name": "Ada Lovelace",
+                        "entityType": "INDIVIDUAL",
+                        "groupId": "g1",
+                    }
+                ],
+                "pagination": {"pageReferences": {"next": "page-2"}},
+            },
+        )
+    if path.endswith("/cases/sys-1/results"):
+        return _json(
+            200,
+            {
+                "results": [
+                    {
+                        "resultId": "r1",
+                        "referenceId": "e_1",
+                        "providerType": "WATCHLIST",
+                        "matchStrength": "EXACT",
+                        "submittedTerm": "Ada Lovelace",
+                    }
+                ],
+                "pagination": {"pageReferences": {}},
+            },
+        )
+    if path.endswith("/cases/screening-status"):
+        body = _body(request)
+        assert body["providerTypes"] == ["WATCHLIST", "PASSPORT_CHECK"]
+        return _json(
+            200,
+            [
+                {
+                    "caseSystemId": "sys-1",
+                    "screeningStatus": "SCREENED",
+                    "providerSummaries": {
+                        "WATCHLIST": {"totalMatches": 1, "reviewRequired": 0, "unresolved": 1}
+                    },
+                }
+            ],
+        )
+    if path.endswith("/cases/sys-1/audit-events"):
+        return _json(
+            200,
+            {
+                "results": [
+                    {
+                        "id": "a1",
+                        "actionType": "NEW_CASE",
+                        "eventDate": "2026-10-22T06:47:00Z",
+                        "actionedByUserName": "service-account",
+                    }
+                ],
+                "pagination": {"pageReferences": {"next": None}},
+            },
+        )
     return httpx2.Response(404)
 
 
@@ -165,6 +242,63 @@ async def test_get_profile_uses_the_record_reference_id() -> None:
     assert profile is not None
     assert profile["names"] == ["Ada Lovelace"]
     assert profile["categories"] == ["PEP"]
+
+
+async def test_list_cases_filters_to_the_group() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("list_cases", {"group_id": "g1"})
+
+    page = result.structured_content
+    assert page is not None
+    assert page["cases"][0]["case_system_id"] == "sys-1"
+    assert page["next_page"] == "page-2"
+
+
+async def test_search_cases_keeps_the_group_filter_with_the_query() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "search_cases",
+            {
+                "group_id": "g1",
+                "query": 'primaryName=="Ada"',
+                "expression": "lifecycleState==UNARCHIVED",
+                "search_mode": "EXACT",
+            },
+        )
+
+    page = result.structured_content
+    assert page is not None
+    assert page["cases"][0]["name"] == "Ada Lovelace"
+
+
+async def test_get_case_results_resolves_an_external_case_id() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case_results", {"case": "ext-1"})
+
+    results = result.structured_content
+    assert results is not None
+    assert results["case_system_id"] == "sys-1"
+    assert results["matches"][0]["reference_id"] == "e_1"
+
+
+async def test_get_screening_status_reports_watchlist_progress() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_screening_status", {"case": "sys-1"})
+
+    status = result.structured_content
+    assert status is not None
+    assert status["screening_status"] == "SCREENED"
+    assert status["providers"][0]["total_matches"] == 1
+
+
+async def test_get_case_audit_events_returns_the_newest_event() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case_audit_events", {"case": "sys-1"})
+
+    page = result.structured_content
+    assert page is not None
+    assert page["events"][0]["action_type"] == "NEW_CASE"
+    assert page["next_page"] is None
 
 
 async def test_get_reference_data_returns_country_codes() -> None:
