@@ -1,0 +1,168 @@
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
+[project]
+name = "world-check-mcp"
+version = "0.0.0"
+description = "Screens people and organizations in LSEG World-Check One and returns sanctions, PEP, and adverse-media results for KYC and third-party due diligence."
+classifiers = ["Development Status :: 3 - Alpha"]
+requires-python = ">=3.14"
+dependencies = [
+    "fastmcp==4.1.0",
+    "httpx2==2.13.1",
+    "mcp-configs==0.1.0",
+    "mcp-openapi==0.1.0",
+    "mcp-types==2.3.0",
+    "py-key-value-aio[redis,wrappers-encryption]==0.4.6",
+    "pydantic-settings==2.15.0",
+    "pydantic==2.14.1",
+    "pyyaml==6.0.3",
+    "starlette==1.8.0",
+    "tenacity==9.1.4",
+    "unique-mcp==2026.44.0.dev1",
+    "unique-sdk==2026.44.0.dev10",
+    "unique-toolkit[monitoring,otel]==2026.44.0.dev2",
+    "uvicorn[standard]==0.53.0",
+]
+
+[project.scripts]
+world-check-mcp = "world_check_mcp.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.2",
+    "mcp-architecture==0.1.0",
+    "mcp-openapi[codegen]==0.1.0",
+    "pytest-asyncio==1.4.0",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
+
+[tool.ruff]
+# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
+# Add to it here, as for generated code, but never loosen it.
+extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
+target-version = "py314"
+exclude = [".venv"]
+
+[tool.ruff.lint.per-file-ignores]
+# A context function takes keyword arguments only, so a call names what it passes. Here and not in
+# the shared code style, since ruff reads a path there from the folder of that file.
+"!src/world_check_mcp/contexts/**" = ["PLR0917"]
+# Generated from the vendor's spec, so its field names are the vendor's.
+"src/world_check_mcp/upstream/generated/vendor_responses.py" = ["N815"]
+
+[tool.basedpyright]
+# The type check every MCP keeps. Make a report stricter here, but never turn one down.
+extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+include = ["src", "tests"]
+# A test may reach a private name of the code it tests. Here and not in the shared type check,
+# since basedpyright reads a root there from the folder of that file. `.` resolves `tests.*`.
+executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsage = false }]
+
+[tool.uv.sources]
+mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-configs = { path = "../../packages/mcp-configs" }
+mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/world_check_mcp/upstream/openapi.yml"
+operation-ids = [
+    "getApiInfo",
+    "getCaseReference",
+    "getCaseTemplateForGroup",
+    "getCountries",
+    "getGroupById",
+    "getGroups",
+    "getNationalities",
+    "getProviders",
+    "getRecord",
+    "getResolutionToolkitsForGroup",
+    "getSearchFilters",
+]
+operation-module = "mcp_openapi.upstream"
+models-module = "world_check_mcp.upstream.generated.vendor_responses"
+models-output = "src/world_check_mcp/upstream/generated/vendor_responses.py"
+operations-output = "src/world_check_mcp/upstream/generated/operations.py"
+
+# The architecture. packages/mcp-architecture/ARCHITECTURE.md explains each contract, and
+# `uv run lint-imports` checks them.
+# The scaffold writes the contracts every MCP keeps. Add a contract of the MCP's own after them.
+[tool.importlinter]
+root_package = "world_check_mcp"
+include_external_packages = true
+contract_types = [
+    "feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layers only import downwards"
+type = "layers"
+containers = ["world_check_mcp"]
+layers = ["main", "mcp", "contexts", "upstream | persistence", "utils", "telemetry"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "mcp is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.mcp.*"]
+allowed_importers = ["world_check_mcp.mcp"]
+
+[[tool.importlinter.contracts]]
+name = "contexts is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.contexts.*"]
+allowed_importers = ["world_check_mcp.contexts"]
+
+[[tool.importlinter.contracts]]
+name = "upstream is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.upstream.*"]
+allowed_importers = ["world_check_mcp.upstream"]
+
+[[tool.importlinter.contracts]]
+name = "persistence is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.persistence.*"]
+allowed_importers = ["world_check_mcp.persistence"]
+
+[[tool.importlinter.contracts]]
+name = "utils is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.utils.*"]
+allowed_importers = ["world_check_mcp.utils"]
+
+[[tool.importlinter.contracts]]
+name = "telemetry is imported through its top level only"
+type = "protected"
+protected_modules = ["world_check_mcp.telemetry.*"]
+allowed_importers = ["world_check_mcp.telemetry"]
+
+[[tool.importlinter.contracts]]
+name = "A context feature is imported through its top level only"
+type = "feature_privacy"
+container = "world_check_mcp.contexts"
+
+[[tool.importlinter.contracts]]
+name = "No package imports its siblings in a cycle"
+type = "acyclic_siblings"
+ancestors = ["world_check_mcp"]
+
+[[tool.importlinter.contracts]]
+name = "The domain and the storage know nothing about MCP"
+type = "forbidden"
+source_modules = ["world_check_mcp.contexts", "world_check_mcp.persistence"]
+forbidden_modules = ["fastmcp", "mcp", "mcp_types"]
+allow_indirect_imports = true

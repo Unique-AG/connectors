@@ -152,6 +152,11 @@ class OperationClient:
             raise LockTimeoutError(message) from None
 
     def _parse[T](self, adapter: TypeAdapter[T], content: bytes) -> T:
+        if not content.strip():
+            try:
+                return adapter.validate_python(None)
+            except ValidationError as exc:
+                raise UpstreamError("Unexpected response: empty body") from exc
         try:
             return adapter.validate_json(content)
         except ValidationError as exc:

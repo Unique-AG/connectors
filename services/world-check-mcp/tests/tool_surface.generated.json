@@ -1,0 +1,3193 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.\n\nThis changes the case's screening state. Media Check is not enabled.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "enable_ongoing_screening",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "failures": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provider_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_system_id",
+        "enabled",
+        "provider_type",
+        "failures"
+      ],
+      "type": "object"
+    },
+    "title": "Enable Ongoing Screening"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Generate MRZ lines without creating a case or recording a verification.\n\nIssuing state and nationality come from get_reference_data nationalities. ICAO conformity\ndoes not prove authenticity, ownership, or validity.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "passport": {
+          "description": "Document details as printed.",
+          "properties": {
+            "date_of_birth": {
+              "description": "Date of birth as printed. Not in the future.",
+              "format": "date",
+              "type": "string"
+            },
+            "date_of_expiry": {
+              "description": "Expiry date as printed.",
+              "format": "date",
+              "type": "string"
+            },
+            "document_type": {
+              "default": "PASSPORT",
+              "description": "PASSPORT, ID1, or ID2.",
+              "enum": [
+                "PASSPORT",
+                "ID1",
+                "ID2"
+              ],
+              "type": "string"
+            },
+            "gender": {
+              "description": "MALE, FEMALE, or UNSPECIFIED.",
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            "given_name": {
+              "description": "Given names as printed on the document.",
+              "type": "string"
+            },
+            "identification_number": {
+              "description": "Document number as printed.",
+              "type": "string"
+            },
+            "issuing_state": {
+              "description": "Issuing-state code from reference nationalities.",
+              "type": "string"
+            },
+            "last_name": {
+              "description": "Surname as printed on the document.",
+              "type": "string"
+            },
+            "nationality": {
+              "description": "Nationality code from reference nationalities.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "given_name",
+            "last_name",
+            "gender",
+            "date_of_birth",
+            "issuing_state",
+            "nationality",
+            "identification_number",
+            "date_of_expiry"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "passport"
+      ],
+      "type": "object"
+    },
+    "name": "generate_passport_mrz",
+    "outputSchema": {
+      "properties": {
+        "conforms_with_icao": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lines",
+        "conforms_with_icao"
+      ],
+      "type": "object"
+    },
+    "title": "Generate Passport MRZ"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "api-info"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get information about the version of the Public API, a link to the documentation, and a date and time that can be used to verify the 'Date' header.",
+    "inputSchema": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_api_info",
+    "outputSchema": {
+      "description": "Auxiliary information about the Public API.",
+      "properties": {
+        "systemDateTime": {
+          "description": "Current system date and time.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "description": "Current API version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "systemDateTime"
+      ],
+      "type": "object",
+      "x-fastmcp-top-level-schema": "ApiInfo"
+    },
+    "title": "Get Api Info"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get a saved case by its internal caseSystemId or its exact external caseId.\n\nAn internal id is tried first. Use the returned case_system_id with the other case tools.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "lifecycle_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "type": "string"
+        },
+        "provider_types": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "provider_types"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read audit events for one case, newest first, including passport verification decisions.\n\nThis does not record an audit action.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Events per page, at most 250.",
+          "maximum": 250,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the query and limit."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "description": "Optional FIQL query. Without eventDate, LSEG returns the last seven days.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional FIQL query. Without eventDate, the last seven days."
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_audit_events",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "properties": {
+              "action_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "actioned_by": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "event_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "action_type",
+              "event_date",
+              "actioned_by"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "events",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Audit Events"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Translate an external caseId into the internal caseSystemId the other tools use.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "description": "External caseId. `get_case_reference` returns its caseSystemId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_reference",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "type": "string"
+        },
+        "case_system_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Reference"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get paginated match facts by internal caseSystemId or exact external caseId.\n\nreference_id identifies a profile. result_id identifies the match on this case.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "description": "Optional FIQL filter, such as matchStrength==EXACT.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional FIQL filter, such as matchStrength==EXACT."
+        },
+        "limit": {
+          "default": 50,
+          "description": "Matches per page.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the case, filter, and limit."
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_case_results",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "matches",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Case Results"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening\nor resolving a match.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_group_settings",
+    "outputSchema": {
+      "$defs": {
+        "Group": {
+          "properties": {
+            "child_groups": {
+              "items": {
+                "$ref": "#/$defs/Group"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "type": "object"
+        },
+        "ResolutionOption": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "status_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ],
+          "type": "object"
+        },
+        "ResolutionToolkit": {
+          "properties": {
+            "provider_type": {
+              "type": "string"
+            },
+            "reasons": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            },
+            "risks": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            },
+            "statuses": {
+              "items": {
+                "$ref": "#/$defs/ResolutionOption"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "provider_type",
+            "statuses",
+            "risks",
+            "reasons"
+          ],
+          "type": "object"
+        },
+        "SecondaryField": {
+          "properties": {
+            "entity_type": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "type_id": {
+              "type": "string"
+            },
+            "value_type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "entity_type",
+            "type_id",
+            "label",
+            "value_type",
+            "required"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "group": {
+          "$ref": "#/$defs/Group"
+        },
+        "mandatory_provider_types": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "screening_type": {
+          "type": "string"
+        },
+        "secondary_fields": {
+          "items": {
+            "$ref": "#/$defs/SecondaryField"
+          },
+          "type": "array"
+        },
+        "toolkits": {
+          "items": {
+            "$ref": "#/$defs/ResolutionToolkit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "group",
+        "screening_type",
+        "mandatory_provider_types",
+        "secondary_fields",
+        "toolkits"
+      ],
+      "type": "object"
+    },
+    "title": "Get Group Settings"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 days.\n\nNo updates returns an empty list. Reuse window.since, window.until, and the other criteria\nwith next_page. This does not acknowledge updates.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Internal caseSystemId or exact external caseId."
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Limit updates to this group."
+        },
+        "limit": {
+          "default": 100,
+          "description": "Updates per page.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "default": "FULL",
+          "description": "FULL returns match detail. SUMMARY returns counts.",
+          "enum": [
+            "FULL",
+            "SUMMARY"
+          ],
+          "type": "string"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page."
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timezone-aware timestamp. Reuse it when paging."
+        },
+        "until": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timezone-aware timestamp. Reuse it when paging."
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_ogs_updates",
+    "outputSchema": {
+      "properties": {
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updates": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "new_results": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "update_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updated_results": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "group_id",
+              "update_date",
+              "new_results",
+              "updated_results"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "window": {
+          "properties": {
+            "since": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "since",
+            "until"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "window",
+        "updates",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Ongoing Screening Updates"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get the World-Check record for a match: its names and categories.\n\nPass the match's referenceId, not its resultId.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reference_id": {
+          "description": "World-Check record referenceId from a screening match, not its resultId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_profile",
+    "outputSchema": {
+      "properties": {
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reference_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference_id",
+        "entity_type",
+        "names",
+        "categories"
+      ],
+      "type": "object"
+    },
+    "title": "Get Profile"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Look up country codes, passport nationalities, providers, case-search filters, or API info.\n\nWATCHLIST nationality and residence use countries. Passport issuing state and nationality\nuse nationalities.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "countries for WATCHLIST ISO alpha-3 codes. nationalities for passport ICAO codes. providers, search_filters, or api_info.",
+          "enum": [
+            "countries",
+            "nationalities",
+            "providers",
+            "search_filters",
+            "api_info"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "name": "get_reference_data",
+    "outputSchema": {
+      "properties": {
+        "api_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "countries",
+            "nationalities",
+            "providers",
+            "search_filters",
+            "api_info"
+          ],
+          "type": "string"
+        },
+        "names_by_code": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "providers": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "code",
+                  "identifier",
+                  "name"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "search_filters": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "fields": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "query",
+                      "custom",
+                      "filter"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "fields"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "system_date_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "title": "Get Reference Data"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Check WATCHLIST and Passport Check progress without screening the case again.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "get_screening_status",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "providers": {
+          "items": {
+            "properties": {
+              "provider_type": {
+                "type": "string"
+              },
+              "review_required": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "total_matches": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unresolved": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "provider_type",
+              "total_matches",
+              "review_required",
+              "unresolved"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "screening_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_system_id",
+        "screening_status",
+        "providers"
+      ],
+      "type": "object"
+    },
+    "title": "Get Screening Status"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List saved cases in one group, newest first.\n\nPass next_page back as page_reference with the same group and limit.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Cases per page. LSEG allows 1 to 100.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the same group and limit."
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_cases",
+    "outputSchema": {
+      "properties": {
+        "cases": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lifecycle_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "name",
+              "entity_type",
+              "group_id",
+              "lifecycle_state"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cases",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "List Cases"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List the LSEG groups this service account can screen in, including descendant groups.\n\nCall it before screening, then pass a group id to `get_group_settings`.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_groups",
+    "outputSchema": {
+      "$defs": {
+        "Group": {
+          "properties": {
+            "child_groups": {
+              "items": {
+                "$ref": "#/$defs/Group"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "result": {
+          "items": {
+            "$ref": "#/$defs/Group"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List Groups"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. It does not record a human document comparison. limit truncates\nWATCHLIST matches only.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "description": "Stable external caseId. An existing id is refused.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "External caseId. Existing ids are refused."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom fields from the group template."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "include_watchlist": {
+          "default": true,
+          "description": "Also screen the name against WATCHLIST.",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "description": "WATCHLIST matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Case name. Defaults to the given and last names."
+        },
+        "passport": {
+          "description": "Document details as printed.",
+          "properties": {
+            "date_of_birth": {
+              "description": "Date of birth as printed. Not in the future.",
+              "format": "date",
+              "type": "string"
+            },
+            "date_of_expiry": {
+              "description": "Expiry date as printed.",
+              "format": "date",
+              "type": "string"
+            },
+            "document_type": {
+              "default": "PASSPORT",
+              "description": "PASSPORT, ID1, or ID2.",
+              "enum": [
+                "PASSPORT",
+                "ID1",
+                "ID2"
+              ],
+              "type": "string"
+            },
+            "gender": {
+              "description": "MALE, FEMALE, or UNSPECIFIED.",
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            "given_name": {
+              "description": "Given names as printed on the document.",
+              "type": "string"
+            },
+            "identification_number": {
+              "description": "Document number as printed.",
+              "type": "string"
+            },
+            "issuing_state": {
+              "description": "Issuing-state code from reference nationalities.",
+              "type": "string"
+            },
+            "last_name": {
+              "description": "Surname as printed on the document.",
+              "type": "string"
+            },
+            "nationality": {
+              "description": "Nationality code from reference nationalities.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "given_name",
+            "last_name",
+            "gender",
+            "date_of_birth",
+            "issuing_state",
+            "nationality",
+            "identification_number",
+            "date_of_expiry"
+          ],
+          "type": "object"
+        },
+        "secondary_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra secondary fields. Passport fields do not fill WATCHLIST fields."
+        }
+      },
+      "required": [
+        "passport",
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "passport_check",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "group_id",
+        "passport_matches",
+        "watchlist_matches",
+        "watchlist_truncated"
+      ],
+      "type": "object"
+    },
+    "title": "Passport Check"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Rescreen a case by internal caseSystemId or external caseId without editing its fields.\n\nWATCHLIST and Passport Check only. Media Check is unsupported.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "delta": {
+          "default": false,
+          "description": "True screens changes since the last run. False screens fully.",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "rescreen_case",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matches_returned": {
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "matches_returned",
+        "watchlist_matches",
+        "watchlist_truncated",
+        "passport_matches"
+      ],
+      "type": "object"
+    },
+    "title": "Rescreen Case"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Record a WATCHLIST match decision only after a person approves the exact choice.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nStatus, risk, and reason must be allowed together by the group's toolkit.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "description": "Remark saved with the reviewer identity appended.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "description": "Id or label from the group's resolution toolkit.",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reason id or label. Required when the toolkit status says so."
+        },
+        "result_id": {
+          "description": "resultId of one WATCHLIST match.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "risk": {
+          "description": "Id or label from the group's resolution toolkit.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status id, label, or POSITIVE, FALSE, POSSIBLE, or UNSPECIFIED.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case",
+        "result_id",
+        "status",
+        "risk"
+      ],
+      "type": "object"
+    },
+    "name": "resolve_result",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reason_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "result_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "cancelled",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "resolved"
+      ],
+      "type": "object"
+    },
+    "title": "Resolve Result"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Repeated calls without case_id create new cases. An existing case_id is\nrefused, not rescreened. Matches are candidates, not confirmed identities.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "description": "Stable external caseId. An existing id is refused.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "External caseId. Existing ids are refused."
+        },
+        "country_of_residence": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual country of residence, ISO alpha-3."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom fields by typeId from the group template."
+        },
+        "dob": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Date of birth. Individuals only."
+        },
+        "entity_type": {
+          "description": "INDIVIDUAL or ORGANISATION.",
+          "enum": [
+            "INDIVIDUAL",
+            "ORGANISATION"
+          ],
+          "type": "string"
+        },
+        "gender": {
+          "anyOf": [
+            {
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "MALE, FEMALE, or UNSPECIFIED."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name to screen.",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "nationality": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual nationality, ISO alpha-3."
+        },
+        "place_of_birth": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual place of birth, ISO alpha-3."
+        },
+        "registered_country": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization registered country, ISO alpha-3."
+        },
+        "secondary_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra secondary fields by typeId from get_group_settings."
+        }
+      },
+      "required": [
+        "name",
+        "entity_type",
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "screen_entity",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matches_returned": {
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "matches_returned",
+        "watchlist_matches",
+        "watchlist_truncated",
+        "passport_matches"
+      ],
+      "type": "object"
+    },
+    "title": "Screen Entity"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved\ncharacters. EXACT is the mode for an exact caseId. The group filter is always added.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "anyOf": [
+            {
+              "description": "LSEG FIQL expression.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra FIQL filter. The group filter is always added."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "description": "Cases per page. LSEG allows 1 to 100.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep every search criterion."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "description": "LSEG FIQL expression.",
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "FIQL query, such as primaryName==\"Ada\"."
+        },
+        "search_mode": {
+          "default": "DEFAULT",
+          "description": "DEFAULT, BEGINS_WITH, EXACT, or CONTAINS. EXACT matches a caseId.",
+          "enum": [
+            "DEFAULT",
+            "BEGINS_WITH",
+            "EXACT",
+            "CONTAINS"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "search_cases",
+    "outputSchema": {
+      "properties": {
+        "cases": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lifecycle_state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "name",
+              "entity_type",
+              "group_id",
+              "lifecycle_state"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cases",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Search Cases"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Record a human comparison of the generated MRZ with the document, only after approval.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nA repeat verification requires rescreen_case first.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mrz_matched": {
+          "description": "True when the generated MRZ matches the document. Not the approval.",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "description": "Note saved with the reviewer identity appended.",
+          "maxLength": 1000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case",
+        "mrz_matched"
+      ],
+      "type": "object"
+    },
+    "name": "verify_passport_check",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "guidance": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mrz_matched": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recorded": {
+          "type": "boolean"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "cancelled",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "recorded"
+      ],
+      "type": "object"
+    },
+    "title": "Verify Passport Check"
+  }
+]

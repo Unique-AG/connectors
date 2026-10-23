@@ -1,0 +1,127 @@
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
+# world-check-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: world-check-mcp
+fullnameOverride: world-check-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+
+# Set per deployment in the overlay. The app refuses to start without them.
+# - MCP_BASE_URL: the public https origin, matching routes.hostname
+# - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
+#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY, REDIS_URL
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/world-check-mcp
+  tag: 0.0.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: world-check-mcp.mcp.qa.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: false
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false
