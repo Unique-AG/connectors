@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.0...outlook-semantic-mcp@4.1.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **confluence-connector,kyckr-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,temenos-mcp:** bump node to 26.12.1 security release ([#1269](https://github.com/Unique-AG/connectors/issues/1269)) ([c57480f](https://github.com/Unique-AG/connectors/commit/c57480fbd576cbae8a53d35975e01db345f65c7b))
+
+
+### Dependencies
+
+* bump express in / ([#1235](https://github.com/Unique-AG/connectors/issues/1235)) ([604a5c6](https://github.com/Unique-AG/connectors/commit/604a5c6d6a54d9b2dd94bd0bacdd487274a4b3d7))
+* bump node in /services/*/deploy ([#1232](https://github.com/Unique-AG/connectors/issues/1232)) ([fd0e934](https://github.com/Unique-AG/connectors/commit/fd0e934ec3ad1e9d9cb38a2e5003d6bfae46a4b2))
+* bump safe-regex2 in / ([#1236](https://github.com/Unique-AG/connectors/issues/1236)) ([b2e7c3f](https://github.com/Unique-AG/connectors/commit/b2e7c3f2f7b68900e6f0d419ae1a1b99f45ae5bc))
+
 ## [4.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.0.0...outlook-semantic-mcp@4.1.0) (2026-10-14)
 
 

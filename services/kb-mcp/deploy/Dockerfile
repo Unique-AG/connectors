@@ -14,8 +14,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.14-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS runtime
 WORKDIR /app
+# 20250419 still trusts the eMudhra roots removed in the security update.
 RUN apt-get update \
     && apt-get upgrade -y \
+    && dpkg --compare-versions "$(dpkg-query -W -f '${Version}' ca-certificates)" ge "20250419+deb13u1" \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
 RUN rm -rf /usr/local/lib/python*/site-packages/pip \

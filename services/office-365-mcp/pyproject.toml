@@ -1,6 +1,6 @@
 [project]
 name = "office-365-mcp"
-version = "0.3.2"
+version = "0.3.3"
 description = "Office 365 FastMCP server"
 requires-python = ">=3.14"
 dependencies = [
@@ -66,7 +66,7 @@ dev = [
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
-    "certifi==2026.7.22",
+    "certifi==2026.10.19",
     "gherkin-official==42.0.1",
     "pyyaml==6.0.3",
 ]
