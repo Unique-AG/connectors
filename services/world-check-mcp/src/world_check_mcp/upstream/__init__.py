@@ -2,6 +2,12 @@
 
 from mcp_openapi.upstream import UpstreamError
 
+from world_check_mcp.upstream.actions import GET_OGS_UPDATES
+from world_check_mcp.upstream.actions import OgsUpdateWire
+from world_check_mcp.upstream.actions import PARTIAL_UPDATE_CASE
+from world_check_mcp.upstream.actions import SAVE_AND_SCREEN
+from world_check_mcp.upstream.actions import ScreenedCaseWire
+from world_check_mcp.upstream.actions import TOGGLE_ONGOING_SCREENING
 from world_check_mcp.upstream.case import CaseWire
 from world_check_mcp.upstream.case import GET_CASE
 from world_check_mcp.upstream.client import open_upstream
@@ -23,6 +29,7 @@ from world_check_mcp.upstream.generated.vendor_responses import ApiInfo
 from world_check_mcp.upstream.generated.vendor_responses import CaseReference
 from world_check_mcp.upstream.generated.vendor_responses import CaseTemplateResponse
 from world_check_mcp.upstream.generated.vendor_responses import Entity
+from world_check_mcp.upstream.generated.vendor_responses import FieldDefinition
 from world_check_mcp.upstream.generated.vendor_responses import GroupSummary
 from world_check_mcp.upstream.generated.vendor_responses import ProviderDetail
 from world_check_mcp.upstream.generated.vendor_responses import ResolutionField
@@ -33,6 +40,7 @@ from world_check_mcp.upstream.queries import GET_CASE_AUDIT_EVENTS
 from world_check_mcp.upstream.queries import GET_RESULTS
 from world_check_mcp.upstream.queries import GET_SCREENING_STATUS
 from world_check_mcp.upstream.queries import next_page
+from world_check_mcp.upstream.queries import ResultWire
 from world_check_mcp.upstream.queries import SEARCH_CASES
 from world_check_mcp.upstream.settings import UpstreamSettings
 
@@ -42,6 +50,7 @@ __all__ = [
     "CaseWire",
     "CaseTemplateResponse",
     "Entity",
+    "FieldDefinition",
     "GET_API_INFO",
     "GET_CASE",
     "GET_CASE_AUDIT_EVENTS",
@@ -51,8 +60,11 @@ __all__ = [
     "GET_GROUP_BY_ID",
     "GET_GROUPS",
     "GET_NATIONALITIES",
+    "GET_OGS_UPDATES",
+    "OgsUpdateWire",
     "GET_PROVIDERS",
     "GET_RECORD",
+    "PARTIAL_UPDATE_CASE",
     "GET_RESULTS",
     "GET_SCREENING_STATUS",
     "GroupSummary",
@@ -61,9 +73,13 @@ __all__ = [
     "ProviderDetail",
     "ResolutionField",
     "ResolutionToolkitResponse",
+    "ResultWire",
+    "SAVE_AND_SCREEN",
+    "ScreenedCaseWire",
     "StatusResolutionField",
     "SEARCH_CASES",
     "SearchParameterCollection",
+    "TOGGLE_ONGOING_SCREENING",
     "Upstream",
     "UpstreamError",
     "UpstreamSettings",

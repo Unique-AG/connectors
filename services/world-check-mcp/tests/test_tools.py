@@ -1,9 +1,12 @@
 import json
+from typing import cast
 
 from fastmcp import Client
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 import httpx2
 from pydantic import TypeAdapter
+import pytest
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
@@ -24,6 +27,59 @@ def _body(request: httpx2.Request) -> dict[str, object]:
     return _OBJECT.validate_json(request.content)
 
 
+_screen_modes: list[str] = []
+
+
+def _template(group_id: str, providers: list[str], *, required: bool) -> httpx2.Response:
+    return _json(
+        200,
+        {
+            "groupId": group_id,
+            "groupScreeningType": "CASE_MANAGEMENT_AUDIT",
+            "mandatoryProviderTypes": providers,
+            "secondaryFieldsByProvider": {
+                "WATCHLIST": {
+                    "secondaryFieldsByEntity": {
+                        "INDIVIDUAL": [
+                            {
+                                "typeId": "SFCT_2",
+                                "fieldValueType": "COUNTRY",
+                                "label": "NATIONALITY",
+                                "fieldRequired": required,
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+    )
+
+
+def _case(case_system_id: str, providers: list[str]) -> httpx2.Response:
+    return _json(
+        200,
+        {
+            "caseId": case_system_id,
+            "caseSystemId": case_system_id,
+            "name": "Ada Lovelace",
+            "entityType": "INDIVIDUAL",
+            "groupId": "g1",
+            "providerTypes": providers,
+        },
+    )
+
+
+def _screened(results: list[object]) -> dict[str, object]:
+    return {
+        "caseId": "new-1",
+        "caseSystemId": "sys-new",
+        "name": "Ada Lovelace",
+        "entityType": "INDIVIDUAL",
+        "groupId": "g-screen",
+        "results": results,
+    }
+
+
 def _json(status: int, body: object) -> httpx2.Response:
     return httpx2.Response(status, json=json.loads(json.dumps(body)))
 
@@ -37,6 +93,10 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(
             200, [{"id": "g1", "name": "KYC", "childGroups": [{"id": "g2", "name": "EU"}]}]
         )
+    if path.endswith("/groups/g-screen/case-template"):
+        return _template("g-screen", ["WATCHLIST"], required=True)
+    if path.endswith("/groups/g-media/case-template"):
+        return _template("g-media", ["MEDIA_CHECK"], required=False)
     if path.endswith("/groups/g1/case-template"):
         return _json(
             200,
@@ -81,7 +141,11 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(200, {"caseId": "ext-1", "caseSystemId": "sys-1"})
     if path.endswith("/cases/ext-1"):
         return httpx2.Response(404)
-    if path.endswith("/cases/sys-1"):
+    if path.endswith("/cases/media-1"):
+        return _case("media-1", ["MEDIA_CHECK"])
+    if path.endswith("/cases/fail-1"):
+        return _case("fail-1", ["WATCHLIST"])
+    if request.method == "GET" and path.endswith("/cases/sys-1"):
         return _json(
             200,
             {
@@ -189,6 +253,86 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                     }
                 ],
                 "pagination": {"pageReferences": {"next": None}},
+            },
+        )
+    if request.method == "POST" and path.endswith("/cases"):
+        body = _body(request)
+        assert request.url.params.get("screen") == "SYNC"
+        assert body["providerTypes"] == ["WATCHLIST"]
+        assert body["caseScreeningState"] == {"WATCHLIST": "INITIAL"}
+        assert body["secondaryFields"] == [{"typeId": "SFCT_2", "value": "GBR"}]
+        return _json(
+            200,
+            _screened(
+                [
+                    {"resultId": "r1", "referenceId": "e_1", "providerType": "WATCHLIST"},
+                    {"resultId": "r2", "referenceId": "e_2", "providerType": "WATCHLIST"},
+                ]
+            ),
+        )
+    if request.method == "PATCH" and path.endswith("/cases/sys-1"):
+        _screen_modes.append(request.url.params["screen"])
+        return _json(
+            200,
+            {
+                **_screened(
+                    [
+                        {"resultId": "r1", "providerType": "WATCHLIST", "matchStrength": "EXACT"},
+                        {"resultId": "p1", "providerType": "PASSPORT_CHECK", "mrzLine1": "P<UTO"},
+                    ]
+                ),
+                "caseSystemId": "sys-1",
+            },
+        )
+    if path.endswith("/bulk/cases/ongoing-screening"):
+        body = _body(request)
+        assert body["caseScreeningState"] == {"WATCHLIST": "ONGOING"}
+        assert "MEDIA_CHECK" not in json.dumps(body)
+        if body["caseSystemIds"] == ["fail-1"]:
+            return _json(
+                200,
+                {
+                    "failedCases": [
+                        {
+                            "caseSystemId": "fail-1",
+                            "errors": [{"code": "DENIED", "message": "Case cannot be monitored."}],
+                        }
+                    ]
+                },
+            )
+        return httpx2.Response(204)
+    if path.endswith("/cases/ongoing-screening-updates"):
+        body = _body(request)
+        expression = str(body["filter"])
+        assert "providerType==WATCHLIST" in expression
+        assert "MEDIA" not in expression
+        pagination = cast(dict[str, object], body["pagination"])
+        if pagination.get("pageReference") == "none":
+            return _json(
+                404,
+                {
+                    "errors": [
+                        {
+                            "code": "NO_OGS_CASE_UPDATES_FOUND_WITHIN_DATE_RANGE",
+                            "message": "No updates.",
+                        }
+                    ]
+                },
+            )
+        assert 'groupId=="g1"' in expression
+        return _json(
+            200,
+            {
+                "results": [
+                    {
+                        "caseSystemId": "sys-1",
+                        "caseId": "ext-1",
+                        "groupId": "g1",
+                        "updateDate": "2026-10-22T06:47:00Z",
+                        "watchlistResults": {"numberOfNewResults": 1, "numberOfUpdatedResults": 0},
+                    }
+                ],
+                "pagination": {"pageReferences": {"next": "page-2"}},
             },
         )
     return httpx2.Response(404)
@@ -313,3 +457,150 @@ async def test_get_reference_data_returns_country_codes() -> None:
         "api_version": None,
         "system_date_time": None,
     }
+
+
+async def test_screen_entity_persists_a_watchlist_case_and_truncates_matches() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "limit": 1,
+            },
+        )
+
+    outcome = result.structured_content
+    assert outcome is not None
+    assert outcome["case_system_id"] == "sys-new"
+    assert outcome["watchlist_truncated"] is True
+    assert outcome["watchlist_matches"][0]["result_id"] == "r1"
+    assert outcome["watchlist_matches"][1:] == []
+    assert outcome["passport_matches"] == []
+
+
+async def test_screen_entity_refuses_an_existing_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="already exists"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "case_id": "ext-1",
+                    "nationality": "GBR",
+                },
+            )
+
+
+async def test_screen_entity_requires_the_group_nationality() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="NATIONALITY"):
+            await client.call_tool(
+                "screen_entity",
+                {"name": "Ada Lovelace", "entity_type": "INDIVIDUAL", "group_id": "g-screen"},
+            )
+
+
+async def test_screen_entity_refuses_a_group_that_requires_media_check() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="WATCHLIST-only"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-media",
+                    "nationality": "GBR",
+                },
+            )
+
+
+async def test_rescreen_case_refuses_media_check() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Media Check"):
+            await client.call_tool("rescreen_case", {"case": "media-1"})
+
+
+async def test_rescreen_case_can_screen_only_changes_since_the_last_run() -> None:
+    _screen_modes.clear()
+    async with Client(_server()) as client:
+        result = await client.call_tool("rescreen_case", {"case": "sys-1", "delta": True})
+
+    outcome = result.structured_content
+    assert _screen_modes == ["DELTA_SYNC"]
+    assert outcome is not None
+    assert outcome["passport_matches"][0]["mrz_line_1"] == "P<UTO"
+
+
+async def test_enable_ongoing_screening_treats_an_empty_response_as_enabled() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "sys-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is True
+    assert screening["provider_type"] == "WATCHLIST"
+
+
+async def test_enable_ongoing_screening_reports_a_failure_body() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "fail-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["Case cannot be monitored."]
+
+
+async def test_get_ogs_updates_returns_watchlist_counts() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "get_ogs_updates",
+            {
+                "since": "2026-10-20T00:00:00Z",
+                "until": "2026-10-22T00:00:00Z",
+                "group_id": "g1",
+            },
+        )
+
+    page = result.structured_content
+    assert page is not None
+    assert page["updates"][0]["new_results"] == 1
+    assert page["next_page"] == "page-2"
+    assert page["window"]["until"] == "2026-10-22T00:00:00Z"
+
+
+async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "get_ogs_updates",
+            {
+                "since": "2026-10-20T00:00:00Z",
+                "until": "2026-10-22T00:00:00Z",
+                "page_reference": "none",
+            },
+        )
+
+    page = result.structured_content
+    assert page is not None
+    assert page["updates"] == []
+    assert page["next_page"] is None
+
+
+async def test_get_ogs_updates_requires_the_original_window_on_the_next_page() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Reuse both since and until"):
+            await client.call_tool("get_ogs_updates", {"page_reference": "page-2"})
+
+
+async def test_get_ogs_updates_rejects_a_future_end() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="last 30 days"):
+            await client.call_tool(
+                "get_ogs_updates",
+                {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
+            )
