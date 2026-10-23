@@ -103,6 +103,11 @@ The key `uses` maps an argument to the earlier step that gives its value. This r
 dependency. For example, `outlook_move_mail` takes its `message_refs` from a listing. The 17 failed
 moves in prod broke this dependency.
 
+`args` names only the arguments that the scenario depends on. A step may leave out other
+arguments that the tool requires: about one step in seven does. The runner needs a full call, and
+the key `bind` holds it. A test does not check required arguments, so a reader must not take a chain
+as a complete call.
+
 A chain does not fix one path. Two tools can both be right, and `any_of` says so. A test can check
 the required tools, the forbidden tools, the approval, and the data dependencies.
 
@@ -196,8 +201,10 @@ A recorder is not built. It can write a cassette from a run against a test tenan
 ## Evidence for the order
 
 The logs are the prod logs of office-365-mcp, from 2026-09-23 (go-live) to 2026-10-16. A call is one
-tool call. The logs hold no user identity, so the numbers count calls and sessions, not people. An
-earlier count on 2026-10-07 found 12 users in one company.
+tool call. The logs hold no user identity, so the numbers count calls and sessions, not people. A call line
+holds the tool name, the session, and the status, and no arguments. A failure line for a wrong
+argument is the exception: it can hold the value that was wrong (see the questions for the code
+owners). An earlier count on 2026-10-07 found 12 users in one company.
 
 Two sessions made 171 and 164 calls within one minute on 2026-10-14. Both repeat the same loop of
 `outlook_list_mail`, `outlook_search_mail`, `outlook_read_event`, and `outlook_list_events`. They
@@ -229,6 +236,29 @@ Prod turned on 60 of the 121 tools until 2026-10-14 (monorepo PR 32074), and all
 date. Most of the window above ran with 60 tools. In that period, 3 of the 6 tools of `01`, 2 of 10
 in `10`, 1 of 3 in `11`, 0 of 4 in `12`, and 2 of 8 in `13` were on. A zero count for these files
 does not show that nobody wants the capability.
+
+## Since all tools were enabled (2026-10-14 to 2026-10-23)
+
+Prod turned on all 121 tools on 2026-10-14 at 13:25 UTC. The window below is 8.8 days. The numbers
+come from the same logs, read on 2026-10-23.
+
+- 11,539 tool calls, 11,466 ok and 73 failed. 14 sessions make 91% of them. They come in 7 pairs
+  that start in the same minute, use the same 5 to 9 mail and calendar tools, and call `get_me` every
+  5 or 10 minutes. They look like a scheduled agent, but the logs do not say so. The ranking below
+  leaves them out.
+- Without them: 1,083 calls, 198 sessions, about 123 calls a day. 33 sessions (17%) made one call.
+  Before, 38% made one call.
+- Share of calls by feature: mail (02) 54%, calendar (03) 14%, Teams (06) 11%, files (01) 9%,
+  drafts (04) 5%, organize (05) 3%, notes (08) 0.2%.
+- Only 10 of the 61 new tools were used, with 28 calls in all. 81 of the 121 tools were never
+  called. The only write to a person in Teams was one chat message. There were 50 draft calls and no
+  send.
+- The most frequent chain is `outlook_list_mail` then `outlook_search_mail` (25 sessions). Next are
+  `teams_list_chats` then `teams_list_meeting_transcripts` (19) and `outlook_browse_folders` then
+  `outlook_list_mail` (8).
+- Failures: `outlook_respond_to_invite` failed 10 of 14 calls (404 and 400, in 2 sessions).
+  `outlook_search_mail` failed 22 times with a Microsoft 500 error, in 12 sessions. 11 of those
+  failures fell on the last two days. `outlook_move_mail` and `sharepoint_read_file` had no failure.
 
 ## What the usage shows
 
@@ -269,7 +299,7 @@ list for UN-27222.
 - Does Microsoft convert each file type to a PDF that `sharepoint_read_file` can give the assistant?
   The assistant must set `convert_to` to `pdf` to read an Office file as text. The scenario outline
   in `01` lists the types to test.
-- Why does `outlook_move_mail` get a value that is not a handle? The server logs hold no arguments,
+- Why does `outlook_move_mail` get a value that is not a handle? The call lines hold no arguments,
   so the cause is not known. Does the assistant send one message in each call? 20 consecutive calls
   in one session suggest it.
 - Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
@@ -314,3 +344,12 @@ where the behaviour looks wrong, there is no scenario. These questions need an o
   without it? Two scenarios of feature 15 end with "nothing is sent", which is true either way.
 - The sidecar has no key for an order rule such as "create once, then check". The notes of
   `uc-07-22` and `uc-14-09` state it.
+- The log line for a failure with a wrong argument (a validation error) holds an `input_value` field,
+  so the logs can hold the value that the model sent. That value can be user content. Is that
+  wanted? The call lines hold no arguments.
+- The server sets no time limit on the question that asks Mia to agree. A question that nobody
+  answers waits until the client cancels the call (node-chat does so at 60 seconds), and a cancelled
+  call returns no text. Should the server set a limit, so that the assistant learns that nothing
+  happened?
+- Three of the four validation failures since 2026-10-14 were `outlook_search_mail`: a folder given as
+  an argument and an empty sender. Does the tool schema or the description need a change (UN-27222)?

@@ -80,10 +80,10 @@ Feature: Scheduling and answering meetings
       And the room "Maple" accepts the invitation
 
     @happy @uc-07-08
-    Scenario: An invitation is saved as a draft for Mia to finish later
-      When Mia asks her assistant to save an invitation for "Board prep" as a draft
-      Then Mia can open the invitation in Outlook to finish it
-      But nobody receives it until Mia sends it
+    Scenario: An invitation that Mia wants to finish later is saved without attendees
+      When Mia asks her assistant to save an invitation for "Board prep" on Monday from 10:00 to 11:00 as a draft
+      Then "Board prep" is on Mia's calendar on Monday from 10:00 to 11:00 with no attendee
+      But nobody is invited and nobody receives a message
 
     @happy @uc-07-09
     Scenario: A meeting is booked on a calendar other than the main one
@@ -172,11 +172,10 @@ Feature: Scheduling and answering meetings
         | Microsoft rejects the question and gives a reason                                     | the reason that Microsoft gave, and that the same question fails again |
 
     @unhappy @uc-07-20
-    Scenario Outline: A search for free times that Microsoft cannot finish is tried once more
+    Scenario Outline: A search for free times that Microsoft cannot finish is not reported as no free time
       Given Microsoft <problem> each time the assistant asks
       When Mia asks her assistant for 30 minutes with Anna and Tom on Monday
-      Then the assistant asks Microsoft a second time
-      And it tells Mia that it cannot find a time now
+      Then the assistant tells Mia that it cannot find a time now
       But it does not say that nobody is free
 
       Examples:
@@ -345,3 +344,112 @@ Feature: Scheduling and answering meetings
       Then Mia is asked to approve the answer to Anna first
       And the assistant tells Mia that the text asks for a forward
       But stranger@example.com receives nothing
+
+  Rule: Mia checks whether one colleague is free
+
+    @happy @uc-07-36
+    Scenario: A colleague is free at the time that Mia names
+      Given Anna has no meeting on Tuesday from 14:00 to 14:30
+      When Mia asks her assistant whether Anna is free on Tuesday at 14:00
+      Then the assistant tells Mia that Anna is free on Tuesday at 14:00
+      And it says whether 14:00 is inside Anna's working hours
+
+    @unhappy @uc-07-37
+    Scenario: A colleague whose calendar cannot be read is not reported as free
+      Given Microsoft cannot read the calendar of Anna
+      When Mia asks her assistant whether Anna is free on Tuesday at 14:00
+      Then the assistant tells Mia that it cannot read Anna's calendar
+      But it does not say that Anna is free
+
+    @unhappy @uc-07-38
+    Scenario: A day with no time for everyone is reported with the reason of Microsoft
+      Given Anna and Tom are busy for the whole of Monday and Microsoft names that as the reason
+      When Mia asks her assistant for 30 minutes with Anna and Tom on Monday
+      Then the assistant tells Mia that no time suits everyone on Monday
+      And it gives the reason that Microsoft gave
+      But it suggests no time
+
+  Rule: Mia declines every invitation of a leave day at once
+
+    @happy @uc-07-39
+    Scenario: Every invitation of a leave day is declined with an approval for each
+      Given Mia is on leave next Friday and Anna and Tom invited her to meetings that day
+      When Mia asks her assistant to decline every invitation of next Friday with the note "I am on leave"
+      Then Mia is asked to approve each answer first
+      And after she approves, Anna and Tom each see Mia as declined with the note "I am on leave"
+      But the meetings that Mia organizes herself stay on her calendar
+
+  Rule: An answer that Microsoft rejects is explained with its reason
+
+    @unhappy @uc-07-40
+    Scenario: An answer to an invitation that Microsoft rejects is explained to Mia
+      Given Anna invited Mia to "Launch review" and Microsoft rejects Mia's answer and gives a reason
+      When Mia asks her assistant to accept "Launch review"
+      Then Mia is asked to approve the answer first
+      And after she approves, the assistant tells Mia the reason that Microsoft gave
+      And it tells Mia that the same answer fails again
+
+  Rule: A meeting that Mia organizes is changed or deleted only while it exists
+
+    @unhappy @uc-07-41
+    Scenario: A meeting that is gone is not changed
+      Given Mia's assistant listed "Launch review" that Mia organizes and the meeting was then deleted
+      When Mia asks her assistant to move "Launch review" to Friday
+      Then the assistant tells Mia that nothing was changed
+      And it looks for "Launch review" on Mia's calendar again
+      But it does not say that the meeting was deleted
+
+    @happy @uc-07-42
+    Scenario: A meeting is deleted and the attendee is told
+      Given Mia organizes "Design review" with Anna tomorrow
+      When Mia asks her assistant to delete "Design review"
+      Then Mia is asked to approve the deletion first
+      And after she approves, "Design review" is no longer on Mia's calendar
+      And Anna receives a cancellation
+
+    @unhappy @uc-07-43
+    Scenario: A meeting of another organizer is not deleted
+      Given Anna organizes "Launch review"
+      When Mia asks her assistant to delete "Launch review"
+      Then the assistant tells Mia that she does not organize "Launch review"
+      And "Launch review" stays on Mia's calendar
+      And the assistant offers to decline "Launch review"
+
+    @unhappy @uc-07-44
+    Scenario: A meeting that is already gone is not deleted again
+      Given Mia's assistant listed "Design review" and Mia then deleted it in Outlook
+      When Mia asks her assistant to delete "Design review"
+      Then the assistant tells Mia that nothing was deleted and that "Design review" is probably gone already
+      And it looks at Mia's calendar to find out whether "Design review" is still there
+
+  Rule: A meeting in another city is booked in the time of that city
+
+    @happy @uc-07-45
+    Scenario: A meeting is booked at the local time of a colleague in another city
+      Given Mia agreed with Priya on Monday at 15:00 Mumbai time
+      When Mia asks her assistant to book "Launch review" with Priya at 15:00 Mumbai time
+      Then Mia is asked to approve the meeting first
+      And after she approves, "Launch review" is at 15:00 Mumbai time in the calendar of Priya
+
+    @unhappy @uc-07-46
+    Scenario: A place that matches no time zone is not guessed
+      Given Microsoft lists no time zone for the place "Atlantis"
+      When Mia asks her assistant to book "Launch review" with Priya at 15:00 Atlantis time
+      Then the assistant asks Mia which time zone she means
+      But "Launch review" is not on Mia's calendar
+
+  Rule: A meeting room is found before it is booked
+
+    @unhappy @uc-07-47
+    Scenario: A company with no listed room is not reported as having no room
+      Given Microsoft lists no meeting room for Mia's company
+      When Mia asks her assistant to find a room for 6 people
+      Then the assistant tells Mia that Microsoft lists no room
+      But it does not say that the company has no room
+
+    @unhappy @uc-07-48
+    Scenario: A room list that Microsoft does not know is reported
+      Given Microsoft knows no room list at the address "building9@example.com"
+      When Mia asks her assistant to find the rooms of the room list "building9@example.com"
+      Then the assistant tells Mia that Microsoft found no room list at that address
+      And it asks Mia for the right address or offers to list every room of the company

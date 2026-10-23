@@ -109,6 +109,13 @@ Feature: Mailbox preferences
       Then the assistant gives the text of the message
       But the list of fixed senders does not change
 
+    @happy @uc-11-24
+    Scenario: The senders with a fixed tab are listed
+      Given Mia fixed "ada@acme.example" in the Focused tab and "news@shop.example" in the Other tab
+      When Mia asks her assistant which senders have a fixed tab
+      Then the assistant lists "ada@acme.example" with the Focused tab
+      And it lists "news@shop.example" with the Other tab
+
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant never reports a failed reading as an automatic reply that is off.
 
@@ -209,6 +216,50 @@ Feature: Mailbox preferences
       When Mia asks her assistant to turn on her out-of-office reply from Monday to Friday, and she approves it each time she is asked
       Then the assistant tells Mia that Microsoft could not store the reply
       But it does not tell Mia that the reply is on
+
+    @unhappy @uc-11-25
+    Scenario Outline: The senders with a fixed tab cannot be read and Mia is told why
+      Given Microsoft <problem>
+      When Mia asks her assistant which senders have a fixed tab
+      Then the assistant tells Mia <told>
+      But it does not tell Mia that no sender has a fixed tab
+
+      Examples:
+        | problem                                                       | told                                                          |
+        | refuses because Mia's sign-in has expired                     | that she must sign in again                                   |
+        | refuses access to Mia's mail                                  | that an administrator must give the assistant access to mail  |
+        | stays busy at every try and asks to wait 30 seconds each time | that the check can run again after 30 seconds                 |
+
+    @unhappy @uc-11-26
+    Scenario Outline: A tab that Microsoft refuses to store is not set
+      Given Microsoft <problem> when the assistant stores the tab of "ada@acme.example"
+      When Mia asks her assistant to always put mail from "ada@acme.example" in Focused
+      Then the assistant tells Mia <told>
+      But the tab of "ada@acme.example" does not change
+
+      Examples:
+        | problem                                                       | told                                                                |
+        | refuses because Mia's sign-in has expired                     | that she must sign in again                                         |
+        | refuses access to change Mia's mail                           | that an administrator must give the assistant access to change mail |
+        | stays busy at every try and asks to wait 30 seconds each time | that the tab can be set after 30 seconds                            |
+
+    @unhappy @uc-11-27
+    Scenario Outline: A tab that Microsoft fails to store is stored at a second try
+      Given Microsoft <problem> on the first try and answers on the second try
+      When Mia asks her assistant to always put mail from "ada@acme.example" in Focused
+      Then the list of fixed senders holds "ada@acme.example" once, in the Focused tab
+
+      Examples:
+        | problem                  |
+        | fails on its side        |
+        | does not answer in time  |
+
+    @unhappy @uc-11-28
+    Scenario: A tab that Microsoft fails to store twice is reported
+      Given Microsoft fails on the first try and on the second try
+      When Mia asks her assistant to always put mail from "ada@acme.example" in Focused
+      Then the assistant tells Mia that Microsoft could not store the tab
+      But it does not tell Mia that the tab is set
 
   Rule: Mia is told when the assistant lacks a permission that an administrator must give
 

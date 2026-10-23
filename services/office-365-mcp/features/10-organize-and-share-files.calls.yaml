@@ -379,7 +379,7 @@ uc-10-31:
   chain:
     - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - any_of: [sharepoint_move_item, sharepoint_delete_item, sharepoint_rename_item, sharepoint_invite, sharepoint_create_text_file]
-  note: "expected behaviour for every row from shared/seam.py:227-233 (_no_answer; the answer path is shared/seam.py:263): nothing was changed, this connector received no answer, tell the user that they can make the same request again, do not call this tool again for the same request unless the user asks for it in a new message. The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the rename uses Rename Plan v1.docx to Plan v2.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
+  note: "The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (shared/seam.py:227-233 and :255-263). A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). Expected behaviour for every row from shared/seam.py:227-233 (_no_answer; the answer path is shared/seam.py:263): nothing was changed, this connector received no answer, tell the user that they can make the same request again, do not call this tool again for the same request unless the user asks for it in a new message. The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the rename uses Rename Plan v1.docx to Plan v2.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
 
 uc-10-32:
   status: untested
@@ -457,3 +457,32 @@ uc-10-36:
       optional: true
       uses: {item: handle of the file Plan.docx, to_folder: handle of the folder Archive}
   note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Files.ReadWrite.All (tools/sharepoint_move_item.py:45), so the call never reaches Microsoft Graph and never reaches the question to Mia. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The move step is optional because the failing call is not a required step. The Then holds the same for every write tool of this feature."
+
+uc-10-37:
+  status: untested
+  ask: "Copy my Template folder into my Archive folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Template}
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_copy_item
+      uses: {item: handle of the folder Template, to_folder: handle of the folder Archive}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Archive}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:82-83: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:259), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:78-81), and no text says who tells Mia."
+
+uc-10-38:
+  status: untested
+  ask: "Create the folder 2026 Signed in my Contracts folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_folder
+      args: {name: 2026 Signed}
+      uses: {parent: handle of the folder Contracts}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Contracts}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:48) and tools/sharepoint_create_folder.py:68-69: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:168), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:66), and the failure comes after the question."

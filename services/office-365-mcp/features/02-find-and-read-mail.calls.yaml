@@ -478,3 +478,112 @@ uc-02-33:
     assistant to ask a Microsoft 365 administrator to grant the permissions and to consent for the
     organization, then to have the user sign in again, and that retrying will not help. The failed
     call is the only step, so it is optional. A failed search is never an empty result.
+
+uc-02-34:
+  status: untested
+  ask: "What does the Brightway offer for the new office say?"
+  provenance: observed
+  evidence: >-
+    Usage report 6c, 2026-10-14 to 2026-10-23, outlier sessions left out: outlook_list_mail then
+    outlook_search_mail in 25 sessions, and list, search, read in 5 sessions. The logs hold tool
+    names and no arguments, so that the listing did not hold the message is the analyst's reading.
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {limit: 25}
+    - tool: outlook_search_mail
+      args: {sender: Brightway, subject: Offer for the new office}
+    - tool: outlook_read_mail
+      optional: true
+      uses: {uri: uri of the message from the search}
+  note: >-
+    Expected behaviour from tools/outlook_list_mail.py:73-80, the listing gives the newest messages
+    of one folder, finding messages by words is for outlook_search_mail, and a listing with `capped`
+    true cannot show that no message matches. A message older than the listing is therefore never
+    reported as missing before the search has run.
+
+uc-02-35:
+  status: untested
+  ask: "What is the newest message from Anna about the budget?"
+  provenance: observed
+  evidence: >-
+    Usage report 6c, 2026-10-14 to 2026-10-23, outlier sessions left out: search, list, search in 5
+    sessions. The logs hold tool names and no arguments, so the purpose of the second call is the
+    analyst's reading.
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {sender: Anna, query: budget}
+    - tool: outlook_list_mail
+      optional: true
+      args: {limit: 5}
+      uses: {from_address: address of Anna from the search result}
+    - tool: outlook_search_mail
+      optional: true
+      args: {sender: Anna, query: budget}
+  note: >-
+    Expected behaviour from tools/outlook_search_mail.py:63-65, the matches come in the index's own
+    order and not newest first, and from shared/mail.py:210-212, each row holds `received_at`,
+    so the assistant picks the newest row itself. The topic filter is the point of the scenario: a
+    newer message from Anna on another topic must not win. tools/outlook_list_mail.py:73 lists newest
+    first for one sender and cannot filter by topic, unlike uc-02-14. The two optional steps are the second route that the logs show.
+
+uc-02-36:
+  status: untested
+  ask: "Show me the unread messages in my Projects folder."
+  provenance: observed
+  evidence: >-
+    Usage report 6c, 2026-10-14 to 2026-10-23, outlier sessions left out: outlook_browse_folders
+    then outlook_list_mail in 8 sessions. The logs hold tool names and no arguments, so that the
+    listing named a folder of Mia is the analyst's reading.
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+      args: {limit: 100}
+    - tool: outlook_list_mail
+      args: {unread_only: true, limit: 25}
+      uses: {folder_ref: uri of Projects from outlook_browse_folders}
+  note: >-
+    Expected behaviour from tools/outlook_list_mail.py:84-87 and :108-112, `folder` takes only a
+    well-known name such as inbox, and a folder that Mia made is addressed with `folder_ref`, the
+    handle that outlook_browse_folders reported in `uri`. A folder name is not a handle.
+
+uc-02-37:
+  status: untested
+  ask: "Show me the unread messages in my Projects folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {unread_only: true, limit: 25}
+      uses: {folder_ref: old uri of Projects from earlier in the chat}
+    - tool: outlook_browse_folders
+      args: {limit: 100}
+    - tool: outlook_list_mail
+      args: {unread_only: true, limit: 25}
+      uses: {folder_ref: uri of Projects reported now}
+  note: >-
+    Expected behaviour from tools/outlook_list_mail.py:51-59 (GRAPH_NOT_FOUND), the handle is well
+    formed, Outlook can give a moved or copied folder a new id, so call outlook_browse_folders again
+    and take the uri that it reports now, and retrying the old handle fails identically. The first
+    list uses the old handle from earlier in the chat, and Outlook refuses it.
+
+uc-02-38:
+  status: untested
+  ask: "Show me the messages that I sent to myself."
+  provenance: observed
+  evidence: >-
+    Usage report 6c, 2026-10-14 to 2026-10-23, outlier sessions left out: get_me then
+    outlook_list_mail in 5 sessions. The logs hold tool names and no arguments, so that the first
+    call gave the address of Mia is the analyst's reading.
+  asks_user: false
+  chain:
+    - tool: get_me
+    - tool: outlook_list_mail
+      args: {limit: 25}
+      uses: {from_address: email of Mia from get_me}
+  note: >-
+    Expected behaviour from tools/get_me.py:24-25, the profile applies when a request depends on who
+    "me" is, and from tools/get_me.py:66-68, `email` is the address to match against the sender of a
+    message. outlook_list_mail takes one address and not a name in `from_address`
+    (tools/outlook_list_mail.py:100-106). Mail that Mia sent to herself arrives in her inbox.

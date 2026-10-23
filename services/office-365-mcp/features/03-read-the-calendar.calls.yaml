@@ -124,7 +124,7 @@ uc-03-11:
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
-  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it), and from shared/seam.py:562-570 for a list that never ends (advice: retry once if the list matters, if it happens again, stop and report)."
+  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it; the second step in the chain is that retry), and from shared/seam.py:562-570 for a list that never ends (advice: retry once if the list matters, if it happens again, stop and report)."
 
 uc-03-12:
   status: untested
@@ -252,3 +252,87 @@ uc-03-21:
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
   note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-03-10 reaches the assistant only when Microsoft stays busy through every try."
+
+uc-03-22:
+  status: untested
+  provenance: drafted
+  ask: "On which dates does the Team sync take place in the next six weeks?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Team sync, starts_on: today, ends_on: in 6 weeks, time_zone: Europe/Zurich}
+    - tool: outlook_list_event_instances
+      args: {starts_on: today, ends_on: in 6 weeks, time_zone: Europe/Zurich}
+      uses: {uri: series_master_uri of the listing row}
+  note: "expected behaviour from tools/outlook_list_event_instances.py:56-69 and :145-150: the tool takes the series master and lists the dates of the series inside the window, and Microsoft states that an occurrence canceled from the series is not in the list. outlook_list_events differs: it keeps a canceled event, with cancelled true (tools/outlook_list_events.py:168)."
+
+uc-03-23:
+  status: untested
+  provenance: drafted
+  ask: "On which dates does the Budget review take place?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Budget review}
+    - tool: outlook_list_event_instances
+      optional: true
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_read_event
+      optional: true
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_list_event_instances.py:98-104 _DOES_NOT_REPEAT: nothing was read, because the event is not part of a recurring series, only a series has instances, to read the event call outlook_read_event with the same uri. Both later steps are optional: the listing row already gives in_series false, series_master_uri null (shared/calendar.py:743-800) and the time, so the call that Microsoft refuses can be avoided, and the read is not needed."
+
+uc-03-24:
+  status: untested
+  provenance: drafted
+  ask: "On which dates does the Team sync take place in the next six weeks?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Team sync}
+    - tool: outlook_list_event_instances
+      uses: {uri: series_master_uri of the listing row}
+    - tool: outlook_list_events
+      args: {subject_contains: Team sync}
+  note: "expected behaviour from tools/outlook_list_event_instances.py:42-49 GRAPH_NOT_FOUND: Microsoft gives one 404 for deleted, moved, and not visible, report that the tool failed to read the series and not that the series ended, and to find the series again call outlook_list_events for a window that holds one date of the series. The tool reads the master before any other call, so the refusal needs no approval."
+
+uc-03-25:
+  status: untested
+  provenance: drafted
+  ask: "Which reminders do I have this week?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_reminders
+      args: {starts_on: today, ends_on: in 7 days, time_zone: Europe/Zurich}
+
+uc-03-26:
+  status: untested
+  provenance: drafted
+  ask: "Which reminders do I have this week?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_reminders
+      args: {starts_on: today, ends_on: in 7 days, time_zone: Europe/Zurich}
+  note: "model behaviour, no code guard (source: tools/outlook_list_reminders.py:40-41, the third note: Graph does not say which calendars the view covers, and an empty list does not prove that no calendar holds a reminder; and :107-112, the reminders field: an empty list means that Graph returned no reminder, read capped before you report that the list is complete)."
+
+uc-03-27:
+  status: untested
+  provenance: drafted
+  ask: "How are my calendars grouped?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendar_groups
+  note: "tools/outlook_list_calendar_groups.py:33-38: the tool shows how the groups hold the calendars and which of them the user owns (is_mine). outlook_list_calendars lists every calendar without the groups."
+
+uc-03-28:
+  status: untested
+  provenance: drafted
+  evidence: outlook_list_events right after get_me in 4 sessions; the logs hold no arguments, so the reason for get_me is not known
+  ask: "Which of my meetings tomorrow do I organize myself?"
+  asks_user: false
+  chain:
+    - tool: get_me
+      optional: true
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
+  note: "expected behaviour from shared/calendar.py:773-775 and tools/outlook_list_events.py:411: a row says whether the calendar owner is the organizer (owner_is_organizer), so the listing alone answers, and get_me is optional. get_me holds no time zone, only preferred_language (tools/get_me.py:101-104), so it is not the source of time_zone."

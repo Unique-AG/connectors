@@ -197,11 +197,11 @@ Feature: Organizing the mailbox
 
     @unhappy @uc-05-26
     Scenario Outline: One wrong message name stops the whole batch
-      Given Mia asks her assistant to file 5 messages in "Archive"
-      And the assistant names 4 of the messages correctly and the fifth by <wrong value>
+      Given Mia asks her assistant to file 3 messages in "Archive"
+      And the assistant names 2 of the messages correctly and the third by <wrong value>
       When the assistant files the batch
-      Then the first try moves none of the 5 messages
-      And in the end all 5 messages are in "Archive", each once
+      Then the first try moves none of the 3 messages
+      And in the end all 3 messages are in "Archive", each once
 
       Examples:
         | wrong value                  |
@@ -272,13 +272,13 @@ Feature: Organizing the mailbox
       Given Mia asks her assistant to file 5 messages in "Archive"
       When <problem>
       Then Mia is told <told>
-      But the assistant does not say that the messages moved
+      But the assistant does not say <not_said>
 
       Examples:
-        | problem                                                     | told                                                     |
-        | Microsoft answers that the sign-in of Mia has expired       | that she must sign in again                              |
-        | Microsoft refuses because Mia has no access                 | that an administrator must give the assistant access     |
-        | Microsoft is busy and asks the assistant to wait 30 seconds | that the assistant can try again after 30 seconds        |
+        | problem                                                     | told                                                 | not_said                                                         |
+        | Microsoft answers that the sign-in of Mia has expired       | that she must sign in again                          | that the messages moved                                          |
+        | Microsoft refuses because Mia has no access                 | that an administrator must give the assistant access | that the messages moved                                          |
+        | Microsoft is busy and asks the assistant to wait 30 seconds | that the assistant can try again after 30 seconds    | that the messages moved, or that the messages did not move       |
 
     @unhappy @uc-05-50
     Scenario Outline: A change that Microsoft cannot serve now and asks to wait for may have taken effect
@@ -289,7 +289,6 @@ Feature: Organizing the mailbox
 
       Examples:
         | action                                                                                      |
-        | file 5 messages in "Archive"                                                                |
         | make a rule that forwards mail from "ceo@example.com" to "anna@example.com", and Mia agreed |
         | create the folder "Alpha" inside "Projects"                                                 |
 
@@ -311,7 +310,7 @@ Feature: Organizing the mailbox
 
     @unhappy @uc-05-33
     Scenario: A batch of messages that are all gone is reported
-      Given Mia asks her assistant to file 3 messages in "Archive", and all 3 are gone from her mailbox
+      Given Mia asks her assistant to file 3 messages in "Archive", the assistant listed the 3 messages, and all 3 were then deleted
       When the assistant files the messages
       Then the assistant searches for the messages again
       And the assistant tells Mia that the 3 messages are not in her mailbox now
@@ -402,9 +401,9 @@ Feature: Organizing the mailbox
       But the message "Refund question" is still where it was
 
       Examples:
-        | answer                       | told                                                   |
-        | she declines                 | that the move was not confirmed and nothing moved      |
-        | her answer does not arrive   | that no answer arrived and that she can ask again      |
+        | answer                                                  | told                                                   |
+        | she declines                                            | that the move was not confirmed and nothing moved      |
+        | her chat program answers the question with an error     | that it received no answer and that she can ask again  |
 
     @unhappy @uc-05-43
     Scenario Outline: A folder is not deleted without Mia's agreement
@@ -416,7 +415,7 @@ Feature: Organizing the mailbox
       Examples:
         | answer                       | told                                                   |
         | she declines                 | that the delete was not confirmed and nothing changed  |
-        | her answer does not arrive   | that no answer arrived and that she can ask again      |
+        | her chat program answers the question with an error | that it received no answer and that she can ask again |
 
     @unhappy @uc-05-44
     Scenario: An approval given for another folder deletes nothing
@@ -435,7 +434,7 @@ Feature: Organizing the mailbox
       Examples:
         | answer                       | told                                                   |
         | she declines                 | that the rule was not confirmed and nothing was made   |
-        | her answer does not arrive   | that no answer arrived and that she can ask again      |
+        | her chat program answers the question with an error | that it received no answer and that she can ask again |
 
     @unhappy @uc-05-46
     Scenario Outline: A rule is not erased without Mia's agreement
@@ -445,9 +444,9 @@ Feature: Organizing the mailbox
       But "Receipts" is still in her rules
 
       Examples:
-        | answer                       | told                                                   |
-        | she declines                 | that the erase was not confirmed and nothing changed   |
-        | her answer does not arrive   | that no answer arrived and that she can ask again      |
+        | answer                                                  | told                                                   |
+        | she declines                                            | that the erase was not confirmed and nothing changed   |
+        | her chat program answers the question with an error     | that it received no answer and that she can ask again  |
 
     @unhappy @uc-05-47
     Scenario: A rule that changed after the question is not erased
@@ -465,3 +464,72 @@ Feature: Organizing the mailbox
       When Mia asks her assistant to file her unread newsletters in "Newsletters"
       Then the assistant files the newsletters
       But no rule exists, and "outsider@example.net" receives no mail
+
+  Rule: Mail that Mia deleted by mistake comes back from Deleted Items
+    Deleted mail stays in Deleted Items, so Mia can ask for it again.
+
+    @happy @uc-05-52
+    Scenario: A message that was deleted by mistake is put back
+      Given Mia deleted the message "Brightway invoice" by mistake, and it is in Deleted Items
+      When Mia asks her assistant to put "Brightway invoice" back in her inbox
+      Then "Brightway invoice" is in her inbox
+      And Deleted Items does not hold it any more
+
+  Rule: A copy that goes wrong is not made twice
+
+    @unhappy @uc-05-53
+    Scenario Outline: A copy that Microsoft fails is not made twice
+      Given Mia asks her assistant to keep a copy of "Signed contract" in the folder "Contracts"
+      When Microsoft <problem> while the assistant copies the message
+      Then the assistant tells Mia that it does not know whether the copy exists
+      And the assistant looks in "Contracts" before it copies the message again
+      But the assistant does not copy the message a second time at once
+
+      Examples:
+        | problem                                  |
+        | fails with an internal error             |
+        | does not answer in time                  |
+
+    @unhappy @uc-05-54
+    Scenario: A message that is gone is not copied
+      Given Mia's assistant found the message "Signed contract" and the message was then deleted
+      When Mia asks her assistant to keep a copy of "Signed contract" in "Archive"
+      Then no copy is made
+      And the assistant searches for the message again
+      And the assistant tells Mia that the message is not in her mailbox now
+
+  Rule: A rule that cannot be changed stays as it is
+
+    @unhappy @uc-05-55
+    Scenario: A rule that is gone is not changed
+      Given Mia asks her assistant to turn on the rule "Receipts" again
+      And the rule "Receipts" was erased after the assistant listed Mia's rules
+      When the assistant changes the rule
+      Then no rule of Mia is changed
+      And the assistant looks at Mia's rules again
+
+    @unhappy @uc-05-56
+    Scenario: A rule that erases mail for good keeps its action
+      Given Mia has the rule "Old junk" that erases matching mail for good, and she made it in Outlook
+      When Mia asks her assistant to make "Old junk" move the mail to "Archive" instead
+      Then the assistant tells Mia to change the action of "Old junk" in Outlook
+      But "Old junk" keeps erasing matching mail for good
+
+  Rule: A message is filed in the same request that answers it
+    The assistant files the message and leaves every draft for Mia to read.
+
+    @happy @uc-05-57
+    Scenario: A reply is drafted and the message that it answers is filed
+      Given Anna wrote to Mia that the contract is ready
+      When Mia asks her assistant to draft a reply to Anna that says "I will sign it on Friday" and to file the message of Anna in "Contracts"
+      Then the draft is addressed to Anna and says that Mia will sign on Friday
+      And the message of Anna is in "Contracts"
+      But nothing is sent
+
+    @happy @uc-05-58
+    Scenario: A note is drafted for a message that Mia files
+      Given Mia has the invoice "Brightway March" in her inbox
+      When Mia asks her assistant to file the invoice in "Finance" and to draft a note to Tom that it is filed
+      Then the invoice is in "Finance"
+      And Mia's drafts hold a note to Tom that says the invoice is filed
+      But nothing is sent

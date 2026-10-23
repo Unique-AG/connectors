@@ -316,7 +316,7 @@ uc-01-22:
       uses: {file: folder handle from the search}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Tenders}
-  note: "expected behaviour from tools/sharepoint_read_file.py:69-79 (_NOT_A_FILE_HANDLE, raised at :134-136 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:185-186), so the assistant may browse without the failed read, which is why that step is optional. Then it reads one of the files that Mia names."
+  note: "expected behaviour from tools/sharepoint_read_file.py:69-79 (_NOT_A_FILE_HANDLE, raised at :134-136 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:185-186), so the assistant may browse without the failed read, which is why that step is optional."
 
 uc-01-23:
   status: untested
@@ -435,3 +435,68 @@ uc-01-31:
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
   note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for the delegated permission of the first call that needs it (sharepoint_read_file asks for Files.Read.All), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
+
+uc-01-32:
+  status: untested
+  ask: "Which drive holds my files?"
+  provenance: drafted
+  evidence: sharepoint_list_drives, 1 call in prod between 2026-10-14 and 2026-10-23; the logs hold the tool name and no chain
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_drives
+  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:62-67)
+
+uc-01-33:
+  status: partly
+  ask: "Which document libraries does the Sales site have?"
+  blocker:
+    kind: tool
+    tool: sharepoint_list_drives
+    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries.
+    user: The assistant cannot list the document libraries of a site.
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_drives
+      optional: true
+    - tool: sharepoint_search_sites
+      args: {query: Sales}
+  note: "expected behaviour from tools/sharepoint_list_drives.py:36-37: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
+
+uc-01-34:
+  status: untested
+  ask: "Find the Zephyr site."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: Zephyr}
+  note: "expected behaviour from tools/sharepoint_search_sites.py:75-77 (SiteList.sites): an empty list means that no site matched. The tool states no sentence for Mia, so the assistant reports the empty list as found no site."
+
+uc-01-35:
+  status: untested
+  ask: "Which sites mention Project?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: Project}
+  note: "expected behaviour from tools/sharepoint_search_sites.py:81-85 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched. Below 1000 matches the assistant raises `limit` (default 25, tools/sharepoint_search_sites.py:135-142) and shows all of them, so the scenario states more than 1000 matches, where capped stays true and the assistant makes `query` more specific."
+
+uc-01-36:
+  status: untested
+  ask: "What is the budget that the Brightway launch plan names?"
+  provenance: observed
+  evidence: "sharepoint_read_file then sharepoint_search_files in 4 sessions, and read, search, read in 3 sessions, between 2026-10-14 and 2026-10-23 (usage report 6c); the logs hold tool names and no arguments, so the reason for the second search is the reading of the analyst"
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      optional: true
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle of the launch plan from the search}
+    - tool: sharepoint_search_files
+      args: {query: Brightway Pricing}
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle of the workbook from the second search}

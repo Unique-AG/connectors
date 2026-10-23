@@ -335,7 +335,7 @@ uc-05-25:
 
 uc-05-26:
   status: untested
-  ask: "File these 5 messages in my Archive folder."
+  ask: "File these 3 messages in my Archive folder."
   provenance: drafted
   evidence: outlook_move_mail failed 17 times in 15 sessions; the 4 newest passed a value that is not a message handle, and nothing moved (features/README.md, What the usage shows)
   asks_user: false
@@ -344,18 +344,18 @@ uc-05-26:
       pick: outlook_list_mail
     - tool: outlook_move_mail
       args: {destination: archive}
-      uses: {message_refs: 4 uri values from the listing and 1 value that is not a message handle}
+      uses: {message_refs: 2 uri values from the listing and 1 value that is not a message handle}
     - any_of: [outlook_search_mail, outlook_list_mail]
       pick: outlook_list_mail
       optional: true
     - tool: outlook_move_mail
       args: {destination: archive}
-      uses: {message_refs: all 5 uri values from the new listing}
+      uses: {message_refs: all 3 uri values from the new listing}
       bind: {message_refs: "$prev.messages[*].uri"}
       expect:
         result: {moved_count: 3, failed_count: 0}
         graph_calls: {POST /v1.0/me/messages/*/move: 3}
-  note: "expected behaviour from tools/outlook_move_mail.py:112 (_NOT_A_MESSAGE_HANDLE): a subject line, an email address, an Outlook web link, a bare message id and a folder or rule handle are not handles. The tool checks every handle before any message moves, so nothing moved, and the assistant fixes the value and calls again with the whole batch. The first call makes no Microsoft call. The second listing is optional, because the first listing already holds the right uri values. The logs show the failing move and no arguments (features/README.md, What the usage shows), so the batch of 4 plus 1 and the 5 wrong values are drafted. uc-05-03 states the success side."
+  note: "expected behaviour from tools/outlook_move_mail.py:112 (_NOT_A_MESSAGE_HANDLE): a subject line, an email address, an Outlook web link, a bare message id and a folder or rule handle are not handles. The tool checks every handle before any message moves, so nothing moved, and the assistant fixes the value and calls again with the whole batch. The first call makes no Microsoft call. The second listing is optional, because the first listing already holds the right uri values. The logs show the failing move and no arguments (features/README.md, What the usage shows), so the batch of 2 plus 1 and the 5 wrong values are drafted. uc-05-03 states the success side."
   variants:
     subject-line:
       cassette: uc-05-26
@@ -420,7 +420,7 @@ uc-05-31:
     - tool: outlook_move_mail
       args: {destination: archive}
       uses: {message_refs: uri values from the previous listing}
-  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. When every message fails, the first failure is the answer (shared/mail.py:426-431)."
+  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. When every message fails, the first failure is the answer (shared/mail.py:426-431). The move runs with no_retry (tools/outlook_move_mail.py:275), and a 503 with a wait time can arrive after Microsoft did the move (errors.py:293-303, uc-05-50), so the busy row does not say that the messages did not move."
 
 uc-05-32:
   status: untested
@@ -450,7 +450,7 @@ uc-05-33:
       args: {destination: archive}
       uses: {message_refs: uri values from the previous listing}
     - tool: outlook_search_mail
-  note: "expected behaviour from tools/outlook_move_mail.py:55 (GRAPH_NOT_FOUND) for a call without `folder_ref`: a message handle is stale, find the message again with outlook_search_mail, and if the search does not find it, tell the user that the message is not in this mailbox now. When every message fails, the answer is an error (shared/mail.py:426-431). One missing message among others is uc-05-16."
+  note: "The first step lists the 3 messages and the delete comes after it, so the move gets the old handles. Expected behaviour from tools/outlook_move_mail.py:55 (GRAPH_NOT_FOUND) for a call without `folder_ref`: a message handle is stale, find the message again with outlook_search_mail, and if the search does not find it, tell the user that the message is not in this mailbox now. When every message fails, the answer is an error (shared/mail.py:426-431). One missing message among others is uc-05-16."
 
 uc-05-34:
   status: untested
@@ -577,7 +577,7 @@ uc-05-42:
     - tool: outlook_move_mail
       args: {mailbox: support@example.com}
       uses: {message_refs: uri values from the previous listing, folder_ref: uri of Handled from outlook_browse_folders}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again. uc-05-05 states the question."
+  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). uc-05-05 states the question."
 
 uc-05-43:
   status: untested
@@ -619,7 +619,7 @@ uc-05-46:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_delete_mail_rule
       uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The rule was not deleted, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The rule delete asks every time (tools/outlook_delete_mail_rule.py:62)."
+  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The rule was not deleted, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The rule delete asks every time (tools/outlook_delete_mail_rule.py:62)."
 
 uc-05-47:
   status: untested
@@ -668,8 +668,8 @@ uc-05-50:
   provenance: drafted
   asks_user: true
   chain:
-    - any_of: [outlook_move_mail, outlook_create_mail_rule, outlook_create_folder]
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam.py:514-518: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. These three writes run with no_retry (tools/outlook_move_mail.py:275, tools/outlook_create_mail_rule.py:129, tools/outlook_create_folder.py:158), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the change happened. The asks of the rows: file 5 messages in Archive; make a rule that forwards mail from ceo@example.com to anna@example.com; create the folder Alpha inside Projects. Only the forwarding rule asks Mia. A second forwarding rule can follow a repeat, and nothing in the advice says to look at the rules first. A repeated create of a folder is refused because the name is used (uc-05-36)."
+    - any_of: [outlook_create_mail_rule, outlook_create_folder]
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam.py:514-518: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. These two writes run with no_retry (tools/outlook_create_mail_rule.py:129, tools/outlook_create_folder.py:158), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the change happened. The asks of the rows: make a rule that forwards mail from ceo@example.com to anna@example.com; create the folder Alpha inside Projects. A move with a wait time is the third row of uc-05-31. Only the forwarding rule asks Mia, so asks_user is true for that row only. A second forwarding rule can follow a repeat, and nothing in the advice says to look at the rules first. A repeated create of a folder is refused because the name is used (uc-05-36)."
 
 uc-05-51:
   status: untested
@@ -679,3 +679,113 @@ uc-05-51:
   chain:
     - tool: outlook_browse_folders
   note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-05-29 reaches the assistant only when Microsoft stays busy through every try."
+
+uc-05-52:
+  status: untested
+  ask: "I deleted the Brightway invoice by mistake. Put it back in my inbox."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: deleteditems}
+    - tool: outlook_move_mail
+      args: {destination: inbox}
+      uses: {message_refs: uri of the message Brightway invoice from the listing of Deleted Items}
+  must_not: [outlook_delete_folder]
+  note: "a delete only moves mail to Deleted Items, and the message stays recoverable there (tools/outlook_move_mail.py:70-76, and shared/rules.py:895-896: the user can move a message back from there). The way back is the same move tool with `inbox` as the destination (shared/mail.py:91-92, WellKnownFolder). The undo that uc-05-04 promises."
+
+uc-05-53:
+  status: untested
+  ask: "Keep a copy of the message Signed contract in my Contracts folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_browse_folders
+      repeat: many
+    - tool: outlook_copy_mail
+      uses: {message_refs: uri of the message from the previous listing, folder_ref: uri of Contracts from outlook_browse_folders}
+    - tool: outlook_list_mail
+      uses: {folder_ref: uri of Contracts from outlook_browse_folders}
+  must_not: [outlook_move_mail]
+  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN) and tools/outlook_copy_mail.py:80-82 and 172-175: the connector does not know if Microsoft made the copy, do not call the tool again first, and make sure that outlook_list_mail does not show the copy in the destination folder (CHANGE_SHOWN_BY: outlook_read_mail or outlook_list_mail, :48). A copy is a new message, so a second call can make a second copy. The copy runs with no_retry (tools/outlook_copy_mail.py:291), so one failure makes one copy call. When the only message fails, the answer is an error (shared/mail.py:426-431). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text (uc-05-50)."
+
+uc-05-54:
+  status: untested
+  ask: "Keep a copy of the message Signed contract in my Archive folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_copy_mail
+      args: {destination: archive}
+      uses: {message_refs: uri of the message from the previous listing}
+    - tool: outlook_search_mail
+  must_not: [outlook_move_mail]
+  note: "The first step finds the message and the delete comes after it, so the copy gets the old handle. Expected behaviour from tools/outlook_copy_mail.py:60-65 (GRAPH_NOT_FOUND) for a call without `folder_ref` (a well-known destination): a message handle is stale, no message was copied, find the message again with outlook_search_mail, and if the search does not find it, tell the user that the message is not in this mailbox now. With `folder_ref` the text blames the destination folder instead (:56-59). When every message fails, the answer is an error (shared/mail.py:426-431). The same case for a move is uc-05-33."
+
+uc-05-55:
+  status: untested
+  ask: "Turn my Receipts rule on again."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {is_enabled: true}
+      uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
+    - tool: outlook_get_mailbox_settings
+  must_not: [outlook_create_mail_rule]
+  note: "The first step lists the rules and the erase comes after it, so the update gets the old handle. Expected behaviour from tools/outlook_update_mail_rule.py:56-64 (GRAPH_NOT_FOUND): the rule was not changed, a person or an earlier call probably deleted the rule, call outlook_get_mailbox_settings again to see the rules that are there now. The tool reads the rule before it writes (:163), so nothing is written for a rule that is gone. A call with a folder in `actions` can fail the same way when the folder is gone."
+
+uc-05-56:
+  status: untested
+  ask: "Change my rule Old junk so that it moves the mail to Archive and does not erase it."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {actions: {move_to_folder: archive}}
+      uses: {rule_ref: uri of the rule Old junk from outlook_get_mailbox_settings}
+  must_not: [outlook_create_mail_rule, outlook_delete_mail_rule]
+  note: "expected behaviour from tools/outlook_update_mail_rule.py:108-113 (_ERASES_PERMANENTLY) and :214-220: a rule that erases each matching message permanently keeps that action, tell the user to change the actions of the rule in Outlook, and to change the other parts call again without `actions` and `remove_actions`. The tool refuses before any write. The other parts of such a rule can change (:84-86)."
+
+uc-05-57:
+  status: untested
+  ask: "Draft a reply to Anna that says I will sign on Friday, and file her message in my Contracts folder."
+  provenance: observed
+  evidence: outlook_draft_reply then outlook_move_mail ran in 4 sessions of prod between 2026-10-14 and 2026-10-23, and a session of 22 calls on 2026-10-09 ran both; the logs hold tool names and not arguments, show no outlook_browse_folders between the two calls, and do not show that the move filed the message that the reply answers (the intent is read from the chain, not logged)
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread, outlook_read_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply, body_html: I will sign it on Friday}
+      uses: {message_ref: uri of the message of Anna}
+    - tool: outlook_browse_folders
+      optional: true
+      repeat: many
+    - tool: outlook_move_mail
+      uses: {message_refs: uri of the message of Anna, folder_ref: uri of Contracts from outlook_browse_folders}
+  must_not: [outlook_send_draft]
+  note: the draft and the move do not depend on each other, and the message keeps its handle after the move. The folder listing is optional because none of the 4 logged sessions shows one between the two calls. That the move filed the message that the reply answers is the analyst's reading of the chain, not logged
+
+uc-05-58:
+  status: untested
+  ask: "File the Brightway March invoice in my Finance folder and draft a note to Tom that it is filed."
+  provenance: drafted
+  evidence: outlook_draft_mail and outlook_move_mail ran adjacent in 4 distinct sessions of prod between 2026-10-14 and 2026-10-23; the logs hold tool names and not arguments, and show no outlook_browse_folders call and no intent for the note
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_browse_folders
+      optional: true
+      repeat: many
+    - tool: outlook_move_mail
+      uses: {message_refs: uri of the invoice from the listing, folder_ref: uri of Finance from outlook_browse_folders}
+    - tool: outlook_find_recipient
+      args: {query: Tom}
+    - tool: outlook_draft_mail
+      uses: {to: address of Tom from outlook_find_recipient}
+  must_not: [outlook_send_draft]
+  note: the logs show both orders, and the assistant can draft the note before it files the invoice. The folder listing is optional because no logged session shows one; the intent of the note is inferred

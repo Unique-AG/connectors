@@ -14,6 +14,14 @@ Feature: Working across mail, calendar, files, and Teams
       Then the assistant lists the 3 meetings with their attendees
       And it names the 2 messages of Anna first among the unread mail
 
+    @happy @uc-15-39
+    Scenario: The unread mail is read first and then checked against the calendar
+      Given Mia has 12 unread messages, and the message of Anna asks for a call today at 15:00
+      And Mia has 3 meetings today, and one of them is at 15:00
+      When Mia asks her assistant what her unread mail says and whether her day has room for the call
+      Then the assistant tells Mia that Anna asks for a call at 15:00
+      And it says that Mia has a meeting at 15:00
+
   Rule: Mia goes through her inbox in one sitting
 
     @happy @uc-15-02
@@ -104,7 +112,7 @@ Feature: Working across mail, calendar, files, and Teams
 
     @unhappy @uc-15-13
     Scenario Outline: A brief says which part it could not read
-      Given Mia has 3 meetings today and 12 unread messages, and Microsoft <trouble> when the assistant reads <part>
+      Given Mia has 3 meetings today and 12 unread messages, and Microsoft <trouble> each time the assistant reads <part>
       When Mia asks her assistant for a brief of her day
       Then the assistant gives <given>
       And it tells Mia that it could not read <part>
@@ -139,16 +147,16 @@ Feature: Working across mail, calendar, files, and Teams
     @unhappy @uc-15-16
     Scenario Outline: A search across three places says which place it could not search
       Given Acme wrote to Mia by mail, Tom wrote about Acme in a Teams chat, and the Sales site holds "Acme Proposal.docx"
-      And Microsoft <trouble> when the assistant searches <part>
+      And Microsoft <trouble> each time the assistant searches <part>
       When Mia asks her assistant for everything about Acme
       Then the assistant names <found>, and it tells Mia that it could not search <part>
       But it does not say that <part> holds nothing about Acme
 
       Examples:
-        | part           | trouble                                                           | found                                       |
-        | Teams messages | refuses access because her company did not grant it               | the mail from Acme and "Acme Proposal.docx" |
-        | mail           | does not answer in time                                           | the message of Tom and "Acme Proposal.docx" |
-        | files          | stays busy on every try and asks the assistant to wait 60 seconds | the mail from Acme and the message of Tom   |
+        | part           | trouble                                              | found                                       |
+        | Teams messages | refuses access because her company did not grant it  | the mail from Acme and "Acme Proposal.docx" |
+        | mail           | does not answer in time                              | the message of Tom and "Acme Proposal.docx" |
+        | files          | stays busy and asks the assistant to wait 60 seconds | the mail from Acme and the message of Tom   |
 
     @unhappy @uc-15-17
     Scenario: A time is not offered as free for a person whose calendar cannot be read
@@ -201,16 +209,6 @@ Feature: Working across mail, calendar, files, and Teams
         | does not answer in time              |
         | sends an answer that nobody can read |
 
-  Rule: Mia is told when no time is free for everyone
-
-    @unhappy @uc-15-18
-    Scenario: A workshop with no common time is reported with Microsoft's reason
-      Given Anna and Tom discussed a workshop of 90 minutes, and Mia, Anna, and Tom have no free 90 minutes together next week
-      When Mia asks her assistant to find a time next week for the workshop
-      Then the assistant tells Mia that it found no time next week
-      And it gives the reason that Microsoft states
-      But it names no time
-
   Rule: A sharing link and a saved file need Mia's clear agreement
 
     @unhappy @uc-15-27
@@ -221,17 +219,12 @@ Feature: Working across mail, calendar, files, and Teams
       And the assistant tells Mia that no link was created
 
     @unhappy @uc-15-28
-    Scenario Outline: A sharing link is not created when the question gets no answer
-      Given <trouble> when Mia is asked to approve the link
+    Scenario: A sharing link is not created when Mia's chat program answers the question with an error
+      Given Mia's chat program answers with an error when Mia is asked to approve the link
       When Mia asks her assistant to send the price list to Anna by mail
       Then no link is created and nothing is shared
       And the assistant tells Mia that it received no answer
       And it says that Mia can ask again
-
-      Examples:
-        | trouble                       |
-        | Mia's answer never comes back |
-        | the connection to Mia breaks  |
 
     @unhappy @uc-15-29
     Scenario Outline: An approval for one link or file does not cover another

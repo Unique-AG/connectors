@@ -285,6 +285,43 @@ def _blocker_table(kind: str, names: Mapping[str, tuple[str, str, str, str]]) ->
     return [f"### {_KIND_TITLES[kind]} ({len(rows)})", "", *head, *rows, ""]
 
 
+def exceptions() -> dict[str, Mapping[str, object]]:
+    path = _FEATURES / "coverage-exceptions.yaml"
+    return {
+        str(tool): _object(entry)
+        for tool, entry in _object(cast("object", yaml.safe_load(path.read_text()) or {})).items()
+    }
+
+
+def coverage() -> dict[str, tuple[int, int]]:
+    paths = {scenario_id: name[3] for scenario_id, name in _names().items()}
+    found = {tool: [0, 0] for tool in TOOL_NAMES}
+    for scenario_id, entry in _entries().items():
+        for step in map(_object, _list(entry["chain"])):
+            for tool in [step["tool"]] if "tool" in step else _list(step["any_of"]):
+                found[str(tool)][paths[scenario_id] == "unhappy"] += 1
+    return {tool: (happy, unhappy) for tool, (happy, unhappy) in found.items()}
+
+
+def _coverage_lines() -> list[str]:
+    counts, reasons = coverage(), exceptions()
+    complete = [tool for tool, (happy, unhappy) in counts.items() if happy and unhappy]
+    lines = [
+        "## Tool coverage",
+        "",
+        f"{len(complete)} of {len(counts)} tools have a happy and an unhappy scenario. "
+        + "A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.",
+        "",
+        "| Tool | happy | unhappy | Reason |",
+        "| --- | --- | --- | --- |",
+    ]
+    for tool, (happy, unhappy) in sorted(counts.items()):
+        if not (happy and unhappy):
+            reason = str(reasons.get(tool, {}).get("reason", ""))
+            lines.append(f"| `{tool}` | {happy} | {unhappy} | {reason} |")
+    return lines
+
+
 def render_status() -> str:
     names = _names()
     counts: dict[str, dict[str, int]] = {
@@ -307,12 +344,6 @@ def render_status() -> str:
         if found:
             happy = found.count("happy")
             paths.append(f"| {surface} | {happy} | {len(found) - happy} | {len(found)} |")
-    used = {
-        str(name)
-        for entry in _entries().values()
-        for step in map(_object, _list(entry["chain"]))
-        for name in ([step["tool"]] if "tool" in step else _list(step["any_of"]))
-    }
     runs = sum(1 for entry in _entries().values() if {"cassette", "variants"} & set(entry))
     lines = [
         "# office-365-mcp use case status",
@@ -345,11 +376,7 @@ def render_status() -> str:
         f"## {_KIND_TITLES['unknown']}",
         "",
         *_blocker_table("unknown", names)[2:],
-        "## Tools in no chain",
-        "",
-        "No scenario calls these tools.",
-        "",
-        *[f"- `{name}`" for name in sorted(set(TOOL_NAMES) - used)],
+        *_coverage_lines(),
     ]
     return "\n".join(lines).rstrip("\n") + "\n"
 

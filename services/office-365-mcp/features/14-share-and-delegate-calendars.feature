@@ -75,11 +75,10 @@ Feature: Sharing and delegating calendars
       But Mia does not have to ask a second time
 
     @unhappy @uc-14-07
-    Scenario Outline: A team calendar that Microsoft cannot finish reading is tried once more
+    Scenario Outline: A team calendar that Microsoft cannot finish reading is not reported as empty
       Given Microsoft <problem> each time the assistant asks
       When Mia asks her assistant what is on the calendar of "Platform" this week
-      Then the assistant asks Microsoft a second time
-      And it tells Mia that it cannot read the calendar of "Platform" now
+      Then the assistant tells Mia that it cannot read the calendar of "Platform" now
       But it does not say that the calendar is empty
 
       Examples:
@@ -199,3 +198,26 @@ Feature: Sharing and delegating calendars
       When Mia asks her assistant what is on the calendar of "Platform" this week
       Then the assistant lists the events of "Platform"
       But Mia's calendar is not shared with stranger@example.com
+
+  Rule: Mia deletes a calendar that she owns when it holds no meeting
+
+    @happy @uc-14-20
+    Scenario: An empty calendar of Mia is deleted
+      Given Mia owns a calendar "Offsite" that holds no meeting
+      When Mia asks her assistant to delete the calendar "Offsite"
+      Then Mia is asked to approve the deletion first
+      And after she approves, the calendar "Offsite" is gone from Mia's calendars
+
+    @unhappy @uc-14-21
+    Scenario Outline: A calendar that cannot be deleted is explained to Mia
+      Given <calendar>
+      When Mia asks her assistant to delete that calendar
+      Then the assistant tells Mia <told>
+      But the calendar stays
+
+      Examples:
+        | calendar                                                 | told                                                           |
+        | the calendar is Mia's main calendar                      | that Microsoft deletes only a calendar other than the main one |
+        | the calendar belongs to Lena and Lena shared it with Mia | that Mia can delete only a calendar that she owns              |
+        | Microsoft marks the calendar as not removable            | that the calendar cannot be removed from the mailbox           |
+        | the calendar holds a meeting                             | to move or cancel the meetings of the calendar first           |

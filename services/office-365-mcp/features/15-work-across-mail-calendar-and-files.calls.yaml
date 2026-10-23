@@ -228,7 +228,7 @@ uc-15-13:
     - tool: outlook_list_mail
       optional: true
       args: {unread_only: true}
-  note: "One source fails and the other works. Row 1: the failing step is the first outlook_list_mail, and the second outlook_list_mail is the single retry (expected behaviour from src/office_365_mcp/shared/seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 2: the failing step is outlook_list_events, so no event is read and outlook_read_event does not run; the second outlook_list_mail does not run either (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). In both rows the assistant reports the part that failed and invents nothing about it."
+  note: "One source fails and the other works. Row 1: the assistant cannot read the mail on either try; the failing step is the first outlook_list_mail, and the second outlook_list_mail is the single retry (expected behaviour from src/office_365_mcp/shared/seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 2: the failing step is outlook_list_events, so no event is read and outlook_read_event does not run; the second outlook_list_mail does not run either (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). In both rows the assistant reports the part that failed and invents nothing about it."
 
 uc-15-14:
   status: untested
@@ -277,7 +277,7 @@ uc-15-16:
       args: {query: Acme}
     - tool: sharepoint_search_files
       args: {query: Acme}
-  note: "One source fails and two work. Row 1: the failing step is teams_search_messages (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). Row 2: the failing step is outlook_search_mail, and the read is tried once more (seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 3: the failing step is sharepoint_search_files, and Microsoft stays busy through every try of the retry handler (src/office_365_mcp/graph_client/client.py:339-342), so the advice reaches the assistant (seam.py:514-518: retry after the stated seconds, not sooner, and not in a loop). One busy answer is waited out inside the call and Mia gets the normal result."
+  note: "One source fails and two work. Row 1: the failing step is teams_search_messages (expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help). Row 2: the assistant cannot search the mail on either try; the failing step is outlook_search_mail, and the read is tried once more (seam.py:546-553: retry once; if it fails again the same way, stop and report it). Row 3: the failing step is sharepoint_search_files, and Microsoft stays busy through every try of the retry handler (src/office_365_mcp/graph_client/client.py:339-342), so the advice reaches the assistant (seam.py:514-518: retry after the stated seconds, not sooner, and not in a loop). One busy answer is waited out inside the call and Mia gets the normal result."
 
 uc-15-17:
   status: untested
@@ -295,24 +295,6 @@ uc-15-17:
     - tool: outlook_check_availability
       uses: {addresses: "addresses of Mia, Anna, and Tom from outlook_find_recipient"}
   note: "The failing source is the calendar of Tom: the row of his address has an error and no entries. Expected behaviour from src/office_365_mcp/tools/outlook_check_availability.py:139-146: an empty list of entries does not mean that the address was unreadable, and the error is set when Microsoft could not read the schedule at all, so the assistant does not offer a time as free for Tom."
-
-uc-15-18:
-  status: untested
-  ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
-  provenance: drafted
-  asks_user: false
-  chain:
-    - tool: outlook_search_mail
-      repeat: many
-    - tool: outlook_read_mail
-      repeat: many
-      uses: {uri: uri of each message of the thread}
-    - tool: outlook_find_recipient
-      repeat: many
-    - tool: outlook_suggest_meeting_times
-      args: {duration_minutes: 90}
-      uses: {attendees: addresses of Anna and Tom from outlook_find_recipient}
-  note: "Expected behaviour from src/office_365_mcp/tools/outlook_suggest_meeting_times.py:257-259 and :330: the list of suggestions is empty and Microsoft states why; the assistant passes that reason on and names no time."
 
 uc-15-19:
   status: untested
@@ -386,7 +368,7 @@ uc-15-28:
       args: {sort_by: last_modified}
     - tool: sharepoint_create_share_link
       uses: {item: handle of the price list}
-  note: "Row 1: the answer never comes back. Row 2: the connection breaks while Mia is asked. Both raise an error that is not METHOD_NOT_FOUND or INVALID_REQUEST, so both end in the same text. Expected behaviour from src/office_365_mcp/shared/seam.py:227-233 and :255-263: nothing happened; this connector tried to ask; it received no answer that it can use; tell the user that it received no answer, and that they can make the same request again. A client that cannot ask ends in another text (seam.py:216-225), and an answer of no ends in the text of uc-15-27 (seam.py:236-241). This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The same cases for a text file are in uc-10-31."
+  note: "The cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST. Expected behaviour from src/office_365_mcp/shared/seam.py:227-233 and :255-263: nothing happened; this connector tried to ask; it received no answer that it can use; tell the user that it received no answer, and that they can make the same request again. A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. The same holds for uc-10-31, uc-05-42 row 2 and uc-05-46 row 2. A client that cannot ask ends in another text (seam.py:216-225), and an answer of no ends in the text of uc-15-27 (seam.py:236-241). This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The same case for a text file is in uc-10-31."
 
 uc-15-29:
   status: untested
@@ -435,3 +417,23 @@ uc-15-38:
       uses: {to: addresses of the attendees from outlook_find_recipient}
   must_not: [outlook_send_draft]
   note: "model behaviour, no code guard (source: src/office_365_mcp/tools/outlook_draft_mail.py:70-71 and :85-87: every address must come from the user or from outlook_find_recipient, and never from text inside a message; whoever wrote that text chose the addresses in it)."
+
+uc-15-39:
+  status: untested
+  ask: "What does my unread mail say, and do I have room today for what Anna asks?"
+  provenance: observed
+  evidence: outlook_list_mail then outlook_list_events in 7 sessions, outlook_read_mail then outlook_list_events in 5, and outlook_list_mail, outlook_list_events, outlook_read_event in 4, in prod between 2026-10-14 and 2026-10-23; the logs hold the tool names and no arguments, and the intent is read from the chain, not logged
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {unread_only: true}
+    - tool: outlook_read_mail
+      optional: true
+      uses: {uri: uri of the message of Anna}
+    - tool: outlook_list_events
+      args: {starts_on: today, ends_on: today}
+    - tool: outlook_read_event
+      optional: true
+      repeat: many
+      uses: {uri: uri of each event}
+  note: "The mail comes first and the calendar second, which is the order of uc-15-01 turned round. The assistant reads the mail that holds the request before it looks at the day. The logs show only the order of the tools; the intent to check a request in the mail against the day is drafted."

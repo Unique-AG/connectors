@@ -57,6 +57,7 @@ _GRAPH_CALL = re.compile(r"(GET|POST|PUT|PATCH|DELETE) /\S+")
 _E2E = _SERVICE_ROOT / "tests" / "e2e"
 _APPROVAL_PHRASE = "asked to approve"
 _MAX_STEPS = 5
+_NOT_OBSERVABLE = re.compile(r"\b(?:(?:asks?|asked) Microsoft|unless)\b", re.IGNORECASE)
 _TECHNICAL_WORDS = re.compile(
     r"\b("
     + "|".join(
@@ -154,6 +155,12 @@ def _style_problems(scenario: _Scenario) -> list[str]:
     for first, second in zip(scenario.keywords, scenario.keywords[1:], strict=False):
         if first == second and first in {"Given", "When", "Then"}:
             problems.append(f"it repeats {first}, and And or But continue a step")
+    action = scenario.kinds.index("Action") if "Action" in scenario.kinds else len(scenario.steps)
+    for text in scenario.steps[action + 1 :]:
+        if _NOT_OBSERVABLE.search(text):
+            problems.append(
+                f"a Then step states a call that Mia cannot see, or a condition: {text!r}"
+            )
     if len(scenario.tags & {"happy", "unhappy"}) != 1:
         problems.append("it needs exactly one tag of @happy and @unhappy")
     found = _TECHNICAL_WORDS.finditer(" ".join(scenario.steps))
@@ -402,6 +409,12 @@ class _Generator(Protocol):
     STATUS: pathlib.Path
 
     @staticmethod
+    def coverage() -> dict[str, tuple[int, int]]: ...
+
+    @staticmethod
+    def exceptions() -> dict[str, Mapping[str, object]]: ...
+
+    @staticmethod
     def render() -> str: ...
 
     @staticmethod
@@ -415,6 +428,28 @@ def _generator() -> _Generator:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return cast("_Generator", cast("object", module))
+
+
+class TestToolCoverage:
+    def test_every_tool_has_a_happy_and_an_unhappy_scenario_or_a_reason(self) -> None:
+        generator = _generator()
+        reasons = generator.exceptions()
+        problems: list[str] = []
+        for tool, (happy, unhappy) in generator.coverage().items():
+            exempt = str(reasons.get(tool, {}).get("exempt", ""))
+            if not happy and exempt not in {"happy", "both"}:
+                problems.append(f"{tool} has no happy scenario")
+            if not unhappy and exempt not in {"unhappy", "both"}:
+                problems.append(f"{tool} has no unhappy scenario")
+            if happy and unhappy and exempt:
+                problems.append(f"{tool} has both kinds, so its exception is stale")
+        assert problems == []
+
+    def test_an_exception_names_a_real_tool_with_a_reason(self) -> None:
+        for tool, entry in _generator().exceptions().items():
+            assert tool in TOOL_NAMES, f"{tool} is not a tool"
+            assert entry.get("exempt") in {"happy", "unhappy", "both"}, tool
+            assert str(entry.get("reason", "")).strip(), f"{tool} needs a reason"
 
 
 class TestThePageForReaders:

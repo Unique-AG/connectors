@@ -102,17 +102,19 @@ uc-07-07:
       uses: {uri: uri of the event from outlook_create_event}
 
 uc-07-08:
-  status: gap
+  status: partly
   provenance: drafted
-  ask: "Save an invitation for the Board prep as a draft, so that I can finish it later."
+  ask: "Save an invitation for the Board prep on Monday from 10:00 to 11:00 as a draft, so that I can finish it later."
   blocker:
     kind: graph
     tool: outlook_create_event
     text: A Microsoft 365 calendar event has no draft state, so an event with an attendee goes out in the same call.
-    user: The assistant cannot save a meeting invitation as a draft.
+    user: The assistant cannot keep a real invitation draft. It can save the meeting without attendees and add them after Mia approves.
   asks_user: false
-  chain: []
-  note: a workaround is outlook_create_event with no attendee, then outlook_update_event to add the attendees after Mia approves
+  chain:
+    - tool: outlook_create_event
+      args: {subject: Board prep, starts_at: Monday 10:00, ends_at: Monday 11:00, time_zone: Europe/Zurich, attendees: []}
+  note: "the workaround creates the event with an empty `attendees` list and the required `time_zone` (tools/outlook_create_event.py:657-690), and it asks nothing, because the tool asks only for an event with an attendee, a room, or a location (:123-125). Adding the attendees is a separate later request, after Mia finishes: outlook_update_event with `attendees` and `optional_attendees` together (tools/outlook_update_event.py:159-166 and :433-437 refuse one list alone), and that call asks Mia (:110-113). The update is not a step of this chain."
 
 uc-07-09:
   status: partly
@@ -251,7 +253,7 @@ uc-07-20:
       args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
     - tool: outlook_check_availability
       args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
-  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it)."
+  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it; the second step in the chain is that retry)."
 
 uc-07-21:
   status: untested
@@ -447,3 +449,162 @@ uc-07-35:
     - tool: outlook_check_availability
       args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
   note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-07-19 reaches the assistant only when Microsoft stays busy through every try."
+
+uc-07-36:
+  status: untested
+  provenance: drafted
+  ask: "Is Anna free on Tuesday at 14:00?"
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: outlook_check_availability
+      args: {addresses: Anna, starts_at: Tuesday 14:00, ends_at: Tuesday 14:30, time_zone: Europe/Zurich}
+  note: "tools/outlook_check_availability.py:49-57: the tool reads the free or busy status of one or more mailboxes over a window, and before the assistant offers a free slot it compares the slot with working_hours. A row has one digit for each interval, with 0 for free (:131-135)."
+
+uc-07-37:
+  status: untested
+  provenance: drafted
+  ask: "Is Anna free on Tuesday at 14:00?"
+  asks_user: false
+  chain:
+    - tool: outlook_check_availability
+      args: {addresses: Anna, starts_at: Tuesday 14:00, ends_at: Tuesday 14:30, time_zone: Europe/Zurich}
+  note: "model behaviour, no code guard (source: tools/outlook_check_availability.py:137-147, the items and error fields: an empty items list does not mean that the address was readable, and error is set when Graph could not read the schedule of the address at all, with items then empty). The call returns a row with error and no tool error."
+
+uc-07-38:
+  status: untested
+  provenance: drafted
+  ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
+  asks_user: false
+  chain:
+    - tool: outlook_check_availability
+      optional: true
+      args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00, time_zone: Europe/Zurich}
+    - tool: outlook_suggest_meeting_times
+      args: {attendees: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00, time_zone: Europe/Zurich, duration_minutes: 30}
+  note: "expected behaviour from tools/outlook_suggest_meeting_times.py:254-259: suggestions is empty and empty_reason holds the reason that Microsoft gave, which is null when a candidate exists. The reason is Microsoft's own text, so the scenario states that Microsoft names it. uc-07-04 is the case with times."
+
+uc-07-39:
+  status: untested
+  provenance: drafted
+  ask: "I am on leave next Friday. Decline all my meetings that day and tell the organizers that I am on leave."
+  asks_user: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: next Friday, ends_on: next Friday, time_zone: Europe/Zurich}
+    - tool: outlook_respond_to_invite
+      repeat: many
+      args: {response: decline, comment: I am on leave}
+      uses: {uri: uri of a row whose owner_is_organizer is false}
+  note: "no tool answers many invitations at once. outlook_respond_to_invite takes one uri and asks the user before it sends each response (tools/outlook_respond_to_invite.py:84-86, :212-225), so Mia approves each answer. The tool is for an invitation that the user received (:78-80), and outlook_cancel_event is the tool for a meeting that the user organizes, so the assistant leaves a row with owner_is_organizer true (shared/calendar.py:773-775)."
+
+uc-07-40:
+  status: untested
+  provenance: drafted
+  evidence: outlook_respond_to_invite failed with a 400 in 3 of its 14 calls in 2 sessions; the logs give no cause
+  ask: "Accept the Launch review invitation."
+  asks_user: true
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_respond_to_invite
+      args: {response: accept}
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from shared/seam.py:579-584: a bad request is not an outage or a permission problem, the same call fails the same way again, and the text carries the reason of Microsoft. The tool reads the event and asks Mia before it sends the answer (tools/outlook_respond_to_invite.py:212-225), so the question comes first. The source names no cause of a 400 for this tool (OPEN in the ledger)."
+
+uc-07-41:
+  status: untested
+  provenance: drafted
+  evidence: outlook_update_event failed in its only call in prod; the logs give no cause
+  ask: "Move the Launch review to Friday."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_update_event
+      args: {starts_at: Friday at the usual time, ends_at: Friday at the usual end, time_zone: Europe/Zurich}
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+  note: "expected behaviour from tools/outlook_update_event.py:85-91 GRAPH_NOT_FOUND: nothing was changed, Microsoft gives one 404 for deleted, moved to another calendar, and not visible, retrying will not help, call outlook_list_events again and read the new handle if the event should still exist. The tool reads the event before it asks Mia (tools/outlook_update_event.py:363-398), so the refusal needs no approval. The scenario is one possible cause of the failed call in prod, which the logs do not show."
+
+uc-07-42:
+  status: untested
+  provenance: drafted
+  ask: "Delete my Design review with Anna tomorrow."
+  asks_user: true
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Design review, starts_on: tomorrow, ends_on: tomorrow}
+    - tool: outlook_delete_event
+      uses: {uri: uri of the event from the listing}
+  note: "tools/outlook_delete_event.py:60-75: the tool deletes one event that the user organizes, Microsoft sends each attendee a cancellation, and the tool always asks the user, naming the subject, the start, and each attendee. The tool has no comment argument, so a note for Anna goes with outlook_cancel_event (uc-07-14). The uri of a series master deletes every occurrence."
+
+uc-07-43:
+  status: untested
+  provenance: drafted
+  ask: "Delete the Launch review."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Launch review}
+    - tool: outlook_delete_event
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_delete_event.py:87-95 _NOT_THE_ORGANIZER: Microsoft does not report the user as the organizer, the event was not deleted, and outlook_respond_to_invite can decline the invitation and tell the organizer. The refusal comes before the question to Mia (:136-138)."
+
+uc-07-44:
+  status: untested
+  provenance: drafted
+  ask: "Delete my Design review."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {subject_contains: Design review}
+    - tool: outlook_delete_event
+      uses: {uri: uri of the event from the listing}
+    - tool: outlook_list_events
+      args: {subject_contains: Design review}
+  note: "expected behaviour from tools/outlook_delete_event.py:45-52 GRAPH_NOT_FOUND: this call deleted nothing, the event is probably already gone, because a person or an earlier call deleted it or it moved, Microsoft gives the same 404 for an event that the user cannot see, call outlook_list_events to find out whether it is still there. The description says that a second call after a timeout finds no event and reports that (:75)."
+
+uc-07-45:
+  status: untested
+  provenance: drafted
+  ask: "Book the Launch review with Priya on Monday at 15:00 Mumbai time."
+  asks_user: true
+  chain:
+    - tool: outlook_list_time_zones
+      optional: true
+    - tool: outlook_create_event
+      args: {subject: Launch review, starts_at: Monday 15:00, ends_at: Monday 15:30, attendees: Priya}
+  note: "tools/outlook_create_event.py:663-675 time_zone: the zone is required with no default, take it from where the user said the meeting is, and Microsoft accepts every Windows zone name and a fixed list of IANA names. tools/outlook_list_time_zones.py:33-46: the tool lists the zone names that the mailbox server supports, with the Windows names as the default. The listing is optional, because an assistant that knows a name that Microsoft accepts needs no listing."
+
+uc-07-46:
+  status: untested
+  provenance: drafted
+  ask: "Book the Launch review with Priya on Monday at 15:00 Atlantis time."
+  asks_user: false
+  chain:
+    - tool: outlook_list_time_zones
+  must_not: [outlook_create_event]
+  note: "model behaviour, no code guard (source: tools/outlook_list_time_zones.py:45-46, find the row that matches the place that the user named and do not guess a zone name; and tools/outlook_create_event.py:663-668, a wrong guess puts the meeting hours off in every attendee calendar, ask the user)."
+
+uc-07-47:
+  status: untested
+  provenance: drafted
+  ask: "Find a room for 6 people."
+  asks_user: false
+  chain:
+    - tool: outlook_find_rooms
+      args: {min_capacity: 6}
+  note: "model behaviour, no code guard (source: tools/outlook_find_rooms.py:41-42: Microsoft lists rooms only after an administrator turns on buildings in the Places settings, and an empty list does not prove that the organization has no room; and :168-173, the rooms field: read capped before you report that the list is complete)."
+
+uc-07-48:
+  status: untested
+  provenance: drafted
+  ask: "Find the rooms of the room list building9@example.com."
+  asks_user: false
+  chain:
+    - tool: outlook_find_rooms
+      args: {room_list: building9@example.com}
+  note: "expected behaviour from tools/outlook_find_rooms.py:27-32 GRAPH_NOT_FOUND: Microsoft found no room list at that address, so no room is listed, ask the user for the address of the room list, or call the tool again without room_list."

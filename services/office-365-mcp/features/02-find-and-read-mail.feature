@@ -95,6 +95,42 @@ Feature: Finding and reading mail
       Then the assistant tells Mia that her mailbox has no Archive folder
       And it names the folders that her mailbox has
 
+    @unhappy @uc-02-34
+    Scenario: A message that the newest mail does not hold is found by a search
+      Given Brightway sent "Offer for the new office" three months ago, and Mia's inbox holds 400 newer messages
+      When Mia asks her assistant what the Brightway offer for the new office says
+      Then the assistant gives the text of "Offer for the new office"
+      But it does not tell Mia that no message matches
+
+    @happy @uc-02-35
+    Scenario: The newest message about a topic is found, and not the newest message from the person
+      Given Anna sent Mia 12 messages about the budget over six months, and a newer message about the holiday rota
+      When Mia asks her assistant for the newest message from Anna about the budget
+      Then the assistant shows the budget message that Anna sent last
+      But it does not show the holiday rota message or an older budget message
+
+    @happy @uc-02-36
+    Scenario: Mail in a folder that Mia names is listed
+      Given Mia has a folder "Projects" that holds 4 unread messages, and her inbox holds 20 other unread messages
+      When Mia asks her assistant for the unread messages in her Projects folder
+      Then the assistant lists the 4 unread messages of "Projects"
+      But it does not list messages of Mia's inbox
+
+    @unhappy @uc-02-37
+    Scenario: A folder that moved is found again before its mail is listed
+      Given the assistant noted the place of Mia's folder "Projects", and Mia then moved that folder to another place
+      And Microsoft answers that the old place of the folder cannot be found
+      When Mia asks her assistant for the unread messages in her Projects folder
+      Then the assistant looks at Mia's folders again
+      And it lists the unread messages of "Projects" from its new place
+
+    @happy @uc-02-38
+    Scenario: Mail that Mia sent to herself is listed
+      Given Mia sent herself 2 reminders, and her inbox holds 30 other messages
+      When Mia asks her assistant for the messages that she sent to herself
+      Then the assistant lists the 2 reminders
+      But it does not list the 30 other messages
+
   Rule: The assistant reads a message and its attachments
 
     @happy @uc-02-06

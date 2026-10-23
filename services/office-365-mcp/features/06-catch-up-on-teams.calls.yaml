@@ -235,7 +235,7 @@ uc-06-18:
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The failing step is teams_list_chats. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
+  note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
   variants:
     limited:
       cassette: uc-06-01
@@ -416,7 +416,7 @@ uc-06-33:
     - tool: teams_list_meeting_transcripts
       uses: {meeting_uri: uri of the meeting}
   must_not: [teams_read_transcript]
-  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:150-151: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam.py:528-537 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
+  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:147-148: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam.py:528-537 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
 
 uc-06-27:
   status: untested
@@ -460,3 +460,80 @@ uc-06-30:
     - tool: teams_list_chats
       args: {limit: 50}
   note: "One call reads at most 50 chats. Expected behaviour from src/office_365_mcp/tools/teams_list_chats.py:42 and :215-222: capped is true when the walk stopped after it collected the limit; chats can remain beyond what the call reached; the assistant says so and does not call the result the full answer."
+
+uc-06-34:
+  status: untested
+  ask: "What did I miss in my Teams channels?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {is_read: false}
+    - tool: teams_read_message
+      optional: true
+      uses: {uri: uri of a hit}
+  note: "teams_list_chats lists chats and not channels, so the unread posts of channels come from the search by read state (src/office_365_mcp/tools/teams_search_messages.py:152 and :188-189). A hit of a channel post has a team and a channel and a hit of a chat message has neither (:109-117), so the assistant keeps the posts. Nobody ran it: whether Microsoft keeps a read state for channel posts is not proven."
+
+uc-06-35:
+  status: untested
+  ask: "Summarize the Design review, and tell me what people wrote about it afterwards."
+  provenance: observed
+  evidence: teams_read_transcript then teams_search_messages in 3 sessions of prod between 2026-10-14 and 2026-10-23; the logs hold the tool names and no arguments, so the listing steps come from uc-06-05
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+    - tool: teams_search_messages
+      args: {query: Design review, sent_after: yesterday}
+    - tool: teams_read_message
+      optional: true
+      uses: {uri: uri of a hit}
+
+uc-06-36:
+  status: untested
+  ask: "Show me all replies to the post 'v2 is out?' in Releases."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: teams_browse_channel
+      uses: {team_id: id of the team, channel_id: id of the channel}
+    - tool: teams_list_message_replies
+      args: {limit: 50}
+      uses: {uri: uri of the post}
+  note: "The tool reads at most 50 replies and never follows the cursor of Microsoft. Expected behaviour from src/office_365_mcp/tools/teams_list_message_replies.py:49-51 and :71-76: more_replies is true when Microsoft reported more replies than the call returned; then the list is not the whole thread, and Microsoft does not say which replies are missing."
+
+uc-06-37:
+  status: untested
+  ask: "What files are in the Launch channel of the Platform team?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team Platform}
+    - tool: teams_get_channel_files_folder
+      uses: {team_id: id of the team Platform, channel_id: id of the channel Launch}
+  must_not: [sharepoint_browse_folder]
+  note: "The failing step is teams_get_channel_files_folder. The tool has no text of its own for a missing folder, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam.py:538-545: Microsoft reports a missing item and an item that the user may not know about in the same way, so the assistant says that it could not find the folder and does not say that the channel holds no files. No folder means that no listing of its content follows."
+
+uc-06-40:
+  status: untested
+  ask: "What happened in the Releases channel this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      uses: {team_id: id of the team}
+    - tool: teams_browse_channel
+      args: {include_window_completeness: true}
+      uses: {team_id: id of the team, channel_id: id of the channel}
+  note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
+

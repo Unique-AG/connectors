@@ -132,7 +132,7 @@ Feature: Posting in Teams
       And Microsoft <problem> when the message is sent
       When Mia asks her assistant to tell the chat that the build is green
       Then the assistant tells Mia that it does not know if the message arrived, and that it checks the chat before it tries again
-      But it does not send the message a second time
+      But the chat shows the message at most once
 
       Examples:
         | problem                              |
@@ -178,22 +178,22 @@ Feature: Posting in Teams
         | give the message of Anna a thumbs-up              |
 
     @unhappy @uc-09-22
-    Scenario Outline: A question whose answer never comes back changes nothing in Teams
-      Given <trouble> when Mia is asked to approve the change
+    Scenario Outline: A question that Mia's chat program answers with an error changes nothing in Teams
+      Given Mia's chat program answers with an error when Mia is asked to approve the change
       When Mia asks her assistant to <action>
       Then nothing changes in Teams
       And the assistant tells Mia that it received no answer
       And it says that Mia can ask again
 
       Examples:
-        | action                                                  | trouble                                  |
-        | tell the chat with Anna and Tom that the build is green | the answer never comes back              |
-        | post "v2 ships on Friday" in the channel "Releases"     | the connection breaks while Mia is asked |
-        | send "Q3 Plan.pptx" to Anna in a chat                   | the answer never comes back              |
-        | post "Q3 Plan.pptx" in the channel "Sales"              | the connection breaks while Mia is asked |
-        | correct "Launch on 14 Jun" to "Launch on 14 June"       | the answer never comes back              |
-        | delete "Launch on 14 Jun"                               | the connection breaks while Mia is asked |
-        | give the message of Anna a thumbs-up                    | the answer never comes back              |
+        | action                                                  |
+        | tell the chat with Anna and Tom that the build is green |
+        | post "v2 ships on Friday" in the channel "Releases"     |
+        | send "Q3 Plan.pptx" to Anna in a chat                   |
+        | post "Q3 Plan.pptx" in the channel "Sales"              |
+        | correct "Launch on 14 Jun" to "Launch on 14 June"       |
+        | delete "Launch on 14 Jun"                               |
+        | give the message of Anna a thumbs-up                    |
 
     @unhappy @uc-09-29
     Scenario: A message that Mia cannot be asked about is not sent

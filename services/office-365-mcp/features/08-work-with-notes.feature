@@ -116,7 +116,7 @@ Feature: Working with notes in OneNote
       And Microsoft stays busy at every try and asks the assistant to wait 30 seconds each time
       When Mia asks her assistant to summarize her notes from the Acme kickoff
       Then the assistant tells Mia that Microsoft is busy and asked it to wait 30 seconds
-      But it does not ask Microsoft again before the 30 seconds pass
+      But it does not ask again before the 30 seconds pass
 
     @unhappy @uc-08-38
     Scenario: One busy answer from Microsoft is waited out before a read
@@ -157,7 +157,7 @@ Feature: Working with notes in OneNote
 
     @unhappy @uc-08-18
     Scenario: A page that Mia may not add to a team notebook is explained
-      Given the team "Platform" owns a notebook, Mia is not a member of the team, and Microsoft refuses the new page
+      Given the team "Platform" owns a notebook, Mia is not a member of the team, and Microsoft refuses her access to that notebook
       When Mia asks her assistant to add the page "Retro" to the notebook of "Platform"
       Then the assistant tells Mia that she is probably not a member of the team
       And it tells Mia to ask for access to the team
@@ -307,14 +307,17 @@ Feature: Working with notes in OneNote
       Given Mia has the notes that the change names
       When Mia asks her assistant to <change>
       Then Mia is asked to approve the change, and she declines
-      And the assistant tells Mia that the change was not approved, and does not ask again unless Mia asks in a new message
+      And the assistant tells Mia that the change was not approved, and does not ask again
       But <unchanged>
 
       Examples:
-        | change                                         | unchanged                                                |
-        | erase the page "Old draft"                     | the page "Old draft" is still there                      |
-        | change the launch date on "Planning" to 21 June | "Planning" still states "Launch on 14 June"              |
-        | add the page "Retro" to the notebook of "Platform" | the notebook of "Platform" does not hold "Retro"       |
+        | change                                                                   | unchanged                                                     |
+        | erase the page "Old draft"                                               | the page "Old draft" is still there                           |
+        | change the launch date on "Planning" to 21 June                          | "Planning" still states "Launch on 14 June"                   |
+        | add the page "Retro" to the notebook of "Platform"                       | the notebook of "Platform" does not hold "Retro"              |
+        | copy the notebook "Customers" into the team "Platform"                   | the team "Platform" holds no copy of "Customers"              |
+        | copy the section "Work" into the notebook of the team "Platform"         | the notebook of "Platform" holds no section "Work"            |
+        | copy the page "Retro" into the section "Planning" of the team "Platform" | the section "Planning" of "Platform" holds no copy of "Retro" |
 
     @unhappy @uc-08-35
     Scenario Outline: A change without an answer from Mia does not happen
@@ -356,3 +359,180 @@ Feature: Working with notes in OneNote
       When Mia asks her assistant to summarize her notes from the Acme kickoff
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       And it does not read any page
+
+  Rule: The assistant copies notebooks, sections, and pages
+
+    @happy @uc-08-40
+    Scenario: A notebook is copied under a new name
+      Given Mia has the notebook "Customers"
+      When Mia asks her assistant to copy "Customers" as "Customers 2026"
+      Then Mia has the notebook "Customers 2026" once the copy is done
+      But "Customers" stays as it was
+
+    @happy @uc-08-41
+    Scenario: A notebook is copied into a team
+      Given Mia belongs to the team "Platform" and has the notebook "Customers"
+      When Mia asks her assistant to copy "Customers" into the team "Platform"
+      Then Mia is asked to approve the copy first
+      And after she approves, the team "Platform" holds a copy of "Customers" once the copy is done
+
+    @happy @uc-08-42
+    Scenario: A section is copied into another notebook
+      Given Mia has the section "Work" in her notebook "Customers" and the notebook "Archive"
+      When Mia asks her assistant to copy the section "Work" into "Archive"
+      Then "Archive" holds the section "Work" with its pages once the copy is done
+      But "Customers" still holds "Work"
+
+    @happy @uc-08-43
+    Scenario: A page is copied into another section
+      Given Mia has the page "Weekly sync" in the section "Work" and the section "Archive"
+      When Mia asks her assistant to copy the page "Weekly sync" into "Archive"
+      Then "Archive" holds a copy of "Weekly sync" once the copy is done
+      But "Work" still holds "Weekly sync"
+
+  Rule: The assistant renames a page and shows its start and its pictures
+    A page keeps its notes when it gets a new title, and its start and its pictures can be shown without a full read.
+
+    @happy @uc-08-44
+    Scenario: A page is renamed and its notes stay
+      Given Mia has the page "Acme kickoff" in her own notebook
+      When Mia asks her assistant to rename "Acme kickoff" to "Acme kickoff decisions"
+      Then the page has the title "Acme kickoff decisions"
+      But its notes are unchanged
+
+    @happy @uc-08-45
+    Scenario: The first words of a page are shown without opening the page
+      Given Mia has the page "Weekly sync", which starts with "Agenda for the sync"
+      When Mia asks her assistant how the page "Weekly sync" starts
+      Then the assistant shows "Agenda for the sync"
+
+    @happy @uc-08-46
+    Scenario: A picture on a page is shown
+      Given Mia has the page "Acme kickoff" with a picture of a whiteboard
+      When Mia asks her assistant to show the picture on that page
+      Then the assistant gives Mia the picture
+
+  Rule: Mia is told when a copy cannot start or does not finish
+    A copy runs after the assistant starts it, so the assistant follows the copy until Microsoft says that it is done or failed.
+
+    @unhappy @uc-08-47
+    Scenario Outline: Nothing is copied from a notebook of a site
+      Given the notebook "Intranet" belongs to the Sales site, and Mia has her own notebook "Archive"
+      When Mia asks her assistant to copy <thing> into <destination>
+      Then the assistant tells Mia that Microsoft documents no copy from a notebook of a site
+      But nothing is copied
+
+      Examples:
+        | thing                                         | destination              |
+        | the notebook "Intranet"                       | her own OneDrive         |
+        | the section "News" of the notebook "Intranet" | her notebook "Archive"   |
+
+    @unhappy @uc-08-48
+    Scenario: A page of a notebook of a site is not copied but its content can be written again
+      Given the page "Policy" is in a notebook that belongs to the Sales site
+      When Mia asks her assistant to copy "Policy" into her section "Work"
+      Then the assistant tells Mia that Microsoft documents no copy from a notebook of a site
+      And it reads "Policy" and writes its content into a new page of "Work"
+      But no copy of "Policy" is made
+
+    @unhappy @uc-08-50
+    Scenario Outline: A copy that Microsoft fails is not started twice at once
+      Given Microsoft <problem> when the assistant copies the notebook "Customers"
+      When Mia asks her assistant to copy "Customers" as "Customers 2026"
+      Then the assistant tells Mia that it does not know if the copy started
+      And it looks in her notebooks for "Customers 2026" before it tries again
+      But it does not start a second copy at once
+
+      Examples:
+        | problem                      |
+        | fails with an internal error |
+        | does not answer in time      |
+
+    @unhappy @uc-08-51
+    Scenario: A copy that cannot be followed is looked for later
+      Given Microsoft accepts the copy of "Customers" but gives no way to follow it
+      When Mia asks her assistant to copy "Customers" as "Customers 2026"
+      Then the assistant tells Mia that the copy can still be running and that it cannot follow the copy
+      And it looks in her notebooks for "Customers 2026" after a while
+      But it does not start a second copy
+
+    @unhappy @uc-08-52
+    Scenario: A copy that Microsoft reports as failed is explained
+      Given Microsoft starts the copy of "Customers" and then reports that it failed, with a reason
+      When Mia asks her assistant to copy "Customers" as "Customers 2026"
+      Then the assistant tells Mia that the copy failed
+      And it gives the reason that Microsoft gave
+
+    @unhappy @uc-08-53
+    Scenario: A copy that Microsoft no longer knows is looked for in the notebook list
+      Given Microsoft keeps no record of the copy of "Customers" as "Customers 2026" any more
+      When Mia asks her assistant if the copy of "Customers" is done
+      Then the assistant tells Mia that Microsoft has no record of the copy
+      And it looks in her notebooks for "Customers 2026"
+
+  Rule: Mia is told what happened when Microsoft cannot show or change a page
+
+    @unhappy @uc-08-54
+    Scenario Outline: A page that is gone is looked for again
+      Given Microsoft answers that the page "Acme kickoff" is gone
+      When Mia asks her assistant to <action>
+      Then the assistant tells Mia that the page was probably deleted or moved
+      And it looks for the page again in the page list
+
+      Examples:
+        | action                                            |
+        | show how "Acme kickoff" starts                    |
+        | rename "Acme kickoff" to "Acme kickoff decisions" |
+        | add a task list at the end of "Acme kickoff"      |
+
+    @unhappy @uc-08-55
+    Scenario: A task list that was added but cannot be shown is not added twice
+      Given Microsoft adds the task list to "Planning" and then does not show the changed page to the assistant
+      When Mia asks her assistant to add a task list at the end of "Planning"
+      Then the assistant tells Mia that the task list was added
+      And it reads "Planning" to show the new content
+      But it does not add the task list a second time
+
+    @unhappy @uc-08-56
+    Scenario Outline: An addition that Microsoft fails is not repeated at once
+      Given Microsoft <problem> when the assistant adds a task list to "Planning"
+      When Mia asks her assistant to add a task list at the end of "Planning"
+      Then the assistant tells Mia that it does not know if the task list was added
+      And it reads "Planning" to look for the task list before it tries again
+      But it does not add the task list a second time at once
+
+      Examples:
+        | problem                      |
+        | fails with an internal error |
+        | does not answer in time      |
+
+    @unhappy @uc-08-57
+    Scenario: A new title that was set but cannot be shown is read from the page
+      Given Microsoft renames "Acme kickoff" and then does not show the changed page to the assistant
+      When Mia asks her assistant to rename "Acme kickoff" to "Acme kickoff decisions"
+      Then the assistant tells Mia that the page was renamed
+      And it reads the page to show the new title
+
+  Rule: Mia is told why a picture cannot be shown
+
+    @unhappy @uc-08-58
+    Scenario: A picture above 10 MB is refused as a whole
+      Given the page "Acme kickoff" holds a picture of 11 MB
+      When Mia asks her assistant to show the picture on that page
+      Then the assistant tells Mia that the picture is too large to give
+      But it does not give only a part of the picture
+
+    @unhappy @uc-08-59
+    Scenario: A picture that arrives empty is asked for again later
+      Given the page "Acme kickoff" holds a picture
+      But Microsoft sends no content for it
+      When Mia asks her assistant to show the picture on that page
+      Then the assistant tells Mia that the fault is on the side of Microsoft
+      And it tells Mia to ask again later, and to open the page in OneNote if it fails again
+
+    @unhappy @uc-08-60
+    Scenario: A picture that is gone is looked for again on the page
+      Given Microsoft answers that the picture on "Acme kickoff" is gone
+      When Mia asks her assistant to show the picture on that page
+      Then the assistant tells Mia that the picture was probably deleted with its page, or that it can no longer be reached
+      And it reads the page again to find the picture

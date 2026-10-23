@@ -90,7 +90,7 @@ uc-14-07:
     - tool: outlook_list_group_events
       args: {starts_on: Monday, ends_on: Sunday}
       uses: {group_id: id of the team Platform}
-  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it), and from shared/seam.py:562-570 for a list that never ends (advice: retry once if the list matters, if it happens again, stop and report)."
+  note: "expected behaviour from shared/seam.py:546-553 for a failure and for no answer in time (read tool, advice: retry once, and if it fails again the same way, stop and report it; the last step in the chain is that retry), and from shared/seam.py:562-570 for a list that never ends (advice: retry once if the list matters, if it happens again, stop and report)."
 
 uc-14-08:
   status: untested
@@ -241,3 +241,26 @@ uc-14-19:
       args: {starts_on: Monday, ends_on: Sunday}
       uses: {group_id: id of the team Platform}
   note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-14-06 reaches the assistant only when Microsoft stays busy through every try."
+
+uc-14-20:
+  status: untested
+  provenance: drafted
+  ask: "Delete my calendar Offsite."
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_delete_calendar
+      uses: {calendar_ref: handle of the calendar Offsite}
+  note: "tools/outlook_delete_calendar.py:62-72: the tool deletes one calendar that the user owns, when it holds no event, and always asks the user, naming the calendar. It looks for an event again after the user agrees, immediately before the delete (:68-69, :152)."
+
+uc-14-21:
+  status: untested
+  provenance: drafted
+  ask: "Delete the calendar Offsite."
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_delete_calendar
+      optional: true
+      uses: {calendar_ref: handle of the calendar}
+  note: "expected behaviour from tools/outlook_delete_calendar.py, one row each, and every refusal comes before the question to Mia (:142-147). The delete call is optional: for the main calendar and the calendar of Lena the listing already shows is_default and is_mine (shared/calendar.py:655-664), so the assistant can stop before the call and the call that Microsoft or the tool refuses is not made. Main calendar, :83-88 _THE_DEFAULT_CALENDAR: Microsoft Graph deletes only a calendar other than the default calendar, nothing was deleted. Calendar of Lena, :95-101 _NOT_THE_OWNER: another person owns it and shares it with the user, the tool deletes only a calendar that the user owns. Not removable, :89-94 _NOT_REMOVABLE: Microsoft 365 marks the calendar as not removable from the mailbox. Holds a meeting, :102-108 _HOLDS_AN_EVENT: the tool deletes only an empty calendar, tell the user to move or cancel the events of the calendar first, for example in Outlook."

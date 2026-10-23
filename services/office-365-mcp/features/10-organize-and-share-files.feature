@@ -282,7 +282,7 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       Given Mia has the items that the change names
       When Mia asks her assistant to <change>
       Then Mia is asked to approve the change, and she declines
-      And the assistant tells Mia that the change was not approved, and does not ask again unless Mia asks in a new message
+      And the assistant tells Mia that the change was not approved, and does not ask again
       But <unchanged>
 
       Examples:
@@ -294,11 +294,11 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
         | save these meeting notes as "Sync 14 June.txt" in "Notes" | "Notes" does not hold "Sync 14 June.txt"     |
 
     @unhappy @uc-10-31
-    Scenario Outline: A change without an answer from Mia does not happen
+    Scenario Outline: A change does not happen when Mia's chat program answers the question with an error
       Given Mia has the items that the change names
+      And Mia's chat program answers with an error when Mia is asked to approve the change
       When Mia asks her assistant to <change>
-      Then Mia is asked to approve the change, and no answer comes back
-      And the assistant tells Mia that no answer came and that she can ask for the same change again
+      Then the assistant tells Mia that it received no answer, and that she can ask for the same change again
       But <unchanged>
 
       Examples:
@@ -341,3 +341,31 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       When Mia asks her assistant to move "Plan.docx" into the folder "Archive"
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       And nothing is moved
+
+  Rule: A copy or a new folder that Microsoft fails is not repeated at once
+
+    @unhappy @uc-10-37
+    Scenario Outline: A copy that Microsoft fails is not made twice at once
+      Given Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft <problem> when the assistant copies "Template" into "Archive"
+      When Mia asks her assistant to copy "Template" into "Archive"
+      Then the assistant tells Mia that it does not know if the copy was made
+      And it looks in "Archive" for the copy before it tries again
+      But it does not copy "Template" a second time at once
+
+      Examples:
+        | problem                      |
+        | fails with an internal error |
+        | does not answer in time      |
+
+    @unhappy @uc-10-38
+    Scenario Outline: A folder that Microsoft fails to create is not created twice at once
+      Given Microsoft <problem> when the assistant creates the folder "2026 Signed" in "Contracts"
+      When Mia asks her assistant to create the folder "2026 Signed" in "Contracts"
+      Then the assistant tells Mia that it does not know if the folder was created
+      And it looks in "Contracts" for the folder before it tries again
+      But it does not create the folder a second time at once
+
+      Examples:
+        | problem                      |
+        | fails with an internal error |
+        | does not answer in time      |

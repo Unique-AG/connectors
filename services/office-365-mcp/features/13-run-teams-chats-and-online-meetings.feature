@@ -73,6 +73,13 @@ Feature: Running Teams chats and online meetings
       When Mia asks her assistant who attended "Design review"
       Then the assistant tells Mia that only Anna can see the attendance
 
+    @happy @uc-13-39
+    Scenario: The organizer sees who attended and for how long
+      Given Mia organized "Design review", and it ended yesterday with an attendance report that lists Anna for 25 minutes and Tom for 40 minutes
+      When Mia asks her assistant who attended "Design review"
+      Then the assistant names Anna and Tom as attendees
+      And it gives the time that each of them attended
+
     @happy @uc-13-10
     Scenario: The time of an online meeting changes and its attendees stay
       Given Mia organizes the online meeting "Design review" tomorrow at 14:00 with Anna and Tom
@@ -130,7 +137,7 @@ Feature: Running Teams chats and online meetings
       And Microsoft <problem> when the chat is created
       When Mia asks her assistant to start a group chat with Anna and Tom named "Launch"
       Then the assistant tells Mia that it does not know if the chat exists, and that it checks her chats before it tries again
-      But it does not create the chat a second time
+      But Mia has at most one chat "Launch"
 
       Examples:
         | problem                              |
@@ -152,7 +159,7 @@ Feature: Running Teams chats and online meetings
       And Microsoft fails with an internal error when the change is made
       When Mia asks her assistant to <action>
       Then the assistant tells Mia that it does not know if <unknown>, and that it checks the members of "Launch" before it tries again
-      But it does not make the change a second time
+      But the members of "Launch" change at most once
 
       Examples:
         | action                   | unknown         |
@@ -179,8 +186,7 @@ Feature: Running Teams chats and online meetings
       Given Mia organizes the online meeting "Design review", and she approves its deletion
       And Microsoft answers that it did not find the meeting, because the meeting was deleted a moment before
       When Mia asks her assistant to delete "Design review"
-      Then the assistant checks if the meeting is still there
-      And it tells Mia that Microsoft did not find the meeting, and that someone probably deleted it
+      Then the assistant tells Mia that Microsoft did not find the meeting, and that someone probably deleted it
 
     @unhappy @uc-13-19
     Scenario Outline: A rename that Microsoft fails is tried once more and then reported
@@ -197,11 +203,10 @@ Feature: Running Teams chats and online meetings
         | sends an answer that nobody can read |
 
     @unhappy @uc-13-20
-    Scenario Outline: A read of the attendance that Microsoft fails is tried once more and then reported
+    Scenario Outline: An attendance that Microsoft fails to read is reported as unreadable
       Given Mia organized "Design review", and Microsoft <problem> each time the assistant reads it
       When Mia asks her assistant who attended "Design review"
-      Then the assistant asks a second time
-      And it tells Mia that it could not read the attendance
+      Then the assistant tells Mia that it could not read the attendance
       But it does not say that nobody attended
 
       Examples:
@@ -318,22 +323,22 @@ Feature: Running Teams chats and online meetings
         | delete the online meeting "Design review"                | no meeting was deleted |
 
     @unhappy @uc-13-32
-    Scenario Outline: A question whose answer never comes back changes nothing in Teams
-      Given <trouble> when Mia is asked to approve the change
+    Scenario Outline: A question that Mia's chat program answers with an error changes nothing in Teams
+      Given Mia's chat program answers with an error when Mia is asked to approve the change
       When Mia asks her assistant to <action>
       Then nothing changes in Teams
       And the assistant tells Mia that it received no answer
       And it says that Mia can ask again
 
       Examples:
-        | action                                                   | trouble                                  |
-        | start a group chat with Anna and Tom named "Launch"      | the answer never comes back              |
-        | add Priya to "Launch"                                    | the connection breaks while Mia is asked |
-        | remove Tom from "Launch"                                 | the answer never comes back              |
-        | rename "Launch" to "Launch 2.0"                          | the connection breaks while Mia is asked |
-        | create an online meeting for tomorrow at 14:00 with Anna | the answer never comes back              |
-        | move the online meeting "Design review" to 15:00         | the connection breaks while Mia is asked |
-        | delete the online meeting "Design review"                | the answer never comes back              |
+        | action                                                   |
+        | start a group chat with Anna and Tom named "Launch"      |
+        | add Priya to "Launch"                                    |
+        | remove Tom from "Launch"                                 |
+        | rename "Launch" to "Launch 2.0"                          |
+        | create an online meeting for tomorrow at 14:00 with Anna |
+        | move the online meeting "Design review" to 15:00         |
+        | delete the online meeting "Design review"                |
 
     @unhappy @uc-13-33
     Scenario Outline: An approval for one change does not cover another

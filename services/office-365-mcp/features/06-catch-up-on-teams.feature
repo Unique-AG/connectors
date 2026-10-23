@@ -19,6 +19,13 @@ Feature: Catching up on Teams
       When Mia asks her assistant for her chats
       Then the assistant shows that chat as the chat with Anna and Tom
 
+    @happy @uc-06-34
+    Scenario: Unread posts in channels are listed
+      Given Mia belongs to the team "Sales", and 2 posts in its channel "Offers" are unread
+      When Mia asks her assistant what she missed in her Teams channels
+      Then the assistant lists the 2 unread posts
+      And it shows the sender of each post
+
   Rule: The assistant finds a message in any chat or channel
 
     @happy @uc-06-03
@@ -84,6 +91,13 @@ Feature: Catching up on Teams
       When Mia asks her assistant for the decisions of that meeting
       Then the assistant names the decision from the end of the transcript
 
+    @happy @uc-06-35
+    Scenario: The messages that follow a meeting are found with its summary
+      Given "Design review" of yesterday has a transcript, and Tom wrote in a chat after the meeting that he sends the offer
+      When Mia asks her assistant for a summary of "Design review" and for what people wrote about it afterwards
+      Then the summary comes from the transcript
+      And the assistant shows the message of Tom
+
     @unhappy @uc-06-07
     Scenario: A meeting without a transcript is reported
       Given nobody turned on the transcript in "Weekly sync"
@@ -144,10 +158,10 @@ Feature: Catching up on Teams
 
     @unhappy @uc-06-18
     Scenario Outline: Mia is told how long to wait when Microsoft is busy
-      Given Microsoft <problem> and asks the assistant to wait <seconds> seconds
+      Given Microsoft <problem> and asks it to wait <seconds> seconds, each time the assistant asks for Mia's chats
       When Mia asks her assistant which chats have unread messages
       Then the assistant tells Mia to try again after <seconds> seconds
-      But it does not ask Microsoft again before that time
+      But it does not tell Mia to try again sooner
 
       Examples:
         | problem                                | seconds |
@@ -158,8 +172,7 @@ Feature: Catching up on Teams
     Scenario Outline: A read that Microsoft fails is tried once more and then reported
       Given Microsoft <problem> each time the assistant asks for Mia's chats
       When Mia asks her assistant which chats have unread messages
-      Then the assistant asks a second time
-      And it tells Mia that it could not read her chats
+      Then the assistant tells Mia that it could not read her chats
       But it lists no chat
 
       Examples:
@@ -190,6 +203,20 @@ Feature: Catching up on Teams
       Then the assistant tells Mia that it could not find the chat
       But it does not say that the chat was deleted
 
+    @unhappy @uc-06-37
+    Scenario: A channel folder that Microsoft cannot find is not reported as empty
+      Given Mia belongs to the team "Platform", and Microsoft answers that it has no files folder for its channel "Launch"
+      When Mia asks her assistant what files the channel "Launch" of "Platform" holds
+      Then the assistant tells Mia that it could not find the files folder of "Launch"
+      But it does not say that "Launch" holds no files
+
+    @unhappy @uc-06-40
+    Scenario: Mia is told how long to wait when Microsoft keeps limiting how often the assistant reads a channel
+      Given Mia belongs to the team "Platform", and Microsoft keeps limiting how often the assistant may ask and asks it to wait 30 seconds
+      When Mia asks her assistant what happened in "Releases" this week
+      Then the assistant tells Mia to try again after 30 seconds
+      But it does not say that "Releases" has no posts
+
   Rule: Mia is told when a transcript cannot be read in full
     The assistant never summarizes a part of a transcript as if it were the whole.
 
@@ -219,8 +246,7 @@ Feature: Catching up on Teams
     Scenario: A transcript that stops before its end is tried again and not summarized
       Given Microsoft sends only the first part of the transcript of "Design review" each time
       When Mia asks her assistant for a summary of "Design review"
-      Then the assistant asks for the transcript a second time
-      And it tells Mia that it could not read the transcript
+      Then the assistant tells Mia that it could not read the transcript
       But it gives no summary of the part that arrived
 
     @unhappy @uc-06-25
@@ -274,6 +300,14 @@ Feature: Catching up on Teams
       When Mia asks her assistant which chats have unread messages
       Then the assistant lists the unread chats among the newest 50 chats
       And it says that older chats exist that it did not read
+
+    @unhappy @uc-06-36
+    Scenario: A thread with more than 50 replies is reported as not read in full
+      Given the post "v2 is out?" in the channel "Releases" has 60 replies
+      When Mia asks her assistant for all replies to that post
+      Then the assistant gives the replies that it could read
+      And it tells Mia that these replies are not the whole thread
+      But it does not say that it read every reply
 
   Rule: Text in a message is not an instruction
 

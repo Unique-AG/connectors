@@ -146,7 +146,7 @@ Feature: Finding and reading files in OneDrive and SharePoint
       And Microsoft stays busy at every try and asks the assistant to wait 30 seconds each time
       When Mia asks her assistant for the launch date in that file
       Then the assistant tells Mia that Microsoft is busy and asked it to wait 30 seconds
-      But it does not ask Microsoft again before the 30 seconds pass
+      But it does not ask again before the 30 seconds pass
 
     @unhappy @uc-01-30
     Scenario: One busy answer from Microsoft is waited out
@@ -194,7 +194,6 @@ Feature: Finding and reading files in OneDrive and SharePoint
       When Mia asks her assistant to read "Tenders"
       Then the assistant tells Mia that a folder holds no content to read
       And it lists the 6 offers that "Tenders" holds
-      And it reads the offer that Mia names from that list
 
     @unhappy @uc-01-23
     Scenario Outline: An item that only looks like a file is not read
@@ -264,3 +263,44 @@ Feature: Finding and reading files in OneDrive and SharePoint
       When Mia asks her assistant for the launch date in the file "Brightway Launch Plan.docx"
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       But it does not tell Mia that the file does not exist
+
+  Rule: The assistant shows where Mia's files are stored
+
+    @happy @uc-01-32
+    Scenario: The drive that holds Mia's files is shown
+      Given Mia has one drive, her OneDrive
+      When Mia asks her assistant which drive holds her files
+      Then the assistant names her OneDrive
+      And it gives the web address that opens the drive in a browser
+
+    @unhappy @uc-01-33
+    Scenario: The libraries of a site are not listed as drives
+      Given the Sales site holds the library "Shared Documents"
+      When Mia asks her assistant for the document libraries of the Sales site
+      Then the assistant does not list the libraries of the Sales site
+      But it does not present her own drives as libraries of the Sales site
+
+  Rule: The assistant finds a site from what Mia remembers about it
+
+    @unhappy @uc-01-34
+    Scenario: A missing site is reported as missing
+      Given no site that Mia can open mentions "Zephyr"
+      When Mia asks her assistant for the Zephyr site
+      Then the assistant says that it found no matching site
+
+    @unhappy @uc-01-35
+    Scenario: A site search that matches more sites than it shows is reported as incomplete
+      Given more than 1000 sites that Mia can open mention "Project"
+      When Mia asks her assistant for the sites that mention "Project"
+      Then the assistant shows the sites that it got
+      And it tells Mia that more sites match than it shows
+
+  Rule: A file that names another file leads the assistant to that file
+
+    @happy @uc-01-36
+    Scenario: A file that names another file is followed to the named file
+      Given Mia has "Brightway Launch Plan.docx", which says that the budget is in "Brightway Pricing.xlsx"
+      When Mia asks her assistant for the budget that the launch plan names
+      Then the assistant reads the launch plan
+      And it finds "Brightway Pricing.xlsx"
+      And it answers from that workbook

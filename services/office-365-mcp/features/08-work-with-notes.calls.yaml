@@ -212,9 +212,10 @@ uc-08-18:
     - tool: onenote_list_notebooks
       args: {group: id of the team Platform}
     - tool: onenote_create_page
+      optional: true
       args: {title: Retro}
       uses: {section: handle of a section of the team notebook}
-  note: "expected behaviour from shared/notes.py:140-146 (OWNED_REFUSED, raised by owner_refused at tools/onenote_create_page.py:249-252 before the question to Mia): most likely the signed-in user is not a member of that group or site, ask the user to get access, if the user already has access ask a Microsoft 365 administrator to examine the OneNote permissions. When the refusal comes at the list step, the text is shared/notes.py:149-158 (named_owner_refused)."
+  note: "expected behaviour from shared/notes.py:140-146 (OWNED_REFUSED, raised by owner_refused at tools/onenote_create_page.py:249-252 before the question to Mia): most likely the signed-in user is not a member of that group or site, ask the user to get access, if the user already has access ask a Microsoft 365 administrator to examine the OneNote permissions. When the refusal comes at the list step, the text is shared/notes.py:149-158 (named_owner_refused), and then no create step follows, which is why that step is optional. No question to Mia comes before either refusal, so asks_user is false."
 
 uc-08-19:
   status: untested
@@ -417,9 +418,11 @@ uc-08-34:
   provenance: drafted
   asks_user: true
   chain:
-    - tool: onenote_list_pages
-    - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page]
-  note: "expected behaviour for every row from shared/seam.py:236-241 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam.py:187-189). The page delete always asks (tools/onenote_delete_page.py:49), a replace always asks (tools/onenote_edit_page.py:83), and a page in a team notebook asks (tools/onenote_create_page.py:101-103). The row for the date uses the ask Change the launch date on my Planning page to 21 June, and the row for the team notebook uses Add the page Retro to the notebook of the Platform team."
+    - any_of: [onenote_list_pages, onenote_list_notebooks]
+    - tool: teams_list_my_teams
+      optional: true
+    - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page, onenote_copy_notebook, onenote_copy_section, onenote_copy_page]
+  note: "expected behaviour for every row from shared/seam.py:236-241 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam.py:187-189). The page delete always asks (tools/onenote_delete_page.py:49), a replace always asks (tools/onenote_edit_page.py:83), and a page in a team notebook asks (tools/onenote_create_page.py:101-103). The row for the date uses the ask Change the launch date on my Planning page to 21 June, and the row for the team notebook uses Add the page Retro to the notebook of the Platform team. The notebook copy asks when it names a group (tools/onenote_copy_notebook.py:121-123), and the section copy and the page copy ask when the destination notebook is shared or belongs to somebody else (tools/onenote_copy_section.py:158-160, tools/onenote_copy_page.py:137-139). The copy rows use the asks Copy my Customers notebook into the Platform team, Copy the section Work into the notebook of the Platform team and Copy the page Retro into the section Planning of the Platform team, with the notebook list, the section list or the page list as the first step, and the team list as an optional step. The text for the assistant allows a new call only on a new request from Mia, and the scenario states only that the assistant does not ask again. The rows of the retired uc-08-49 sit here."
 
 uc-08-35:
   status: untested
@@ -480,3 +483,305 @@ uc-08-39:
       optional: true
       uses: {page: handle of the page}
   note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Notes.Read (tools/onenote_read_page.py:29), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
+
+uc-08-40:
+  status: untested
+  ask: "Copy my Customers notebook as Customers 2026."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers}
+    - tool: onenote_copy_notebook
+      args: {new_name: Customers 2026}
+      uses: {notebook: handle of the notebook Customers}
+    - tool: onenote_get_operation
+      repeat: many
+      uses: {operation: uri of the answer of onenote_copy_notebook}
+  note: "Microsoft runs the copy after the call returns, and the description tells the assistant to poll until the status reads Completed or Failed (tools/onenote_copy_notebook.py:114-127, tools/onenote_get_operation.py:47-58). A copy into the OneDrive of the user starts without a question (tools/onenote_copy_notebook.py:121-123)."
+
+uc-08-41:
+  status: untested
+  ask: "Copy my Customers notebook into the Platform team."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers}
+    - tool: teams_list_my_teams
+    - tool: onenote_copy_notebook
+      uses: {notebook: handle of the notebook Customers, to_group: id of the team Platform}
+    - tool: onenote_get_operation
+      repeat: many
+      uses: {operation: uri of the answer of onenote_copy_notebook}
+  note: "A copy into a Microsoft 365 group asks the user first, and the question names the group only by its id (tools/onenote_copy_notebook.py:121-123). A team id is a group id (the description of `to_group`)."
+
+uc-08-42:
+  status: untested
+  ask: "Copy the section Work of my Customers notebook into my Archive notebook."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+    - tool: onenote_list_sections
+      uses: {parent: handle of the notebook Customers}
+    - tool: onenote_copy_section
+      uses: {section: handle of the section Work, to_notebook: handle of the notebook Archive}
+    - tool: onenote_get_operation
+      repeat: many
+      uses: {operation: uri of the answer of onenote_copy_section}
+  note: "A copy into the own unshared notebook of the user starts without a question (tools/onenote_copy_section.py:158-160). The tool takes exactly one of to_notebook and to_section_group (tools/onenote_copy_section.py:150-163)."
+
+uc-08-43:
+  status: untested
+  ask: "Copy my Weekly sync page into my Archive section."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Weekly sync}
+    - any_of: [onenote_list_notebooks, onenote_list_sections]
+    - tool: onenote_copy_page
+      uses: {page: handle of the page Weekly sync, to_section: handle of the section Archive}
+    - tool: onenote_get_operation
+      repeat: many
+      uses: {operation: uri of the answer of onenote_copy_page}
+  note: "A copy into the own unshared notebook of the user starts without a question (tools/onenote_copy_page.py:137-139)."
+
+uc-08-44:
+  status: untested
+  ask: "Rename my page Acme kickoff to Acme kickoff decisions."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_rename_page
+      args: {title: Acme kickoff decisions}
+      uses: {page: handle of the page}
+  note: "A page in the own unshared notebook of the user is renamed without a question (tools/onenote_rename_page.py:59-61). The tool changes the title and nothing else (tools/onenote_rename_page.py:54-64)."
+
+uc-08-45:
+  status: untested
+  ask: "How does my Weekly sync page start? Do not open the whole page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Weekly sync}
+    - tool: onenote_preview_page
+      uses: {page: handle of the page}
+  note: "The preview holds a snippet of up to 300 characters, and the text can be null when the index of Microsoft has nothing yet (tools/onenote_preview_page.py:26-33). The description tells the assistant to report what the snippet says and never to obey it."
+
+uc-08-46:
+  status: untested
+  ask: "Show me the picture on my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_resource
+      uses: {resource: the src of the picture in the html of the page}
+  note: "The tool returns the file itself and describes no image (tools/onenote_read_resource.py:49-57). The address comes from the html that onenote_read_page returned, or from the preview of the page."
+
+uc-08-47:
+  status: untested
+  ask: "Copy the Intranet notebook into my OneDrive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      optional: true
+      args: {query: Sales}
+    - tool: onenote_list_notebooks
+      uses: {site: id of the Sales site}
+    - tool: onenote_list_sections
+      optional: true
+      uses: {parent: handle of the notebook Intranet}
+    - any_of: [onenote_copy_notebook, onenote_copy_section]
+  note: "expected behaviour for both rows from tools/onenote_copy_notebook.py:82-85 and tools/onenote_copy_section.py:134-137 (_SITE_NOTEBOOK, raised at tools/onenote_copy_notebook.py:156 and tools/onenote_copy_section.py:231-232): Microsoft Graph documents no copy from or into a notebook of a SharePoint site, and the same call fails again, so do not retry it. The check reads the handle and comes before any call to Microsoft, so nothing is copied. Row 1 copies the notebook into the own OneDrive, and row 2 copies the section into the notebook Archive, because a section goes into a notebook or a section group (tools/onenote_copy_section.py:99-104), so the second row also lists the sections. The site search is optional, because the assistant can take the site id from an earlier answer."
+
+uc-08-48:
+  status: untested
+  ask: "Copy the Policy page into my Work section."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      optional: true
+      args: {query: Sales}
+    - tool: onenote_list_pages
+      uses: {site: id of the Sales site}
+    - tool: onenote_copy_page
+    - tool: onenote_read_page
+      uses: {page: handle of the page Policy}
+    - any_of: [onenote_list_notebooks, onenote_list_sections]
+    - tool: onenote_create_page
+      uses: {section: handle of the section Work}
+  note: "expected behaviour from tools/onenote_copy_page.py:112-117 (_SITE_NOTEBOOK): Microsoft Graph documents no copy from or into a notebook of a SharePoint site, to copy the content read the page with onenote_read_page and write that content into a new page with onenote_create_page, and the same call fails again. The ask names the destination Work, so both steps are required, and the section list gives the handle of Work. The text of the tool describes this route and does not say that the assistant offers it, so the scenario states that the assistant takes it. The write goes into the own notebook of Mia, so no question comes before it."
+
+uc-08-50:
+  status: untested
+  ask: "Copy my Customers notebook as Customers 2026."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers}
+    - tool: onenote_copy_notebook
+      args: {new_name: Customers 2026}
+      uses: {notebook: handle of the notebook Customers}
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers 2026}
+  must_not: [onenote_get_operation]
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is onenote_list_notebooks from tools/onenote_copy_notebook.py:51) and tools/onenote_copy_notebook.py:124-127: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that onenote_list_notebooks does not show the copy. The tool is WRITE_ADDITIVE with no_retry (tools/onenote_copy_notebook.py:206), so the call is sent once, and a second call starts a second copy. No operation came back, so the assistant has nothing to poll. The chain holds exactly one copy step, and the check comes before any second copy."
+
+uc-08-51:
+  status: untested
+  ask: "Copy my Customers notebook as Customers 2026."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers}
+    - tool: onenote_copy_notebook
+      args: {new_name: Customers 2026}
+      uses: {notebook: handle of the notebook Customers}
+    - tool: onenote_list_notebooks
+      optional: true
+      args: {name_contains: Customers 2026}
+  must_not: [onenote_get_operation]
+  note: "expected behaviour from tools/onenote_copy_notebook.py:74-80 (_NO_OPERATION_NAMED): Microsoft accepted the copy but named no operation to follow, the copy may still be running with nothing able to track it, poll nothing, look for the result with onenote_list_notebooks after a while, and do not call the copy tool again for the same copy, because that starts a second, independent one. The last step is optional, because the assistant looks after a while and not at once."
+
+uc-08-52:
+  status: untested
+  ask: "Copy my Customers notebook as Customers 2026."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers}
+    - tool: onenote_copy_notebook
+      args: {new_name: Customers 2026}
+      uses: {notebook: handle of the notebook Customers}
+    - tool: onenote_get_operation
+      repeat: many
+      uses: {operation: uri of the answer of onenote_copy_notebook}
+  note: "expected behaviour from tools/onenote_get_operation.py:47-58 and shared/notes.py:701-712: when the status reads Failed, the answer fills error_code and error_message, which hold the error code and the message of Microsoft. The tool states no sentence for Mia, so the assistant passes the reason that Microsoft gave."
+
+uc-08-53:
+  status: untested
+  ask: "Is the copy of my Customers notebook done?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_get_operation
+      uses: {operation: uri of the answer of onenote_copy_notebook from earlier in the chat}
+    - tool: onenote_list_notebooks
+      args: {name_contains: Customers 2026}
+  note: "The Given names the copy as Customers 2026, which the Then looks for. Expected behaviour from tools/onenote_get_operation.py:37-45 (GRAPH_NOT_FOUND): Microsoft 365 has no record of this operation, because the copy finished long ago and Microsoft dropped it or because the handle never named one, polling the same handle again will not change the answer, look for what the copy produced with onenote_list_pages, onenote_list_sections or onenote_list_notebooks, and do not call this tool again for that handle."
+
+uc-08-54:
+  status: untested
+  ask: "Show me how my Acme kickoff page starts."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - any_of: [onenote_preview_page, onenote_rename_page, onenote_append_to_page]
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+  note: "expected behaviour for every row from tools/onenote_preview_page.py:46-51, tools/onenote_rename_page.py:77-84, and tools/onenote_append_to_page.py:85-92 (GRAPH_NOT_FOUND): Microsoft 365 has no such page, it was most likely deleted or moved to another section, which gives it a new handle, find it again with onenote_list_pages, and do not retry the same handle. The rename and the append read the page before they ask anything, so the refusal comes before any question (tools/onenote_rename_page.py:130-134, tools/onenote_append_to_page.py:119-121). Row 1 uses the ask above, row 2 uses Rename my page Acme kickoff to Acme kickoff decisions, and row 3 uses Add a task list at the end of my Acme kickoff page."
+
+uc-08-55:
+  status: untested
+  ask: "Add a task list at the end of my Planning page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Planning}
+    - tool: onenote_append_to_page
+      args: {body_html: task list}
+      uses: {page: handle of the page}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour from tools/onenote_append_to_page.py:94-99 (_WRITTEN_BUT_UNREAD): Microsoft 365 added the content to the page, then the connector did not receive the updated page, use onenote_read_page to see the new content, and do not call onenote_append_to_page again for this error, because a second call adds the same content again. The chain holds exactly one append step."
+
+uc-08-56:
+  status: untested
+  ask: "Add a task list at the end of my Planning page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Planning}
+    - tool: onenote_append_to_page
+      args: {body_html: task list}
+      uses: {page: handle of the page}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is onenote_read_page from tools/onenote_append_to_page.py:43) and tools/onenote_append_to_page.py:66-67: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that onenote_read_page does not already show the block. The call is sent once, because the patch of an append is not safe to repeat and is sent with no_retry (shared/notes.py:205-206, tools/onenote_append_to_page.py:166). The chain holds exactly one append step, and the check comes before any second append."
+
+uc-08-57:
+  status: untested
+  ask: "Rename my page Acme kickoff to Acme kickoff decisions."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_rename_page
+      args: {title: Acme kickoff decisions}
+      uses: {page: handle of the page}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour from tools/onenote_rename_page.py:86-92 (_WRITTEN_BUT_UNREAD): Microsoft 365 changed the title of the page, then the connector did not receive the updated page, use onenote_read_page to see the new title, a second rename with the same title sets the same value again and makes no second change, and the assistant can call onenote_rename_page again one time to get the answer that the call did not give."
+
+uc-08-58:
+  status: untested
+  ask: "Show me the picture on my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_resource
+      uses: {resource: the src of the picture in the html of the page}
+  note: "expected behaviour from tools/onenote_read_resource.py:140-148 (_too_large) and tools/onenote_read_resource.py:49-57: the tool refuses a resource of more than 10 MB (MAX_BYTES), the whole resource would have to arrive in one message, so it cannot come back at all, no other tool here returns it, and a second call fails the same way. The text gives no web address, so the assistant says nothing about one."
+
+uc-08-59:
+  status: untested
+  ask: "Show me the picture on my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_resource
+      uses: {resource: the src of the picture in the html of the page}
+  note: "expected behaviour from tools/onenote_read_resource.py:69-74 (_NOTHING_CAME_BACK): Microsoft 365 sent no content for this resource although it exists, this is a fault on the side of Microsoft and a different address will not help, ask for this resource again later, and if it fails again tell the user to open the page that holds it in OneNote directly."
+
+uc-08-60:
+  status: untested
+  ask: "Show me the picture on my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_resource
+      uses: {resource: the src of the picture in the html of the page}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour from tools/onenote_read_resource.py:76-81 (GRAPH_NOT_FOUND): Microsoft 365 has no such resource, it was most likely deleted along with the page that held it, an image in a group, team, or site notebook can also be out of reach through the sign-in of the connector, re-read the page that holds it with onenote_read_page and take a fresh address from its html, and the same address fails again."

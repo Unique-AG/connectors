@@ -8,13 +8,13 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 10 | 5 | 220 | 240 |
-| Teams | 0 | 2 | 1 | 96 | 99 |
-| SharePoint | 0 | 2 | 3 | 61 | 66 |
-| OneNote | 0 | 1 | 1 | 37 | 39 |
+| Outlook | 5 | 11 | 4 | 264 | 284 |
+| Teams | 0 | 2 | 1 | 102 | 105 |
+| SharePoint | 0 | 3 | 3 | 67 | 73 |
+| OneNote | 0 | 1 | 1 | 57 | 59 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
-Scenarios with an executable run: 14 of 470.
+Scenarios with an executable run: 14 of 547.
 
 ## Happy and unhappy paths by surface
 
@@ -22,20 +22,21 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 | Surface | happy | unhappy | total |
 | --- | --- | --- | --- |
-| Outlook | 99 | 141 | 240 |
-| Teams | 33 | 66 | 99 |
-| SharePoint | 26 | 40 | 66 |
-| OneNote | 14 | 25 | 39 |
-| Across sources | 11 | 15 | 26 |
+| Outlook | 115 | 169 | 284 |
+| Teams | 36 | 69 | 105 |
+| SharePoint | 28 | 45 | 73 |
+| OneNote | 21 | 38 | 59 |
+| Across sources | 12 | 14 | 26 |
 
 ## Work for UN-27222
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.
 
-### A tool is missing (9)
+### A tool is missing (10)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
+| `uc-01-33` | Finding and reading files in OneDrive and SharePoint | The libraries of a site are not listed as drives | partly | `sharepoint_list_drives` | No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries. |
 | `uc-02-11` | Finding and reading mail | A mailbox that Mia cannot open is explained as missing access | gap | `outlook_list_mail` | The tool has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia. |
 | `uc-04-11` | Drafting and sending mail | A new file is attached to a draft | gap | `outlook_draft_mail` | the draft tools write text only, and no other tool adds a file to a message |
 | `uc-10-02` | Organizing and sharing files in OneDrive and SharePoint | A folder is copied to another drive | partly | `sharepoint_list_drives` | No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns. |
@@ -76,7 +77,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-05-22` | Organizing the mailbox | A category is renamed | partly | `outlook_create_category` | the `name` field of outlook_create_category says the name cannot change after the call, and no tool renames or deletes a category |
-| `uc-07-08` | Scheduling and answering meetings | An invitation is saved as a draft for Mia to finish later | gap | `outlook_create_event` | A Microsoft 365 calendar event has no draft state, so an event with an attendee goes out in the same call. |
+| `uc-07-08` | Scheduling and answering meetings | An invitation that Mia wants to finish later is saved without attendees | partly | `outlook_create_event` | A Microsoft 365 calendar event has no draft state, so an event with an attendee goes out in the same call. |
 | `uc-08-02` | Working with notes in OneNote | A page is found by a word that is only in its body | gap | `onenote_list_pages` | Microsoft Graph has no full-text search over the words of a page for a work or school account. |
 
 ## It fails in prod and the cause is not known
@@ -89,21 +90,10 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-14-05` | Sharing and delegating calendars | The events of a team calendar are listed for a week | partly | `outlook_list_group_events` | The only call in prod failed and the logs give no cause, and the tool declares the permission Calendars.Read only. |
 | `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known. |
 
-## Tools in no chain
+## Tool coverage
 
-No scenario calls these tools.
+120 of 121 tools have a happy and an unhappy scenario. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
-- `onenote_copy_notebook`
-- `onenote_copy_page`
-- `onenote_copy_section`
-- `onenote_get_operation`
-- `onenote_preview_page`
-- `onenote_read_resource`
-- `onenote_rename_page`
-- `outlook_delete_calendar`
-- `outlook_delete_event`
-- `outlook_list_calendar_groups`
-- `outlook_list_event_instances`
-- `outlook_list_reminders`
-- `outlook_list_time_zones`
-- `sharepoint_list_drives`
+| Tool | happy | unhappy | Reason |
+| --- | --- | --- | --- |
+| `outlook_list_calendar_groups` | 1 | 0 | The only condition of its own is a listing that stops after 1000 groups or calendars, which no user reaches. The faults of a read are stated for the read chain of uc-03-10. |

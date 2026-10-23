@@ -324,3 +324,86 @@ uc-11-23:
     tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent
     for the organization, then to have the user sign in again, and that retrying will not help. The
     failed call is the only step, so it is optional. A failed reading is never a reply that is off.
+
+uc-11-24:
+  status: untested
+  ask: "Which senders do I always put in a tab?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_focused_overrides
+  note: the tool gives one row for each sender with the address and the tab, and an empty list means that Mia fixed no sender (tools/outlook_list_focused_overrides.py:20-28)
+
+uc-11-25:
+  status: untested
+  ask: "Which senders do I always put in a tab?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_focused_overrides
+  note: >-
+    Expected behaviour per Examples row. Sign-in expired, shared/seam.py:520-525, ask the user to
+    sign in again. Access refused, seam.py:528-537 (the tool has no GRAPH_FORBIDDEN text), an
+    administrator grants Mail.Read to the app registration
+    (tools/outlook_list_focused_overrides.py:16), and retrying will not help. Busy, seam.py:509-513,
+    left alone for 30 seconds, retry after that and not sooner. This text reaches the assistant only
+    when every try is busy: the listing is a GET, so the SDK retry handler waits out up to 3 busy
+    answers (graph_client/client.py:339-342, config.py:126). OPEN: 4 busy answers in a row take
+    about 90 s, longer than the 60 s tool limit of node-chat. A failed listing is never an empty
+    list.
+
+uc-11-26:
+  status: untested
+  ask: "Always put mail from ada@acme.example in my Focused tab."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_focused_override
+      args: {sender: ada@acme.example, classify_as: focused}
+  note: >-
+    Expected behaviour per Examples row. Sign-in expired, shared/seam.py:520-525, ask the user to
+    sign in again. Access refused, seam.py:528-537 (the tool has no GRAPH_FORBIDDEN text), an
+    administrator grants Mail.ReadWrite to the app registration
+    (tools/outlook_set_focused_override.py:25), and retrying will not help. Busy, seam.py:509-513,
+    left alone for 30 seconds, retry after that and not sooner. The tool never asks Mia
+    (tools/outlook_set_focused_override.py:34-35). Its POST and PATCH carry no no_retry option, so
+    the SDK retry handler waits out up to 3 busy answers
+    (tests/tools/test_outlook_set_focused_override.py:383-413) and the text reaches the assistant
+    only when every try is busy. OPEN: the same 60 s limit as uc-11-25. A refusal or a busy answer
+    changes no tab.
+
+uc-11-27:
+  status: untested
+  ask: "Always put mail from ada@acme.example in my Focused tab."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_focused_override
+      args: {sender: ada@acme.example, classify_as: focused}
+    - tool: outlook_set_focused_override
+      args: {sender: ada@acme.example, classify_as: focused}
+  note: >-
+    Expected behaviour from shared/seam.py:549-553, for a tool that Microsoft could not reach or that
+    failed internally, retry once. The tool carries the idempotent hint
+    (tools/outlook_set_focused_override.py:103) and says that the call is safe to repeat after a
+    timeout (:43), so the seam does not treat the failed write as outcome unknown (seam.py:392-396).
+    A status of 500 or more, graph_client/errors.py:332-335, and a timeout or lost connection,
+    errors.py:218-227, both reach the assistant. A 503 or 504 is sent again by the SDK before the
+    assistant sees it (tests/tools/test_outlook_set_focused_override.py:383-413). A sender holds
+    one row, so a repeat leaves the sender once in the list.
+
+uc-11-28:
+  status: untested
+  ask: "Always put mail from ada@acme.example in my Focused tab."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_focused_override
+      args: {sender: ada@acme.example, classify_as: focused}
+    - tool: outlook_set_focused_override
+      args: {sender: ada@acme.example, classify_as: focused}
+  note: >-
+    Expected behaviour from shared/seam.py:549-553, if it fails again the same way, stop and report
+    it. The assistant calls the tool twice and no third time. OPEN: the tool has no text for the
+    1001st sender (tools/outlook_set_focused_override.py:41-42 says a mailbox holds 1000 at most), so
+    no scenario states what Mia is told then.

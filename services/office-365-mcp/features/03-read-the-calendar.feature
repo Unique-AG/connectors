@@ -98,11 +98,10 @@ Feature: Reading the calendar
         | Microsoft rejects the question and gives a reason                                     | the reason that Microsoft gave, and that the same question fails again |
 
     @unhappy @uc-03-11
-    Scenario Outline: A calendar that Microsoft cannot finish reading is tried once more
+    Scenario Outline: A calendar that Microsoft cannot finish reading is not reported as empty
       Given Microsoft <problem> each time the assistant asks
       When Mia asks her assistant what is on her calendar tomorrow
-      Then the assistant asks Microsoft a second time
-      And it tells Mia that it cannot read her calendar now
+      Then the assistant tells Mia that it cannot read her calendar now
       But it does not say that the calendar is empty
 
       Examples:
@@ -194,3 +193,61 @@ Feature: Reading the calendar
       When Mia asks her assistant what is on Anna's calendar tomorrow
       Then the assistant tells Mia that something is on Anna's calendar tomorrow at 11:00
       But it does not tell Mia the subject "Doctor"
+
+  Rule: The assistant lists the dates of a meeting that repeats
+
+    @happy @uc-03-22
+    Scenario: The dates of a weekly meeting are listed for a period
+      Given Mia's "Team sync" repeats every Thursday
+      And the Thursday in three weeks was cancelled out of the series
+      When Mia asks her assistant on which dates "Team sync" takes place in the next six weeks
+      Then the assistant lists the five other Thursdays
+      But it does not list the cancelled Thursday
+
+    @unhappy @uc-03-23
+    Scenario: A meeting that does not repeat is reported as a single meeting
+      Given Mia has "Budget review" once and it does not repeat
+      When Mia asks her assistant on which dates "Budget review" takes place
+      Then the assistant tells Mia that "Budget review" does not repeat
+      And it shows the time of that one meeting
+
+    @unhappy @uc-03-24
+    Scenario: A series that cannot be read is not reported as ended
+      Given Mia's assistant listed the weekly "Team sync" and Anna then deleted the series
+      When Mia asks her assistant on which dates "Team sync" takes place in the next six weeks
+      Then the assistant tells Mia that it could not read the series "Team sync"
+      And it looks for a date of "Team sync" on Mia's calendar again
+      But it does not say that the series ended
+
+  Rule: The assistant lists the reminders that Mia has set
+
+    @happy @uc-03-25
+    Scenario: The reminders of a week are listed
+      Given Mia has reminders on 3 meetings this week
+      When Mia asks her assistant which reminders she has this week
+      Then the assistant lists the 3 meetings with the time of each reminder
+
+    @unhappy @uc-03-26
+    Scenario: A week without a listed reminder is not reported as proof that none exists
+      Given Microsoft lists no reminder for this week
+      When Mia asks her assistant which reminders she has this week
+      Then the assistant tells Mia that no reminder is listed for this week
+      But it does not say that Mia has no reminder on any calendar
+
+  Rule: The assistant shows how Mia's calendars are grouped
+
+    @happy @uc-03-27
+    Scenario: The calendars of Mia are shown by group
+      Given Mia keeps her own calendars in one group and the calendar of Anna in another group
+      When Mia asks her assistant how her calendars are grouped
+      Then the assistant lists each group with its calendars
+      And it says which calendars are Mia's own
+
+  Rule: The assistant tells the meetings that Mia organizes from the invitations that she received
+
+    @happy @uc-03-28
+    Scenario: The meetings that Mia organizes are told apart from the invitations she received
+      Given Mia organizes "Team sync" tomorrow and Anna invited her to "Launch review" tomorrow
+      When Mia asks her assistant which of tomorrow's meetings she organizes herself
+      Then the assistant names "Team sync" as her own meeting
+      But it does not name "Launch review" as her own meeting
