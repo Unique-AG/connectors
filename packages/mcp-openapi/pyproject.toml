@@ -53,6 +53,8 @@ exclude = [".venv"]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.12"
 typeCheckingMode = "all"
 include = ["src", "tests"]

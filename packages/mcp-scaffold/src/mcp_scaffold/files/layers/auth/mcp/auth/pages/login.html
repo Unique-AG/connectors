@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in to {{ title }}</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f4f5f7;
+        display: flex;
+        justify-content: center;
+        padding: 4rem 1rem;
+      }
+      main {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+        padding: 2rem;
+        width: 100%;
+        max-width: 22rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 1.5rem;
+      }
+      label {
+        display: block;
+        font-size: 0.875rem;
+        margin: 1rem 0 0.25rem;
+      }
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 1rem;
+      }
+      button {
+        margin-top: 1.5rem;
+        width: 100%;
+        padding: 0.6rem;
+        font-size: 1rem;
+      }
+      .error {
+        color: #b3261e;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sign in to {{ title }}</h1>
+      {% if error %}
+      <p class="error" role="alert">{{ error }}</p>
+      {% endif %}
+      <form method="post">
+        <input type="hidden" name="request_id" value="{{ request_id }}" />
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label for="username">Username</label>
+        <input id="username" name="username" value="{{ username }}" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button type="submit">Sign in</button>
+      </form>
+    </main>
+  </body>
+</html>

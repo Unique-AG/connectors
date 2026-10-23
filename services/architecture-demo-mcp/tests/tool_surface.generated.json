@@ -1,0 +1,1690 @@
+[
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Crypto"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get historical crypto price data",
+    "inputSchema": {
+      "properties": {
+        "endDate": {
+          "description": "f startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or less than the endDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "exchanges": {
+          "description": "If you would like to limit the query to a subset of exchanes, pass a comma-separated list of exchanged to select. E.g. \"POLONIEX, GDAX\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resampleFreq": {
+          "description": "This allows you to set the frequency in which you want data resampled. For example \"1hour\" would return the data where OHLC is calculated on an hourly schedule. The minimum value is \"1min\". Units in minutes (min), hours (hour), and days (day) are accepted. Format is # + (min/hour/dau); e.g. \"15min\", \"4hour\" or \"1day\". If no value is provided, defaults to 5min.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or later than the startDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "tickers": {
+          "description": "The ticker(s) associated with the crypto pair(s). Can either be a single string or an array of strings (string[]). Please note: no more than 100 tickers may be requested at this time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tickers"
+      ],
+      "type": "object"
+    },
+    "name": "get_crypto_prices",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "baseCurrency": {
+                "description": "The base pair of the cryptocurrency, e.g. \"btc\" for \"btcusd\".",
+                "type": "string"
+              },
+              "exchangeData": {
+                "description": "The underlying data for each exchange. This will only be returned if the includeRawExchangeData flag is set to \"true\".",
+                "type": "object"
+              },
+              "priceData": {
+                "description": "Stores the top-of-book data being returned. See the table below for the fields in this object.",
+                "items": {
+                  "properties": {
+                    "close": {
+                      "description": "The closing price for the asset on the given date.",
+                      "type": "number"
+                    },
+                    "date": {
+                      "description": "The datetime this data pertains to. It will be a timestamp dependent upon the resampleFreq parameter. For example, if resampleFreq=5min, it will be in 5 min increments.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "high": {
+                      "description": "The high price for the asset on the given date.",
+                      "type": "number"
+                    },
+                    "low": {
+                      "description": "The low price for the asset on the given date.",
+                      "type": "number"
+                    },
+                    "open": {
+                      "description": "The opening price for the asset on the given date.",
+                      "type": "number"
+                    },
+                    "tradesDone": {
+                      "description": "The number of trades done on the given date.",
+                      "type": "integer"
+                    },
+                    "volume": {
+                      "description": "The volume done for the asset on the specific date in the base currency.",
+                      "type": "number"
+                    },
+                    "volumeNotional": {
+                      "description": "The last size done for the asset on the specific date in the quote currency. The volume done for the asset on the specific date in the quote currency. In mathematical terms: volumeNotional = close * volume",
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "quoteCurrency": {
+                "description": "The quote pair of the cryptocurrency, e.g. \"usd\" for \"btcusd\".",
+                "type": "string"
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Crypto Prices"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Crypto"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get top-of-book quotes for crypto tickers",
+    "inputSchema": {
+      "properties": {
+        "exchanges": {
+          "description": "If you would like to limit the query to a subset of exchanes, pass a comma-separated list of exchanged to select. E.g. \"POLONIEX, GDAX\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includeRawExchangeData": {
+          "description": "If True, the endpoint will return all of the underlying exchange data used in the calculation. If this is set to true, there will be a new field called exchangeData for each crypto. This will contain the exchange-level OHLC for each asset.",
+          "type": "boolean"
+        },
+        "tickers": {
+          "description": "The ticker(s) associated with the crypto pair(s). Can either be a single string or an array of strings (string[]). Please note: no more than 100 tickers may be requested at this time.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tickers"
+      ],
+      "type": "object"
+    },
+    "name": "get_crypto_top_of_book",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "baseCurrency": {
+                "description": "The base pair of the cryptocurrency, e.g. \"btc\" for \"btcusd\".",
+                "type": "string"
+              },
+              "exchangeData": {
+                "description": "The underlying data for each exchange. This will only be returned if the includeRawExchangeData flag is set to \"true\".",
+                "type": "object"
+              },
+              "quoteCurrency": {
+                "description": "The quote pair of the cryptocurrency, e.g. \"usd\" for \"btcusd\".",
+                "type": "string"
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              },
+              "topOfBookData": {
+                "description": "Stores the top-of-book data being returned. See the table below for the fields in this object.",
+                "items": {
+                  "properties": {
+                    "askExchange": {
+                      "description": "The full name of the exchange the \"askPrice\" and \"askSize\" are located on.",
+                      "type": "string"
+                    },
+                    "askPrice": {
+                      "description": "The current ask price.",
+                      "type": "number"
+                    },
+                    "askSize": {
+                      "description": "The amount of shares at the ask price.",
+                      "type": "number"
+                    },
+                    "bidExchange": {
+                      "description": "The full name of the exchange the \"bidPrice\" and \"bidSize\" are located on.",
+                      "type": "string"
+                    },
+                    "bidPrice": {
+                      "description": "The current bid price.",
+                      "type": "number"
+                    },
+                    "bidSize": {
+                      "description": "The amount of shares at the bid price.",
+                      "type": "number"
+                    },
+                    "lastExchange": {
+                      "description": "The full name of the exchange the \"lastPrice\" and \"lastSize\" were executed on.",
+                      "type": "string"
+                    },
+                    "lastPrice": {
+                      "description": "Last price is the last price that was executed on any crypto exchange.",
+                      "type": "number"
+                    },
+                    "lastSaleTimestamp": {
+                      "description": "The timestamp the last time the trade (last/lastSize) data was received from any crypto exchange.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "lastSize": {
+                      "description": "The amount of crypto volume done at the last price in the base currency.",
+                      "type": "number"
+                    },
+                    "lastSizeNotional": {
+                      "description": "The last size done for the asset on the specific date in the quote currency. The notional of the volume traded. In mathematical terms: lastSizeNotional = lastPrice * lastSize",
+                      "type": "number"
+                    },
+                    "quoteTimestamp": {
+                      "description": "The timestamp the last time the quote (bid/ask) data was received from any crypto exchange.",
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Crypto Top Of Book"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "End-of-Day"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get end-of-day metadata for a ticker",
+    "inputSchema": {
+      "properties": {
+        "ticker": {
+          "description": "Ticker related to the asset.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_daily_meta",
+    "outputSchema": {
+      "properties": {
+        "description": {
+          "description": "Long-form descripton of the asset.",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "The latest date we have price data available for the asset. When null it means no price data available for the given asset.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchangeCode": {
+          "description": "An identifier that maps which Exchange this asset is listed on.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Full-length name of the asset.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "The earliest date we have price data available for the asset. When null it means no price data available for the given asset.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ticker": {
+          "description": "Ticker related to the asset.",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "DailyMeta"
+    },
+    "title": "Get Daily Meta"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "End-of-Day"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get end-of-day price history for a ticker",
+    "inputSchema": {
+      "properties": {
+        "endDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or before the endDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "format": {
+          "description": "Response format. Supports \"json\" (default) and \"csv\". CSV is a bare-bones return type that is often 4-5x faster than JSON.",
+          "enum": [
+            "json",
+            "csv"
+          ],
+          "type": "string"
+        },
+        "resampleFreq": {
+          "description": "Allows resampled values that allow you to choose the values returned as daily, weekly, monthly, or annually values. Note: ONLY DAILY takes into account holidays. All others use standard business days Acceptable values: daily : Values returned as daily periods, with a holiday calendar. weekly : Values returned as weekly data, with days ending on Friday. monthly : Values returned as monthly data, with days ending on the last standard business day (Mon-Fri) of each month. annually : Values returned as annual data, with days ending on the last standard business day (Mon-Fri) of each year. Note, that if you choose a value in-between the resample period for weekly, monthly, and daily, the start date rolls back to consider the entire period. For example, if you choose to resample weekly, but your \"startDate\" parameter is set to Wednesday of that week, the startDate will be adjusted to Monday, so the entire week is captured. Another example is if you send a startDate mid-month, we roll back the startDate to the beginning of the month. Similarly, if you provide an endDate, and it's midway through the period, we roll-forward the date to capture the whole period. In the above example, if the end date is set to a wednesday with a weekly resample, the end date is rolled forward to the Friday of that week.",
+          "type": "string"
+        },
+        "sort": {
+          "description": "This field allows you to specify the sort direct and which column to sort by. Prepend \"-\" if you want descending order, otherwise it will be ascending. E.g. sort=date will sort by date in ascending order. sort=-date will sort by date in descending order.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or after the startDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Ticker related to the asset.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_daily_prices",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "adjClose": {
+                "description": "The adjusted closing price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjHigh": {
+                "description": "The adjusted high price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjLow": {
+                "description": "The adjusted low price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjOpen": {
+                "description": "The adjusted opening price for the asset on the given date.",
+                "type": "number"
+              },
+              "adjVolume": {
+                "description": "The number of shares traded for the asset.",
+                "type": "integer"
+              },
+              "close": {
+                "description": "The closing price for the asset on the given date.",
+                "type": "number"
+              },
+              "date": {
+                "description": "The date this data pertains to.",
+                "format": "date",
+                "type": "string"
+              },
+              "divCash": {
+                "description": "The dividend paid out on \"date\" (note that \"date\" will be the \"exDate\" for the dividend).",
+                "type": "number"
+              },
+              "high": {
+                "description": "The high price for the asset on the given date.",
+                "type": "number"
+              },
+              "low": {
+                "description": "The low price for the asset on the given date.",
+                "type": "number"
+              },
+              "open": {
+                "description": "The opening price for the asset on the given date.",
+                "type": "number"
+              },
+              "splitFactor": {
+                "description": "The factor used to adjust prices when a company splits, reverse splits, or pays a distribution.",
+                "type": "number"
+              },
+              "volume": {
+                "description": "The number of shares traded for the asset.",
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Daily Prices"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Forex"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get forex top-of-book quotes",
+    "inputSchema": {
+      "properties": {
+        "tickers": {
+          "description": "Ticker related to the asset.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_forex_top_of_book",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "askPrice": {
+                "description": "The current ask price.",
+                "type": "number"
+              },
+              "askSize": {
+                "description": "The amount of units at the ask price.",
+                "type": "number"
+              },
+              "bidPrice": {
+                "description": "The current bid price.",
+                "type": "number"
+              },
+              "bidSize": {
+                "description": "The amount of units at the bid price.",
+                "type": "number"
+              },
+              "midPrice": {
+                "description": "The mid price of the current timestamp when both \"bidPrice\" and \"askPrice\" are not-null. In mathematical terms: midPrice = (bidPrice + askPrice)/2.0",
+                "type": "number"
+              },
+              "quoteTimestamp": {
+                "description": "The timestamp the data was last refresh on.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Forex Top Of Book"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Fundamentals"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get daily fundamentals metrics for a ticker",
+    "inputSchema": {
+      "properties": {
+        "endDate": {
+          "description": "This filter limits metrics to on or before the endDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "sort": {
+          "description": "This field allows you to specify the sort direct and which column to sort by. Prepend \"-\" if you want descending order, otherwise it will be ascending. E.g. sort=date will sort by date in ascending order. sort=-date will sort by date in descending order.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "This filter limits metrics to on or after the startDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Required. Use the ticker for active symbols, or Tiingo PermaTicker (stable identifier) for delisted/recycled symbols.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_fundamentals_daily",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "date": {
+                "description": "The date the daily data corresponds to.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "enterpriseVal": {
+                "description": "The value of the field corresponding to the enterprise value.",
+                "type": "number"
+              },
+              "marketCap": {
+                "description": "The value of the field corresponding to the market capitalization.",
+                "type": "number"
+              },
+              "pbRatio": {
+                "description": "The value of the field corresponding to the price/book ratio.",
+                "type": "number"
+              },
+              "peRatio": {
+                "description": "The value of the field corresponding to the price/earnings ratio.",
+                "type": "number"
+              },
+              "trailingPEG1Y": {
+                "description": "The value of the field corresponding to the trailing 1 year PEG Ratio.",
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Fundamentals Daily"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Fundamentals"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get fundamentals metadata for tickers",
+    "inputSchema": {
+      "properties": {
+        "tickers": {
+          "description": "Specific tickers to return meta data for. If no string passed, will return meta data for all available tickers. Can either be a single ticker, a comma-separated list of tickers, or an array of strings (string[]).",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_fundamentals_meta",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "companyWebsite": {
+                "description": "The website of the company when available.",
+                "type": "string"
+              },
+              "dailyLastUpdated": {
+                "description": "The timestamp the daily data/endpoint was last updated for the ticker.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "industry": {
+                "description": "Sector information that is derived from sicIndustry and is meant to approximate GICS.",
+                "type": "string"
+              },
+              "isADR": {
+                "description": "Boolean describing whether or not the ticker is an ADR. Value is true if listed ticker is an ADR.",
+                "type": "boolean"
+              },
+              "isActive": {
+                "description": "Boolean describing whether or not the ticker is still actively traded. If false, this ticker is delisted.",
+                "type": "boolean"
+              },
+              "location": {
+                "description": "Location/domicile of the company. States are included for U.S. companies, otherwise countries for non-US companies.",
+                "type": "string"
+              },
+              "name": {
+                "description": "Full-length name of the asset.",
+                "type": "string"
+              },
+              "permaTicker": {
+                "description": "Permanent Tiingo Ticker mapping to the security. Can be used as a primary key.",
+                "type": "string"
+              },
+              "reportingCurrency": {
+                "description": "The currency the company reports their SEC statement filings in.",
+                "type": "string"
+              },
+              "secFilingWebsite": {
+                "description": "A URL to where you can find the company's SEC filings directly on the SEC website.",
+                "type": "string"
+              },
+              "sector": {
+                "description": "Sector information that is derived from sicSector and is meant to approximate GICS.",
+                "type": "string"
+              },
+              "sicCode": {
+                "description": "SIC Code that represents company's business activities.",
+                "type": "integer"
+              },
+              "sicIndustry": {
+                "description": "Industry as determined by the SIC Code.",
+                "type": "string"
+              },
+              "sicSector": {
+                "description": "Sector as determined by the SIC Code.",
+                "type": "string"
+              },
+              "statementLastUpdated": {
+                "description": "The timestamp the statement data/endpoint was last updated for the ticker.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Fundamentals Meta"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Fundamentals"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get financial statement history for a ticker",
+    "inputSchema": {
+      "properties": {
+        "asReported": {
+          "description": "When false (default), the endpoint will return the most recent data, including any revisions for the reporting period. The dates will correspond to the fiscal end of the quarter or year. When true, the endpoint will return the data as it was reported on the release date. Similarly, the date will correspond to the date the filings were posted on the SEC.",
+          "type": "boolean"
+        },
+        "endDate": {
+          "description": "This filter limits metrics to on or before the endDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "sort": {
+          "description": "This field allows you to specify the sort direct and which column to sort by. Prepend \"-\" if you want descending order, otherwise it will be ascending. E.g. sort=date will sort by date in ascending order. sort=-date will sort by date in descending order. NOTE: For Fundamentals statement only the \"date\" field may be sorted upon",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "This filter limits metrics to on or after the startDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Required. Use the ticker for active symbols, or Tiingo PermaTicker (stable identifier) for delisted/recycled symbols.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_fundamentals_statements",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "date": {
+                "description": "The date the statement data was released to the public.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "quarter": {
+                "description": "An integer corresponding to the fiscal quarter reported. A value of \"0\" means this is an Annual Report. A value of \"1\" through \"4\" corresponds to the respective fiscal quarter.",
+                "type": "integer"
+              },
+              "statementData": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "balanceSheet": {
+                        "items": {
+                          "properties": {
+                            "dataCode": {
+                              "description": "An identifier representing the fundamentals field the value belongs to. For example, \"peRatio.\"",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value of the field corresponding to the dataCode",
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "cashFlow": {
+                        "items": {
+                          "properties": {
+                            "dataCode": {
+                              "description": "An identifier representing the fundamentals field the value belongs to. For example, \"peRatio.\"",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value of the field corresponding to the dataCode",
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "incomeStatement": {
+                        "items": {
+                          "properties": {
+                            "dataCode": {
+                              "description": "An identifier representing the fundamentals field the value belongs to. For example, \"peRatio.\"",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value of the field corresponding to the dataCode",
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "overview": {
+                        "items": {
+                          "properties": {
+                            "dataCode": {
+                              "description": "An identifier representing the fundamentals field the value belongs to. For example, \"peRatio.\"",
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "The value of the field corresponding to the dataCode",
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "description": "Statement data that is broken out by four different fields in a JSON object. Each fields corresponds to a statement. The four fields are: balanceSheet : Balance sheet data incomeStatement : Income Statement Data cashFlow : Cash flow statement data overview : Metrics and ratios that may be a combination of the fields from various statements Each field will return an array of \"dataCode\" and \"value\" pairs that are described in the \"Statement Data Table\" below."
+              },
+              "year": {
+                "description": "An integer corresponding to the fiscal year reported.",
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Fundamentals Statements"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "IEX"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get IEX top-of-book and last-sale quotes",
+    "inputSchema": {
+      "properties": {
+        "tickers": {
+          "description": "Ticker related to the asset.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_iex_top_of_book",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "askPrice": {
+                "description": "The current ask price. IEX entitlement required",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "askSize": {
+                "description": "The amount of shares at the ask price. IEX entitlement required",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "bidPrice": {
+                "description": "The current bid price. IEX entitlement required",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "bidSize": {
+                "description": "The amount of shares at the bid price. IEX entitlement required",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "high": {
+                "description": "The high price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "last": {
+                "description": "Last is the last trade that was executed on IEX. IEX entitlement required",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "lastSaleTimestamp": {
+                "description": "The timestamp the last time the trade (last/lastSize) data was received from IEX. IEX entitlement required",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastSize": {
+                "description": "The amount of shares traded (volume) at the last price on IEX. IEX entitlement required",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "low": {
+                "description": "The low price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "mid": {
+                "description": "The mid price of the current timestamp when both \"bidPrice\" and \"askPrice\" are not-null. In mathematical terms: mid = (bidPrice + askPrice)/2.0 This value is calculated by Tiingo and not provided by IEX.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "open": {
+                "description": "The opening price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "prevClose": {
+                "description": "Previous day's closing price of the security.This can be from any of the exchanges, NYSE, NASDAQ, IEX, etc.",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "quoteTimestamp": {
+                "description": "The timestamp the last time the quote (bid/ask) data was received from IEX. IEX entitlement required",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              },
+              "timestamp": {
+                "description": "The timestamp the data was last refresh on.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tngoLast": {
+                "description": "Tiingo Last is either the last price or mid price. The mid price is only used if our algo determines it is a good proxy for the last price. So if the spread is considered wide by our algo, we do not use it. Also, after the official exchange print comes in, this value changes to that value. This value is calculated by Tiingo and not provided by IEX .",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "volume": {
+                "description": "Volume will be IEX Volume throughout the day, but once the official closing price comes in, volume will reflect the volume done on the entire day across all exchanges. This field is available for convenience.",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Iex Top Of Book"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Summarize how a ticker's price moved over a period: total return, annualized volatility,\nmaximum drawdown and the high and low, from closes adjusted for splits and dividends.\n\nCall it to compare assets or judge risk. For the raw daily prices, call `get_daily_prices`.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "end_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The last day of the period, `YYYY-MM-DD`. Leave it out for today."
+        },
+        "start_date": {
+          "description": "The first day of the period, `YYYY-MM-DD`.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "A stock, ETF or fund ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker",
+        "start_date"
+      ],
+      "type": "object"
+    },
+    "name": "get_price_performance",
+    "outputSchema": {
+      "properties": {
+        "annualized_volatility": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The standard deviation of daily returns, scaled to 252 trading days."
+        },
+        "first_close": {
+          "type": "number"
+        },
+        "first_date": {
+          "format": "date",
+          "type": "string"
+        },
+        "last_close": {
+          "type": "number"
+        },
+        "last_date": {
+          "format": "date",
+          "type": "string"
+        },
+        "max_drawdown": {
+          "description": "The largest fall from a running high close, 0.25 for 25%.",
+          "type": "number"
+        },
+        "period_high": {
+          "type": "number"
+        },
+        "period_low": {
+          "type": "number"
+        },
+        "ticker": {
+          "type": "string"
+        },
+        "total_return": {
+          "description": "0.12 is a 12% gain from the first to the last close.",
+          "type": "number"
+        },
+        "trading_days": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ticker",
+        "first_date",
+        "last_date",
+        "trading_days",
+        "first_close",
+        "last_close",
+        "total_return",
+        "annualized_volatility",
+        "max_drawdown",
+        "period_high",
+        "period_low"
+      ],
+      "type": "object"
+    },
+    "title": "Get Price Performance"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Corporate Actions"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get dividend distributions for a ticker",
+    "inputSchema": {
+      "properties": {
+        "endExDate": {
+          "description": "This filter limits distributions that have an ex-date <= on the date passed. Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "startExDate": {
+          "description": "This filter limits distributions that have an ex-date >= on the date passed. Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Ticker related to the asset you would like distribution data for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_ticker_distributions",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "declarationDate": {
+                "description": "The declaration date of the distribution.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "distribution": {
+                "description": "The total distribution for the given date.",
+                "type": "number"
+              },
+              "distributionFreqency": {
+                "description": "The frequency that's associated with this distribution. For example \"q\" means quarterly, meaning this is a declared quarterly distribution. The full list of codes is available here: w : Weekly bm : Bimonthly m : Monthly tm : Trimesterly q : Quarterly sa : Semiannually a : Annually ir : Irregular f : Final u : Unspecified c : Cancelled",
+                "type": "string"
+              },
+              "exDate": {
+                "description": "The ex-Date of the distribution. In the Tiingo EOD Endpoints, this is the date where \"divCash\" will be non-zero. This is also the date used for dividend price adjustments.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "paymentDate": {
+                "description": "The payment date of the distribution.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "permaTicker": {
+                "description": "The Tiingo permaticker.",
+                "type": "string"
+              },
+              "recordDate": {
+                "description": "The record date of the distribution.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Ticker Distributions"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Corporate Actions"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get split corporate actions for a ticker",
+    "inputSchema": {
+      "properties": {
+        "endExDate": {
+          "description": "This filter limits distributions that have an ex-date <= on the date passed. Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "startExDate": {
+          "description": "This filter limits distributions that have an ex-date >= on the date passed. Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "ticker": {
+          "description": "Ticker related to the asset you would like distribution data for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticker"
+      ],
+      "type": "object"
+    },
+    "name": "get_ticker_splits",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "exDate": {
+                "description": "The ex-Date of the split. In the Tiingo EOD Endpoints, this is the date where \"splitFactor\" will not be 1.0. This is also the date used for split adjustments.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "permaTicker": {
+                "description": "The Tiingo permaticker.",
+                "type": "string"
+              },
+              "splitFactor": {
+                "description": "The ratio of splitTo from splitFrom . In other words: splitFactor = splitTo/splitFrom This ratio is helpful in calculating split price adjustments.",
+                "type": "number"
+              },
+              "splitFrom": {
+                "description": "The prior split ratio.",
+                "type": "number"
+              },
+              "splitStatus": {
+                "description": "A code representing the status of split a : Active c : Cancelled",
+                "type": "string"
+              },
+              "splitTo": {
+                "description": "The new split ratio, i.e. how many shares of \"splitTo\" are given for each share of \"splitFrom\".",
+                "type": "number"
+              },
+              "ticker": {
+                "description": "Ticker related to the asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Get Ticker Splits"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "News"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get curated financial news articles",
+    "inputSchema": {
+      "properties": {
+        "endDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits news stories to on or less than the publishedDate (<=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "limit": {
+          "description": "The maximum number of news objects to return in the array. The default is 100 and the max is 1000. This is maxed to 1,000 as any more than that tends to lead to longer wait times. If you would like this adjusted, please contact us at support@tiingo.com .",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "This is a \"pagination\" variable that is often used alongside limit. It returns an array with the results shifted by \"offset\". For example, when limit is 0 you may get the following: 0. News Story A 1. News Story B 2. News Story C 3. News Story D When offset is \"2\" you will receive: 0. News Story C 1. News Story D 2. News Story E 3. News Story F This, when used alongside \"limit\" allows for pagination and more efficient queries.",
+          "type": "integer"
+        },
+        "sortBy": {
+          "description": "The field can take either \"publishedDate\" or \"crawlDate\". The date field specified will be used to sort the results in descending order. The results can either be sorted by when the news outlet reported the publish time (\"datePublished\") or when our feeds came across is (\"crawlDate\"). Defaults to \"publishedDate\" if no value provided",
+          "type": "string"
+        },
+        "source": {
+          "description": "A comma-separated list of the tags requested. When passing via GET parameter (not in URL), use a JSON array, otherwise use a comma-separated list. #Use the below format if querying directly in the URL https://api.tiingo.com/tiingo/news?source=bloomberg.com,reuters.com #Otherwise, if passing GET parameters via a request library, use a JSON array like this: source : ['bloomberg.com','reuters.com']",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "startDate": {
+          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits news stories to on or later than the publishedDate (>=). Parameter must be in YYYY-MM-DD format.",
+          "format": "date",
+          "type": "string"
+        },
+        "tickers": {
+          "description": "A comma-separated list of the tickers requested. When passing via GET parameter (not in URL), use a JSON array, otherwise use a comma-separated list. #Use the below format if querying directly in the URL https://api.tiingo.com/tiingo/news?tickers=aapl,googl #Otherwise, if passing GET parameters via a request library, use a JSON array like this: tickers : ['aapl','googl']",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_news",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "crawlDate": {
+                "description": "The datetime the news story was added to our database in UTC. This is always recorded by Tiingo and the news source has no input on this date. If you note a large gap between crawlDate and publishedDate, it means the news article was backfilled, which usually happens when we add a new data source or gain access to historical data archives.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "Long-form descripton of the news story.",
+                "type": "string"
+              },
+              "id": {
+                "description": "Unique identifier specific to the news article.",
+                "type": "integer"
+              },
+              "publishedDate": {
+                "description": "The datetime the news story was published in UTC. This is usually reported by the news source and not by Tiingo. If the news source does not declare a published date, Tiingo will use the time the news story was discovered by our crawler farm.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "source": {
+                "description": "The domain the news source is from.",
+                "type": "string"
+              },
+              "tags": {
+                "description": "Tags that are mapped and discovered by Tiingo using Tiingo's proprietary tagging algo.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "tickers": {
+                "description": "What tickers are mentioned in the news story using Tiingo's proprietary tagging algo.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "title": {
+                "description": "Title of the news article.",
+                "type": "string"
+              },
+              "url": {
+                "description": "URL of the news article.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List News"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Record how much of a ticker the user holds in one of their portfolios, then value the\nwhole portfolio at the latest closes: market value, unrealized P&L and each position's weight.\n\nRecording a ticker again replaces its quantity and cost basis. Only the signed-in user sees\ntheir portfolios. Tiingo must have prices for the ticker.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_basis": {
+          "description": "What one share or unit cost on average, in the ticker's currency.",
+          "exclusiveMaximum": 1000000000.0,
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "portfolio": {
+          "description": "The portfolio to hold the position in, such as `retirement`.",
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quantity": {
+          "description": "How many shares or units are held, replacing any earlier quantity.",
+          "exclusiveMaximum": 1000000000000.0,
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "ticker": {
+          "description": "A stock, ETF or fund ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "portfolio",
+        "ticker",
+        "quantity",
+        "cost_basis"
+      ],
+      "type": "object"
+    },
+    "name": "record_position",
+    "outputSchema": {
+      "properties": {
+        "cost": {
+          "description": "What every position cost, quantity times cost basis.",
+          "type": "number"
+        },
+        "market_value": {
+          "description": "Every priced position at its latest close.",
+          "type": "number"
+        },
+        "portfolio": {
+          "type": "string"
+        },
+        "positions": {
+          "items": {
+            "properties": {
+              "cost_basis": {
+                "type": "number"
+              },
+              "last_close": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null when Tiingo has no price for the ticker."
+              },
+              "last_close_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "market_value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "quantity": {
+                "type": "number"
+              },
+              "ticker": {
+                "type": "string"
+              },
+              "unrealized_pnl": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "weight": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Share of the portfolio's market value, 0.25 for 25%."
+              }
+            },
+            "required": [
+              "ticker",
+              "quantity",
+              "cost_basis",
+              "last_close",
+              "last_close_date",
+              "market_value",
+              "unrealized_pnl",
+              "weight"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "unrealized_pnl": {
+          "description": "Market value less the cost of the positions it prices.",
+          "type": "number"
+        },
+        "unrealized_return": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unrealized P&L over the cost of the priced positions, 0.1 for 10%."
+        }
+      },
+      "required": [
+        "portfolio",
+        "positions",
+        "cost",
+        "market_value",
+        "unrealized_pnl",
+        "unrealized_return"
+      ],
+      "type": "object"
+    },
+    "title": "Record Position"
+  },
+  {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "Utilities"
+        ]
+      }
+    },
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search for assets by ticker or name",
+    "inputSchema": {
+      "properties": {
+        "exactTickerMatch": {
+          "description": "True to only include exact ticker matches based on the search query. If set to true, no partial matches will be included and asset names will not be searched.",
+          "type": "boolean"
+        },
+        "includeDelisted": {
+          "description": "True to include delisted tickers and false (default) to exclude delisted tickers.",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "The maximum number of assets to return. Defaults to 10 and can be set to a maximum of 100.",
+          "type": "integer"
+        },
+        "query": {
+          "description": "The search query to use to look up assets.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search_assets",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "assetType": {
+                "description": "The asset type of the asset (Stock, ETF, & Mutual Fund).",
+                "type": "string"
+              },
+              "isActive": {
+                "description": "True if the ticker is still actively quoted, and false if the ticker is no longer actively quoted (delisted).",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name of the asset.",
+                "type": "string"
+              },
+              "openFIGI": {
+                "description": "Placeholder for an upcoming change to the Tiingo API that allows querying by the openFIGI ticker.",
+                "type": "string"
+              },
+              "permaTicker": {
+                "description": "Placeholder for an upcoming change to the Tiingo API that allows querying by permaticker.",
+                "type": "string"
+              },
+              "ticker": {
+                "description": "Ticker of the given asset.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Search Assets"
+  }
+]

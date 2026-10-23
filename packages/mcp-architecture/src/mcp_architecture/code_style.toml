@@ -1,0 +1,72 @@
+# The code style every MCP keeps: the Google Python Style Guide as far as ruff checks it.
+# packages/mcp-architecture/ARCHITECTURE.md lists where it departs from the guide.
+line-length = 100
+target-version = "py314"
+
+[lint]
+# Only for the preview rules selected by their full code below.
+preview = true
+explicit-preview-rules = true
+select = [
+    # Google
+    "E", "W",            # pycodestyle: semicolons (3.1), whitespace (3.6), one statement per line (3.14), lambdas (2.10), True/False (2.14), bare except (2.4)
+    "F",                 # pyflakes: unused imports and variables
+    "I",                 # import formatting (3.13)
+    "N",                 # naming (3.16)
+    "A",                 # no shadowed builtins (3.16)
+    "B",                 # mutable default arguments (2.12), lexical scoping (2.16), raise from (2.4)
+    "BLE",               # no catch-all except (2.4)
+    "PLC", "PLE", "PLW", # pylint's convention, error and warning checks, as Google's pylintrc runs them; it turns off the refactor (PLR) ones
+    "ARG",               # unused arguments, pylint's unused-argument
+    "UP",                # modern Python (2.20)
+    "ANN",               # type annotations (2.21)
+    "TID",               # imports by full package path (2.3)
+    "G",                 # logging with a pattern, not an f-string (3.10.1)
+    "TD",                # TODO comments (3.12)
+    "EXE",               # shebangs (3.7)
+    "D",                 # docstring format (3.8)
+    # Ours
+    "SIM",               # simpler code where ruff knows a simpler form
+    "T20",               # no print: logs go through logging
+    "PTH",               # pathlib over os.path
+    "RET",               # consistent returns, no else after return
+    "INP",               # import-linter does not see a folder of Python code without an __init__.py
+    "PGH004",            # a noqa names the rule it turns off
+    "ISC003",            # a long string is split by implicit concatenation, not +
+    "S701",              # Jinja2 escapes what it renders
+    "TRY400",            # an error logged in an except block keeps its traceback
+    "PLR0917",           # at most three positional arguments; name the rest after a `*`
+]
+ignore = [
+    "D1",                # a docstring only for what the code cannot say
+    "TD002",             # Google's TODO names a link, not an author
+    "D205",              # a docstring's summary may run onto a second line
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.isort]
+# Google's import order: one import per line, apart from typing and collections.abc, sorted
+# within each group by full module path, ignoring case.
+force-single-line = true
+single-line-exclusions = ["typing", "collections.abc", "typing_extensions"]
+force-sort-within-sections = true
+order-by-type = false
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# What a past fix replaced with something safer.
+[lint.flake8-tidy-imports.banned-api]
+"dataclasses.dataclass".msg = "Use a pydantic model."
+"urllib.parse".msg = "Build a URL with httpx2.URL or pydantic's HttpUrl, not by hand."
+"ssl.create_default_context".msg = "Let mcp_configs.PostgresSettings build the TLS context."
+"html.escape".msg = "Render HTML with a Jinja2 template, with autoescape on."
+"cryptography.hazmat".msg = "Use cryptography.fernet."
+
+[lint.pylint]
+max-positional-args = 3
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.CurrentContext"]

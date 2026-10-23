@@ -1,0 +1,66 @@
+[project]
+name = "mcp-architecture"
+version = "0.1.0"
+description = "The architecture every scaffolded Python MCP keeps, as tool configuration: its code style, its type check, its import contracts and the checks of what a client sees"
+requires-python = ">=3.14"
+dependencies = [
+    "fastmcp>=4.1,<5",
+    "grimp>=3.17,<4",
+    "import-linter>=2.15,<3",
+    "mcp-types>=2.3,<3",
+    "pydantic-settings>=2.15,<3",
+    "ruff>=0.17,<0.18",
+]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_architecture"]
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.2",
+    "poethepoet==0.49.0",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.17.0",
+]
+
+[tool.poe.tasks]
+# Run from the package's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+test = "pytest"
+ci = { sequence = [{ cmd = "ruff format --check ." }, "lint", "typecheck", "test"], help = "every check CI runs, in its order" }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+typeCheckingMode = "all"
+include = ["src", "tests"]
+reportMissingTypeStubs = false
+reportUnusedCallResult = false
+reportImplicitStringConcatenation = false

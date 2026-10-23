@@ -1,0 +1,148 @@
+{% set postgres = "postgres" in options.persistence %}
+{% set redis = "redis" in options.persistence %}
+{% set parameters = [
+    options.opens_upstream and "upstream_settings: UpstreamSettings",
+    options.opens_persistence and "persistence: Persistence",
+    options.opens_upstream and "upstream_transport: httpx2.MockTransport",
+] | select | join(", ") %}
+{% set arguments = [
+    options.opens_upstream and "upstream_settings",
+    options.opens_persistence and "open_persistence",
+    options.opens_upstream and "upstream_transport",
+    options.auth and "auth=fake_auth_settings()",
+    options.auth and "base_url=BASE_URL",
+] | select | join(", ") %}
+{% set offline = [
+    options.opens_upstream and "fake_upstream_settings()",
+    options.opens_persistence and "persistence",
+    options.opens_upstream and "unanswered_upstream()",
+] | select | join(", ") %}
+"""The server with fakes in place of the upstream and the stores. The tests build it, and so
+does `uv run poe architecture`, which lists its tools."""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+{% if options.auth %}
+from cryptography.fernet import Fernet
+{% endif %}
+{% if options.opens_upstream %}
+import httpx2
+{% endif %}
+from fastmcp import FastMCP
+{% if redis %}
+from key_value.aio.stores.memory import MemoryStore
+{% endif %}
+{% if options.opens_upstream %}
+from mcp_configs import RetrySettings
+{% if options.auth %}
+from pydantic import AnyHttpUrl
+{% else %}
+from pydantic import AnyHttpUrl, SecretStr
+{% endif %}
+{% endif %}
+{% if options.auth %}
+from pydantic import SecretStr
+{% endif %}
+{% if postgres %}
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+{% endif %}
+
+{% if options.auth %}
+from mcp_skeleton.mcp import AuthSettings, create_server
+from mcp_skeleton.persistence import AuthStoreSettings, Base, Persistence, SqlAuthStore
+{% else %}
+from mcp_skeleton.mcp import create_server
+{% if options.opens_persistence %}
+from mcp_skeleton.persistence import {{ [postgres and "Base", "Persistence"] | select | join(", ") }}
+{% endif %}
+{% endif %}
+{% if options.opens_upstream %}
+from mcp_skeleton.upstream import UpstreamSettings
+
+
+def fake_upstream_settings() -> UpstreamSettings:
+    """Every field given, so neither the environment nor `.env` changes what the tests see.
+    Retries never wait."""
+    return UpstreamSettings(
+{% if not options.auth %}
+        api_key=SecretStr("dummy-api-key"),
+{% endif %}
+        api_url=AnyHttpUrl({{ quoted(api_url) }}),
+{% if options.auth %}
+        verify_path="/",
+{% endif %}
+        timeout_seconds=30,
+        retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
+    )
+
+
+def unanswered_upstream() -> httpx2.MockTransport:
+    return httpx2.MockTransport(lambda _request: httpx2.Response(404))
+{% endif %}
+{% if options.auth %}
+
+BASE_URL = "http://127.0.0.1:8000"
+
+
+def fake_auth_settings() -> AuthSettings:
+    """Every field given, so neither the environment nor `.env` changes what the tests see."""
+    return AuthSettings(
+        max_failed_sign_ins=3,
+        failed_sign_in_window_minutes=15,
+        access_token_minutes=15,
+        refresh_token_days=30,
+    )
+{% endif %}
+{% if options.opens_persistence %}
+
+
+@asynccontextmanager
+async def open_fake_persistence() -> AsyncGenerator[Persistence]:
+{% if postgres and redis %}
+    """SQLite and an in-memory store in place of Postgres and Redis, which CI does not run."""
+{% elif postgres %}
+    """SQLite in place of Postgres, which CI does not run."""
+{% else %}
+    """An in-memory store in place of Redis, which CI does not run."""
+{% endif %}
+{% if postgres %}
+    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+{% endif %}
+{% if options.auth %}
+    database = async_sessionmaker(engine, expire_on_commit=False)
+    key = AuthStoreSettings(encryption_key=SecretStr(Fernet.generate_key().decode()))
+    yield Persistence({{ ["database=database", redis and "store=MemoryStore()", "auth=SqlAuthStore(database, key)"] | select | join(", ") }})
+{% else %}
+    yield Persistence({{ [postgres and "database=async_sessionmaker(engine, expire_on_commit=False)", redis and "store=MemoryStore()"] | select | join(", ") }})
+{% endif %}
+{% if postgres %}
+    await engine.dispose()
+{% endif %}
+{% endif %}
+
+
+def build_server({{ parameters }}) -> FastMCP:
+{% if options.opens_persistence %}
+    """Every client of the server shares `persistence`, as the server's clients share the real
+    stores."""
+
+    @asynccontextmanager
+    async def open_persistence() -> AsyncGenerator[Persistence]:
+        yield persistence
+
+{% endif %}
+    return create_server({{ arguments }})
+
+
+@asynccontextmanager
+async def offline_server() -> AsyncGenerator[FastMCP]:
+{% if options.opens_persistence %}
+    async with open_fake_persistence() as persistence:
+        yield build_server({{ offline }})
+{% else %}
+    yield build_server({{ offline }})
+{% endif %}

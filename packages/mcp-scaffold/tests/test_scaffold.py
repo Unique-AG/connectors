@@ -1,0 +1,599 @@
+import ast
+import json
+import re
+import tomllib
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
+from typing import cast
+
+import pytest
+import yaml
+from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
+
+from mcp_scaffold import commands, openapi
+from mcp_scaffold.commands import run
+from mcp_scaffold.openapi import VendorSpec
+from mcp_scaffold.options import Auth, Options, Persistence, Upstream
+from mcp_scaffold.pins import pinned
+from mcp_scaffold.repository import register
+from mcp_scaffold.scaffold import load_spec, scaffold
+from mcp_scaffold.stamp import stamped
+from tests.conftest import (
+    DEVELOPER_ENVIRONMENT,
+    REGISTRIES,
+    REPO,
+    UseVenv,
+    copy_registries,
+    run_linked,
+    venvs,
+)
+
+type Config = dict[str, dict[str, dict[str, object]]]
+type Scaffolded = Callable[[str], Path]
+
+
+def json_response(schema: str, code: str = "200") -> dict[str, object]:
+    content = {"application/json": {"schema": {"$ref": f"#/components/schemas/{schema}"}}}
+    return {code: {"description": schema, "content": content}}
+
+
+# A POST comes first and a GET without a JSON body next, so the scaffold starts from getForecast.
+WEATHER_PATHS: dict[str, object] = {
+    "/alerts": {
+        "post": {"operationId": "subscribeAlerts", "responses": json_response("Alert", "201")}
+    },
+    "/health": {"get": {"operationId": "ping", "responses": {"204": {"description": "Up"}}}},
+    "/forecasts/{city}": {
+        "get": {
+            "operationId": "getForecast",
+            "parameters": [
+                {"name": "city", "in": "path", "required": True, "schema": {"type": "string"}}
+            ],
+            "responses": json_response("Forecast"),
+        }
+    },
+}
+WEATHER_SPEC = {
+    "openapi": "3.0.3",
+    "info": {"title": "Fictional Weather API", "version": "1.0.0"},
+    "servers": [{"url": "https://weather.example.com/v1/"}],
+    "paths": WEATHER_PATHS,
+    "components": {
+        "schemas": {
+            "Alert": {"type": "object", "properties": {"id": {"type": "string"}}},
+            "Forecast": {
+                "type": "object",
+                "required": ["city", "celsius"],
+                "properties": {"city": {"type": "string"}, "celsius": {"type": "number"}},
+            },
+        }
+    },
+}
+
+
+@pytest.fixture(scope="module")
+def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A repository the scaffold can register in, beside the shared packages a new MCP uses."""
+    repo = tmp_path_factory.mktemp("repo")
+    copy_registries(repo)
+    (repo / "packages").symlink_to((REPO / "packages").resolve())
+    (repo / "services").mkdir()
+    (repo / "weather.json").write_text(json.dumps(WEATHER_SPEC))
+    return repo
+
+
+def probe(
+    upstream: Upstream | None, persistence: set[Persistence], auth: Auth | None = None
+) -> Options:
+    return Options(
+        name="-".join(
+            [
+                "probe",
+                upstream or "none",
+                *sorted(persistence or {"none"}),
+                *(["auth"] if auth else []),
+                "mcp",
+            ]
+        ),
+        description="Answers questions about the probe upstream, a stand-in for a vendor API "
+        "that is long enough to wrap onto a second line of the server instructions.",
+        upstream=upstream,
+        spec="weather.json" if upstream is Upstream.OPENAPI else None,
+        persistence=frozenset(persistence),
+        auth=auth,
+    )
+
+
+# Each upstream and each store appears at least once, and the stores once together. The first
+# opens nothing, so its server has no lifespan; the next two open only an upstream or only a
+# store. Then an OpenAPI upstream with Postgres and Redis, and the sign-in over each upstream.
+PROBES = {
+    options.name: options
+    for options in [
+        probe(None, set()),
+        probe(Upstream.OPENAPI, set()),
+        probe(None, {Persistence.REDIS}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES, Persistence.REDIS}),
+        probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.CREDENTIALS),
+        probe(Upstream.OPENAPI, {Persistence.POSTGRES}, Auth.CREDENTIALS),
+    ]
+}
+# The commit a run is stamped with, which the CLI reads from git.
+COMMIT = "3f2a9c1e5b7d"
+STAMP = re.compile(
+    r"mcp-scaffold-commit: (?P<commit>[0-9a-f]+), timestamp: (?P<timestamp>[0-9T:+-]+)"
+)
+# What a tool writes rather than the scaffold: uv, the codegen, pytest and the chart's schema
+# script.
+NOT_THE_SCAFFOLDS = {
+    "uv.lock",
+    "operations.py",
+    "vendor_responses.py",
+    "tool_surface.generated.json",
+    "values.schema.json",
+}
+
+
+@pytest.fixture(scope="module")
+def scaffolded(repo: Path, request: pytest.FixtureRequest) -> Iterator[Scaffolded]:
+    """Scaffolds a probe the first time a test asks for it, so each test runs alone too. Its
+    checks run under a developer's environment, which its tests must not read."""
+    built: dict[str, Path] = {}
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(commands, "run", run_linked)
+        monkeypatch.setattr(openapi, "run", run_linked)
+        for variable, value in DEVELOPER_ENVIRONMENT.items():
+            monkeypatch.setenv(variable, value)
+
+        def scaffold_probe(name: str) -> Path:
+            if name not in built:
+                monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(venvs(request.config) / name))
+                built[name] = scaffold(
+                    PROBES[name], repo, spec=load_spec(PROBES[name], repo), commit=COMMIT
+                )
+            return built[name]
+
+        yield scaffold_probe
+
+
+@pytest.mark.parametrize("name", PROBES)
+def test_a_scaffolded_mcp_passes_its_own_checks(scaffolded: Scaffolded, name: str) -> None:
+    target = scaffolded(name)
+
+    leftovers = [
+        str(path.relative_to(target))
+        for path in target.rglob("*")
+        if path.is_file()
+        and ".venv" not in path.parts
+        and "mcp_skeleton" in path.read_text(errors="ignore")
+    ]
+    assert not leftovers, f"files still name the skeleton package: {leftovers}"
+    chart = (target / "deploy" / "helm-charts" / name / "Chart.yaml").read_text()
+    assert f"description: {json.dumps(PROBES[name].description)}\n" in chart
+    assert f"services/{name}" in (target / "deploy" / "Dockerfile").read_text()
+    assert (target / "tests" / "tool_surface.generated.json").is_file()
+    agents = (target / "AGENTS.md").read_text()
+    architecture = "../../packages/mcp-architecture/ARCHITECTURE.md"
+    assert f"@{architecture}" in agents
+    assert (target / architecture).is_file()
+
+
+def test_a_scaffolded_mcp_pins_what_the_scaffold_pins(scaffolded: Scaffolded) -> None:
+    pyproject = cast(
+        dict[str, dict[str, object]],
+        tomllib.loads((scaffolded("probe-custom-postgres-mcp") / "pyproject.toml").read_text()),
+    )
+    runtime = cast(list[str], pyproject["project"]["dependencies"])
+    dev = cast(list[str], pyproject["dependency-groups"]["dev"])
+
+    assert set(pinned("service")) | set(pinned("service-postgres")) <= set(runtime)
+    assert set(pinned("service-dev")) <= set(dev)
+    assert {"mcp-configs==0.1.0", "mcp-openapi==0.1.0"} <= set(runtime)
+    assert not [pin for pin in dev if pin.startswith("mcp-openapi")]
+    assert "mcp-openapi" not in pyproject["tool"]
+
+
+def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: UseVenv) -> None:
+    service = scaffolded("probe-custom-postgres-mcp")
+    use_venv(service.name)
+
+    run([["uv", "run", "alembic", "revision", "-m", "create things"]], service)
+
+    (migration,) = (service / "src" / "probe_custom_postgres_mcp" / "persistence").glob(
+        "migrations/versions/*_create_things.py"
+    )
+    assert migration.read_text().startswith('"""Create things.\n')
+    assert not STAMP.search(migration.read_text())
+    run(
+        [["uv", "run", "ruff", "format", "--check", "."], ["uv", "run", "ruff", "check", "."]],
+        service,
+    )
+
+
+@pytest.mark.parametrize("name", PROBES)
+def test_the_image_copies_every_shared_package_the_mcp_runs_with(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    """The image installs the runtime dependencies alone, from the paths `[tool.uv.sources]`
+    names, so each must be copied in before `uv sync`."""
+    target = scaffolded(name)
+    pyproject = cast(
+        dict[str, dict[str, object]], tomllib.loads((target / "pyproject.toml").read_text())
+    )
+    sources = cast(dict[str, dict[str, object]], pyproject["tool"]["uv"])["sources"]
+    runtime = {
+        re.split(r"[\[=<>]", dependency, maxsplit=1)[0]
+        for dependency in cast(list[str], pyproject["project"]["dependencies"])
+    }
+    dockerfile = (target / "deploy" / "Dockerfile").read_text()
+
+    missing = [
+        package
+        for package in sorted(runtime & sources.keys())
+        if f"COPY packages/{package} /workspace/packages/{package}\n" not in dockerfile
+    ]
+    assert missing == []
+
+
+@pytest.mark.parametrize("name", ["probe-none-none-mcp", "probe-none-redis-mcp"])
+def test_an_mcp_without_an_upstream_keeps_the_layer_empty(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    target = scaffolded(name)
+    package = target / "src" / name.replace("-", "_")
+
+    assert [path.name for path in (package / "upstream").iterdir()] == ["__init__.py"]
+    assert "__all__: list[str] = []" in (package / "upstream" / "__init__.py").read_text()
+    assert "UPSTREAM_" not in (target / ".env.example").read_text()
+    assert "get_upstream" not in (package / "mcp" / "dependencies.py").read_text()
+    assert not (target / "tests" / "test_upstream.py").exists()
+    assert "mcp-openapi" not in (target / "pyproject.toml").read_text()
+
+
+def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
+    scaffolded: Scaffolded,
+) -> None:
+    service = scaffolded("probe-openapi-none-mcp")
+    upstream = service / "src" / "probe_openapi_none_mcp" / "upstream"
+
+    assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
+    operations = upstream / "generated" / "operations.py"
+    assert "GET_FORECAST = Operation[Forecast]" in operations.read_text()
+    assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
+    assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
+    offline_server = (service / "tests" / "offline_server.py").read_text()
+    assert 'AnyHttpUrl("https://weather.example.com/v1")' in offline_server
+    assert (upstream / "openapi.yml").read_text().splitlines()[1] == "openapi: 3.0.3"
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    [
+        (WEATHER_PATHS, "getForecast"),
+        ({"/alerts": WEATHER_PATHS["/alerts"]}, "subscribeAlerts"),
+    ],
+    ids=["a GET first", "any operation without one"],
+)
+def test_a_spec_starts_from_its_first_json_operation(
+    tmp_path: Path, paths: dict[str, object], expected: str
+) -> None:
+    (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
+
+    assert VendorSpec.load("spec.json", tmp_path).operation == expected
+
+
+def test_a_spec_with_extension_keys_starts_from_its_first_json_operation(
+    tmp_path: Path,
+) -> None:
+    forecast = cast(dict[str, dict[str, object]], WEATHER_PATHS["/forecasts/{city}"])["get"]
+    responses = {**cast(dict[str, object], forecast["responses"]), "x-note": "n"}
+    paths = {"x-internal": True, "/forecasts/{city}": {"get": {**forecast, "responses": responses}}}
+    (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
+
+    assert VendorSpec.load("spec.json", tmp_path).operation == "getForecast"
+
+
+def test_a_spec_vendored_from_another_mcp_loses_its_stamp(tmp_path: Path) -> None:
+    stamp = "# mcp-scaffold-commit: 3f2a9c1e5b7d, timestamp: 2026-10-21T09:30:00+00:00\n"
+    (tmp_path / "spec.yml").write_text(stamp + yaml.safe_dump(WEATHER_SPEC))
+
+    assert VendorSpec.load("spec.yml", tmp_path).text == yaml.safe_dump(WEATHER_SPEC)
+
+
+def test_a_spec_without_a_json_operation_is_rejected(tmp_path: Path) -> None:
+    paths = {"/health": WEATHER_PATHS["/health"]}
+    (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "paths": paths}))
+
+    with pytest.raises(ValueError, match="no operation"):
+        VendorSpec.load("spec.json", tmp_path)
+
+
+def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "spec.json").write_text(json.dumps({**WEATHER_SPEC, "openapi": "3.1.0"}))
+
+    with pytest.raises(ValueError, match="openapi"):
+        VendorSpec.load("spec.json", tmp_path)
+
+
+def scaffold_offline(repo: Path, options: Options) -> Path:
+    """Scaffold `options` without uv: the codegen leaves an empty `operations.py`, and nothing is
+    checked."""
+
+    def codegen_only(commands: list[list[str]], service: Path) -> None:
+        if ["uv", "run", "mcp-openapi-codegen"] in commands:
+            generated = service / "src" / options.package / "upstream" / "generated"
+            (generated / "operations.py").write_text("")
+
+    copy_registries(repo)
+    (repo / "packages").symlink_to((REPO / "packages").resolve())
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(commands, "run", codegen_only)
+        monkeypatch.setattr(openapi, "run", codegen_only)
+        return scaffold(options, repo, spec=load_spec(options, repo), commit=COMMIT, release=False)
+
+
+def openapi_probe(spec: str) -> Options:
+    return Options(
+        name="probe-spec-mcp",
+        description="Probes.",
+        upstream=Upstream.OPENAPI,
+        spec=spec,
+        persistence=frozenset(),
+    )
+
+
+@pytest.fixture
+def vendor(tmp_path: Path) -> Iterator[str]:
+    """The URL of an HTTP server on loopback that serves `tmp_path / "vendor"`, as a vendor
+    serves its spec."""
+    (tmp_path / "vendor").mkdir()
+    handler = partial(SimpleHTTPRequestHandler, directory=tmp_path / "vendor")
+    with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
+        Thread(target=server.serve_forever, daemon=True).start()
+        yield f"http://127.0.0.1:{server.server_port}"
+        server.shutdown()
+
+
+def test_a_spec_fetched_from_a_url_is_fetched_from_it_again(tmp_path: Path, vendor: str) -> None:
+    (tmp_path / "vendor" / "weather.json").write_text(json.dumps(WEATHER_SPEC))
+    url = f"{vendor}/weather.json"
+
+    target = scaffold_offline(tmp_path / "repo", openapi_probe(url))
+
+    pyproject = cast(Config, tomllib.loads((target / "pyproject.toml").read_text()))
+    assert pyproject["tool"]["mcp-openapi"]["spec-source"] == url
+    assert (target / "src" / "probe_spec_mcp" / "upstream" / "openapi.yml").is_file()
+
+
+def test_values_from_the_spec_reach_code_and_config_escaped(tmp_path: Path) -> None:
+    forecast = cast(dict[str, dict[str, object]], WEATHER_PATHS["/forecasts/{city}"])["get"]
+    server = 'https://weather.example.com/v1"); import os  #'
+    spec = {
+        **WEATHER_SPEC,
+        "servers": [{"url": server}],
+        "paths": {"/forecasts/{city}": {"get": {**forecast, "operationId": 'get"Forecast'}}},
+    }
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "weather.json").write_text(json.dumps(spec))
+
+    target = scaffold_offline(repo, openapi_probe("weather.json"))
+
+    pyproject = cast(Config, tomllib.loads((target / "pyproject.toml").read_text()))
+    assert pyproject["tool"]["mcp-openapi"]["operation-ids"] == ['get"Forecast']
+    settings = ast.parse(
+        (target / "src" / "probe_spec_mcp" / "upstream" / "settings.py").read_text()
+    )
+    (default,) = [
+        node.value
+        for node in ast.walk(settings)
+        if isinstance(node, ast.AnnAssign) and ast.unparse(node.target) == "api_url"
+    ]
+    assert isinstance(default, ast.Call)
+    assert ast.literal_eval(default.args[0]) == str(TypeAdapter(AnyHttpUrl).validate_python(server))
+    assert not [node for node in ast.walk(settings) if isinstance(node, ast.Import)]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Reads the long-range forecast of a city from the fictional weather service, as listed "
+        "at https://weather.example.com/v1/forecasts/long-range/cities/by-region/and-by-country",
+        "Answers weather questions \u26c5 and storm warnings \U0001f329 for a city.",
+    ],
+    ids=["a hyphen and a long URL", "an emoji"],
+)
+def test_the_description_reaches_every_file_as_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, description: str
+) -> None:
+    def run_nothing(_commands: list[list[str]], _service: Path) -> None: ...
+
+    copy_registries(tmp_path)
+    (tmp_path / "packages").symlink_to((REPO / "packages").resolve())
+    monkeypatch.setattr(commands, "run", run_nothing)
+    options = Options(name="probe-text-mcp", description=description, persistence=frozenset())
+
+    target = scaffold(options, tmp_path, spec=None, commit=COMMIT, release=False)
+
+    pyproject = tomllib.loads((target / "pyproject.toml").read_text())
+    chart = (target / "deploy" / "helm-charts" / options.name / "Chart.yaml").read_text()
+    server = ast.parse((target / "src" / options.package / "mcp" / "server.py").read_text())
+    (instructions,) = [
+        node.value
+        for node in server.body
+        if isinstance(node, ast.Assign)
+        and [ast.unparse(name) for name in node.targets] == ["INSTRUCTIONS"]
+    ]
+
+    assert pyproject["project"]["description"] == description
+    assert cast(dict[str, object], yaml.safe_load(chart))["description"] == description
+    assert ast.literal_eval(instructions) == description
+
+
+def test_a_description_of_only_whitespace_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="description"):
+        Options(name="probe-text-mcp", description=" \n ", persistence=frozenset())
+
+
+@pytest.mark.parametrize("description", ["Two\nlines.", "A\ttab.", "A\x7fdelete."])
+def test_a_description_with_a_control_character_is_rejected(description: str) -> None:
+    with pytest.raises(ValidationError, match="must be one line"):
+        Options(name="probe-text-mcp", description=description, persistence=frozenset())
+
+
+def test_a_name_whose_chart_names_fit_kubernetes_is_accepted() -> None:
+    name = f"{'a' * 29}-mcp"
+
+    options = Options(name=name, description="Probes.", persistence=frozenset())
+
+    assert len(f"{options.name}-kubernetes-application-alerts") == 63
+
+
+def test_a_name_too_long_for_its_chart_names_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="at most 33 characters"):
+        Options(name=f"{'a' * 30}-mcp", description="Probes.", persistence=frozenset())
+
+
+def test_the_scaffolds_registered_their_release_and_scope(
+    repo: Path, scaffolded: Scaffolded
+) -> None:
+    names = [scaffolded(name).name for name in PROBES]
+    config = cast(Config, json.loads((repo / "release-please-config.json").read_text()))
+    manifest = cast(
+        dict[str, str], json.loads((repo / ".release-please-manifest.json").read_text())
+    )
+
+    assert sorted(path.name for path in (repo / "services").iterdir()) == sorted(names)
+    for name in names:
+        assert config["packages"][f"services/{name}"]["component"] == name
+        assert manifest[f"services/{name}"] == "0.0.0"
+        assert f"{name} = services/{name}/**" in (repo / ".gitcommitizen").read_text()
+        assert (
+            f"          - {name}\n" in (repo / ".github/workflows/release-rerun.yaml").read_text()
+        )
+        assert f'"!services/{name}"' in (repo / "pnpm-workspace.yaml").read_text()
+
+
+def test_a_name_a_removed_service_left_its_scope_under_is_listed_once(tmp_path: Path) -> None:
+    copy_registries(tmp_path)
+    options = Options(
+        name="probe-again-mcp",
+        description="Registered twice.",
+        upstream=Upstream.CUSTOM,
+        persistence=frozenset(),
+    )
+
+    register(options, tmp_path, release=False)
+    registered = {registry: (tmp_path / registry).read_text() for registry in REGISTRIES}
+    register(options, tmp_path, release=False)
+
+    assert {registry: (tmp_path / registry).read_text() for registry in REGISTRIES} == registered
+    assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["probe-openapi-none-mcp", "probe-custom-postgres-redis-mcp", "probe-custom-postgres-auth-mcp"],
+)
+def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    target = scaffolded(name)
+    files = [
+        path
+        for path in target.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and not {".venv", ".ruff_cache", ".import_linter_cache", ".pytest_cache", "__pycache__"}
+        & set(path.parts)
+        and path.name not in NOT_THE_SCAFFOLDS
+    ]
+
+    stamps = {
+        path.relative_to(target).as_posix(): [
+            match.groups() for match in STAMP.finditer(path.read_text())
+        ]
+        for path in files
+    }
+
+    assert {path: found for path, found in stamps.items() if len(found) != 1} == {}
+    assert {found[0][0] for found in stamps.values()} == {COMMIT}
+    (timestamp,) = {found[0][1] for found in stamps.values()}
+    assert abs(datetime.now(UTC) - datetime.fromisoformat(timestamp)).total_seconds() < 3600
+
+
+def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
+    target = scaffolded("probe-openapi-none-mcp")
+    generated = target / "src" / "probe_openapi_none_mcp" / "upstream" / "generated"
+
+    for path in [
+        target / "uv.lock",
+        generated / "operations.py",
+        generated / "vendor_responses.py",
+    ]:
+        assert not STAMP.search(path.read_text()), path.name
+
+
+def test_the_stamp_follows_a_line_that_has_to_stay_first(tmp_path: Path) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("# syntax=docker/dockerfile:1.7\n\nFROM python\n")
+    script = tmp_path / "render.sh"
+    script.write_text("#!/bin/bash\nhelm template\n")
+    page = tmp_path / "login.html"
+    page.write_text("<!doctype html>\n<html></html>\n")
+
+    assert (
+        stamped(dockerfile, "stamp") == "# syntax=docker/dockerfile:1.7\n# stamp\n\nFROM python\n"
+    )
+    assert stamped(script, "stamp") == "#!/bin/bash\n# stamp\nhelm template\n"
+    assert stamped(page, "stamp") == "<!doctype html>\n{# stamp #}\n<html></html>\n"
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "expected"),
+    [
+        ("models.py", "import ast\n", "# stamp\n\nimport ast\n"),
+        ("__init__.py", "", "# stamp\n"),
+        ("AGENTS.md", "# Title\n", "<!-- stamp -->\n# Title\n"),
+        ("script.py.mako", "<% x = 1 %>\n", "## stamp\n<% x = 1 %>\n"),
+        ("_helpers.tpl", "{{/* helpers */}}\n", "{{/* stamp */}}\n{{/* helpers */}}\n"),
+        (
+            "schema.json",
+            '{\n  "type": "object"\n}\n',
+            '{\n  "$comment": "stamp",\n  "type": "object"\n}\n',
+        ),
+    ],
+)
+def test_the_stamp_is_a_comment_in_the_files_own_syntax(
+    tmp_path: Path, name: str, text: str, expected: str
+) -> None:
+    path = tmp_path / name
+    path.write_text(text)
+
+    assert stamped(path, "stamp") == expected
+
+
+@pytest.mark.parametrize(
+    ("upstream", "persistence"),
+    [(None, {Persistence.POSTGRES}), (Upstream.CUSTOM, {Persistence.REDIS})],
+)
+def test_credentials_need_an_upstream_and_postgres(
+    upstream: Upstream | None, persistence: set[Persistence]
+) -> None:
+    with pytest.raises(ValidationError, match="--auth credentials needs an --upstream"):
+        probe(upstream, persistence, Auth.CREDENTIALS)
+
+
+def test_a_file_without_a_known_comment_syntax_fails_the_stamp(tmp_path: Path) -> None:
+    path = tmp_path / "notes.txt"
+    path.write_text("notes\n")
+
+    with pytest.raises(AssertionError, match="no comment syntax for notes.txt"):
+        stamped(path, "stamp")
