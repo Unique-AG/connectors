@@ -181,6 +181,18 @@ def test_call_error_includes_the_start_of_the_response_body() -> None:
         asyncio.run(client.call(Operation("getThings", ROWS)))
 
 
+def test_call_reads_an_empty_body_as_none_when_the_type_allows_it() -> None:
+    client = api(lambda _: httpx2.Response(204))
+    result = asyncio.run(client.call(Operation("getThings", TypeAdapter(list[Row] | None))))
+    assert result is None
+
+
+def test_call_rejects_an_empty_body_when_the_type_needs_json() -> None:
+    client = api(lambda _: httpx2.Response(204))
+    with pytest.raises(UpstreamError, match="Unexpected response: empty body"):
+        asyncio.run(client.call(Operation("getThings", ROWS)))
+
+
 def test_call_names_the_body_when_it_is_not_json() -> None:
     client = api(lambda _: httpx2.Response(200, content=b"<html>"))
     with pytest.raises(UpstreamError, match="Unexpected response: body: Invalid JSON"):
