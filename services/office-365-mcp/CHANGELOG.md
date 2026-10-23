@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.3](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.2...office-365-mcp@0.3.3) (2026-10-23)
+
+
+### Features
+
+* **office-365-mcp:** accept the enabled tools as a YAML list ([#1250](https://github.com/Unique-AG/connectors/issues/1250)) ([0f30be8](https://github.com/Unique-AG/connectors/commit/0f30be8da0200b0c4c0ecb6226f193d7454b6461))
+
+
+### Bug Fixes
+
+* **backstop-mcp,kb-mcp,office-365-mcp,with-intelligence-mcp,exp-kyckr-mcp,exp-tiingo-mcp,mcp-credential-auth:** drop compromised eMudhra CA roots ([#1268](https://github.com/Unique-AG/connectors/issues/1268)) ([1f81406](https://github.com/Unique-AG/connectors/commit/1f814060865c9af03a60957b8a57242d9f08d422))
+
 ## [0.3.2](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.1...office-365-mcp@0.3.2) (2026-10-19)
 
 
