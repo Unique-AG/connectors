@@ -166,7 +166,11 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
-    # A Unique cluster's Zitadel and gateway hostnames match *.unique.app.
+    # Covers single-label Unique hostnames (e.g. gateway.unique.app). Multi-label
+    # hostnames like a single-tenant Zitadel (id.<tenant>.unique.app) don't match
+    # this pattern -- Cilium's "*" doesn't cross "." -- so the exact Zitadel host
+    # from mcpConfig.zitadel.baseUrl is added automatically as its own matchName
+    # rule (see templates/_ext.tpl).
     egress:
       unique:
         toFQDNs:

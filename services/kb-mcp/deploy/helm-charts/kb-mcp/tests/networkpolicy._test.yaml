@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: CiliumNetworkPolicy Zitadel egress
+templates:
+  - all.yaml
+capabilities:
+  apiVersions:
+    - cilium.io/v2
+tests:
+  - it: adds a matchName egress rule for a multi-label Zitadel host
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        zitadel:
+          baseUrl: https://id.terra.ps.unique.app
+      networkPolicy:
+        enabled: true
+    documentSelector:
+      path: kind
+      value: CiliumNetworkPolicy
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: id.terra.ps.unique.app
+            toPorts:
+              - ports:
+                  - port: "443"
+                    protocol: TCP
+
+  - it: still renders the matchName rule for a single-label Zitadel host already covered by the wildcard
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        zitadel:
+          baseUrl: https://id.unique.app
+      networkPolicy:
+        enabled: true
+    documentSelector:
+      path: kind
+      value: CiliumNetworkPolicy
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: id.unique.app
+            toPorts:
+              - ports:
+                  - port: "443"
+                    protocol: TCP
+
+  - it: omits the matchName rule when zitadel.baseUrl is unset
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        zitadel:
+          baseUrl: ""
+      networkPolicy:
+        enabled: true
+    documentSelector:
+      path: kind
+      value: CiliumNetworkPolicy
+    asserts:
+      - notContains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: id.terra.ps.unique.app

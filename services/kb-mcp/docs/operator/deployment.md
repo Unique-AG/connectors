@@ -127,11 +127,14 @@ and setting `postgresql.enabled: false`, bypassing the `postgresql.connection` c
 
 `networkPolicy.enabled` defaults to `false` (`flavor: cilium`); set it to `true` for a default-deny
 `CiliumNetworkPolicy`. `kb-mcp` needs egress to DNS, the Unique API, Zitadel and the platform gateway,
-and its Postgres host if external. The chart's baseline only allows `toFQDNs: ["*.unique.app"]` on
-443, so an in-cluster Unique API address (the `UNIQUE_API_BASE_URL` in Minimal Values) is not
-covered: add its egress rule in your overlay, under `networkPolicy.egress[]` or as an
-`internalServices.dependencies.<key>` entry, which builds the rule from `servicePort` and `podPort`.
-The chart does not emit `UNIQUE_API_BASE_URL` from it, so keep setting that under `envVars`.
+and its Postgres host if external. The chart's baseline allows `toFQDNs: ["*.unique.app"]` on 443
+(single-label hosts, e.g. `gateway.unique.app`) and derives an exact `matchName` rule for
+`mcpConfig.zitadel.baseUrl` automatically, since a single-tenant Zitadel host like
+`id.<tenant>.unique.app` has more labels than the wildcard pattern matches. An in-cluster Unique
+API address (the `UNIQUE_API_BASE_URL` in Minimal Values) is not covered by either: add its egress
+rule in your overlay, under `networkPolicy.egress[]` or as an `internalServices.dependencies.<key>`
+entry, which builds the rule from `servicePort` and `podPort`. The chart does not emit
+`UNIQUE_API_BASE_URL` from it, so keep setting that under `envVars`.
 
 !!! warning "`toEndpoints` rules match the pod port, not the Service port"
     Cilium's eBPF Service DNAT happens *before* a `CiliumNetworkPolicy`'s `toEndpoints` rule is
