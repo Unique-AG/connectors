@@ -45,6 +45,9 @@ class ResultWire(BaseModel):
     provider_type: str | None = Field(default=None, alias="providerType")
     match_strength: str | None = Field(default=None, alias="matchStrength")
     submitted_term: str | None = Field(default=None, alias="submittedTerm")
+    mrz_line_1: str | None = Field(default=None, alias="mrzLine1")
+    mrz_line_2: str | None = Field(default=None, alias="mrzLine2")
+    mrz_line_3: str | None = Field(default=None, alias="mrzLine3")
 
 
 class ResultsWire(BaseModel):
