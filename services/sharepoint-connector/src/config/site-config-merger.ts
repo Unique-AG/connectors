@@ -44,6 +44,7 @@ export function mergeSiteWithDefaults(
   const merged: Record<keyof SiteConfig, unknown> = {
     siteId: partialSite.siteId,
     syncColumnName: coalesce(partialSite.syncColumnName, siteDefaults.syncColumnName),
+    itemNameColumnName: coalesce(partialSite.itemNameColumnName, siteDefaults.itemNameColumnName),
     ingestionMode: coalesce(partialSite.ingestionMode, siteDefaults.ingestionMode),
     scopeId: coalesce(partialSite.scopeId, siteDefaults.scopeId),
     maxFilesToIngest: coalesce(partialSite.maxFilesToIngest, siteDefaults.maxFilesToIngest),
@@ -55,6 +56,10 @@ export function mergeSiteWithDefaults(
       siteDefaults.permissionsInheritanceMode,
     ),
     subsitesScan: coalesce(partialSite.subsitesScan, siteDefaults.subsitesScan),
+    listAttachmentsScan: coalesce(
+      partialSite.listAttachmentsScan,
+      siteDefaults.listAttachmentsScan,
+    ),
   };
 
   // We separately check the fields required after merge because it's apparently problematic to

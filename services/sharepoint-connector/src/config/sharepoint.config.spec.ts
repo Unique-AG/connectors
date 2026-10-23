@@ -624,10 +624,11 @@ describe('SharepointConfigSchema', () => {
 });
 
 describe('SiteDefaultsSchema', () => {
-  it('parses an empty object and populates the five schema-level defaults', () => {
+  it('parses an empty object and populates the schema-level defaults', () => {
     const result = SiteDefaultsSchema.parse({});
 
     expect(result.syncColumnName).toBe('FinanceGPTKnowledge');
+    expect(result.itemNameColumnName).toBe('Title');
     expect(result.storeInternally).toBe(EnabledDisabledMode.Enabled);
     expect(result.syncStatus).toBe('active');
     expect(result.permissionsInheritanceMode).toBe('inherit_scopes_and_files');

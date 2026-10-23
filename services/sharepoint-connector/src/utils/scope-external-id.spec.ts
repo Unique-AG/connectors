@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDriveExternalId,
   buildFolderExternalId,
+  buildListExternalId,
+  buildListItemExternalId,
   buildRootExternalId,
   buildSitePagesExternalId,
   buildSubsiteExternalId,
@@ -262,6 +264,25 @@ describe('buildFolderExternalId', () => {
   it('builds new-format folder externalId', () => {
     expect(buildFolderExternalId('root-abc', 'site-abc', 'item-789').value).toBe(
       'spc:root-abc/folder:site-abc/item-789',
+    );
+  });
+});
+
+describe('buildListExternalId', () => {
+  it('keys the list folder by ids only', () => {
+    expect(buildListExternalId('root-abc', 'site-abc', 'list-1').value).toBe(
+      'spc:root-abc/list:site-abc/list-1',
+    );
+    expect(isLegacyExternalId(buildListExternalId('root-abc', 'site-abc', 'list-1').value)).toBe(
+      false,
+    );
+  });
+});
+
+describe('buildListItemExternalId', () => {
+  it('keys the item folder by ids only', () => {
+    expect(buildListItemExternalId('root-abc', 'site-abc', 'list-1', '4').value).toBe(
+      'spc:root-abc/listItem:site-abc/list-1/4',
     );
   });
 });

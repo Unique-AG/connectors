@@ -5,6 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
+import type { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { SharepointRestClientService } from '../../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import { sanitizeError } from '../../utils/normalize-error';
@@ -23,6 +25,7 @@ export class UploadContentStep implements IPipelineStep {
     private readonly httpClientService: HttpClientService,
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly apiService: GraphApiService,
+    private readonly sharepointRestClientService: SharepointRestClientService,
   ) {}
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
@@ -34,10 +37,13 @@ export class UploadContentStep implements IPipelineStep {
     );
 
     try {
-      if (context.pipelineItem.itemType === 'listItem') {
+      const item = context.pipelineItem;
+      if (item.itemType === 'listItem') {
         await this.uploadListItemContent(context);
-      } else {
+      } else if (item.itemType === 'driveItem') {
         await this.uploadDriveItemContent(context);
+      } else {
+        await this.uploadListItemAttachmentContent(context, item);
       }
 
       context.uploadSucceeded = true;
@@ -94,6 +100,31 @@ export class UploadContentStep implements IPipelineStep {
     await this.streamUpload(context, contentStream);
   }
 
+  private async uploadListItemAttachmentContent(
+    context: ProcessingContext,
+    item: Extract<SharepointContentItem, { itemType: 'listItemAttachment' }>,
+  ): Promise<void> {
+    this.validateMimeType(context);
+    assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
+
+    // A subsite list is only addressable through its own web. Subsites share the site
+    // collection's managed path.
+    const { siteName, managedPath } = context.syncContext;
+    const { subsiteRelativePath } = item;
+    const webName = subsiteRelativePath
+      ? siteName.transform((name) => `${name}/${subsiteRelativePath}`)
+      : siteName;
+    const contentStream = await this.sharepointRestClientService.downloadListItemAttachment(
+      webName,
+      managedPath,
+      item.driveId,
+      item.item.id,
+      item.fileName,
+    );
+
+    await this.streamUpload(context, contentStream);
+  }
+
   private async uploadDriveItemContent(context: ProcessingContext): Promise<void> {
     this.validateMimeType(context);
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
@@ -122,9 +153,9 @@ export class UploadContentStep implements IPipelineStep {
 
     const mimeType = context.mimeType;
     const contentLength =
-      context.pipelineItem.itemType === 'listItem'
-        ? context.fileSize
-        : context.pipelineItem.item.size;
+      context.pipelineItem.itemType === 'driveItem'
+        ? context.pipelineItem.item.size
+        : context.fileSize;
 
     const headers: Record<string, string> = {
       'Content-Type': mimeType ?? 'application/octet-stream',

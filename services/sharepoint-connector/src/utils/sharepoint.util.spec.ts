@@ -4,8 +4,10 @@ import type {
   SharepointContentItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import {
+  buildAttachmentAbsoluteUrl,
   buildFileDiffKey,
   buildIngestionItemKey,
+  getUniqueListFolderPathFromItem,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
 } from './sharepoint.util';
@@ -461,5 +463,84 @@ describe('buildFileDiffKey', () => {
     item.syncSiteId = new Smeared('parent-uuid', false);
 
     expect(buildFileDiffKey(item)).toBe(`${subsiteSiteId}::file123`);
+  });
+});
+
+function createListItemAttachment(
+  overrides: Partial<{
+    syncSiteId: Smeared;
+    subsiteRelativePath: string;
+    fileName: string;
+  }> = {},
+): Extract<SharepointContentItem, { itemType: 'listItemAttachment' }> {
+  return {
+    itemType: 'listItemAttachment',
+    siteId: new Smeared('site-1', false),
+    syncSiteId: overrides.syncSiteId,
+    driveId: 'list-1',
+    driveName: 'Procedures',
+    folderPath: '/Policy',
+    fileName: overrides.fileName ?? 'policy.pdf',
+    subsiteRelativePath: overrides.subsiteRelativePath,
+    attachment: {
+      absoluteUrl:
+        'https://contoso.sharepoint.com/sites/Site/Lists/Procedures/Attachments/4/policy.pdf',
+      size: 2048,
+    },
+    item: {
+      id: '4',
+      webUrl: 'https://contoso.sharepoint.com/sites/Site/Lists/Procedures/4_.000',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdDateTime: '2024-01-01T00:00:00Z',
+      createdBy: { user: { email: 'a@b.c', id: 'u', displayName: 'A' } },
+      fields: { Title: 'Policy' },
+    },
+  } as Extract<SharepointContentItem, { itemType: 'listItemAttachment' }>;
+}
+
+describe('list item attachment keys and paths', () => {
+  const rootPath = new Smeared('Knowledge', false);
+  const siteName = new Smeared('Site', false);
+
+  it('builds a three-segment diff key for a root attachment', () => {
+    expect(buildFileDiffKey(createListItemAttachment())).toBe('list-1::4::policy.pdf');
+  });
+
+  it('prefixes a subsite attachment diff key with the subsite id', () => {
+    const item = createListItemAttachment({
+      syncSiteId: new Smeared('parent', false),
+      subsiteRelativePath: 'Asia',
+    });
+    item.siteId = new Smeared('subsite-1', false);
+
+    expect(buildFileDiffKey(item)).toBe('subsite-1::list-1::4::policy.pdf');
+    expect(buildIngestionItemKey(item)).toBe('parent/subsite-1::list-1::4::policy.pdf');
+  });
+
+  it('builds the list and item folder path without using the attachment url', () => {
+    const item = createListItemAttachment({ subsiteRelativePath: 'Asia' });
+
+    expect(getUniquePathFromItem(item, rootPath, siteName).value).toBe(
+      '/Knowledge/Asia/Procedures/Policy/policy.pdf',
+    );
+    expect(getUniqueParentPathFromItem(item, rootPath, siteName).value).toBe(
+      '/Knowledge/Asia/Procedures/Policy',
+    );
+    expect(getUniqueListFolderPathFromItem(item, rootPath).value).toBe(
+      '/Knowledge/Asia/Procedures',
+    );
+  });
+});
+
+describe('buildAttachmentAbsoluteUrl', () => {
+  it('percent-encodes each segment of the server-relative url', () => {
+    expect(
+      buildAttachmentAbsoluteUrl(
+        'https://contoso.sharepoint.com/',
+        '/sites/Site/Lists/My List/Attachments/4/Q3 #1 100%.pdf',
+      ),
+    ).toBe(
+      'https://contoso.sharepoint.com/sites/Site/Lists/My%20List/Attachments/4/Q3%20%231%20100%25.pdf',
+    );
   });
 });

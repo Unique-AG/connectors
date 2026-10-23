@@ -9,6 +9,7 @@ import { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discove
 import { normalizeSlashes } from '../utils/paths.util';
 import {
   buildIngestionItemKey,
+  getUniqueListFolderPathFromItem,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
 } from '../utils/sharepoint.util';
@@ -63,11 +64,20 @@ export class GetTopFolderPermissionsQuery {
       createSmeared(`/${normalizeSlashes(rootPath.value)}/${relativePath}`),
     );
 
+    // An attachment's parent is its item folder, so the list folder above it, which is always a
+    // top folder, is added here.
+    const listFolders = pipe(
+      items,
+      filter((item) => item.itemType === 'listItemAttachment'),
+      map((item) => getUniqueListFolderPathFromItem(item, rootPath)),
+      uniqueBy(prop('value')),
+    );
+
     return pipe(
       items,
       map((item) => getUniqueParentPathFromItem(item, rootPath, siteName)),
       filter((folderPath) => isTopFolder(folderPath, rootPath, subsiteRelativePaths)),
-      (paths) => [normalizedRootPath, ...subsiteRootPaths, ...paths],
+      (paths) => [normalizedRootPath, ...subsiteRootPaths, ...paths, ...listFolders],
       uniqueBy(prop('value')),
     );
   }

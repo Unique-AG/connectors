@@ -11,7 +11,7 @@ import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.s
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
-import { ContentSyncService } from './content-sync.service';
+import { ContentSyncService, extractItemId } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { FindFilesWithExpectedLocationQuery } from './find-files-with-expected-location.query';
 import { FindScopeSuccessorQuery } from './find-scope-successor.query';
@@ -933,5 +933,14 @@ describe('ContentSyncService with an edited file that also moved', () => {
       [editedFile],
       expect.any(Function),
     );
+  });
+});
+
+describe('extractItemId', () => {
+  it('strips only a subsite prefix', () => {
+    expect(extractItemId('item-1')).toBe('item-1');
+    expect(extractItemId('subsite::item-1')).toBe('item-1');
+    expect(extractItemId('list::item::file.pdf')).toBe('list::item::file.pdf');
+    expect(extractItemId('subsite::list::item::file.pdf')).toBe('list::item::file.pdf');
   });
 });

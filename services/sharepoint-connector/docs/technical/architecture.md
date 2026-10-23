@@ -55,7 +55,7 @@ flowchart TB
 - The system reads content and permissions from Microsoft Graph and SharePoint REST API, processes it, and pushes it into Unique AI
 - All communication is secure, well-defined, and limited to known ports and protocols
 - The design aligns with typical financial-sector network security expectations
-- SharePoint REST API is only needed if permission sync is enabled
+- SharePoint REST API is required for list-item attachment sync on sites with `listAttachmentsScan` enabled, in every mode, and for permission sync when that mode is enabled. It needs the SharePoint `Sites.Selected` application permission, a site grant, certificate authentication, and network access to `{tenant}.sharepoint.com/_api`
 - Site configurations can be loaded from a static YAML file or dynamically from a SharePoint list
 - Subsites can be configured as standalone sites using compound site IDs (`hostname,siteCollectionId,webId`)
 - When `subsitesScan` is enabled per-site, the connector recursively discovers and syncs content from subsites
@@ -202,11 +202,15 @@ Used to obtain OAuth2 tokens for Microsoft Graph and SharePoint REST APIs.
 | `graph.microsoft.com/v1.0/drives/{driveId}/items/{itemId}/permissions` | Fetch item permissions |
 | `graph.microsoft.com/v1.0/groups/{groupId}/members` | Fetch group members |
 
-### SharePoint REST Endpoints (Permission Sync Only)
+### SharePoint REST Endpoints
+
+List attachment endpoints are used in every sync mode, on sites with `listAttachmentsScan` enabled. Site group endpoints are used only when permission sync is enabled. Calls need certificate authentication and network access to `{tenant}.sharepoint.com/_api`.
 
 | Endpoint | Use Case |
 |----------|----------|
-| `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
+| `{tenant}.sharepoint.com/{sites\|teams}/{siteName}/_api/web/lists(guid'{listId}')/RootFolder/Folders('Attachments')/Folders?$expand=Files` | List item attachment names and sizes |
+| `{tenant}.sharepoint.com/{sites\|teams}/{siteName}/_api/web/lists(guid'{listId}')/items({itemId})/AttachmentFiles('{fileName}')/$value` | Download an attachment |
+| `{tenant}.sharepoint.com/{sites\|teams}/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
 | `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})/users` | Fetch site group members |
 
 ## Hosting Models

@@ -58,5 +58,11 @@ export function sanitizeError(error: unknown): object {
     };
   }
 
-  return serializeError(normalizeError(error));
+  const serialized = serializeError(normalizeError(error));
+  if (!(error instanceof Error) || error.cause === undefined) {
+    return serialized;
+  }
+  // serializeError turns `cause` into `{}`, which hides why a wrapping error such as
+  // PermissionsSyncError was thrown.
+  return { ...serialized, cause: sanitizeError(error.cause) };
 }

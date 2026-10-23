@@ -124,6 +124,7 @@ export class PermissionsSyncService {
 
         const regularFolderPermissions = this.getRegularFolderPermissionsQuery.run({
           directories: sharePoint.directories,
+          items: sharePoint.items,
           permissionsMap,
           rootPath: context.rootPath,
           siteName: context.siteName,

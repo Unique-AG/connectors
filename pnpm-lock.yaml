@@ -1203,6 +1203,9 @@ importers:
       js-yaml:
         specifier: 'catalog:'
         version: 5.5.0
+      mime-types:
+        specifier: 3.0.2
+        version: 3.0.2
       nestjs-otel:
         specifier: 'catalog:'
         version: 8.1.1(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.8)(rxjs@7.8.2)
@@ -1267,6 +1270,9 @@ importers:
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
+      '@types/mime-types':
+        specifier: 3.0.1
+        version: 3.0.1
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -3613,6 +3619,9 @@ packages:
 
   '@types/methods@1.1.4':
     resolution: {integrity: sha512-ymXWVrDiCxTBE3+RIrrP533E70eA+9qu7zdWoHuOmGujkYtzf4HQF96b8nwHLqhuf4ykX61IGRIB38CC6/sImQ==}
+
+  '@types/mime-types@3.0.1':
+    resolution: {integrity: sha512-xRMsfuQbnRq1Ef+C+RKaENOxXX87Ygl38W1vDfPHRku02TgQr+Qd8iivLtAMcR0KF5/29xlnFihkTlbqFrGOVQ==}
 
   '@types/node@26.6.5':
     resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
@@ -8356,6 +8365,8 @@ snapshots:
       '@types/node': 26.6.5
 
   '@types/methods@1.1.4': {}
+
+  '@types/mime-types@3.0.1': {}
 
   '@types/node@26.6.5':
     dependencies:

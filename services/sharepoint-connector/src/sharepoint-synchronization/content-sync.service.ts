@@ -14,7 +14,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl, SUBSITE_KEY_SEPARATOR } from '../utils/sharepoint.util';
+import { buildFileDiffKey, getItemUrl, KEY_SEPARATOR } from '../utils/sharepoint.util';
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -296,11 +296,13 @@ export class ContentSyncService {
   }
 }
 
-/**
- * Extracts the base item ID from a file diff key by stripping any subsite prefix.
- * E.g. "subsiteId::itemId" → "itemId", "itemId" → "itemId".
- */
-function extractItemId(key: string): string {
-  const separatorIndex = key.indexOf(SUBSITE_KEY_SEPARATOR);
-  return separatorIndex >= 0 ? key.slice(separatorIndex + SUBSITE_KEY_SEPARATOR.length) : key;
+// Strips a subsite prefix only. Root items have 1 segment and root attachments have 3
+// (`listId::itemId::fileName`), so their first segment is not a subsite id. Subsite items have 2
+// segments and subsite attachments have 4.
+export function extractItemId(key: string): string {
+  const segments = key.split(KEY_SEPARATOR);
+  if (segments.length === 2 || segments.length === 4) {
+    return segments.slice(1).join(KEY_SEPARATOR);
+  }
+  return key;
 }

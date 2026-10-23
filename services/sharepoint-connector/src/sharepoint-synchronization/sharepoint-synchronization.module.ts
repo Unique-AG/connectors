@@ -8,6 +8,7 @@ import { ScopeExternalIdMigrationModule } from '../scope-external-id-migration/s
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { FetchSiteItemsQuery } from './fetch-site-items.query';
 import { FileMoveProcessor } from './file-move-processor.service';
 import { FindFilesWithExpectedLocationQuery } from './find-files-with-expected-location.query';
 import { FindScopeSuccessorQuery } from './find-scope-successor.query';
@@ -17,6 +18,7 @@ import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
 import { ResolveScopePathCommand } from './root-scope/resolve-scope-path.command';
 import { RootScopeMigrationService } from './root-scope-migration.service';
+import { ScanListItemAttachmentsQuery } from './scan-list-item-attachments.query';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 import { SubsiteDiscoveryService } from './subsite-discovery.service';
@@ -36,6 +38,7 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
     ContentSyncService,
     CreateRootScopeCommand,
     DeduplicateSitesQuery,
+    FetchSiteItemsQuery,
     FileMoveProcessor,
     FindFilesWithExpectedLocationQuery,
     FindRootScopeQuery,
@@ -44,6 +47,7 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
     InitializeRootScopeCommand,
     ResolveScopePathCommand,
     RootScopeMigrationService,
+    ScanListItemAttachmentsQuery,
     ScopeManagementService,
     SubsiteDiscoveryService,
   ],

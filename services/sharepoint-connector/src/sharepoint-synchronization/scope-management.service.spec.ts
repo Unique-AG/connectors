@@ -520,6 +520,73 @@ describe('ScopeManagementService', () => {
           expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
       });
+
+      describe('list item attachments', () => {
+        const createAttachment = (
+          overrides: Partial<{ siteId: string; subsiteRelativePath: string }> = {},
+        ): SharepointContentItem =>
+          ({
+            itemType: 'listItemAttachment',
+            siteId: new Smeared(overrides.siteId ?? 'site-123', false),
+            ...(overrides.subsiteRelativePath && {
+              syncSiteId: new Smeared('site-123', false),
+              subsiteRelativePath: overrides.subsiteRelativePath,
+            }),
+            driveId: 'list-1',
+            driveName: 'Procedures',
+            folderPath: '/Policy',
+            fileName: 'policy.pdf',
+            attachment: {
+              absoluteUrl:
+                'https://example.sharepoint.com/sites/test-site/Lists/Procedures/Attachments/4/policy.pdf',
+              size: 2048,
+            },
+            item: { id: '4' },
+          }) as SharepointContentItem;
+
+        it('keys the list and item folders by ids', async () => {
+          await service.batchCreateScopes([createAttachment()], [], mockContext);
+
+          // Paths are created in order: /test1, /test1/Procedures, /test1/Procedures/Policy.
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-1',
+            expect.objectContaining({ value: 'spc:site-123/list:site-123/list-1' }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-2',
+            expect.objectContaining({ value: 'spc:site-123/listItem:site-123/list-1/4' }),
+          );
+        });
+
+        it('places subsite list folders under the subsite and keys them by the subsite id', async () => {
+          const subASiteId = 'host.com,col-a,web-a';
+          const context: SharepointSyncContext = {
+            ...mockContext,
+            discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+          };
+
+          await service.batchCreateScopes(
+            [createAttachment({ siteId: subASiteId, subsiteRelativePath: 'SubA' })],
+            [],
+            context,
+          );
+
+          // Paths are created in order: /test1, /test1/SubA, /test1/SubA/Procedures,
+          // /test1/SubA/Procedures/Policy.
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-1',
+            expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-2',
+            expect.objectContaining({ value: `spc:site-123/list:${subASiteId}/list-1` }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-3',
+            expect.objectContaining({ value: `spc:site-123/listItem:${subASiteId}/list-1/4` }),
+          );
+        });
+      });
     });
   });
 

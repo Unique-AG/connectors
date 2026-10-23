@@ -167,6 +167,21 @@ export function buildSitePagesExternalId(rootSiteId: string, siteId: string): Sm
   return createSmeared(`${EXTERNAL_ID_PREFIX}${rootSiteId}/sitePages:${siteId}`);
 }
 
+// Keyed by ids only. The item folder keeps this id when its display name changes, so the
+// successor-folder move can find it.
+export function buildListExternalId(rootSiteId: string, siteId: string, listId: string): Smeared {
+  return createSmeared(`${EXTERNAL_ID_PREFIX}${rootSiteId}/list:${siteId}/${listId}`);
+}
+
+export function buildListItemExternalId(
+  rootSiteId: string,
+  siteId: string,
+  listId: string,
+  itemId: string,
+): Smeared {
+  return createSmeared(`${EXTERNAL_ID_PREFIX}${rootSiteId}/listItem:${siteId}/${listId}/${itemId}`);
+}
+
 // Takes an arbitrary suffix (caller is responsible for uniqueness — typically
 // `${path}-${randomUUID()}`). Keeping the suffix opaque lets migration reuse
 // the existing legacy suffix verbatim without reconstructing it.
