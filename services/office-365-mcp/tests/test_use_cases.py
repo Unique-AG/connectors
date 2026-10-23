@@ -430,6 +430,26 @@ def _generator() -> _Generator:
     return cast("_Generator", cast("object", module))
 
 
+class TestScenarioIds:
+    def test_a_retired_id_is_never_used_again(self) -> None:
+        retired = set((_FEATURES / "retired-ids.txt").read_text().split())
+        used = {scenario_id for _, scenario_id in _entries()}
+
+        assert sorted(retired & used) == [], "these ids were retired and came back"
+
+    def test_every_number_up_to_the_highest_is_used_or_retired(self) -> None:
+        retired = set((_FEATURES / "retired-ids.txt").read_text().split())
+        used = {scenario_id for _, scenario_id in _entries()}
+        missing: list[str] = []
+        for stem in sorted({stem for stem, _ in _entries()}):
+            prefix = stem[:2]
+            highest = max(int(i[-2:]) for i in used if i.startswith(f"uc-{prefix}-"))
+            wanted = {f"uc-{prefix}-{n:02d}" for n in range(1, highest + 1)}
+            missing += sorted(wanted - used - retired)
+
+        assert missing == [], "an id went missing without a line in retired-ids.txt"
+
+
 class TestToolCoverage:
     def test_every_tool_has_a_happy_and_an_unhappy_scenario_or_a_reason(self) -> None:
         generator = _generator()

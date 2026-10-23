@@ -289,11 +289,11 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant says that it found no matching site
 
     @unhappy @uc-01-35
-    Scenario: A site search that matches more sites than it shows is reported as incomplete
+    Scenario: A site search that matches more sites than it shows is not called complete
       Given more than 1000 sites that Mia can open mention "Project"
       When Mia asks her assistant for the sites that mention "Project"
       Then the assistant shows the sites that it got
-      And it tells Mia that more sites match than it shows
+      But it does not say that these are all the sites that match
 
   Rule: A file that names another file leads the assistant to that file
 

@@ -36,6 +36,8 @@ The feature tag sets the surface. A feature with tags of two surfaces is in "Acr
 | `@onenote` | OneNote |
 
 The tag `@uc-NN-MM` is the permanent id of a scenario. The sidecar uses it as a key. Never reuse an id.
+`retired-ids.txt` lists the ids that were removed. A test fails when a listed id comes back, and when
+an id goes missing without a line there.
 
 ## Happy and unhappy paths
 

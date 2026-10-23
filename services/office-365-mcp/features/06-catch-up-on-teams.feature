@@ -169,7 +169,7 @@ Feature: Catching up on Teams
         | is too busy to answer                  | 120     |
 
     @unhappy @uc-06-19
-    Scenario Outline: A read that Microsoft fails is tried once more and then reported
+    Scenario Outline: A read that Microsoft keeps failing is reported
       Given Microsoft <problem> each time the assistant asks for Mia's chats
       When Mia asks her assistant which chats have unread messages
       Then the assistant tells Mia that it could not read her chats
@@ -243,7 +243,7 @@ Feature: Catching up on Teams
       Then the assistant names the decision from the end of the transcript
 
     @unhappy @uc-06-24
-    Scenario: A transcript that stops before its end is tried again and not summarized
+    Scenario: A transcript that stops before its end is not summarized
       Given Microsoft sends only the first part of the transcript of "Design review" each time
       When Mia asks her assistant for a summary of "Design review"
       Then the assistant tells Mia that it could not read the transcript

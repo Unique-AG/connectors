@@ -481,7 +481,10 @@ uc-01-35:
   chain:
     - tool: sharepoint_search_sites
       args: {query: Project}
-  note: "expected behaviour from tools/sharepoint_search_sites.py:81-85 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched. Below 1000 matches the assistant raises `limit` (default 25, tools/sharepoint_search_sites.py:135-142) and shows all of them, so the scenario states more than 1000 matches, where capped stays true and the assistant makes `query` more specific."
+    - tool: sharepoint_search_sites
+      optional: true
+      args: {query: Project, limit: 1000}
+  note: "expected behaviour from tools/sharepoint_search_sites.py:81-85 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched, and the field text says to raise `limit` up to 1000 or to make `query` more specific. Below 1000 matches a raised `limit` shows all of them (default 25, tools/sharepoint_search_sites.py:135-142), so the scenario states more than 1000 matches, where capped stays true after the second search with `limit` 1000. The source has no text that tells the assistant to report the cap to Mia, so the Then states only that the assistant does not call the list complete (model behaviour from the capped field, no code guard)."
 
 uc-01-36:
   status: untested

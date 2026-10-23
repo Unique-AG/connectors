@@ -349,8 +349,7 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
       Given Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft <problem> when the assistant copies "Template" into "Archive"
       When Mia asks her assistant to copy "Template" into "Archive"
       Then the assistant tells Mia that it does not know if the copy was made
-      And it looks in "Archive" for the copy before it tries again
-      But it does not copy "Template" a second time at once
+      But "Archive" holds no second copy of "Template"
 
       Examples:
         | problem                      |

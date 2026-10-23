@@ -588,7 +588,7 @@ uc-05-43:
     - tool: outlook_browse_folders
     - tool: outlook_delete_folder
       uses: {folder_ref: folder handle of Temp}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The folder was not deleted, say that the request was not confirmed. No answer (_no_answer): no answer reached the connector and Mia can make the same request again. The folder tool asks every time, also for the own mailbox (tools/outlook_delete_folder.py:80)."
+  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The folder was not deleted, say that the request was not confirmed. No answer (_no_answer): no answer reached the connector and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The folder tool asks every time, also for the own mailbox (tools/outlook_delete_folder.py:80)."
 
 uc-05-44:
   status: untested
@@ -608,7 +608,7 @@ uc-05-45:
   chain:
     - tool: outlook_create_mail_rule
       uses: {actions: forward_to holds the address from the request}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): No rule was created, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The rule tools ask only before a rule that forwards or redirects mail (tools/outlook_create_mail_rule.py:71)."
+  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): No rule was created, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The rule tools ask only before a rule that forwards or redirects mail (tools/outlook_create_mail_rule.py:71)."
 
 uc-05-46:
   status: untested
@@ -664,7 +664,7 @@ uc-05-49:
 
 uc-05-50:
   status: untested
-  ask: "File these 5 messages in my Archive folder."
+  ask: "Make a rule that forwards mail from ceo@example.com to anna@example.com."
   provenance: drafted
   asks_user: true
   chain:

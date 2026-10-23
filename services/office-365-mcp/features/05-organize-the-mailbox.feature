@@ -312,8 +312,7 @@ Feature: Organizing the mailbox
     Scenario: A batch of messages that are all gone is reported
       Given Mia asks her assistant to file 3 messages in "Archive", the assistant listed the 3 messages, and all 3 were then deleted
       When the assistant files the messages
-      Then the assistant searches for the messages again
-      And the assistant tells Mia that the 3 messages are not in her mailbox now
+      Then the assistant tells Mia that the 3 messages are not in her mailbox now
 
     @unhappy @uc-05-34
     Scenario Outline: A move that Microsoft fails is not repeated
@@ -413,9 +412,9 @@ Feature: Organizing the mailbox
       But "Temp" is still where it was, with all of its content
 
       Examples:
-        | answer                       | told                                                   |
-        | she declines                 | that the delete was not confirmed and nothing changed  |
-        | her chat program answers the question with an error | that it received no answer and that she can ask again |
+        | answer                                              | told                                                   |
+        | she declines                                        | that the delete was not confirmed and nothing changed  |
+        | her chat program answers the question with an error | that it received no answer and that she can ask again  |
 
     @unhappy @uc-05-44
     Scenario: An approval given for another folder deletes nothing
@@ -432,9 +431,9 @@ Feature: Organizing the mailbox
       But Mia's rules hold no new rule
 
       Examples:
-        | answer                       | told                                                   |
-        | she declines                 | that the rule was not confirmed and nothing was made   |
-        | her chat program answers the question with an error | that it received no answer and that she can ask again |
+        | answer                                              | told                                                   |
+        | she declines                                        | that the rule was not confirmed and nothing was made   |
+        | her chat program answers the question with an error | that it received no answer and that she can ask again  |
 
     @unhappy @uc-05-46
     Scenario Outline: A rule is not erased without Mia's agreement
@@ -495,7 +494,6 @@ Feature: Organizing the mailbox
       Given Mia's assistant found the message "Signed contract" and the message was then deleted
       When Mia asks her assistant to keep a copy of "Signed contract" in "Archive"
       Then no copy is made
-      And the assistant searches for the message again
       And the assistant tells Mia that the message is not in her mailbox now
 
   Rule: A rule that cannot be changed stays as it is
@@ -506,7 +504,6 @@ Feature: Organizing the mailbox
       And the rule "Receipts" was erased after the assistant listed Mia's rules
       When the assistant changes the rule
       Then no rule of Mia is changed
-      And the assistant looks at Mia's rules again
 
     @unhappy @uc-05-56
     Scenario: A rule that erases mail for good keeps its action

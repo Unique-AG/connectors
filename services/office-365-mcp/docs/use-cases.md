@@ -218,7 +218,7 @@ What happens:
 - The assistant lists the 4 unread messages of "Projects".
 - It does not list messages of Mia's inbox.
 
-**A folder that moved is found again before its mail is listed**
+**A folder that Mia moved still shows its unread messages**
 
 Ask your assistant: "Show me the unread messages in my Projects folder."
 
@@ -226,8 +226,7 @@ Situation: The assistant noted the place of Mia's folder "Projects", and Mia the
 
 What happens:
 
-- The assistant looks at Mia's folders again.
-- It lists the unread messages of "Projects" from its new place.
+- Mia sees the unread messages of "Projects" from its new place.
 
 **Mail that Mia sent to herself is listed**
 
@@ -913,7 +912,6 @@ Situation: Mia's assistant found the message of Anna to Mia, Tom, and Priya and 
 What happens:
 
 - No draft is made.
-- The assistant searches for the message again.
 - The assistant tells Mia that the message is not in her mailbox now.
 
 **A reply to everyone that Microsoft fails to save is not saved twice**
@@ -1319,7 +1317,7 @@ Cases:
 
 **A change that Microsoft cannot serve now and asks to wait for may have taken effect**
 
-Ask your assistant: "File these 5 messages in my Archive folder."
+Ask your assistant: "Make a rule that forwards mail from ceo@example.com to anna@example.com."
 
 Cases:
 
@@ -1356,7 +1354,6 @@ Situation: Mia asks her assistant to file 3 messages in "Archive", the assistant
 
 What happens:
 
-- The assistant searches for the messages again.
 - The assistant tells Mia that the 3 messages are not in her mailbox now.
 
 **A move that Microsoft fails is not repeated**
@@ -1562,7 +1559,6 @@ Situation: Mia's assistant found the message "Signed contract" and the message w
 What happens:
 
 - No copy is made.
-- The assistant searches for the message again.
 - The assistant tells Mia that the message is not in her mailbox now.
 
 #### A rule that cannot be changed stays as it is
@@ -1576,7 +1572,6 @@ Situation: Mia asks her assistant to turn on the rule "Receipts" again. The rule
 What happens:
 
 - No rule of Mia is changed.
-- The assistant looks at Mia's rules again.
 
 **A rule that erases mail for good keeps its action**
 
@@ -3560,7 +3555,7 @@ Cases:
 - Microsoft limits how often the assistant may ask and asks it to wait 30 seconds, each time the assistant asks for Mia's chats. The assistant tells Mia to try again after 30 seconds. It does not tell Mia to try again sooner.
 - Microsoft is too busy to answer and asks it to wait 120 seconds, each time the assistant asks for Mia's chats. The assistant tells Mia to try again after 120 seconds. It does not tell Mia to try again sooner.
 
-**A read that Microsoft fails is tried once more and then reported**
+**A read that Microsoft keeps failing is reported**
 
 Ask your assistant: "What is unread in my Teams chats?"
 
@@ -3663,7 +3658,7 @@ What happens:
 
 - The assistant names the decision from the end of the transcript.
 
-**A transcript that stops before its end is tried again and not summarized**
+**A transcript that stops before its end is not summarized**
 
 Ask your assistant: "Give me the summary of the Design review."
 
@@ -4363,7 +4358,7 @@ What happens:
 - The assistant tells Mia that her program cannot ask her.
 - It says that Mia can do this in the Microsoft 365 app.
 
-**A meeting that Microsoft cannot find at the time of the deletion is checked**
+**A meeting that is already gone at the time of the deletion is reported**
 
 Ask your assistant: "Delete the online meeting Design review."
 
@@ -4959,7 +4954,7 @@ What happens:
 
 - The assistant says that it found no matching site.
 
-**A site search that matches more sites than it shows is reported as incomplete**
+**A site search that matches more sites than it shows is not called complete**
 
 Ask your assistant: "Which sites mention Project?"
 
@@ -4968,7 +4963,7 @@ Situation: More than 1000 sites that Mia can open mention "Project".
 What happens:
 
 - The assistant shows the sites that it got.
-- It tells Mia that more sites match than it shows.
+- It does not say that these are all the sites that match.
 
 #### A file that names another file leads the assistant to that file
 
@@ -5389,8 +5384,8 @@ Ask your assistant: "Copy my Template folder into my Archive folder."
 
 Cases:
 
-- Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft fails with an internal error when the assistant copies "Template" into "Archive". The assistant tells Mia that it does not know if the copy was made. It looks in "Archive" for the copy before it tries again. It does not copy "Template" a second time at once.
-- Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft does not answer in time when the assistant copies "Template" into "Archive". The assistant tells Mia that it does not know if the copy was made. It looks in "Archive" for the copy before it tries again. It does not copy "Template" a second time at once.
+- Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft fails with an internal error when the assistant copies "Template" into "Archive". The assistant tells Mia that it does not know if the copy was made. "Archive" holds no second copy of "Template".
+- Mia has the folders "Template" and "Archive" in her OneDrive, and Microsoft does not answer in time when the assistant copies "Template" into "Archive". The assistant tells Mia that it does not know if the copy was made. "Archive" holds no second copy of "Template".
 
 **A folder that Microsoft fails to create is not created twice at once**
 
@@ -5990,7 +5985,7 @@ What happens:
 - The assistant tells Mia that the copy failed.
 - It gives the reason that Microsoft gave.
 
-**A copy that Microsoft no longer knows is looked for in the notebook list**
+**A copy that Microsoft no longer knows is reported as unknown**
 
 Ask your assistant: "Is the copy of my Customers notebook done?"
 
@@ -5999,7 +5994,6 @@ Situation: Microsoft keeps no record of the copy of "Customers" as "Customers 20
 What happens:
 
 - The assistant tells Mia that Microsoft has no record of the copy.
-- It looks in her notebooks for "Customers 2026".
 
 #### Mia is told what happened when Microsoft cannot show or change a page
 

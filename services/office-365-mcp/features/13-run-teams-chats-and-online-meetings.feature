@@ -182,7 +182,7 @@ Feature: Running Teams chats and online meetings
       And it says that Mia can do this in the Microsoft 365 app
 
     @unhappy @uc-13-18
-    Scenario: A meeting that Microsoft cannot find at the time of the deletion is checked
+    Scenario: A meeting that is already gone at the time of the deletion is reported
       Given Mia organizes the online meeting "Design review", and she approves its deletion
       And Microsoft answers that it did not find the meeting, because the meeting was deleted a moment before
       When Mia asks her assistant to delete "Design review"

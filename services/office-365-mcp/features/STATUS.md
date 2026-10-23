@@ -92,7 +92,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Tool coverage
 
-120 of 121 tools have a happy and an unhappy scenario. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
+120 of 121 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
 | Tool | happy | unhappy | Reason |
 | --- | --- | --- | --- |

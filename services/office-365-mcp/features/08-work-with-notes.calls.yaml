@@ -682,7 +682,7 @@ uc-08-53:
       uses: {operation: uri of the answer of onenote_copy_notebook from earlier in the chat}
     - tool: onenote_list_notebooks
       args: {name_contains: Customers 2026}
-  note: "The Given names the copy as Customers 2026, which the Then looks for. Expected behaviour from tools/onenote_get_operation.py:37-45 (GRAPH_NOT_FOUND): Microsoft 365 has no record of this operation, because the copy finished long ago and Microsoft dropped it or because the handle never named one, polling the same handle again will not change the answer, look for what the copy produced with onenote_list_pages, onenote_list_sections or onenote_list_notebooks, and do not call this tool again for that handle."
+  note: "The Given names the copy as Customers 2026, which the second step looks for. Expected behaviour from tools/onenote_get_operation.py:37-45 (GRAPH_NOT_FOUND): Microsoft 365 has no record of this operation, because the copy finished long ago and Microsoft dropped it or because the handle never named one, polling the same handle again will not change the answer, look for what the copy produced with onenote_list_pages, onenote_list_sections or onenote_list_notebooks, and do not call this tool again for that handle."
 
 uc-08-54:
   status: untested

@@ -310,7 +310,9 @@ def _coverage_lines() -> list[str]:
         "## Tool coverage",
         "",
         f"{len(complete)} of {len(counts)} tools have a happy and an unhappy scenario. "
-        + "A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.",
+        + "A tool counts when it is in a step of a chain, including an optional step or one of "
+        + "several tools. A test fails for any other tool unless `coverage-exceptions.yaml` "
+        + "gives a reason.",
         "",
         "| Tool | happy | unhappy | Reason |",
         "| --- | --- | --- | --- |",

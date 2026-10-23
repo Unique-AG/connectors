@@ -117,12 +117,11 @@ Feature: Finding and reading mail
       But it does not list messages of Mia's inbox
 
     @unhappy @uc-02-37
-    Scenario: A folder that moved is found again before its mail is listed
+    Scenario: A folder that Mia moved still shows its unread messages
       Given the assistant noted the place of Mia's folder "Projects", and Mia then moved that folder to another place
       And Microsoft answers that the old place of the folder cannot be found
       When Mia asks her assistant for the unread messages in her Projects folder
-      Then the assistant looks at Mia's folders again
-      And it lists the unread messages of "Projects" from its new place
+      Then Mia sees the unread messages of "Projects" from its new place
 
     @happy @uc-02-38
     Scenario: Mail that Mia sent to herself is listed

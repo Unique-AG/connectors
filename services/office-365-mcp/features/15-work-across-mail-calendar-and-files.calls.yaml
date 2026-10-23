@@ -273,6 +273,9 @@ uc-15-16:
   chain:
     - tool: outlook_search_mail
       args: {query: Acme}
+    - tool: outlook_search_mail
+      optional: true
+      args: {query: Acme}
     - tool: teams_search_messages
       args: {query: Acme}
     - tool: sharepoint_search_files

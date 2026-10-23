@@ -464,11 +464,10 @@ Feature: Working with notes in OneNote
       And it gives the reason that Microsoft gave
 
     @unhappy @uc-08-53
-    Scenario: A copy that Microsoft no longer knows is looked for in the notebook list
+    Scenario: A copy that Microsoft no longer knows is reported as unknown
       Given Microsoft keeps no record of the copy of "Customers" as "Customers 2026" any more
       When Mia asks her assistant if the copy of "Customers" is done
       Then the assistant tells Mia that Microsoft has no record of the copy
-      And it looks in her notebooks for "Customers 2026"
 
   Rule: Mia is told what happened when Microsoft cannot show or change a page
 

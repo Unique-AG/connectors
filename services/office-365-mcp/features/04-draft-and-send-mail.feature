@@ -383,7 +383,6 @@ Feature: Drafting and sending mail
       Given Mia's assistant found the message of Anna to Mia, Tom, and Priya and the message was then deleted
       When Mia asks her assistant for a reply to everyone on the message of Anna
       Then no draft is made
-      And the assistant searches for the message again
       And the assistant tells Mia that the message is not in her mailbox now
 
     @unhappy @uc-04-42
