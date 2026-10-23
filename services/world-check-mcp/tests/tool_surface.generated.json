@@ -1,5 +1,56 @@
 [
   {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.\n\nThis changes the case's screening state. Media Check is not enabled.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "enable_ongoing_screening",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "failures": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provider_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_system_id",
+        "enabled",
+        "provider_type",
+        "failures"
+      ],
+      "type": "object"
+    },
+    "title": "Enable Ongoing Screening"
+  },
+  {
     "_meta": {
       "fastmcp": {
         "tags": [
@@ -625,6 +676,204 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
+    "description": "Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 days.\n\nNo updates returns an empty list. Reuse window.since, window.until, and the other criteria\nwith next_page. This does not acknowledge updates.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Internal caseSystemId or exact external caseId."
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Limit updates to this group."
+        },
+        "limit": {
+          "default": 100,
+          "description": "Updates per page.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "default": "FULL",
+          "description": "FULL returns match detail. SUMMARY returns counts.",
+          "enum": [
+            "FULL",
+            "SUMMARY"
+          ],
+          "type": "string"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page."
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timezone-aware timestamp. Reuse it when paging."
+        },
+        "until": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Timezone-aware timestamp. Reuse it when paging."
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_ogs_updates",
+    "outputSchema": {
+      "properties": {
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updates": {
+          "items": {
+            "properties": {
+              "case_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "case_system_id": {
+                "type": "string"
+              },
+              "group_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "new_results": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "update_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updated_results": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "case_id",
+              "case_system_id",
+              "group_id",
+              "update_date",
+              "new_results",
+              "updated_results"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "window": {
+          "properties": {
+            "since": {
+              "type": "string"
+            },
+            "until": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "since",
+            "until"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "window",
+        "updates",
+        "next_page"
+      ],
+      "type": "object"
+    },
+    "title": "Get Ongoing Screening Updates"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
     "description": "Get the World-Check record for a match: its names and categories.\n\nPass the match's referenceId, not its resultId.",
     "inputSchema": {
       "additionalProperties": false,
@@ -1129,6 +1378,811 @@
       "x-fastmcp-wrap-result": true
     },
     "title": "List Groups"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Rescreen a case by internal caseSystemId or external caseId without editing its fields.\n\nWATCHLIST and Passport Check only. Media Check is unsupported.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "delta": {
+          "default": false,
+          "description": "True screens changes since the last run. False screens fully.",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "case"
+      ],
+      "type": "object"
+    },
+    "name": "rescreen_case",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matches_returned": {
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "matches_returned",
+        "watchlist_matches",
+        "watchlist_truncated",
+        "passport_matches"
+      ],
+      "type": "object"
+    },
+    "title": "Rescreen Case"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Repeated calls without case_id create new cases. An existing case_id is\nrefused, not rescreened. Matches are candidates, not confirmed identities.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "description": "Stable external caseId. An existing id is refused.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "External caseId. Existing ids are refused."
+        },
+        "country_of_residence": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual country of residence, ISO alpha-3."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom fields by typeId from the group template."
+        },
+        "dob": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Date of birth. Individuals only."
+        },
+        "entity_type": {
+          "description": "INDIVIDUAL or ORGANISATION.",
+          "enum": [
+            "INDIVIDUAL",
+            "ORGANISATION"
+          ],
+          "type": "string"
+        },
+        "gender": {
+          "anyOf": [
+            {
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "MALE, FEMALE, or UNSPECIFIED."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name to screen.",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "nationality": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual nationality, ISO alpha-3."
+        },
+        "place_of_birth": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Individual place of birth, ISO alpha-3."
+        },
+        "registered_country": {
+          "anyOf": [
+            {
+              "description": "ISO alpha-3 country code.",
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Organization registered country, ISO alpha-3."
+        },
+        "secondary_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra secondary fields by typeId from get_group_settings."
+        }
+      },
+      "required": [
+        "name",
+        "entity_type",
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "screen_entity",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "matches_returned": {
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "entity_type",
+        "group_id",
+        "matches_returned",
+        "watchlist_matches",
+        "watchlist_truncated",
+        "passport_matches"
+      ],
+      "type": "object"
+    },
+    "title": "Screen Entity"
   },
   {
     "annotations": {
