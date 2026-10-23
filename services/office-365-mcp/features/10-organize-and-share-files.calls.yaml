@@ -1,0 +1,488 @@
+uc-10-01:
+  status: untested
+  ask: "Move the 4 signed contracts from Contracts into a new folder called 2026 Signed."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_folder
+      args: {name: 2026 Signed}
+      uses: {parent: handle of the folder Contracts}
+    - tool: sharepoint_move_item
+      repeat: many
+      uses: {item: handle of each contract, to_folder: handle of 2026 Signed}
+  note: the folder and each of the 4 moves ask for approval, so 5 approvals are expected
+
+uc-10-02:
+  status: partly
+  ask: "Copy my Template folder into the Sales site."
+  blocker:
+    kind: tool
+    tool: sharepoint_list_drives
+    text: No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns.
+    user: The assistant can copy into the Sales site only when it can find a folder there.
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Template}
+    - tool: sharepoint_search_sites
+      args: {query: Sales}
+    - tool: sharepoint_search_files
+      args: {query: Documents}
+      uses: {path: web address of the Sales site from sharepoint_search_sites}
+    - tool: sharepoint_copy_item
+      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site from the second search}
+    - tool: sharepoint_browse_folder
+      optional: true
+      uses: {folder: handle of the destination folder}
+  note: the second query is a guess at a folder name of the site, and Microsoft runs the copy after the call returns, so a listing shows the copy only after some time
+
+uc-10-03:
+  status: untested
+  ask: "Delete the file Old draft.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_delete_item
+      uses: {item: handle of the file}
+
+uc-10-04:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+
+uc-10-05:
+  status: gap
+  ask: "Replace the content of Plan.docx with this new text."
+  blocker:
+    kind: tool
+    tool: sharepoint_create_text_file
+    text: The tool creates new text files only and cannot replace a file or write a Word file.
+    user: The assistant cannot replace the content of an existing file.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-10-06:
+  status: untested
+  ask: "Give Anna edit access to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: sharepoint_invite
+      args: {role: write}
+      uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
+  note: Anna gets an invitation mail that cannot be recalled
+
+uc-10-07:
+  status: untested
+  ask: "Give me a view-only sharing link to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_create_share_link
+      args: {access: view}
+      uses: {item: handle of the file}
+  must_not: [sharepoint_invite, outlook_send_draft, teams_send_chat_message]
+
+uc-10-08:
+  status: gap
+  ask: "Stop sharing Q3 Plan.pptx with Anna."
+  blocker:
+    kind: tool
+    tool: sharepoint_invite
+    text: No tool removes a permission, and the description of sharepoint_invite says so.
+    user: The assistant cannot take back access to a file.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-10-09:
+  status: untested
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_rename_item
+      args: {name: Plan v2.docx}
+      uses: {item: handle of the file Plan v1.docx}
+  note: the new name carries the extension, and the tool asks for approval every time
+
+uc-10-10:
+  status: gap
+  ask: "Save the file attached to Anna's mail in my Tenders folder."
+  blocker:
+    kind: tool
+    tool: sharepoint_create_text_file
+    text: No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file.
+    user: The assistant cannot save an attached file in a folder.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-10-11:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour per row. Both rows fail at the read of the folder (item_for_a_question, tools/sharepoint_create_text_file.py:169), before the question to Mia, so asks_user is false. Sign-in expired, from shared/seam.py:520-525: ask the user to sign in to this connector again. Folder gone, from tools/sharepoint_create_text_file.py:122-129 (GRAPH_NOT_FOUND): the folder was most probably deleted or moved, find it again with sharepoint_search_files or sharepoint_browse_folder, and do not retry the same handle. A refusal at the save itself, after the question, is uc-10-35."
+
+uc-10-12:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - any_of: [sharepoint_create_text_file, sharepoint_create_folder]
+  note: "expected behaviour for both rows from shared/seam.py:571-578 (status 409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that shows a list of items. Both tools set FAIL_ON_CONFLICT (shared/files.py:51, tools/sharepoint_create_text_file.py:207, tools/sharepoint_create_folder.py:164), and their descriptions say Microsoft refuses and creates nothing (tools/sharepoint_create_text_file.py:90, tools/sharepoint_create_folder.py:67). The row for a folder uses the ask Create a folder 2026 Signed in my Notes folder."
+
+uc-10-13:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner"
+
+uc-10-14:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_text_file.py:50) and tools/sharepoint_create_text_file.py:82-92: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a file named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_text_file.py:211), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
+
+uc-10-15:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:116-121 (_WRITTEN_BUT_UNREAD): Microsoft 365 created the file, do not call this tool again for this file, use sharepoint_browse_folder on the same folder to find the new file and its uri"
+
+uc-10-16:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from shared/seam.py:579-584 and 587-590: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
+
+uc-10-17:
+  status: untested
+  ask: "Save these meeting notes as Sync: 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: "Sync: 14 June.txt", content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour per row from shared/files.py:406-446 (unusable_name, NAME_RULES), raised at tools/sharepoint_create_text_file.py:154-156 before any call and before the question to Mia: Nothing was changed, because Microsoft does not allow this name in OneDrive and SharePoint. The name must not contain any of the characters \" * : < > ? / \\ | and must not start with ~$. Remove or replace these characters. This same value fails again, so do not retry it. The row for the name Notes?.txt uses the ask Save these meeting notes as Notes?.txt, and the row for ~$Sync.txt uses the ask Save these meeting notes as ~$Sync.txt. The refusal comes before any call to Microsoft."
+
+uc-10-18:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.docx in my Notes folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.docx, content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour for every row from tools/sharepoint_create_text_file.py:103-109 (_NOT_TEXT, raised at :154-156 before any call and before the question to Mia): No file was created, the tool writes text only, the name must end with one of the text extensions, the tool cannot create a Word, Excel, PowerPoint or PDF file, tell the user that this connector cannot create it, this same value fails again. The text endings are txt, md, csv, tsv, json, xml, html, htm, yaml, yml, and log (tools/sharepoint_create_text_file.py:58-70)."
+
+uc-10-19:
+  status: untested
+  ask: "Save this text as Log.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Log.txt, content: the text of one million characters}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:72 and 255-258: MAX_CONTENT_CHARACTERS is 1,000,000 and the schema allows content up to that length, so a text of exactly that length is saved"
+
+uc-10-20:
+  status: untested
+  ask: "Save this text as Log.txt in my Notes folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Log.txt, content: the text of one million and one characters}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:72 and 255-262: the schema of content has max_length 1,000,000, so a longer text fails the validation of the arguments before the tool runs, and nothing is created. The description of the argument says at most 1,000,000 characters."
+
+uc-10-21:
+  status: untested
+  ask: "Rename the top folder of the Sales site library to Archive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_move_item, sharepoint_rename_item, sharepoint_copy_item, sharepoint_delete_item]
+  note: "expected behaviour per row: move from tools/sharepoint_move_item.py:104-109 (_THE_TOP_FOLDER_STAYS: the top folder of a drive cannot move, to move what it holds move each item inside it). Rename from tools/sharepoint_rename_item.py:71-76 (_THE_DRIVE_ROOT: rename a file or a folder inside the drive instead). Copy from tools/sharepoint_copy_item.py:103-109 (_TOP_FOLDER_CANNOT_BE_COPIED: copy the items inside it one at a time). Delete from tools/sharepoint_delete_item.py:72-78 (_THE_DRIVE_ROOT: to delete a file or a folder inside the drive, pass the handle of that item). Every refusal comes before the question to Mia. The ask names rename, and each row uses the matching ask."
+
+uc-10-22:
+  status: untested
+  ask: "Move Q3 Plan.pptx from my OneDrive into the Sales site."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Q3 Plan}
+    - tool: sharepoint_move_item
+      uses: {item: handle of the file, to_folder: handle of a folder on the Sales site}
+    - tool: sharepoint_copy_item
+      uses: {item: handle of the file, to_folder: handle of a folder on the Sales site}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the destination folder}
+    - tool: sharepoint_delete_item
+      uses: {item: handle of the original file}
+  note: "expected behaviour from tools/sharepoint_move_item.py:56-61 and 91-97 (_TO_A_DIFFERENT_DRIVE, _ANOTHER_DRIVE): to move an item to a different drive, copy it with sharepoint_copy_item, before you delete the original tell the user that the copy has only the latest version of a file, if sharepoint_browse_folder shows the copy use sharepoint_delete_item on the original"
+
+uc-10-23:
+  status: untested
+  ask: "Move Plan v1.docx into the Projects folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_move_item
+      uses: {item: handle of the file Plan v1.docx, to_folder: handle of the folder Projects}
+  note: "expected behaviour from tools/sharepoint_move_item.py:116-121 (_ALREADY_THERE): Nothing was moved, the item is already in the folder, so no change is necessary, a call with the same values gives the same answer"
+
+uc-10-24:
+  status: untested
+  ask: "Make a copy of Template.docx in the same folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_copy_item
+      args: {name: a new name for the copy}
+      uses: {item: handle of the file Template.docx, to_folder: handle of the folder Projects}
+    - tool: sharepoint_browse_folder
+      optional: true
+      uses: {folder: handle of the folder Projects}
+  note: "expected behaviour from tools/sharepoint_copy_item.py:68-85 (description): if the destination already holds an item with the same name the copy fails, to copy an item into its own folder give the copy a new name"
+
+uc-10-25:
+  status: untested
+  ask: "Delete the file Old draft.docx."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_delete_item
+      uses: {item: handle of the file}
+    - tool: sharepoint_search_files
+  note: "expected behaviour from tools/sharepoint_delete_item.py:79-87 (GRAPH_NOT_FOUND): the item is probably already gone, if you must still delete it find it again with sharepoint_search_files or sharepoint_browse_folder, if the item is not in that result it is already gone and nothing is left to delete"
+
+uc-10-26:
+  status: untested
+  ask: "Give Anna at Brightway edit access to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna at Brightway}
+    - tool: sharepoint_invite
+      optional: true
+      args: {role: write}
+      uses: {item: handle of the file, recipients: the name Anna at Brightway}
+  note: "outlook_find_recipient finds no match (tools/outlook_find_recipient.py:116-119, no proof that the person does not exist), so the assistant asks Mia for the address, as in uc-10-27 and uc-11-17. The invite step is optional: if the assistant passes the name anyway, the tool refuses at tools/sharepoint_invite.py:111-119 (_bad_address) before the question to Mia. Source of the refusal text: the entry is not one email address, an entry must be exactly one SMTP address and not a display name, take the address from what the user told you, Nothing was shared, and nobody was invited, correct the addresses and call again"
+
+uc-10-27:
+  status: untested
+  ask: "Give Anna edit access to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: sharepoint_invite
+      args: {role: write}
+      uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
+  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN and _NO_TOOL_SHOWS_IT, tools/sharepoint_invite.py:48 sets CHANGE_SHOWN_BY to nothing): Microsoft 365 can make a change and then give an error, do not call this tool again first, no tool of this deployment can show the change, ask the user if the Microsoft 365 app shows the change. The description says an invitation can already be out (tools/sharepoint_invite.py:76-88). The chain holds exactly one invite step."
+
+uc-10-28:
+  status: untested
+  ask: "Give me a sharing link to Q3 Plan.pptx that anyone can open."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: anonymous}
+      uses: {item: handle of the file}
+  note: "expected behaviour from tools/sharepoint_create_share_link.py:103-107 (GRAPH_FORBIDDEN): No link was created, and nothing was shared, an administrator can block links that work with no sign-in, if audience was anonymous ask the user if a link for the organization is enough"
+
+uc-10-30:
+  status: untested
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - any_of: [sharepoint_move_item, sharepoint_delete_item, sharepoint_rename_item, sharepoint_invite, sharepoint_create_text_file]
+  note: "expected behaviour for every row from shared/seam.py:236-241 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam.py:187-189). The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the delete uses Delete Old draft.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
+
+uc-10-31:
+  status: untested
+  ask: "Delete the file Old draft.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - any_of: [sharepoint_move_item, sharepoint_delete_item, sharepoint_rename_item, sharepoint_invite, sharepoint_create_text_file]
+  note: "The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (shared/seam.py:227-233 and :255-263). A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). Expected behaviour for every row from shared/seam.py:227-233 (_no_answer; the answer path is shared/seam.py:263): nothing was changed, this connector received no answer, tell the user that they can make the same request again, do not call this tool again for the same request unless the user asks for it in a new message. The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the rename uses Rename Plan v1.docx to Plan v2.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
+
+uc-10-32:
+  status: untested
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_rename_item
+      args: {name: Plan v2.docx}
+      uses: {item: handle of the file Plan v1.docx}
+  note: "expected behaviour from shared/seam.py:244-250 and 283-284 (_another_request, a check of request_state against the digest in write_state_for at tools/sharepoint_rename_item.py:122): the confirmation was given for a different request, so that agreement does not cover this request, nothing was changed, ask the user again and call this tool with exactly what they confirm. This check runs only on the newer protocol path, where the question comes back with the answer."
+
+uc-10-29:
+  status: untested
+  ask: "Move Q3 Plan.pptx into the Archive folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_move_item
+      uses: {item: handle of the file Q3 Plan.pptx, to_folder: handle of the folder Archive}
+    - tool: sharepoint_move_item
+      uses: {item: same handle as the first move, to_folder: same handle as the first move}
+  note: "expected behaviour from shared/seam.py:546-553 (sharepoint_move_item is WRITE_DESTRUCTIVE_IDEMPOTENT at tools/sharepoint_move_item.py:265, and shared/seam.py:392-395 treats an idempotent tool as safe to repeat): retry once, and if it fails again stop and report it. The description says this call is safe to repeat after a timeout (tools/sharepoint_move_item.py:62-71). The tool asks the user to agree every time, so the second try asks again. sharepoint_delete_item (tools/sharepoint_delete_item.py:59), sharepoint_rename_item (tools/sharepoint_rename_item.py:59), and sharepoint_create_share_link (tools/sharepoint_create_share_link.py:72) carry the same sentence."
+
+uc-10-33:
+  status: untested
+  ask: "Give Anna edit access to Q3 Plan.pptx and add this note to the invitation."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: sharepoint_invite
+      args: {role: write, message: the note of 2000 characters}
+      uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message allows at most MESSAGE_CHARACTERS (2000) characters, and Microsoft accepts 2,000 characters at most, so a note of exactly 2000 characters goes out"
+
+uc-10-34:
+  status: untested
+  ask: "Give Anna edit access to Q3 Plan.pptx and add this note to the invitation."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: sharepoint_invite
+      args: {role: write, message: the note of 2001 characters}
+      uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message has max_length 2000, so a longer note fails the validation of the arguments before the tool runs, and nothing is shared"
+
+uc-10-35:
+  status: untested
+  ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_text_file
+      args: {name: Sync 14 June.txt, content: the notes}
+      uses: {folder: handle of the folder Notes}
+  note: "expected behaviour from shared/files.py:385-392 (GRAPH_FORBIDDEN of sharepoint_create_text_file at tools/sharepoint_create_text_file.py:130): no file was created, the user can lack the necessary access or a policy of the organization can refuse, the owner of the item can give the user more access. The folder read works (Mia can open the folder), the question to Mia comes next, and the PUT at :211 is refused after she approves. The PUT uses no_retry."
+
+uc-10-36:
+  status: untested
+  ask: "Move Plan.docx into the Archive folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+    - tool: sharepoint_move_item
+      optional: true
+      uses: {item: handle of the file Plan.docx, to_folder: handle of the folder Archive}
+  note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Files.ReadWrite.All (tools/sharepoint_move_item.py:45), so the call never reaches Microsoft Graph and never reaches the question to Mia. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The move step is optional because the failing call is not a required step. The Then holds the same for every write tool of this feature."
+
+uc-10-37:
+  status: untested
+  ask: "Copy my Template folder into my Archive folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Template}
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_copy_item
+      uses: {item: handle of the folder Template, to_folder: handle of the folder Archive}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Archive}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:82-83: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:259), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:78-81), and no text says who tells Mia."
+
+uc-10-38:
+  status: untested
+  ask: "Create the folder 2026 Signed in my Contracts folder."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_create_folder
+      args: {name: 2026 Signed}
+      uses: {parent: handle of the folder Contracts}
+    - tool: sharepoint_browse_folder
+      uses: {folder: handle of the folder Contracts}
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:48) and tools/sharepoint_create_folder.py:68-69: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:168), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:66), and the failure comes after the question."
