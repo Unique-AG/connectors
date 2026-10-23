@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.1...backstop-mcp@2.0.0) (2026-10-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219))
+* **backstop-mcp:** per-client chart settings move to `mcpConfig`. Set `mcpConfig.app.publicBaseUrl`, `mcpConfig.backstop.baseUrl`, `mcpConfig.backstop.uiBaseUrl`, `mcpConfig.employment.*` and `mcpConfig.tenantGuidance` instead of the matching `env:` keys and the top-level `tenantGuidance`. The top-level `tenantGuidance` is removed; a value left there is ignored. Relationship type ids must be quoted strings (`["1042"]`). A value under `mcpConfig` overrides the same variable under `env:`. Tenant guidance now reaches the pod through the container `env` list instead of the env ConfigMap, so the first deploy rolls the pod.
+
+### Features
+
+* **backstop-mcp:** move per-client Helm settings into typed mcpConfig values ([#1217](https://github.com/Unique-AG/connectors/issues/1217)) ([169aac6](https://github.com/Unique-AG/connectors/commit/169aac6413140409ad04fe3ab95a552c4a22225b))
+
+
+### Bug Fixes
+
+* **backstop-mcp,kb-mcp,office-365-mcp,with-intelligence-mcp,exp-kyckr-mcp,exp-tiingo-mcp,mcp-credential-auth:** drop compromised eMudhra CA roots ([#1268](https://github.com/Unique-AG/connectors/issues/1268)) ([1f81406](https://github.com/Unique-AG/connectors/commit/1f814060865c9af03a60957b8a57242d9f08d422))
+* **backstop-mcp,with-intelligence-mcp:** verify database certificates against the CloudNativePG CA ([#1219](https://github.com/Unique-AG/connectors/issues/1219)) ([4f26e36](https://github.com/Unique-AG/connectors/commit/4f26e36e8e96a9770c9f17d29e61a193928c4ed6))
+
+
+### Dependencies
+
+* bump asyncpg in /* ([#1240](https://github.com/Unique-AG/connectors/issues/1240)) ([23628b0](https://github.com/Unique-AG/connectors/commit/23628b0de199bbf5ff4f60d8c27c112c68c3d28c))
+* bump python in /services/*/deploy ([#1229](https://github.com/Unique-AG/connectors/issues/1229)) ([c5e1f49](https://github.com/Unique-AG/connectors/commit/c5e1f49ff2c9fce8ef01561463d193b6f627c81b))
+* bump ruff in /packages/* ([#1241](https://github.com/Unique-AG/connectors/issues/1241)) ([fe61f41](https://github.com/Unique-AG/connectors/commit/fe61f410134445384ce6f5de5ed25edbb249c34e))
+* bump sqlalchemy[asyncio] in /services/* ([#1239](https://github.com/Unique-AG/connectors/issues/1239)) ([25d653e](https://github.com/Unique-AG/connectors/commit/25d653e7dd014bd964bc4fc043585e70b9d5599f))
+* bump uvicorn[standard] in /services/* ([#1242](https://github.com/Unique-AG/connectors/issues/1242)) ([28f9743](https://github.com/Unique-AG/connectors/commit/28f9743dfa4dbdcc6d9c57a7e09cd432f7d0036f))
+
 ## [1.0.1](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.0...backstop-mcp@1.0.1) (2026-10-12)
 
 
