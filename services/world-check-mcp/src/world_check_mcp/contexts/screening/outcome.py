@@ -20,13 +20,13 @@ def outcome(*, screened: ScreenedCaseWire, limit: int) -> ScreeningOutcome:
         entity_type=screened.entity_type,
         group_id=screened.group_id,
         matches_returned=len(screened.results),
-        watchlist_matches=[_match(item=item) for item in watchlist[:limit]],
+        watchlist_matches=[match_from_result(item=item) for item in watchlist[:limit]],
         watchlist_truncated=len(watchlist) > limit,
-        passport_matches=[_match(item=item) for item in passport[:limit]],
+        passport_matches=[match_from_result(item=item) for item in passport[:limit]],
     )
 
 
-def _match(*, item: ResultWire) -> ScreeningMatch:
+def match_from_result(*, item: ResultWire) -> ScreeningMatch:
     return ScreeningMatch(
         result_id=item.result_id,
         reference_id=item.reference_id,
