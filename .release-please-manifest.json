@@ -5,7 +5,7 @@
   "services/outlook-semantic-mcp": "4.1.1",
   "services/kyckr-mcp": "0.1.1-alpha",
   "services/hello-mcp": "0.1.1",
-  "services/kb-mcp": "0.1.6",
+  "services/kb-mcp": "0.1.7",
   "services/backstop-mcp": "1.0.1",
   "services/office-365-mcp": "0.3.2",
   "services/with-intelligence-mcp": "0.1.1"
