@@ -166,15 +166,22 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
-    # Covers single-label Unique hostnames (e.g. gateway.unique.app). Multi-label
-    # hostnames like a single-tenant Zitadel (id.<tenant>.unique.app) don't match
-    # this pattern -- Cilium's "*" doesn't cross "." -- so the exact Zitadel host
-    # from mcpConfig.zitadel.baseUrl is added automatically as its own matchName
-    # rule (see templates/_ext.tpl).
+    # *.unique.app covers single-label hosts; templates/_ext.tpl adds the
+    # Zitadel host explicitly since multi-label hosts don't match the pattern.
     egress:
       unique:
         toFQDNs:
           - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+      # tiktoken (read_file's token counter) downloads its encoding file from
+      # here on first use. Identical for every deployment, so it lives here
+      # rather than duplicated across tenant overlays.
+      tiktokenBlobStorage:
+        toFQDNs:
+          - matchName: openaipublic.blob.core.windows.net
         toPorts:
           - ports:
               - port: "443"
