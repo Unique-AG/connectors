@@ -1655,6 +1655,7 @@ dependencies = [
     { name = "jsonschema-path" },
     { name = "mcp-types" },
     { name = "pydantic" },
+    { name = "tenacity" },
 ]
 
 [package.optional-dependencies]
@@ -1676,6 +1677,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.14,<3" },
     { name = "pyyaml", marker = "extra == 'codegen'", specifier = ">=6,<7" },
     { name = "ruff", marker = "extra == 'codegen'", specifier = ">=0.17,<1" },
+    { name = "tenacity", specifier = ">=9.1,<10" },
 ]
 provides-extras = ["codegen"]
 

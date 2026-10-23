@@ -9,6 +9,7 @@ dependencies = [
     "jsonschema-path>=0.5,<1",
     "mcp-types>=2.3,<3",
     "pydantic>=2.14,<3",
+    "tenacity>=9.1,<10",
 ]
 
 [project.optional-dependencies]
