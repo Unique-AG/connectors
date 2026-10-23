@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Shared building blocks for MCP servers generated from an OpenAPI spec with FastMCP"
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=4.1,<5",
+    "fastmcp>=4.1.1,<5",
     "httpx2>=2.13,<3",
     "jsonschema-path>=0.5,<1",
     "mcp-types>=2.3,<3",
