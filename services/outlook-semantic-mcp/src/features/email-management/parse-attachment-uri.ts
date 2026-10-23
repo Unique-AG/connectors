@@ -20,6 +20,18 @@ export type ParsedUri =
 
 const UNIQUE_URI_PATTERN = /^unique:\/\/content\/([^/]+)$/;
 const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
+const ZIP_LOCAL_HEADER_SIGNATURE = 0x04034b50;
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
+const ZIP_EOCD_SIZE = 22;
+const ZIP_MAX_COMMENT_LENGTH = 0xffff;
+const ZIP64_MARKER = 0xffffffff;
+const TRUNCATED_ATTACHMENT_MESSAGE = 'Attachment data is truncated and cannot be opened';
+
+const OOXML_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
 
 export function parseAttachmentUri(uri: string): ParsedUri {
   const uniqueMatch = uri.match(UNIQUE_URI_PATTERN);
@@ -34,11 +46,71 @@ export function parseAttachmentUri(uri: string): ParsedUri {
     const mimeType = dataMatch[1] || 'application/octet-stream';
     const isBase64 = dataMatch[2] === ';base64';
     const data = isBase64
-      ? Buffer.from(rawData, 'base64')
+      ? decodeBase64Attachment(rawData)
       : Buffer.from(decodeURIComponent(rawData));
+
+    if (isBase64 && shouldCheckZipStructure(mimeType, data)) {
+      assertOfficeZipIsComplete(data);
+    }
 
     return { type: 'data', mimeType, data };
   }
 
   throw new Error(`Unsupported attachment URI scheme: ${uri.slice(0, 30)}`);
+}
+
+function shouldCheckZipStructure(mimeType: string, data: Buffer): boolean {
+  if (OOXML_MIME_TYPES.has(mimeType.toLowerCase())) {
+    return true;
+  }
+  return data.length >= 4 && data.readUInt32LE(0) === ZIP_LOCAL_HEADER_SIGNATURE;
+}
+
+function decodeBase64Attachment(rawData: string): Buffer {
+  const compact = rawData.replace(/\s/g, '');
+  if (compact.length % 4 === 1) {
+    throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+  }
+  return Buffer.from(rawData, 'base64');
+}
+
+function assertOfficeZipIsComplete(data: Buffer): void {
+  const eocdOffset = findZipEocdOffset(data);
+  if (eocdOffset === undefined) {
+    throw new Error('Attachment is not a valid Office file and cannot be opened');
+  }
+
+  const centralDirectorySize = data.readUInt32LE(eocdOffset + 12);
+  const centralDirectoryOffset = data.readUInt32LE(eocdOffset + 16);
+  if (centralDirectoryOffset === ZIP64_MARKER || centralDirectorySize === ZIP64_MARKER) {
+    return;
+  }
+
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+  if (
+    centralDirectoryOffset > eocdOffset ||
+    centralDirectorySize > eocdOffset ||
+    centralDirectoryEnd > eocdOffset
+  ) {
+    throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+  }
+}
+
+function findZipEocdOffset(data: Buffer): number | undefined {
+  if (data.length < ZIP_EOCD_SIZE) {
+    return undefined;
+  }
+
+  const earliest = Math.max(0, data.length - ZIP_EOCD_SIZE - ZIP_MAX_COMMENT_LENGTH);
+  for (let offset = data.length - ZIP_EOCD_SIZE; offset >= earliest; offset -= 1) {
+    if (data.readUInt32LE(offset) !== ZIP_EOCD_SIGNATURE) {
+      continue;
+    }
+    const commentLength = data.readUInt16LE(offset + 20);
+    if (offset + ZIP_EOCD_SIZE + commentLength === data.length) {
+      return offset;
+    }
+  }
+
+  return undefined;
 }
