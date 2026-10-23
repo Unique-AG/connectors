@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import AnyHttpUrl, SecretStr, ValidationError
 
@@ -17,6 +19,52 @@ from mcp_configs import (
 )
 
 SIGNING_KEY = "k" * 32
+
+
+@pytest.mark.parametrize(
+    ("environment", "endpoint"),
+    [
+        (
+            {"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://c:4318/v1/traces"},
+            "http://c:4318/v1/traces",
+        ),
+        ({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://c:4318/"}, "http://c:4318/v1/traces"),
+        (
+            {
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://traces:4318/t",
+                "OTEL_EXPORTER_OTLP_ENDPOINT": "http://c:4318",
+            },
+            "http://traces:4318/t",
+        ),
+        ({}, None),
+    ],
+    ids=["traces endpoint as given", "base endpoint with the traces path", "traces first", "none"],
+)
+def test_tracing_resolves_the_traces_endpoint_as_the_spec_does(
+    monkeypatch: pytest.MonkeyPatch, environment: dict[str, str], endpoint: str | None
+) -> None:
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+
+    assert TracingSettings().traces_endpoint == endpoint
+
+
+def test_tracing_reads_an_endpoint_from_the_env_file() -> None:
+    Path(".env").write_text("OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318\n")
+
+    settings = TracingSettings()
+
+    assert settings.exporter is TraceExporter.OTLP
+    assert settings.traces_endpoint == "http://collector:4318/v1/traces"
+
+
+@pytest.mark.parametrize("host", ["::1", "localhost"])
+def test_server_settings_let_a_loopback_base_url_be_reached_by_any_loopback_name(
+    host: str,
+) -> None:
+    settings = ServerSettings(host=host)
+
+    assert set(settings.allowed_hosts) == {"localhost", "127.0.0.1", "[::1]"}
 
 
 def test_tracing_is_off_unless_the_environment_turns_it_on() -> None:
@@ -190,7 +238,7 @@ def test_server_settings_default_to_a_local_origin_and_the_inspector() -> None:
     settings = ServerSettings()
 
     assert settings.base_url == "http://127.0.0.1:8000"
-    assert settings.allowed_hosts == ["localhost", "127.0.0.1"]
+    assert settings.allowed_hosts == ["localhost", "127.0.0.1", "[::1]"]
     assert settings.allowed_origins == ["http://localhost:6274"]
     assert settings.binds_to_loopback
 

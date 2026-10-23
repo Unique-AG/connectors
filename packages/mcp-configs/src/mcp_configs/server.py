@@ -38,7 +38,7 @@ class ServerSettings(BaseSettings):
     def allowed_hosts(self) -> list[str]:
         host = self.mcp_base_url.host
         assert host is not None, "an http URL always has a host"
-        return ["localhost", "127.0.0.1"] if host in LOCAL_HOSTS else [host]
+        return ["localhost", "127.0.0.1", "[::1]"] if host in LOCAL_HOSTS else [host]
 
     @property
     def allowed_origins(self) -> list[str]:
