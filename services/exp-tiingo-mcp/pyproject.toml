@@ -28,7 +28,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "basedpyright==1.40.1",
+    "basedpyright==1.40.2",
     "mcp-openapi[codegen]==0.1.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
