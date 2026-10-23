@@ -5,6 +5,7 @@ from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 import httpx2
+from mcp_types import ElicitResult
 from pydantic import TypeAdapter
 import pytest
 
@@ -28,6 +29,56 @@ def _body(request: httpx2.Request) -> dict[str, object]:
 
 
 _screen_modes: list[str] = []
+_writes: list[tuple[str, dict[str, object]]] = []
+
+
+def _passport_template() -> httpx2.Response:
+    passport_fields = [
+        ("SFCT_8", "TEXT", "GIVEN NAME"),
+        ("SFCT_9", "TEXT", "LAST NAME"),
+        ("SFCT_10", "GENDER", "GENDER"),
+        ("SFCT_11", "STATE", "ISSUING STATE"),
+        ("SFCT_12", "STATE", "NATIONALITY"),
+        ("SFCT_13", "DATE", "DATE OF BIRTH"),
+        ("SFCT_14", "PASSPORT_DOCUMENT_TYPE", "DOCUMENT TYPE"),
+        ("SFCT_15", "TEXT", "IDENTIFICATION NUMBER"),
+        ("SFCT_16", "DATE", "DATE OF EXPIRY"),
+    ]
+    return _json(
+        200,
+        {
+            "groupId": "g-passport",
+            "groupScreeningType": "CASE_MANAGEMENT_AUDIT",
+            "mandatoryProviderTypes": ["PASSPORT_CHECK"],
+            "secondaryFieldsByProvider": {
+                "PASSPORT_CHECK": {
+                    "secondaryFieldsByEntity": {
+                        "INDIVIDUAL": [
+                            {
+                                "typeId": type_id,
+                                "fieldValueType": value_type,
+                                "label": label,
+                                "fieldRequired": True,
+                            }
+                            for type_id, value_type, label in passport_fields
+                        ]
+                    }
+                },
+                "WATCHLIST": {
+                    "secondaryFieldsByEntity": {
+                        "INDIVIDUAL": [
+                            {
+                                "typeId": "SFCT_2",
+                                "fieldValueType": "COUNTRY",
+                                "label": "NATIONALITY",
+                                "fieldRequired": False,
+                            }
+                        ]
+                    }
+                },
+            },
+        },
+    )
 
 
 def _template(group_id: str, providers: list[str], *, required: bool) -> httpx2.Response:
@@ -93,6 +144,8 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(
             200, [{"id": "g1", "name": "KYC", "childGroups": [{"id": "g2", "name": "EU"}]}]
         )
+    if path.endswith("/groups/g-passport/case-template"):
+        return _passport_template()
     if path.endswith("/groups/g-screen/case-template"):
         return _template("g-screen", ["WATCHLIST"], required=True)
     if path.endswith("/groups/g-media/case-template"):
@@ -128,9 +181,26 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                     "groupId": "g1",
                     "providerType": "WATCHLIST",
                     "resolutionFields": {
-                        "statuses": [{"id": "s1", "label": "Positive", "type": "POSITIVE"}],
-                        "risks": [{"id": "r1", "label": "High"}],
+                        "statuses": [
+                            {"id": "s1", "label": "Positive", "type": "POSITIVE"},
+                            {"id": "s2", "label": "False", "type": "FALSE"},
+                        ],
+                        "risks": [{"id": "k1", "label": "High"}, {"id": "k2", "label": "Low"}],
                         "reasons": [{"id": "n1", "label": "Full match"}],
+                    },
+                    "resolutionRules": {
+                        "s1": {
+                            "risks": ["k1"],
+                            "reasons": ["n1"],
+                            "reasonRequired": False,
+                            "remarkRequired": False,
+                        },
+                        "s2": {
+                            "risks": ["k1"],
+                            "reasons": ["n1"],
+                            "reasonRequired": True,
+                            "remarkRequired": True,
+                        },
                     },
                 }
             },
@@ -145,6 +215,21 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _case("media-1", ["MEDIA_CHECK"])
     if path.endswith("/cases/fail-1"):
         return _case("fail-1", ["WATCHLIST"])
+    if request.method == "GET" and path.endswith("/cases/sys-pass"):
+        return _json(
+            200,
+            {
+                "caseId": "ext-pass",
+                "caseSystemId": "sys-pass",
+                "name": "Ada Lovelace",
+                "entityType": "INDIVIDUAL",
+                "groupId": "g1",
+                "providerTypes": ["PASSPORT_CHECK", "WATCHLIST"],
+                "lifecycleState": "UNARCHIVED",
+            },
+        )
+    if request.method == "GET" and path.endswith("/cases/sys-bare"):
+        return _case("sys-bare", ["PASSPORT_CHECK"])
     if request.method == "GET" and path.endswith("/cases/sys-1"):
         return _json(
             200,
@@ -209,6 +294,35 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "pagination": {"pageReferences": {"next": "page-2"}},
             },
         )
+    if path.endswith("/cases/sys-pass/results"):
+        return _json(
+            200,
+            {
+                "results": [
+                    {
+                        "resultId": "p1",
+                        "providerType": "PASSPORT_CHECK",
+                        "mrzLine1": "P<GBRLOVELACE<<ADA",
+                        "mrzLine2": "1234567890GBR",
+                    },
+                    {
+                        "resultId": "r9",
+                        "referenceId": "e_1",
+                        "providerType": "WATCHLIST",
+                        "submittedTerm": "Ada Lovelace",
+                    },
+                ],
+                "pagination": {"pageReferences": {}},
+            },
+        )
+    if path.endswith("/cases/sys-bare/results"):
+        return _json(
+            200,
+            {
+                "results": [{"resultId": "p0", "providerType": "PASSPORT_CHECK"}],
+                "pagination": {"pageReferences": {}},
+            },
+        )
     if path.endswith("/cases/sys-1/results"):
         return _json(
             200,
@@ -255,10 +369,32 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "pagination": {"pageReferences": {"next": None}},
             },
         )
+    if path.endswith("/passport-check/mrz"):
+        body = _body(request)
+        assert body["issuingState"] == "GBR"
+        assert body["nationality"] == "GBR"
+        return _json(
+            200, {"lines": ["P<GBRLOVELACE<<ADA", "1234567890GBR"], "conformWithICAO": True}
+        )
     if request.method == "POST" and path.endswith("/cases"):
         body = _body(request)
         assert request.url.params.get("screen") == "SYNC"
-        assert body["providerTypes"] == ["WATCHLIST"]
+        providers = cast(list[str], body["providerTypes"])
+        assert "MEDIA_CHECK" not in providers
+        if providers == ["WATCHLIST", "PASSPORT_CHECK"]:
+            secondary = cast(list[dict[str, object]], body["secondaryFields"])
+            assert {"typeId": "SFCT_8", "value": "Ada"} in secondary
+            return _json(
+                200,
+                _screened(
+                    [
+                        {"resultId": "p1", "providerType": "PASSPORT_CHECK", "mrzLine1": "P<GBR"},
+                        {"resultId": "r1", "providerType": "WATCHLIST"},
+                        {"resultId": "r2", "providerType": "WATCHLIST"},
+                    ]
+                ),
+            )
+        assert providers == ["WATCHLIST"]
         assert body["caseScreeningState"] == {"WATCHLIST": "INITIAL"}
         assert body["secondaryFields"] == [{"typeId": "SFCT_2", "value": "GBR"}]
         return _json(
@@ -335,6 +471,11 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "pagination": {"pageReferences": {"next": "page-2"}},
             },
         )
+    if request.method == "PUT" and (
+        path.endswith("/passport-check/verification") or path.endswith("/results/resolution")
+    ):
+        _writes.append((path, _body(request)))
+        return httpx2.Response(204)
     return httpx2.Response(404)
 
 
@@ -595,6 +736,190 @@ async def test_get_ogs_updates_requires_the_original_window_on_the_next_page() -
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="Reuse both since and until"):
             await client.call_tool("get_ogs_updates", {"page_reference": "page-2"})
+
+
+_PASSPORT = {
+    "given_name": "Ada",
+    "last_name": "Lovelace",
+    "gender": "FEMALE",
+    "date_of_birth": "1815-12-10",
+    "issuing_state": "gbr",
+    "nationality": "GBR",
+    "identification_number": "123456789",
+    "date_of_expiry": "2030-01-01",
+}
+
+
+async def test_generate_passport_mrz_uses_nationality_codes() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("generate_passport_mrz", {"passport": _PASSPORT})
+
+    mrz = result.structured_content
+    assert mrz is not None
+    assert mrz["lines"][0] == "P<GBRLOVELACE<<ADA"
+    assert mrz["conforms_with_icao"] is True
+
+
+async def test_generate_passport_mrz_rejects_a_watchlist_country_code() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="nationalities"):
+            await client.call_tool(
+                "generate_passport_mrz",
+                {"passport": {**_PASSPORT, "issuing_state": "XXX"}},
+            )
+
+
+async def test_passport_check_screens_without_media_check() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "passport_check", {"passport": _PASSPORT, "group_id": "g-passport", "limit": 1}
+        )
+
+    check = result.structured_content
+    assert check is not None
+    assert check["case_system_id"] == "sys-new"
+    assert check["passport_matches"][0]["mrz_line_1"] == "P<GBR"
+    assert check["watchlist_truncated"] is True
+    assert check["watchlist_matches"][1:] == []
+
+
+async def test_passport_check_refuses_an_existing_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="already exists"):
+            await client.call_tool(
+                "passport_check",
+                {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "ext-1"},
+            )
+
+
+_messages: list[str] = []
+
+
+async def _approve(
+    message: str, _response_type: object, _params: object, _context: object
+) -> dict[str, bool]:
+    _messages.append(message)
+    return {"approve": True}
+
+
+async def _decline(
+    _message: str, _response_type: object, _params: object, _context: object
+) -> ElicitResult:
+    return ElicitResult(action="decline")
+
+
+async def test_verify_passport_check_saves_only_after_approval() -> None:
+    _writes.clear()
+    _messages.clear()
+    async with Client(_server(), elicitation_handler=_approve) as client:
+        result = await client.call_tool(
+            "verify_passport_check",
+            {"case": "sys-pass", "mrz_matched": True, "note": "Compared the document"},
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["recorded"] is True
+    assert saved["mrz_matched"] is True
+    assert "MCP reviewer: local development (unauthenticated)" in saved["note"]
+    assert "P<GBRLOVELACE<<ADA" in _messages[0]
+    assert _writes[0][0].endswith("/passport-check/verification")
+    assert _writes[0][1]["mrzMatched"] is True
+
+
+async def test_verify_passport_check_decline_does_not_write() -> None:
+    _writes.clear()
+    async with Client(_server(), elicitation_handler=_decline) as client:
+        result = await client.call_tool(
+            "verify_passport_check", {"case": "sys-pass", "mrz_matched": False}
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["recorded"] is False
+    assert saved["status"] == "cancelled"
+    assert _writes == []
+
+
+async def test_verify_passport_check_refuses_a_case_without_an_mrz() -> None:
+    _writes.clear()
+    async with Client(_server(), elicitation_handler=_approve) as client:
+        with pytest.raises(ToolError, match="No generated passport MRZ"):
+            await client.call_tool(
+                "verify_passport_check", {"case": "sys-bare", "mrz_matched": True}
+            )
+
+    assert _writes == []
+
+
+async def test_resolve_result_saves_an_approved_watchlist_decision() -> None:
+    _writes.clear()
+    _messages.clear()
+    async with Client(_server(), elicitation_handler=_approve) as client:
+        result = await client.call_tool(
+            "resolve_result",
+            {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"},
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["resolved"] is True
+    assert saved["status_id"] == "s1"
+    assert saved["risk_id"] == "k1"
+    assert "Positive match" in _messages[0]
+    body = _writes[0][1]
+    assert body["resultIds"] == ["r1"]
+    assert body["statusId"] == "s1"
+    assert "MCP reviewer:" in str(body["resolutionRemark"])
+
+
+async def test_resolve_result_decline_does_not_write() -> None:
+    _writes.clear()
+    async with Client(_server(), elicitation_handler=_decline) as client:
+        result = await client.call_tool(
+            "resolve_result",
+            {"case": "sys-1", "result_id": "r1", "status": "s1", "risk": "k1"},
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["resolved"] is False
+    assert _writes == []
+
+
+async def test_resolve_result_honours_toolkit_rules_before_approval() -> None:
+    _writes.clear()
+    async with Client(_server(), elicitation_handler=_approve) as client:
+        with pytest.raises(ToolError, match="not allowed"):
+            await client.call_tool(
+                "resolve_result",
+                {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "Low"},
+            )
+        with pytest.raises(ToolError, match="non-empty note"):
+            await client.call_tool(
+                "resolve_result",
+                {
+                    "case": "sys-1",
+                    "result_id": "r1",
+                    "status": "FALSE",
+                    "risk": "High",
+                    "reason": "n1",
+                },
+            )
+
+    assert _writes == []
+
+
+async def test_resolve_result_refuses_a_passport_match() -> None:
+    _writes.clear()
+    async with Client(_server(), elicitation_handler=_approve) as client:
+        with pytest.raises(ToolError, match="WATCHLIST"):
+            await client.call_tool(
+                "resolve_result",
+                {"case": "sys-pass", "result_id": "p1", "status": "POSITIVE", "risk": "High"},
+            )
+
+    assert _writes == []
 
 
 async def test_get_ogs_updates_rejects_a_future_end() -> None:

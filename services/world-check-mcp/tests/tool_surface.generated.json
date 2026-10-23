@@ -51,6 +51,115 @@
     "title": "Enable Ongoing Screening"
   },
   {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Generate MRZ lines without creating a case or recording a verification.\n\nIssuing state and nationality come from get_reference_data nationalities. ICAO conformity\ndoes not prove authenticity, ownership, or validity.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "passport": {
+          "description": "Document details as printed.",
+          "properties": {
+            "date_of_birth": {
+              "description": "Date of birth as printed. Not in the future.",
+              "format": "date",
+              "type": "string"
+            },
+            "date_of_expiry": {
+              "description": "Expiry date as printed.",
+              "format": "date",
+              "type": "string"
+            },
+            "document_type": {
+              "default": "PASSPORT",
+              "description": "PASSPORT, ID1, or ID2.",
+              "enum": [
+                "PASSPORT",
+                "ID1",
+                "ID2"
+              ],
+              "type": "string"
+            },
+            "gender": {
+              "description": "MALE, FEMALE, or UNSPECIFIED.",
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            "given_name": {
+              "description": "Given names as printed on the document.",
+              "type": "string"
+            },
+            "identification_number": {
+              "description": "Document number as printed.",
+              "type": "string"
+            },
+            "issuing_state": {
+              "description": "Issuing-state code from reference nationalities.",
+              "type": "string"
+            },
+            "last_name": {
+              "description": "Surname as printed on the document.",
+              "type": "string"
+            },
+            "nationality": {
+              "description": "Nationality code from reference nationalities.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "given_name",
+            "last_name",
+            "gender",
+            "date_of_birth",
+            "issuing_state",
+            "nationality",
+            "identification_number",
+            "date_of_expiry"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "passport"
+      ],
+      "type": "object"
+    },
+    "name": "generate_passport_mrz",
+    "outputSchema": {
+      "properties": {
+        "conforms_with_icao": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lines",
+        "conforms_with_icao"
+      ],
+      "type": "object"
+    },
+    "title": "Generate Passport MRZ"
+  },
+  {
     "_meta": {
       "fastmcp": {
         "tags": [
@@ -1382,6 +1491,479 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. It does not record a human document comparison. limit truncates\nWATCHLIST matches only.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "description": "Stable external caseId. An existing id is refused.",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "External caseId. Existing ids are refused."
+        },
+        "custom_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom fields from the group template."
+        },
+        "group_id": {
+          "description": "Group id from `list_groups`. It owns the case template.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "include_watchlist": {
+          "default": true,
+          "description": "Also screen the name against WATCHLIST.",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "description": "WATCHLIST matches to return.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Case name. Defaults to the given and last names."
+        },
+        "passport": {
+          "description": "Document details as printed.",
+          "properties": {
+            "date_of_birth": {
+              "description": "Date of birth as printed. Not in the future.",
+              "format": "date",
+              "type": "string"
+            },
+            "date_of_expiry": {
+              "description": "Expiry date as printed.",
+              "format": "date",
+              "type": "string"
+            },
+            "document_type": {
+              "default": "PASSPORT",
+              "description": "PASSPORT, ID1, or ID2.",
+              "enum": [
+                "PASSPORT",
+                "ID1",
+                "ID2"
+              ],
+              "type": "string"
+            },
+            "gender": {
+              "description": "MALE, FEMALE, or UNSPECIFIED.",
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "UNSPECIFIED"
+              ],
+              "type": "string"
+            },
+            "given_name": {
+              "description": "Given names as printed on the document.",
+              "type": "string"
+            },
+            "identification_number": {
+              "description": "Document number as printed.",
+              "type": "string"
+            },
+            "issuing_state": {
+              "description": "Issuing-state code from reference nationalities.",
+              "type": "string"
+            },
+            "last_name": {
+              "description": "Surname as printed on the document.",
+              "type": "string"
+            },
+            "nationality": {
+              "description": "Nationality code from reference nationalities.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "given_name",
+            "last_name",
+            "gender",
+            "date_of_birth",
+            "issuing_state",
+            "nationality",
+            "identification_number",
+            "date_of_expiry"
+          ],
+          "type": "object"
+        },
+        "secondary_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "date_time_value": {
+                    "anyOf": [
+                      {
+                        "format": "date",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Date value for a DATE field."
+                  },
+                  "type_id": {
+                    "description": "typeId from get_group_settings.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Text, country, or gender value."
+                  }
+                },
+                "required": [
+                  "type_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extra secondary fields. Passport fields do not fill WATCHLIST fields."
+        }
+      },
+      "required": [
+        "passport",
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "name": "passport_check",
+    "outputSchema": {
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_system_id": {
+          "type": "string"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passport_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_matches": {
+          "items": {
+            "properties": {
+              "match_strength": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mrz_line_1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "mrz_line_3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "provider_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "result_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submitted_term": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "result_id",
+              "reference_id",
+              "provider_type",
+              "match_strength",
+              "submitted_term"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "watchlist_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_system_id",
+        "name",
+        "group_id",
+        "passport_matches",
+        "watchlist_matches",
+        "watchlist_truncated"
+      ],
+      "type": "object"
+    },
+    "title": "Passport Check"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": false
@@ -1676,6 +2258,155 @@
       "type": "object"
     },
     "title": "Rescreen Case"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Record a WATCHLIST match decision only after a person approves the exact choice.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nStatus, risk, and reason must be allowed together by the group's toolkit.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "description": "Remark saved with the reviewer identity appended.",
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "description": "Id or label from the group's resolution toolkit.",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reason id or label. Required when the toolkit status says so."
+        },
+        "result_id": {
+          "description": "resultId of one WATCHLIST match.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "risk": {
+          "description": "Id or label from the group's resolution toolkit.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status id, label, or POSITIVE, FALSE, POSSIBLE, or UNSPECIFIED.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case",
+        "result_id",
+        "status",
+        "risk"
+      ],
+      "type": "object"
+    },
+    "name": "resolve_result",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reason_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "result_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "cancelled",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "resolved"
+      ],
+      "type": "object"
+    },
+    "title": "Resolve Result"
   },
   {
     "annotations": {
@@ -2355,5 +3086,108 @@
       "type": "object"
     },
     "title": "Search Cases"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Record a human comparison of the generated MRZ with the document, only after approval.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nA repeat verification requires rescreen_case first.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "description": "Internal caseSystemId, or the exact external caseId. Not a person's name or a profile referenceId.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mrz_matched": {
+          "description": "True when the generated MRZ matches the document. Not the approval.",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "description": "Note saved with the reviewer identity appended.",
+          "maxLength": 1000,
+          "type": "string"
+        }
+      },
+      "required": [
+        "case",
+        "mrz_matched"
+      ],
+      "type": "object"
+    },
+    "name": "verify_passport_check",
+    "outputSchema": {
+      "properties": {
+        "case_system_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "guidance": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mrz_matched": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recorded": {
+          "type": "boolean"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "const": "cancelled",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "recorded"
+      ],
+      "type": "object"
+    },
+    "title": "Verify Passport Check"
   }
 ]
