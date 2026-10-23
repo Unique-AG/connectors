@@ -194,6 +194,7 @@ dependencies = [
     { name = "fastmcp" },
     { name = "httpx2" },
     { name = "mcp-configs" },
+    { name = "mcp-observability" },
     { name = "mcp-openapi" },
     { name = "mcp-types" },
     { name = "py-key-value-aio", extra = ["redis", "wrappers-encryption"] },
@@ -215,6 +216,7 @@ dev = [
     { name = "basedpyright" },
     { name = "mcp-architecture" },
     { name = "mcp-openapi", extra = ["codegen"] },
+    { name = "poethepoet" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -227,6 +229,7 @@ requires-dist = [
     { name = "fastmcp", specifier = "==4.1.0" },
     { name = "httpx2", specifier = "==2.13.1" },
     { name = "mcp-configs", directory = "../../packages/mcp-configs" },
+    { name = "mcp-observability", directory = "../../packages/mcp-observability" },
     { name = "mcp-openapi", directory = "../../packages/mcp-openapi" },
     { name = "mcp-types", specifier = "==2.3.0" },
     { name = "py-key-value-aio", extras = ["redis", "wrappers-encryption"], specifier = "==0.4.6" },
@@ -236,9 +239,9 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.1.3" },
     { name = "starlette", specifier = "==1.8.0" },
     { name = "tenacity", specifier = "==9.1.4" },
-    { name = "unique-mcp", specifier = "==2026.44.0.dev1" },
-    { name = "unique-sdk", specifier = "==2026.44.0.dev10" },
-    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.44.0.dev2" },
+    { name = "unique-mcp", specifier = "==2026.44.1" },
+    { name = "unique-sdk", specifier = "==2026.44.1" },
+    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.44.1" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.53.0" },
 ]
 
@@ -248,6 +251,7 @@ dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "mcp-architecture", directory = "../../packages/mcp-architecture" },
     { name = "mcp-openapi", extras = ["codegen"], directory = "../../packages/mcp-openapi" },
+    { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.17.0" },
@@ -1672,6 +1676,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.17.0" },
@@ -1696,6 +1701,43 @@ requires-dist = [
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "pytest", specifier = "==9.1.1" },
+    { name = "ruff", specifier = "==0.17.0" },
+]
+
+[[package]]
+name = "mcp-observability"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-observability" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "mcp-configs" },
+    { name = "mcp-types" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "prometheus-client" },
+    { name = "starlette" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=4.1,<5" },
+    { name = "mcp-configs", directory = "../../packages/mcp-configs" },
+    { name = "mcp-types", specifier = ">=2.3,<3" },
+    { name = "opentelemetry-api", specifier = ">=1.27,<2" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.27,<2" },
+    { name = "opentelemetry-sdk", specifier = ">=1.27,<2" },
+    { name = "prometheus-client", specifier = ">=0.24.1,<1" },
+    { name = "starlette", specifier = ">=1.3.1,<2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "httpx2", specifier = "==2.13.1" },
+    { name = "poethepoet", specifier = "==0.49.0" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "ruff", specifier = "==0.17.0" },
 ]
 
@@ -2290,6 +2332,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
+]
+
+[[package]]
+name = "poethepoet"
+version = "0.49.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/7e/160d391368d359f7dd6dd647575499c395687beb4a6b2ebfbfbf8a20b817/poethepoet-0.49.0.tar.gz", hash = "sha256:256b72c057b5f60341bbe09498212939e558341fac4ab59d0ce478aca04f0d2a", size = 157750, upload-time = "2026-10-15T06:08:57.094Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/f5/a2404b9cb3c299cd148533d07e1a378b60aa4ae640c69fb522596ca157ae/poethepoet-0.49.0-py3-none-any.whl", hash = "sha256:97b456f3c52c9af75d4bc504e0f5cfee44545a84f446ba645a0a8f6a0131422f", size = 195985, upload-time = "2026-10-15T06:08:55.332Z" },
 ]
 
 [[package]]
@@ -3280,7 +3334,7 @@ wheels = [
 
 [[package]]
 name = "unique-mcp"
-version = "2026.44.0.dev1"
+version = "2026.44.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
@@ -3296,14 +3350,14 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-toolkit", extra = ["monitoring", "otel"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/cb/420511c84e1f923dfc086e4e34b92dc76377519ab30323695c7768e97826/unique_mcp-2026.44.0.dev1.tar.gz", hash = "sha256:e88bb9ef4348645e2b860ab18c05018519e744006fdcb827beabbfeb61e0567d", size = 18482, upload-time = "2026-10-12T12:00:27.429Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/7a/d5c9053f0c97081ca0db9401899b4a02af8bce95460cfe9f4d8f0d2baddd/unique_mcp-2026.44.1.tar.gz", hash = "sha256:f5809dc65fcacd43df912b43f4093114877fc4255ae793aa6bf5209df23d9ebc", size = 18457, upload-time = "2026-10-23T12:52:33.9Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/7d/e6d249ff83b796c81ac668b43800f4a76f198b169d412047efb4923fb9a8/unique_mcp-2026.44.0.dev1-py3-none-any.whl", hash = "sha256:080ab1f6d173b00fd06b4973923adfd23f5b20379b0ee4c99c9df7fc63a28d12", size = 25631, upload-time = "2026-10-12T12:00:26.117Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/f9/7e21247cc19c767ba9de6a48b7ec954768ab1d3e975506f9ffe3c87cb888/unique_mcp-2026.44.1-py3-none-any.whl", hash = "sha256:92a507fab9e5f0064621d45e916b50635c21c4bb673d8025fbda859feda244ed", size = 25578, upload-time = "2026-10-23T12:52:32.87Z" },
 ]
 
 [[package]]
 name = "unique-sdk"
-version = "2026.44.0.dev10"
+version = "2026.44.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -3315,14 +3369,14 @@ dependencies = [
     { name = "tiktoken" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/83/ba/ae5e21136fceb3555b458325b667859b30e9ec7d14f5b1f091007b6fa899/unique_sdk-2026.44.0.dev10.tar.gz", hash = "sha256:439ddc50aa0517c51fc0db352348ac597073712f41ceeb2c646a1de185de5478", size = 219833, upload-time = "2026-10-19T13:12:28.104Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/90/ae0612e0cedc633f962c0ff85b6a39142c13860179898cb9bcb53064af80/unique_sdk-2026.44.1.tar.gz", hash = "sha256:74477b5eaf657823ba2e7c0171ca10e9246450f0f6f3fa13fc07658cc077d3c5", size = 222862, upload-time = "2026-10-23T12:52:32.334Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/c5/34bd868b84aec659aa24d98b05feaff736bf9a42834152c08122563bee98/unique_sdk-2026.44.0.dev10-py3-none-any.whl", hash = "sha256:9d3e076183658903753f49add3241232dd416df92b123319c74f01a4f12d5b68", size = 269184, upload-time = "2026-10-19T13:12:26.371Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/e9/163b8e78ada91c92533ebaaa8640c38f7a5372f4e221d8dd301756f1dbd9/unique_sdk-2026.44.1-py3-none-any.whl", hash = "sha256:64a5104b0f39a4cc88db096a4df37c93e56511b64cfc105f8b1335bf7001c77e", size = 272152, upload-time = "2026-10-23T12:52:30.935Z" },
 ]
 
 [[package]]
 name = "unique-toolkit"
-version = "2026.44.0.dev2"
+version = "2026.44.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -3355,9 +3409,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-sdk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/83/4fa3adeea6dbe91867e482e548912220e5830f09b6fc4b7b13f1f86ae7fe/unique_toolkit-2026.44.0.dev2.tar.gz", hash = "sha256:cffd48ff5ce754614040e169a31e62dcf8448eeeb5b45b555543dbeadbc0a2e1", size = 4570637, upload-time = "2026-10-12T07:35:14.76Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/43/bb54c7927752f2f9b10a26e0abf9f86a9a55fb4b7bbadad595f3247448c9/unique_toolkit-2026.44.1.tar.gz", hash = "sha256:c125b28ce07d611225305ee62b0c23654f983e925d7168ed5e551b3995aa752a", size = 4576969, upload-time = "2026-10-23T12:52:32.37Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/a7/68ffe807021506e87c9c012a2be75cce2a22e1887c24a27d5d7ed3907e44/unique_toolkit-2026.44.0.dev2-py3-none-any.whl", hash = "sha256:824156bc6f30e648406b93cadd9640bcadd6f0e790ab8de1c2c82d0e106e853b", size = 4774076, upload-time = "2026-10-12T07:35:12.2Z" },
+    { url = "https://files.pythonhosted.org/packages/34/8a/480a5e3b0588e0023a5a1e3c1fdb54c10bb8dbaa367ce1b0097dc8c42364/unique_toolkit-2026.44.1-py3-none-any.whl", hash = "sha256:558c6d53d60176720d27b81a17ff2db7b942c42268094ee7875d14a1a491e54c", size = 4783046, upload-time = "2026-10-23T12:52:30.144Z" },
 ]
 
 [package.optional-dependencies]

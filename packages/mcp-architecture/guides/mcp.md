@@ -12,12 +12,13 @@ The FastMCP server, its HTTP serving and middleware, auth, tools and their input
   locally but never in a pod.
 - `middleware.py`: `http_middleware` puts the host and origin guard first, then CORS, then the
   MCP's own HTTP middleware, such as a request id, after `instrument(mcp)`. The guard lets a
-  request through only for a host of `MCP_BASE_URL` (or `localhost`) and, from a browser, an
-  allowed origin. `/probe`, `/health` and `/metrics` skip it, since Kubernetes and Prometheus
+  request through only for the host of `MCP_BASE_URL` (`localhost` and `127.0.0.1` alike when
+  that is local) and, from a browser, an allowed origin. `/probe`, `/health` and `/metrics` skip it, since Kubernetes and Prometheus
   reach the pod by IP. MCP-level middleware, which sees tool calls rather than HTTP requests,
   goes on the server in `create_server`: `mcp.add_middleware(...)`.
 - `auth/`, once the MCP has auth: what FastMCP does not provide itself, behind its own
-  `__init__.py` (see [auth](auth.md)).
+  `__init__.py`. With `--auth credentials` it is the OAuth server the clients use and its
+  `/sign-in` page (see [auth](auth.md)).
 - `tools/`: `FileSystemProvider` discovers every `@tool` under it. A new tool file is picked up
   with no registration step. If one fails to import, the server refuses to start.
 

@@ -1,10 +1,13 @@
-"""The import contracts every scaffolded MCP keeps, which `mcp-architecture-imports` checks."""
+"""The import contracts every scaffolded MCP keeps, which the scaffold writes to its
+`[tool.importlinter]`."""
 
 import json
 
 _CONTRACT_TYPES = ["feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract"]
-_LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "utils", "telemetry"]
-_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "contexts", "upstream", "persistence", "utils", "telemetry"]
+_LAYERS = ["main", "mcp", "contexts", "upstream | persistence", "shared", "telemetry"]
+_IMPORTED_THROUGH_TOP_LEVEL = ["mcp", "contexts", "upstream", "persistence", "shared", "telemetry"]
+# A contract between layers is types alone: what implements it lives in a layer above.
+_CONTRACTS_IMPORT_NOTHING_OF = ["sqlalchemy", "httpx2", "cryptography"]
 
 
 def render_importlinter(package: str) -> str:
@@ -56,10 +59,16 @@ def _contracts(package: str) -> list[dict[str, object]]:
         {
             # Indirect imports are allowed: contexts reach fastmcp through upstream, whose
             # UpstreamError is a ToolError.
-            "name": "The domain, the storage and utils know nothing about MCP",
+            "name": "The domain, the storage and shared know nothing about MCP",
             "type": "forbidden",
-            "source_modules": [contexts, f"{package}.persistence", f"{package}.utils"],
+            "source_modules": [contexts, f"{package}.persistence", f"{package}.shared"],
             "forbidden_modules": ["fastmcp", "mcp", "mcp_types"],
             "allow_indirect_imports": True,
+        },
+        {
+            "name": "The contracts in shared are types, not implementations",
+            "type": "forbidden",
+            "source_modules": [f"{package}.shared.contracts"],
+            "forbidden_modules": _CONTRACTS_IMPORT_NOTHING_OF,
         },
     ]

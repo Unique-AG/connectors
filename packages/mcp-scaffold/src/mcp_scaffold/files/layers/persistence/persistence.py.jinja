@@ -4,16 +4,22 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import ClassVar
 
-{% if redis %}
+{% if redis or options.auth %}
 from mcp_configs import from_environment
 {% endif %}
 from pydantic import BaseModel, ConfigDict, Field
 
+{% if options.auth %}
+from mcp_skeleton.persistence.auth import AuthStoreSettings, SqlAuthStore
+{% endif %}
 {% if postgres %}
 from mcp_skeleton.persistence.database import Database, DatabaseSettings, open_database
 {% endif %}
 {% if redis %}
 from mcp_skeleton.persistence.store import Store, StoreSettings, open_store
+{% endif %}
+{% if options.auth %}
+from mcp_skeleton.shared import AuthStore
 {% endif %}
 
 
@@ -23,6 +29,9 @@ class PersistenceSettings(BaseModel):
 {% if postgres %}
 {# PostgresSettings checks its own required settings at runtime. #}
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+{% endif %}
+{% if options.auth %}
+    auth: AuthStoreSettings = Field(default_factory=lambda: from_environment(AuthStoreSettings))
 {% endif %}
 {% if redis %}
     store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
@@ -40,6 +49,10 @@ class Persistence(BaseModel):
 {% if redis %}
     store: Store
 {% endif %}
+{% if options.auth %}
+    # What the sign-in keeps, in `database`.
+    auth: AuthStore
+{% endif %}
 
 
 @asynccontextmanager
@@ -52,4 +65,4 @@ async def open_persistence(settings: PersistenceSettings) -> AsyncGenerator[Pers
         open_store(settings.store) as store,
 {% endif %}
     ):
-        yield Persistence({{ [postgres and "database=database", redis and "store=store"] | select | join(", ") }})
+        yield Persistence({{ [postgres and "database=database", redis and "store=store", options.auth and "auth=SqlAuthStore(database, settings.auth)"] | select | join(", ") }})

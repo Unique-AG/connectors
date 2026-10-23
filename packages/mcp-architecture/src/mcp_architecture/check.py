@@ -1,8 +1,6 @@
-"""`mcp-architecture-check`: the checks of what a client sees, of the MCP's type check
-configuration and of its files' suppression comments, run outside pytest, so nothing in a
-service's `conftest.py` can skip, xfail or deselect them."""
+"""The checks of what a client sees and of the MCP's files' suppression comments, which an MCP's
+`architecture` and `surface` poe tasks run in its folder."""
 
-import argparse
 import asyncio
 import difflib
 import importlib.util
@@ -13,7 +11,6 @@ from typing import cast
 
 from fastmcp import FastMCP
 
-from mcp_architecture.configuration import loosened_type_check
 from mcp_architecture.settings import settings_showing_input_in_errors
 from mcp_architecture.suppression_comments import (
     files_changing_their_type_check,
@@ -31,17 +28,9 @@ OFFLINE_SERVER = Path("tests") / "offline_server.py"
 SNAPSHOT = Path("tests") / "tool_surface.generated.json"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="mcp-architecture-check",
-        description="Check the MCP in the current folder for the rules no other tool checks.",
-    )
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        help=f"write {SNAPSHOT} instead of comparing with it",
-    )
-    update = cast(bool, parser.parse_args().update)
+def main(*, update: bool = False) -> None:
+    """Exit with 1 when the MCP in the current folder breaks a rule. `update` writes the tool
+    surface snapshot instead of comparing with it."""
     findings = asyncio.run(check_service(Path.cwd(), update=update))
     print("\n\n".join(findings) if findings else "Every architecture check passed.")
     sys.exit(1 if findings else 0)
@@ -57,7 +46,7 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
         dict[str, dict[str, object]], tomllib.loads((root / "pyproject.toml").read_text())
     )
     package = str(pyproject["project"]["name"]).replace("-", "_")
-    findings = loosened_type_check(root, pyproject)
+    findings: list[str] = []
     if comments := files_changing_their_type_check(root):
         findings.append(
             "Remove these `# pyright:` comments, so each file keeps the type check of the whole "
@@ -114,7 +103,7 @@ def _snapshot_findings(snapshot: Path, surface: str, update: bool) -> list[str]:
         snapshot.write_text(surface)
         return []
     if not snapshot.is_file():
-        return [f"{SNAPSHOT} is missing. Run `uv run mcp-architecture-check --update`."]
+        return [f"{SNAPSHOT} is missing. Run `uv run poe surface`."]
     recorded = snapshot.read_text()
     if recorded == surface:
         return []
@@ -126,5 +115,5 @@ def _snapshot_findings(snapshot: Path, surface: str, update: bool) -> list[str]:
     )
     return [
         f"What a client sees no longer matches {SNAPSHOT}. If you meant the change, run "
-        f"`uv run mcp-architecture-check --update` and commit it.\n{''.join(diff)}"
+        f"`uv run poe surface` and commit it.\n{''.join(diff)}"
     ]

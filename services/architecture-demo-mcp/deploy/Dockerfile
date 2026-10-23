@@ -6,6 +6,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0 UV_PROJECT_ENVIRONMENT=/app/.venv
 WORKDIR /workspace/services/architecture-demo-mcp
 COPY packages/mcp-configs /workspace/packages/mcp-configs
+COPY packages/mcp-observability /workspace/packages/mcp-observability
 COPY packages/mcp-openapi /workspace/packages/mcp-openapi
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=services/architecture-demo-mcp/uv.lock,target=uv.lock \

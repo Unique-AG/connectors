@@ -89,13 +89,22 @@ def generate_operations(options: Options, target: Path) -> Path:
         if isinstance(name, ast.Name)
     ]
     exported = ["open_upstream", "Upstream", "upstream_http", "upstream_tools"]
-    names = sorted([*exported, *constants, "UpstreamError", "UpstreamSettings"])
+    credentials = ["verify_credentials"] if options.auth else []
+    names = sorted([*exported, *constants, *credentials, "UpstreamError", "UpstreamSettings"])
+    imports = [
+        f"from {options.package}.upstream.client import {', '.join(sorted(exported))}",
+        *(
+            [f"from {options.package}.upstream.sign_in import verify_credentials"]
+            if credentials
+            else []
+        ),
+        f"from {options.package}.upstream.generated.operations import {', '.join(constants)}",
+        f"from {options.package}.upstream.settings import UpstreamSettings",
+    ]
     (upstream / "__init__.py").write_text(
         f"""from mcp_openapi.upstream import UpstreamError
 
-from {options.package}.upstream.client import {", ".join(sorted(exported))}
-from {options.package}.upstream.generated.operations import {", ".join(constants)}
-from {options.package}.upstream.settings import UpstreamSettings
+{chr(10).join(imports)}
 
 __all__ = {json.dumps(names)}
 """

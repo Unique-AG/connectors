@@ -29,7 +29,7 @@ async def record_position(
         raise PositionRejectedError(
             f"Tiingo does not list {position.ticker}, so a position in it cannot be valued."
         ) from error
-    if meta.endDate is None:
+    if meta.end_date is None:
         raise PositionRejectedError(
             f"Tiingo has no prices for {position.ticker}, so a position in it cannot be valued."
         )

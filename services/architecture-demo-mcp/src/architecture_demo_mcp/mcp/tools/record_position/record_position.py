@@ -22,6 +22,7 @@ from architecture_demo_mcp.upstream import Upstream
     ),
 )
 async def record_position(
+    *,
     portfolio: PortfolioName,
     ticker: Ticker,
     quantity: Quantity,

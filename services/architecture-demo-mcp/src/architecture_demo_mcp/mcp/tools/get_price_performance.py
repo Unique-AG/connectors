@@ -20,6 +20,7 @@ from architecture_demo_mcp.upstream import Upstream
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 async def get_price_performance(
+    *,
     ticker: Ticker,
     start_date: Annotated[date, Field(description="The first day of the period, `YYYY-MM-DD`.")],
     end_date: Annotated[

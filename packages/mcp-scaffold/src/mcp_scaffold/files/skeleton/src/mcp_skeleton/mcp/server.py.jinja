@@ -3,6 +3,9 @@
     options.opens_upstream and "upstream: UpstreamSettings",
     options.opens_persistence and "open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]]",
     options.opens_upstream and "transport: httpx2.AsyncBaseTransport | None = None",
+    options.auth and "*",
+    options.auth and "auth: AuthSettings",
+    options.auth and "base_url: str",
 ] | select | join(", ") %}
 {% set resources = [
     options.opens_upstream and "upstream",
@@ -10,7 +13,7 @@
 ] | select | list %}
 {# An OpenAPI upstream shares its client with the tools served straight from the spec. #}
 {% set openers = {
-    "upstream": "open_upstream(http, upstream)" if openapi else "open_upstream(upstream, transport)",
+    "upstream": "open_upstream(http, upstream)" if openapi else ("open_upstream(upstream, transport, caller_credentials(auth_store))" if options.auth else "open_upstream(upstream, transport)"),
     "persistence": "open_persistence()",
 } %}
 {% if resources %}
@@ -21,6 +24,9 @@ from contextlib import AbstractAsyncContextManager
 {% endif %}
 from contextlib import asynccontextmanager
 {% endif %}
+{% if options.auth %}
+from functools import partial
+{% endif %}
 from importlib.metadata import version
 from pathlib import Path
 
@@ -30,13 +36,17 @@ import httpx2
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 
-{% if options.opens_persistence %}
+{% if options.auth %}
+from mcp_skeleton.mcp.auth import AuthSettings, CredentialsAuthProvider, caller_credentials
+from mcp_skeleton.persistence import Persistence
+from mcp_skeleton.shared import AuthStore
+{% elif options.opens_persistence %}
 from mcp_skeleton.persistence import Persistence
 {% endif %}
 {% if openapi %}
-from mcp_skeleton.upstream import UpstreamSettings, open_upstream, upstream_http, upstream_tools
+from mcp_skeleton.upstream import UpstreamSettings, open_upstream, upstream_http, upstream_tools{{ ", verify_credentials" if options.auth else "" }}
 {% elif options.opens_upstream %}
-from mcp_skeleton.upstream import UpstreamSettings, open_upstream
+from mcp_skeleton.upstream import UpstreamSettings, open_upstream{{ ", verify_credentials" if options.auth else "" }}
 {% endif %}
 
 INSTRUCTIONS = (
@@ -47,10 +57,25 @@ INSTRUCTIONS = (
 
 
 def create_server({{ parameters }}) -> FastMCP:
-{% if options.opens_persistence %}
+{% if options.auth %}
+    """Build the server. `open_persistence` opens every store, so the tests can open their own.
+
+    Users sign in at `base_url`, and each call reaches the upstream with the credentials of the
+    user it acts for.
+    """
+    opened: list[Persistence] = []
+
+    def auth_store() -> AuthStore:
+        assert opened, "the server lifespan opens the store before the first request"
+        return opened[-1].auth
+
+{% elif options.opens_persistence %}
     """Build the server. `open_persistence` opens every store, so the tests can open their own."""
 {% endif %}
-{% if openapi %}
+{% if openapi and options.auth %}
+    http = upstream_http(upstream, transport, caller_credentials(auth_store))
+
+{% elif openapi %}
     http = upstream_http(upstream, transport)
 
 {% endif %}
@@ -62,11 +87,23 @@ def create_server({{ parameters }}) -> FastMCP:
             {{ openers[key] }} as {{ key }}_resource,
 {% endfor %}
         ):
+{% if options.auth %}
+            opened.append(persistence_resource)
+            try:
+                yield {
+{% for key in resources %}
+                    "{{ key }}": {{ key }}_resource{{ "," if not loop.last else "" }}
+{% endfor %}
+                }
+            finally:
+                opened.remove(persistence_resource)
+{% else %}
             yield {
 {% for key in resources %}
                 "{{ key }}": {{ key }}_resource{{ "," if not loop.last else "" }}
 {% endfor %}
             }
+{% endif %}
 
 {% endif %}
     mcp = FastMCP(
@@ -78,6 +115,14 @@ def create_server({{ parameters }}) -> FastMCP:
         mask_error_details=True,
 {% if resources %}
         lifespan=lifespan,
+{% endif %}
+{% if options.auth %}
+        auth=CredentialsAuthProvider(
+            base_url=base_url,
+            settings=auth,
+            store=auth_store,
+            verify=partial(verify_credentials, upstream, transport=transport),
+        ),
 {% endif %}
     )
 {% if openapi %}

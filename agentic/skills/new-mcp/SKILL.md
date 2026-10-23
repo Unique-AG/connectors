@@ -1,6 +1,6 @@
 ---
 name: new-mcp
-description: Starts a new Python MCP server in this repo with packages/mcp-scaffold. Use whenever the user asks to create, scaffold, bootstrap or add a new MCP, MCP server or connector service in Python. Asks whether the MCP talks to an upstream (an OpenAPI spec, or one the agent writes a client for with the user, or none) and what it stores (Postgres, Redis or nothing), runs the scaffold, then writes the upstream client, the auth, the persistence and the first tool.
+description: Starts a new Python MCP server in this repo with packages/mcp-scaffold. Use whenever the user asks to create, scaffold, bootstrap or add a new MCP, MCP server or connector service in Python. Asks whether the MCP talks to an upstream (an OpenAPI spec, or one the agent writes a client for with the user, or none) what it stores (Postgres, Redis or nothing) and whether users sign in with their own upstream credentials, runs the scaffold, then writes the upstream client, the auth, the persistence and the first tool.
 metadata:
   internal: true
 ---
@@ -26,7 +26,8 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 | Name, kebab-case, ending in `-mcp` (the scaffold refuses any other) | `<name>`, the first argument: the service folder, package, chart and commit scope |
 | One or two sentences on what it does for the user | `--description`, the server instructions and the pyproject description |
 | Does it call an upstream, a system of its own such as a vendor API? If so, does it publish an OpenAPI 3.0 spec we can use? | `--upstream openapi` with `--spec`, `--upstream custom`, or no `--upstream` at all |
-| What does it store? Nothing, or any of Postgres and Redis (multi-select) | `--persistence none`, or every store chosen: `--persistence postgres redis` |
+| What does it store? Nothing, or any of Postgres and Redis (multi-select) | no `--persistence`, or every store chosen: `--persistence postgres redis` |
+| Do users sign in with their own username and password for the upstream, so each call acts as them? | `--auth credentials`, which needs an upstream and Postgres; otherwise no `--auth`, and step 4 settles the auth |
 | Will it be released and deployed, or is it an example or experiment? | nothing, or `--no-release`, which skips release-please and the release re-run list |
 
 Then ask the follow-ups for what they chose, again in one round:
@@ -43,26 +44,34 @@ Then ask the follow-ups for what they chose, again in one round:
   `upstream/` stays an empty layer until it needs one.
 - **Postgres or Redis**: what is stored, for how long, and who reads it.
 
-Auth is not a scaffold option. Every MCP starts without it, and its `run_server` refuses to
-serve beyond loopback until the server has an auth provider. Step 4 settles it with the user.
+`--auth credentials` is the one sign-in the scaffold writes: the MCP is the OAuth server its
+clients use, each user signs in on its `/sign-in` page with their credentials for the upstream,
+which the upstream checks, and every call reaches the upstream as that user. Any other auth, such
+as Zitadel or a machine token, step 4 settles with the user. Without `--auth`, `run_server`
+refuses to serve beyond loopback until the server has an auth provider.
 
 ## 2. Scaffold
 
 From the repository root:
 
 ```bash
-uv run --project packages/mcp-scaffold mcp-scaffold new <name> \
+uv run --project packages/mcp-scaffold mcp-scaffold <name> \
     --description "<description>" [--upstream openapi|custom] [--spec <path or URL>] \
-    --persistence <kind>... [--no-release]
+    [--persistence postgres|redis ...] [--auth credentials] [--no-release]
 ```
 
 It refuses to start unless `git status` is clean, untracked files included. Ask the user to
 commit or stash their changes; never do it for them. It ends by running `uv sync`, ruff, the
 codegen's drift check for an OpenAPI upstream, basedpyright, import-linter,
-`mcp-architecture-check` and pytest in the new service, and fails loudly if any of them does. Since it
+`poe architecture` and pytest in the new service, and fails loudly if any of them does. Since it
 started from a clean tree, everything it wrote is its own: a failed run prints the command that
 undoes it, `git checkout . && git clean -fdx services/<name>`, to run from the repository root. It
 also removes the service's ignored `.venv` and caches, which would otherwise stop the next run.
+
+When a check fails, here or in any later change, fix the code. Never loosen a rule in
+`pyproject.toml`, a contract or a file-wide comment to make it pass: CI checks only what that
+configuration says, so loosening it hides the failure instead of fixing it. If no fix works, stop
+and ask the user.
 
 Every file it writes starts with a `mcp-scaffold-commit: <commit>, timestamp: <when>` comment,
 the same in every file of the run. Leave it in place on a file you edit. Never add one to a file
@@ -71,7 +80,7 @@ scaffold file you rewrite from scratch: the stamp marks what the scaffold wrote,
 did.
 
 It records the first `tests/tool_surface.generated.json`. Prefer a spec URL over a downloaded
-file: it becomes `spec-source`, so `uv run mcp-openapi-codegen --refresh-spec` can fetch the
+file: it becomes `spec-source`, so `uv run poe codegen --refresh-spec` can fetch the
 vendor's next version. The scaffold runs once: every file it wrote is the service's own from
 here on, `mcp/server.py`, `mcp/http.py`, `mcp/middleware.py` and `telemetry/setup.py` included.
 
@@ -149,7 +158,21 @@ provides them.
 
 ## 4. Settle the auth
 
-Ask the user, in one round: who uses the MCP and how they sign in (Unique's Zitadel, another
+**Scaffolded with `--auth credentials`**: the sign-in works as it is, with HTTP Basic auth and a
+username and password. Shape three things to the upstream, and nothing in `mcp/auth/` or
+`persistence/auth/` unless the user asks:
+
+- `auth_for` in `upstream/credentials.py`: how a request is signed with a user's credentials,
+  such as a header of the vendor's own in place of Basic auth. The sign-in check and every call
+  go through it.
+- `UpstreamCredentials` in `shared/contracts/auth.py`: what the upstream needs per user. A field
+  added there needs a column in `persistence/auth/` and a field on the sign-in form.
+- `UPSTREAM_VERIFY_PATH`: a GET the upstream answers 401 or 403 to wrong credentials.
+
+`guides/auth.md` in `packages/mcp-architecture` says which layer owns what, and how a request
+takes credentials of its own. Set `MCP_AUTH_ENCRYPTION_KEY` in the overlay's secrets.
+
+**Otherwise**, ask the user, in one round: who uses the MCP and how they sign in (Unique's Zitadel, another
 OIDC or OAuth provider, a static token for a machine client, or nobody because it stays local),
 and whether the upstream needs the signed-in user's own credentials or only the MCP's.
 
@@ -162,7 +185,8 @@ If it stays local, leave it: `run_server` keeps it on loopback. Otherwise write 
    `StaticTokenVerifier`, the introspection verifier, `OAuthProxy`, `OIDCProxy`, and the
    providers under `fastmcp.server.auth.providers`. For Zitadel, use
    `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`, configured by the environment
-   `ZitadelSettings` in `mcp-configs` reads. If one of them does the job, pass it to
+   `ZitadelSettings` in `mcp-configs` reads; the scaffold does not add `unique-mcp`, so add it
+   with the version `architecture-demo-mcp` pins. If one of them does the job, pass it to
    `FastMCP(auth=...)` in `create_server` and write nothing else.
 2. **Our code in `mcp/auth/`.** Only what FastMCP and `unique_mcp` lack goes there, exported
    from `mcp/auth/__init__.py`. Its settings are built on `shared_config` and passed in from
@@ -214,10 +238,8 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
   does not write one.
 - If you changed `values.additional.schema.json`, run `scripts/render-values-schema.sh`.
 - Each tool you added or served changes the tool surface. Read the diff
-  `uv run mcp-architecture-check` prints, then accept it with
-  `uv run mcp-architecture-check --update`.
-- Run `bash scripts/check-python-service.sh services/<name>` from the repository root: every
-  check CI runs, in its order.
+  `uv run poe architecture` prints, then accept it with `uv run poe surface`.
+- Run `uv run poe ci` in `services/<name>`: every check CI runs, in its order.
 - Tell the user what is registered and what is still theirs to do:
   - Registered: the `<name>` commit scope, and release-please and release-rerun unless it ran
     with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.

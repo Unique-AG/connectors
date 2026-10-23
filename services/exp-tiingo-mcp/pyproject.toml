@@ -74,6 +74,8 @@ response-operation-ids = "tiingo_mcp.openapi.routes:RESPONSE_MODELS"
 # Operations the tools call through `OperationClient`, one `Operation` constant each.
 operation-ids = "tiingo_mcp.openapi.routes:CLIENT_BACKED"
 fields = "tiingo_mcp.openapi.fields:RESPONSE_FIELDS"
+# The tools return vendor models to clients, which see the spec's field names.
+snake-case-fields = false
 operation-module = "mcp_openapi.upstream"
 models-module = "tiingo_mcp.models.vendor_responses"
 models-output = "src/tiingo_mcp/models/vendor_responses.py"

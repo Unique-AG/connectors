@@ -17,7 +17,7 @@ from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
 from mcp_scaffold import commands, openapi
 from mcp_scaffold.commands import run
 from mcp_scaffold.openapi import VendorSpec
-from mcp_scaffold.options import Options, Persistence, Upstream
+from mcp_scaffold.options import Auth, Options, Persistence, Upstream
 from mcp_scaffold.pins import pinned
 from mcp_scaffold.repository import register
 from mcp_scaffold.scaffold import load_spec, scaffold
@@ -86,20 +86,31 @@ def repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return repo
 
 
-def probe(upstream: Upstream | None, persistence: set[Persistence]) -> Options:
+def probe(
+    upstream: Upstream | None, persistence: set[Persistence], auth: Auth | None = None
+) -> Options:
     return Options(
-        name="-".join(["probe", upstream or "none", *sorted(persistence or {"none"}), "mcp"]),
+        name="-".join(
+            [
+                "probe",
+                upstream or "none",
+                *sorted(persistence or {"none"}),
+                *(["auth"] if auth else []),
+                "mcp",
+            ]
+        ),
         description="Answers questions about the probe upstream, a stand-in for a vendor API "
         "that is long enough to wrap onto a second line of the server instructions.",
         upstream=upstream,
         spec="weather.json" if upstream is Upstream.OPENAPI else None,
         persistence=frozenset(persistence),
+        auth=auth,
     )
 
 
 # Each upstream and each store appears at least once, and the stores once together. The first
 # opens nothing, so its server has no lifespan; the next two open only an upstream or only a
-# store. The last is every option at once: an OpenAPI upstream with Postgres and Redis.
+# store. Then an OpenAPI upstream with Postgres and Redis, and the sign-in over each upstream.
 PROBES = {
     options.name: options
     for options in [
@@ -109,6 +120,8 @@ PROBES = {
         probe(Upstream.CUSTOM, {Persistence.POSTGRES}),
         probe(Upstream.CUSTOM, {Persistence.POSTGRES, Persistence.REDIS}),
         probe(Upstream.OPENAPI, {Persistence.POSTGRES, Persistence.REDIS}),
+        probe(Upstream.CUSTOM, {Persistence.POSTGRES}, Auth.CREDENTIALS),
+        probe(Upstream.OPENAPI, {Persistence.POSTGRES}, Auth.CREDENTIALS),
     ]
 }
 # The commit a run is stamped with, which the CLI reads from git.
@@ -202,6 +215,31 @@ def test_a_new_migration_keeps_the_code_style(scaffolded: Scaffolded, use_venv: 
         [["uv", "run", "ruff", "format", "--check", "."], ["uv", "run", "ruff", "check", "."]],
         service,
     )
+
+
+@pytest.mark.parametrize("name", PROBES)
+def test_the_image_copies_every_shared_package_the_mcp_runs_with(
+    scaffolded: Scaffolded, name: str
+) -> None:
+    """The image installs the runtime dependencies alone, from the paths `[tool.uv.sources]`
+    names, so each must be copied in before `uv sync`."""
+    target = scaffolded(name)
+    pyproject = cast(
+        dict[str, dict[str, object]], tomllib.loads((target / "pyproject.toml").read_text())
+    )
+    sources = cast(dict[str, dict[str, object]], pyproject["tool"]["uv"])["sources"]
+    runtime = {
+        re.split(r"[\[=<>]", dependency, maxsplit=1)[0]
+        for dependency in cast(list[str], pyproject["project"]["dependencies"])
+    }
+    dockerfile = (target / "deploy" / "Dockerfile").read_text()
+
+    missing = [
+        package
+        for package in sorted(runtime & sources.keys())
+        if f"COPY packages/{package} /workspace/packages/{package}\n" not in dockerfile
+    ]
+    assert missing == []
 
 
 @pytest.mark.parametrize("name", ["probe-none-none-mcp", "probe-none-redis-mcp"])
@@ -460,7 +498,10 @@ def test_a_name_a_removed_service_left_its_scope_under_is_listed_once(tmp_path: 
     assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
 
 
-@pytest.mark.parametrize("name", ["probe-openapi-none-mcp", "probe-custom-postgres-redis-mcp"])
+@pytest.mark.parametrize(
+    "name",
+    ["probe-openapi-none-mcp", "probe-custom-postgres-redis-mcp", "probe-custom-postgres-auth-mcp"],
+)
 def test_every_file_the_scaffold_wrote_carries_the_same_stamp(
     scaffolded: Scaffolded, name: str
 ) -> None:
@@ -505,11 +546,14 @@ def test_the_stamp_follows_a_line_that_has_to_stay_first(tmp_path: Path) -> None
     dockerfile.write_text("# syntax=docker/dockerfile:1.7\n\nFROM python\n")
     script = tmp_path / "render.sh"
     script.write_text("#!/bin/bash\nhelm template\n")
+    page = tmp_path / "login.html"
+    page.write_text("<!doctype html>\n<html></html>\n")
 
     assert (
         stamped(dockerfile, "stamp") == "# syntax=docker/dockerfile:1.7\n# stamp\n\nFROM python\n"
     )
     assert stamped(script, "stamp") == "#!/bin/bash\n# stamp\nhelm template\n"
+    assert stamped(page, "stamp") == "<!doctype html>\n{# stamp #}\n<html></html>\n"
 
 
 @pytest.mark.parametrize(
@@ -534,6 +578,17 @@ def test_the_stamp_is_a_comment_in_the_files_own_syntax(
     path.write_text(text)
 
     assert stamped(path, "stamp") == expected
+
+
+@pytest.mark.parametrize(
+    ("upstream", "persistence"),
+    [(None, {Persistence.POSTGRES}), (Upstream.CUSTOM, {Persistence.REDIS})],
+)
+def test_credentials_need_an_upstream_and_postgres(
+    upstream: Upstream | None, persistence: set[Persistence]
+) -> None:
+    with pytest.raises(ValidationError, match="--auth credentials needs an --upstream"):
+        probe(upstream, persistence, Auth.CREDENTIALS)
 
 
 def test_a_file_without_a_known_comment_syntax_fails_the_stamp(tmp_path: Path) -> None:

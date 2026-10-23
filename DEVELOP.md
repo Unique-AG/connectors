@@ -69,16 +69,18 @@ pnpm install --frozen-lockfile          # once, from the repo root, for biome
 bash scripts/check-python-service.sh services/<service>
 ```
 
+In a scaffolded MCP, `uv run poe ci` runs the same script, and `uv run poe` lists the task for
+each check.
+
 It runs, in this order:
 
 1. `uv sync --locked`
 2. the generated-code drift checks, in a service that has a generator
-3. `uv run ruff format --check .` and `uv run ruff check .`, or, in a service whose
-   `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one that keeps
-   `packages/mcp-architecture/ARCHITECTURE.md`, `uv run mcp-architecture-lint`
+3. `uv run ruff format --check .` and `uv run ruff check .`
 4. `pnpm exec biome check .` and `uv run basedpyright`
-5. in such a service, `uv run mcp-architecture-imports`, then `uv run mcp-architecture-check`.
-   `ARCHITECTURE.md` lists what each enforces
+5. in a service whose `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one
+   that keeps `packages/mcp-architecture/ARCHITECTURE.md`, `uv run lint-imports`, then
+   `uv run poe architecture`. `ARCHITECTURE.md` lists what each enforces
 6. `uv run pytest`
 
 Every check runs even after one fails, and the run ends with the list of those that failed, so one
@@ -90,10 +92,11 @@ is a plain `uv run` command, so you can also run one alone from the service's fo
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
-the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs` and
-`packages/mcp-architecture` work the same way. `packages/mcp-scaffold` also runs for a change to
-`packages/mcp-configs`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the MCPs its
-tests generate use all three: the last for an OpenAPI upstream. It runs as well for a change to a
+the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs`,
+`packages/mcp-observability` and `packages/mcp-architecture` work the same way.
+`packages/mcp-scaffold` also runs for a change to `packages/mcp-configs`,
+`packages/mcp-observability`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the
+MCPs its tests generate use all four: the last for an OpenAPI upstream. It runs as well for a change to a
 file it registers a new MCP in by matching its text: `.gitcommitizen`,
 `release-please-config.json`, `.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
 and for a change to the workflow files that list every service.

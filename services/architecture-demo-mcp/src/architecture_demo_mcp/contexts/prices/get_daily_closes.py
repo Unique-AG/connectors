@@ -41,12 +41,12 @@ def _daily_close(*, bar: DailyPriceBar) -> DailyClose | None:
     """None for a bar Tiingo sent half-filled or without a positive close, which no figure can
     use, since every return and weight divides by a close.
     """
-    if bar.date is None or bar.adjClose is None or bar.adjClose <= 0:
+    if bar.date is None or bar.adj_close is None or bar.adj_close <= 0:
         return None
     # Tiingo sends a date as midnight UTC, such as 2026-10-19T00:00:00.000Z.
     return DailyClose(
         date=date.fromisoformat(bar.date[:10]),
-        close=bar.adjClose,
-        high=bar.adjHigh,
-        low=bar.adjLow,
+        close=bar.adj_close,
+        high=bar.adj_high,
+        low=bar.adj_low,
     )

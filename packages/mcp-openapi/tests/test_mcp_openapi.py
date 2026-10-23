@@ -769,6 +769,7 @@ def models_for(
     operation_ids: list[str],
     fields: dict[str, tuple[str, ...]] | None = None,
     allow_extra_fields: bool = False,
+    snake_case_fields: bool = True,
 ) -> str:
     spec = tmp_path / "spec.yml"
     spec.write_text(spec_text)
@@ -778,6 +779,7 @@ def models_for(
         operation_ids=operation_ids,
         fields=fields,
         allow_extra_fields=allow_extra_fields,
+        snake_case_fields=snake_case_fields,
         output=output,
     )
     return output.read_text()
@@ -809,6 +811,45 @@ def test_a_field_cut_by_fields_stays_as_an_extra_when_extra_fields_are_kept(
     models_for(tmp_path, SPEC, ["getThing"], fields={"Thing": ("name",)}, allow_extra_fields=True)
     assert "secret" not in _model(tmp_path, "Thing").model_fields
     assert validated(tmp_path, "Thing", {"name": "a", "secret": "s"})["secret"] == "s"
+
+
+CASED_SPEC = """
+openapi: 3.0.3
+info: {title: t, version: "1"}
+paths:
+  /bar:
+    get:
+      operationId: getBar
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Bar"}
+components:
+  schemas:
+    Bar:
+      type: object
+      properties:
+        adjClose: {type: number}
+        start-date: {type: string}
+"""
+
+
+def test_fields_are_snake_case_validate_from_the_spec_names_and_dump_back_to_them(
+    tmp_path: Path,
+) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"])
+    bar = _model(tmp_path, "Bar").model_validate({"adjClose": 1.5, "start-date": "2024-01-02"})
+
+    assert bar.model_dump() == {"adj_close": 1.5, "start_date": "2024-01-02"}
+    assert bar.model_dump(by_alias=True) == {"adjClose": 1.5, "start-date": "2024-01-02"}
+
+
+def test_fields_keep_the_spec_names_when_snake_case_is_turned_off(tmp_path: Path) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"], snake_case_fields=False)
+
+    assert set(_model(tmp_path, "Bar").model_fields) == {"adjClose", "start_date"}
 
 
 STRICT_SPEC = """

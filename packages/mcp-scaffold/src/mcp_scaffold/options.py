@@ -1,5 +1,5 @@
-"""What a new MCP asks for: its name, what it talks to and what it stores. Auth is not asked:
-the `new-mcp` skill works it out with the user once the MCP exists."""
+"""What a new MCP asks for: its name, what it talks to, what it stores and how its users sign in.
+Any other auth the `new-mcp` skill works out with the user once the MCP exists."""
 
 import re
 from enum import StrEnum
@@ -21,6 +21,13 @@ class Persistence(StrEnum):
     REDIS = "redis"
 
 
+class Auth(StrEnum):
+    """`credentials`: each user signs in with their own username and secret for the upstream,
+    which the MCP verifies with it, keeps encrypted in Postgres, and sends on that user's calls."""
+
+    CREDENTIALS = "credentials"
+
+
 class Options(BaseModel):
     name: str
     description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -29,7 +36,9 @@ class Options(BaseModel):
     # The vendor's OpenAPI spec, a path or an http(s) URL. Only an OpenAPI upstream has one.
     spec: str | None = None
     # Empty when the MCP stores nothing.
-    persistence: frozenset[Persistence]
+    persistence: frozenset[Persistence] = frozenset()
+    # None when the MCP starts without sign-in.
+    auth: Auth | None = None
 
     @field_validator("name")
     @classmethod
@@ -57,6 +66,17 @@ class Options(BaseModel):
     def _spec_only_for_openapi(self) -> Self:
         if (self.upstream is Upstream.OPENAPI) != (self.spec is not None):
             raise ValueError("--spec goes with --upstream openapi, and only it")
+        return self
+
+    @model_validator(mode="after")
+    def _credentials_need_an_upstream_and_postgres(self) -> Self:
+        if self.auth is Auth.CREDENTIALS and (
+            self.upstream is None or Persistence.POSTGRES not in self.persistence
+        ):
+            raise ValueError(
+                "--auth credentials needs an --upstream to check them with, and --persistence "
+                "postgres to keep them in"
+            )
         return self
 
     @property

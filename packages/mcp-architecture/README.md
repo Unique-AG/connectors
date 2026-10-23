@@ -30,7 +30,7 @@ extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
 extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
 ```
 
-The scaffold writes this, a `[tool.importlinter]` for the MCP's own contracts, and
+The scaffold writes this, a `[tool.importlinter]` with the contracts every MCP keeps, and
 `tests/offline_server.py`, whose `offline_server()` builds the server with fakes in place of the
 upstream and the stores.
 
@@ -40,26 +40,25 @@ upstream and the stores.
   checks it, plus the APIs a past fix replaced.
 - `type_check.json`: basedpyright's `all` mode, with the reports every MCP turns off. An MCP's
   `[tool.basedpyright]` extends it.
-- `render_importlinter(package)`: the contracts every MCP keeps, as TOML.
+- `render_importlinter(package)`: the contracts every MCP keeps, as the TOML the scaffold writes
+  to its `[tool.importlinter]`.
 - `FeaturePrivacyContract`: the one contract type of our own, which the rendered contracts
   register.
-- Three commands, which CI runs in the MCP's folder:
-  - `mcp-architecture-lint [--fix]`: ruff with `code_style.toml` as `--config`, then with the
-    MCP's own configuration.
-  - `mcp-architecture-imports`: import-linter on the rendered contracts, then on the MCP's own.
-  - `mcp-architecture-check [--update]`: the checks no tool runs. `--update` writes
-    `tests/tool_surface.generated.json` instead of comparing with it.
+- `mcp_architecture.check.main`, which an MCP's `architecture` poe task runs and CI with it: the
+  checks no tool runs. Its `surface` task passes `update=True`, which writes
+  `tests/tool_surface.generated.json` instead of comparing with it.
 
-[Where each rule is configured](guides/configuration.md) explains the first two,
+[Where each rule is configured](guides/configuration.md) explains the configuration,
 [the rules in `ARCHITECTURE.md`](ARCHITECTURE.md#the-rules) list what each command enforces, and
 [`CUSTOM_CHECKS.md`](CUSTOM_CHECKS.md) why the code is ours.
 
 ## Working on the package from a service
 
-basedpyright reads `type_check.json` from this folder, so an edit there reaches a service at once.
-A service installs the rest as a copy, `code_style.toml` and the contracts included, so an edit
-to them reaches its commands only after `uv sync --reinstall-package mcp-architecture` in the
-service.
+ruff and basedpyright read `code_style.toml` and `type_check.json` from this folder, so an edit
+there reaches a service at once. The contracts are written into each MCP's `[tool.importlinter]`
+when it is scaffolded, so a change to `contracts.py` reaches an existing MCP only through an edit
+of that table. A service installs the rest as a copy, so an edit to it reaches its commands only
+after `uv sync --reinstall-package mcp-architecture` in the service.
 
 ## Checks
 
@@ -68,9 +67,7 @@ lists the steps. Here:
 
 ```sh
 uv sync
-uv run pytest
-uv run ruff check . && uv run ruff format --check .
-uv run basedpyright
+uv run poe ci     # ruff format --check, ruff check, basedpyright, pytest
 ```
 
 CI runs the same sequence here, and every service that depends on the package.

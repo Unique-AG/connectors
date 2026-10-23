@@ -22,9 +22,11 @@ def dependencies(options: Options, repo: Path) -> Dependencies:
     runtime = [
         *pinned("service"),
         shared(repo, "mcp-configs"),
+        shared(repo, "mcp-observability"),
         *([shared(repo, "mcp-openapi")] if uses_mcp_openapi else []),
         *(pinned("service-openapi") if openapi else []),
         *(dependency for store in options.stores for dependency in pinned(f"service-{store}")),
+        *(pinned("service-auth") if options.auth is not None else []),
     ]
     dev = [
         *pinned("service-dev"),
@@ -35,5 +37,10 @@ def dependencies(options: Options, repo: Path) -> Dependencies:
     return Dependencies(
         runtime=sorted(runtime),
         dev=sorted(dev),
-        shared=["mcp-architecture", "mcp-configs", *(["mcp-openapi"] if uses_mcp_openapi else [])],
+        shared=[
+            "mcp-architecture",
+            "mcp-configs",
+            "mcp-observability",
+            *(["mcp-openapi"] if uses_mcp_openapi else []),
+        ],
     )

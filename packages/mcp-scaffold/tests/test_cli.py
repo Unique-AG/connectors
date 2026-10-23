@@ -10,14 +10,7 @@ from mcp_scaffold import cli, commands
 from mcp_scaffold.cli import main
 from tests.conftest import REGISTRIES, REPO, UseVenv, copy_registries, run_linked
 
-VALID_ARGUMENTS = [
-    "--description",
-    "Probes.",
-    "--upstream",
-    "custom",
-    "--persistence",
-    "none",
-]
+VALID_ARGUMENTS = ["--description", "Probes.", "--upstream", "custom"]
 
 
 @pytest.fixture
@@ -55,7 +48,7 @@ def read_registries(repo: Path) -> dict[str, str]:
 
 
 def refusal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], *argv: str) -> str:
-    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "new", *argv])
+    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", *argv])
 
     with pytest.raises(SystemExit) as exit_info:
         main()
@@ -70,7 +63,6 @@ def refusal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
         ("weather", "name: must be kebab-case and end in -mcp"),
         ("Weather-mcp", "name: must be kebab-case and end in -mcp"),
         ("weather--mcp", "name: must be kebab-case and end in -mcp"),
-        ("unique-mcp", "unique-mcp would shadow the package of that name"),
         ("shared-mcp", "shared-mcp would shadow the package of that name"),
         ("guides-mcp", "guides-mcp is already the commit scope of docs/guides-mcp/**"),
         ("taken-mcp", "services/taken-mcp already exists"),
@@ -88,13 +80,14 @@ def test_a_name_that_cannot_be_a_service_is_refused(
 @pytest.mark.parametrize(
     ("arguments", "message"),
     [
-        (
-            ["--persistence", "none", "redis"],
-            "--persistence none cannot be combined with a store",
-        ),
         (["--spec", "weather.json"], "--spec goes with --upstream openapi, and only it"),
+        (
+            ["--auth", "credentials"],
+            "--auth credentials needs an --upstream to check them with, and --persistence "
+            "postgres to keep them in",
+        ),
     ],
-    ids=["none with a store", "a spec with a custom upstream"],
+    ids=["a spec with a custom upstream", "credentials without postgres"],
 )
 @pytest.mark.usefixtures("repo")
 def test_options_that_contradict_each_other_are_refused(
@@ -110,7 +103,7 @@ def test_options_that_contradict_each_other_are_refused(
 def test_a_spec_without_an_upstream_is_refused(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    arguments = ["--description", "Probes.", "--persistence", "none", "--spec", "weather.json"]
+    arguments = ["--description", "Probes.", "--spec", "weather.json"]
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *arguments)
 
@@ -131,14 +124,25 @@ def test_an_untracked_file_refuses_the_run_whatever_git_is_told_to_show(
     assert not (repo / "services" / "weather-mcp").exists()
 
 
-def test_a_run_outside_the_repository_root_is_refused(
+def test_a_git_repository_other_than_this_one_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     monkeypatch.chdir(tmp_path)
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS)
 
-    assert "run mcp-scaffold from the repository root" in error
+    assert "run mcp-scaffold inside the connectors repository" in error
+
+
+def test_a_run_from_a_folder_inside_the_repository_finds_its_root(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(repo / "services")
+
+    error = refusal(monkeypatch, capsys, "taken-mcp", *VALID_ARGUMENTS)
+
+    assert "services/taken-mcp already exists" in error
 
 
 def test_a_run_outside_a_git_repository_is_refused(
@@ -150,7 +154,7 @@ def test_a_run_outside_a_git_repository_is_refused(
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *VALID_ARGUMENTS)
 
-    assert "git cannot tell whether the tree is clean" in error
+    assert "run mcp-scaffold inside the repository" in error
     assert not (tmp_path / "services" / "weather-mcp").exists()
 
 
@@ -187,7 +191,7 @@ def test_a_spec_the_scaffold_cannot_use_is_refused_before_anything_is_written(
         outside = tmp_path_factory.mktemp("specs") / spec
         outside.write_text(content)
         spec = str(outside)
-    arguments = ["--description", "Probes.", "--upstream", "openapi", "--persistence", "none"]
+    arguments = ["--description", "Probes.", "--upstream", "openapi"]
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *arguments, "--spec", spec)
 
@@ -198,7 +202,7 @@ def test_a_spec_the_scaffold_cannot_use_is_refused_before_anything_is_written(
 def test_a_description_with_a_newline_is_refused(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], repo: Path
 ) -> None:
-    arguments = ["--description", "Two\nlines.", "--persistence", "none"]
+    arguments = ["--description", "Two\nlines."]
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *arguments)
 
@@ -226,7 +230,7 @@ def test_an_untracked_spec_in_the_repository_is_named_in_the_refusal(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (repo / "weather.yml").write_text("openapi: 3.0.3\n")
-    arguments = ["--description", "Probes.", "--upstream", "openapi", "--persistence", "none"]
+    arguments = ["--description", "Probes.", "--upstream", "openapi"]
 
     error = refusal(monkeypatch, capsys, "weather-mcp", *arguments, "--spec", "weather.yml")
 
@@ -251,7 +255,7 @@ def test_a_failed_check_prints_how_to_undo_the_run(monkeypatch: pytest.MonkeyPat
         raise subprocess.CalledProcessError(1, ["uv", "run", "pytest", "-q"])
 
     monkeypatch.setattr(cli, "scaffold", failing_scaffold)
-    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "new", "weather-mcp", *VALID_ARGUMENTS])
+    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "weather-mcp", *VALID_ARGUMENTS])
 
     with pytest.raises(SystemExit) as exit_info:
         main()
@@ -270,7 +274,7 @@ def test_any_other_failure_prints_how_to_undo_the_run_and_is_raised(
         raise AssertionError("pnpm-workspace.yaml excludes no Python service")
 
     monkeypatch.setattr(cli, "scaffold", failing_scaffold)
-    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "new", "weather-mcp", *VALID_ARGUMENTS])
+    monkeypatch.setattr(sys, "argv", ["mcp-scaffold", "weather-mcp", *VALID_ARGUMENTS])
 
     with pytest.raises(AssertionError, match="excludes no Python service"):
         main()
@@ -296,7 +300,7 @@ def test_a_run_without_a_release_registers_the_mcp_but_no_release(
     use_venv("probe-cli-mcp")
     monkeypatch.setattr(commands, "run", run_linked)
     monkeypatch.setattr(
-        sys, "argv", ["mcp-scaffold", "new", "probe-cli-mcp", *VALID_ARGUMENTS, "--no-release"]
+        sys, "argv", ["mcp-scaffold", "probe-cli-mcp", *VALID_ARGUMENTS, "--no-release"]
     )
 
     main()

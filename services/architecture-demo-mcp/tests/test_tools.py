@@ -302,7 +302,7 @@ async def test_record_position_leaves_a_ticker_it_cannot_price_unpriced(
 @pytest.mark.parametrize("bound", ["quantity", "cost_basis"])
 @pytest.mark.parametrize("value", ["inf", "Infinity", "nan", 1e13])
 async def test_record_position_rejects_an_amount_without_a_finite_valuation(
-    call_tool: CallTool, persistence: Persistence, bound: str, value: object
+    *, call_tool: CallTool, persistence: Persistence, bound: str, value: object
 ) -> None:
     arguments: dict[str, object] = {
         "portfolio": "core",
@@ -318,6 +318,7 @@ async def test_record_position_rejects_an_amount_without_a_finite_valuation(
 
 
 async def test_each_signed_in_caller_sees_only_the_positions_it_records(
+    *,
     upstream_settings: UpstreamSettings,
     upstream_transport: httpx2.MockTransport,
     server_settings: ServerSettings,
@@ -336,6 +337,7 @@ async def test_each_signed_in_caller_sees_only_the_positions_it_records(
         headers: dict[str, str] | None = None,
         timeout: httpx2.Timeout | None = None,
         auth: httpx2.Auth | None = None,
+        *,
         follow_redirects: bool = False,
     ) -> httpx2.AsyncClient:
         return httpx2.AsyncClient(
@@ -370,6 +372,7 @@ async def test_each_signed_in_caller_sees_only_the_positions_it_records(
 
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer unknown-token"}])
 async def test_the_http_app_refuses_a_caller_without_a_known_token(
+    *,
     upstream_settings: UpstreamSettings,
     upstream_transport: httpx2.MockTransport,
     server_settings: ServerSettings,

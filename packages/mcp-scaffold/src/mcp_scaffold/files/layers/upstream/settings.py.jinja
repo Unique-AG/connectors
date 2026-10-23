@@ -4,7 +4,9 @@ from mcp_configs import RetrySettings
 from mcp_configs import shared_config
 from pydantic import AnyHttpUrl
 from pydantic import Field
+{% if not options.auth %}
 from pydantic import SecretStr
+{% endif %}
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -12,7 +14,13 @@ from pydantic_settings import SettingsConfigDict
 class UpstreamSettings(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = shared_config("UPSTREAM_")
 
+{% if options.auth %}
+    # Where the sign-in asks the upstream whether a user's credentials are right: any GET that
+    # answers 401 or 403 to wrong ones.
+    verify_path: str = "/"
+{% else %}
     api_key: SecretStr = Field(min_length=1)
+{% endif %}
     api_url: AnyHttpUrl = AnyHttpUrl({{ quoted(api_url) }})
     timeout_seconds: float = Field(default=30, gt=0, le=120)
     # Read from UPSTREAM_RETRY_*, with the defaults every MCP shares.
