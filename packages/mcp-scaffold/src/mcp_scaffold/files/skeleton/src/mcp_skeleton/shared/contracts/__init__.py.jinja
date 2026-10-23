@@ -1,0 +1,26 @@
+"""The types two layers agree on. See `shared/__init__.py`."""
+{% if options.auth %}
+
+from mcp_skeleton.shared.contracts.auth import (
+    AuthStore,
+    CredentialsProvider,
+    IssuedCode,
+    IssuedToken,
+    PendingSignIn,
+    RegisteredClient,
+    UpstreamCredentials,
+)
+
+__all__ = [
+    "AuthStore",
+    "CredentialsProvider",
+    "IssuedCode",
+    "IssuedToken",
+    "PendingSignIn",
+    "RegisteredClient",
+    "UpstreamCredentials",
+]
+{% else %}
+
+__all__: list[str] = []
+{% endif %}

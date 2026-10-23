@@ -7,7 +7,7 @@ nameOverride: mcp-skeleton
 fullnameOverride: mcp-skeleton
 selectorComponentLabel: server
 
-# Loki scrapes use this label to parse stderr as pino-json (unique_mcp.configure_logging).
+# Loki scrapes use this label to parse stderr as pino-json (mcp_observability.configure_logging).
 podLabels:
   logging.unique.app/format: pino-json
 

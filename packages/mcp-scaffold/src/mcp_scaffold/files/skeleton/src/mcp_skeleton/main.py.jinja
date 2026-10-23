@@ -12,7 +12,11 @@ from mcp_configs import LoggingSettings, ServerSettings, from_environment
 from mcp_configs import LoggingSettings, ServerSettings
 {% endif %}
 
+{% if options.auth %}
+from mcp_skeleton.mcp import AuthSettings, create_server, run_server
+{% else %}
 from mcp_skeleton.mcp import create_server, run_server
+{% endif %}
 {% if options.opens_persistence %}
 from mcp_skeleton.persistence import PersistenceSettings, open_persistence
 {% endif %}
@@ -27,8 +31,16 @@ def main() -> None:
 {% if options.opens_persistence %}
     persistence = partial(open_persistence, PersistenceSettings())
 {% endif %}
+{% if options.auth %}
+    server_settings = ServerSettings()
+    server = create_server(
+        {{ settings }}, auth=AuthSettings(), base_url=server_settings.base_url
+    )
+    run_server(server, server_settings)
+{% else %}
     server = create_server({{ settings }})
     run_server(server, ServerSettings())
+{% endif %}
 
 
 if __name__ == "__main__":

@@ -7,17 +7,17 @@ from pathlib import Path
 
 def check(target: Path, *, openapi: bool) -> None:
     """Format the generated code, then check it as `scripts/check-python-service.sh` does, but
-    for biome. The generator leaves layout to ruff, and `mcp-architecture-check` records the first
+    for biome. The generator leaves layout to ruff, and `poe surface` records the first
     tool surface snapshot."""
     run(
         [
             ["uv", "sync"],
-            ["uv", "run", "mcp-architecture-lint", "--fix"],
-            *([["uv", "run", "mcp-openapi-codegen", "--check"]] if openapi else []),
-            ["uv", "run", "basedpyright"],
-            ["uv", "run", "mcp-architecture-imports"],
-            ["uv", "run", "mcp-architecture-check", "--update"],
-            ["uv", "run", "pytest", "-q"],
+            ["uv", "run", "poe", "fix"],
+            *([["uv", "run", "poe", "codegen", "--check"]] if openapi else []),
+            ["uv", "run", "poe", "typecheck"],
+            ["uv", "run", "poe", "imports"],
+            ["uv", "run", "poe", "surface"],
+            ["uv", "run", "poe", "test", "-q"],
         ],
         target,
     )

@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 from importlinter.application.output import console
+from importlinter.cli import lint_imports
 
-from mcp_architecture.imports import check_imports
+from mcp_architecture import render_importlinter
 
 SHOP = {
     "__init__.py": "",
@@ -40,22 +41,18 @@ SHOP = {
         "class Upstream:\n    name = 'upstream'\n"
     ),
     "persistence/__init__.py": "",
-    "utils/__init__.py": "",
+    "shared/__init__.py": "",
+    "shared/contracts/__init__.py": "",
     "telemetry/__init__.py": "",
 }
-
-PROJECT = '[project]\nname = "shop"\n\n'
 
 
 @pytest.fixture
 def shop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A service that keeps the contracts, its package `shop` under `src`, with no contract of
-    its own."""
+    """A service whose package `shop` under `src` keeps the contracts the scaffold writes."""
     for relative, text in SHOP.items():
         write(tmp_path, relative, text)
-    (tmp_path / "pyproject.toml").write_text(
-        f'{PROJECT}[tool.importlinter]\nroot_package = "shop"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text(render_importlinter("shop"))
     monkeypatch.setattr(sys, "path", [str(tmp_path / "src"), *sys.path])
     importlib.invalidate_caches()
     return tmp_path
@@ -70,7 +67,9 @@ def write(root: Path, relative: str, text: str) -> None:
 def broken_contracts(root: Path) -> str:
     """import-linter's report, with its lines unwrapped, or nothing when every contract holds."""
     with console.capture() as captured:
-        exit_code = check_imports(root)
+        exit_code = lint_imports(
+            config_filename=str(root / "pyproject.toml"), no_cache=True, no_logo=True
+        )
     return "" if exit_code == 0 else " ".join(captured.get().split())
 
 
@@ -171,7 +170,7 @@ def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract
 
 
 @pytest.mark.parametrize(
-    "layer", ["contexts/orders/errors.py", "persistence/errors.py", "utils/errors.py"]
+    "layer", ["contexts/orders/errors.py", "persistence/errors.py", "shared/errors.py"]
 )
 @pytest.mark.parametrize(
     ("statement", "package"),
@@ -180,45 +179,65 @@ def test_packages_inside_a_layer_importing_each_other_break_the_acyclic_contract
         ("from mcp_types import ToolAnnotations", "mcp_types"),
     ],
 )
-def test_the_domain_the_storage_or_utils_importing_mcp_breaks_the_contract(
+def test_the_domain_the_storage_or_shared_importing_mcp_breaks_the_contract(
     shop: Path, layer: str, statement: str, package: str
 ) -> None:
     write(shop, layer, f"{statement}\n")
 
     report = broken_contracts(shop)
 
-    assert "The domain, the storage and utils know nothing about MCP" in report
+    assert "The domain, the storage and shared know nothing about MCP" in report
     assert f"-> {package}" in report
 
 
-def test_the_domain_reaching_mcp_through_utils_breaks_the_contract(shop: Path) -> None:
-    write(shop, "utils/__init__.py", "from fastmcp.exceptions import ToolError\n")
-    write(shop, "contexts/orders/errors.py", "from shop.utils import ToolError\n")
+def test_the_domain_reaching_mcp_through_shared_breaks_the_contract(shop: Path) -> None:
+    write(shop, "shared/__init__.py", "from fastmcp.exceptions import ToolError\n")
+    write(shop, "contexts/orders/errors.py", "from shop.shared import ToolError\n")
 
     report = broken_contracts(shop)
 
-    assert "The domain, the storage and utils know nothing about MCP" in report
-    assert "shop.utils -> fastmcp" in report
+    assert "The domain, the storage and shared know nothing about MCP" in report
+    assert "shop.shared -> fastmcp" in report
 
 
 @pytest.mark.parametrize("layer", ["mcp", "contexts", "upstream", "persistence"])
-def test_every_layer_above_utils_may_use_it(shop: Path, layer: str) -> None:
-    write(shop, "utils/__init__.py", "import shop.telemetry\n")
-    write(shop, f"{layer}/helpers.py", "import shop.utils\n")
+def test_every_layer_above_shared_may_use_it(shop: Path, layer: str) -> None:
+    write(shop, "shared/__init__.py", "import shop.telemetry\n")
+    write(shop, f"{layer}/helpers.py", "import shop.shared\n")
 
     assert broken_contracts(shop) == ""
 
 
 @pytest.mark.parametrize("layer", ["mcp", "contexts", "upstream", "persistence"])
-def test_utils_importing_a_layer_above_it_breaks_the_layers_contract(
+def test_shared_importing_a_layer_above_it_breaks_the_layers_contract(
     shop: Path, layer: str
 ) -> None:
-    write(shop, "utils/__init__.py", f"import shop.{layer}\n")
+    write(shop, "shared/__init__.py", f"import shop.{layer}\n")
 
     report = broken_contracts(shop)
 
     assert "Layers only import downwards" in report
-    assert f"shop.utils -> shop.{layer}" in report
+    assert f"shop.shared -> shop.{layer}" in report
+
+
+def test_a_contract_in_shared_importing_an_implementation_breaks_the_contract(
+    shop: Path,
+) -> None:
+    write(shop, "shared/contracts/auth.py", "import httpx2\n")
+
+    report = broken_contracts(shop)
+
+    assert "The contracts in shared are types, not implementations" in report
+    assert "shop.shared.contracts.auth -> httpx2" in report
+
+
+def test_upstream_and_persistence_may_share_a_contract(shop: Path) -> None:
+    write(shop, "shared/contracts/auth.py", "class Credentials: ...\n")
+    write(shop, "shared/__init__.py", "from shop.shared.contracts.auth import Credentials\n")
+    write(shop, "upstream/auth.py", "from shop.shared import Credentials\n")
+    write(shop, "persistence/auth.py", "from shop.shared import Credentials\n")
+
+    assert broken_contracts(shop) == ""
 
 
 def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> None:
@@ -228,51 +247,3 @@ def test_a_module_outside_the_layers_breaks_the_layers_contract(shop: Path) -> N
 
     assert "Layers only import downwards" in report
     assert "shop.logic" in report
-
-
-OWN_CONTRACT = (
-    "\n[[tool.importlinter.contracts]]\n"
-    'name = "Orders know nothing about payments"\n'
-    'type = "forbidden"\n'
-    'source_modules = ["shop.contexts.orders"]\n'
-    'forbidden_modules = ["shop.contexts.payments"]\n'
-)
-ALWAYS_KEPT = (
-    "from importlinter.domain.contract import Contract, ContractCheck\n\n\n"
-    "class AlwaysKept(Contract):\n"
-    "    def check(self, graph, verbose):\n"
-    "        return ContractCheck(kept=True, warnings=[])\n\n"
-    "    def render_broken_contract(self, check): ...\n"
-)
-
-
-def test_a_broken_contract_of_the_mcps_own_breaks_the_check(shop: Path) -> None:
-    pyproject = shop / "pyproject.toml"
-    pyproject.write_text(pyproject.read_text() + OWN_CONTRACT)
-    write(shop, "contexts/payments/__init__.py", "")
-    write(shop, "contexts/orders/refund.py", "import shop.contexts.payments\n")
-
-    assert "Orders know nothing about payments" in broken_contracts(shop)
-
-
-@pytest.mark.parametrize("kind", ["layers", "feature_privacy"])
-def test_an_own_contract_type_of_a_shared_name_does_not_turn_the_shared_contract_off(
-    shop: Path, kind: str
-) -> None:
-    (shop / "src" / "shop_checks.py").write_text(ALWAYS_KEPT)
-    pyproject = shop / "pyproject.toml"
-    pyproject.write_text(
-        pyproject.read_text() + f'contract_types = ["{kind}: shop_checks.AlwaysKept"]\n'
-    )
-    write(shop, "utils/__init__.py", "import shop.mcp\n")
-
-    assert "Layers only import downwards" in broken_contracts(shop)
-
-
-def test_an_mcp_without_an_importlinter_table_still_keeps_the_shared_contracts(
-    shop: Path,
-) -> None:
-    (shop / "pyproject.toml").write_text(PROJECT)
-    write(shop, "utils/__init__.py", "import shop.mcp\n")
-
-    assert "Layers only import downwards" in broken_contracts(shop)

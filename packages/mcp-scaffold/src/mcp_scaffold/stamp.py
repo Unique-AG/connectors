@@ -58,10 +58,13 @@ _BY_NAME = dict.fromkeys(
 _BY_SUFFIX = {
     **dict.fromkeys([".py", ".toml", ".yaml", ".yml", ".ini", ".sh"], "# {}"),
     ".md": "<!-- {} -->",
+    # Every HTML page the scaffold writes is a Jinja2 template, which drops a Jinja comment.
+    ".html": "{{# {} #}}",
     ".mako": "## {}",
 }
-# A shebang, and a Dockerfile's parser directive, which BuildKit only reads before any comment.
-_FIRST_LINE_ONLY = ("#!", "# syntax=")
+# A shebang, a Dockerfile's parser directive, which BuildKit only reads before any comment, and
+# an HTML doctype, which biome only parses on the first line.
+_FIRST_LINE_ONLY = ("#!", "# syntax=", "<!doctype")
 # scripts/render-values-schema.sh writes it from the base chart's, and CI fails on any other line.
 _REGENERATED = {"values.schema.json"}
 _STAMP_COMMENT = re.compile(r"^# mcp-scaffold-[a-z]+: .*\n", flags=re.MULTILINE)

@@ -9,6 +9,12 @@ from fastmcp.server.context import Context
 {% if options.opens_persistence %}
 from mcp_skeleton.persistence import Persistence
 {% endif %}
+{% if options.auth %}
+from mcp_skeleton.mcp.auth import caller_credentials
+{% endif %}
+{% if options.auth %}
+from mcp_skeleton.shared import CredentialsProvider
+{% endif %}
 {% if options.opens_upstream %}
 from mcp_skeleton.upstream import Upstream
 {% endif %}
@@ -23,5 +29,13 @@ def get_persistence(ctx: Context = CurrentContext()) -> Persistence:
 
 def get_upstream(ctx: Context = CurrentContext()) -> Upstream:
     return cast(Upstream, ctx.lifespan_context["upstream"])
+{% endif %}
+{% if options.auth %}
+
+
+def get_credentials(ctx: Context = CurrentContext()) -> CredentialsProvider:
+    """The credentials of the user the call acts for. `Upstream` signs every request with them
+    already; this is for a request that takes them in place of the client's own."""
+    return caller_credentials(lambda: get_persistence(ctx).auth)
 {% endif %}
 {% endif %}

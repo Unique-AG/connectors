@@ -33,6 +33,7 @@ def create_server(
     upstream: UpstreamSettings,
     open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
     transport: httpx2.AsyncBaseTransport | None = None,
+    *,
     auth: AuthProvider | None = None,
 ) -> FastMCP:
     """Build the server. `open_persistence` opens every store, so the tests can open their own."""

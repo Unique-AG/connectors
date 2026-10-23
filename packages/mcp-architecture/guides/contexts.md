@@ -30,7 +30,8 @@ Start small and grow only when the code asks for it:
 
 A module reads top down: the one public function first, then the private helpers it calls, then
 its models. Python 3.14 evaluates annotations lazily, so a function may return a model defined
-below it. Every function takes keyword arguments only, so a call names what it passes:
+below it. A function takes at most three positional arguments. A context function that takes
+its stores and its input together names them all after a `*`, so a call names what it passes:
 
 ```python
 async def get_price_performance(
@@ -80,8 +81,9 @@ A context:
   `record_position` stores a holding with `save_position`, and `value_portfolio` reads them
   back with `list_positions`. It calls what `persistence` exposes, never SQLAlchemy or Redis
   directly (see [persistence](persistence.md)).
-- Returns its own pydantic models, never the upstream's. Map the vendor's field names to
-  snake_case here, so a vendor change stops at this layer.
+- Returns its own pydantic models, never the upstream's. Map the vendor's model to the
+  context's own here, keeping only what the tool needs, so a vendor change stops at this layer.
+  The codegen already names generated fields in snake_case, with the vendor's names as aliases.
 - Knows nothing about MCP. It raises its own errors for its own rules
   (`PositionRejectedError`), never a `ToolError`. An `UpstreamError` passes through it as it is:
   `upstream` made it a `ToolError` already.

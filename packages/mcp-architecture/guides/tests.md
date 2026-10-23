@@ -11,14 +11,18 @@
   Postgres behaviour, such as a timezone or a JSON column, needs a real database.
 - `tests/test_server.py` covers the ops routes, the host and origin guard, CORS and the refusal
   to serve beyond loopback without auth, through the MCP's own `http_app` and `run_server`.
+- With `--auth credentials`, `tests/test_auth.py` signs users in over HTTP end to end, through
+  registration, the sign-in page and the token exchange, and checks that each call acts for the
+  user who signed in. `tests/test_auth_store.py` covers `SqlAuthStore` on SQLite.
 - A custom upstream's `tests/test_upstream.py` covers its client: the parse into the model, the
   auth header and each retry rule, against `httpx2.MockTransport`.
-- `uv run mcp-architecture-check` runs the checks of what a client sees against the server
+- `uv run poe architecture` runs the checks of what a client sees against the server
   `offline_server()` in `tests/offline_server.py` builds: the descriptions, the input schemas,
   the masked errors and the settings that keep their input out of an error. It runs outside
   pytest, for the reason [`CUSTOM_CHECKS.md`](../CUSTOM_CHECKS.md) gives. The `server` fixture
   builds the same server with `build_server`.
 - One of them compares every tool the server lists, its arguments, output, annotations and
   tags, with `tests/tool_surface.generated.json`. A change to what a client sees is a diff of
-  that file in review. Accept a change you meant with `uv run mcp-architecture-check --update`.
-- Tests import through the top level too.
+  that file in review. Accept a change you meant with `uv run poe surface`.
+- Tests import through the top level too. A tool a test defines is the exception: it imports
+  from `mcp/dependencies.py`, as the MCP's own tools do.

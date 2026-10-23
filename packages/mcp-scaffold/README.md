@@ -6,9 +6,9 @@ skill asks what the MCP needs and runs it. From the repository root, with no unc
 untracked changes, so git can undo a failed run:
 
 ```bash
-uv run --project packages/mcp-scaffold mcp-scaffold new weather-mcp \
+uv run --project packages/mcp-scaffold mcp-scaffold weather-mcp \
     --description "Current weather and forecasts for any city." \
-    --upstream openapi --spec https://api.example.com/openapi.yml --persistence none
+    --upstream openapi --spec https://api.example.com/openapi.yml
 ```
 
 A run that fails partway leaves what it wrote. From the repository root, this undoes it, the
@@ -31,7 +31,8 @@ tool of our own replaces it. A spec given as a URL is recorded as `spec-source`,
 |---|---|
 | `--upstream` | `openapi` (mcp-openapi's typed client and codegen), `custom` (a small HTTP client to start from, which the agent shapes to the upstream with the user). Leave it out for an MCP without an upstream client: `upstream/` stays an empty layer |
 | `--spec` | The vendor's OpenAPI 3.0 spec, a path or an http(s) URL, JSON or YAML. `openapi` needs it |
-| `--persistence` | `none`, or one or more of `postgres` (SQLAlchemy, asyncpg, Alembic, the chart's database) and `redis`, e.g. `--persistence postgres redis` |
+| `--persistence` | One or more of `postgres` (SQLAlchemy, asyncpg, Alembic, the chart's database) and `redis`, e.g. `--persistence postgres redis`. Leave it out for an MCP that stores nothing |
+| `--auth` | `credentials`: each user signs in on the MCP's `/sign-in` page with their own credentials for the upstream, kept encrypted in Postgres, and every call reaches the upstream as them. Needs an `--upstream` and `--persistence postgres`. Leave it out for an MCP that starts without sign-in |
 | `--no-release` | skip release-please and the release re-run list |
 
 A `custom` upstream starts as `upstream/client.py`: one `request(method, path, adapter)` that
@@ -70,7 +71,7 @@ bump rather than a copy:
 - `packages/mcp-configs`: the settings with their defaults.
 - `packages/mcp-architecture`: `ARCHITECTURE.md`, which the generated `AGENTS.md` points to, the
   code style and import contracts its commands check, the type check its `[tool.basedpyright]`
-  extends, and `mcp-architecture-check`, which checks what a client sees of the server
+  extends, and `poe architecture`, which checks what a client sees of the server
   `tests/offline_server.py` builds.
 - `packages/mcp-openapi`, for an OpenAPI upstream: the client and the codegen.
 
@@ -90,7 +91,9 @@ needs belongs in their code, put it in one of those packages instead.
 
 - `src/mcp_scaffold/files/skeleton/`: what every MCP gets, written for the placeholder package
   `mcp_skeleton`.
-- `src/mcp_scaffold/files/layers/`: one folder per `--upstream` and `--persistence` choice.
+- `src/mcp_scaffold/files/layers/`: one folder per `--upstream` and `--persistence` choice, and
+  `auth/` for `--auth credentials`, laid over the `mcp`, `persistence`, `shared` and `upstream`
+  layers.
 - `src/mcp_scaffold/files/root/`: files outside the package a choice brings, such as `alembic.ini`
   or a custom upstream's `tests/test_upstream.py`.
 - A file under `files/` named `*.jinja` depends on the combination of choices. Once every layer
@@ -99,7 +102,8 @@ needs belongs in their code, put it in one of those packages instead.
   `Dependencies` from `pyproject.py` as `dependencies`.
 - `src/mcp_scaffold/cli.py`: the `new` command.
 - `src/mcp_scaffold/scaffold.py`: `scaffold()`, the steps in order. Each step is a module named
-  for what it copies, writes or edits: `upstream.py` and `persistence.py` (the layer folders),
+  for what it copies, writes or edits: `upstream.py`, `persistence.py` and `auth.py` (the layer
+  folders),
   `openapi.py` (the spec, its first operation, the codegen), `pyproject.py` (the dependencies,
   with `pins.py`), `repository.py` and `stamp.py`. `skeleton.py` copies, renders and renames the
   skeleton, `commands.py` runs uv in the new service, and `options.py` holds what a new MCP
@@ -113,5 +117,5 @@ None of the files under `files/` is linted or type-checked here. They are checke
 land:
 
 - `tests/test_scaffold.py` generates one MCP per choice and runs every check `commands.check`
-  runs on a new MCP: `mcp-architecture-lint`, the codegen's drift check, basedpyright,
-  `mcp-architecture-imports`, `mcp-architecture-check` and pytest.
+  runs on a new MCP: ruff, the codegen's drift check, basedpyright, `lint-imports`,
+  `poe architecture` and pytest.

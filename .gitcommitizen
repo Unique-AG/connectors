@@ -45,6 +45,7 @@ instrumentation = packages/instrumentation/**
 logger = packages/logger/**
 mcp-architecture = packages/mcp-architecture/**
 mcp-configs = packages/mcp-configs/**
+mcp-observability = packages/mcp-observability/**
 mcp-credential-auth = packages/mcp-credential-auth/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-openapi = packages/mcp-openapi/**

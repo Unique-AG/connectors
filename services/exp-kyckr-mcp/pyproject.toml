@@ -69,6 +69,8 @@ spec = "src/kyckr_mcp/openapi/kyckr-openapi.yml"
 operation-ids = "kyckr_mcp.openapi.routes:CLIENT_BACKED"
 fields = "kyckr_mcp.openapi.fields:RESPONSE_FIELDS"
 allow-extra-fields = true
+# The replies copy vendor models field by field, so clients see the spec's field names.
+snake-case-fields = false
 operation-module = "mcp_openapi.upstream"
 models-module = "kyckr_mcp.models.vendor_responses"
 models-output = "src/kyckr_mcp/models/vendor_responses.py"

@@ -10,11 +10,37 @@ from mcp_configs import (
     RetrySettings,
     ServerSettings,
     Toggle,
+    TraceExporter,
+    TracingSettings,
     ZitadelSettings,
     from_environment,
 )
 
 SIGNING_KEY = "k" * 32
+
+
+def test_tracing_is_off_unless_the_environment_turns_it_on() -> None:
+    assert TracingSettings().exporter is TraceExporter.NONE
+
+
+@pytest.mark.parametrize(
+    ("environment", "exporter"),
+    [
+        ({"OTEL_TRACES_EXPORTER": "console"}, TraceExporter.CONSOLE),
+        ({"OTEL_TRACES_EXPORTER": "none", "OTEL_EXPORTER_OTLP_ENDPOINT": "http://c"}, None),
+        ({"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://collector"}, TraceExporter.OTLP),
+        ({"ENABLE_OPENTELEMETRY": "true"}, TraceExporter.OTLP),
+        ({"ENABLE_OPENTELEMETRY": "true", "OTEL_SPAN_PROCESSOR": "console"}, TraceExporter.CONSOLE),
+        ({"ENABLE_OPENTELEMETRY": "false", "OTEL_SPAN_PROCESSOR": "console"}, None),
+    ],
+)
+def test_tracing_reads_the_standard_names_then_the_node_services_ones(
+    monkeypatch: pytest.MonkeyPatch, environment: dict[str, str], exporter: TraceExporter | None
+) -> None:
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+
+    assert TracingSettings().exporter is (exporter or TraceExporter.NONE)
 
 
 def test_logging_defaults_to_info_and_conceals_diagnostics() -> None:

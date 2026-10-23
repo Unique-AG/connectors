@@ -91,7 +91,7 @@ def _fastmcp_logs_off() -> Generator[None]:
 
 
 async def tool_surface(server: FastMCP) -> str:
-    """The tools the server lists, sorted by name, as JSON for `mcp-architecture-check` to compare
+    """The tools the server lists, sorted by name, as JSON for `poe architecture` to compare
     with `tests/tool_surface.generated.json`.
 
     Of `_meta`, only the tags are kept.

@@ -34,6 +34,7 @@ class CodegenConfig(BaseModel):
     response_operation_ids: list[str] | None = None
     fields: dict[str, tuple[str, ...]] = {}
     allow_extra_fields: bool = False
+    snake_case_fields: bool = True
     operation_module: str
     models_module: str
     models_output: Path
@@ -107,6 +108,7 @@ def _generate(root: Path, config: CodegenConfig) -> None:
         operation_ids=config.response_operation_ids or config.operation_ids,
         fields=config.fields,
         allow_extra_fields=config.allow_extra_fields,
+        snake_case_fields=config.snake_case_fields,
         output=root / config.models_output,
     )
     generate_operations(

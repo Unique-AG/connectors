@@ -5,7 +5,8 @@
 ## Settings
 
 What every MCP configures the same way comes from `packages/mcp-configs`, with the defaults we
-always use: the server, Postgres, Redis, Zitadel, upstream retries, logging and elicitation.
+always use: the server, Postgres, Redis, Zitadel, upstream retries, logging, tracing and
+elicitation.
 Never write your own class for these. [The mcp-configs README](../../mcp-configs/README.md) lists
 each class with its env variables and defaults.
 
@@ -24,14 +25,14 @@ own.
 
 ## Telemetry
 
-`telemetry/setup.py` sets it up under the MCP's name, with `unique_mcp` and `unique_toolkit`:
+`telemetry/setup.py` sets it up under the MCP's name, with `packages/mcp-observability`:
 
 - `init_telemetry(settings)` runs first in `main`, before anything logs: JSON logs in the format
-  Loki expects, with trace ids, and OpenTelemetry tracing, off unless `OTEL_TRACES_EXPORTER` is
-  set.
+  Loki expects, with trace ids, and OpenTelemetry tracing, off unless `mcp_configs.TracingSettings`
+  finds it turned on in the environment.
 - `instrument(mcp)` mounts the `/probe`, `/health` and `/metrics` routes and returns the
   metrics middleware that `http_middleware` lists. Every tool, resource and prompt call gets a
   counter, a duration and a log line.
 
 A metric of the MCP's own, such as upstream calls by route, is defined here with
-`unique_toolkit.monitoring.MetricNamespace` and exported from `telemetry/__init__.py`.
+`mcp_observability.MetricNamespace` and exported from `telemetry/__init__.py`.

@@ -9,41 +9,54 @@ from pydantic import Field
 
 class DailyMeta(BaseModel):
     description: str | None = Field(None, description="Long-form descripton of the asset.")
-    endDate: str | None = Field(
+    end_date: str | None = Field(
         None,
+        alias="endDate",
         description="The latest date we have price data available for the asset. When null it means no price data available for the given asset.",
     )
-    exchangeCode: str | None = Field(
-        None, description="An identifier that maps which Exchange this asset is listed on."
+    exchange_code: str | None = Field(
+        None,
+        alias="exchangeCode",
+        description="An identifier that maps which Exchange this asset is listed on.",
     )
     name: str | None = Field(None, description="Full-length name of the asset.")
-    startDate: str | None = Field(
+    start_date: str | None = Field(
         None,
+        alias="startDate",
         description="The earliest date we have price data available for the asset. When null it means no price data available for the given asset.",
     )
     ticker: str | None = Field(None, description="Ticker related to the asset.")
 
 
 class DailyPriceBar(BaseModel):
-    adjClose: float | None = Field(
-        None, description="The adjusted closing price for the asset on the given date."
+    adj_close: float | None = Field(
+        None,
+        alias="adjClose",
+        description="The adjusted closing price for the asset on the given date.",
     )
-    adjHigh: float | None = Field(
-        None, description="The adjusted high price for the asset on the given date."
+    adj_high: float | None = Field(
+        None,
+        alias="adjHigh",
+        description="The adjusted high price for the asset on the given date.",
     )
-    adjLow: float | None = Field(
-        None, description="The adjusted low price for the asset on the given date."
+    adj_low: float | None = Field(
+        None, alias="adjLow", description="The adjusted low price for the asset on the given date."
     )
-    adjOpen: float | None = Field(
-        None, description="The adjusted opening price for the asset on the given date."
+    adj_open: float | None = Field(
+        None,
+        alias="adjOpen",
+        description="The adjusted opening price for the asset on the given date.",
     )
-    adjVolume: int | None = Field(None, description="The number of shares traded for the asset.")
+    adj_volume: int | None = Field(
+        None, alias="adjVolume", description="The number of shares traded for the asset."
+    )
     close: float | None = Field(
         None, description="The closing price for the asset on the given date."
     )
     date: str | None = Field(None, description="The date this data pertains to.")
-    divCash: float | None = Field(
+    div_cash: float | None = Field(
         None,
+        alias="divCash",
         description='The dividend paid out on "date" (note that "date" will be the "exDate" for the dividend).',
     )
     high: float | None = Field(None, description="The high price for the asset on the given date.")
@@ -51,8 +64,9 @@ class DailyPriceBar(BaseModel):
     open: float | None = Field(
         None, description="The opening price for the asset on the given date."
     )
-    splitFactor: float | None = Field(
+    split_factor: float | None = Field(
         None,
+        alias="splitFactor",
         description="The factor used to adjust prices when a company splits, reverse splits, or pays a distribution.",
     )
     volume: int | None = Field(None, description="The number of shares traded for the asset.")

@@ -6,12 +6,6 @@ import pytest
 
 from mcp_architecture.check import SNAPSHOT, check_service, main
 
-TYPE_CHECK = (
-    "[tool.basedpyright]\n"
-    'extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"\n'
-    'executionEnvironments = [{ root = "tests", reportPrivateUsage = false }]\n'
-)
-
 KEPT = {
     "mask": "True",
     "tool": (
@@ -48,9 +42,7 @@ def write_service(
     server: dict[str, str] | None = None,
 ) -> Path:
     """An MCP named after `package`, whose `tests/offline_server.py` builds `server`."""
-    (root / "pyproject.toml").write_text(
-        f'[project]\nname = "{package.replace("_", "-")}"\n\n{TYPE_CHECK}'
-    )
+    (root / "pyproject.toml").write_text(f'[project]\nname = "{package.replace("_", "-")}"\n')
     source = root / "src" / package
     source.mkdir(parents=True)
     (source / "__init__.py").write_text("")
@@ -83,7 +75,7 @@ async def test_update_records_what_a_client_sees(tmp_path: Path) -> None:
 
 async def test_a_missing_snapshot_is_a_finding(tmp_path: Path) -> None:
     assert await check_service(write_service(tmp_path)) == [
-        f"{SNAPSHOT} is missing. Run `uv run mcp-architecture-check --update`."
+        f"{SNAPSHOT} is missing. Run `uv run poe surface`."
     ]
 
 
@@ -196,10 +188,8 @@ def test_main_exits_with_1_on_a_finding(
     write_service(tmp_path)
     monkeypatch.chdir(tmp_path)
     if snapshot:
-        monkeypatch.setattr(sys, "argv", ["mcp-architecture-check", "--update"])
         with pytest.raises(SystemExit):
-            main()
-    monkeypatch.setattr(sys, "argv", ["mcp-architecture-check"])
+            main(update=True)
 
     with pytest.raises(SystemExit) as exit_:
         main()

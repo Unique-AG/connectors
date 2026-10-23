@@ -12,6 +12,7 @@ on:
       - "packages/mcp-architecture/**"
       - "packages/mcp-configs/**"
       - "packages/mcp-credential-auth/**"
+      - "packages/mcp-observability/**"
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
       # What mcp-scaffold edits by matching its text when it registers a new MCP.
@@ -53,6 +54,7 @@ jobs:
       mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
       mcp-configs-changed: ${{ steps.filter.outputs.mcp_configs }}
+      mcp-observability-changed: ${{ steps.filter.outputs.mcp_observability }}
       mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
@@ -76,14 +78,18 @@ jobs:
               - 'packages/mcp-openapi/**'
             mcp_configs:
               - 'packages/mcp-configs/**'
-            # The MCPs the scaffold's tests generate depend on mcp-configs, run mcp-architecture's
-            # rules, and use mcp-openapi for an OpenAPI upstream, so a change to any of them runs them too.
+            mcp_observability:
+              - 'packages/mcp-observability/**'
+            # The MCPs the scaffold's tests generate depend on mcp-configs and mcp-observability, run
+            # mcp-architecture's rules, and use mcp-openapi for an OpenAPI upstream, so a change to any
+            # of them runs them too.
             # The scaffold also edits the registry files below by matching their text.
             mcp_scaffold:
               - 'packages/mcp-scaffold/**'
               - 'packages/mcp-architecture/**'
               - 'packages/mcp-openapi/**'
               - 'packages/mcp-configs/**'
+              - 'packages/mcp-observability/**'
               - '.gitcommitizen'
               - 'release-please-config.json'
               - '.github/workflows/release-rerun.yaml'
@@ -109,6 +115,7 @@ jobs:
           MCP_ARCHITECTURE_CHANGED: ${{ steps.filter.outputs.mcp_architecture }}
           MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
           MCP_CONFIGS_CHANGED: ${{ steps.filter.outputs.mcp_configs }}
+          MCP_OBSERVABILITY_CHANGED: ${{ steps.filter.outputs.mcp_observability }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -163,6 +170,10 @@ jobs:
             fi
             if [ "$MCP_CONFIGS_CHANGED" = "true" ]; then
               consumers=$(grep -l '"mcp-configs' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
+            if [ "$MCP_OBSERVABILITY_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-observability' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
           fi
@@ -347,6 +358,47 @@ jobs:
     defaults:
       run:
         working-directory: packages/mcp-configs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-observability:
+    name: Test mcp-observability
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-observability-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-observability
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

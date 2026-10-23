@@ -1,8 +1,8 @@
-"""Generate a Python MCP, once. From the repository root:
+"""Generate a Python MCP, once. From the repository root, though it finds the root itself:
 
-uv run --project packages/mcp-scaffold mcp-scaffold new <name> \\
+uv run --project packages/mcp-scaffold mcp-scaffold <name> \\
     --description "<what it does>" [--upstream openapi|custom] [--spec <path or URL>] \\
-    --persistence none|postgres|redis [postgres|redis]
+    [--persistence postgres|redis [postgres|redis]] [--auth credentials]
 
 The `new-mcp` skill asks for the options and runs it. The MCP owns every file it generates.
 """
@@ -17,7 +17,7 @@ import yaml
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from mcp_scaffold.options import Options, Persistence, Upstream
+from mcp_scaffold.options import Auth, Options, Persistence, Upstream
 from mcp_scaffold.repository import name_conflict
 from mcp_scaffold.scaffold import load_spec, scaffold
 
@@ -26,28 +26,33 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="mcp-scaffold", description=(__doc__ or "").split("\n\n")[0]
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    new = commands.add_parser("new", help="generate services/<name> and register it")
-    new.add_argument("name", help="kebab-case, e.g. weather-mcp")
-    new.add_argument("--description", required=True)
-    new.add_argument(
+    parser.add_argument("name", help="kebab-case, e.g. weather-mcp")
+    parser.add_argument("--description", required=True)
+    parser.add_argument(
         "--upstream",
         type=Upstream,
         choices=list(Upstream),
         help="what the MCP calls; leave it out for an MCP without an upstream client",
     )
-    new.add_argument(
+    parser.add_argument(
         "--spec",
         help="the vendor's OpenAPI 3.0 spec, a path or an http(s) URL; --upstream openapi needs it",
     )
-    new.add_argument(
+    parser.add_argument(
         "--persistence",
         nargs="+",
-        choices=["none", *Persistence],
-        required=True,
-        help="none, or every store the MCP owns, e.g. --persistence postgres redis",
+        type=Persistence,
+        choices=list(Persistence),
+        default=[],
+        help="every store the MCP owns, e.g. --persistence postgres redis; leave it out for none",
     )
-    new.add_argument(
+    parser.add_argument(
+        "--auth",
+        type=Auth,
+        choices=list(Auth),
+        help="how users sign in; leave it out for an MCP that starts without sign-in",
+    )
+    parser.add_argument(
         "--no-release",
         dest="release",
         action="store_false",
@@ -55,16 +60,9 @@ def main() -> None:
     )
     arguments = parser.parse_args()
 
-    repo = Path.cwd()
-    if not (repo / ".gitcommitizen").is_file():
-        parser.error("run mcp-scaffold from the repository root")
-    stores = cast(list[str], arguments.persistence)
-    if "none" in stores and len(stores) > 1:
-        parser.error("--persistence none cannot be combined with a store")
+    repo = _repository(parser)
     try:
-        options = Options.model_validate(
-            {**vars(arguments), "persistence": [store for store in stores if store != "none"]}
-        )
+        options = Options.model_validate(vars(arguments))
     except ValidationError as error:
         parser.error("\n".join(_describe(problem) for problem in error.errors()))
     if (conflict := name_conflict(options.name, repo)) is not None:
@@ -92,6 +90,26 @@ def main() -> None:
         )
         raise
     print(f"{target} is ready. The new-mcp skill lists what to fill in next.")
+
+
+def _repository(parser: argparse.ArgumentParser) -> Path:
+    """The root of the repository the command runs in, from any folder of it."""
+    try:
+        root = Path(
+            subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        )
+    except FileNotFoundError:
+        parser.error("git is not installed, and the run needs it to find the repository")
+    except subprocess.CalledProcessError as error:
+        parser.error(f"run mcp-scaffold inside the repository: {cast(str, error.stderr).strip()}")
+    if not (root / ".gitcommitizen").is_file():
+        parser.error(f"run mcp-scaffold inside the connectors repository, not {root}")
+    return root
 
 
 def _require_clean(parser: argparse.ArgumentParser, repo: Path, spec: str | None) -> None:

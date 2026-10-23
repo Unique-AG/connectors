@@ -14,6 +14,8 @@ _READ_PREFIXES = (
     "LOG",
     "HOST",
     "PORT",
+    "OTEL_",
+    "ENABLE_OPENTELEMETRY",
 )
 
 
