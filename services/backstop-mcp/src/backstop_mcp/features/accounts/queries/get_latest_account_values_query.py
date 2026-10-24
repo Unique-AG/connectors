@@ -13,6 +13,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
+from backstop_mcp.observability import failure_event, info_event, most_severe
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -25,7 +26,9 @@ class GetLatestAccountValuesQuery:
         self._client: BackstopClient = client
 
     async def run(self, *, account_ids: Sequence[str]) -> tuple[AccountLatestValueDto, ...]:
-        with _tracer.start_as_current_span("accounts.query.latest_values") as span:
+        with _tracer.start_as_current_span(
+            "accounts.query.latest_values", record_exception=False, set_status_on_exception=False
+        ) as span:
             span.set_attribute("requested", len(account_ids))
             settled = await asyncio.gather(
                 *(
@@ -38,17 +41,29 @@ class GetLatestAccountValuesQuery:
                 self._outcome(account_id, result)
                 for account_id, result in zip(account_ids, settled, strict=True)
             )
-            logger.info(
+            failures = [
+                (account_id, result)
+                for account_id, result in zip(account_ids, settled, strict=True)
+                if isinstance(result, BaseException)
+            ]
+            if failures:
+                failure_event(
+                    logger,
+                    "accounts.latest_values.series_failed",
+                    most_severe([failure for _, failure in failures]),
+                    count=len(failures),
+                    sample_ids=[account_id for account_id, _ in failures[:5]],
+                )
+            info_event(
+                logger,
                 "accounts.latest_values.fetched",
-                extra={
-                    "requested": len(account_ids),
-                    "valued": sum(
-                        1
-                        for value in latest
-                        if value.figure is not None and value.figure.valued is not None
-                    ),
-                    "failed": sum(1 for value in latest if value.error is not None),
-                },
+                requested=len(account_ids),
+                valued=sum(
+                    1
+                    for value in latest
+                    if value.figure is not None and value.figure.valued is not None
+                ),
+                failed=sum(1 for value in latest if value.error is not None),
             )
             return latest
 
@@ -58,11 +73,7 @@ class GetLatestAccountValuesQuery:
         if isinstance(settled, BaseException):
             if not isinstance(settled, Exception) or isinstance(settled, BATCH_ABORTING_ERRORS):
                 raise settled
-            logger.warning(
-                "accounts.latest_values.series_failed",
-                extra={"account_id": account_id},
-                exc_info=settled,
-            )
+            logger.debug("accounts.latest_values.series_failed", extra={"account_id": account_id})
             return AccountLatestValueDto(
                 account_id=account_id, error=f"{type(settled).__name__}: {settled}"
             )

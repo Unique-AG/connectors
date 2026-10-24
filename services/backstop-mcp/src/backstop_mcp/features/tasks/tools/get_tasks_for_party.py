@@ -29,6 +29,7 @@ from backstop_mcp.features.resolution import (
 from backstop_mcp.features.tasks import GetTasksForPartyQuery, TaskFilter, TasksResolvedResponse
 from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +87,7 @@ async def get_tasks_for_party(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    logger.info(
-        "tasks.get.start",
-        extra={"segment": party.search_type, "entity_id": party.id, "status": status},
-    )
+    add_call_fields(segment=party.search_type, entity_id=party.id, status=status)
     fetched = await get_tasks_for_party_query.run(
         search_type=party.search_type,
         entity_id=party.id,

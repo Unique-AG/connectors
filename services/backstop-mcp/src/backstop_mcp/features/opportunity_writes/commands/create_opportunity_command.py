@@ -31,6 +31,7 @@ from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
 from backstop_mcp.features.opportunity_writes.responses import CreatedOpportunityResponse
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import info_event
 from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,11 @@ class CreateOpportunityCommand:
     async def run(
         self, *, opportunity: CreateOpportunityInput, investor_id: str
     ) -> CreatedOpportunityResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.create") as span:
+        with _tracer.start_as_current_span(
+            "opportunity_writes.command.create",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("investor_id", investor_id)
             requested_stage = None
             if opportunity.stage is not None:
@@ -100,13 +105,12 @@ class CreateOpportunityCommand:
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             )
-            logger.info(
+            info_event(
+                logger,
                 "opportunity_writes.opportunity.created",
-                extra={
-                    "id": created_id,
-                    "stage": stage_name,
-                    "warnings": len(warnings),
-                },
+                id=created_id,
+                stage_id=stage_id,
+                warnings=len(warnings),
             )
             return CreatedOpportunityResponse(
                 id=created_id,

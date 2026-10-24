@@ -13,6 +13,7 @@ from backstop_mcp.features.activity_tags.tools.list_activity_tags import list_ac
 from tests.helpers import (
     BASE_URL,
     activity_tags_service,
+    aggregated_warning,
     recorded_requests,
     resource,
     tool_client,
@@ -296,9 +297,31 @@ class TestListActivityTagsTool:
         assert refreshed.cache == "ok"
         assert len(refreshed.tags) == 1
         assert refreshed.tags[0].quantity_tagged == 12
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [f"Conflicting activity tags for duplicate id {_LIVE_TAG_ID!r}; retaining first tag"]
+        aggregated_warning(
+            caplog, "activity_tags.catalog.duplicate_id", count=1, sample_ids=[_LIVE_TAG_ID]
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("at-list-conflicting-many")
+        ids = [str(4000 + index) for index in range(7)]
+        next_url = f"{base_url}/activity-tags?page[offset]=1000&page[limit]=1000"
+        respx.get(f"{base_url}/activity-tags").mock(
+            side_effect=[
+                _collection_page(*(_tag(i, name="Original") for i in ids), next_url=next_url),
+                _collection_page(*(_tag(i, name="Changed") for i in ids)),
+            ]
+        )
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_activity_tags(refresh=True, activity_tags=activity_tags_service(client))
+
+        aggregated_warning(
+            caplog, "activity_tags.catalog.duplicate_id", count=7, sample_ids=ids[:5]
+        )
 
     @pytest.mark.asyncio
     @respx.mock

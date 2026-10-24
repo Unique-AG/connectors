@@ -1,5 +1,6 @@
 """Create, patch, or delete `contact-locations` rows. `contact.type` is always `contacts`."""
 
+import logging
 from typing import Never
 from urllib.parse import quote
 
@@ -17,7 +18,9 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.features.org_people_writes.api_responses import ContactLocationAttributes
 from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
+from backstop_mcp.observability import info_event, warning_event
 
+logger = logging.getLogger(__name__)
 _Document = BackstopApiSingleResourceDocument[ContactLocationAttributes]
 _RESOURCE_TYPE = "contact-locations"
 _tracer = trace.get_tracer(__name__)
@@ -36,23 +39,70 @@ class ModifyContactLocationCommand:
         locations: tuple[ContactLocationInput, ...] = (),
         delete_location_ids: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
-        with _tracer.start_as_current_span("org_people_writes.command.modify_contact_location"):
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.modify_contact_location",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
+            deleted: list[str] = []
             for delete_location_id in delete_location_ids:
                 try:
                     await self._delete(delete_location_id)
                 except BackstopApiError as exc:
+                    self._log_deleted(party_id, tuple(deleted))
                     self._reraise_write_error(exc, operation="deleted")
+                deleted.append(delete_location_id)
+            self._log_deleted(party_id, tuple(deleted))
+            created: list[str] = []
+            updated: list[str] = []
             written: list[str] = []
             for location in locations:
+                creating = location.location_id is None
                 try:
-                    if location.location_id is None:
-                        written.append(await self._create(party_id=party_id, location=location))
-                    else:
-                        written.append(await self._update(location=location))
+                    location_id = (
+                        await self._create(party_id=party_id, location=location)
+                        if creating
+                        else await self._update(location=location)
+                    )
                 except BackstopApiError as exc:
-                    operation = "created" if location.location_id is None else "updated"
-                    self._reraise_write_error(exc, operation=operation)
+                    self._log_written(party_id, tuple(created), tuple(updated), tuple(written))
+                    self._reraise_write_error(exc, operation="created" if creating else "updated")
+                if creating:
+                    created.append(location_id)
+                else:
+                    updated.append(location_id)
+                written.append(location_id)
+            self._log_written(party_id, tuple(created), tuple(updated), tuple(written))
             return tuple(written)
+
+    def _log_deleted(self, party_id: str, deleted_ids: tuple[str, ...]) -> None:
+        if not deleted_ids:
+            return
+        warning_event(
+            logger,
+            "org_people_writes.contact_location.deleted",
+            party_id=party_id,
+            count=len(deleted_ids),
+            ids=deleted_ids,
+        )
+
+    def _log_written(
+        self,
+        party_id: str,
+        created_ids: tuple[str, ...],
+        updated_ids: tuple[str, ...],
+        written_ids: tuple[str, ...],
+    ) -> None:
+        if not written_ids:
+            return
+        info_event(
+            logger,
+            "org_people_writes.contact_location.written",
+            party_id=party_id,
+            created_count=len(created_ids),
+            updated_count=len(updated_ids),
+            ids=written_ids,
+        )
 
     async def _create(self, *, party_id: str, location: ContactLocationInput) -> str:
         created = await self._client.post(

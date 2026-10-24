@@ -1,5 +1,6 @@
 """`CreateOpportunityCommand`: POST payload shape, stage resolve, re-read stage."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -21,6 +22,8 @@ from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.features.opportunity_writes.test_update_opportunity_command import VOCABULARY
 from tests.helpers import (
     BASE_URL,
+    SERVICE_LOGGER,
+    assert_absent_from_records,
     client_factory,
     credential,
     opportunity_stages_service,
@@ -272,6 +275,45 @@ class TestCreateOpportunityCommand:
             "type": "system-users",
             "id": _REPRESENTATIVE_ID,
         }
+
+
+class TestCreateOpportunityTelemetry:
+    @respx.mock
+    async def test_created_line_carries_the_landed_stage_id_and_no_stage_name(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        landed_stage_name = "zq-canary-created-stage"
+        landed: dict[str, object] = {
+            "data": {
+                "id": _ID,
+                "type": "opportunities",
+                "attributes": {"name": "Contoso - Harbor Select"},
+                "relationships": {
+                    "stage": {"data": {"id": "st-unlisted", "type": "opportunity-stages"}}
+                },
+            },
+            "included": [resource("st-unlisted", "opportunity-stages", name=landed_stage_name)],
+        }
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.post(f"{BASE_URL}/opportunities").mock(return_value=httpx.Response(201, json=landed))
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=httpx.Response(200, json=landed)
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER):
+            result = await make_command(client).run(opportunity=_create(), investor_id=_INVESTOR_ID)
+
+        assert result.stage == landed_stage_name
+        (created,) = [
+            record
+            for record in caplog.records
+            if record.message == "opportunity_writes.opportunity.created"
+        ]
+        assert created.levelno == logging.INFO
+        assert created.__dict__["id"] == _ID
+        assert created.__dict__["stage_id"] == "st-unlisted"
+        assert "stage" not in created.__dict__
+        assert_absent_from_records(caplog, landed_stage_name)
 
 
 class TestUniqueCatalogEntityTypeId:

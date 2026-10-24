@@ -8,7 +8,6 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from opentelemetry import trace
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -22,9 +21,10 @@ from backstop_mcp.features.reports import (
 from backstop_mcp.features.reports.dependencies import get_run_report_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.models import NonEmptyStr, published_output_schema
+from backstop_mcp.observability import add_call_fields
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 type RunReportToolResponse = RunReportResponse | RunReportPendingResponse | NotFoundResponse
 
@@ -110,30 +110,20 @@ async def run_report(
     "offset": 100}
     """
     as_of = as_of_date if as_of_date is not None else date.today()
-    with _tracer.start_as_current_span("reports.run") as span:
-        span.set_attribute("report_name", report_name)
-        span.set_attribute("as_of_date", as_of.isoformat())
-        span.set_attribute("limit", limit)
-        span.set_attribute("offset", offset)
-        logger.info(
-            "reports.run.start",
-            extra={
-                "report_name": report_name,
-                "as_of_date": as_of.isoformat(),
-                "limit": limit,
-                "offset": offset,
-            },
+    logged_report_name = identifiable_value(report_name)
+    add_call_fields(
+        report_name=logged_report_name, as_of_date=as_of.isoformat(), limit=limit, offset=offset
+    )
+    try:
+        return await run_report_query.run(
+            report_name=report_name,
+            as_of_date=as_of,
+            limit=limit,
+            offset=offset,
         )
-        try:
-            return await run_report_query.run(
-                report_name=report_name,
-                as_of_date=as_of,
-                limit=limit,
-                offset=offset,
-            )
-        except BackstopApiError as exc:
-            # An unknown report name is a 400 whose detail reads "... not found", not a 404.
-            # If Backstop rephrases that, this stops matching and the error surfaces raw.
-            if exc.status_code == HTTPStatus.BAD_REQUEST and "not found" in exc.detail.lower():
-                return NotFoundResponse(query=report_name, scope="reports")
-            raise
+    except BackstopApiError as exc:
+        # An unknown report name is a 400 whose detail reads "... not found", not a 404.
+        # If Backstop rephrases that, this stops matching and the error surfaces raw.
+        if exc.status_code == HTTPStatus.BAD_REQUEST and "not found" in exc.detail.lower():
+            return NotFoundResponse(query=report_name, scope="reports")
+        raise

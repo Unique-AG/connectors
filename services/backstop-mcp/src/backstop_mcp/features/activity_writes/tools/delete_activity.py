@@ -32,6 +32,7 @@ from backstop_mcp.features.elicitation_utils import (
 )
 from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,7 @@ async def delete_activity(
 
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>"}}
     """
-    logger.info(
-        "activity_writes.delete.start",
-        extra={"kind": activity.kind, "activity_id": activity.activity_id},
-    )
+    add_call_fields(kind=activity.kind, activity_id=activity.activity_id)
 
     async def prompt() -> str:
         return await _deletion_prompt(
@@ -83,15 +81,19 @@ async def delete_activity(
     if input_required(outcome):
         return outcome
     if outcome is EntityDeletion.DECLINED:
-        logger.info(
+        info_event(
+            logger,
             "activity_writes.delete.not_confirmed",
-            extra={"kind": activity.kind, "activity_id": activity.activity_id},
+            kind=activity.kind,
+            activity_id=activity.activity_id,
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
-        logger.info(
+        info_event(
+            logger,
             "activity_writes.delete.elicit.not_available",
-            extra={"kind": activity.kind, "activity_id": activity.activity_id},
+            kind=activity.kind,
+            activity_id=activity.activity_id,
         )
     return await delete_activity_command.run(activity=activity)
 
@@ -103,13 +105,12 @@ async def _deletion_prompt(
     try:
         handle = parse_activity_detail_handle(activity.activity_id)
     except ToolError:
-        logger.info(
+        info_event(
+            logger,
             "activity_writes.delete.detail.skipped",
-            extra={
-                "kind": activity.kind,
-                "activity_id": activity.activity_id,
-                "reason": "handle is not a detail id",
-            },
+            kind=activity.kind,
+            activity_id=activity.activity_id,
+            reason="handle is not a detail id",
         )
         return _format_deletion_prompt(kind=activity.kind, activity_id=activity.activity_id)
     try:
@@ -118,13 +119,12 @@ async def _deletion_prompt(
         )
     except BackstopApiError as exc:
         if exc.status_code == HTTPStatus.NOT_FOUND and activity.kind in _DETAIL_OPTIONAL_KINDS:
-            logger.info(
+            info_event(
+                logger,
                 "activity_writes.delete.detail.skipped",
-                extra={
-                    "kind": activity.kind,
-                    "activity_id": activity.activity_id,
-                    "reason": "detail endpoint has no record",
-                },
+                kind=activity.kind,
+                activity_id=activity.activity_id,
+                reason="detail endpoint has no record",
             )
             return _format_deletion_prompt(kind=activity.kind, activity_id=activity.activity_id)
         raise

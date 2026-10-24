@@ -1,5 +1,6 @@
 """`DeleteActivityCommand` hard-deletes every activity collection."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -40,6 +41,24 @@ class TestDeleteActivityCommand:
         assert result.resource_type == "notes"
         assert result.permanent is True
         assert route.call_count == 1
+
+    @respx.mock
+    async def test_successful_delete_is_logged_at_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.delete(f"{BASE_URL}/notes/{_NOTE_ID}").mock(return_value=httpx.Response(204))
+
+        with caplog.at_level(logging.INFO):
+            await get_delete_activity_command_factory(client).run(
+                activity=DeleteActivityInput(kind="note", activity_id=_NOTE_ID)
+            )
+
+        record = next(
+            item for item in caplog.records if item.message == "activity_writes.activity.deleted"
+        )
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["id"] == _NOTE_ID
+        assert record.__dict__["kind"] == "note"
 
     @respx.mock
     @pytest.mark.parametrize("handle", [f"emails_{_EMAIL_ID}", f"email_{_EMAIL_ID}"])

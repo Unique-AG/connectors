@@ -28,6 +28,7 @@ from backstop_mcp.features.org_people_writes.responses import UpdatedPersonRespo
 from backstop_mcp.features.org_people_writes.update_person_input import UpdatePersonInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -57,7 +58,11 @@ class UpdatePersonCommand:
     async def run(
         self, *, person: UpdatePersonInput, party_id: str, search_type: PersonCollection
     ) -> UpdatedPersonResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.update_person") as span:
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.update_person",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("party_id", party_id)
             span.set_attribute("search_type", search_type)
             owner = await self._system_users_service.resolve_relationship(person.owner_login)
@@ -69,9 +74,13 @@ class UpdatePersonCommand:
             )
             written = await self._read(party_id, search_type=search_type)
             record = PersonRecordResponse.from_attributes(written.data.attributes)
-            logger.info(
+            info_event(
+                logger,
                 "org_people_writes.person.updated",
-                extra={"id": party_id, "search_type": search_type, "location_ids": location_ids},
+                id=party_id,
+                search_type=search_type,
+                location_ids=location_ids,
+                deleted_location_count=len(person.delete_location_ids or ()),
             )
             return UpdatedPersonResponse(
                 id=party_id,

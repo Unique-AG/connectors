@@ -31,6 +31,7 @@ from backstop_mcp.features.includes.responses import (
     PersonIncludesResponse,
 )
 from backstop_mcp.features.includes.types import Include
+from backstop_mcp.observability import failed_fields, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,17 @@ class _IncludeAttributes(BaseModel):
 _IncludeResource = IncludedResource[_IncludeAttributes]
 
 
+class _Rejected(BaseModel):
+    """A side-loaded resource `_project` could not use, and why."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    entry_id: str
+    actual_type: str | None
+    unexpected_type: bool = False
+    failure: ValidationError | None = None
+
+
 def _include_resources[AttrT](
     *, document: BackstopApiSingleResourceDocument[AttrT], planned: _PlannedInclude
 ) -> list[BaseModel]:
@@ -179,13 +191,43 @@ def _include_resources[AttrT](
         resource, planned.include.relationship, schema=_IncludeResource
     )
     if not entries and resource.related_ids(planned.include.relationship):
-        logger.warning(
+        warning_event(
+            logger,
             "includes.side_load.unresolved",
-            extra={"include": planned.name, "relationship": planned.include.relationship},
+            include=planned.name,
+            relationship=planned.include.relationship,
         )
-    return [
-        model for entry in entries if (model := _project(entry=entry, planned=planned)) is not None
-    ]
+    outcomes = [_project(entry=entry, planned=planned) for entry in entries]
+    _warn_rejected([outcome for outcome in outcomes if isinstance(outcome, _Rejected)], planned)
+    return [outcome for outcome in outcomes if not isinstance(outcome, _Rejected)]
+
+
+def _warn_rejected(rejected: Sequence[_Rejected], planned: _PlannedInclude) -> None:
+    """At most one warning per reason for one include of one record."""
+    mistyped = [item for item in rejected if item.unexpected_type]
+    if mistyped:
+        warning_event(
+            logger,
+            "includes.side_load.unexpected_type",
+            include=planned.name,
+            expected_type=planned.include.resource_type,
+            actual_types=sorted({item.actual_type for item in mistyped if item.actual_type}),
+            count=len(mistyped),
+            sample_ids=[item.entry_id for item in mistyped[:5]],
+        )
+    unreadable = [item for item in rejected if not item.unexpected_type]
+    if unreadable:
+        failures = [item.failure for item in unreadable if item.failure is not None]
+        warning_event(
+            logger,
+            "includes.side_load.unreadable",
+            exc=failures[0] if failures else None,
+            include=planned.name,
+            resource_type=planned.include.resource_type,
+            count=len(unreadable),
+            sample_ids=[item.entry_id for item in unreadable[:5]],
+            failed_fields=failed_fields(failures),
+        )
 
 
 def _with_resource_id(entry: _IncludeResource) -> dict[str, object]:
@@ -199,34 +241,17 @@ def _with_resource_id(entry: _IncludeResource) -> dict[str, object]:
     return {**entry.attributes.model_dump(), "id": entry.id}
 
 
-def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel | None:
-    """One related resource as the field's model, or `None` if unusable."""
+def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel | _Rejected:
+    """One related resource as the field's model, or why it is unusable."""
     if entry.type != planned.include.resource_type:
-        logger.warning(
-            "includes.side_load.unexpected_type",
-            extra={
-                "include": planned.name,
-                "expected_type": planned.include.resource_type,
-                "actual_type": entry.type,
-            },
-        )
-        return None
+        return _Rejected(entry_id=entry.id, actual_type=entry.type, unexpected_type=True)
     # `included_resource` reads a present non-object `attributes` as `{}` so a strict schema
     # can still drop the entry. Include projections are not strict — every field is optional —
     # so that empty mapping would otherwise become a hollow record (id, no address). Treat it
     # as unreadable: one broken location must not look like a real one.
     if not entry.attributes.model_dump():
-        logger.warning(
-            "includes.side_load.unreadable",
-            extra={"include": planned.name, "resource_type": planned.include.resource_type},
-        )
-        return None
+        return _Rejected(entry_id=entry.id, actual_type=entry.type)
     try:
         return planned.model.model_validate(_with_resource_id(entry))
     except ValidationError as exc:
-        logger.warning(
-            "includes.side_load.unreadable",
-            extra={"include": planned.name, "resource_type": planned.include.resource_type},
-            exc_info=exc,
-        )
-        return None
+        return _Rejected(entry_id=entry.id, actual_type=entry.type, failure=exc)

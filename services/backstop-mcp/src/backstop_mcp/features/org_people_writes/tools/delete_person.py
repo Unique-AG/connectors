@@ -33,6 +33,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import Resolved, input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields, info_event
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +74,7 @@ async def delete_person(
         return unresolved_party_response(result)
     party = result.value
     collection = as_person_collection(party.search_type)
-    logger.info(
-        "org_people_writes.delete_person.start",
-        extra={"search_type": collection, "party_id": party.id},
-    )
+    add_call_fields(search_type=collection, party_id=party.id)
 
     async def prompt() -> str:
         return await delete_party_with_locations_command.preview(
@@ -87,15 +85,19 @@ async def delete_person(
     if input_required(outcome):
         return outcome
     if outcome is EntityDeletion.DECLINED:
-        logger.info(
+        info_event(
+            logger,
             "org_people_writes.delete_person.not_confirmed",
-            extra={"search_type": collection, "party_id": party.id},
+            search_type=collection,
+            party_id=party.id,
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
-        logger.info(
+        info_event(
+            logger,
             "org_people_writes.delete_person.elicit.not_available",
-            extra={"search_type": collection, "party_id": party.id},
+            search_type=collection,
+            party_id=party.id,
         )
     deleted_location_ids = await delete_party_with_locations_command.run(
         collection=collection, party_id=party.id

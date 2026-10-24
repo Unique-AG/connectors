@@ -287,11 +287,13 @@ class TestListCustomFieldsTool:
         definitions = refreshed.definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS]
         assert len(definitions) == 1
         assert definitions[0].group_id == 321
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            "Conflicting custom-field definitions for duplicate id '99'; retaining first definition"
+        duplicates = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert [record.getMessage() for record in duplicates] == [
+            "custom_fields.catalog.duplicate_id"
         ]
+        assert duplicates[0].__dict__["count"] == 1
+        assert duplicates[0].__dict__["sample_ids"] == ["99"]
+        assert duplicates[0].exc_info is None
 
     @pytest.mark.asyncio
     @respx.mock

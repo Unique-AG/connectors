@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -24,7 +25,8 @@ from backstop_mcp.db import BackstopCredential, PendingAuthorization
 from backstop_mcp.db import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider, ResolveSystemUser
-from tests.helpers import client_factory
+from backstop_mcp.utils import identifiable_value
+from tests.helpers import assert_absent_from_records, client_factory, logged_field
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
@@ -309,6 +311,8 @@ class TestLoginFormSubmission:
 
         same_redirect = await provider.authorize(client_info, _authorization_params())
         same_id = parse_qs(urlparse(same_redirect).query)["request_id"][0]
+        # The first login's line is captured too once another test lowered the root level.
+        caplog.clear()
         with caplog.at_level(logging.INFO):
             same = await provider.handle_login_post(
                 _login_post_request(same_id, "pv-returning.user", "token-same")
@@ -722,6 +726,116 @@ class TestLoginThrottling:
                 select(LoginAttemptRow).where(LoginAttemptRow.username == username)
             )
             assert result.scalars().all() == []
+
+
+@pytest.mark.usefixtures("keyed_pseudonyms")
+class TestLoginTelemetry:
+    """Login records name the user only by keyed pseudonym and never carry a secret."""
+
+    @staticmethod
+    async def _pending_request_id(provider: BackstopOAuthProvider, client_id: str) -> str:
+        client_info = await _register_client(provider, client_id)
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        return parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+    @staticmethod
+    def _login_record(caplog: pytest.LogCaptureFixture, message: str) -> logging.LogRecord:
+        """This service's record: `mcp_credential_auth` logs its own `auth.login.throttled`."""
+        (record,) = [
+            item
+            for item in caplog.records
+            if item.message == message and item.name == "backstop_mcp.features.auth.provider"
+        ]
+        return record
+
+    @pytest.mark.asyncio
+    async def test_succeeded_carries_the_keyed_username_and_no_secret(
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "telemetry-client-succeeded")
+        username = f"tl-zq-canary-succeeded-{uuid.uuid4().hex[:8]}"
+        api_token = "tl-zq-canary-token-succeeded"
+
+        with caplog.at_level(logging.DEBUG):
+            response = await provider.handle_login_post(
+                _login_post_request(request_id, username, api_token)
+            )
+
+        assert response.status_code == 302
+        record = self._login_record(caplog, "auth.login.succeeded")
+        assert record.levelno == logging.INFO
+        assert logged_field(record, "username") == str(identifiable_value(username))
+        assert logged_field(record, "username").startswith("hmac-sha256:")
+        assert_absent_from_records(caplog, username)
+        assert_absent_from_records(caplog, api_token)
+        assert_absent_from_records(caplog, _CSRF_TOKEN)
+
+    @pytest.mark.asyncio
+    async def test_invalid_credential_logs_rejected_at_info(
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_invalid)
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "telemetry-client-rejected")
+        username = f"tl-zq-canary-rejected-{uuid.uuid4().hex[:8]}"
+        api_token = "tl-zq-canary-token-rejected"
+
+        with caplog.at_level(logging.DEBUG):
+            response = await provider.handle_login_post(
+                _login_post_request(request_id, username, api_token)
+            )
+
+        assert response.status_code == 200
+        record = self._login_record(caplog, "auth.login.rejected")
+        assert record.levelno == logging.INFO
+        assert logged_field(record, "username") == str(identifiable_value(username))
+        assert logged_field(record, "username").startswith("hmac-sha256:")
+        assert "auth.login.succeeded" not in [item.message for item in caplog.records]
+        assert_absent_from_records(caplog, username)
+        assert_absent_from_records(caplog, api_token)
+        assert_absent_from_records(caplog, _CSRF_TOKEN)
+
+    @pytest.mark.asyncio
+    async def test_throttled_attempt_logs_throttled_at_warning(
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_invalid)
+        provider = _make_provider(
+            db, throttle=LoginThrottleConfig(max_attempts=1, window=timedelta(minutes=15))
+        )
+        # The throttle counts failures per username across the shared database.
+        username = f"tl-zq-canary-throttled-{uuid.uuid4().hex[:8]}"
+        api_token = "tl-zq-canary-token-throttled"
+        first_id = await self._pending_request_id(provider, "telemetry-client-throttle-1")
+        first = await provider.handle_login_post(_login_post_request(first_id, username, api_token))
+        assert first.status_code == 200
+        blocked_id = await self._pending_request_id(provider, "telemetry-client-throttle-2")
+
+        with caplog.at_level(logging.DEBUG):
+            blocked = await provider.handle_login_post(
+                _login_post_request(blocked_id, username, api_token)
+            )
+
+        assert blocked.status_code == 429
+        record = self._login_record(caplog, "auth.login.throttled")
+        assert record.levelno == logging.WARNING
+        assert record.exc_info is None
+        assert logged_field(record, "username") == str(identifiable_value(username))
+        assert logged_field(record, "username").startswith("hmac-sha256:")
+        assert_absent_from_records(caplog, username)
+        assert_absent_from_records(caplog, api_token)
+        assert_absent_from_records(caplog, _CSRF_TOKEN)
 
 
 class TestTokenLifecycle:

@@ -22,6 +22,7 @@ from backstop_mcp.features.resolution import (
     client_supports_elicitation,
     elicit_from_client,
 )
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,10 @@ async def elicit_entity_deletion(
         timeout_seconds = get_resolution_config().elicit_timeout_seconds
 
     if not client_supports_elicitation(ctx):
-        logger.info(
+        info_event(
+            logger,
             "elicitation.entity_deletion.skipped",
-            extra={"reason": "client lacks elicitation capability"},
+            reason="client lacks elicitation capability",
         )
         return EntityDeletion.NOT_AVAILABLE
 
@@ -104,26 +106,23 @@ async def elicit_entity_deletion(
         answered = cast("Mapping[object, object]", responses).get(_ASK)
     if isinstance(answered, ElicitResult):
         if answered.action != "accept":
-            logger.info(
-                "elicitation.entity_deletion.dismissed",
-                extra={"action": answered.action},
-            )
+            info_event(logger, "elicitation.entity_deletion.dismissed", action=answered.action)
             return EntityDeletion.DECLINED
         try:
             accepted = handle_elicit_accept(config, answered.content)
         except Exception as exc:
-            logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
+            warning_event(logger, "elicitation.entity_deletion.degraded", exc=exc)
             return EntityDeletion.DECLINED
         data = cast("object", accepted.data)
         if isinstance(data, DeletionChoice) and data.choice == DELETE:
             return EntityDeletion.CONFIRMED
-        logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
+        info_event(logger, "elicitation.entity_deletion.dismissed", action="kept")
         return EntityDeletion.DECLINED
 
     # 2026-07-28: picker is this tools/call result; client retries with input_responses.
     # Handshake: mid-call elicit (GET on /mcp) via elicit_from_client.
     if asks_as_tool_result(ctx):
-        logger.info("elicitation.entity_deletion.input_required")
+        info_event(logger, "elicitation.entity_deletion.input_required")
         return InputRequiredResult(
             input_requests={
                 _ASK: ElicitRequest(
@@ -137,25 +136,20 @@ async def elicit_entity_deletion(
         async with asyncio.timeout(timeout_seconds):
             result = await elicit_from_client(ctx, message, DeletionChoice)
     except TimeoutError:
-        logger.warning(
-            "elicitation.entity_deletion.timed_out",
-            extra={"timeout_seconds": timeout_seconds},
+        warning_event(
+            logger, "elicitation.entity_deletion.timed_out", timeout_seconds=timeout_seconds
         )
         return EntityDeletion.DECLINED
     except Exception as exc:
-        logger.warning("elicitation.entity_deletion.degraded", extra={"error": str(exc)})
+        warning_event(logger, "elicitation.entity_deletion.degraded", exc=exc)
         return EntityDeletion.DECLINED
 
     if isinstance(result, AcceptedElicitation) and result.data.choice == DELETE:
         return EntityDeletion.CONFIRMED
     if isinstance(result, AcceptedElicitation):
-        logger.info("elicitation.entity_deletion.dismissed", extra={"action": "kept"})
+        info_event(logger, "elicitation.entity_deletion.dismissed", action="kept")
         return EntityDeletion.DECLINED
 
-    logger.info(
-        "elicitation.entity_deletion.dismissed",
-        extra={
-            "action": "cancelled" if isinstance(result, CancelledElicitation) else "declined",
-        },
-    )
+    action = "cancelled" if isinstance(result, CancelledElicitation) else "declined"
+    info_event(logger, "elicitation.entity_deletion.dismissed", action=action)
     return EntityDeletion.DECLINED

@@ -22,6 +22,7 @@ from backstop_mcp.features.org_people_writes.create_organization_input import (
 from backstop_mcp.features.org_people_writes.responses import CreatedOrganizationResponse
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -45,7 +46,11 @@ class CreateOrganizationCommand:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, organization: CreateOrganizationInput) -> CreatedOrganizationResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.create_organization"):
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.create_organization",
+            record_exception=False,
+            set_status_on_exception=False,
+        ):
             owner = await self._system_users_service.resolve_relationship(organization.owner_login)
             attributes = omit_none_values(organization_attributes(organization))
             relationships = omit_none_values(
@@ -64,7 +69,7 @@ class CreateOrganizationCommand:
             written = await self._client.get(
                 f"/{_RESOURCE_TYPE}/{quote(created_id, safe='')}", schema=_Document
             )
-            logger.info("org_people_writes.organization.created", extra={"id": created_id})
+            info_event(logger, "org_people_writes.organization.created", id=created_id)
             return CreatedOrganizationResponse(
                 id=created_id,
                 resource_type=_RESOURCE_TYPE,

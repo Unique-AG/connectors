@@ -15,6 +15,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.observability import install_caller_failure_redaction
 from backstop_mcp.teardown import close_singletons
+from backstop_mcp.utils import LogsDiagnosticDataPolicy, configure_identifiable_values
 from backstop_mcp.utils.identifiable_value import reset_identifiable_values
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
@@ -28,6 +29,19 @@ def _reset_pseudonym_mode() -> Iterator[None]:
     reset_identifiable_values()
     yield
     reset_identifiable_values()
+
+
+@pytest.fixture
+def keyed_pseudonyms() -> None:
+    """The mode a deployment at `LOG_LEVEL=info` runs: `hmac-sha256:` pseudonyms.
+
+    `_reset_pseudonym_mode` undoes it after the test.
+    """
+    configure_identifiable_values(
+        policy=LogsDiagnosticDataPolicy.CONCEAL,
+        log_level="info",
+        encryption_key=b"backstop-mcp-test-key",
+    )
 
 
 @pytest.fixture

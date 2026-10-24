@@ -23,6 +23,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -75,13 +76,8 @@ async def end_employment(
         return unresolved_party_response(organization_result)
     person = person_result.value
     organization = organization_result.value
-    logger.info(
-        "org_people_writes.end_employment.start",
-        extra={
-            "person_id": person.id,
-            "person_search_type": person.search_type,
-            "organization_id": organization.id,
-        },
+    add_call_fields(
+        person_id=person.id, person_search_type=person.search_type, organization_id=organization.id
     )
     return await end_employment_command.run(
         person_id=person.id,

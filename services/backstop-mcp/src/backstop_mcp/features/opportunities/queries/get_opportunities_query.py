@@ -19,6 +19,7 @@ from backstop_mcp.features.opportunities.responses import (
     PartyOpportunitiesResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import failed_fields, info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class GetOpportunitiesQuery:
         )
         stage_id_to_name = get_stage_id_to_name_map(pages.included)
         opportunities_mapped: list[OpportunityResponse] = []
+        unreadable: list[tuple[str, ValidationError]] = []
         for opportunity in pages.items:
             try:
                 opportunity_mapped = await self.map_opportunity_to_response_util.run(
@@ -84,11 +86,21 @@ class GetOpportunitiesQuery:
                 )
                 opportunities_mapped.append(opportunity_mapped)
             except ValidationError as exc:
-                logger.warning(
-                    "opportunities.record.unreadable",
-                    extra={"opportunity_id": opportunity.id},
-                    exc_info=exc,
+                logger.debug(
+                    "opportunities.record.unreadable", extra={"opportunity_id": opportunity.id}
                 )
+                unreadable.append((opportunity.id, exc))
+        if unreadable:
+            warning_event(
+                logger,
+                "opportunities.record.unreadable",
+                exc=unreadable[0][1],
+                segment=segment,
+                entity_id=entity_id,
+                count=len(unreadable),
+                sample_ids=[opportunity_id for opportunity_id, _ in unreadable[:5]],
+                failed_fields=failed_fields(failure for _, failure in unreadable),
+            )
 
         selected = tuple(
             opportunity
@@ -107,15 +119,14 @@ class GetOpportunitiesQuery:
             ),
             custom_fields_unavailable=catalog is None,
         )
-        logger.info(
+        info_event(
+            logger,
             "opportunities.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "status": status,
-                "total": result.total,
-                "returned": len(result.opportunities),
-            },
+            segment=segment,
+            entity_id=entity_id,
+            status=status,
+            total=result.total,
+            returned=len(result.opportunities),
         )
         return result
 

@@ -3,6 +3,7 @@ developer has to act.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import ClassVar
 
 import httpx
@@ -27,3 +28,8 @@ def failure_level(exc: BaseException) -> int:
             return logging.WARNING
         return failure_level(cause)
     return logging.ERROR
+
+
+def most_severe(failures: Sequence[BaseException]) -> BaseException:
+    """The failure to report for a batch: a bug outranks the timeouts around it."""
+    return max(failures, key=failure_level)

@@ -44,6 +44,7 @@ from datetime import timedelta
 from typing import Literal
 
 from backstop_mcp.metrics import CATALOG_FETCH_DURATION, CATALOG_GET_DURATION
+from backstop_mcp.observability import failure_event
 from backstop_mcp.timed_gate import TimedGate
 
 __all__ = ["CacheFreshness", "CacheSource", "CachedValue"]
@@ -226,17 +227,14 @@ class CachedValue[T]:
         except Exception as error:
             held = self._value
             if self._serve_stale and held is not None:
-                logger.warning(
+                failure_event(
+                    logger,
                     f"{self._log_prefix}.refresh_failed_serving_stale",
-                    extra={
-                        "catalog": self._name,
-                        "fetched_at": (
-                            self._freshness.marked_at.isoformat()
-                            if self._freshness.marked_at
-                            else None
-                        ),
-                    },
-                    exc_info=True,
+                    error,
+                    catalog=self._name,
+                    fetched_at=(
+                        self._freshness.marked_at.isoformat() if self._freshness.marked_at else None
+                    ),
                 )
                 self._record_load("stale")
                 self._freshness.mark()

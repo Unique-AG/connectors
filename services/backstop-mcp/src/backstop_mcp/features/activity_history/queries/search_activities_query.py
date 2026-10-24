@@ -33,6 +33,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import SearchCursor, continuation
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
+from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +62,16 @@ _TYPE_LABELS: dict[EntityActivityType, str] = {
 
 
 class _ProjectedPage(BaseModel):
-    """One page checked against the filters: kept rows by index, dropped indices, violations."""
+    """One page checked against the filters: kept rows by index, dropped indices, violations.
+
+    `unreadable` pairs each unparseable row's index with its id, when the raw row had one.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     rows: tuple[tuple[int, EntityActivityDto], ...]
     dropped: tuple[int, ...]
+    unreadable: tuple[tuple[int, str | None], ...]
     violating: dict[str, int]
 
 
@@ -120,6 +125,7 @@ class SearchActivitiesQuery:
         )
         start_offset = 0 if resume is None else resume.offsets[0]
         collected: list[EntityActivityDto] = []
+        unreadable: list[str | None] = []
         dropped = 0
         rows_received = 0
         pages_fetched = 0
@@ -164,10 +170,12 @@ class SearchActivitiesQuery:
             except (BackstopApiError, BackstopResponseSchemaError) as exc:
                 if pages_fetched == 0:
                     raise
-                logger.warning(
+                warning_event(
+                    logger,
                     "activity_history.entity_activities.later_page_failed_returning_partial",
-                    extra={"page_num": page_num, "pages_fetched": pages_fetched},
-                    exc_info=exc,
+                    exc=exc,
+                    page_num=page_num,
+                    pages_fetched=pages_fetched,
                 )
                 partial_due_to_error = True
                 break
@@ -201,6 +209,7 @@ class SearchActivitiesQuery:
             skip = min(max(0, start_offset - page_offset), len(page.results))
             collected.extend(row for index, row in projected.rows if index >= skip)
             dropped += sum(1 for index in projected.dropped if index >= skip)
+            unreadable.extend(row_id for index, row_id in projected.unreadable if index >= skip)
             rows_received += len(page.results) - skip
             # A short page is not the end: an activity with no `regarding` party keeps its
             # position but is omitted. The end is positions reaching totalCount, or at the wall
@@ -222,19 +231,25 @@ class SearchActivitiesQuery:
                 break
             page_num += 1
 
-        logger.info(
+        if unreadable:
+            warning_event(
+                logger,
+                "activity_history.entity_activities.row_unreadable",
+                count=len(unreadable),
+                sample_ids=[row_id for row_id in unreadable if row_id is not None][:5],
+            )
+        info_event(
+            logger,
             "activity_history.entity_activities.fetched",
-            extra={
-                "pages": pages_fetched,
-                "returned": len(collected),
-                "dropped": dropped,
-                "received": rows_received,
-                "total_count": total_count,
-                "start_offset": start_offset,
-                "next_offset": next_offset,
-                "ceiling_clamped": ceiling_clamped,
-                "partial_due_to_error": partial_due_to_error,
-            },
+            pages=pages_fetched,
+            returned=len(collected),
+            dropped=dropped,
+            received=rows_received,
+            total_count=total_count,
+            start_offset=start_offset,
+            next_offset=next_offset,
+            ceiling_clamped=ceiling_clamped,
+            partial_due_to_error=partial_due_to_error,
         )
         return EntityActivitiesFetchDto(
             rows=tuple(collected),
@@ -350,14 +365,14 @@ class SearchActivitiesQuery:
         readable = 0
         party_hits = 0
         party_contradictions = 0
-        unreadable: list[int] = []
+        unreadable: list[tuple[int, str | None]] = []
         unprojectable: list[int] = []
         projected: list[tuple[int, EntityActivityDto]] = []
         for index, raw in enumerate(results):
             attributes = EntityActivityAttributes.safe_model_validate(raw)
             if attributes is None:
-                logger.warning("activity_history.entity_activities.row_unreadable")
-                unreadable.append(index)
+                raw_id = raw.get("id")
+                unreadable.append((index, str(raw_id) if isinstance(raw_id, str | int) else None))
                 continue
             readable += 1
             row_violation = False
@@ -408,7 +423,8 @@ class SearchActivitiesQuery:
             violating["total_count"] = 0
         return _ProjectedPage(
             rows=tuple(projected),
-            dropped=tuple(sorted((*unreadable, *unprojectable))),
+            dropped=tuple(sorted((*(index for index, _ in unreadable), *unprojectable))),
+            unreadable=tuple(unreadable),
             violating=violating,
         )
 
@@ -466,18 +482,19 @@ class SearchActivitiesQuery:
         for name, rows_violating in violating.items():
             if name in already_logged:
                 continue
-            logger.log(
-                logging.INFO if name == "total_count" else logging.WARNING,
-                "activity_history.entity_activities.filter_ignored",
-                extra={
-                    "filter": name,
-                    "rows_violating": rows_violating,
-                    "total_count": total_count,
-                    "body_shape": body_shape,
-                    "party_id": party_id,
-                    "resource_type": resource_type,
-                    "endpoint": "entity-activities",
-                },
+            fields: dict[str, object] = {
+                "filter": name,
+                "rows_violating": rows_violating,
+                "total_count": total_count,
+                "body_shape": body_shape,
+                "party_id": party_id,
+                "resource_type": resource_type,
+                "endpoint": "entity-activities",
+            }
+            if name == "total_count":
+                info_event(logger, "activity_history.entity_activities.filter_ignored", **fields)
+                continue
+            warning_event(
+                logger, "activity_history.entity_activities.filter_ignored", exc=None, **fields
             )
-            if name != "total_count":
-                BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})
+            BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})

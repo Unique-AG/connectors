@@ -31,6 +31,7 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_time_series_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -158,15 +159,12 @@ async def get_time_series(
             return ProductAmbiguousResponse.from_unresolved(outcome)
         resolved_id = outcome.value.id
 
-    logger.info(
-        "accounts.time_series.start",
-        extra={
-            "entity_type": entity_type,
-            "entity_id": resolved_id,
-            "series": series,
-            "start_date": None if start_date is None else start_date.isoformat(),
-            "end_date": None if end_date is None else end_date.isoformat(),
-        },
+    add_call_fields(
+        entity_type=entity_type,
+        entity_id=resolved_id,
+        series=series,
+        start_date=None if start_date is None else start_date.isoformat(),
+        end_date=None if end_date is None else end_date.isoformat(),
     )
     try:
         result = await get_time_series_query.run(
@@ -181,13 +179,7 @@ async def get_time_series(
             raise
         return NotFoundResponse(query=entity_id, scope=entity_type)
 
-    logger.info(
-        "accounts.time_series.completed",
-        extra={
-            "entity_type": entity_type,
-            "entity_id": resolved_id,
-            "series": series,
-            "points": len(result.points),
-        },
+    add_call_fields(
+        entity_type=entity_type, entity_id=resolved_id, series=series, points=len(result.points)
     )
     return result

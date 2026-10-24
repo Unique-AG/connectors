@@ -32,6 +32,7 @@ from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunit
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.observability import info_event, warning_event
 from backstop_mcp.utils import first_item, identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,11 @@ class UpdateOpportunityCommand:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
     async def run(self, *, new_opportunity: UpdateOpportunityInput) -> UpdatedOpportunityResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.update") as span:
+        with _tracer.start_as_current_span(
+            "opportunity_writes.command.update",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("opportunity_id", new_opportunity.opportunity_id)
             current = await self._read(new_opportunity.opportunity_id)
             catalog = await self._opportunity_stages_service.get_catalog()
@@ -95,13 +100,12 @@ class UpdateOpportunityCommand:
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
-            logger.info(
+            info_event(
+                logger,
                 "opportunity_writes.opportunity.updated",
-                extra={
-                    "id": new_opportunity.opportunity_id,
-                    "stage": stage_name,
-                    "warnings": len(warnings),
-                },
+                id=new_opportunity.opportunity_id,
+                stage_id=stage_id,
+                warnings=len(warnings),
             )
             return UpdatedOpportunityResponse(
                 id=new_opportunity.opportunity_id,
@@ -194,17 +198,20 @@ class UpdateOpportunityCommand:
         for login in logins:
             user = await self._system_users_service.find_by_user_name(login)
             if user is None:
-                logger.warning(
-                    "opportunity_writes.login.unresolved",
-                    extra={"login": identifiable_value(login)},
-                )
                 skipped.append(login)
                 continue
-            logger.info(
+            logger.debug(
                 "opportunity_writes.login.resolved",
                 extra={"login": identifiable_value(login), "id": user.id},
             )
             ids.append(user.id)
+        if skipped:
+            warning_event(
+                logger,
+                "opportunity_writes.login.unresolved",
+                count=len(skipped),
+                sample_ids=tuple(identifiable_value(login) for login in skipped[:5]),
+            )
         if not ids:
             return None, tuple(skipped)
         return tuple(ids), tuple(skipped)

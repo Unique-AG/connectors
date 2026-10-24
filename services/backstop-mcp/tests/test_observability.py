@@ -4,18 +4,22 @@ import logging
 from typing import ClassVar
 
 import httpx
+import pydantic
 import pytest
 from fastmcp.exceptions import ToolError, ValidationError
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 
+from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
 from backstop_mcp.observability import (
     DeclaresFailureLevel,
     add_call_fields,
     error_event,
+    failed_fields,
     failure_level,
     info_event,
+    most_severe,
     operation,
     tool_call_scope,
     warning_event,
@@ -131,6 +135,50 @@ class TestFailureLevel:
 
     def test_a_declared_level_wins(self) -> None:
         assert failure_level(_Declared("quiet")) == logging.INFO
+
+
+def _custom_field_failure(raw: object) -> pydantic.ValidationError:
+    with pytest.raises(pydantic.ValidationError) as exc_info:
+        pydantic.TypeAdapter(dict[str, list[CustomFieldValueAttributes]]).validate_python(raw)
+    return exc_info.value
+
+
+class TestFailedFields:
+    def test_names_our_fields_and_masks_record_keys_and_indexes(self) -> None:
+        failure = _custom_field_failure({"zq-canary label": [{"name": 5}]})
+
+        assert failed_fields([failure]) == ["*.*.name (string_type)"]
+
+    def test_never_carries_the_input(self) -> None:
+        failure = _custom_field_failure({"k": [{"name": {"zq-canary": "zq-canary-value"}}]})
+
+        assert "zq-canary" not in str(failed_fields([failure]))
+
+    def test_merges_a_batch_and_ignores_other_failures(self) -> None:
+        first = _custom_field_failure({"a": [{"name": 5}]})
+        second = _custom_field_failure({"b": "not a list"})
+
+        assert failed_fields([first, httpx.ReadTimeout("slow"), second]) == [
+            "* (list_type)",
+            "*.*.name (string_type)",
+        ]
+
+    def test_caps_the_list(self) -> None:
+        failure = _custom_field_failure({str(index): "not a list" for index in range(20)})
+
+        assert len(failed_fields([failure])) <= 10
+
+
+class TestMostSevere:
+    def test_a_bug_outranks_the_timeouts_around_it(self) -> None:
+        bug = KeyError("missing")
+
+        assert most_severe([httpx.ReadTimeout("slow"), bug, ToolError("nope")]) is bug
+
+    def test_among_equals_the_first_wins(self) -> None:
+        first = httpx.ReadTimeout("slow")
+
+        assert most_severe([first, httpx.ConnectError("down")]) is first
 
 
 class TestOperation:

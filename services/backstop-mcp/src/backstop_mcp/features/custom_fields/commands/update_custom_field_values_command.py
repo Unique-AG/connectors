@@ -32,6 +32,7 @@ from backstop_mcp.features.custom_fields.update_custom_field_values_input import
     UpdateCustomFieldValueInput,
     UpdateCustomFieldValuesInput,
 )
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -47,7 +48,11 @@ class UpdateCustomFieldValuesCommand:
         self._custom_fields_service: CustomFieldsService = custom_fields_service
 
     async def run(self, *, update: UpdateCustomFieldValuesInput) -> UpdateCustomFieldValuesResponse:
-        with _tracer.start_as_current_span("custom_fields.command.update_values") as span:
+        with _tracer.start_as_current_span(
+            "custom_fields.command.update_values",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("entity_type", update.entity_type)
             span.set_attribute("record_count", len(update.values))
             catalog, _freshness = await self._custom_fields_service.get()
@@ -82,15 +87,15 @@ class UpdateCustomFieldValuesCommand:
             )
             outcomes, warnings = self._outcomes(update.values, document.data.attributes)
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
-            logger.info(
+            info_event(
+                logger,
                 "custom_fields.values.updated",
-                extra={
-                    "entity_type": update.entity_type,
-                    "total_count": len(outcomes),
-                    "applied_count": applied_count,
-                    "failed_count": len(outcomes) - applied_count,
-                    "warning_count": len(warnings),
-                },
+                entity_type=update.entity_type,
+                entity_id=update.entity_id,
+                total_count=len(outcomes),
+                applied_count=applied_count,
+                failed_count=len(outcomes) - applied_count,
+                warning_count=len(warnings),
             )
             return UpdateCustomFieldValuesResponse(
                 total_count=len(outcomes),

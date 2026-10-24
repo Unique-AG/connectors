@@ -25,6 +25,7 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +75,7 @@ async def log_activity(
     # Every `log_activity` variant carries the secondary-party pair, so this reads straight
     # off the union rather than through a `getattr` the type checker cannot see.
     secondary_party_id = activity.secondary_party_id
-    logger.info(
-        "activity_writes.log.start",
-        extra={
-            "kind": activity.kind,
-            "search_type": party.search_type,
-            "party_id": party.id,
-        },
-    )
+    add_call_fields(kind=activity.kind, search_type=party.search_type, party_id=party.id)
     return await log_activity_command.run(
         activity=activity,
         party_id=party.id,

@@ -13,6 +13,7 @@ from pydantic import (
 from backstop_mcp.features.bulk_writes import BulkLoadSummaryAttributes
 from backstop_mcp.lenient import LenientBool, LenientInt
 from backstop_mcp.models import StrippedStr
+from backstop_mcp.observability import failed_fields, warning_event
 
 __all__ = [
     "BulkCustomFieldValuesAttributes",
@@ -109,6 +110,8 @@ def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttribut
     if not isinstance(value, list):
         return []
     rows: list[CustomFieldValueAttributes] = []
+    failures: list[ValidationError] = []
+    unreadable_ids: list[str | int] = []
     for item in cast(list[object], value):
         if isinstance(item, CustomFieldValueAttributes):
             rows.append(item)
@@ -117,8 +120,20 @@ def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttribut
             continue
         try:
             rows.append(CustomFieldValueAttributes.model_validate(item))
-        except ValidationError:
-            logger.warning("custom_fields.values.unreadable", exc_info=True)
+        except ValidationError as exc:
+            failures.append(exc)
+            definition_id = cast(Mapping[str, object], item).get("definitionId")
+            if isinstance(definition_id, str | int):
+                unreadable_ids.append(definition_id)
+    if failures:
+        warning_event(
+            logger,
+            "custom_fields.values.unreadable",
+            exc=failures[0],
+            count=len(failures),
+            sample_ids=unreadable_ids[:5],
+            failed_fields=failed_fields(failures),
+        )
     return rows
 
 

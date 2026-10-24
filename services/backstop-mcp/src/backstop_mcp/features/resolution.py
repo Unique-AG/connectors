@@ -50,6 +50,8 @@ from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.dependencies import get_resolution_config
+from backstop_mcp.observability import info_event, warning_event
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +261,7 @@ async def elicit_from_client[T](
     if not _on_streamable_http():
         return await ctx.elicit(message=message, response_type=response_type)
 
-    logger.info("resolution.elicit.standalone_stream")
+    info_event(logger, "resolution.elicit.standalone_stream")
     config = parse_elicit_response_type(response_type)
     # No related_request_id → Streamable HTTP GET stream, not the tools/call POST.
     raw = await ctx.session.elicit_form(message, config.schema)
@@ -288,10 +290,7 @@ def client_supports_elicitation(ctx: Context) -> bool:
             )
         )
     except Exception as exc:
-        logger.warning(
-            "resolution.elicit.capability_check_failed",
-            extra={"error": str(exc)},
-        )
+        warning_event(logger, "resolution.elicit.capability_check_failed", exc=exc)
         return False
 
 
@@ -371,17 +370,12 @@ def _apply_elicit_result[T](
     if isinstance(result, AcceptedElicitation):
         chosen = by_label.get(result.data)
         if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            warning_event(logger, "resolution.elicit.unknown_choice", exc=None, **outcome_log)
             return ambiguous
         return Resolved(value=chosen.value)
     assert isinstance(result, (DeclinedElicitation, CancelledElicitation))
-    logger.info(
-        "resolution.elicit.dismissed",
-        extra={
-            **outcome_log,
-            "action": "declined" if isinstance(result, DeclinedElicitation) else "cancelled",
-        },
-    )
+    action = "declined" if isinstance(result, DeclinedElicitation) else "cancelled"
+    info_event(logger, "resolution.elicit.dismissed", **outcome_log, action=action)
     return ambiguous
 
 
@@ -413,7 +407,7 @@ async def elicit_choice[T](
         timeout_seconds = get_resolution_config().elicit_timeout_seconds
 
     outcome_log: dict[str, object] = {
-        "query": ambiguous.query,
+        "query": identifiable_value(ambiguous.query),
         "scope": ambiguous.scope,
         "candidates": len(ambiguous.candidates),
     }
@@ -423,9 +417,11 @@ async def elicit_choice[T](
         return _resolved_by_key(ambiguous, prior[key])
 
     if not client_supports_elicitation(ctx):
-        logger.info(
+        info_event(
+            logger,
             "resolution.elicit.skipped",
-            extra={**outcome_log, "reason": "client lacks elicitation capability"},
+            **outcome_log,
+            reason="client lacks elicitation capability",
         )
         return ambiguous
 
@@ -437,19 +433,16 @@ async def elicit_choice[T](
         answered = cast("Mapping[object, object]", responses).get(key)
     if isinstance(answered, ElicitResult):
         if answered.action != "accept":
-            logger.info(
-                "resolution.elicit.dismissed",
-                extra={**outcome_log, "action": answered.action},
-            )
+            info_event(logger, "resolution.elicit.dismissed", **outcome_log, action=answered.action)
             return ambiguous
         try:
             accepted = handle_elicit_accept(config, answered.content)
         except Exception as exc:
-            logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
+            warning_event(logger, "resolution.elicit.degraded", exc=exc, **outcome_log)
             return ambiguous
         chosen = by_label.get(cast("str", accepted.data))
         if chosen is None:
-            logger.warning("resolution.elicit.unknown_choice", extra=outcome_log)
+            warning_event(logger, "resolution.elicit.unknown_choice", exc=None, **outcome_log)
             return ambiguous
         _remember(ctx, key, chosen.key)
         return Resolved(value=chosen.value)
@@ -457,7 +450,7 @@ async def elicit_choice[T](
     # 2026-07-28: picker is this tools/call result; client retries with input_responses.
     # Handshake: mid-call elicit (GET on /mcp) via elicit_from_client.
     if asks_as_tool_result(ctx):
-        logger.info("resolution.elicit.input_required", extra=outcome_log)
+        info_event(logger, "resolution.elicit.input_required", **outcome_log)
         return InputRequiredResult(
             input_requests={
                 key: ElicitRequest(
@@ -474,13 +467,16 @@ async def elicit_choice[T](
         async with asyncio.timeout(timeout_seconds):
             result = await elicit_from_client(ctx, prompt, list(by_label))
     except TimeoutError:
-        logger.warning(
+        warning_event(
+            logger,
             "resolution.elicit.timed_out",
-            extra={**outcome_log, "timeout_seconds": timeout_seconds},
+            exc=None,
+            **outcome_log,
+            timeout_seconds=timeout_seconds,
         )
         return ambiguous
     except Exception as exc:
-        logger.warning("resolution.elicit.degraded", extra={**outcome_log, "error": str(exc)})
+        warning_event(logger, "resolution.elicit.degraded", exc=exc, **outcome_log)
         return ambiguous
 
     return _apply_elicit_result(ambiguous, by_label, result, outcome_log)

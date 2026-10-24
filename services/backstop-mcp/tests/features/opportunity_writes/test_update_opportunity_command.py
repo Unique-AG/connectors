@@ -1,5 +1,6 @@
 """`UpdateOpportunityCommand`: PATCH payload shape, stage guards, notify-list append."""
 
+import logging
 from collections.abc import AsyncGenerator
 from datetime import date
 
@@ -20,6 +21,8 @@ from backstop_mcp.features.opportunity_writes import (
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import (
     BASE_URL,
+    SERVICE_LOGGER,
+    assert_absent_from_records,
     client_factory,
     credential,
     opportunity_stages_service,
@@ -605,3 +608,49 @@ class TestUpdateOpportunityCommand:
             )
 
         assert route.call_count == 0
+
+
+class TestUpdateOpportunityTelemetry:
+    @respx.mock
+    async def test_updated_line_carries_the_landed_stage_id_and_no_stage_name(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        landed_stage_name = "zq-canary-updated-stage"
+        reread: dict[str, object] = {
+            "data": {
+                "id": _ID,
+                "type": "opportunities",
+                "attributes": {"description": "now"},
+                "relationships": {
+                    "stage": {"data": {"id": "st-unlisted", "type": "opportunity-stages"}}
+                },
+            },
+            "included": [resource("st-unlisted", "opportunity-stages", name=landed_stage_name)],
+        }
+        _mock_catalogs()
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
+            side_effect=[
+                _opportunity_document(_ID, description="was"),
+                httpx.Response(200, json=reread),
+            ]
+        )
+        respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=_opportunity_document(_ID, description="now")
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER):
+            result = await make_command(client).run(
+                new_opportunity=_update(opportunity_id=_ID, description="now")
+            )
+
+        assert result.stage == landed_stage_name
+        (updated,) = [
+            record
+            for record in caplog.records
+            if record.message == "opportunity_writes.opportunity.updated"
+        ]
+        assert updated.levelno == logging.INFO
+        assert updated.__dict__["id"] == _ID
+        assert updated.__dict__["stage_id"] == "st-unlisted"
+        assert "stage" not in updated.__dict__
+        assert_absent_from_records(caplog, landed_stage_name)

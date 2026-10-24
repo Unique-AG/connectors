@@ -7,6 +7,8 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.features.reports.responses import RunReportResponse
+from backstop_mcp.observability import info_event
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,9 @@ class ReportRunCache:
         run = self._runs.pop(key)
         if not run.task.done():
             run.task.cancel()
-            logger.info(
+            info_event(
+                logger,
                 "reports.run.evicted",
-                extra={"report_name": key.report_name, "reason": reason},
+                report_name=identifiable_value(key.report_name),
+                reason=reason,
             )

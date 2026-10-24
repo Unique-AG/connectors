@@ -34,6 +34,7 @@ from backstop_mcp.features.resolution import (
     input_required,
 )
 from backstop_mcp.models import NonEmptyStr
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -252,13 +253,12 @@ async def extract_fetch_activity_history_args(
                 party=ResolvedPartyDto(id=entity_id, search_type=search_type, name=None),
                 continuations=dict(continuations),
             )
-            logger.info(
+            info_event(
+                logger,
                 "activity_history.args.next",
-                extra={
-                    "segment": args.segment,
-                    "entity_id": args.entity_id,
-                    "activity_types": list(args.continuations),
-                },
+                segment=args.segment,
+                entity_id=args.entity_id,
+                activity_types=list(args.continuations),
             )
             return args
         case ActivityHistoryFirstPageInput(
@@ -280,14 +280,13 @@ async def extract_fetch_activity_history_args(
             if input_required(result):
                 return result
             if not isinstance(result, Resolved):
-                logger.info(
+                info_event(
+                    logger,
                     "activity_history.args.unresolved",
-                    extra={
-                        "search_type": search_type,
-                        "has_party_id": party_id is not None,
-                        "has_search": search is not None,
-                        "status": result.status,
-                    },
+                    search_type=search_type,
+                    has_party_id=party_id is not None,
+                    has_search=search is not None,
+                    status=result.status,
                 )
                 return unresolved_party_response(result)
             party = result.value
@@ -313,12 +312,11 @@ async def extract_fetch_activity_history_args(
                     for activity_type in effective_types
                 },
             )
-            logger.info(
+            info_event(
+                logger,
                 "activity_history.args.first",
-                extra={
-                    "segment": args.segment,
-                    "entity_id": args.entity_id,
-                    "activity_types": list(args.continuations),
-                },
+                segment=args.segment,
+                entity_id=args.entity_id,
+                activity_types=list(args.continuations),
             )
             return args

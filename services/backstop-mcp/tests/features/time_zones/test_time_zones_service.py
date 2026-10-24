@@ -1,10 +1,19 @@
+import logging
+
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
 from backstop_mcp.features.time_zones import TimeZoneDto, TimeZonesService
-from tests.helpers import BASE_URL, recorded_requests, resource, time_zones_service, tool_client
+from tests.helpers import (
+    BASE_URL,
+    aggregated_warning,
+    recorded_requests,
+    resource,
+    time_zones_service,
+    tool_client,
+)
 
 
 def tenant(name: str) -> str:
@@ -176,3 +185,23 @@ class TestResolve:
             await time_zones_service(client).resolve("US/Eastern")
 
         assert _filter_params(recorded_requests(zones_route.calls)[0].url.params) == []
+
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("tz-conflicts")
+        ids = [f"zone_{index}" for index in range(7)]
+        respx.get(f"{base_url}/time-zones").mock(
+            return_value=_collection_page(
+                _zone("america_new_york", short_name="US/Eastern", name="Eastern Standard Time"),
+                *(_zone(i, short_name=f"Zone/{i}", name="Original") for i in ids),
+                *(_zone(i, short_name=f"Zone/{i}", name="Changed") for i in ids),
+            )
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING):
+                await time_zones_service(client).resolve("US/Eastern")
+
+        aggregated_warning(caplog, "time_zones.catalog.duplicate_id", count=7, sample_ids=ids[:5])

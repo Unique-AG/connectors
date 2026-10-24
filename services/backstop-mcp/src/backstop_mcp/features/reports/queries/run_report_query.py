@@ -14,6 +14,8 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
     ReportRunKey,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
+from backstop_mcp.observability import info_event, span_attributes, warning_event
+from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -64,8 +66,11 @@ class RunReportQuery:
     ) -> RunReportResponse | RunReportPendingResponse:
         assert 1 <= limit <= MAX_REPORT_PAGE_SIZE
         assert offset >= 0
-        with _tracer.start_as_current_span("reports.query.run") as span:
-            span.set_attribute("report_name", report_name)
+        logged_report_name = identifiable_value(report_name)
+        with _tracer.start_as_current_span(
+            "reports.query.run", record_exception=False, set_status_on_exception=False
+        ) as span:
+            span.set_attributes(span_attributes({"report_name": logged_report_name}))
             span.set_attribute("as_of_date", as_of_date.isoformat())
             span.set_attribute("limit", limit)
             span.set_attribute("offset", offset)
@@ -91,13 +96,12 @@ class RunReportQuery:
             if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
-                logger.info(
+                info_event(
+                    logger,
                     "reports.run.pending",
-                    extra={
-                        "report_name": report_name,
-                        "as_of_date": as_of_date.isoformat(),
-                        "running_seconds": running_seconds,
-                    },
+                    report_name=logged_report_name,
+                    as_of_date=as_of_date.isoformat(),
+                    running_seconds=running_seconds,
                 )
                 return RunReportPendingResponse(
                     report_name=report_name,
@@ -142,7 +146,10 @@ class RunReportQuery:
         limit: int,
         offset: int,
     ) -> RunReportResponse:
-        with _tracer.start_as_current_span("reports.query.fetch"):
+        logged_report_name = identifiable_value(report_name)
+        with _tracer.start_as_current_span(
+            "reports.query.fetch", record_exception=False, set_status_on_exception=False
+        ):
             page = await self._client.fetch_page(
                 "/reports",
                 schema=ReportResource,
@@ -158,6 +165,7 @@ class RunReportQuery:
             # Backstop's offset counts values it sent, not rows we could read; advancing by
             # len(records) would re-request each dropped slot and duplicate the rest.
             consumed = 0
+            unreadable_offsets: list[int] = []
             for report in page.items:
                 result = report.attributes.result
                 if result is None:
@@ -167,9 +175,17 @@ class RunReportQuery:
                 for value in result.values:
                     consumed += 1
                     if not isinstance(value, dict):
-                        logger.warning("reports.row.unreadable", extra={"report_name": report_name})
+                        unreadable_offsets.append(offset + consumed - 1)
                         continue
                     records.append(cast("dict[str, object]", value))
+            if unreadable_offsets:
+                warning_event(
+                    logger,
+                    "reports.row.unreadable",
+                    report_name=logged_report_name,
+                    count=len(unreadable_offsets),
+                    sample_offsets=unreadable_offsets[:5],
+                )
             columns = self._columns(header, records)
             rows = tuple(tuple(record.get(key) for key in columns) for record in records)
             total = page.total_count
@@ -188,16 +204,15 @@ class RunReportQuery:
                 offset=offset,
                 next_offset=next_offset,
             )
-            logger.info(
+            info_event(
+                logger,
                 "reports.fetched",
-                extra={
-                    "report_name": report_name,
-                    "as_of_date": as_of_date.isoformat(),
-                    "offset": offset,
-                    "limit": limit,
-                    "row_count": fetched.row_count,
-                    "total": fetched.total,
-                },
+                report_name=logged_report_name,
+                as_of_date=as_of_date.isoformat(),
+                offset=offset,
+                limit=limit,
+                row_count=fetched.row_count,
+                total=fetched.total,
             )
             return fetched
 

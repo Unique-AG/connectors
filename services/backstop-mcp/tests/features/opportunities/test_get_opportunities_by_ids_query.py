@@ -1,6 +1,8 @@
 """`GetOpportunitiesByIdsQuery`: per-id GET, catalog join, not-found, and opt-in history."""
 
+import logging
 from collections.abc import Sequence
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -8,9 +10,18 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
-from backstop_mcp.features.opportunities import GetOpportunitiesByIdsResponse
+from backstop_mcp.features.opportunities import (
+    GetOpportunitiesByIdsResponse,
+    MapOpportunityToResponseUtil,
+)
 from tests.features.opportunities.conftest import VOCABULARY, make_get_opportunities_by_ids_query
-from tests.helpers import BASE_URL, recorded_requests, resource
+from tests.helpers import (
+    BASE_URL,
+    aggregated_warning,
+    recorded_requests,
+    resource,
+    validation_error,
+)
 
 _STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _DEFINITIONS_URL = f"{BASE_URL}/custom-field-definitions"
@@ -419,3 +430,50 @@ class TestGetOpportunitiesByIdsQuery:
         assert len(result.errors) == 1
         assert result.errors[0].id == "broken"
         assert result.errors[0].detail == "unreadable opportunity document"
+
+
+class TestCopedWithFailures:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_requests_produce_one_warning_per_call(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [f"down-{index}" for index in range(7)]
+        for opportunity_id in ids:
+            respx.get(f"{BASE_URL}/opportunities/{opportunity_id}").mock(
+                side_effect=httpx.ConnectError("backstop down")
+            )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client, ids=ids)
+
+        assert [error.id for error in result.errors] == ids
+        record = aggregated_warning(
+            caplog, "opportunities.by_ids.request_failed", count=7, sample_ids=ids[:5]
+        )
+        assert record.__dict__["error_type"] == "ConnectError"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_records_produce_one_warning_per_call(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ids = [f"deal-{index}" for index in range(7)]
+        for opportunity_id in ids:
+            respx.get(f"{BASE_URL}/opportunities/{opportunity_id}").mock(
+                return_value=_document(_opportunity(opportunity_id))
+            )
+        monkeypatch.setattr(
+            MapOpportunityToResponseUtil, "run", AsyncMock(side_effect=validation_error())
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client, ids=ids)
+
+        assert [error.detail for error in result.errors] == ["unreadable opportunity record"] * 7
+        aggregated_warning(
+            caplog, "opportunities.by_ids.record.unreadable", count=7, sample_ids=ids[:5]
+        )

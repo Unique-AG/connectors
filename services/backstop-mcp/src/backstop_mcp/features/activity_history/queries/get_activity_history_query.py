@@ -64,6 +64,7 @@ from backstop_mcp.features.includes import (
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
+from backstop_mcp.observability import failure_event, info_event, most_severe, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -125,19 +126,12 @@ class GetActivityHistoryQuery:
         settled = await asyncio.gather(*page_calls.values(), return_exceptions=True)
 
         groups: dict[ActivityType, ActivityGroupResponse[TimelineRecord]] = {}
+        forbidden: list[tuple[ActivityType, BackstopApiError]] = []
         for (activity_type, continuation), result in zip(
             continuations.items(), settled, strict=True
         ):
             if isinstance(result, BackstopApiError) and result.status_code == 403:
-                logger.warning(
-                    "activity_history.stream.forbidden",
-                    extra={
-                        "segment": segment,
-                        "entity_id": entity_id,
-                        "stream": activity_type,
-                        "detail": result.detail,
-                    },
-                )
+                forbidden.append((activity_type, result))
                 groups[activity_type] = ActivityGroupResponse(
                     activity_type=activity_type,
                     items=(),
@@ -156,6 +150,16 @@ class GetActivityHistoryQuery:
                 since=continuation.since,
                 until=continuation.until,
                 activity_tag_ids=continuation.activity_tag_ids,
+            )
+        if forbidden:
+            warning_event(
+                logger,
+                "activity_history.stream.forbidden",
+                exc=forbidden[0][1],
+                segment=segment,
+                entity_id=entity_id,
+                count=len(forbidden),
+                streams=[activity_type for activity_type, _ in forbidden],
             )
 
         attributes = document.data.attributes
@@ -261,17 +265,16 @@ class GetActivityHistoryQuery:
             )
             for resource, row_attendees in zip(resources, attendees, strict=True)
         )
-        logger.info(
+        info_event(
+            logger,
             "activity_history.activity_page.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "stream": stream,
-                "raw_count": raw_count,
-                "kept": len(items),
-                "end_of_stream": end_of_stream,
-                "offset": offset,
-            },
+            segment=segment,
+            entity_id=entity_id,
+            stream=stream,
+            raw_count=raw_count,
+            kept=len(items),
+            end_of_stream=end_of_stream,
+            offset=offset,
         )
         return items, end_of_stream
 
@@ -315,15 +318,14 @@ class GetActivityHistoryQuery:
             for resource in page.items
         )
         end_of_stream = len(page.items) < limit
-        logger.info(
+        info_event(
+            logger,
             "activity_history.email_page.fetched",
-            extra={
-                "segment": segment,
-                "entity_id": entity_id,
-                "count": len(items),
-                "end_of_stream": end_of_stream,
-                "offset": offset,
-            },
+            segment=segment,
+            entity_id=entity_id,
+            count=len(items),
+            end_of_stream=end_of_stream,
+            offset=offset,
         )
         return items, end_of_stream
 
@@ -374,16 +376,15 @@ class GetActivityHistoryQuery:
                 )
                 continue
             if effective_date < since:
-                logger.info(
+                info_event(
+                    logger,
                     "activity_history.since_truncate.cutoff",
-                    extra={
-                        "activity_id": resource.id,
-                        "stream": stream,
-                        "effective_date": effective_date.isoformat(),
-                        "since": since.isoformat(),
-                        "kept": index,
-                        "dropped": len(resources) - index,
-                    },
+                    activity_id=resource.id,
+                    stream=stream,
+                    effective_date=effective_date.isoformat(),
+                    since=since.isoformat(),
+                    kept=index,
+                    dropped=len(resources) - index,
                 )
                 return resources[:index], True
         return resources, False
@@ -417,10 +418,26 @@ class GetActivityHistoryQuery:
             return_exceptions=True,
         )
         results = iter(fetched)
-        return tuple(
+        attendees = tuple(
             None if resource_id is None else self._attendee_responses(resource_id, next(results))
             for resource_id in resource_ids
         )
+        looked_up = [resource_id for resource_id in resource_ids if resource_id is not None]
+        failures = [
+            (resource_id, result)
+            for resource_id, result in zip(looked_up, fetched, strict=True)
+            if isinstance(result, BaseException)
+        ]
+        if failures:
+            failure_event(
+                logger,
+                "activity_history.attendees.join_failed",
+                most_severe([failure for _, failure in failures]),
+                stream=stream,
+                count=len(failures),
+                sample_ids=[resource_id for resource_id, _ in failures[:5]],
+            )
+        return attendees
 
     def _record_from_resource(
         self,
@@ -491,10 +508,8 @@ class GetActivityHistoryQuery:
         if isinstance(fetched, BaseException):
             if not isinstance(fetched, Exception) or isinstance(fetched, BATCH_ABORTING_ERRORS):
                 raise fetched
-            logger.warning(
-                "activity_history.attendees.join_failed",
-                extra={"resource_id": resource_id},
-                exc_info=fetched,
+            logger.debug(
+                "activity_history.attendees.join_failed", extra={"resource_id": resource_id}
             )
             return None
         return tuple(

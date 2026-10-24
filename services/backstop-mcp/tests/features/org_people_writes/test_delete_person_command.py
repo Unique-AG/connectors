@@ -1,5 +1,6 @@
 """`DeletePartyWithLocationsCommand` against `/people/{id}`."""
 
+import logging
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
@@ -77,7 +78,7 @@ def _party_not_found() -> httpx.Response:
 class TestDeletePartyWithLocationsAgainstPeople:
     @respx.mock
     async def test_delete_person_deletes_locations_before_the_party(
-        self, client: BackstopClient
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
     ) -> None:
         preview = respx.get(f"{BASE_URL}/people/{_ID}").mock(
             return_value=httpx.Response(200, json=_person_document())
@@ -90,9 +91,25 @@ class TestDeletePartyWithLocationsAgainstPeople:
         )
         party = respx.delete(f"{BASE_URL}/people/{_ID}").mock(return_value=httpx.Response(204))
 
-        result = await make_command(client).run(collection="people", party_id=_ID)
+        with caplog.at_level(logging.INFO):
+            result = await make_command(client).run(collection="people", party_id=_ID)
 
         assert result == (_LOC_1, _LOC_2)
+        party_deleted = next(
+            record
+            for record in caplog.records
+            if record.message == "org_people_writes.party.deleted"
+        )
+        location_deleted = [
+            record
+            for record in caplog.records
+            if record.message == "org_people_writes.contact_location.deleted"
+        ]
+        assert party_deleted.levelno == logging.WARNING
+        assert party_deleted.__dict__["id"] == _ID
+        assert [record.levelno for record in location_deleted] == [logging.WARNING, logging.WARNING]
+        logged = " ".join(record.getMessage() + str(record.__dict__) for record in caplog.records)
+        assert _NAME not in logged
         assert preview.call_count == 1
         assert loc_1.call_count == 1
         assert loc_2.call_count == 1

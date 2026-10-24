@@ -16,6 +16,7 @@ from backstop_mcp.features.opportunity_writes import (
     get_update_opportunity_command_factory,
 )
 from backstop_mcp.models import published_output_schema
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,5 @@ async def update_opportunity(
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>",
     "stage": "<stage name from get_opportunities>", "probability": 0.3}}
     """
-    logger.info(
-        "opportunity_writes.update.start",
-        extra={"opportunity_id": opportunity.opportunity_id},
-    )
+    add_call_fields(opportunity_id=opportunity.opportunity_id)
     return await update_opportunity_command.run(new_opportunity=opportunity)

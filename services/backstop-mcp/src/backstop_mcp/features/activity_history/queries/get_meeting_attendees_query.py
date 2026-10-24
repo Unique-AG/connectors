@@ -11,6 +11,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.activity_history.api_responses import AttendeeAttributes
 from backstop_mcp.features.activity_history.internal_dto import AttendeeDto
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -23,7 +24,11 @@ class GetMeetingAttendeesQuery:
         self._client: BackstopClient = client
 
     async def run(self, *, resource_id: str) -> tuple[AttendeeDto, ...]:
-        with _tracer.start_as_current_span("activity_history.query.meeting_attendees") as span:
+        with _tracer.start_as_current_span(
+            "activity_history.query.meeting_attendees",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("resource_id", resource_id)
             logger.debug("activity_history.attendees.fetch", extra={"resource_id": resource_id})
             page = await self._client.paginate(
@@ -52,9 +57,11 @@ class GetMeetingAttendeesQuery:
                         "total": len(attendees),
                     },
                 )
-            logger.info(
+            info_event(
+                logger,
                 "activity_history.attendees.fetched",
-                extra={"resource_id": resource_id, "count": len(attendees)},
+                resource_id=resource_id,
+                count=len(attendees),
             )
             return attendees
 

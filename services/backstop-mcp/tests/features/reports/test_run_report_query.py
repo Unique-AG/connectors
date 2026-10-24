@@ -1,12 +1,14 @@
 """`RunReportQuery`: one GET /reports page, flattened to columns and rows."""
 
 import asyncio
+import logging
 import time
 from datetime import date
 
 import httpx
 import pytest
 import respx
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.reports import (
@@ -18,8 +20,18 @@ from backstop_mcp.features.reports import (
     RunReportResponse,
 )
 from backstop_mcp.features.reports.queries import REPORT_RUN_CACHE_SIZE, REPORT_RUN_TTL_SECONDS
+from backstop_mcp.utils import identifiable_value
 from tests.features.reports.conftest import make_run_report_query
-from tests.helpers import BASE_URL, client_factory, credential, recorded_params
+from tests.helpers import (
+    BASE_URL,
+    SERVICE_LOGGER,
+    aggregated_warning,
+    assert_canary_absent,
+    client_factory,
+    credential,
+    logged_field,
+    recorded_params,
+)
 
 _REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
@@ -208,6 +220,28 @@ class TestRunReportQuery:
 
         assert result.row_count == 1
         assert result.rows == (("ok@example.com", "Ok"),)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_values_produce_one_warning_per_page(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unreadable: list[object] = ["not-a-row"] * 7
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": "ok@example.com", "Company Name": "Ok"},
+                extra_values=unreadable,
+                total=30,
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client, limit=10, offset=10)
+
+        assert result.row_count == 1
+        aggregated_warning(
+            caplog, "reports.row.unreadable", count=7, sample_offsets=[11, 12, 13, 14, 15]
+        )
 
     @pytest.mark.asyncio
     @respx.mock
@@ -588,3 +622,70 @@ class TestRunReportQueryColdBuild:
 
         # Backstop decides what each caller may see, so one caller never collects another's run.
         assert build.started == 2
+
+
+_CANARY_REPORT_NAME = "zq-canary-report-name"
+
+
+def _report_names_logged(caplog: pytest.LogCaptureFixture, message: str) -> list[str]:
+    return [
+        logged_field(record, "report_name")
+        for record in caplog.records
+        if record.message == message
+    ]
+
+
+@pytest.mark.usefixtures("keyed_pseudonyms")
+class TestRunReportQueryTelemetry:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetched_line_and_span_carry_the_keyed_report_name(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        exporter: InMemorySpanExporter,
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": _CANARY_REPORT_NAME, "Company Name": _CANARY_REPORT_NAME}
+            )
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER):
+            await _run(client, report_name=_CANARY_REPORT_NAME)
+
+        pseudonym = str(identifiable_value(_CANARY_REPORT_NAME))
+        assert pseudonym.startswith("hmac-sha256:")
+        assert _report_names_logged(caplog, "reports.fetched") == [pseudonym]
+        (query_span,) = [
+            span for span in exporter.get_finished_spans() if span.name == "reports.query.run"
+        ]
+        assert query_span.attributes is not None
+        assert query_span.attributes["report_name"] == pseudonym
+        assert_canary_absent(caplog, exporter, _CANARY_REPORT_NAME)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_pending_and_evicted_lines_carry_the_keyed_report_name(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        exporter: InMemorySpanExporter,
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+        query = make_run_report_query(client, wait_seconds=0.05, cache_size=1)
+
+        with caplog.at_level(logging.DEBUG, logger=SERVICE_LOGGER):
+            first = await query.run(
+                report_name=_CANARY_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0
+            )
+            await query.run(report_name=_CANARY_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+            build.release.set()
+            await query.run(report_name=_CANARY_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=3)
+
+        assert isinstance(first, RunReportPendingResponse)
+        pseudonym = str(identifiable_value(_CANARY_REPORT_NAME))
+        assert _report_names_logged(caplog, "reports.run.pending") == [pseudonym, pseudonym]
+        assert _report_names_logged(caplog, "reports.run.evicted") == [pseudonym]
+        assert_canary_absent(caplog, exporter, _CANARY_REPORT_NAME)

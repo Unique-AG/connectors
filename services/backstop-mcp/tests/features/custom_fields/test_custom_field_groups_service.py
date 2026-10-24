@@ -5,6 +5,7 @@ The TTL, single-flight and serve-stale protocol behind `get` is `CachedValue`, e
 `tests/features/test_cached_catalog.py`.
 """
 
+import logging
 from collections.abc import AsyncGenerator, Callable
 
 import httpx
@@ -13,7 +14,7 @@ import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.features.custom_fields import CustomFieldGroupsService
-from tests.helpers import BASE_URL, client_factory, credential, resource
+from tests.helpers import BASE_URL, aggregated_warning, client_factory, credential, resource
 
 type ClientBuilder = Callable[[str], BackstopClient]
 
@@ -69,3 +70,34 @@ class TestCustomFieldGroupsService:
         assert groups["9"].full_path_name == ["Overview", "Status"]
         assert groups["9"].parent is not None
         assert groups["9"].parent.name == "Overview"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_produce_one_warning_per_walk(
+        self, clients: ClientBuilder, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = f"{BASE_URL}/custom-field-groups-conflicts"
+        service = CustomFieldGroupsService.with_ttl_minutes(
+            client=clients(base_url), ttl_minutes=60
+        )
+        ids = [str(500 + index) for index in range(7)]
+        respx.get(f"{base_url}/custom-field-groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        *(resource(i, "custom-field-groups", name="Original") for i in ids),
+                        *(resource(i, "custom-field-groups", name="Changed") for i in ids),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            groups, _cache = await service.get()
+
+        assert groups[ids[0]].name == "Original"
+        aggregated_warning(
+            caplog, "custom_fields.group_catalog.duplicate_id", count=7, sample_ids=ids[:5]
+        )

@@ -18,6 +18,7 @@ from backstop_mcp.features.data_hygiene import (
 )
 from backstop_mcp.features.org_people_writes.commands._open_employment import open_employment_id
 from backstop_mcp.features.org_people_writes.responses import EndedEmploymentResponse
+from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -50,7 +51,11 @@ class EndEmploymentCommand:
         organization_id: str,
         end_date: date,
     ) -> EndedEmploymentResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.end_employment") as span:
+        with _tracer.start_as_current_span(
+            "org_people_writes.command.end_employment",
+            record_exception=False,
+            set_status_on_exception=False,
+        ) as span:
             span.set_attribute("person_id", person_id)
             span.set_attribute("organization_id", organization_id)
             relationship_id = await open_employment_id(
@@ -81,13 +86,13 @@ class EndEmploymentCommand:
                 )
             elif not end_date < self._employment_index_factory.today():
                 warnings += (_NOT_YET_FORMER,)
-            logger.info(
+            info_event(
+                logger,
                 "org_people_writes.employment.ended",
-                extra={
-                    "id": relationship_id,
-                    "person_id": person_id,
-                    "organization_id": organization_id,
-                },
+                id=relationship_id,
+                person_id=person_id,
+                organization_id=organization_id,
+                warning_count=len(warnings),
             )
             return EndedEmploymentResponse(
                 id=relationship_id,
