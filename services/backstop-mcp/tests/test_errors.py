@@ -17,21 +17,39 @@ class _Schema(BaseModel):
 
 
 class TestBackstopResponseSchemaError:
-    def test_message_includes_path_and_schema_name(self) -> None:
+    def test_message_names_the_schema_and_locations_only(self) -> None:
         try:
-            _Schema.model_validate({})
+            _Schema.model_validate({"name": 42, "email": "jane@example.com"})
         except ValidationError as exc:
             cause = exc
         else:
             raise AssertionError("expected ValidationError")
 
-        error = BackstopResponseSchemaError("/parties/123", _Schema.__name__, cause)
+        error = BackstopResponseSchemaError(
+            "/people?filter[lastName][eq]=Doe", _Schema.__name__, cause
+        )
 
-        assert error.path == "/parties/123"
+        assert error.path == "/people?filter[lastName][eq]=Doe"
         assert error.schema_name == "_Schema"
         assert error.cause is cause
-        assert "/parties/123" in str(error)
-        assert "_Schema" in str(error)
+        assert str(error) == "Backstop response failed schema validation against '_Schema' at name"
+        assert "Doe" not in str(error)
+        assert "42" not in str(error)
+
+    def test_message_caps_the_locations(self) -> None:
+        class _Wide(BaseModel):
+            fields: list[int]
+
+        try:
+            _Wide.model_validate({"fields": [str(index) + "x" for index in range(12)]})
+        except ValidationError as exc:
+            cause = exc
+        else:
+            raise AssertionError("expected ValidationError")
+
+        error = BackstopResponseSchemaError("/wide", "_Wide", cause)
+
+        assert str(error).endswith(" and 2 more")
 
 
 class TestParseJsonApiErrorWellFormed:

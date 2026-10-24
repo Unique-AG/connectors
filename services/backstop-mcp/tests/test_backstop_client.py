@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import time
+import traceback
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import cast
@@ -10,6 +11,10 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from opentelemetry import trace
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind, StatusCode
 from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client import (
@@ -28,6 +33,7 @@ from backstop_mcp.backstop_client import (
     SinglePage,
 )
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.observability import failure_level
 from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential, recorded_params
 
@@ -1235,7 +1241,25 @@ class TestSchemaAwareDeserialization:
         assert exc_info.value.path == "/widgets/1"
         assert exc_info.value.schema_name == "_Widget"
         assert isinstance(exc_info.value.cause, ValidationError)
-        assert exc_info.value.__cause__ is exc_info.value.cause
+        # Not chained, so a traceback cannot print the record's values.
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__ is True
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_schema_error_traceback_omits_the_record_values(
+        self, factory: BackstopClientFactory
+    ) -> None:
+        # Joined at runtime: the traceback quotes source lines, so a literal would match itself.
+        canary = "-".join(["zq", "canary", "record"])
+        respx.get(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": [canary]})
+        )
+
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await factory.for_credential(_credential()).get("/widgets/1", schema=_Widget)
+
+        assert canary not in "".join(traceback.format_exception(exc_info.value))
 
     @pytest.mark.asyncio
     @respx.mock
@@ -1407,3 +1431,152 @@ class TestVerifyCredential:
         sent_request = route.calls.last.request
         assert sent_request.headers["authorization"] == _BASIC_AUTH
         assert sent_request.headers["token"] == "true"
+
+
+def _client_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
+    return [span for span in exporter.get_finished_spans() if span.name.startswith("backstop ")]
+
+
+class TestClientSpan:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_one_request_is_one_client_span(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
+
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        spans = _client_spans(exporter)
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "backstop GET /system-info"
+        assert span.kind == SpanKind.CLIENT
+        attributes = span.attributes
+        assert attributes is not None
+        assert attributes["http.response.status_code"] == 200
+        assert attributes["url.template"] == "/system-info"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_query_string_and_path_ids_stay_off_the_span(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(url__regex=r".*/people/123").mock(return_value=httpx.Response(200, json={}))
+
+        await factory.for_credential(_credential()).raw_request(
+            "GET", "/people/123", params={"filter[lastName][eq]": "SecretName"}
+        )
+
+        spans = _client_spans(exporter)
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "backstop GET /people/:id"
+        rendered = str(span.attributes)
+        assert "SecretName" not in rendered
+        assert "123" not in rendered
+        assert "/people/123" not in rendered
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_retry_is_still_one_span(
+        self,
+        factory: BackstopClientFactory,
+        exporter: InMemorySpanExporter,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.retry._BACKOFF_INITIAL_SECONDS", 0.01)
+        respx.get(f"{_BASE_URL}/system-info").mock(
+            side_effect=[
+                httpx.Response(
+                    429,
+                    json={
+                        "errors": [{"detail": "Concurrency limit exceeded", "code": "concurrency"}]
+                    },
+                    headers={"Retry-After": "0.01"},
+                ),
+                httpx.Response(200, json={"version": "1.0"}),
+            ]
+        )
+
+        await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        assert len(_client_spans(exporter)) == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_401_records_its_status(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+
+        with pytest.raises(BackstopAuthError):
+            await factory.for_credential(_credential()).raw_request("GET", "/system-info")
+
+        (span,) = _client_spans(exporter)
+        assert span.attributes is not None
+        assert span.attributes["http.response.status_code"] == 401
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("status", "expected"), [(422, StatusCode.UNSET), (503, StatusCode.ERROR)]
+    )
+    async def test_only_a_5xx_marks_the_client_span_as_an_error(
+        self,
+        factory: BackstopClientFactory,
+        exporter: InMemorySpanExporter,
+        status: int,
+        expected: StatusCode,
+    ) -> None:
+        respx.get(f"{_BASE_URL}/people").mock(
+            return_value=httpx.Response(status, json={"errors": [{"detail": "nope"}]})
+        )
+
+        with pytest.raises(BackstopApiError):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        (span,) = _client_spans(exporter)
+        assert span.status.status_code == expected
+        assert not any(event.name == "exception" for event in span.events)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_enclosing_feature_span_exports_no_error_detail(
+        self, factory: BackstopClientFactory, exporter: InMemorySpanExporter
+    ) -> None:
+        canary = "zq-canary-detail"
+        respx.get(f"{_BASE_URL}/people").mock(
+            return_value=httpx.Response(
+                422, json={"errors": [{"detail": f"Can not convert {canary}", "code": "invalid"}]}
+            )
+        )
+        tracer = trace.get_tracer("test")
+
+        with pytest.raises(BackstopApiError), tracer.start_as_current_span("org_people.query"):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        feature = next(
+            span for span in exporter.get_finished_spans() if span.name == "org_people.query"
+        )
+        assert not any(event.name == "exception" for event in feature.events)
+        assert feature.status.description is None
+        assert canary not in str(feature.attributes)
+
+
+class TestDeclaredFailureLevels:
+    def test_each_backstop_error_declares_its_level(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Record.model_validate({})
+        schema_error = BackstopResponseSchemaError("/system-info", "_Record", caught.value)
+
+        assert failure_level(BackstopAuthError("rejected")) == logging.WARNING
+        assert failure_level(BackstopTransientAuthError("retry")) == logging.WARNING
+        assert failure_level(BackstopSessionRevokedError()) == logging.INFO
+        assert failure_level(BackstopUnreachableError("down")) == logging.WARNING
+        assert (
+            failure_level(BackstopUntrustedUrlError("http://evil", "api.example"))
+            == logging.WARNING
+        )
+        assert failure_level(schema_error) == logging.ERROR
+        assert failure_level(BackstopApiError(422, "nope")) == logging.WARNING
