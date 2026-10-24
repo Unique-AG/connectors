@@ -35,8 +35,7 @@ podLabels:
 env:
   APP_ENV: production
   LOG_LEVEL: info
-  # conceal (default): identifying strings in logs become sha256:<hex> so they can
-  # be correlated without leaking. disclose: print the original (local debugging).
+  # conceal (default): hmac-sha256 at info+, plain sha256 at debug. disclose: the original.
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   PORT: "8000"
   # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL, the employment relationship

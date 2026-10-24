@@ -248,9 +248,11 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
 Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
 `backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
-`tenant_guidance.applied`. Tool-level events conceal Backstop logins as `sha256:<hex>` unless
-`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events (`backstop.request.*`,
-`backstop.auth_recheck.*`) currently carry the username in clear. API tokens are never logged.
+`tenant_guidance.applied`. Tool-level events pass Backstop logins through `identifiable_value`:
+`hmac-sha256:<hex>` when `LOG_LEVEL` is info or above, plain `sha256:<hex>` at debug, and the
+original value only when `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events
+(`backstop.request.*`, `backstop.auth_recheck.*`) currently carry the username in clear. API tokens
+are never logged.
 
 Each tool call also logs one completion line with its name, status, and duration.
 
@@ -275,6 +277,60 @@ Served on `/metrics` in Prometheus format. `setup_ops` contributes the HTTP requ
 The chart's `BackstopFilterIgnored` alert fires when `backstop_filter_ignored_total` increases over
 15 minutes. In `search_activities`, rows that contradict a filter are dropped and the filter is named
 in `server_filter_ignored`.
+
+### Helpers
+
+`backstop_mcp.observability` is the only way to log a major event or open a nested span.
+`info_event`, `warning_event`, `error_event`, and `failure_event` write the log line and add the
+same event to the current span. `operation` wraps one noisy sub-step (a paginated walk, a report
+poll, a catalog refresh) in a child span with an INFO line at each end. `add_call_fields` adds
+fields to the current tool call. `failure_level` picks the level of a failure.
+
+What a line or span may carry:
+
+- Data that travels through the MCP (tool arguments, tool results, Backstop requests and
+  responses, elicitation answers, login form fields) is never logged or traced as a whole, at any
+  level, DEBUG included. A line may carry individual fields picked one by one, and only when the
+  field is certainly non-sensitive. If it is not, log a count or a presence flag, or pass it
+  through `identifiable_value`. Never `**dto.model_dump()`, `vars(obj)`, a whole record list,
+  `.json()`, `.text`, `.content`, or `str(exc)` of a `ToolError`, and no helper that "sanitizes"
+  a whole object: only an explicit pick holds when Backstop adds a field.
+- Safe to log raw: Backstop record ids, our `subject` UUID, enum-like values defined in our code,
+  counts, lengths, offsets, booleans and presence flags, HTTP status, JSON:API `code`, route
+  templates, retry counts, durations, tool names, argument names, selected field names, filter
+  names, the names of figures our code asks for (`figure`), and date windows the caller asked for.
+- Identifying, and only through `identifiable_value`: Backstop usernames, emails, search terms, and
+  person names used as a filter.
+- Never, not even hashed: free text, file names and bytes, addresses, phone numbers, websites,
+  monetary figures, custom-field values, tenant-defined labels (use their ids), dates read from
+  records, Backstop error `detail` / `title` / `errors[]`, `ToolError` text, and argument values or
+  tool results as a whole.
+- Never, anywhere: API tokens, passwords, CSRF tokens, `Authorization` headers, cookies, and URLs
+  with query strings.
+- A field that is not in that list is never logged until this doc gains a row for it, in the same
+  change, with a one-line reason.
+- `extra` keys must not be `LogRecord` attributes (`name`, `msg`, `args`, `message`, `module`,
+  `filename`, `levelname`, `lineno`, `created`, `process`, `thread`, `exc_info`, `stack_info`).
+  Use `tool`, `report_name`, `entity_type`.
+
+Levels:
+
+- `DEBUG`: per-page, per-record, and per-request detail; anything inside a loop.
+- `INFO`: the start and end of a tool call or of a noisy operation, and state changes (login
+  succeeded, cache refreshed, record created, updated, or deleted). At `LOG_LEVEL=info` the flow
+  of a call is readable without a flood.
+- `WARNING`: the service coped, or the caller, the LLM, or Backstop caused it: invalid tool input,
+  Backstop 4xx/5xx/429, timeouts, a skipped unreadable row, a stale cache served. No stack trace;
+  the line carries `error_type`. A loop logs one aggregated WARNING per call (`count`,
+  `sample_ids`), not one per row. A successful delete is also WARNING, on purpose, so destructive
+  writes stand out.
+- `ERROR`: a developer has to act: an unexpected exception, a Backstop response that no longer
+  matches our schema, a failure in our own persistence. With stack trace.
+
+`LOGS_DIAGNOSTICS_DATA_POLICY=disclose` changes `identifiable_value` only. It is a local-debugging
+opt-in. `tests/test_no_payload_logging.py` checks call sites statically, by argument name, so a
+payload passed under an innocent name slips past it. It fails on a new violation and on an
+allowlist entry whose call is gone.
 
 ### Traces
 
