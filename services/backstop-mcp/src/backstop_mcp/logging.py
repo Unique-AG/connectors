@@ -8,6 +8,28 @@ from unique_mcp.logging import configure_logging as configure_pino_logging
 from backstop_mcp.config import AppConfig
 
 
+class _DuplicateMcpMetricsFilter(logging.Filter):
+    """Drop `unique_mcp` per-call lines. Metrics stay; our middleware writes the line."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (hasattr(record, "operation") and hasattr(record, "duration_ms"))
+
+
+class _FastMcpToolErrorFilter(logging.Filter):
+    """Drop FastMCP's tool-error lines. They repeat ours and can include argument text."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.msg
+        if not isinstance(message, str):
+            return True
+        return not (
+            message.startswith("Error calling tool")
+            or message.startswith("Invalid arguments for tool")
+        )
+
+
 class _FastMcpArgumentDumpFilter(logging.Filter):
     """Drop the debug line that prints the tool-call argument dict."""
 
@@ -31,6 +53,8 @@ def configure_logging(config: AppConfig) -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     # sse-starlette logs each outbound event body at DEBUG, which is the tool result.
     logging.getLogger("sse_starlette").setLevel(logging.INFO)
+    _install("unique_mcp", _DuplicateMcpMetricsFilter)
+    _install("fastmcp.server.server", _FastMcpToolErrorFilter)
     _install("fastmcp.server.mixins.mcp_operations", _FastMcpArgumentDumpFilter)
 
 

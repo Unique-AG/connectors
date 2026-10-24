@@ -254,7 +254,13 @@ original value only when `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop clien
 (`backstop.request.*`, `backstop.auth_recheck.*`) currently carry the username in clear. API tokens
 are never logged.
 
-Each tool call also logs one completion line with its name, status, and duration.
+Each tool call logs `tool.call.start` and one terminal line: `tool.call.completed`,
+`tool.call.failed`, or `tool.call.cancelled`, with `tool`, `argument_names`, `subject`, and
+`duration_ms`. A failure is WARNING when the caller or Backstop caused it and ERROR, with its
+stack, when it is a bug; `invalid_arguments` names the argument locations pydantic rejected, never
+their values. A tool adds its own fields to the terminal line and to the tool span with
+`add_call_fields`. FastMCP's and `unique_mcp`'s per-call lines are dropped, because they repeat
+these and can quote the caller's input.
 
 ### Metrics
 
