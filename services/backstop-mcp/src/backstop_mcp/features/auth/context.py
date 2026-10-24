@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.db import read_session
 from backstop_mcp.features.auth.credential_store import get_credential
+from backstop_mcp.features.auth.crypto import InvalidCredentialEnvelopeError
 
 
 class NotConnectedError(ToolError):
@@ -50,8 +51,14 @@ class BackstopAuthContext(BaseModel):
                 + "complete the login flow first."
             )
 
-        async with read_session(self.session_factory) as session:
-            credential = await get_credential(session, subject, self.encryption_key)
+        try:
+            async with read_session(self.session_factory) as session:
+                credential = await get_credential(session, subject, self.encryption_key)
+        except InvalidCredentialEnvelopeError:
+            raise NotConnectedError(
+                "The stored Backstop credential for this connection is unreadable — please "
+                + "reconnect."
+            ) from None
 
         if credential is None:
             raise NotConnectedError(

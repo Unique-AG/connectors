@@ -3,10 +3,15 @@
 import logging
 
 from opentelemetry import trace
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import Status, StatusCode
 
 from backstop_mcp.observability.failures import failure_level
 from backstop_mcp.observability.fields import span_attributes
+
+# Tells the redaction processor that the failure on this span was caller-caused. An ERROR on the
+# same span, before or after, wins: a bug keeps its stack.
+EXPECTED_FAILURE_ATTRIBUTE = "backstop.failure.expected"
 
 
 def info_event(logger: logging.Logger, event: str, **fields: object) -> None:
@@ -49,3 +54,14 @@ def _emit(
         if exc is not None:
             span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, event))
+        span.set_attribute(EXPECTED_FAILURE_ATTRIBUTE, False)
+        return
+    if exc is not None and not _logged_an_error(span):
+        span.set_attribute(EXPECTED_FAILURE_ATTRIBUTE, True)
+
+
+def _logged_an_error(span: trace.Span) -> bool:
+    """Our own ERROR, not the span status: FastMCP sets ERROR for every exception a tool raises."""
+    if not isinstance(span, ReadableSpan) or span.attributes is None:
+        return False
+    return span.attributes.get(EXPECTED_FAILURE_ATTRIBUTE) is False

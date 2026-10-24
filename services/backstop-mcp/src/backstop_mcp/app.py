@@ -8,6 +8,7 @@ from mcp.server.transport_security import (
     RequestBodyLimitMiddleware,
 )
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+from opentelemetry.metrics import NoOpMeterProvider
 from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -16,6 +17,7 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from unique_mcp.monitoring import setup_ops
+from unique_toolkit.monitoring import configure_tracing
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.dependencies import (
@@ -32,6 +34,7 @@ from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.system_users import find_system_user_by_user_name
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
+from backstop_mcp.observability import install_caller_failure_redaction
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
 from backstop_mcp.server.tenant_guidance import (
@@ -60,6 +63,9 @@ def create_app() -> Starlette:
         encryption_key=get_encryption_key(),
     )
     configure_metrics(config)
+    # Before FastMCP is built. A no-op when no OTEL_* variable is set, so tests stay untraced.
+    configure_tracing(service_name="backstop-mcp", service_version=config.version)
+    install_caller_failure_redaction()
 
     engine = get_engine()
     session_factory = get_session_factory()
@@ -121,7 +127,14 @@ def create_app() -> Starlette:
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
             Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),
-            Middleware(OpenTelemetryMiddleware),
+            Middleware(
+                OpenTelemetryMiddleware,
+                excluded_urls="/health$,/probe$,/ready$,/metrics$",
+                exclude_spans=["receive", "send"],
+                # The global meter is what `/metrics` scrapes. This middleware's histogram would
+                # duplicate unique_toolkit's HTTP one, in different units.
+                meter_provider=NoOpMeterProvider(),
+            ),
             ops_middleware,
             # Innermost: Starlette wraps last-listed first, so the rewritten 401 is what
             # request-metrics / OTel see. First-listed would rewrite on the raw send after they
