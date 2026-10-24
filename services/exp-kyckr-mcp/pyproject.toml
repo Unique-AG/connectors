@@ -5,7 +5,7 @@ description = "Experimental Kyckr MCP built on a vendored copy of the Companies 
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp==4.1.0",
+    "fastmcp==4.1.1",
     "httpx2==2.13.1",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
