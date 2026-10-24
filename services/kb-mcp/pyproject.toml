@@ -16,7 +16,7 @@ dependencies = [
     "unique-toolkit[monitoring,otel]==2026.42.0.dev0",
     "unique-sdk==2026.42.0.dev0",
     "httpx==0.28.1",
-    "starlette==1.7.0",
+    "starlette==1.9.0",
     "pydantic-settings==2.15.0",
     "python-dotenv==1.2.3",
     "mcp==2.3.0",
