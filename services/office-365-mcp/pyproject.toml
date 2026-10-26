@@ -89,6 +89,9 @@ exclude = [".venv"]
 # values (ANN2xx) — enforced everywhere, not just public functions.
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/dogfood/**" = ["E402", "E501", "ANN001", "ANN401"]
+
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
