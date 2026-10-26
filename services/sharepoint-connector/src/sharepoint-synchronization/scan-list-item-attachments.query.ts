@@ -377,13 +377,9 @@ interface NamingEntry {
   candidates: readonly [string, ...string[]];
 }
 
-// Names are assigned from the full set so a later run with the same entries produces the same
-// folders. Every entry whose name is shared, with another entry or a taken name, moves on to its
-// next candidate, so all of them change, not only the second one. Unique scope paths are
-// case-sensitive, so names that differ only in case are distinct.
-// The last candidate ends in the entry's unique key, which keeps it distinct from other entries
-// and ends the loop. It is not checked against taken names: a clash there needs a sibling folder
-// whose name already contains this entry's key.
+// Deterministic: every entry whose name is shared, with another entry or a taken name, moves to its
+// next candidate, not only the later one. Scope paths are case-sensitive. The last candidate holds
+// the entry's unique key, so it is final and not checked against taken names.
 function assignDistinctNames(
   entries: readonly NamingEntry[],
   takenNames: ReadonlySet<string>,

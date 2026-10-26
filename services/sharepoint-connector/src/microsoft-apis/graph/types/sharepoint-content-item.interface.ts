@@ -31,9 +31,8 @@ export type SharepointContentItem = BaseItem &
         itemType: 'listItemAttachment';
         item: ListItem;
         attachment: ListItemAttachmentFile;
-        // Set when the item was scanned from a discovered subsite. Drive and SitePages items keep
-        // the subsite in their URL, so only attachments need it carried explicitly. Also locates
-        // the web that owns the list, which SharePoint REST needs to download the attachment.
+        // Set when scanned from a discovered subsite. Unlike drive and SitePages URLs, the folder
+        // path lacks the subsite, and SharePoint REST needs it to locate the list's web.
         subsiteRelativePath?: string;
       }
   );

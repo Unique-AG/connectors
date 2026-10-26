@@ -136,11 +136,9 @@ export class SharepointRestClientService {
     }
   }
 
-  // SharePoint keeps one folder per item, named after the item id, under the list's Attachments
-  // folder. Unlike the items endpoint, this one returns each file's size. It returns every folder
-  // in one response: `$top` truncates it without a next link. On a list above the list view
-  // threshold SharePoint rejects it with SPQueryThrottledException, however few items have
-  // attachments.
+  // One folder per item, named after its id, under the list's Attachments folder. Unlike the items
+  // endpoint it returns file sizes. `$top` truncates it without a next link, so it is read whole.
+  // Above the list view threshold SharePoint rejects it with SPQueryThrottledException.
   public async getListItemAttachments(
     siteName: Smeared,
     managedPath: ManagedPath,
