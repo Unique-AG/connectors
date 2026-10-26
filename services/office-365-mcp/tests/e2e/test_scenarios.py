@@ -153,7 +153,8 @@ def _response(spec: Json) -> httpx.Response:
     named = HERE / "fixtures" / str(spec.get("body", ""))
     content = named.read_bytes() if named.is_file() else b""
     headers = {"content-type": "application/json"} if named.suffix == ".json" else {}
-    headers.update(cast("Mapping[str, str]", spec.get("headers", {})))
+    answered = spec.get("response_headers", spec.get("headers", {}))
+    headers.update(cast("Mapping[str, str]", answered))
     return httpx.Response(cast("int", spec["status"]), content=content, headers=headers)
 
 
@@ -192,8 +193,10 @@ class Replay:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         call = f"{request.method} {unquote(request.url.path)}"
         self.calls.append((self.step, call))
-        if request.headers.get("authorization") != f"Bearer {_OBO_TOKEN}":
-            self.unmatched.append(f"{call} did not carry the caller's OBO token")
+        sent = cast("str | None", request.headers.get("authorization"))
+        carries_token = sent == f"Bearer {_OBO_TOKEN}"
+        if carries_token != (request.url.host == "graph.microsoft.com"):
+            self.unmatched.append(f"{call} on {request.url.host}: the OBO token is {carries_token}")
             return httpx.Response(418)
         asked = _asked(request)
         open_ = [n for n in range(len(self.interactions)) if n not in self.served]
@@ -238,8 +241,7 @@ class Person:
         return ElicitResult(action="accept", content={"value": str(items(answers["enum"])[0])})
 
 
-@pytest.fixture(scope="module")
-def server() -> FastMCP[None]:
+def build_server() -> FastMCP[None]:
     entra = {"tenant_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81", "client_id": _CLIENT_ID}
     app = create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
@@ -250,13 +252,17 @@ def server() -> FastMCP[None]:
     return cast("FastMCP[None]", app.state.fastmcp_server)
 
 
+@pytest.fixture(scope="module")
+def server() -> FastMCP[None]:
+    return build_server()
+
+
 class _Obo:
     async def get_token(self, *_scopes: str) -> GraphAccessToken:
         return GraphAccessToken(token=_OBO_TOKEN, expires_on=0)
 
 
-@pytest.fixture
-def obo(monkeypatch: pytest.MonkeyPatch) -> None:
+def patch_obo(monkeypatch: pytest.MonkeyPatch) -> None:
     async def exchange(_self: AzureProvider, *, user_assertion: str) -> _Obo:
         assert user_assertion == _CLIENT_TOKEN
         return _Obo()
@@ -266,6 +272,11 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
         "fastmcp.server.dependencies.get_access_token",
         lambda: AccessToken(token=_CLIENT_TOKEN, client_id=_CLIENT_ID, scopes=["access_as_user"]),
     )
+
+
+@pytest.fixture
+def obo(monkeypatch: pytest.MonkeyPatch) -> None:
+    patch_obo(monkeypatch)
 
 
 @pytest.mark.usefixtures("obo")
@@ -338,6 +349,34 @@ async def _step(
     if "retry_sleeps" in expect:
         assert sleeps.delays[slept:] == expect["retry_sleeps"], f"{where}: slept {sleeps.delays}"
     return outcome
+
+
+def _ask(url: str, token: str | None) -> httpx.Request:
+    headers = {"authorization": f"Bearer {token}"} if token else {}
+    return httpx.Request("GET", url, headers=headers)
+
+
+def test_a_redirect_answer_carries_its_own_headers() -> None:
+    replay = Replay(
+        [{"method": "GET", "host": "contoso.sharepoint.com", "path": "/f", "status": 200}]
+    )
+    moved = _response(
+        {
+            "status": 302,
+            "headers": {"authorization": "x"},
+            "response_headers": {"location": "https://a/b"},
+        }
+    )
+    assert moved.headers["location"] == "https://a/b"
+    assert "authorization" not in moved.headers
+    assert replay(_ask("https://contoso.sharepoint.com/f", None)).status_code == 200
+
+
+def test_the_obo_token_goes_to_graph_only() -> None:
+    replay = Replay([{"method": "GET", "path": "/v1.0/me", "status": 200}])
+    assert replay(_ask("https://graph.microsoft.com/v1.0/me", None)).status_code == 418
+    assert replay(_ask("https://other.example/v1.0/me", _OBO_TOKEN)).status_code == 418
+    assert len(replay.unmatched) == 2
 
 
 def test_the_number_of_executable_scenarios_only_goes_up() -> None:

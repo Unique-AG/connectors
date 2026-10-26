@@ -48,7 +48,7 @@ _ENTRY_KEYS = {
     "cassette",
     "variants",
 }
-_RUNNER_STEP_KEYS = {"pick", "fault", "expect", "approval", "bind"}
+_RUNNER_STEP_KEYS = {"args", "pick", "fault", "expect", "approval", "bind"}
 _STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses", *_RUNNER_STEP_KEYS}
 _APPROVALS = {"yes", "no", "silent", "unanswered"}
 _FAULTS = {"graph", "transport", "input"}
