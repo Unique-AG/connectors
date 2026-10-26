@@ -9,6 +9,7 @@ import {
   buildIngestionItemKey,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
+  smearContentKey,
 } from '../utils/sharepoint.util';
 import { Smeared } from '../utils/smeared';
 import { Membership } from './types';
@@ -45,7 +46,7 @@ export class GetRegularFolderPermissionsQuery {
 
       if (isNullish(permissions)) {
         this.logger.warn(
-          `No SharePoint permissions found for directory with key ${permissionsKey}`,
+          `No SharePoint permissions found for directory with key ${smearContentKey(permissionsKey)}`,
         );
         continue;
       }
@@ -62,7 +63,9 @@ export class GetRegularFolderPermissionsQuery {
       const permissionsKey = buildIngestionItemKey(item);
       const permissions = permissionsMap[permissionsKey];
       if (isNullish(permissions)) {
-        this.logger.warn(`No SharePoint permissions found for list item folder ${permissionsKey}`);
+        this.logger.warn(
+          `No SharePoint permissions found for list item folder ${smearContentKey(permissionsKey)}`,
+        );
         continue;
       }
 

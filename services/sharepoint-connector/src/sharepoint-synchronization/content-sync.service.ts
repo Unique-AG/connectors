@@ -14,7 +14,12 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl, KEY_SEPARATOR } from '../utils/sharepoint.util';
+import {
+  buildFileDiffKey,
+  getItemUrl,
+  KEY_SEPARATOR,
+  smearContentKey,
+} from '../utils/sharepoint.util';
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -283,7 +288,7 @@ export class ContentSyncService {
 
         this.logger.error({
           msg: `${logPrefix} Failed to delete content`,
-          fileKey: file.key,
+          fileKey: smearContentKey(file.key),
           fileId: file.id,
           error: sanitizeError(error),
         });

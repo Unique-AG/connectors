@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { LogsDiagnosticDataPolicy } from '../config/app.config';
 import type {
   AnySharepointItem,
   SharepointContentItem,
@@ -10,6 +11,7 @@ import {
   getUniqueListFolderPathFromItem,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
+  smearContentKey,
 } from './sharepoint.util';
 import { Smeared } from './smeared';
 
@@ -529,6 +531,84 @@ describe('list item attachment keys and paths', () => {
     expect(getUniqueListFolderPathFromItem(item, rootPath).value).toBe(
       '/Knowledge/Asia/Procedures',
     );
+  });
+});
+
+describe('smearContentKey', () => {
+  const siteId = '86dba82a-0516-4b48-8a06-74ca095ff3f4';
+  const subsiteId =
+    'dogfoodindustries.sharepoint.com,86dba82a-0516-4b48-8a06-74ca095ff3f4,b918fc3d-ab2f-4832-894b-f3369ddeef2c';
+  const listId = '02a15601-20f3-4039-afb7-83ddea1f438a';
+  const driveItemId = '01W55DFFLF3YOR255VDRG23WVVSJEVUEBK';
+
+  const nonAttachmentKeys = {
+    'main-site item ingestion key': `${siteId}/${driveItemId}`,
+    'subsite item ingestion key': `${siteId}/${subsiteId}::${driveItemId}`,
+    'subsite list item ingestion key': `${siteId}/${subsiteId}::7`,
+    'main-site item diff key': driveItemId,
+    'subsite item diff key': `${subsiteId}::${driveItemId}`,
+  };
+
+  afterEach(() => {
+    delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
+  });
+
+  describe('when logs are concealed', () => {
+    beforeEach(() => {
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
+    });
+
+    it('smears only the file name of a main-site attachment ingestion key', () => {
+      expect(smearContentKey(`${siteId}/${listId}::1::sub-collision.txt`)).toBe(
+        `${siteId}/${listId}::1::***-*********.txt`,
+      );
+    });
+
+    it('smears only the file name of a subsite attachment ingestion key', () => {
+      expect(smearContentKey(`${siteId}/${subsiteId}::${listId}::1::subsite.txt`)).toBe(
+        `${siteId}/${subsiteId}::${listId}::1::*******.txt`,
+      );
+    });
+
+    it('smears only the file name of a main-site attachment diff key', () => {
+      expect(smearContentKey(`${listId}::12::policy.pdf`)).toBe(`${listId}::12::******.pdf`);
+    });
+
+    it('smears only the file name of a subsite attachment diff key', () => {
+      expect(smearContentKey(`${subsiteId}::${listId}::12::policy.pdf`)).toBe(
+        `${subsiteId}::${listId}::12::******.pdf`,
+      );
+    });
+
+    it('smears a file name with spaces and brackets', () => {
+      expect(smearContentKey(`${siteId}/${listId}::3::[public] simple_presentation.pptx`)).toBe(
+        `${siteId}/${listId}::3::[******] *******************.pptx`,
+      );
+    });
+
+    it.each(Object.entries(nonAttachmentKeys))('leaves a %s unchanged', (_, key) => {
+      expect(smearContentKey(key)).toBe(key);
+    });
+  });
+
+  describe('when logs are disclosed', () => {
+    beforeEach(() => {
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
+    });
+
+    it.each([
+      `${siteId}/${listId}::1::sub-collision.txt`,
+      `${siteId}/${subsiteId}::${listId}::1::subsite.txt`,
+      `${listId}::12::policy.pdf`,
+      `${subsiteId}::${listId}::12::policy.pdf`,
+      `${siteId}/${listId}::3::[public] simple_presentation.pptx`,
+    ])('leaves attachment key %s unchanged', (key) => {
+      expect(smearContentKey(key)).toBe(key);
+    });
+
+    it.each(Object.entries(nonAttachmentKeys))('leaves a %s unchanged', (_, key) => {
+      expect(smearContentKey(key)).toBe(key);
+    });
   });
 });
 

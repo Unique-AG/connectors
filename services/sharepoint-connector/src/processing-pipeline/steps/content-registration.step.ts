@@ -21,7 +21,7 @@ import {
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { sanitizeError } from '../../utils/normalize-error';
-import { buildIngestionItemKey } from '../../utils/sharepoint.util';
+import { buildIngestionItemKey, smearContentKey } from '../../utils/sharepoint.util';
 import { createSmeared } from '../../utils/smeared';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -79,7 +79,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         {
           url: createSmeared(contentRegistrationRequest.url ?? ''),
           baseUrl: createSmeared(contentRegistrationRequest.baseUrl ?? ''),
-          key: createSmeared(contentRegistrationRequest.key),
+          key: smearContentKey(contentRegistrationRequest.key),
           correlationId: context.correlationId,
           sourceName: contentRegistrationRequest.sourceName,
         },

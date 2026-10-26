@@ -82,6 +82,21 @@ function itemKeyWithinSite(item: AnySharepointItem): string {
   return item.item.id;
 }
 
+// Only attachment keys end in `{listId}::{itemId}::{fileName}`: other keys have at most one
+// separator, and SharePoint forbids `:` in file names.
+const ATTACHMENT_KEY_REGEX = new RegExp(`^(.+${KEY_SEPARATOR}\\d+${KEY_SEPARATOR})([^:]+)$`);
+
+/**
+ * Smears the file name of a list item attachment key, which is customer data, and leaves its ids
+ * readable. Works for both ingestion and file-diff keys; any other key is returned unchanged.
+ */
+export function smearContentKey(key: string): string {
+  return key.replace(
+    ATTACHMENT_KEY_REGEX,
+    (_, ids: string, fileName: string) => `${ids}${createSmeared(fileName)}`,
+  );
+}
+
 /**
  * Extracts a relative path from a SharePoint URL, stripping the managed path and site name prefix.
  *

@@ -12,6 +12,7 @@ import {
   getUniqueListFolderPathFromItem,
   getUniqueParentPathFromItem,
   getUniquePathFromItem,
+  smearContentKey,
 } from '../utils/sharepoint.util';
 import { createSmeared, Smeared } from '../utils/smeared';
 import { GroupMembership, Membership } from './types';
@@ -102,7 +103,9 @@ export class GetTopFolderPermissionsQuery {
       const permissions = permissionsMap[permissionsKey];
 
       if (isNullish(permissions)) {
-        this.logger.warn(`No SharePoint permissions found for item with key ${permissionsKey}`);
+        this.logger.warn(
+          `No SharePoint permissions found for item with key ${smearContentKey(permissionsKey)}`,
+        );
         continue;
       }
 

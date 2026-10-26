@@ -4,6 +4,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
+import { smearContentKey } from '../utils/sharepoint.util';
 import { FindFilesWithExpectedLocationQuery } from './find-files-with-expected-location.query';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -58,7 +59,7 @@ export class MoveUpdatedFilesToExpectedScopeCommand {
       } catch (error) {
         this.logger.error({
           msg: `${logPrefix} Failed to move updated file ${file.contentId} to scope ${file.expectedScopeId}`,
-          fileKey: file.key,
+          fileKey: smearContentKey(file.key),
           error: sanitizeError(error),
         });
         keysToLeaveOut.add(file.diffKey);
