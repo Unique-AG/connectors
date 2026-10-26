@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.custom_fields import ListCustomFieldGroupsResponse
@@ -19,9 +19,9 @@ from tests.helpers import (
     resource,
     tool_client,
 )
-from tests.server.tools.helpers import tool_model, tool_payload
+from tests.server.tools.helpers import input_adapter, tool_model, tool_payload
 
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_custom_field_groups))
+_INPUT = input_adapter(list_custom_field_groups)
 
 
 def tenant(name: str) -> str:

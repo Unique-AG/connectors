@@ -5,8 +5,7 @@ from collections.abc import Sequence
 import httpx
 import pytest
 import respx
-from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.opportunities import (
@@ -23,13 +22,13 @@ from tests.helpers import (
     recorded_requests,
     resource,
 )
-from tests.server.tools.helpers import tool_model
+from tests.server.tools.helpers import input_adapter, tool_model
 
 _STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _DEFINITIONS_URL = f"{BASE_URL}/custom-field-definitions"
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
 
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(get_opportunities_by_ids))
+_INPUT = input_adapter(get_opportunities_by_ids)
 
 
 @pytest.fixture(autouse=True)

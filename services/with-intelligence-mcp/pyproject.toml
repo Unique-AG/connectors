@@ -6,7 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "fastmcp==4.1.0",
     "uvicorn[standard]==0.54.0",
-    "pydantic[email]==2.13.5",
+    "pydantic[email]==2.14.1",
     "pydantic-settings==2.15.0",
     "python-dotenv==1.2.3",
     "httpx==0.28.1",
@@ -22,8 +22,8 @@ dependencies = [
     "markdownify==1.2.3",
     "tenacity==9.1.4",
     "typing-extensions==4.16.0",
-    "unique-mcp==2026.38.0",
-    "starlette==1.7.0",
+    "unique-mcp==2026.44.1",
+    "starlette==1.8.0",
     "mcp==2.3.0",
     "mcp-credential-auth==0.1.0",
 ]
@@ -83,9 +83,6 @@ reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
 reportCallInDefaultInitializer = false
-
-[tool.uv]
-override-dependencies = ["fastmcp==4.1.0"]
 
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }

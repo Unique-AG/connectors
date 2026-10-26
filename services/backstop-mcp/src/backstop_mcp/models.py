@@ -1,7 +1,7 @@
 """Shared pydantic bases and field types used by tool-facing models."""
 
 from collections.abc import Sequence
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 from pydantic import (
     BaseModel,
@@ -11,6 +11,9 @@ from pydantic import (
     TypeAdapter,
     model_serializer,
 )
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
 
 StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -69,7 +72,7 @@ def published_output_schema(annotation: object) -> dict[str, object]:
     and pydantic then has no serialization schema to publish. MCP also requires a root object,
     so a union of models (`anyOf` / `oneOf` at the root) is labelled as one.
     """
-    raw: object = TypeAdapter(annotation).json_schema(mode="validation")
+    raw: object = TypeAdapter(cast("TypeForm[object]", annotation)).json_schema(mode="validation")
     assert isinstance(raw, dict)
     schema = {str(key): value for key, value in cast("dict[object, object]", raw).items()}
     if schema.get("type") == "object" or "properties" in schema:
