@@ -1,0 +1,83 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-uc-05-16.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "3"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-uc-05-16.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/UOeWChMHFIPUQKUJZdplYx6poYIwHC-SGd2Rn6Dmxf28AbQQXl7E8firkqME8U09EiNZ/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('UOeWChMHFIPUQKUJZdplYx6poYIwHC-SGd2Rn6Dmxf28AbQQXl7E8firkqME8U09EiNZ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-uc-05-16.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/DWiFRmBQOUONUVJTYgfbUa7ncNEhTL-OZy2Vd0Czee50YrSUYq8V7wknddZD5W10aNNC/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('DWiFRmBQOUONUVJTYgfbUa7ncNEhTL-OZy2Vd0Czee50YrSUYq8V7wknddZD5W10aNNC')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-uc-05-16.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/IObKZvOAPYHDWGKTQymbBa1wfJJdKG-WHz5Yq4Favd45MiQMXy7T2kvarlKJ8P95LTCD/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('IObKZvOAPYHDWGKTQymbBa1wfJJdKG-WHz5Yq4Favd45MiQMXy7T2kvarlKJ8P95LTCD')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-uc-05-16.05.json"
+  }
+]

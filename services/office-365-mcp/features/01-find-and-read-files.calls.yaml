@@ -65,6 +65,21 @@ uc-01-06:
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search or the folder}
   note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows
+  variants:
+    recorded:
+      cassette: rec-uc-01-06
+      1:
+        bind: {query: seed-v1 Project Plan}
+        expect:
+          result: {"files[0].name": seed-v1 Project Plan.docx}
+          graph_calls: {POST /v1.0/search/query: 1}
+      2:
+        args: {}
+        bind: {file: "$prev.files[0].uri"}
+        expect:
+          result:
+            "content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document
+          graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
 
 uc-01-07:
   status: untested

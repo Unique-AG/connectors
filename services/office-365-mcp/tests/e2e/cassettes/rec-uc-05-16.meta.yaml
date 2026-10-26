@@ -1,0 +1,22 @@
+scenario: uc-05-16
+cassette: rec-uc-05-16
+source: recorded
+target: graph
+recorded_at: '2026-10-26T15:01:56+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 37
+  keys dropped: 20
+  persona addresses: 20
+  persona names: 20
+  response headers dropped: 35
+  text kept: 30
+literals:
+- archive
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.0.3

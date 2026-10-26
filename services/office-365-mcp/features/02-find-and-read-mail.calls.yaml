@@ -19,6 +19,14 @@ uc-02-01:
           result: {"messages[*].subject": [Invoice 4471, "Lunch on Friday?"]}
           graph_calls: {GET /v1.0/me/mailFolders/inbox: 2, GET /v1.0/me/mailFolders/inbox/messages: 1}
           retry_sleeps: [2.0]
+    recorded:
+      cassette: rec-uc-02-01
+      1:
+        expect:
+          result:
+            "messages[0].subject": "Q3 budget: travel costs"
+            "messages[0].is_read": false
+            capped: false
 
 uc-02-02:
   status: untested

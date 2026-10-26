@@ -35,7 +35,7 @@ type Json = Mapping[str, object]
 
 HERE = Path(__file__).parent
 FEATURES = HERE.parents[1] / "features"
-_MINIMUM_EXECUTABLE = 20
+_MINIMUM_EXECUTABLE = 23
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"

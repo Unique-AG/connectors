@@ -62,6 +62,15 @@ uc-05-16:
         graph_calls: {POST /v1.0/me/messages/*/move: 3}
   note: the tool moves each message on its own, and it reports an error only when no message moved
   cassette: uc-05-16
+  variants:
+    recorded:
+      cassette: rec-uc-05-16
+      1:
+        args: {category: seed-v1, limit: 3}
+      2:
+        expect:
+          result: {moved_count: 3, failed_count: 0}
+          graph_calls: {POST /v1.0/me/messages/*/move: 3}
 
 uc-05-04:
   status: untested

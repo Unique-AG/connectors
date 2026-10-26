@@ -1,0 +1,58 @@
+{
+  "@odata.etag": "W/\"SFIGHSGCKDBlvBmrLvotKQNyKhZt/QeoKNUuyls7\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "Final check list is green. Only the cookie banner text is still open.",
+    "contentType": "text"
+  },
+  "bodyPreview": "Final check list is green. Only the cookie banner text is still open.",
+  "categories": [
+    "seed-v1",
+    "Website"
+  ],
+  "ccRecipients": [],
+  "changeKey": "DKSZMXVPAPMudIpdUgrtJBXkImUx/KovGVUmonm2",
+  "conversationId": "AAQkNEghUAX4SYF4FYXcWKerKSI8WM38Amf4RER5ICLtLJTuQ1SjDGPWMA-AhDXw-0-vuFXmuwktsxL=",
+  "createdDateTime": "2026-10-26T14:17:18Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "from": {
+    "emailAddress": {
+      "address": "tom@example.test",
+      "name": "Tom Berger"
+    }
+  },
+  "hasAttachments": false,
+  "id": "DWiFRmBQOUONUVJTYgfbUa7ncNEhTL-OZy2Vd0Czee50YrSUYq8V7wknddZD5W10aNNC",
+  "importance": "high",
+  "isDraft": false,
+  "isRead": false,
+  "lastModifiedDateTime": "2026-10-26T15:01:57Z",
+  "parentFolderId": "AAMkTTozVMU4EDU4VAMsUTaoLFS4JI21Hof2PYA2EVBdJVYvE3JiWPRjTNUBYMUzanrHBAzhVHenQ1o7YGX0JWWudOtkNaavTIBvZsHu-MvtSTRCow7LIPL=",
+  "receivedDateTime": "2026-10-25T13:50:00Z",
+  "replyTo": [],
+  "sender": {
+    "emailAddress": {
+      "address": "tom@example.test",
+      "name": "Tom Berger"
+    }
+  },
+  "sentDateTime": "2026-10-25T13:50:00Z",
+  "subject": "RE: Website relaunch: launch checklist",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    },
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=ZIaVPvJJCKNISZTUNpcoXt4dqVSmEQ%2FUZc9Pz3Xbbu75TkWFJo0I0iwintTT3H88dWGJ&exvsurl=1&viewmodel=ReadMessageItem"
+}
