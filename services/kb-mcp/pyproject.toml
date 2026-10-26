@@ -42,7 +42,18 @@ dev = [
     "hatchling==1.32.4",
     "ruff==0.17.0",
     "basedpyright==1.40.2",
+    "poethepoet==0.49.0",
 ]
+
+[tool.poe.tasks]
+# Run from the service's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+test = "pytest"
+ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check CI runs, in its order" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

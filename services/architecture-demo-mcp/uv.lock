@@ -1720,6 +1720,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "ruff", specifier = "==0.17.0" },
 ]
@@ -1802,6 +1803,7 @@ dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "datamodel-code-generator", specifier = "==0.83.0" },
     { name = "openapi-pydantic", specifier = "==0.6.0" },
+    { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "ruff", specifier = "==0.17.0" },

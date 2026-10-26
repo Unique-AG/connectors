@@ -69,8 +69,9 @@ pnpm install --frozen-lockfile          # once, from the repo root, for biome
 bash scripts/check-python-service.sh services/<service>
 ```
 
-In a scaffolded MCP, `uv run poe ci` runs the same script, and `uv run poe` lists the task for
-each check.
+In every Python service, `uv run poe ci` runs the same script, and `uv run poe` lists the task for
+each check. Each shared package under `packages/` has the same task names, and its `ci` runs that
+package's checks.
 
 It runs, in this order:
 
