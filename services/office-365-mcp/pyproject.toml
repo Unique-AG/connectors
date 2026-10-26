@@ -39,6 +39,7 @@ dependencies = [
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
     "unique-toolkit[monitoring,otel]==2026.38.0",
     "mcp==2.3.0",
+    "markdown-it-py==4.2.0",
     # `shared/calendar.py` converts every calendar time through `zoneinfo`; this is its fallback
     # when a base image ships no system tz database, which otherwise refuses every IANA zone name.
     "tzdata==2026.3",

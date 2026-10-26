@@ -293,7 +293,7 @@ class TestTheRequestItMakes:
             "one edit reads the message and the signed-in user, then writes once"
         )
         assert _body(routes[endpoint]) == {
-            "body": {"content": _TEXT, "contentType": "text"},
+            "body": {"content": f"<p>{_TEXT}</p>", "contentType": "html"},
             "mentions": [],
         }
 
@@ -318,7 +318,7 @@ class TestTheRequestItMakes:
 
         body = _body(route)
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Ship it Monday.',
+            "content": '<p><at id="0">Jane Smith</at> Ship it Monday.</p>',
             "contentType": "html",
         }
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
@@ -347,7 +347,7 @@ class TestTheRequestItMakes:
 
         body = cast("Mapping[str, object]", _body(route)["body"])
         assert body["content"] == (
-            '<at id="0">Jane Smith</at> 1 &lt; 2 &amp; &lt;b&gt;done&lt;/b&gt;<br>next'
+            '<p><at id="0">Jane Smith</at> 1 &lt; 2 &amp; &lt;b&gt;done&lt;/b&gt;<br />\nnext</p>'
         )
 
     async def test_a_chat_mention_goes_out_under_the_name_microsoft_365_gives_and_never_the_label(
@@ -366,7 +366,7 @@ class TestTheRequestItMakes:
         sent = route.calls.last.request.content.decode()
         body = cast("Mapping[str, object]", json.loads(sent))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Ship it Monday.',
+            "content": '<p><at id="0">Jane Smith</at> Ship it Monday.</p>',
             "contentType": "html",
         }
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
@@ -400,7 +400,7 @@ class TestTheRequestItMakes:
         )
 
         assert _body(route)["body"] == {
-            "content": f'<at id="0">{_LABEL}</at> Ship it Monday.',
+            "content": f'<p><at id="0">{_LABEL}</at> Ship it Monday.</p>',
             "contentType": "html",
         }
         assert _methods(graph) == ["GET", "GET", "PATCH"], "a channel edit read the chat members"

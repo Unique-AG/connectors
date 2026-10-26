@@ -7,6 +7,7 @@ from typing import Literal, Self, cast
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
+from markdown_it import MarkdownIt
 from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
     ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
 )
@@ -360,6 +361,13 @@ class MentionedMember:
 type OutgoingMention = Mention | MentionedMember
 
 
+_MARKDOWN = (
+    MarkdownIt("commonmark", {"html": False, "breaks": True})
+    .enable(["strikethrough", "table"])
+    .disable("image")
+)
+
+
 def outgoing_message(
     text: str,
     *,
@@ -368,19 +376,20 @@ def outgoing_message(
     subject: str | None = None,
     attachments: Sequence[AttachableFile] = (),
 ) -> ChatMessage:
-    if not mentions and not attachments:
-        return ChatMessage(
-            body=ItemBody(content=text, content_type=BodyType.Text),
-            importance=importance,
-            subject=subject,
+    tags = " ".join(
+        f'<at id="{index}">{html.escape(mention.name)}</at>'
+        for index, mention in enumerate(mentions)
+    )
+    rendered = cast("str", _MARKDOWN.render(text)).strip()
+    if tags:
+        rendered = (
+            f"<p>{tags} {rendered.removeprefix('<p>')}"
+            if rendered.startswith("<p>")
+            else f"{tags} {rendered}"
         )
     content = " ".join(
         (
-            *(
-                f'<at id="{index}">{html.escape(mention.name)}</at>'
-                for index, mention in enumerate(mentions)
-            ),
-            html.escape(text).replace("\n", "<br>"),
+            rendered,
             *(f'<attachment id="{file.attachment_id}"></attachment>' for file in attachments),
         )
     )
@@ -454,8 +463,10 @@ CHAT_ID_FIELD: str = (
 )
 
 MESSAGE_FIELD: str = (
-    "The text of the message, as plain text. Do not put HTML or mention markup in this text, "
-    + "because this tool writes all the markup itself."
+    "The text of the message, as Markdown. Teams shows bold, italic, strikethrough, links, "
+    + "lists, quotes, code, and tables. Do not put HTML or mention markup in this text, because "
+    + "this tool writes all the markup itself. To show a character such as `*`, `_`, or `#` as "
+    + "it is, put a backslash before it."
 )
 
 MENTIONS_FIELD: str = (

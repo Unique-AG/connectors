@@ -265,7 +265,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The new text of the message, as plain text. Give the complete text that the "
+                    "The new text of the message, as Markdown. Give the complete text that the "
                     + "message must show after the change."
                 ),
             ),
@@ -276,9 +276,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 default=[],
                 description=(
                     "The people to @mention in the new text, one entry for each person. This tool "
-                    + "writes the mention markup itself, so `message` stays plain text. This tool "
-                    + "puts the mentions first, in the order of this list. An empty list sends the "
-                    + "new text with no mention."
+                    + "writes the mention markup itself, so `message` has no mention markup. This "
+                    + "tool puts the mentions first, in the order of this list. An empty list "
+                    + "sends the new text with no mention."
                 ),
             ),
         ],

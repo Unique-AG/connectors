@@ -591,7 +591,7 @@ class TestWhatItAsksGraphFor:
         sent = _posted(post, reply, reply_to_id)
         body = cast("Mapping[str, object]", json.loads(sent.calls.last.request.content))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Q3 &lt; Q4 &amp; more '
+            "content": '<p><at id="0">Jane Smith</at> Q3 &lt; Q4 &amp; more</p> '
             + f'<attachment id="{_BUDGET_ID}"></attachment> '
             + f'<attachment id="{_PLAN_ID}"></attachment>',
             "contentType": "html",
