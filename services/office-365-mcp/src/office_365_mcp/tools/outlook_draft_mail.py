@@ -28,6 +28,7 @@ from office_365_mcp.shared.mail import (
     one_address_each,
     repeated_address,
 )
+from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -51,7 +52,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",
-    "body_html": "Sending this over for review.",
+    "body": "Sending this over for review.",
 }
 
 MAX_SUBJECT_CHARACTERS = 255
@@ -304,14 +305,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description="The subject line, stored exactly as given.",
             ),
         ],
-        body_html: Annotated[
+        body: Annotated[
             str,
             Field(
                 min_length=1,
-                description=(
-                    "The message body as HTML; escape `&`, `<`, `>`, and use `<p>`/`<br>` for "
-                    + "structure."
-                ),
+                description="The message body, as Markdown. This tool turns it into HTML.",
             ),
         ],
         cc: Annotated[
@@ -352,7 +350,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             to=to,
             subject=subject,
-            body_html=body_html,
+            body_html=markdown_to_html(body),
             confirm=a_person_agrees(ctx),
             cc=cc,
             importance=importance,

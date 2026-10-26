@@ -7,7 +7,6 @@ from typing import Literal, Self, cast
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
-from markdown_it import MarkdownIt
 from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
     ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
 )
@@ -46,6 +45,7 @@ from office_365_mcp.shared.identity import (
     member_in_question,
     person_in_question,
 )
+from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 
 
@@ -361,13 +361,6 @@ class MentionedMember:
 type OutgoingMention = Mention | MentionedMember
 
 
-_MARKDOWN = (
-    MarkdownIt("commonmark", {"html": False, "breaks": True})
-    .enable(["strikethrough", "table"])
-    .disable("image")
-)
-
-
 def outgoing_message(
     text: str,
     *,
@@ -380,7 +373,7 @@ def outgoing_message(
         f'<at id="{index}">{html.escape(mention.name)}</at>'
         for index, mention in enumerate(mentions)
     )
-    rendered = cast("str", _MARKDOWN.render(text)).strip()
+    rendered = markdown_to_html(text)
     if tags:
         rendered = (
             f"<p>{tags} {rendered.removeprefix('<p>')}"

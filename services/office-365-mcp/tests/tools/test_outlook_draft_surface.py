@@ -64,13 +64,13 @@ _ORIGINAL: Mapping[str, object] = {
 _MAIL_ARGUMENTS: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",
-    "body_html": "Sending this over for review.",
+    "body": "Sending this over for review.",
 }
 
 _REPLY_ARGUMENTS: Mapping[str, object] = {
     "message_ref": MailMessageHandle(_MESSAGE_ID).uri,
     "mode": "reply",
-    "body_html": "Friday works.",
+    "body": "Friday works.",
 }
 
 _COPIED_AND_MARKED: Mapping[str, object] = {
@@ -228,6 +228,19 @@ class TestTheWholeConfirmationOverARealClient:
 
         assert result.structured_content is not None, "the agreed draft answered nothing"
         assert _writes(graph) == methods, f"an agreed draft wrote {_writes(graph)}"
+
+    async def test_the_markdown_of_the_body_reaches_graph_as_html(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        arguments = {**_MAIL_ARGUMENTS, "body": "**Ship** it <b>Friday</b>."}
+
+        _ = await an_agreeing_client.call_tool(outlook_draft_mail.TOOL_NAME, arguments)
+
+        posted = next(call for call in _made(graph) if call.request.method == "POST")
+        assert _object(_body_of(posted)["body"]) == {
+            "contentType": "html",
+            "content": "<p><strong>Ship</strong> it &lt;b&gt;Friday&lt;/b&gt;.</p>",
+        }
 
     @_EACH_TOOL
     async def test_a_person_who_says_no_leaves_the_shared_mailbox_alone(
