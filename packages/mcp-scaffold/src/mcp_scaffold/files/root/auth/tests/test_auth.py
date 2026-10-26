@@ -33,7 +33,7 @@ USERS = {"ada": "s3cret", "grace": "hopper"}
 
 
 def vendor(request: httpx2.Request) -> httpx2.Response:
-    """Accepts the users in USERS at `/`, the default verify path, and nobody else."""
+    """Accepts the users in USERS, and nobody else."""
     expected = {
         "Basic " + base64.b64encode(f"{name}:{password}".encode()).decode()
         for name, password in USERS.items()
@@ -209,6 +209,34 @@ async def test_wrong_credentials_are_refused_and_counted(
         assert [response.status_code for response in refused] == [401, 401, 401]
         assert "Wrong username or password." in refused[0].text
         assert throttled.status_code == 429
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx2.Response(302, headers={"Location": "/login"}),
+        httpx2.Response(500),
+    ],
+    ids=["a redirect to a login page", "a server error"],
+)
+async def test_an_upstream_answer_that_is_neither_yes_nor_no_signs_nobody_in(
+    *,
+    upstream_settings: UpstreamSettings,
+    persistence: Persistence,
+    server_settings: ServerSettings,
+    answer: httpx2.Response,
+) -> None:
+    server = build_server(
+        upstream_settings, persistence, httpx2.MockTransport(lambda _request: answer)
+    )
+    app = http_app(server, server_settings)
+    async with serving(app, server_settings) as client:
+        request_id, csrf_token = await sign_in_form(client, await register(client))
+
+        response = await submit(client, request_id, csrf_token, username="ada", password="wrong")
+
+    assert response.status_code == 503
+    assert "The sign-in could not be checked." in response.text
 
 
 async def test_a_form_without_its_csrf_cookie_is_refused(

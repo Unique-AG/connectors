@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
+# mcp-scaffold-commit: 9a91a8864afe, timestamp: 2026-10-21T12:09:32+00:00
 
 FROM python:3.14-slim-trixie@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4b074572e6107f171d88d086682fd2500 /uv /bin/uv

@@ -101,17 +101,17 @@ unused `upstream`, `persistence` or `shared` stays as an `__init__.py` with an e
 | What a past fix replaced stays replaced: a pydantic model, not a `dataclass`; `httpx2.URL` or `HttpUrl`, not `urllib.parse`; `mcp_configs.PostgresSettings`, not `ssl.create_default_context`; a Jinja2 template, not `html.escape`; `cryptography.fernet`, not `cryptography.hazmat`. | ruff `TID251` |
 | The [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), as far as ruff checks it, with four departures: lines run to 100 characters, a docstring is only for what the code cannot say, its summary may run onto a second line, and a TODO names a link rather than an author. Besides it: no `print`, `pathlib` over `os.path`, no `else` after `return`, a long string split by implicit concatenation rather than `+`, and an error logged in an `except` with its traceback. | ruff, with `code_style.toml` |
 | Every type is known: no `Any`, no unannotated attribute, `@override` on an override, `super().__init__()` in a subclass. A test may use a private name of the code it tests. | basedpyright `all`, with `type_check.json` |
-| No file changes its own type check: a `# pyright:` comment only ignores a named rule on its line. | `uv run poe architecture` |
-| No file turns a lint rule off beyond one line: no `# ruff: noqa` or `# ruff: disable` comment outside `upstream/generated/`. | `uv run poe architecture` |
 | Every tool has a description and every parameter a `Field(description=...)`. | `uv run poe architecture` |
 | Every tool's input schema is a plain object, with no `anyOf`, `oneOf`, `allOf` or `not` at its root, which some clients reject. | `uv run poe architecture` |
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run poe architecture` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run poe architecture` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run poe architecture` |
 | `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
+| No file changes its own type check or turns a lint rule off beyond one line: no file-level `# pyright:` comment, and no `# ruff: noqa` or `# ruff: disable` outside `upstream/generated/`. | review |
 
 Never loosen a rule to make a change pass. CI runs each tool with the MCP's own configuration, so
-nothing stops an edit to `[tool.ruff]`, `[tool.basedpyright]` or `[tool.importlinter]` but review.
+nothing stops an edit to `[tool.ruff]`, `[tool.basedpyright]` or `[tool.importlinter]`, or a
+file-wide suppression comment, but review.
 Treat that as yours to hold. When a check fails, try everything else first: move the code to where
 it belongs, change its design, or narrow its types. Only when the line truly cannot comply, name
 the rule in a `# noqa: <rule>` or `# pyright: ignore[<rule>]` on that one line, with the reason

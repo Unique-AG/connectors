@@ -1,4 +1,4 @@
-# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-21T12:09:32+00:00
+# mcp-scaffold-commit: 9a91a8864afe, timestamp: 2026-10-21T12:09:32+00:00
 
 """The server with fakes in place of the upstream and the stores. The tests build it, and so
 does `uv run poe architecture`, which lists its tools.

@@ -104,4 +104,6 @@ async def _measured[T, R](
         if failure is None:
             _log.info("%s '%s' completed", kind, name, extra=extra)
         else:
-            _log.error("%s '%s' failed", kind, name, exc_info=failure, extra=extra)
+            # FastMCP logs an unexpected error with its traceback already, and reaches here with
+            # it wrapped in a ToolError, so this line adds only the outcome.
+            _log.warning("%s '%s' failed: %s", kind, name, failure, extra=extra)

@@ -4,7 +4,7 @@ import hashlib
 import logging
 import secrets
 import time
-from typing import override
+from typing import NoReturn, override
 import uuid
 
 from fastmcp.server.auth import AccessToken
@@ -197,17 +197,16 @@ class CredentialsAuthProvider(OAuthProvider):
         token = await store.get_token_by_refresh_hash(_hash(refresh_token.token))
         if token is None or token.refresh_token_expires_at < now:
             raise TokenError(error="invalid_grant", error_description="Refresh token has expired")
-        if token.revoked_at is not None or not await store.revoke_token(token.id, now=now):
-            await store.revoke_family(token.family_id, now=now)
-            raise TokenError(
-                error="invalid_grant", error_description="Refresh token was already used"
-            )
+        if token.revoked_at is not None:
+            await self._revoke_reused(store, token.family_id, now=now)
         granted = token.scopes.split()
         if not set(scopes) <= set(granted):
             raise TokenError(
                 error="invalid_scope",
                 error_description="The requested scopes exceed those granted",
             )
+        if not await store.revoke_token(token.id, now=now):
+            await self._revoke_reused(store, token.family_id, now=now)
         return await self._issue_tokens(
             store,
             family_id=token.family_id,
@@ -380,6 +379,11 @@ class CredentialsAuthProvider(OAuthProvider):
             scope=" ".join(scopes) or None,
             refresh_token=refresh_token,
         )
+
+    @staticmethod
+    async def _revoke_reused(store: AuthStore, family_id: str, *, now: float) -> NoReturn:
+        await store.revoke_family(family_id, now=now)
+        raise TokenError(error="invalid_grant", error_description="Refresh token was already used")
 
     @property
     def _failed_sign_in_window_seconds(self) -> float:

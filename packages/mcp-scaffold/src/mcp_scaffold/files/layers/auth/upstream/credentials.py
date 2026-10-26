@@ -26,4 +26,11 @@ class CredentialsAuth(httpx2.Auth):
     async def async_auth_flow(
         self, request: httpx2.Request
     ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
-        yield next(auth_for(await self._provider()).sync_auth_flow(request))
+        flow = auth_for(await self._provider()).async_auth_flow(request)
+        outgoing = await anext(flow)
+        while True:
+            response = yield outgoing
+            try:
+                outgoing = await flow.asend(response)
+            except StopAsyncIteration:
+                return

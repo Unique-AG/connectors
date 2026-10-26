@@ -53,7 +53,8 @@ Every file the scaffold writes starts with the same comment, in the file's own s
 
 The commit is the one the scaffold ran from, which the clean tree it requires makes exact, and
 the timestamp the moment the run started, the same in every file of one run, so a file tells
-which scaffold wrote it. A Dockerfile's `# syntax=` line and a
+which scaffold wrote it. A rebase or squash can drop the commit from the branch; the timestamp
+still dates the run, so the scaffold's history around that date shows what it wrote. A Dockerfile's `# syntax=` line and a
 shebang stay first, and a JSON schema takes it as `"$comment"`. What a tool writes is not
 stamped: `uv.lock`, the codegen's `upstream/generated/` modules, the tool surface
 snapshot and the chart's `values.schema.json`, which `scripts/render-values-schema.sh`

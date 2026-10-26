@@ -11,7 +11,8 @@ from typing import override
 
 from opentelemetry import trace
 
-_OPS_PATHS = frozenset({"/probe", "/health", "/metrics", "/ready"})
+from mcp_observability.ops import OPS_PATHS
+
 _ACCESS_PATH = re.compile(
     r'(?:^|[\s"])(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\s+([^?\s"]+)', re.IGNORECASE
 )
@@ -68,7 +69,7 @@ class _QuietOpsRoutes(logging.Filter):
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         match = _ACCESS_PATH.search(record.getMessage())
-        return match is None or (match.group(1).rstrip("/") or "/") not in _OPS_PATHS
+        return match is None or (match.group(1).rstrip("/") or "/") not in OPS_PATHS
 
 
 def _trace_fields() -> dict[str, str | int]:

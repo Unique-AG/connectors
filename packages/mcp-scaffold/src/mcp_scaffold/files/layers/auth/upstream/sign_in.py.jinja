@@ -18,8 +18,9 @@ async def verify_credentials(
 ) -> bool:
     """Whether the upstream accepts `credentials`, asked at `settings.verify_path`.
 
-    A 401 or 403 is a no. Any other error says nothing about the credentials, so it is an
-    UpstreamError, and the user is asked to try again rather than told they are wrong.
+    Only a 2xx is a yes, and a 401 or 403 is a no. Anything else, a redirect to a login page
+    included, says nothing about the credentials, so it is an UpstreamError, and the user is asked
+    to try again rather than signed in.
     """
     async with httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
@@ -32,7 +33,7 @@ async def verify_credentials(
             raise UpstreamError(str(error) or type(error).__name__) from error
     if response.status_code in {401, 403}:
         return False
-    if response.is_error:
+    if not response.is_success:
         raise UpstreamError(
             f"{response.status_code} {response.reason_phrase} for GET {settings.verify_path}"
         )

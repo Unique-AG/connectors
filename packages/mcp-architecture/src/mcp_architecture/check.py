@@ -1,5 +1,5 @@
-"""The checks of what a client sees and of the MCP's files' suppression comments, which an MCP's
-`architecture` and `surface` poe tasks run in its folder."""
+"""The checks of what a client sees, which an MCP's `architecture` and `surface` poe tasks run in
+its folder."""
 
 import asyncio
 import difflib
@@ -12,10 +12,6 @@ from typing import cast
 from fastmcp import FastMCP
 
 from mcp_architecture.settings import settings_showing_input_in_errors
-from mcp_architecture.suppression_comments import (
-    files_changing_their_type_check,
-    files_turning_rules_off,
-)
 from mcp_architecture.tools import (
     ServerFactory,
     masks_error_details,
@@ -47,16 +43,6 @@ async def check_service(root: Path, *, update: bool = False) -> list[str]:
     )
     package = str(pyproject["project"]["name"]).replace("-", "_")
     findings: list[str] = []
-    if comments := files_changing_their_type_check(root):
-        findings.append(
-            "Remove these `# pyright:` comments, so each file keeps the type check of the whole "
-            f"MCP: {comments}"
-        )
-    if suppressions := files_turning_rules_off(root, package):
-        findings.append(
-            "Remove these `# ruff: noqa` and `# ruff: disable` comments, and name the rule in a "
-            f"`# noqa: <rule>` on the line that needs it: {suppressions}"
-        )
     factory = _offline_server(root / OFFLINE_SERVER)
     if factory is None:
         findings.append(

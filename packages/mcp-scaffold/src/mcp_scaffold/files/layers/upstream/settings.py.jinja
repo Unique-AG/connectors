@@ -15,9 +15,9 @@ class UpstreamSettings(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = shared_config("UPSTREAM_")
 
 {% if options.auth %}
-    # Where the sign-in asks the upstream whether a user's credentials are right: any GET that
-    # answers 401 or 403 to wrong ones.
-    verify_path: str = "/"
+    # Where the sign-in asks the upstream whether a user's credentials are right: a GET that
+    # answers 2xx to right ones and 401 or 403 to wrong ones, never a public page.
+    verify_path: str = Field(min_length=1)
 {% else %}
     api_key: SecretStr = Field(min_length=1)
 {% endif %}

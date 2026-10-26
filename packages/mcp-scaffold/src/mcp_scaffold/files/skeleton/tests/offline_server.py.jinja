@@ -71,7 +71,7 @@ def fake_upstream_settings() -> UpstreamSettings:
 {% endif %}
         api_url=AnyHttpUrl({{ quoted(api_url) }}),
 {% if options.auth %}
-        verify_path="/",
+        verify_path="/account",
 {% endif %}
         timeout_seconds=30,
         retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),

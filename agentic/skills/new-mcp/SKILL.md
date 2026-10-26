@@ -167,7 +167,9 @@ username and password. Shape three things to the upstream, and nothing in `mcp/a
   go through it.
 - `UpstreamCredentials` in `shared/contracts/auth.py`: what the upstream needs per user. A field
   added there needs a column in `persistence/auth/` and a field on the sign-in form.
-- `UPSTREAM_VERIFY_PATH`: a GET the upstream answers 401 or 403 to wrong credentials.
+- `UPSTREAM_VERIFY_PATH`, which has no default: a GET the upstream answers 2xx to right
+  credentials and 401 or 403 to wrong ones, such as the vendor's "current user" endpoint. Never a
+  public page: anything that answers 2xx to wrong credentials signs anyone in as anyone.
 
 `guides/auth.md` in `packages/mcp-architecture` says which layer owns what, and how a request
 takes credentials of its own. Set `MCP_AUTH_ENCRYPTION_KEY` in the overlay's secrets.
