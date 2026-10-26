@@ -137,11 +137,13 @@ interaction has a request part and an answer part:
 
 - The request part: `method`, `path`, and optionally `host`, `query`, `json` (the body), and
   `headers`. The headers are only `prefer` and `consistencylevel`, and they must be equal.
-- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/fixtures/`.
+- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/fixtures/`,
+  and `response_headers`, the headers of the answer (for example `location` of a redirect).
 
 The run is strict. A request that matches no unused interaction fails the step, and the message
 shows the request and the interactions that no request reached yet. An interaction that no request
-reaches fails the run. A request without the token of the user fails the step.
+reaches fails the run. A request to Graph without the token of the user fails the step. A request
+to another host, such as a download redirect, fails the step when it carries the token.
 
 A date or a time in a request matches only the same text in the cassette, or a symbol.
 `~yesterday`, `~today`, and `~tomorrow` match a date whose UTC day is that day, plus or minus one
@@ -198,7 +200,10 @@ the other rows in the same way, with a different `fault` `input` and the same ca
 cassette exists, that a sidecar names each cassette, and that a cassette or a sidecar names each
 fixture.
 
-A recorder is not built. It can write a cassette from a run against a test tenant.
+A recorder writes a cassette from a run against a test tenant. It scrubs the answers, so that
+only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has the commands, and
+`../scripts/dogfood/seed/README.md` has the seed. A recorded cassette is a variant named
+`recorded` in the sidecar, and its cassette name starts with `rec-`.
 
 ## Evidence for the order
 
