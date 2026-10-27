@@ -96,5 +96,11 @@ reportMissingTypeStubs = false
 reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
+[tool.uv]
+override-dependencies = [
+    "filelock>=4.2.1",
+    "pillow>=13.0.0",
+]
+
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
