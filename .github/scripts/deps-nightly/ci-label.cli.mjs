@@ -2,12 +2,12 @@ import { FAILED_LABEL, failureLabelAction, READY_LABEL, reviewLabelAction } from
 import { runOrThrow } from './run.mjs';
 
 const LABELS = [
-  [FAILED_LABEL, 'd93f0b', 'The CI of a dependency update failed'],
-  [READY_LABEL, '0e8a16', 'The CI of a dependency update passed and the review is next'],
-  ['deps-reviewed', '0e8a16', 'The review of a dependency update is done'],
-  ['deps-needs-human', 'b60205', 'A dependency update that a person must finish'],
-  ['deps-fix-attempt-1', 'fbca04', 'The first automatic fix of a dependency update'],
-  ['deps-fix-attempt-2', 'fbca04', 'The second automatic fix of a dependency update'],
+  [FAILED_LABEL, 'd93f0b', 'Marks a dependency update with a failed CI.'],
+  [READY_LABEL, '0e8a16', 'Marks a dependency update with a green CI that waits for the review.'],
+  ['deps-reviewed', '0e8a16', 'Marks a dependency update that the agent reviewed.'],
+  ['deps-human-needed', 'b60205', 'Marks a dependency update that a person must finish.'],
+  ['deps-fix-attempt-1', 'fbca04', 'Marks the first automatic fix of a dependency update.'],
+  ['deps-fix-attempt-2', 'fbca04', 'Marks the second automatic fix of a dependency update.'],
 ];
 
 for (const [name, color, description] of LABELS) {

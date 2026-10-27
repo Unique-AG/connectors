@@ -334,7 +334,7 @@ gh pr view <number> --repo Unique-AG/connectors --json state,labels,headRefName,
 
 Stop with no change when any of these is true:
 - The PR is not open, or it comes from a fork.
-- The PR carries the label `deps-reviewed` (it was handled) or `deps-needs-human` (a person has it).
+- The PR carries the label `deps-reviewed` (it was handled) or `deps-human-needed` (a person has it).
 - A label automation started the run, and the PR carries neither `deps-ci-failed` nor `deps-review-ready`. A label change that removed the label can start this run again.
 
 If the PR changes no manifest and no lockfile, it is not a dependency PR. Go to Part F and state this reason.
@@ -471,7 +471,7 @@ Do this before you change anything. Then a crashed run still counts.
 Neither attempt label on the PR: this is attempt 1. Only `deps-fix-attempt-1`: this is attempt 2. `deps-fix-attempt-2`: both attempts are used, so go to Part E, then Part F.
 Add the label for the current attempt. Create the label first when it does not exist. Use `deps-fix-attempt-2` for the second attempt.
 ```bash
-gh label create deps-fix-attempt-1 --repo Unique-AG/connectors --description "First automatic CI fix" 2>/dev/null
+gh label create deps-fix-attempt-1 --repo Unique-AG/connectors --description "Marks the first automatic fix of a dependency update." 2>/dev/null
 gh pr edit <number> --repo Unique-AG/connectors --add-label deps-fix-attempt-1
 ```
 
@@ -537,7 +537,7 @@ Use the first command to find the comment. Use the second command when none exis
 
 Then change the labels. Leave the attempt labels in place.
 ```bash
-gh label create deps-reviewed --repo Unique-AG/connectors --description "The review of a dependency update is done" 2>/dev/null
+gh label create deps-reviewed --repo Unique-AG/connectors --description "Marks a dependency update that the agent reviewed." 2>/dev/null
 gh pr edit <number> --repo Unique-AG/connectors --remove-label deps-review-ready --remove-label deps-ci-failed --add-label deps-reviewed
 ```
 
@@ -549,8 +549,8 @@ Verdict `safe with a gap` or `do not merge`, CI still red after the attempts, CI
 ### Label the PR
 
 ```bash
-gh label create deps-needs-human --repo Unique-AG/connectors --description "A human must fix this dependency PR" 2>/dev/null
-gh pr edit <number> --repo Unique-AG/connectors --add-label deps-needs-human --remove-label deps-ci-failed
+gh label create deps-human-needed --repo Unique-AG/connectors --description "Marks a dependency update that a person must finish." 2>/dev/null
+gh pr edit <number> --repo Unique-AG/connectors --add-label deps-human-needed --remove-label deps-ci-failed
 ```
 
 When the PR is not a dependency PR, Part E did not run. Write one comment that states the reason, and stop.

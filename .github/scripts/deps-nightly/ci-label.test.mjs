@@ -59,7 +59,7 @@ describe('reviewLabelAction', () => {
 
   it('adds nothing after the review is done or a person has the update', () => {
     assert.strictEqual(reviewLabelAction(green, ['deps-reviewed']), 'none');
-    assert.strictEqual(reviewLabelAction(green, ['deps-needs-human']), 'none');
+    assert.strictEqual(reviewLabelAction(green, ['deps-human-needed']), 'none');
   });
 
   it('does nothing when the label is already there', () => {
