@@ -1,0 +1,19 @@
+{
+  "folders": [
+    { "name": "connectors", "path": "." },
+    { "path": "packages/mcp-architecture" },
+    { "path": "packages/mcp-configs" },
+    { "path": "packages/mcp-credential-auth" },
+    { "path": "packages/mcp-observability" },
+    { "path": "packages/mcp-openapi" },
+    { "path": "packages/mcp-scaffold" },
+    { "path": "services/architecture-demo-mcp" },
+    { "path": "services/backstop-mcp" },
+    { "path": "services/exp-kyckr-mcp" },
+    { "path": "services/exp-tiingo-mcp" },
+    { "path": "services/hello-mcp" },
+    { "path": "services/kb-mcp" },
+    { "path": "services/office-365-mcp" },
+    { "path": "services/with-intelligence-mcp" }
+  ]
+}

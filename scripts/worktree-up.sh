@@ -14,5 +14,5 @@ for tool in pnpm uv; do
 done
 
 pnpm install --frozen-lockfile
-uv run --locked poe install
+uvx --from poethepoet==0.49.0 poe install
 bash "$root/agentic/skill-management/install-skills.sh"

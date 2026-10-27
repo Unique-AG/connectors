@@ -73,17 +73,37 @@ In every Python service, `uv run poe ci` runs the same script, and `uv run poe` 
 each check. Each shared package under `packages/` has the same task names, and its `ci` runs that
 package's checks.
 
-From the repository root, `uv run poe` lists the tasks that cover every project under `packages/`
-and `services/` that has a `pyproject.toml`. Each project keeps its own `uv.lock` and `.venv`, so a
-new one needs no entry at the root:
+From the repository root, `uvx --from poethepoet==0.49.0 poe` lists the tasks that cover every
+project under `packages/` and `services/` that has a `pyproject.toml`. The root is no uv project:
+its `pyproject.toml` holds only these tasks, and it has no `uv.lock`.
+Each project keeps its own `uv.lock` and `.venv`, so a new one needs no entry at the root:
 
-- `uv run poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs it
-  in a new worktree.
-- `uv run poe ci` runs `ci` in every project, and `uv run poe ci services/<service> ...` in the ones
-  named. `format`, `lint`, `lint-fix`, `fix`, `typecheck` and `test` run that task in every
-  project. Each lists at the end the projects it failed in.
-- `uv run poe lock` runs `uv lock` in every project, for a change to a shared package's
-  `pyproject.toml` that the projects using it by path have to pick up.
+- `poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs it in a
+  new worktree.
+- `poe ci` runs `ci` in every project, and `poe ci services/<service> ...` in the ones named.
+  `format`, `lint`, `lint-fix`, `fix`, `typecheck` and `test` run that task in every project. Each
+  lists at the end the projects it failed in.
+- `poe lock` runs `uv lock` in every project, for a change to a shared package's `pyproject.toml`
+  that the projects using it by path have to pick up.
+
+Do not `uv run` at the root. It creates a root `uv.lock` and `.venv`, and Zed starts basedpyright
+in the outermost folder that has both a `pyproject.toml` and a `uv.lock`: with one at the root,
+every project shares one server that knows none of them. Delete both if they appear.
+
+#### Editors
+
+Each editor type-checks a project with that project's own `[tool.basedpyright]` and `.venv`, the
+same way CI does, as long as it runs one basedpyright per project:
+
+- Zed: open the repository root. Zed starts basedpyright in the outermost folder that has both a
+  `pyproject.toml` and a `uv.lock`, which is each project's own.
+- VS Code and Cursor: open `connectors.code-workspace` (File > Open Workspace from File...). Each
+  project is a folder of that workspace, and each folder gets its own basedpyright. A window
+  opened on the repository root runs one for the whole repository, which knows no project.
+- PyCharm 2026.2: open the repository root. Its Workspace mode, on by default, makes each folder
+  with a `pyproject.toml` a project and sets its `.venv` as that project's interpreter.
+
+A new project needs a line in the `folders` of `connectors.code-workspace`.
 
 #### One version of each package
 
@@ -93,14 +113,14 @@ of them in one pull request. Nothing makes the locks agree on the rest: a Depend
 bumps one project at a time, and a project that has a package only through another package keeps
 its version when a grouped bump passes it by. The `Report Python version drift` job of
 `[CI] Python` lists the packages two locks resolve to different versions, as a warning, and never
-fails, so it never holds up a Dependabot pull request. `uv run poe drift` prints the same list.
+fails, so it never holds up a Dependabot pull request. `poe drift` prints the same list.
 
-To align them again, run `uv run poe upgrade` on a branch of its own. It runs `uv lock --upgrade`
-in every project at once, which moves each to the newest versions its pins allow, and then prints
-what still drifts. Raise the pin of a package that drifts because a project pins it lower, and
+To align them again, run `poe upgrade` from the root on a branch of its own. It runs
+`uv lock --upgrade` in every project at once, which moves each to the newest versions its pins
+allow, and then prints what still drifts. Raise the pin of a package that drifts because a project pins it lower, and
 take a package that one project caps, such as `cachetools`, which `unique-toolkit` keeps below 6,
 down to the capped version in the others with `uv lock --upgrade-package <name>==<version>` in
-each. Run `uv run poe ci` and open a pull request.
+each. Run `poe ci` from the root and open a pull request.
 
 It runs, in this order:
 
