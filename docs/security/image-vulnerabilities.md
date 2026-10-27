@@ -97,9 +97,10 @@ flowchart LR
   shipC --> zero
 ```
 
-Three facts follow from this:
+Four facts follow from this:
 
 - A fixed lockfile on `main` does not close an image alert. Only a release does.
+- A lock file alert, category `trivy-lockfiles`, closes when the fixed lock file reaches `main`. It does not need a release.
 - A service with no code change needs the Rebuild Service workflow, so that it can ship an operating system patch.
 - The patch windows give 1 month for critical and high findings. A count above 0 during the week is normal.
 
@@ -113,7 +114,7 @@ A Cursor Automation reads the findings every day. It opens fix PRs for critical 
 |---|---|
 | A Python or Node dependency | The nightly dependency PR, or a fix PR from the patch run |
 | An operating system package | Run the Rebuild Service workflow. The new build takes the patch. |
-| The base image | Raise the base image digest in the Dockerfile. The change starts a release. |
+| The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
 
 ## Build and release

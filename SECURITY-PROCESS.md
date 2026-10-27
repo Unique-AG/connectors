@@ -31,7 +31,7 @@ flowchart LR
 | Kind | Tool | What blocks | Read |
 |---|---|---|---|
 | Code | CodeQL | A PR that adds an alert | [Code vulnerabilities](./docs/security/code-vulnerabilities.md) |
-| Dependencies | Nightly update, dependency review | A PR that adds a vulnerable dependency | [Dependencies](./docs/security/dependencies.md) |
+| Dependencies | Nightly update, lock file scan, dependency review | A PR that adds a vulnerable dependency | [Dependencies](./docs/security/dependencies.md) |
 | Images | Trivy | A release PR with a fixable critical or high finding | [Image vulnerabilities](./docs/security/image-vulnerabilities.md) |
 
 ## DEVIATION from monorepo setup
