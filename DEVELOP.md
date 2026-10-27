@@ -78,8 +78,9 @@ project under `packages/` and `services/` that has a `pyproject.toml`. The root 
 its `pyproject.toml` holds only these tasks, and it has no `uv.lock`.
 Each project keeps its own `uv.lock` and `.venv`, so a new one needs no entry at the root:
 
-- `poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs it in a
-  new worktree.
+- `poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs the same
+  command in a new worktree, without poe, so setup that runs unattended installs only what the
+  projects' locks pin by hash.
 - `poe ci` runs `ci` in every project, and `poe ci services/<service> ...` in the ones named.
   `format`, `lint`, `lint-fix`, `fix`, `typecheck` and `test` run that task in every project. Each
   lists at the end the projects it failed in.
