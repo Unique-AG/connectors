@@ -1,19 +1,10 @@
-# Tasks that run in every Python project. Not a uv workspace: each keeps its own uv.lock and .venv.
-[project]
-name = "connectors"
-version = "0"
-requires-python = ">=3.14"
-
-[dependency-groups]
-dev = ["poethepoet==0.49.0"]
-
-[tool.uv]
-package = false
+# Tasks for every Python project. Run `uvx --from poethepoet==0.49.0 poe <task>`, never `uv run`
+# here: it creates the root uv.lock that DEVELOP.md explains Zed must not see.
 
 [tool.poe.tasks]
 install = { cmd = "bash scripts/each-python-project.sh uv sync --locked", help = "install every project's locked dependencies into its own .venv" }
 lock = { cmd = "bash scripts/each-python-project.sh uv lock", help = "refresh every project's uv.lock after a pyproject.toml change, such as a shared package's" }
-drift = { cmd = "python scripts/report-python-version-drift.py", help = "list the packages two projects' locks resolve to different versions" }
+drift = { cmd = "uv run --no-project --python 3.14 python scripts/report-python-version-drift.py", help = "list the packages two projects' locks resolve to different versions" }
 format = { cmd = "bash scripts/each-python-project.sh uv run --locked poe format", help = "run format in every project" }
 lint = { cmd = "bash scripts/each-python-project.sh uv run --locked poe lint", help = "run lint in every project" }
 lint-fix = { cmd = "bash scripts/each-python-project.sh uv run --locked poe lint-fix", help = "run lint-fix in every project" }
@@ -29,3 +20,4 @@ sequence = [{ cmd = "bash scripts/each-python-project.sh uv lock --upgrade" }, {
 help = "every check CI runs, in the projects named (e.g. services/hello-mcp) or in all of them"
 shell = 'PROJECTS="${projects:-}" bash scripts/each-python-project.sh uv run --locked poe ci'
 args = [{ name = "projects", positional = true, multiple = true, help = "project folders, all of them when none is named" }]
+

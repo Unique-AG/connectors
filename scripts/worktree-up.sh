@@ -14,5 +14,6 @@ for tool in pnpm uv; do
 done
 
 pnpm install --frozen-lockfile
-uv run --locked poe install
+# What `poe install` runs, without uvx resolving poe and its dependencies from an index unpinned.
+bash scripts/each-python-project.sh uv sync --locked
 bash "$root/agentic/skill-management/install-skills.sh"
