@@ -45,15 +45,15 @@ The agent never merges, never approves, and never edits a lockfile by hand. A ne
 
 ## Hand-off and follow-up ticket
 
-When a person is needed, the agent adds the label `deps-needs-human` and creates a follow-up ticket. The ticket is a GitHub issue with the label `deps-follow-up`. It names the PR, the breaking changes that affect us with their file and line, what the agent tried, and the exact next steps.
+When a person is needed, the agent adds the label `deps-needs-human` and creates a follow-up ticket in Jira. The ticket is a Task in the project `UN`, with the component `mcp-servers` and the labels `mcp-server` and `deps-follow-up`. It names the PR, the breaking changes that affect us with their file and line, what the agent tried, and the exact next steps.
 
-One issue exists for each package. A second hand-off adds a comment to it. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
+One ticket exists for each package. A second hand-off adds a comment to it. When the Jira tool is not connected, the agent creates a GitHub issue with the label `deps-follow-up` instead. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
 
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `deps-reviewed` and not `deps-needs-human`, read the report in its comment and merge the PR.
-3. If a PR has the label `deps-needs-human`, open its follow-up issue with `gh issue list --label deps-follow-up --state open`. Finish the work there.
+3. If a PR has the label `deps-needs-human`, open its follow-up ticket. Search Jira with `project = UN AND labels = "deps-follow-up" AND statusCategory != Done`. Finish the work there.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 

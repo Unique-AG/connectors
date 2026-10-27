@@ -50,6 +50,7 @@ flowchart LR
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
 | Cursor automations for the skill `vulna-squash`. One runs on a schedule and is `nightly-vulna-patchy`. One reacts to the label `deps-ci-failed`. One reacts to the label `deps-review-ready`. | The daily patch run, and the whole job for a nightly dependency PR: assess, fix a red CI, report, and a follow-up ticket. |
+| The Jira tool for those automations, with the site `unique-ch.atlassian.net`, the project `UN`, and the component `mcp-servers` | A hand-off creates a follow-up ticket in Jira. Without the tool, the agent creates a GitHub issue instead. |
 
 ## DEVIATION from monorepo setup
 
