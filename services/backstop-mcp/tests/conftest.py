@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from mcp_observability import reset_identifiable_values
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
@@ -42,6 +43,8 @@ async def _close_singletons() -> AsyncGenerator[None]:
     """
     yield
     await close_singletons()
+    # `create_app` configures the process-wide pseudonym mode.
+    reset_identifiable_values()
 
 
 @pytest.fixture(scope="session")

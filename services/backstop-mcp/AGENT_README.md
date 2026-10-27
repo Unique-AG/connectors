@@ -630,9 +630,9 @@ logger.warning(
 Log at the start of a tool call and when a query finishes (what was asked, what came
 back). Warn when a record is dropped, a catalog miss is flagged, or a per-id GET fails.
 Do not log every mapped row. Do not put secrets, tokens, or raw Backstop bodies in
-`extra`. A username or login is `IdentifiableValue(login)` from `utils/` — it prints
-`sha256:<hex>` unless `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Never interpolate the raw
-login into the line.
+`extra`. A username or login is `identifiable_value(login)` from `mcp_observability` — it
+prints `hmac-sha256:<hex>` (plain `sha256:<hex>` at debug) unless
+`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Never interpolate the raw login into the line.
 
 **Metrics.** Add an instrument in `metrics.py` only when a number will change a decision
 you can name: catalog TTL vs walk cost (`CUSTOM_FIELD_SCHEMA_LOADS`, the catalog

@@ -3,12 +3,12 @@ from datetime import timedelta
 from typing import Self, overload
 
 from fastmcp.exceptions import ToolError
+from mcp_observability import identifiable_value
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, relationship_to_one
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
-from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
 

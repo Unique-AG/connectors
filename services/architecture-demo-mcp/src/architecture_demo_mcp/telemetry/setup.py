@@ -18,7 +18,7 @@ def init_telemetry(settings: LoggingSettings) -> None:
     configure_tracing(
         TracingSettings(), service_name=SERVICE_NAME, service_version=version(SERVICE_NAME)
     )
-    configure_logging(level=settings.log_level)
+    configure_logging(settings, own_loggers=("architecture_demo_mcp",))
 
 
 def instrument(mcp: FastMCP) -> Middleware:
