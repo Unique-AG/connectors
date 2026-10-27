@@ -19,8 +19,6 @@ prompt: |-
 
   Read `agentic/skills/vulna-squash/SKILL.md` end to end and follow it. Do not repeat its rules here.
 
-  Pass `ticket: UN-28256` to every subagent for the required plain-text `Refs:` line.
-
   Start one subagent per planned batch, as the skill says. Start them in parallel when more than one batch fits the open slots. Wait for all subagents before you post to Slack.
 
   Use the Slack action for every message the skill requires. Post exactly one message for each opened PR. Post at most one stop message when this run opens no PR. Never put two PRs in one message.

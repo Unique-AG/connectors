@@ -7,7 +7,7 @@ metadata:
 
 # Vulna Squash
 
-Handle every dependency PR in one pass: make or take the PR, assess it, watch CI, fix a red CI, decide a verdict, post one report comment. When a human is needed, hand off with a follow-up ticket. After a hand-off nobody runs a review by hand, because the report is already on the PR.
+Handle every dependency PR in one pass: make or take the PR, assess it, watch CI, fix a red CI, decide a verdict, post one report comment. When a human is needed, hand off: label the PR and say in the report comment that a person must log a Jira ticket. After a hand-off nobody runs a review by hand, because the report is already on the PR.
 
 Repository: `Unique-AG/connectors`. Base branch: `main`.
 
@@ -43,8 +43,6 @@ Fix CRITICAL and HIGH findings at their source. Stop early when a check fails.
 MEDIUM and below are out of scope. Open as few PRs as the rules allow.
 Post to Slack channel `C0C1PR9CNMP` on every exit.
 Post one Slack message for each opened PR. Never put two PRs in one message.
-
-The caller gives a ticket key for the run. When a local run has no ticket, ask for one before you start a subagent. Never invent a ticket key.
 
 ### Open-PR cap
 
@@ -157,7 +155,6 @@ Then give one field on each line:
 - `scan_run_url`: the run URL from the scan freshness check
 - `batch_kind`: `patch`, `minor`, `major` or `rebuild`
 - `batch_slug`: the unique slug
-- `ticket`: the ticket key for this run
 - `packages`: comma-separated `name old→new` for this batch only. For a `rebuild` batch, give the service and the operating system packages.
 - `projects`: the projects that hold the package, for example `services/hello-mcp packages/mcp-configs`
 - `cleared`: the CVE or GHSA IDs with severity and the alert URLs
@@ -192,7 +189,7 @@ Hand-off (`handoff: true`). Use it for a red CI, a timeout, and the verdicts `sa
 :warning: *Vulna Squash* · <pr-url|#1234> · … · *needs a human*
 • Cleared … — <scan-url|scan run>
 • <one sentence: the verdict, or still red, or timed out>
-• Ticket: <ticket-url>. The full report is on the PR. No review run is needed.
+• A person must log a Jira ticket. The full report is on the PR. No review run is needed.
 ```
 
 #### Stop messages
@@ -209,9 +206,7 @@ Post one message when this run opens no PR.
 
 You are the Vulna Squash PR opener. You handle one batch. You open at most one PR. You return structured results to the caller. After the PR exists, you continue with Parts C to F for that PR.
 
-The brief gives the fields `repository`, `scan_run_url`, `batch_kind`, `batch_slug`, `ticket`, `packages`, `projects`, `cleared` and `memory_notes`.
-
-If `ticket` is missing, do not open a PR. Return `status: skipped` and say the ticket is missing.
+The brief gives the fields `repository`, `scan_run_url`, `batch_kind`, `batch_slug`, `packages`, `projects`, `cleared` and `memory_notes`.
 
 ### Clone
 
@@ -261,7 +256,7 @@ Do not change code. Run the rebuild workflow for the service.
 gh workflow run release-rebuild.yaml --repo Unique-AG/connectors -f services=<service>
 ```
 
-The workflow opens one PR for the service. Its branch starts with `rebuild/<service>-`. Wait for the PR, find it, then retitle it, label it and add the ticket line. Use the rules for title, label and body below.
+The workflow opens one PR for the service. Its branch starts with `rebuild/<service>-`. Wait for the PR, find it, then retitle it, and label it. Use the rules for title, label and body below.
 ```bash
 gh pr list --repo Unique-AG/connectors --state open --json number,headRefName,createdAt \
   --jq '.[] | select(.headRefName | startswith("rebuild/<service>-"))'
@@ -274,7 +269,7 @@ gh pr edit <number> --repo Unique-AG/connectors \
   --body "<body>"
 ```
 
-GitHub holds the workflow runs on a PR that a workflow opens. Do not wait for checks. A rebuild PR changes no dependency and has no CI result, so skip Parts C to F. Return `status: held`, `verdict: none`, `ticket: none` and `handoff: false`.
+GitHub holds the workflow runs on a PR that a workflow opens. Do not wait for checks. A rebuild PR changes no dependency and has no CI result, so skip Parts C to F. Return `status: held`, `verdict: none` and `handoff: false`.
 If the dispatch fails, return `status: skipped` and give the error.
 
 ### Cap check, commit and push
@@ -311,7 +306,6 @@ If the check fails, do not create the PR. Return `status: skipped` with the erro
 
 Every PR carries the label `vulna-squash`. Pass `--label vulna-squash` to `gh pr create`. The cap counts this label.
 - Link `scan_run_url`.
-- Add the plain-text line `Refs: <ticket>`. Use the ticket from the brief.
 - List each cleared CVE or GHSA ID with its severity and its alert URL.
 - List the exact packages, versions and files that change.
 - State that Vulna Squash opened the PR.
@@ -547,7 +541,7 @@ gh label create deps-reviewed --repo Unique-AG/connectors --description "The rev
 gh pr edit <number> --repo Unique-AG/connectors --remove-label deps-review-ready --remove-label deps-ci-failed --add-label deps-reviewed
 ```
 
-Verdict `safe to merge`: stop here. A human reviews and merges the PR. Return `handoff: false` and `ticket: none`.
+Verdict `safe to merge`: stop here. A human reviews and merges the PR. Return `handoff: false`.
 Verdict `safe with a gap` or `do not merge`, CI still red after the attempts, CI timed out, or an unclear cause: go to Part F.
 
 ## Part F: Hand off to a human (both modes)
@@ -559,66 +553,25 @@ gh label create deps-needs-human --repo Unique-AG/connectors --description "A hu
 gh pr edit <number> --repo Unique-AG/connectors --add-label deps-needs-human --remove-label deps-ci-failed
 ```
 
-When the PR is not a dependency PR, Part E did not run. Write one comment that states the reason, and stop. No package exists, so create no ticket.
+When the PR is not a dependency PR, Part E did not run. Write one comment that states the reason, and stop.
 
-### Find or create the follow-up ticket
+### Ask for a Jira ticket
 
-The ticket is a Jira issue in the project `UN` on `https://unique-ch.atlassian.net`. Follow the rules of `agentic/skills/jira/SKILL.md`. Use the Jira tool of the run, and not the REST API. Do not add the label `mcp-server/unplanned`. Do not transition the issue. Do not log time.
+The agent has no Jira access. Do not create a ticket. Do not create a GitHub issue.
 
-The summary identifies the ticket. It starts with `Dependency follow-up: <package>`. Use the package that caused the problem. When the PR changes several packages and none caused it, use the first package of the PR title.
-
-1. Call `getAccessibleAtlassianResources`. Use the `cloudId` of `unique-ch.atlassian.net`.
-2. Search for an open ticket of the package with `searchJiraIssuesUsingJql`.
-```text
-project = UN AND labels = "deps-follow-up" AND statusCategory != Done AND summary ~ "\"Dependency follow-up: <package>\""
-```
-3. When a ticket exists, add a comment with `addCommentToJiraIssue`. The comment has the PR link and the verdict in one sentence. Do not create a second ticket.
-4. When no ticket exists, call `createJiraIssue`. Use the project `UN`, the type `Task`, the component `mcp-servers`, and the labels `mcp-server` and `deps-follow-up`. The summary is `Dependency follow-up: <package> <old> -> <new>`. Write the description in markdown with the parts below. Leave the assignee unset.
+Update the report comment in place as in Part E. Add this section under the verdict. Give the exact actions that a person must do.
 
 ```markdown
-Finish the update of <package> <old> -> <new> and merge <pr-url>.
+## Hand-off: log a Jira ticket
+The agent could not finish this PR. A person must log a Jira ticket to follow it up.
 
-PR: <pr-url>
-
-Verdict: <one sentence>.
-
-## Breaking changes that affect us
-| Change | Where we use it | What to do |
-|---|---|---|
-| <change> | `<file>:<line>` | <action> |
-
-## What the agent tried
-- Attempt 1: <change, commit link, result>
-- Attempt 2: <change, commit link, result>
-
-## Next steps
+Next steps:
 1. <exact action for a person>
 
-## Cleared by the PR
-- <CVE or GHSA ID> (<severity>): <alert URL>
-
-Refs: <ticket>
-
-**Confirm:** `gh pr view <number> --repo Unique-AG/connectors --json state --jq .state` prints `MERGED`.
+No manual review run is needed. This comment holds the full report.
 ```
 
-- Write `No attempt made.` under `What the agent tried` when you made none.
-- Add `Cleared by the PR` only in mode `findings`. Add the line `Refs: <ticket>` only when the caller gave a ticket key.
-- Quote 20 lines of log at most. Do not copy tokens or secrets. State what did not run here.
-- Check the new ticket with `getJiraIssue`. It must show the component `mcp-servers` and the labels `mcp-server` and `deps-follow-up`.
-
-When the Jira tool is not connected, do not stop. Create a GitHub issue instead, with the same body and the first line `<!-- deps-follow-up: <package> -->`. Search the open issues with the label `deps-follow-up` first. State in the report comment that Jira was not available.
-```bash
-gh label create deps-follow-up --repo Unique-AG/connectors --description "A person must finish a dependency update" 2>/dev/null
-gh issue create --repo Unique-AG/connectors --title "Dependency follow-up: <package> <old> -> <new>" --label deps-follow-up --body-file issue.md
-```
-
-### Link the ticket
-
-Update the report comment in place as in Part E. Add the line `Follow-up ticket: <ticket-url>` and the line `No manual review run is needed. This comment holds the full report.` under the verdict.
-
-Return the ticket URL in the field `ticket` and set `handoff: true`. The caller puts the link in the Slack message.
-Do not merge. Do not close the PR. Stop.
+Do not merge. Do not close the PR. Return `handoff: true`. The caller puts the hand-off line in the Slack message. Stop.
 
 ## Return contract
 
@@ -632,7 +585,6 @@ packages: ...
 cleared: ...
 status: green|red|timed_out|held|skipped
 verdict: safe to merge|safe with a gap|do not merge|none
-ticket: <ticket URL>|none
 handoff: true|false
 reason: ...
 ```
