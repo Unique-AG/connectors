@@ -8,7 +8,7 @@ dependencies = [
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
     # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
     # the Graph SDK stops depending on them, OBO must not break silently.
-    "fastmcp[azure]==4.1.0",
+    "fastmcp[azure]==4.1.3",
     # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.6",
@@ -19,18 +19,18 @@ dependencies = [
     "uvicorn[standard]==0.54.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
-    "starlette==1.8.0",
+    "starlette==1.9.0",
     "pydantic==2.14.1",
-    "pydantic-settings==2.15.0",
-    "python-dotenv==1.2.3",
+    "pydantic-settings==2.16.1",
+    "python-dotenv==1.2.4",
     # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
     # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
     # we are the ones passing `http2=True`.
     "httpx[http2]==0.28.1",
-    "opentelemetry-api==1.44.0",
-    "opentelemetry-sdk==1.44.0",
-    "opentelemetry-exporter-prometheus==0.65b0",
-    "opentelemetry-instrumentation-asgi==0.65b0",
+    "opentelemetry-api==1.45.1",
+    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-exporter-prometheus==0.66b1",
+    "opentelemetry-instrumentation-asgi==0.66b1",
     "asyncpg==0.32.0",
     "cryptography==50.0.2",
     "unique-mcp==2026.44.1",
@@ -41,7 +41,7 @@ dependencies = [
     "mcp==2.3.0",
     # `shared/calendar.py` converts every calendar time through `zoneinfo`; this is its fallback
     # when a base image ships no system tz database, which otherwise refuses every IANA zone name.
-    "tzdata==2026.3",
+    "tzdata==2026.5",
 ]
 
 [project.scripts]
@@ -66,7 +66,7 @@ dev = [
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
-    "certifi==2026.10.19",
+    "certifi==2026.10.23",
     "poethepoet==0.49.0",
 ]
 

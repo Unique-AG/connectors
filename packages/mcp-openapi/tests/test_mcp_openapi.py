@@ -531,7 +531,7 @@ def test_only_acquiring_the_lock_counts_against_the_timeout() -> None:
 
 def test_a_timeout_error_of_the_lock_itself_is_not_reported_as_a_lock_timeout() -> None:
     class BrokenLock:
-        def hold(self, _request: httpx2.Request) -> "BrokenLock":
+        def hold(self, _request: httpx2.Request) -> BrokenLock:
             return self
 
         async def __aenter__(self) -> None:

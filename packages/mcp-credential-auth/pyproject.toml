@@ -2,7 +2,7 @@
 name = "mcp-credential-auth"
 version = "0.1.0"
 description = "Shared credential-backed OAuth infrastructure for MCP servers"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "cryptography>=46,<51",
     "fastmcp>=4.0.3,<5",
@@ -48,7 +48,7 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -57,7 +57,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests"]
 reportUnusedCallResult = false
