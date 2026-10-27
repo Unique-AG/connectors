@@ -22,7 +22,6 @@ jobs:
     timeout-minutes: 30
     env:
       SERVICE_PATH: ${{ inputs.service-path }}
-      SERVICE_NAME: ${{ inputs.service-name }}
       GHCR_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
       GHA_CACHE_SCOPE: ${{ inputs.service-name }}
     steps:
@@ -38,11 +37,6 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Resolve image tar path
-        id: image-tar
-        if: steps.check-dockerfile.outputs.exists == 'true'
-        run: echo "path=${RUNNER_TEMP}/${SERVICE_NAME}.tar" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
         if: steps.check-dockerfile.outputs.exists == 'true'
@@ -70,31 +64,3 @@ jobs:
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
             type=registry,ref=${{ env.GHCR_REPO }}:cache
           cache-to: type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
-          outputs: type=docker,dest=${{ steps.image-tar.outputs.path }}
-
-      - name: Scan the image
-        if: steps.check-dockerfile.outputs.exists == 'true'
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_DISABLE_VEX_NOTICE: "true"
-        with:
-          scan-type: image
-          input: ${{ steps.image-tar.outputs.path }}
-          format: json
-          output: trivy-results.json
-          severity: CRITICAL,HIGH
-          scanners: vuln
-          ignore-unfixed: true
-          exit-code: "0"
-          timeout: 20m
-          cache: true
-
-      - name: Report the findings
-        if: steps.check-dockerfile.outputs.exists == 'true' && hashFiles('trivy-results.json') != ''
-        continue-on-error: true
-        run: |
-          trivy convert --format template \
-            --template @.github/trivy-templates/image-summary-markdown.tpl \
-            trivy-results.json >> "$GITHUB_STEP_SUMMARY"
-          jq -r '.Results[]?.Vulnerabilities[]? | "::warning title=Image finding::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"' trivy-results.json
