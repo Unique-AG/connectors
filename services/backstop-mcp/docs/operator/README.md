@@ -300,7 +300,7 @@ the Backstop API host (`mcpConfig.backstop.baseUrl`). See the [FAQ](../faq.md#Co
 |---|---|---|
 | `/health` | The process is up | Liveness and startup probes |
 | `/probe` | The process is up | Not used by the chart |
-| `/ready` | PostgreSQL answers `SELECT 1` | Readiness probe. A database outage takes the pod out of service without restarting it |
+| `/ready` | PostgreSQL answers `SELECT 1` within 2 seconds | Readiness probe (timeout 3 seconds). A database outage takes the pod out of service without restarting it, and logs one WARNING when it starts and one INFO when it ends |
 | `/metrics` | Prometheus metrics | Scraping, through a ServiceMonitor |
 
 The ServiceMonitor and the alert rules are rendered only when the Prometheus Operator CRDs
