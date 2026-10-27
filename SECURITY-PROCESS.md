@@ -38,9 +38,9 @@ flowchart LR
 
 | Time (UTC) | What runs |
 |---|---|
-| 02:00 | The dependency update opens its PRs. |
+| 02:00 | The dependency update opens its PRs. Each new PR starts an agent run. |
 | 03:00 | The Trivy scan reads the published images, the lock files of `main`, and the Dockerfiles. It posts the Slack report. |
-| 05:00 | The patch run assesses each open dependency PR, reads the findings, and opens fix PRs. The cache warming also runs. |
+| 05:00 | The patch run reads the findings and opens fix PRs. The cache warming also runs. |
 
 ## Setup that needs an admin
 
@@ -49,7 +49,8 @@ flowchart LR
 | The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
-| The Cursor automation `nightly-vulna-patchy`. It runs the skill `vulna-squash` every day. | The daily patch run, and the whole job for each open nightly dependency PR: assess, fix a red CI, report, and a hand-off comment. |
+| The Cursor automation `nightly-vulna-patchy`. It runs the skill `vulna-squash` every day. | The daily patch run for Trivy findings. |
+| The Cursor automation `dependency-pr-assess`. Its trigger is "Pull request opened" on this repository. Its prompt is "Run the skill `vulna-squash` in mode `pr` for the PR of this event." Its Slack action posts to the channel `C0C1PR9CNMP`. | The whole job for each nightly dependency PR: assess, fix a red CI, report, and a hand-off comment. |
 
 ## DEVIATION from monorepo setup
 

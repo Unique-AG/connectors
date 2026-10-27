@@ -108,7 +108,7 @@ The nightly Slack report is the list of images that still need a release.
 
 ## The daily patch run
 
-A Cursor Automation reads the findings every day. It opens fix PRs for critical and high findings. It opens at most 3 PRs at a time, and it never merges. The same run also assesses each open dependency PR, fixes a red CI, and hands off with a comment when a person is needed. The comment asks for a Jira ticket. See [Dependencies](./dependencies.md#one-agent-run-for-every-pr).
+A Cursor Automation reads the findings every day. It opens fix PRs for critical and high findings. It opens at most 3 PRs at a time, and it never merges. The same run assesses each PR that it opens, fixes a red CI, and hands off with a comment when a person is needed. The comment asks for a Jira ticket. See [Dependencies](./dependencies.md#one-agent-run-for-every-pr).
 
 | Cause | Fix |
 |---|---|

@@ -11,8 +11,8 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 flowchart TD
   nightly[Nightly job] --> pr[One PR for each dependency]
   pr --> ci[Full CI]
-  ci --> cron[Daily cron run at 05:00 UTC]
-  cron --> agent["Agent run: assess, fix a red CI, report, label ai-assisted"]
+  pr -->|Pull request opened| agent["Agent run: assess, wait for CI, fix a red CI, report, label ai-assisted"]
+  ci --> agent
   agent -->|safe to merge| review[A person reads the report and merges]
   agent -->|gap, do not merge, or still red| human[Label human-required and ask for a Jira ticket]
 ```
@@ -31,7 +31,7 @@ A manual run of the nightly job is a dry run by default. It writes the plan to t
 
 ## One agent run for every PR
 
-The skill `vulna-squash` does the whole job for a dependency PR in one run. The daily cron run of the Cursor Automation `nightly-vulna-patchy` starts it. The cron run starts after the nightly job has finished. It takes each open PR with the label `dependencies` that has neither `ai-assisted` nor `human-required`, at most 10 for each run. The same cron run also handles Trivy findings.
+The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `dependency-pr-assess` starts it. Its trigger is "Pull request opened". The nightly job opens a PR, and the run starts. The agent stops at once for a PR without the label `dependencies`. The daily cron run of the same skill handles Trivy findings.
 
 In one run the agent does these things:
 1. It assesses the PR: the release notes, our own usage, and the CI result.
@@ -39,13 +39,27 @@ In one run the agent does these things:
 3. It posts one report comment with the verdict, and adds the label `ai-assisted`.
 4. It hands off to a person when the verdict is "do not merge" or "safe with a gap". It also hands off when the CI is still red after 2 attempts.
 
-The agent never merges, never approves, and never edits a lockfile by hand. When the nightly job rebuilds a PR, it removes the labels `ai-assisted` and `human-required`, so the PR gets a new run.
+The agent never merges, never approves, and never edits a lockfile by hand. The agent waits for the CI of the PR. To run the agent again, remove the labels `ai-assisted` and `human-required`, convert the PR to a draft, and mark it ready for review.
 
 ## Hand-off
 
 When a person is needed, the agent adds the label `human-required`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
 
 The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
+
+## An open PR on the next night
+
+The nightly job runs again while a PR is open. It does this for each dependency.
+
+| Case | What the job does |
+|---|---|
+| The version is the same, and the agent has not handled the PR | It rebuilds the branch from `main` and updates the PR body. |
+| The version is the same, and the PR has the label `ai-assisted` or `human-required` | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
+| A newer version exists | It closes the PR with a comment and opens a new PR. The new PR starts a new agent run. |
+| A person closed the PR without a merge | It skips that version. A newer version opens a new PR. This is how you ignore one version. |
+| A person merged the PR | Nothing. The plan finds no update. |
+
+To ignore a dependency for good, add a pin. The job lists a pinned dependency in "Needs a person" and does not move it.
 
 ## Each day
 
@@ -64,7 +78,7 @@ Two parts touch dependency PRs. Each has one job.
 | Part | It starts from | What it does |
 |---|---|---|
 | The nightly job | The schedule | Opens one PR for each dependency. |
-| The skill `vulna-squash` | The daily cron run. It handles each open nightly PR and each Trivy alert that has a fix. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a comment. For a finding it opens the PR first. At most 3 such PRs are open. |
+| The skill `vulna-squash` | The event "Pull request opened" for a nightly PR. The daily cron run for a Trivy alert that has a fix. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a comment. For a finding it opens the PR first. At most 3 such PRs are open. |
 
 The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
 
