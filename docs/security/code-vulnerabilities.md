@@ -32,4 +32,14 @@ Do not dismiss an alert without a reason. The next scan of `main` closes a fixed
 | What | Where |
 |---|---|
 | Alerts | Security tab, code scanning, one category for each language |
-| The ruleset | Repository settings, Rules. An admin changes it. |
+| The ruleset | Repository settings, Rules. An admin changes it. See [The ruleset](#the-ruleset). |
+
+## The ruleset
+
+An admin sets one branch ruleset on the default branch. It makes the checks of this process required.
+
+1. Open Settings, Rules, Rulesets, and add a branch ruleset for the default branch.
+2. Add the rule "Require status checks to pass". Add the checks `gatekeeper` and `release-gate`.
+3. Add the rule "Require code scanning results". Add the tool CodeQL. Set the security alerts to "High or higher" and the alerts to "Errors".
+
+The check `release-gate` is skipped on a PR that is not a release PR. A skipped check counts as passing. The check is required so that a release PR cannot merge before the gate has run.

@@ -45,11 +45,15 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 
 ## Dependency review
 
-The dependency review runs on a PR that changes a lockfile or a manifest. It fails for a known HIGH advisory or worse. It checks only what the PR adds.
+The dependency review runs on a PR that changes a lockfile or a manifest. It fails for a known HIGH advisory or worse. It checks only what the PR adds. It checks runtime and development dependencies.
 
 If the dependency review blocks your PR, raise the version of the dependency you added. If a parent pins it exactly, add a pnpm override. If you cannot take the fix, add the label `security-exception`.
 
 The policy needs written approval from the engineering council for a new dependency with a known critical or high vulnerability.
+
+## Pinned actions
+
+The pinned-actions check runs on a PR that changes a workflow file. It fails when an action is not pinned to a commit. A new action is a new dependency, so it must be pinned. The nightly job keeps the pins current.
 
 ## GitHub Actions, Docker, and Terraform
 
@@ -75,5 +79,6 @@ A lock file alert closes when the fixed lock file reaches `main`. It does not ne
 | `.github/workflows/deps-ci-label.yaml` | The job that sets `deps-ci-failed` |
 | `agentic/skills/deps-ci-fix/SKILL.md` | The skill that fixes a red dependency PR |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
-| `.github/workflows/security-trivy-registry.yaml` | The nightly scan, including the lock files of `main` |
+| `.github/workflows/security-trivy-nightly.yaml` | The nightly scan, including the lock files of `main` |
+| `.github/workflows/security-pinned-actions.yaml` | The check that an action is pinned to a commit |
 | `agentic/skills/dependency-pr-review/SKILL.md` | The skill that reviews a dependency PR |

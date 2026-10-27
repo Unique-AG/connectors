@@ -73,7 +73,7 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
 
@@ -122,14 +122,15 @@ A Cursor Automation reads the findings every day. It opens fix PRs for critical 
 - The base image is pinned to one exact digest.
 - The final stage removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build.
 - A release pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record.
-- A PR builds the image without a push. It scans the image and reports warnings. The warnings do not block.
+- A PR builds the image without a push. It does not scan the image.
 
 ## Files
 
 | File | What it holds |
 |---|---|
-| `.github/workflows/release-gate.yaml` | The release gate |
-| `.github/workflows/security-trivy-registry.yaml` | The nightly scan and the Slack report |
+| `.github/workflows/security-release-gate.yaml` | The release gate |
+| `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
+| `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
 | `.cursor/automations/workflows/nightly-vulna-patchy.yaml` | The daily patch run |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
