@@ -43,39 +43,31 @@ If a release must ship with a critical or high finding, read [Skip the release g
 
 ## Skip the release gate
 
-Use the skip only when a release must ship with a fixable critical or high finding. The skip needs two parts: a label and a comment.
+Use the skip only when a release must ship with a fixable critical or high finding. The skip is one label.
 
 ```mermaid
 flowchart TD
-  blocked[Release gate blocks] --> label{Label security-exception set?}
-  label -->|no| red[Gate stays red]
-  label -->|yes| stamp{Comment for this commit?}
-  stamp -->|no| red
-  stamp -->|yes| green[Gate passes and records who approved]
+  blocked[Release gate blocks] --> add[A person adds the label security-exception]
+  add --> green[Gate passes and skips the blocking findings]
+  add --> record[A bot comment records who added the label and when]
+  green --> remove[A person removes the label]
+  remove --> red[Gate blocks again]
 ```
 
 1. Read the gate summary on the release PR. It names each blocking finding.
 2. Get the approval of the people who accept the risk.
 3. Add the label `security-exception` to the release PR.
-4. Add a comment that starts with `Security exception approved by:`, then the names, then `for`, then the head commit.
-5. Approve the workflow runs again. The gate then passes.
+4. Approve the workflow runs again. The gate then passes.
 
-Example of the comment:
-
-```text
-Security exception approved by: Anna and Tom for a1b2c3d
-```
+To undo the skip, remove the label.
 
 | Rule | Reason |
 |---|---|
-| Write the comment on its first line. | The gate reads only the first line. |
-| Name at least one person. | A skip needs an owner. |
-| Use 7 or more characters of the head commit. | The comment is valid for one commit. A new commit can add new findings, so it needs a new comment. The gate prints the line to copy. |
-| Set both the label and the comment. | The label alone does not skip. The comment alone does nothing. |
+| The label is the only step. | No second step can be forgotten. |
+| A bot comment records every change. | It shows the state, the person, the time, and the commit. It updates in place when someone adds or removes the label. Its history lists every change. |
+| Anyone with write access can set the label. | This is a deviation. GitHub knows who set the label, and the comment shows it on the PR. |
 | A label with no blocking finding does nothing. | The gate says that the label is not needed. |
-| Anyone with write access can do it. | This is a deviation. The gate does not check who writes the comment. |
-
-The gate writes the names, the commit, the author of the comment, the time, and a link to the comment in the job summary. It also lists each skipped finding.
+| The label stays when the release PR gets a new commit. | Read the job summary after each new commit. It lists every skipped finding. Remove the label if the new commit needs a new decision. |
 
 The skip covers one release PR. The finding stays visible in the nightly scan, and the finding stays in the Security tab until a new version ships. On any other PR, the label `security-exception` skips the dependency review. See [DEVIATION from monorepo setup](../../SECURITY-PROCESS.md#deviation-from-monorepo-setup).
 
