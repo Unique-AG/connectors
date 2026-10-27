@@ -32,6 +32,10 @@ inputs:
   run_url:
     description: URL of the workflow run
     required: true
+  other_alerts:
+    description: Optional text for a section about the other open alerts, for example the lock files
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -49,6 +53,7 @@ runs:
         ACTOR: ${{ inputs.actor }}
         WORKFLOW_NAME: ${{ inputs.workflow_name }}
         RUN_URL: ${{ inputs.run_url }}
+        OTHER_ALERTS: ${{ inputs.other_alerts }}
       run: |
         set -euo pipefail
         PAYLOAD=$(node "${{ github.action_path }}/build-payload.mjs")

@@ -297,6 +297,7 @@ export function buildPayload(env) {
     ACTOR,
     WORKFLOW_NAME,
     RUN_URL,
+    OTHER_ALERTS = '',
   } = env;
   const expected = JSON.parse(SERVICES);
   assert.ok(Array.isArray(expected), 'SERVICES must be a JSON array');
@@ -318,6 +319,7 @@ export function buildPayload(env) {
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },
       sectionBlock(buildMainSectionText(summary)),
+      ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       ...buildTopOffendersBlocks(summary.images),
       ...buildDetailBlocks(summary.images),
       {

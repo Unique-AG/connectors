@@ -377,3 +377,24 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
     /SERVICES must be a JSON array/,
   );
 });
+
+test('buildPayload adds a section for the other alerts only when it has text', () => {
+  const base = {
+    TITLE: 'Security Trivy Scan',
+    VERSION_LABEL: 'published-images',
+    REPORTS_PATH: '/nonexistent',
+    SERVICES: '[]',
+    TRIGGER_LABEL: 'scheduled',
+    REPOSITORY: 'unique-ag/connectors',
+    ACTOR: 'octocat',
+    WORKFLOW_NAME: 'Trivy',
+    RUN_URL: 'https://github.com/unique-ag/connectors/actions/runs/1',
+  };
+  const without = buildPayload(base);
+  const withOther = buildPayload({
+    ...base,
+    OTHER_ALERTS: ':package: Lock files of main: 0 critical, 2 high',
+  });
+  assert.equal(withOther.blocks.length, without.blocks.length + 1);
+  assert.equal(withOther.blocks[2].text.text, ':package: Lock files of main: 0 critical, 2 high');
+});
