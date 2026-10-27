@@ -15,9 +15,7 @@
               "field": "SPSiteURL"
             }
           ],
-          "entityTypes": [
-            "driveItem"
-          ],
+          "entityTypes": ["driveItem"],
           "from": 0,
           "query": {
             "queryString": "seed-v1 Project Plan"

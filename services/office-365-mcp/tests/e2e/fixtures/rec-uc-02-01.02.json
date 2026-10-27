@@ -3,11 +3,7 @@
     {
       "@odata.etag": "W/\"MPKEBFYBXDBoqEfnVhciJASvDmLx/WkyVPUyovpK\"",
       "bodyPreview": "Travel costs for the offsite go to cost center 4100.",
-      "categories": [
-        "seed-v1",
-        "Finance",
-        "Offsite"
-      ],
+      "categories": ["seed-v1", "Finance", "Offsite"],
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -45,10 +41,7 @@
     {
       "@odata.etag": "W/\"JXRGFJBEWFIzpJhfYrunUKMeAnFm/IhcOADoxuH9\"",
       "bodyPreview": "Final check list is green. Only the cookie banner text is still open.",
-      "categories": [
-        "seed-v1",
-        "Website"
-      ],
+      "categories": ["seed-v1", "Website"],
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -92,10 +85,7 @@
     {
       "@odata.etag": "W/\"HEPUKYPRIWGpkFhlFkjkGNIcByNj/NgiRJQznaiL\"",
       "bodyPreview": "Notes from the design review: bigger buttons on mobile, darker footer.",
-      "categories": [
-        "seed-v1",
-        "Website"
-      ],
+      "categories": ["seed-v1", "Website"],
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -133,10 +123,7 @@
     {
       "@odata.etag": "W/\"CXPJTYHUTVThjEenHfkrCRJuMnKi/SteBOYogmJq\"",
       "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
-      "categories": [
-        "seed-v1",
-        "Finance"
-      ],
+      "categories": ["seed-v1", "Finance"],
       "flag": {
         "flagStatus": "flagged"
       },
@@ -174,9 +161,7 @@
     {
       "@odata.etag": "W/\"QAPBBNRGRYAohKsfXslhZMZiUnTo/SsnLZBnjsKg\"",
       "bodyPreview": "Your new laptop is ready. You can collect it at the IT desk from 10:00.",
-      "categories": [
-        "seed-v1"
-      ],
+      "categories": ["seed-v1"],
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -214,11 +199,7 @@
     {
       "@odata.etag": "W/\"QKSFJGBBISQrwWfyTrlhBQGsOvUj/FifQHGjwvN6\"",
       "bodyPreview": "Who signs the go-live protocol? I need the name for the invoice.",
-      "categories": [
-        "seed-v1",
-        "Website",
-        "Finance"
-      ],
+      "categories": ["seed-v1", "Website", "Finance"],
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -256,9 +237,7 @@
     {
       "@odata.etag": "W/\"AZAMKTEZFMPpbXiwJpmnVRBmNuFm/YrfLIPbrlWl\"",
       "bodyPreview": "The office move is on the 14th. Please pack your desk by the evening before.",
-      "categories": [
-        "seed-v1"
-      ],
+      "categories": ["seed-v1"],
       "flag": {
         "flagStatus": "notFlagged"
       },

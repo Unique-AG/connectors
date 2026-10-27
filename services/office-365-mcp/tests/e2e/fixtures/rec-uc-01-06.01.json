@@ -43,11 +43,7 @@
           "total": 1
         }
       ],
-      "searchTerms": [
-        "seed-v1",
-        "project",
-        "plan"
-      ]
+      "searchTerms": ["seed-v1", "project", "plan"]
     }
   ]
 }

@@ -93,7 +93,9 @@ The files go to `tests/e2e/cassettes/rec-<id>.json`, `rec-<id>.meta.yaml` and
 `tests/e2e/fixtures/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
 scenario's block from `recorded.calls.yaml` into its sidecar entry as `variants: recorded:`, and
 only after a recording whose `expect` holds. It prints the number of runs. Set `_MINIMUM_EXECUTABLE`
-to that number and run `uv run pytest tests/e2e tests/test_use_cases.py`. The tenant owner
+to that number, run `pnpm exec biome check --write services/office-365-mcp/tests/e2e` from the
+repository root (CI fails on the unformatted files that the recorder writes), and run
+`uv run pytest tests/e2e tests/test_use_cases.py`. The tenant owner
 reads the first cassette diff before any push.
 
 To record uc-05-16 again, run the seed `cleanup` and `apply` as Mia first. The first run moved

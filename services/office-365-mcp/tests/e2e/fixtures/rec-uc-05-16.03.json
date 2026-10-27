@@ -6,11 +6,7 @@
     "contentType": "text"
   },
   "bodyPreview": "Travel costs for the offsite go to cost center 4100.",
-  "categories": [
-    "seed-v1",
-    "Finance",
-    "Offsite"
-  ],
+  "categories": ["seed-v1", "Finance", "Offsite"],
   "ccRecipients": [],
   "changeKey": "CVZLGHLCPTAymPvkUhhzIATbTcMf/QmxMBGuuucs",
   "conversationId": "AAQkLXqdFEV4CJC5BTOhARjtKOX2QE57Ruk2OCT5NQXyMTAdK5QsQARBBIQPS9krsPOVorXi20rlHHo=",
