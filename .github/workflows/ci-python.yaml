@@ -179,7 +179,7 @@ jobs:
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
           echo "Python packages to validate: $packages"
 
-  # Each project keeps its own uv.lock, and a Dependabot security update bumps one at a time, so
+  # Each project keeps its own uv.lock, and a bump of one package can reach one project only, so
   # versions drift between alignments. This lists the drift as a warning and never fails.
   version-drift:
     name: Report Python version drift

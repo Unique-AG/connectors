@@ -116,8 +116,8 @@ A new project needs a line in the `folders` of `connectors.code-workspace`.
 
 Every project resolves the same version of each package. A dependency pinned in several projects
 is pinned to the same version in each, and the nightly dependency job bumps it in all
-of them in one pull request. Nothing makes the locks agree on the rest: a Dependabot security update
-bumps one project at a time, and a project that has a package only through another package keeps
+of them in one pull request. Nothing makes the locks agree on the rest: a bump of one package
+changes one project at a time, and a project that has a package only through another package keeps
 its version when a grouped bump passes it by. The `Report Python version drift` job of
 `[CI] Python` lists the packages two locks resolve to different versions, as a warning, and never
 fails, so it never holds up a dependency pull request. `poe drift` prints the same list.
