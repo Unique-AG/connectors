@@ -1,7 +1,5 @@
-# Tasks that run in every Python project. Each project keeps its own uv.lock and .venv. This is no
-# uv project: run a task with `uvx --from poethepoet==0.49.0 poe <task>`. A `uv run` here creates a
-# uv.lock and a .venv, and with the lock Zed starts one basedpyright for the whole repository
-# instead of one per project, so delete both.
+# Tasks for every Python project. Run `uvx --from poethepoet==0.49.0 poe <task>`, never `uv run`
+# here: it creates the root uv.lock that DEVELOP.md explains Zed must not see.
 
 [tool.poe.tasks]
 install = { cmd = "bash scripts/each-python-project.sh uv sync --locked", help = "install every project's locked dependencies into its own .venv" }

@@ -15,5 +15,12 @@
     { "path": "services/kb-mcp" },
     { "path": "services/office-365-mcp" },
     { "path": "services/with-intelligence-mcp" }
-  ]
+  ],
+  "settings": {
+    // Only the root folder has no [tool.basedpyright], so only it reads these; without them its
+    // server would also check every project's files, with none of their packages.
+    "basedpyright.analysis.exclude": ["packages", "services"],
+    "cursorpyright.analysis.exclude": ["packages", "services"],
+    "python.analysis.exclude": ["packages", "services"]
+  }
 }
