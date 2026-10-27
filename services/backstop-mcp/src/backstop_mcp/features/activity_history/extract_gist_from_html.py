@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.observability import failure_event, warning_event
+from backstop_mcp.observability import failure_level
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,12 @@ def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
     try:
         return _gist(_html_to_markdown(html), max_chars=max_chars)
     except Exception as exc:
-        failure_event(logger, "activity_history.gist.conversion_failed", exc, html_chars=len(html))
+        logger.log(
+            failure_level(exc),
+            "activity_history.gist.conversion_failed",
+            exc_info=exc,
+            extra={"html_chars": len(html)},
+        )
         if max_chars is None or len(html) <= max_chars:
             return Gist(text=html, truncated=False, full_length=len(html))
         return Gist(text=html[:max_chars], truncated=True, full_length=len(html))
@@ -91,11 +96,9 @@ def _html_to_markdown(html: str) -> str:
         return markdownify(html)
     except RecursionError:
         capped = _cap_nesting(html, max_depth=_MAX_TAG_DEPTH)
-        warning_event(
-            logger,
+        logger.warning(
             "activity_history.gist.nesting_capped",
-            html_chars=len(html),
-            max_depth=_MAX_TAG_DEPTH,
+            extra={"html_chars": len(html), "max_depth": _MAX_TAG_DEPTH},
         )
         return markdownify(capped)
 

@@ -23,7 +23,6 @@ from backstop_mcp.features.org_people_writes.entity_relationship_types_service i
     EntityRelationshipTypesService,
 )
 from backstop_mcp.features.org_people_writes.responses import CreatedEmploymentResponse
-from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -94,12 +93,13 @@ class CreateEmploymentCommand:
             written = await self._client.get(
                 f"/{_RESOURCE_TYPE}/{quote(created_id, safe='')}", schema=_Document
             )
-            info_event(
-                logger,
+            logger.info(
                 "org_people_writes.employment.created",
-                id=created_id,
-                person_id=person_id,
-                organization_id=organization_id,
+                extra={
+                    "id": created_id,
+                    "person_id": person_id,
+                    "organization_id": organization_id,
+                },
             )
             return CreatedEmploymentResponse(
                 id=created_id,

@@ -28,7 +28,7 @@ from backstop_mcp.features.opportunity_writes import (
 )
 from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import add_call_fields, info_event
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -77,17 +77,15 @@ async def delete_opportunity(
     if input_required(outcome):
         return outcome
     if outcome is EntityDeletion.DECLINED:
-        info_event(
-            logger,
+        logger.info(
             "opportunity_writes.delete.not_confirmed",
-            opportunity_id=opportunity.opportunity_id,
+            extra={"opportunity_id": opportunity.opportunity_id},
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
-        info_event(
-            logger,
+        logger.info(
             "opportunity_writes.delete.elicit.not_available",
-            opportunity_id=opportunity.opportunity_id,
+            extra={"opportunity_id": opportunity.opportunity_id},
         )
     return await delete_opportunity_command.run(opportunity=opportunity)
 

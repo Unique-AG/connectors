@@ -39,7 +39,6 @@ _DUMP_METHODS = frozenset({"model_dump", "json", "getvalue"})
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset()
 
 # A stack trace is for a developer, so only ERROR carries one.
-_STACKLESS_LOG_METHODS = frozenset({"debug", "info", "warning"})
 _LOOPS = (ast.For, ast.AsyncFor)
 _SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 
@@ -163,8 +162,6 @@ def _logger_method(node: ast.Call) -> str | None:
 
 
 def _is_warning_call(node: ast.Call) -> bool:
-    if isinstance(node.func, ast.Name):
-        return node.func.id == "warning_event"
     return _logger_method(node) == "warning"
 
 
@@ -180,17 +177,6 @@ def _calls_in_loop_body(loop: ast.For | ast.AsyncFor) -> list[ast.Call]:
             calls.append(node)
         pending.extend(ast.iter_child_nodes(node))
     return calls
-
-
-def _stack_traces_below_error() -> set[tuple[str, str]]:
-    return {
-        (relative, _event_name(node))
-        for relative, tree in _trees()
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and _logger_method(node) in _STACKLESS_LOG_METHODS
-        and any(keyword.arg == "exc_info" for keyword in node.keywords)
-    }
 
 
 def _warnings_inside_loops() -> set[tuple[str, str]]:
@@ -269,21 +255,12 @@ class TestNoPayloadLogging:
         )
 
 
-class TestStackTracesOnlyAtError:
-    def test_no_debug_info_or_warning_call_passes_exc_info(self) -> None:
-        offending = _stack_traces_below_error()
-
-        assert not offending, "use warning_event(..., exc=exc) instead:\n  " + "\n  ".join(
-            f"{path} {event}" for path, event in sorted(offending)
-        )
-
-
 class TestNoWarningPerRecord:
     def test_no_warning_is_logged_inside_a_loop_body(self) -> None:
         offending = _warnings_inside_loops() - _ONCE_PER_CALL_LOOP_WARNINGS.keys()
 
         assert not offending, (
-            "aggregate after the loop: warning_event(logger, event, count=n, sample_ids=ids[:5])"
+            'aggregate after the loop: logger.warning(event, extra={"count": n, ...})'
             + "\n  "
             + "\n  ".join(f"{path} {event}" for path, event in sorted(offending))
         )

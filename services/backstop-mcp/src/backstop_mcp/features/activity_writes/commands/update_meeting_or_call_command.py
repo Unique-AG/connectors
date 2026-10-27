@@ -33,7 +33,6 @@ from backstop_mcp.features.activity_writes.update_activity_input import (
 )
 from backstop_mcp.features.time_zones import TimeZonesService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, CallLinkTarget, MeetingLinkTarget
-from backstop_mcp.observability import info_event
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -79,11 +78,9 @@ class UpdateMeetingOrCallCommand:
             relationships=self._relationships(activity),
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
-        info_event(
-            logger,
+        logger.info(
             "activity_writes.meeting_or_call.updated",
-            id=document.data.id,
-            kind=activity.kind,
+            extra={"id": document.data.id, "kind": activity.kind},
         )
         target = (
             MeetingLinkTarget(entity_activity_details_id=document.data.id)

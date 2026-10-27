@@ -32,7 +32,6 @@ from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunit
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import info_event, warning_event
 from backstop_mcp.utils import first_item, identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -100,12 +99,13 @@ class UpdateOpportunityCommand:
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
-            info_event(
-                logger,
+            logger.info(
                 "opportunity_writes.opportunity.updated",
-                id=new_opportunity.opportunity_id,
-                stage_id=stage_id,
-                warnings=len(warnings),
+                extra={
+                    "id": new_opportunity.opportunity_id,
+                    "stage_id": stage_id,
+                    "warnings": len(warnings),
+                },
             )
             return UpdatedOpportunityResponse(
                 id=new_opportunity.opportunity_id,
@@ -206,11 +206,12 @@ class UpdateOpportunityCommand:
             )
             ids.append(user.id)
         if skipped:
-            warning_event(
-                logger,
+            logger.warning(
                 "opportunity_writes.login.unresolved",
-                count=len(skipped),
-                sample_ids=tuple(identifiable_value(login) for login in skipped[:5]),
+                extra={
+                    "count": len(skipped),
+                    "sample_ids": tuple(identifiable_value(login) for login in skipped[:5]),
+                },
             )
         if not ids:
             return None, tuple(skipped)

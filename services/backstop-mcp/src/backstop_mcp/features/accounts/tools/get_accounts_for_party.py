@@ -55,7 +55,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import add_call_fields, info_event
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +150,9 @@ async def get_accounts_for_party(
     if _listing_is_empty(listing) and party.name is None:
         confirmed = await _confirm_party(get_party_name_query, party)
         if confirmed is None:
-            info_event(
-                logger,
+            logger.info(
                 "accounts.for_party.unverified_party_id",
-                segment=party.search_type,
-                entity_id=party.id,
+                extra={"segment": party.search_type, "entity_id": party.id},
             )
             # `NotFoundResponse` is the shared shape and carries no free-text field; the
             # reason this check ran at all is in the module docstring and the log line above.

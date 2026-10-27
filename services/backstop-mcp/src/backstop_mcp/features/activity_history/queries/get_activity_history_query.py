@@ -64,7 +64,7 @@ from backstop_mcp.features.includes import (
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
-from backstop_mcp.observability import failure_event, info_event, most_severe, warning_event
+from backstop_mcp.observability import failure_level, most_severe
 
 logger = logging.getLogger(__name__)
 
@@ -152,14 +152,15 @@ class GetActivityHistoryQuery:
                 activity_tag_ids=continuation.activity_tag_ids,
             )
         if forbidden:
-            warning_event(
-                logger,
+            logger.warning(
                 "activity_history.stream.forbidden",
-                exc=forbidden[0][1],
-                segment=segment,
-                entity_id=entity_id,
-                count=len(forbidden),
-                streams=[activity_type for activity_type, _ in forbidden],
+                exc_info=forbidden[0][1],
+                extra={
+                    "segment": segment,
+                    "entity_id": entity_id,
+                    "count": len(forbidden),
+                    "streams": [activity_type for activity_type, _ in forbidden],
+                },
             )
 
         attributes = document.data.attributes
@@ -265,16 +266,17 @@ class GetActivityHistoryQuery:
             )
             for resource, row_attendees in zip(resources, attendees, strict=True)
         )
-        info_event(
-            logger,
+        logger.info(
             "activity_history.activity_page.fetched",
-            segment=segment,
-            entity_id=entity_id,
-            stream=stream,
-            raw_count=raw_count,
-            kept=len(items),
-            end_of_stream=end_of_stream,
-            offset=offset,
+            extra={
+                "segment": segment,
+                "entity_id": entity_id,
+                "stream": stream,
+                "raw_count": raw_count,
+                "kept": len(items),
+                "end_of_stream": end_of_stream,
+                "offset": offset,
+            },
         )
         return items, end_of_stream
 
@@ -318,14 +320,15 @@ class GetActivityHistoryQuery:
             for resource in page.items
         )
         end_of_stream = len(page.items) < limit
-        info_event(
-            logger,
+        logger.info(
             "activity_history.email_page.fetched",
-            segment=segment,
-            entity_id=entity_id,
-            count=len(items),
-            end_of_stream=end_of_stream,
-            offset=offset,
+            extra={
+                "segment": segment,
+                "entity_id": entity_id,
+                "count": len(items),
+                "end_of_stream": end_of_stream,
+                "offset": offset,
+            },
         )
         return items, end_of_stream
 
@@ -376,15 +379,16 @@ class GetActivityHistoryQuery:
                 )
                 continue
             if effective_date < since:
-                info_event(
-                    logger,
+                logger.info(
                     "activity_history.since_truncate.cutoff",
-                    activity_id=resource.id,
-                    stream=stream,
-                    effective_date=effective_date.isoformat(),
-                    since=since.isoformat(),
-                    kept=index,
-                    dropped=len(resources) - index,
+                    extra={
+                        "activity_id": resource.id,
+                        "stream": stream,
+                        "effective_date": effective_date.isoformat(),
+                        "since": since.isoformat(),
+                        "kept": index,
+                        "dropped": len(resources) - index,
+                    },
                 )
                 return resources[:index], True
         return resources, False
@@ -429,13 +433,16 @@ class GetActivityHistoryQuery:
             if isinstance(result, BaseException)
         ]
         if failures:
-            failure_event(
-                logger,
+            worst = most_severe([failure for _, failure in failures])
+            logger.log(
+                failure_level(worst),
                 "activity_history.attendees.join_failed",
-                most_severe([failure for _, failure in failures]),
-                stream=stream,
-                count=len(failures),
-                sample_ids=[resource_id for resource_id, _ in failures[:5]],
+                exc_info=worst,
+                extra={
+                    "stream": stream,
+                    "count": len(failures),
+                    "sample_ids": [resource_id for resource_id, _ in failures[:5]],
+                },
             )
         return attendees
 

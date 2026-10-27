@@ -51,7 +51,7 @@ from backstop_mcp.features.ui_links import (
     get_build_entity_link_util_factory,
 )
 from backstop_mcp.models import CoercedId, published_output_schema
-from backstop_mcp.observability import add_call_fields, failure_event
+from backstop_mcp.observability import add_call_fields, failure_level
 from backstop_mcp.utils import date_window
 
 logger = logging.getLogger(__name__)
@@ -480,11 +480,7 @@ async def search_activities(
         # out), and letting it propagate is the one path where the "name the fallback" contract
         # silently would not fire, on the failure an unbounded-payload UI endpoint is likeliest
         # to produce.
-        failure_event(
-            logger,
-            "activity_history.search.primary_unavailable",
-            exc,
-        )
+        logger.log(failure_level(exc), "activity_history.search.primary_unavailable", exc_info=exc)
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
 
     aggregates = ()

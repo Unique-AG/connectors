@@ -263,8 +263,8 @@ stack, when it is a bug; `invalid_arguments` names the argument locations pydant
 their values. A tool does not write its own start and end lines: it adds its fields (`segment`,
 `entity_id`, `returned`) to the terminal line and to the tool span with `add_call_fields`.
 Queries and commands log what they learned or changed (`*.fetched`, `*.created`, `*.updated`,
-`*.deleted`) with `info_event`, so the line also lands on the span. FastMCP's and `unique_mcp`'s per-call lines are dropped, because they repeat
-these and can quote the caller's input.
+`*.deleted`) with `logger.info`, and the line also lands on the span. FastMCP's and `unique_mcp`'s
+per-call lines are dropped, because they repeat these and can quote the caller's input.
 
 ### Metrics
 
@@ -343,9 +343,9 @@ Levels:
   Backstop 4xx/5xx/429, timeouts, a skipped unreadable row, a stale cache served. No stack trace;
   the line carries `error_type`. A loop logs one aggregated WARNING per call (`count`,
   `sample_ids`), not one per row. A handler that catches broadly (`except Exception`, a
-  `gather(return_exceptions=True)` batch) logs with `failure_event` and `most_severe`, so a bug
-  it copes with is still an ERROR with its stack. A successful delete is also WARNING, on purpose, so destructive
-  writes stand out.
+  `gather(return_exceptions=True)` batch) logs at `failure_level(most_severe(...))`, so a bug it
+  copes with is still an ERROR with its stack. A successful delete is also WARNING, on purpose, so
+  destructive writes stand out.
 - `ERROR`: a developer has to act: an unexpected exception, a Backstop response that no longer
   matches our schema, a failure in our own persistence. With stack trace.
 

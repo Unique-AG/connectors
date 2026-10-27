@@ -39,7 +39,6 @@ from backstop_mcp.features.accounts.responses import (
     CapitalFlowRowResponse,
     CapitalFlowsResolvedResponse,
 )
-from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -144,12 +143,13 @@ class GetCapitalFlowsQuery:
             if self._has_completed_status(resource)
         )
         if page.truncated:
-            warning_event(
-                logger,
+            logger.warning(
                 "accounts.capital_flows.scan_ceiling_reached",
-                kind=kind,
-                ceiling=MAX_CAPITAL_FLOW_SCAN_RECORDS,
-                total_count=page.total_count,
+                extra={
+                    "kind": kind,
+                    "ceiling": MAX_CAPITAL_FLOW_SCAN_RECORDS,
+                    "total_count": page.total_count,
+                },
             )
         return _CapitalFlowScan(
             rows=rows,

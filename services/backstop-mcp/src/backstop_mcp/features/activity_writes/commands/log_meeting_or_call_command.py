@@ -40,7 +40,6 @@ from backstop_mcp.features.activity_writes.responses import (
 from backstop_mcp.features.system_users import system_user_relationship
 from backstop_mcp.features.time_zones import TimeZonesService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, CallLinkTarget, MeetingLinkTarget
-from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +97,14 @@ class LogMeetingOrCallCommand:
         )
         document = await self._client.post("/meeting-or-calls", schema=_Document, json=payload)
         resource = document.data
-        info_event(
-            logger,
+        logger.info(
             "activity_writes.meeting_or_call.created",
-            id=resource.id,
-            kind=activity.kind,
-            party_id=party_id,
-            time_zone=time_zone,
+            extra={
+                "id": resource.id,
+                "kind": activity.kind,
+                "party_id": party_id,
+                "time_zone": time_zone,
+            },
         )
         match activity.kind:
             case "meeting":

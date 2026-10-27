@@ -20,7 +20,7 @@ from backstop_mcp.features.custom_fields.internal_dto import (
 from backstop_mcp.features.custom_fields.responses import ResolvedCustomFieldValueResponse
 from backstop_mcp.features.entity_types import party_search_type
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
-from backstop_mcp.observability import failure_event, warning_event
+from backstop_mcp.observability import failure_level
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +60,9 @@ async def _fetch_custom_field_definitions(
         elif existing != definition:
             conflicting_ids.append(definition.id)
     if conflicting_ids:
-        warning_event(
-            logger,
+        logger.warning(
             "custom_fields.catalog.duplicate_id",
-            count=len(conflicting_ids),
-            sample_ids=conflicting_ids[:5],
+            extra={"count": len(conflicting_ids), "sample_ids": conflicting_ids[:5]},
         )
     return definitions_by_id
 
@@ -125,11 +123,7 @@ class CustomFieldsService:
         try:
             catalog, _status = await self.get()
         except Exception as exc:
-            failure_event(
-                logger,
-                "custom_fields.values.catalog_unavailable",
-                exc,
-            )
+            logger.log(failure_level(exc), "custom_fields.values.catalog_unavailable", exc_info=exc)
             return None
         return catalog
 
@@ -160,12 +154,13 @@ class CustomFieldsService:
             if definition_id and definition_id not in catalog
         ]
         if missing_ids:
-            warning_event(
-                logger,
+            logger.warning(
                 "custom_fields.values.definition_missing",
-                count=len(missing_ids),
-                sample_ids=missing_ids[:5],
-                remedy="list_custom_fields(refresh=true)",
+                extra={
+                    "count": len(missing_ids),
+                    "sample_ids": missing_ids[:5],
+                    "remedy": "list_custom_fields(refresh=true)",
+                },
             )
         published: list[ResolvedCustomFieldValueResponse] = []
         for stored in stored_values:

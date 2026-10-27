@@ -31,7 +31,6 @@ from backstop_mcp.features.opportunity_writes.create_opportunity_input import (
 from backstop_mcp.features.opportunity_writes.responses import CreatedOpportunityResponse
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import info_event
 from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
@@ -105,12 +104,9 @@ class CreateOpportunityCommand:
             warnings = self._stage_warnings(
                 requested=requested_stage, landed_name=stage_name, landed_id=stage_id
             )
-            info_event(
-                logger,
+            logger.info(
                 "opportunity_writes.opportunity.created",
-                id=created_id,
-                stage_id=stage_id,
-                warnings=len(warnings),
+                extra={"id": created_id, "stage_id": stage_id, "warnings": len(warnings)},
             )
             return CreatedOpportunityResponse(
                 id=created_id,

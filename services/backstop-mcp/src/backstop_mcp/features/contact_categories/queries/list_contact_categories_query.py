@@ -9,7 +9,6 @@ from backstop_mcp.features.contact_categories.responses import (
     ContactCategoryResponse,
     ListContactCategoriesResponse,
 )
-from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +76,8 @@ class ListContactCategoriesQuery:
             elif existing != category:
                 conflicting_ids.append(category.id)
         if conflicting_ids:
-            warning_event(
-                logger,
+            logger.warning(
                 "contact_categories.catalog.duplicate_id",
-                count=len(conflicting_ids),
-                sample_ids=conflicting_ids[:5],
+                extra={"count": len(conflicting_ids), "sample_ids": conflicting_ids[:5]},
             )
         return categories_by_id

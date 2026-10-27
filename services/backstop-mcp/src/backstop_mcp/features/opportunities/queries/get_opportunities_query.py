@@ -19,7 +19,7 @@ from backstop_mcp.features.opportunities.responses import (
     PartyOpportunitiesResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import failed_fields, info_event, warning_event
+from backstop_mcp.observability import failed_fields
 
 logger = logging.getLogger(__name__)
 
@@ -91,15 +91,16 @@ class GetOpportunitiesQuery:
                 )
                 unreadable.append((opportunity.id, exc))
         if unreadable:
-            warning_event(
-                logger,
+            logger.warning(
                 "opportunities.record.unreadable",
-                exc=unreadable[0][1],
-                segment=segment,
-                entity_id=entity_id,
-                count=len(unreadable),
-                sample_ids=[opportunity_id for opportunity_id, _ in unreadable[:5]],
-                failed_fields=failed_fields(failure for _, failure in unreadable),
+                exc_info=unreadable[0][1],
+                extra={
+                    "segment": segment,
+                    "entity_id": entity_id,
+                    "count": len(unreadable),
+                    "sample_ids": [opportunity_id for opportunity_id, _ in unreadable[:5]],
+                    "failed_fields": failed_fields(failure for _, failure in unreadable),
+                },
             )
 
         selected = tuple(
@@ -119,14 +120,15 @@ class GetOpportunitiesQuery:
             ),
             custom_fields_unavailable=catalog is None,
         )
-        info_event(
-            logger,
+        logger.info(
             "opportunities.fetched",
-            segment=segment,
-            entity_id=entity_id,
-            status=status,
-            total=result.total,
-            returned=len(result.opportunities),
+            extra={
+                "segment": segment,
+                "entity_id": entity_id,
+                "status": status,
+                "total": result.total,
+                "returned": len(result.opportunities),
+            },
         )
         return result
 

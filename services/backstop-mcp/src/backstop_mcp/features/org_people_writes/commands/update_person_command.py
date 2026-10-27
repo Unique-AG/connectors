@@ -28,7 +28,6 @@ from backstop_mcp.features.org_people_writes.responses import UpdatedPersonRespo
 from backstop_mcp.features.org_people_writes.update_person_input import UpdatePersonInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
-from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -74,13 +73,14 @@ class UpdatePersonCommand:
             )
             written = await self._read(party_id, search_type=search_type)
             record = PersonRecordResponse.from_attributes(written.data.attributes)
-            info_event(
-                logger,
+            logger.info(
                 "org_people_writes.person.updated",
-                id=party_id,
-                search_type=search_type,
-                location_ids=location_ids,
-                deleted_location_count=len(person.delete_location_ids or ()),
+                extra={
+                    "id": party_id,
+                    "search_type": search_type,
+                    "location_ids": location_ids,
+                    "deleted_location_count": len(person.delete_location_ids or ()),
+                },
             )
             return UpdatedPersonResponse(
                 id=party_id,

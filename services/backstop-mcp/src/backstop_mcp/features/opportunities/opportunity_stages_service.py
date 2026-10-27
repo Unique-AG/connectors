@@ -9,7 +9,6 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue
 from backstop_mcp.features.opportunities.api_responses import OpportunityStageAttributes
 from backstop_mcp.features.opportunities.responses import OpportunityStageResponse
-from backstop_mcp.observability import warning_event
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
@@ -117,7 +116,7 @@ class OpportunityStagesService:
         except Exception as error:
             self._failure = error
             self._cooldown.mark()
-            warning_event(logger, "opportunities.stages.fetch_failed", exc=error)
+            logger.warning("opportunities.stages.fetch_failed", exc_info=error)
             raise
 
         self._failure = None

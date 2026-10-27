@@ -9,7 +9,6 @@ import logging
 
 from fastmcp.exceptions import ToolError
 
-from backstop_mcp.observability import info_event
 from backstop_mcp.utils import ParsedActivityHandle, parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ def parse_activity_detail_handle(activity_id: str) -> ParsedActivityHandle:
     """
     parsed = parse_activity_handle(activity_id)
     if parsed.resource_type in _EMAIL_RESOURCE_TYPES:
-        info_event(logger, "activity_history.handle.email_id", activity_id=parsed.handle)
+        logger.info("activity_history.handle.email_id", extra={"activity_id": parsed.handle})
         raise ToolError(
             f"{activity_id!r} is a get_activity_history email handle, not an "
             + "activity_id `get_activity_detail` can fetch. History emails come from "
@@ -32,5 +31,5 @@ def parse_activity_detail_handle(activity_id: str) -> ParsedActivityHandle:
             + "`search_activities` for the email body (`include_description`)."
         )
     if parsed.resource_type is None:
-        info_event(logger, "activity_history.handle.bare_id", activity_id=parsed.handle)
+        logger.info("activity_history.handle.bare_id", extra={"activity_id": parsed.handle})
     return parsed

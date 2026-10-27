@@ -33,7 +33,6 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import SearchCursor, continuation
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
-from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -170,12 +169,10 @@ class SearchActivitiesQuery:
             except (BackstopApiError, BackstopResponseSchemaError) as exc:
                 if pages_fetched == 0:
                     raise
-                warning_event(
-                    logger,
+                logger.warning(
                     "activity_history.entity_activities.later_page_failed_returning_partial",
-                    exc=exc,
-                    page_num=page_num,
-                    pages_fetched=pages_fetched,
+                    exc_info=exc,
+                    extra={"page_num": page_num, "pages_fetched": pages_fetched},
                 )
                 partial_due_to_error = True
                 break
@@ -232,24 +229,26 @@ class SearchActivitiesQuery:
             page_num += 1
 
         if unreadable:
-            warning_event(
-                logger,
+            logger.warning(
                 "activity_history.entity_activities.row_unreadable",
-                count=len(unreadable),
-                sample_ids=[row_id for row_id in unreadable if row_id is not None][:5],
+                extra={
+                    "count": len(unreadable),
+                    "sample_ids": [row_id for row_id in unreadable if row_id is not None][:5],
+                },
             )
-        info_event(
-            logger,
+        logger.info(
             "activity_history.entity_activities.fetched",
-            pages=pages_fetched,
-            returned=len(collected),
-            dropped=dropped,
-            received=rows_received,
-            total_count=total_count,
-            start_offset=start_offset,
-            next_offset=next_offset,
-            ceiling_clamped=ceiling_clamped,
-            partial_due_to_error=partial_due_to_error,
+            extra={
+                "pages": pages_fetched,
+                "returned": len(collected),
+                "dropped": dropped,
+                "received": rows_received,
+                "total_count": total_count,
+                "start_offset": start_offset,
+                "next_offset": next_offset,
+                "ceiling_clamped": ceiling_clamped,
+                "partial_due_to_error": partial_due_to_error,
+            },
         )
         return EntityActivitiesFetchDto(
             rows=tuple(collected),
@@ -492,9 +491,7 @@ class SearchActivitiesQuery:
                 "endpoint": "entity-activities",
             }
             if name == "total_count":
-                info_event(logger, "activity_history.entity_activities.filter_ignored", **fields)
+                logger.info("activity_history.entity_activities.filter_ignored", extra=fields)
                 continue
-            warning_event(
-                logger, "activity_history.entity_activities.filter_ignored", exc=None, **fields
-            )
+            logger.warning("activity_history.entity_activities.filter_ignored", extra=fields)
             BACKSTOP_FILTER_IGNORED.add(1, {"endpoint": "entity-activities", "filter": name})

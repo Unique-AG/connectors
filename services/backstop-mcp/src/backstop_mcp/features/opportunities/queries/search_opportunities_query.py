@@ -49,7 +49,7 @@ from backstop_mcp.features.opportunities.responses import (
 )
 from backstop_mcp.features.system_users import SystemUserAttributes
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.observability import failed_fields, info_event, warning_event
+from backstop_mcp.observability import failed_fields
 
 logger = logging.getLogger(__name__)
 
@@ -239,13 +239,14 @@ class SearchOpportunitiesQuery:
         dropped = self._warn_unreadable(
             [item for item in unreadable_items if start_offset <= item.position < consumed_end]
         )
-        info_event(
-            logger,
+        logger.info(
             "opportunities.search.page",
-            stop_reason=collected.stop_reason,
-            records_scanned=collected.records_scanned,
-            request_count=collected.request_count,
-            rows=len(collected.rows),
+            extra={
+                "stop_reason": collected.stop_reason,
+                "records_scanned": collected.records_scanned,
+                "request_count": collected.request_count,
+                "rows": len(collected.rows),
+            },
         )
         return SearchOpportunitiesResolvedResponse(
             mode="rows",
@@ -313,13 +314,14 @@ class SearchOpportunitiesQuery:
         """One WARNING for every unreadable record in `scanned`; returns how many there were."""
         failed = [item for item in scanned if item.failure is not None]
         if failed:
-            warning_event(
-                logger,
+            logger.warning(
                 "opportunities.search.record.unreadable",
-                exc=failed[0].failure,
-                count=len(failed),
-                sample_ids=[item.opportunity_id for item in failed[:5]],
-                failed_fields=failed_fields(item.failure for item in failed if item.failure),
+                exc_info=failed[0].failure,
+                extra={
+                    "count": len(failed),
+                    "sample_ids": [item.opportunity_id for item in failed[:5]],
+                    "failed_fields": failed_fields(item.failure for item in failed if item.failure),
+                },
             )
         return len(failed)
 

@@ -61,7 +61,7 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
-from backstop_mcp.observability import failed_fields, info_event, warning_event
+from backstop_mcp.observability import failed_fields
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -196,25 +196,27 @@ class SearchOrganizationsQuery:
             span.set_attribute("stop_reason", page.stop_reason)
             dropped = len(unreadable)
             if unreadable:
-                warning_event(
-                    logger,
+                logger.warning(
                     "org_people.search.record.unreadable",
-                    exc=unreadable[0][1],
-                    count=dropped,
-                    sample_ids=[organization_id for organization_id, _ in unreadable[:5]],
-                    failed_fields=failed_fields(failure for _, failure in unreadable),
+                    exc_info=unreadable[0][1],
+                    extra={
+                        "count": dropped,
+                        "sample_ids": [organization_id for organization_id, _ in unreadable[:5]],
+                        "failed_fields": failed_fields(failure for _, failure in unreadable),
+                    },
                 )
-            info_event(
-                logger,
+            logger.info(
                 "org_people.search.fetched",
-                memory=should_filter_in_memory,
-                start_offset=start_offset,
-                rows_scanned=page.records_scanned,
-                matched=len(page.rows),
-                dropped=dropped,
-                total_count=page.total_count,
-                request_count=page.request_count,
-                stop_reason=page.stop_reason,
+                extra={
+                    "memory": should_filter_in_memory,
+                    "start_offset": start_offset,
+                    "rows_scanned": page.records_scanned,
+                    "matched": len(page.rows),
+                    "dropped": dropped,
+                    "total_count": page.total_count,
+                    "request_count": page.request_count,
+                    "stop_reason": page.stop_reason,
+                },
             )
             projected = fields | {"id"}
             if not exclude_custom_fields:

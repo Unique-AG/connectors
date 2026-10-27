@@ -41,7 +41,6 @@ from backstop_mcp.features.opportunity_writes.commands._opportunity_attributes i
 from backstop_mcp.features.opportunity_writes.responses import (
     BackfillOpportunityStageHistoryResponse,
 )
-from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -90,12 +89,10 @@ class BackfillOpportunityStageHistoryCommand:
                 else:
                     entity_type_ids[opportunity_id] = entity_type_id
             if lookup_error is not None:
-                warning_event(
-                    logger,
+                logger.warning(
                     "opportunity_writes.stage_history.opportunity_lookup_failed",
-                    exc=lookup_error,
-                    count=len(lookup_failures),
-                    sample_ids=tuple(lookup_failures[:5]),
+                    exc_info=lookup_error,
+                    extra={"count": len(lookup_failures), "sample_ids": tuple(lookup_failures[:5])},
                 )
             posted_indexes: list[int] = []
             posted_rows: list[OpportunityStageHistoryRecordInput] = []
@@ -148,13 +145,14 @@ class BackfillOpportunityStageHistoryCommand:
                 posted_outcomes=posted_outcomes,
             )
             applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
-            info_event(
-                logger,
+            logger.info(
                 "opportunity_writes.stage_history.backfilled",
-                total_count=len(outcomes),
-                applied_count=applied_count,
-                failed_count=len(outcomes) - applied_count,
-                warning_count=len(warnings),
+                extra={
+                    "total_count": len(outcomes),
+                    "applied_count": applied_count,
+                    "failed_count": len(outcomes) - applied_count,
+                    "warning_count": len(warnings),
+                },
             )
             return BackfillOpportunityStageHistoryResponse(
                 total_count=len(outcomes),

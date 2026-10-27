@@ -31,7 +31,6 @@ from backstop_mcp.features.org_people_writes.update_organization_input import (
 )
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
-from backstop_mcp.observability import info_event
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -78,12 +77,15 @@ class UpdateOrganizationCommand:
                 delete_location_ids=new_organization_fields.delete_location_ids or (),
             )
             written = await self._read(party_id)
-            info_event(
-                logger,
+            logger.info(
                 "org_people_writes.organization.updated",
-                id=party_id,
-                location_ids=location_ids,
-                deleted_location_count=len(new_organization_fields.delete_location_ids or ()),
+                extra={
+                    "id": party_id,
+                    "location_ids": location_ids,
+                    "deleted_location_count": len(
+                        new_organization_fields.delete_location_ids or ()
+                    ),
+                },
             )
             return UpdatedOrganizationResponse(
                 id=party_id,

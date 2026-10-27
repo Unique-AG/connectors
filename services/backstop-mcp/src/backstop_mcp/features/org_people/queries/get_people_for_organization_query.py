@@ -21,7 +21,6 @@ from backstop_mcp.features.org_people.responses import (
     PersonAtOrganizationResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
-from backstop_mcp.observability import warning_event
 
 logger = logging.getLogger(__name__)
 
@@ -161,10 +160,8 @@ class GetPeopleForOrganizationQuery:
         selected = sum(1 for item in raw if item.get("type") == resource_type)
         dropped = selected - len(chips)
         if dropped:
-            warning_event(
-                logger,
+            logger.warning(
                 "org_people.side_load.unreadable",
-                resource_type=resource_type,
-                dropped=dropped,
+                extra={"resource_type": resource_type, "dropped": dropped},
             )
         return chips

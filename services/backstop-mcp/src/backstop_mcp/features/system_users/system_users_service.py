@@ -8,7 +8,6 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, re
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
-from backstop_mcp.observability import warning_event
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -56,11 +55,12 @@ async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto
         elif existing != user:
             conflicting_logins.append(login)
     if conflicting_logins:
-        warning_event(
-            logger,
+        logger.warning(
             "system_users.catalog.duplicate_id",
-            count=len(conflicting_logins),
-            sample_logins=[identifiable_value(login) for login in conflicting_logins[:5]],
+            extra={
+                "count": len(conflicting_logins),
+                "sample_logins": [identifiable_value(login) for login in conflicting_logins[:5]],
+            },
         )
     return users_by_login
 

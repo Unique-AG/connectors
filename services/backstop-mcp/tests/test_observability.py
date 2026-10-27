@@ -15,10 +15,8 @@ from backstop_mcp.features.custom_fields import CustomFieldValueAttributes
 from backstop_mcp.observability import (
     DeclaresFailureLevel,
     add_call_fields,
-    error_event,
     failed_fields,
     failure_level,
-    info_event,
     most_severe,
     operation,
     tool_call_scope,

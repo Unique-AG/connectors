@@ -25,7 +25,7 @@ import httpx
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from backstop_mcp.observability import DeclaresFailureLevel, failed_fields, warning_event
+from backstop_mcp.observability import DeclaresFailureLevel, failed_fields
 
 logger = logging.getLogger(__name__)
 
@@ -325,12 +325,10 @@ def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail,
     try:
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
     except ValidationError as exc:
-        warning_event(
-            logger,
+        logger.warning(
             "backstop.error_body.schema_error",
-            exc=exc,
-            status_code=response.status_code,
-            failed_fields=failed_fields([exc]),
+            exc_info=exc,
+            extra={"status_code": response.status_code, "failed_fields": failed_fields([exc])},
         )
         return None
     if not body.errors:
@@ -383,8 +381,8 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
     try:
         when = parsedate_to_datetime(retry_after)
     except TypeError, ValueError, IndexError:
-        warning_event(
-            logger, "backstop.retry_after.unparseable", retry_after_length=len(retry_after)
+        logger.warning(
+            "backstop.retry_after.unparseable", extra={"retry_after_length": len(retry_after)}
         )
         return None
     if when.tzinfo is None:

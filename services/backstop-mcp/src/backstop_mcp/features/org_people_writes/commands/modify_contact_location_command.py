@@ -18,7 +18,6 @@ from backstop_mcp.backstop_client import (
 )
 from backstop_mcp.features.org_people_writes.api_responses import ContactLocationAttributes
 from backstop_mcp.features.org_people_writes.contact_location_input import ContactLocationInput
-from backstop_mcp.observability import info_event, warning_event
 
 logger = logging.getLogger(__name__)
 _Document = BackstopApiSingleResourceDocument[ContactLocationAttributes]
@@ -78,12 +77,9 @@ class ModifyContactLocationCommand:
     def _log_deleted(self, party_id: str, deleted_ids: tuple[str, ...]) -> None:
         if not deleted_ids:
             return
-        warning_event(
-            logger,
+        logger.warning(
             "org_people_writes.contact_location.deleted",
-            party_id=party_id,
-            count=len(deleted_ids),
-            ids=deleted_ids,
+            extra={"party_id": party_id, "count": len(deleted_ids), "ids": deleted_ids},
         )
 
     def _log_written(
@@ -95,13 +91,14 @@ class ModifyContactLocationCommand:
     ) -> None:
         if not written_ids:
             return
-        info_event(
-            logger,
+        logger.info(
             "org_people_writes.contact_location.written",
-            party_id=party_id,
-            created_count=len(created_ids),
-            updated_count=len(updated_ids),
-            ids=written_ids,
+            extra={
+                "party_id": party_id,
+                "created_count": len(created_ids),
+                "updated_count": len(updated_ids),
+                "ids": written_ids,
+            },
         )
 
     async def _create(self, *, party_id: str, location: ContactLocationInput) -> str:

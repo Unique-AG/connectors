@@ -16,7 +16,6 @@ from backstop_mcp.features.activity_writes.commands._json_api_utils import (
 from backstop_mcp.features.activity_writes.commands.extract_collection import extract_collection
 from backstop_mcp.features.activity_writes.responses import UpdatedActivityResponse
 from backstop_mcp.features.activity_writes.update_activity_input import UpdateEmailInput
-from backstop_mcp.observability import info_event
 from backstop_mcp.utils import parse_activity_handle
 
 logger = logging.getLogger(__name__)
@@ -46,5 +45,5 @@ class UpdateEmailCommand:
             or None,
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
-        info_event(logger, "activity_writes.email.updated", id=document.data.id)
+        logger.info("activity_writes.email.updated", extra={"id": document.data.id})
         return UpdatedActivityResponse(id=document.data.id, resource_type="emails")

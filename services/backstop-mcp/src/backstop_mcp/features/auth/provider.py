@@ -30,7 +30,6 @@ from backstop_mcp.features.auth.credential_store import (
 )
 from backstop_mcp.features.auth.crypto import InvalidCredentialEnvelopeError
 from backstop_mcp.features.auth.login_form import render_login_form
-from backstop_mcp.observability import info_event, warning_event
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -186,7 +185,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         # token, so the legitimate case — a user whose cookie expired while the form sat open —
         # recovers by simply submitting again.
         if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
-            warning_event(logger, "auth.login.csrf_mismatch")
+            logger.warning("auth.login.csrf_mismatch")
             return self._form_response(
                 request_id,
                 status_code=400,
@@ -215,7 +214,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             config=self._throttle,
         )
         if attempt_id is None:
-            warning_event(logger, "auth.login.throttled", username=identifiable_value(username))
+            logger.warning("auth.login.throttled", extra={"username": identifiable_value(username)})
             return self._form_response(
                 request_id,
                 status_code=429,
@@ -230,11 +229,10 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             valid = await self._backstop_clients.verify_credential(username, api_token)
         except BackstopUnreachableError as exc:
             await discard_login_attempt(self._session_factory, attempt_id)
-            warning_event(
-                logger,
+            logger.warning(
                 "auth.login.backstop_unreachable",
-                exc=exc,
-                username=identifiable_value(username),
+                exc_info=exc,
+                extra={"username": identifiable_value(username)},
             )
             return self._form_response(
                 request_id,
@@ -243,7 +241,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             )
 
         if not valid:
-            info_event(logger, "auth.login.rejected", username=identifiable_value(username))
+            logger.info("auth.login.rejected", extra={"username": identifiable_value(username)})
             await finalize_login_failure(self._session_factory, attempt_id)
             return self._form_response(
                 request_id,
@@ -259,11 +257,10 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         try:
             system_user = await self._resolve_system_user(username, api_token)
         except BackstopUnreachableError as exc:
-            warning_event(
-                logger,
+            logger.warning(
                 "auth.login.backstop_unreachable",
-                exc=exc,
-                username=identifiable_value(username),
+                exc_info=exc,
+                extra={"username": identifiable_value(username)},
             )
             return self._form_response(
                 request_id,
@@ -297,12 +294,13 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             if previous is None
             else previous.api_token.get_secret_value() != api_token
         )
-        info_event(
-            logger,
+        logger.info(
             "auth.login.succeeded",
-            username=identifiable_value(username),
-            had_previous_credential=had_previous_credential,
-            credential_changed=credential_changed,
+            extra={
+                "username": identifiable_value(username),
+                "had_previous_credential": had_previous_credential,
+                "credential_changed": credential_changed,
+            },
         )
 
         async def save_subject(session: AsyncSession) -> str:

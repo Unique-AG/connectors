@@ -47,7 +47,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
-from backstop_mcp.observability import failure_event, info_event, most_severe, warning_event
+from backstop_mcp.observability import failure_level, most_severe
 
 logger = logging.getLogger(__name__)
 
@@ -101,11 +101,11 @@ class GetHoldingsQuery:
             # counts-versus-rows contradiction, and a 401 that re-verified
             # (`BackstopTransientAuthError`) all mean the same thing here — the unsupported
             # endpoint did not answer usably, so use the documented one.
-            failure_event(
-                logger,
+            logger.log(
+                failure_level(exc),
                 "accounts.holdings.table_unavailable_using_documented_walk",
-                exc,
-                owner_id=owner_id,
+                exc_info=exc,
+                extra={"owner_id": owner_id},
             )
         return await self._documented_holdings(owner_id=owner_id, include_closed=include_closed)
 
@@ -122,21 +122,23 @@ class GetHoldingsQuery:
         )
         rows_dropped = len(table.accounts) - len(all_rows)
         if rows_dropped:
-            warning_event(
-                logger,
+            logger.warning(
                 "accounts.holdings_table.rows_without_account_id",
-                entity_id=owner_id,
-                dropped=rows_dropped,
-                returned=len(table.accounts),
+                extra={
+                    "entity_id": owner_id,
+                    "dropped": rows_dropped,
+                    "returned": len(table.accounts),
+                },
             )
         rows = all_rows if include_closed else tuple(row for row in all_rows if not row.closed)
-        info_event(
-            logger,
+        logger.info(
             "accounts.holdings_table.fetched",
-            entity_id=owner_id,
-            rows=len(rows),
-            closed_omitted=len(all_rows) - len(rows),
-            all_count=table.all_count,
+            extra={
+                "entity_id": owner_id,
+                "rows": len(rows),
+                "closed_omitted": len(all_rows) - len(rows),
+                "all_count": table.all_count,
+            },
         )
         return HoldingListingDto(
             rows=rows,
@@ -178,16 +180,19 @@ class GetHoldingsQuery:
             series_failures.extend(failures)
         if series_failures:
             failed_rows = [row for row in rows if row.figure_errors]
-            failure_event(
-                logger,
+            worst = most_severe(series_failures)
+            logger.log(
+                failure_level(worst),
                 "accounts.holdings.fallback_series_failed",
-                most_severe(series_failures),
-                owner_id=owner_id,
-                count=len(series_failures),
-                sample_ids=[row.account_id for row in failed_rows[:5]],
-                figures=sorted(
-                    {error.figure for row in failed_rows for error in row.figure_errors}
-                ),
+                exc_info=worst,
+                extra={
+                    "owner_id": owner_id,
+                    "count": len(series_failures),
+                    "sample_ids": [row.account_id for row in failed_rows[:5]],
+                    "figures": sorted(
+                        {error.figure for row in failed_rows for error in row.figure_errors}
+                    ),
+                },
             )
         return HoldingListingDto(
             rows=tuple(rows),

@@ -29,7 +29,7 @@ from backstop_mcp.features.activity_history.queries.search_activities_query impo
     SearchActivitiesQuery,
 )
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.observability import failure_event, info_event, most_severe
+from backstop_mcp.observability import failure_level, most_severe
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -79,23 +79,27 @@ class GetLastActivityForPartiesQuery:
                 if isinstance(result, BaseException)
             ]
             if failures:
-                failure_event(
-                    logger,
+                worst = most_severe([failure for _, failure in failures])
+                logger.log(
+                    failure_level(worst),
                     "activity_history.last_activity.party_failed",
-                    most_severe([failure for _, failure in failures]),
-                    count=len(failures),
-                    sample_ids=[party_id for party_id, _ in failures[:5]],
+                    exc_info=worst,
+                    extra={
+                        "count": len(failures),
+                        "sample_ids": [party_id for party_id, _ in failures[:5]],
+                    },
                 )
-            info_event(
-                logger,
+            logger.info(
                 "activity_history.last_activity.fetched",
-                requested=len(parties),
-                failed=sum(1 for outcome in outcomes if outcome.error is not None),
-                without_activity=sum(
-                    1
-                    for outcome in outcomes
-                    if outcome.fetch is not None and not outcome.fetch.rows
-                ),
+                extra={
+                    "requested": len(parties),
+                    "failed": sum(1 for outcome in outcomes if outcome.error is not None),
+                    "without_activity": sum(
+                        1
+                        for outcome in outcomes
+                        if outcome.fetch is not None and not outcome.fetch.rows
+                    ),
+                },
             )
             return outcomes
 

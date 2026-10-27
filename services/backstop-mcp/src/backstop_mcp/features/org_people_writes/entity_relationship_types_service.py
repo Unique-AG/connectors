@@ -12,7 +12,6 @@ from backstop_mcp.features.data_hygiene import (
     RelationshipTypeAttributes,
 )
 from backstop_mcp.features.org_people_writes.responses import EntityRelationshipTypeResponse
-from backstop_mcp.observability import warning_event
 from backstop_mcp.timed_gate import TimedGate
 
 logger = logging.getLogger(__name__)
@@ -82,8 +81,8 @@ class EntityRelationshipTypesService:
         except Exception as error:
             self._failure = error
             self._cooldown.mark()
-            warning_event(
-                logger, "org_people_writes.entity_relationship_types.fetch_failed", exc=error
+            logger.warning(
+                "org_people_writes.entity_relationship_types.fetch_failed", exc_info=error
             )
             raise
 

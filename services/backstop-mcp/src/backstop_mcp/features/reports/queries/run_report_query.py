@@ -14,7 +14,7 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
     ReportRunKey,
 )
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
-from backstop_mcp.observability import info_event, span_attributes, warning_event
+from backstop_mcp.observability import span_attributes
 from backstop_mcp.utils import identifiable_value
 
 logger = logging.getLogger(__name__)
@@ -96,12 +96,13 @@ class RunReportQuery:
             if not run.task.done():
                 running_seconds = round(time.monotonic() - run.started_at)
                 span.set_attribute("pending", True)
-                info_event(
-                    logger,
+                logger.info(
                     "reports.run.pending",
-                    report_name=logged_report_name,
-                    as_of_date=as_of_date.isoformat(),
-                    running_seconds=running_seconds,
+                    extra={
+                        "report_name": logged_report_name,
+                        "as_of_date": as_of_date.isoformat(),
+                        "running_seconds": running_seconds,
+                    },
                 )
                 return RunReportPendingResponse(
                     report_name=report_name,
@@ -179,12 +180,13 @@ class RunReportQuery:
                         continue
                     records.append(cast("dict[str, object]", value))
             if unreadable_offsets:
-                warning_event(
-                    logger,
+                logger.warning(
                     "reports.row.unreadable",
-                    report_name=logged_report_name,
-                    count=len(unreadable_offsets),
-                    sample_offsets=unreadable_offsets[:5],
+                    extra={
+                        "report_name": logged_report_name,
+                        "count": len(unreadable_offsets),
+                        "sample_offsets": unreadable_offsets[:5],
+                    },
                 )
             columns = self._columns(header, records)
             rows = tuple(tuple(record.get(key) for key in columns) for record in records)
@@ -204,15 +206,16 @@ class RunReportQuery:
                 offset=offset,
                 next_offset=next_offset,
             )
-            info_event(
-                logger,
+            logger.info(
                 "reports.fetched",
-                report_name=logged_report_name,
-                as_of_date=as_of_date.isoformat(),
-                offset=offset,
-                limit=limit,
-                row_count=fetched.row_count,
-                total=fetched.total,
+                extra={
+                    "report_name": logged_report_name,
+                    "as_of_date": as_of_date.isoformat(),
+                    "offset": offset,
+                    "limit": limit,
+                    "row_count": fetched.row_count,
+                    "total": fetched.total,
+                },
             )
             return fetched
 

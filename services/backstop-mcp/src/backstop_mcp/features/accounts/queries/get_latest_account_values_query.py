@@ -13,7 +13,7 @@ from opentelemetry import trace
 from backstop_mcp.backstop_client import BATCH_ABORTING_ERRORS, BackstopClient
 from backstop_mcp.features.accounts.internal_dto import AccountLatestValueDto, SeriesFigureDto
 from backstop_mcp.features.accounts.utils import fetch_series
-from backstop_mcp.observability import failure_event, info_event, most_severe
+from backstop_mcp.observability import failure_level, most_severe
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -47,23 +47,27 @@ class GetLatestAccountValuesQuery:
                 if isinstance(result, BaseException)
             ]
             if failures:
-                failure_event(
-                    logger,
+                worst = most_severe([failure for _, failure in failures])
+                logger.log(
+                    failure_level(worst),
                     "accounts.latest_values.series_failed",
-                    most_severe([failure for _, failure in failures]),
-                    count=len(failures),
-                    sample_ids=[account_id for account_id, _ in failures[:5]],
+                    exc_info=worst,
+                    extra={
+                        "count": len(failures),
+                        "sample_ids": [account_id for account_id, _ in failures[:5]],
+                    },
                 )
-            info_event(
-                logger,
+            logger.info(
                 "accounts.latest_values.fetched",
-                requested=len(account_ids),
-                valued=sum(
-                    1
-                    for value in latest
-                    if value.figure is not None and value.figure.valued is not None
-                ),
-                failed=sum(1 for value in latest if value.error is not None),
+                extra={
+                    "requested": len(account_ids),
+                    "valued": sum(
+                        1
+                        for value in latest
+                        if value.figure is not None and value.figure.valued is not None
+                    ),
+                    "failed": sum(1 for value in latest if value.error is not None),
+                },
             )
             return latest
 

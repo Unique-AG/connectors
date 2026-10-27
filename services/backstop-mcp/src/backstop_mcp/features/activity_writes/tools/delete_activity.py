@@ -32,7 +32,7 @@ from backstop_mcp.features.elicitation_utils import (
 )
 from backstop_mcp.features.resolution import input_required
 from backstop_mcp.models import published_output_schema
-from backstop_mcp.observability import add_call_fields, info_event
+from backstop_mcp.observability import add_call_fields
 
 logger = logging.getLogger(__name__)
 
@@ -81,19 +81,15 @@ async def delete_activity(
     if input_required(outcome):
         return outcome
     if outcome is EntityDeletion.DECLINED:
-        info_event(
-            logger,
+        logger.info(
             "activity_writes.delete.not_confirmed",
-            kind=activity.kind,
-            activity_id=activity.activity_id,
+            extra={"kind": activity.kind, "activity_id": activity.activity_id},
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
-        info_event(
-            logger,
+        logger.info(
             "activity_writes.delete.elicit.not_available",
-            kind=activity.kind,
-            activity_id=activity.activity_id,
+            extra={"kind": activity.kind, "activity_id": activity.activity_id},
         )
     return await delete_activity_command.run(activity=activity)
 
@@ -105,12 +101,13 @@ async def _deletion_prompt(
     try:
         handle = parse_activity_detail_handle(activity.activity_id)
     except ToolError:
-        info_event(
-            logger,
+        logger.info(
             "activity_writes.delete.detail.skipped",
-            kind=activity.kind,
-            activity_id=activity.activity_id,
-            reason="handle is not a detail id",
+            extra={
+                "kind": activity.kind,
+                "activity_id": activity.activity_id,
+                "reason": "handle is not a detail id",
+            },
         )
         return _format_deletion_prompt(kind=activity.kind, activity_id=activity.activity_id)
     try:
@@ -119,12 +116,13 @@ async def _deletion_prompt(
         )
     except BackstopApiError as exc:
         if exc.status_code == HTTPStatus.NOT_FOUND and activity.kind in _DETAIL_OPTIONAL_KINDS:
-            info_event(
-                logger,
+            logger.info(
                 "activity_writes.delete.detail.skipped",
-                kind=activity.kind,
-                activity_id=activity.activity_id,
-                reason="detail endpoint has no record",
+                extra={
+                    "kind": activity.kind,
+                    "activity_id": activity.activity_id,
+                    "reason": "detail endpoint has no record",
+                },
             )
             return _format_deletion_prompt(kind=activity.kind, activity_id=activity.activity_id)
         raise

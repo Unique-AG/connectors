@@ -31,7 +31,7 @@ from backstop_mcp.features.includes.responses import (
     PersonIncludesResponse,
 )
 from backstop_mcp.features.includes.types import Include
-from backstop_mcp.observability import failed_fields, warning_event
+from backstop_mcp.observability import failed_fields
 
 logger = logging.getLogger(__name__)
 
@@ -191,11 +191,9 @@ def _include_resources[AttrT](
         resource, planned.include.relationship, schema=_IncludeResource
     )
     if not entries and resource.related_ids(planned.include.relationship):
-        warning_event(
-            logger,
+        logger.warning(
             "includes.side_load.unresolved",
-            include=planned.name,
-            relationship=planned.include.relationship,
+            extra={"include": planned.name, "relationship": planned.include.relationship},
         )
     outcomes = [_project(entry=entry, planned=planned) for entry in entries]
     _warn_rejected([outcome for outcome in outcomes if isinstance(outcome, _Rejected)], planned)
@@ -206,27 +204,29 @@ def _warn_rejected(rejected: Sequence[_Rejected], planned: _PlannedInclude) -> N
     """At most one warning per reason for one include of one record."""
     mistyped = [item for item in rejected if item.unexpected_type]
     if mistyped:
-        warning_event(
-            logger,
+        logger.warning(
             "includes.side_load.unexpected_type",
-            include=planned.name,
-            expected_type=planned.include.resource_type,
-            actual_types=sorted({item.actual_type for item in mistyped if item.actual_type}),
-            count=len(mistyped),
-            sample_ids=[item.entry_id for item in mistyped[:5]],
+            extra={
+                "include": planned.name,
+                "expected_type": planned.include.resource_type,
+                "actual_types": sorted({item.actual_type for item in mistyped if item.actual_type}),
+                "count": len(mistyped),
+                "sample_ids": [item.entry_id for item in mistyped[:5]],
+            },
         )
     unreadable = [item for item in rejected if not item.unexpected_type]
     if unreadable:
         failures = [item.failure for item in unreadable if item.failure is not None]
-        warning_event(
-            logger,
+        logger.warning(
             "includes.side_load.unreadable",
-            exc=failures[0] if failures else None,
-            include=planned.name,
-            resource_type=planned.include.resource_type,
-            count=len(unreadable),
-            sample_ids=[item.entry_id for item in unreadable[:5]],
-            failed_fields=failed_fields(failures),
+            exc_info=failures[0] if failures else None,
+            extra={
+                "include": planned.name,
+                "resource_type": planned.include.resource_type,
+                "count": len(unreadable),
+                "sample_ids": [item.entry_id for item in unreadable[:5]],
+                "failed_fields": failed_fields(failures),
+            },
         )
 
 
