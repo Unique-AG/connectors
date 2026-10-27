@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - ".github/actions/**"
+      - ".github/scripts/**"
       - ".github/workflows/ci-github-actions.yaml"
 
 permissions:
@@ -16,7 +17,7 @@ concurrency:
 
 jobs:
   test:
-    name: Test composite actions
+    name: Test composite actions and scripts
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -28,5 +29,5 @@ jobs:
         with:
           node-version: "26"
 
-      - name: Run action unit tests
-        run: node --test .github/actions/container-image-vuln-gate/*.test.mjs .github/actions/pull-request-labels/*.test.mjs
+      - name: Run action and script unit tests
+        run: node --test .github/actions/pull-request-labels/*.test.mjs

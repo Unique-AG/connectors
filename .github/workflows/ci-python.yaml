@@ -27,7 +27,6 @@ on:
       - ".github/workflows/_template-containerize.yaml"
       - ".github/workflows/_template-helm.yaml"
       - ".github/workflows/_template-terraform.yaml"
-      - ".github/actions/**"
   workflow_dispatch:
     inputs:
       packages:
@@ -38,7 +37,6 @@ on:
 permissions:
   contents: read # to read the repository
   packages: read # to let the called workflows pull the base chart and the cache image from GHCR
-  pull-requests: read # to let containerize read the live security-exception label
 
 concurrency:
   group: ci-python-${{ github.event.pull_request.number || github.ref }}
@@ -101,7 +99,6 @@ jobs:
               - '.github/workflows/_template-containerize.yaml'
               - '.github/workflows/_template-helm.yaml'
               - '.github/workflows/_template-terraform.yaml'
-              - '.github/actions/**'
 
       # This step builds the list of Python services for the matrix jobs.
       # A change to a workflow file lists every service. A manual run lists the services that the input names.
@@ -523,10 +520,6 @@ jobs:
     name: Containerize ${{ matrix.package }}
     needs: detect-changes
     if: needs.detect-changes.outputs.packages != '[]'
-    permissions:
-      contents: read # to let the called workflow read the repository
-      packages: read # to let the called workflow read the cache image from GHCR
-      pull-requests: read # to let the called workflow read the live security-exception label
     strategy:
       fail-fast: false
       matrix:
