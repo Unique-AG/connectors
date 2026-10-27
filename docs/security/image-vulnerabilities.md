@@ -73,7 +73,7 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The run turns red when it finds a fixable critical or high finding.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
 
