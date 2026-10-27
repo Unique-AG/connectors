@@ -32,7 +32,7 @@ flowchart TD
 
 The job adds the label `deps-ci-failed`. A Cursor Automation then starts the fix agent. The agent pushes a fix to the PR branch and tries at most 2 times. After that, it adds `deps-needs-human` and a comment.
 
-The agent edits only the paths in the PR. It never edits a lockfile by hand. The skill `dependabot-pr-review` is the base for the review.
+The agent edits only the paths in the PR. It never edits a lockfile by hand. The skill `dependency-pr-review` is the base for the review.
 
 ## Each day
 
@@ -62,4 +62,4 @@ Dependabot version updates cover GitHub Actions, Docker, and Terraform. Dependab
 | `agentic/skills/deps-ci-fix/SKILL.md` | The skill that fixes a red dependency PR |
 | `.github/dependabot.yaml` | Dependabot for Actions, Docker, and Terraform |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
-| `agentic/skills/dependabot-pr-review/SKILL.md` | The skill that reviews a dependency PR |
+| `agentic/skills/dependency-pr-review/SKILL.md` | The skill that reviews a dependency PR |

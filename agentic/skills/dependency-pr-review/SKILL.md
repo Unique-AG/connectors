@@ -1,11 +1,11 @@
 ---
-name: dependabot-pr-review
-description: Use when the user gives a Dependabot PR link (or number) in Unique-AG/connectors and wants to know if the dependency update breaks our code. Starts from our own usage of the dependency, fans out read-only agents, and returns a short simple-english report with a snippet. Also use for "check this bump", "is this PR safe to merge", or "review the open dependency PRs".
+name: dependency-pr-review
+description: Use when the user gives a dependency update PR link (or number) in Unique-AG/connectors and wants to know if the dependency update breaks our code. Starts from our own usage of the dependency, fans out read-only agents, and returns a short simple-english report with a snippet. Also use for "check this bump", "is this PR safe to merge", or "review the open dependency PRs".
 metadata:
   internal: true
 ---
 
-# Dependabot PR review
+# Dependency PR review
 
 Answer one question: **does this version bump break our code?**
 Start from how we use the dependency. Do not start from the changelog.
@@ -117,7 +117,7 @@ Rules for the report:
 - Include one code snippet. It shows our real usage next to the changed API.
 - Add a "Gap" or "Limit of the evidence" section when it applies. Give one concrete command or manual check that closes it.
 - Do not write "should". Write "must", or state the fact.
-- Mention a newer release if one exists and Dependabot has not proposed it yet.
+- Mention a newer release if one exists and the nightly dependency job has not proposed it yet.
 - Say plainly what you did not run. Do not claim a result you did not see.
 
 ## Step 6: Stop
