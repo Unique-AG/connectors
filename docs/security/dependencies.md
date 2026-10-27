@@ -23,10 +23,12 @@ flowchart TD
 | Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, and Docker base images |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*` |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
-| Labels | `dependencies`, and `npm` or `uv` |
+| Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `actions`, or `docker` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Cap | At most 5 new PRs each night |
 | Merge | A person merges. The agent never merges. |
+
+A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. The job also opens no PR until the GitHub App exists. See [Setup that needs an admin](../../SECURITY-PROCESS.md#setup-that-needs-an-admin).
 
 ## If CI is red
 
@@ -39,7 +41,8 @@ The agent edits only the paths in the PR. It never edits a lockfile by hand. The
 1. Run `gh pr list --label dependencies --state open`.
 2. If a PR has a green CI, review it and merge it.
 3. If a PR has the label `deps-needs-human`, fix it or close it.
-4. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
+4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
+5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
 Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the root `package.json`. A pin holds a dependency at one version, so the nightly job cannot move it.
 

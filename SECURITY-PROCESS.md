@@ -21,7 +21,7 @@ flowchart LR
   releasePr --> gate[Release gate]
   gate -->|fixable critical or high| relStop[Release cannot merge]
   gate -->|clean| published[Image published]
-  published --> nightlyScan[Nightly image scan]
+  published --> nightlyScan["Nightly scan: images, lock files, configuration"]
   nightlyScan -->|Slack report| patchRun[Daily patch run]
   patchRun -->|fix PR| pr
 ```
@@ -33,6 +33,23 @@ flowchart LR
 | Code | CodeQL | A PR that adds an alert | [Code vulnerabilities](./docs/security/code-vulnerabilities.md) |
 | Dependencies | Nightly update, lock file scan, dependency review | A PR that adds a vulnerable dependency | [Dependencies](./docs/security/dependencies.md) |
 | Images | Trivy | A release PR with a fixable critical or high finding | [Image vulnerabilities](./docs/security/image-vulnerabilities.md) |
+
+## The nightly timetable
+
+| Time (UTC) | What runs |
+|---|---|
+| 02:00 | The dependency update opens its PRs. |
+| 03:00 | The Trivy scan reads the published images, the lock files of `main`, and the Dockerfiles. It posts the Slack report. |
+| 05:00 | The patch run reads the findings and opens fix PRs. The cache warming also runs. |
+
+## Setup that needs an admin
+
+| What | Why |
+|---|---|
+| The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
+| The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
+| The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
+| The Cursor automation `nightly-vulna-patchy`, and an automation for the label `deps-ci-failed` that uses the skill `deps-ci-fix` | The daily patch run and the fix of a red dependency PR. |
 
 ## DEVIATION from monorepo setup
 
