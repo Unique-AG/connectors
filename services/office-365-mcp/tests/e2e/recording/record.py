@@ -580,6 +580,51 @@ def write(cassette: Cassette, out: Path) -> list[Path]:
     return written
 
 
+def _span_end(lines: Sequence[str], start: int, indent: int) -> int:
+    last = start
+    for n in range(start + 1, len(lines)):
+        if lines[n].strip() and len(lines[n]) - len(lines[n].lstrip()) <= indent:
+            break
+        last = n if lines[n].strip() else last
+    return last + 1
+
+
+def link(scenario: str, recorded: Path = RECORDED, features: Path = runner.FEATURES) -> Path:
+    text = recorded.read_text()
+    wanted = mapping(cast("object", yaml.safe_load(text)) or {})
+    if scenario not in wanted:
+        raise Refused(f"{scenario} has no block in recorded.calls.yaml")
+    source = text.splitlines()
+    first = source.index(f"{scenario}:")
+    block = [
+        f"    {line}" if line else line for line in source[first + 1 : _span_end(source, first, 0)]
+    ]
+    header = ["    recorded:", *block]
+    for sidecar in sorted(features.glob("*.calls.yaml")):
+        lines = sidecar.read_text().splitlines()
+        if f"{scenario}:" not in lines:
+            continue
+        start = lines.index(f"{scenario}:")
+        end = _span_end(lines, start, 0)
+        if "  variants:" not in lines[start:end]:
+            lines[end:end] = ["  variants:", *header]
+        else:
+            variants = lines.index("  variants:", start, end)
+            top = _span_end(lines, variants, 2)
+            if "    recorded:" in lines[variants:top]:
+                old = lines.index("    recorded:", variants, top)
+                lines[old : _span_end(lines, old, 4)] = header
+            else:
+                lines[top:top] = header
+        linked = "\n".join(lines) + "\n"
+        entry = mapping(mapping(cast("object", yaml.safe_load(linked)))[scenario])
+        if mapping(mapping(entry["variants"])["recorded"]) != mapping(wanted[scenario]):
+            raise Refused(f"{scenario}: the linked block differs from recorded.calls.yaml")
+        _ = sidecar.write_text(linked)
+        return sidecar
+    raise Refused(f"{scenario} is not an entry of features/*.calls.yaml")
+
+
 def upns_from_environment() -> tuple[str, ...]:
     upns = tuple(
         one.strip().casefold() for one in os.environ.get("SEED_UPNS", "").split(",") if one.strip()
@@ -602,6 +647,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-writes", action="store_true")
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--link", action="store_true")
     parser.add_argument("--max-requests", type=int, default=DEFAULT_CAP)
     parser.add_argument("--stand-in-variant", action="append", default=[])
     arguments = parser.parse_args(argv)
@@ -610,6 +656,7 @@ def main(argv: list[str] | None = None) -> int:
         cast("list[str]", arguments.stand_in_variant),
     )
     allow_writes, cap = cast("bool", arguments.allow_writes), cast("int", arguments.max_requests)
+    linked, out_dir = cast("bool", arguments.link), cast("Path | None", arguments.out)
     for name in ("httpx", "httpcore", "mcp", "fastmcp"):
         logging.getLogger(name).setLevel(logging.WARNING)
     target = cast("Target", arguments.target)
@@ -618,6 +665,8 @@ def main(argv: list[str] | None = None) -> int:
         if not 1 <= cap <= MAX_CAP:
             raise Refused(f"--max-requests must be within 1..{MAX_CAP}")
         stand_in = target == "stand-in"
+        if linked and (stand_in or out_dir):
+            raise Refused("--link needs a graph recording that goes into the repository")
         upns = stand_in_graph.UPNS if stand_in else upns_from_environment()
         secrets += upns
         guard = Guard(upns[0], frozenset({upns[0].rpartition("@")[2].casefold()}), allow_writes)
@@ -630,7 +679,7 @@ def main(argv: list[str] | None = None) -> int:
         if not token:
             raise Refused("GRAPH_TOKEN is not set (see tests/e2e/recording/README.md)")
         secrets.append(token)
-        out = cast("Path | None", arguments.out) or (STAND_IN_OUT if stand_in else runner.HERE)
+        out = out_dir or (STAND_IN_OUT if stand_in else runner.HERE)
         status = 0
         for plan in plans:
             graph = StandIn(frozenset(variants)) if stand_in else None
@@ -663,6 +712,12 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
                 status = 1
+            elif linked:
+                sidecar = link(plan.scenario)
+                print(
+                    f"  linked {plan.scenario} into {sidecar.name}. Runs now: {len(runner.runs())}."
+                    + " Set _MINIMUM_EXECUTABLE to that number."
+                )
         return status
     except Refused as refused:
         print(f"refused: {_redacted(str(refused), secrets)}", file=sys.stderr)

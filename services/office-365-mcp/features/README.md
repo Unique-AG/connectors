@@ -203,7 +203,8 @@ fixture.
 A recorder writes a cassette from a run against a test tenant. It scrubs the answers, so that
 only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has the commands, and
 `../scripts/dogfood/seed/README.md` has the seed. A recorded cassette is a variant named
-`recorded` in the sidecar, and its cassette name starts with `rec-`.
+`recorded` in the sidecar, and its cassette name starts with `rec-`. The option `--link` of the
+recorder writes that variant into the sidecar.
 
 ## Evidence for the order
 

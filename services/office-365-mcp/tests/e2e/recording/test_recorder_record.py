@@ -16,7 +16,7 @@ from tests.e2e.recording.conftest import SCENARIOS, Recorded, record_on
 from tests.e2e.recording.drift import differences, stored
 from tests.e2e.recording.drift import main as drift_main
 from tests.e2e.recording.guard import Refused
-from tests.e2e.recording.record import RECORDED, Plan, main, resolve
+from tests.e2e.recording.record import RECORDED, Plan, link, main, resolve
 from tests.e2e.recording.scrub import files_of
 from tests.e2e.recording.stand_in import StandIn
 from tests.e2e.test_scenarios import Json, build_server, entries, mapping
@@ -193,3 +193,61 @@ def test_the_cli_records_and_refuses_under_python_o(tmp_path: Path) -> None:
     )
     assert refused.returncode == 2
     assert "outlook_move_mail is a write and needs --allow-writes" in refused.stderr
+
+
+_RECORDED_BLOCK = """\
+uc-01-01:
+  cassette: rec-uc-01-01
+  1:
+    expect:
+      result: {capped: false}
+"""
+_NEXT = "\nuc-01-02:\n  status: untested\n"
+_SIDECARS = {
+    "no variants": "uc-01-01:\n  chain:\n    - tool: t\n" + _NEXT,
+    "other variants": "uc-01-01:\n  variants:\n    busy:\n      1: {fault: {transport: timeout}}\n"
+    + _NEXT,
+    "old recorded variant": "uc-01-01:\n  variants:\n    recorded:\n      cassette: old\n" + _NEXT,
+}
+
+
+def _linkable(tmp_path: Path, sidecar: str) -> tuple[Path, Path, Path]:
+    recorded, features = tmp_path / "recorded.calls.yaml", tmp_path / "features"
+    features.mkdir()
+    _ = recorded.write_text(_RECORDED_BLOCK)
+    _ = (features / "01-x.calls.yaml").write_text(_SIDECARS[sidecar])
+    return recorded, features, features / "01-x.calls.yaml"
+
+
+@pytest.mark.parametrize("sidecar", _SIDECARS)
+def test_link_puts_the_recorded_block_in_the_sidecar_entry(sidecar: str, tmp_path: Path) -> None:
+    recorded, features, path = _linkable(tmp_path, sidecar)
+    assert link("uc-01-01", recorded, features) == path
+    loaded = mapping(cast("object", yaml.safe_load(path.read_text())))
+    variants = mapping(mapping(loaded["uc-01-01"])["variants"])
+    wanted = mapping(mapping(cast("object", yaml.safe_load(_RECORDED_BLOCK)))["uc-01-01"])
+    assert mapping(variants["recorded"]) == wanted
+    assert ("busy" in variants) == (sidecar == "other variants")
+    assert loaded["uc-01-02"] == {"status": "untested"}
+
+
+def test_link_twice_changes_nothing(tmp_path: Path) -> None:
+    recorded, features, path = _linkable(tmp_path, "other variants")
+    _ = link("uc-01-01", recorded, features)
+    once = path.read_text()
+    _ = link("uc-01-01", recorded, features)
+    assert path.read_text() == once
+
+
+def test_link_refuses_a_scenario_that_has_no_entry_or_no_block(tmp_path: Path) -> None:
+    recorded, features, _ = _linkable(tmp_path, "no variants")
+    with pytest.raises(Refused, match="has no block"):
+        link("uc-01-02", recorded, features)
+    _ = recorded.write_text(_RECORDED_BLOCK.replace("uc-01-01", "uc-09-09"))
+    with pytest.raises(Refused, match="is not an entry"):
+        link("uc-09-09", recorded, features)
+
+
+def test_the_cli_refuses_link_for_a_stand_in_recording(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["uc-02-01", "--target", "stand-in", "--link"]) == 2
+    assert "--link needs a graph recording" in capsys.readouterr().err

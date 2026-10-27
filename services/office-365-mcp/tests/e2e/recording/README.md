@@ -74,8 +74,8 @@ MIA="${SEED_UPNS%%,*}"
 export GRAPH_TOKEN="$(.venv/bin/python scripts/dogfood/get_token.py "$MIA")"
 
 # 3. Record. uc-05-16 moves three seed mails to Archive.
-.venv/bin/python -m tests.e2e.recording.record uc-02-01 uc-01-06 --target graph
-.venv/bin/python -m tests.e2e.recording.record uc-05-16 --target graph --allow-writes
+.venv/bin/python -m tests.e2e.recording.record uc-02-01 uc-01-06 --target graph --link
+.venv/bin/python -m tests.e2e.recording.record uc-05-16 --target graph --allow-writes --link
 
 # 4. The second record (B6): reads only. It must print "no drift".
 .venv/bin/python -m tests.e2e.recording.drift uc-02-01 uc-01-06 --target graph
@@ -90,9 +90,10 @@ Exit codes of `record`: 0 written; 1 written, but the variant's `expect` does no
 recorder shows the values; update `recorded.calls.yaml` and replay); 2 refused, nothing written.
 
 The files go to `tests/e2e/cassettes/rec-<id>.json`, `rec-<id>.meta.yaml` and
-`tests/e2e/fixtures/rec-<id>.NN.*`. To land them, copy the scenario's block from
-`recorded.calls.yaml` into its sidecar entry as `variants: recorded:`, increase
-`_MINIMUM_EXECUTABLE`, and run `uv run pytest tests/e2e tests/test_use_cases.py`. The tenant owner
+`tests/e2e/fixtures/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
+scenario's block from `recorded.calls.yaml` into its sidecar entry as `variants: recorded:`, and
+only after a recording whose `expect` holds. It prints the number of runs. Set `_MINIMUM_EXECUTABLE`
+to that number and run `uv run pytest tests/e2e tests/test_use_cases.py`. The tenant owner
 reads the first cassette diff before any push.
 
 To record uc-05-16 again, run the seed `cleanup` and `apply` as Mia first. The first run moved
