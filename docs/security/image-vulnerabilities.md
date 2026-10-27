@@ -108,7 +108,37 @@ The nightly Slack report is the list of images that still need a release.
 
 ## The daily patch run
 
-A Cursor Automation reads the findings every day. It opens fix PRs for critical and high findings. It opens at most 3 PRs at a time, and it never merges. The same run assesses each PR that it opens, fixes a red CI, and hands off with a comment when a person is needed. The comment asks for a Jira ticket. See [Dependencies](./dependencies.md#one-agent-run-for-every-pr).
+The cron automation `nightly-vulna-patchy` reads the findings every day. It opens fix PRs for critical and high findings. It opens at most 3 PRs at a time, and it never merges. Each fix PR gets the same assess, fix, report, and hand-off run as a nightly dependency PR. See [Dependencies](./dependencies.md#one-agent-run-for-every-pr).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Scan as Nightly scan
+  participant Tab as Security tab
+  participant Slack
+  participant Cron as Cron automation
+  participant Agent as Agent with the skill
+  participant GH as GitHub
+  Scan->>Tab: Upload alerts for images and lock files
+  Scan->>Slack: Report with image tag and CVE
+  Cron->>Agent: Start mode findings at 05:00
+  Agent->>GH: Wait for the nightly dependency job
+  Agent->>Tab: Read open critical and high alerts
+  Agent->>GH: Open fix PRs, 3 open PRs at most
+  Agent->>GH: Assess, fix a red CI, report
+  Agent->>Slack: One message for each PR
+```
+
+| Step | What happens |
+|---|---|
+| 1 | The scan reads every published image, `pnpm-lock.yaml`, every `uv.lock`, and the Dockerfiles of `main`. It posts the report. It ends red when a fixable critical or high finding exists. |
+| 2 | At 05:00 the cron automation starts the skill. The skill stops if the nightly dependency job still runs, or if the scan is 24 hours old or older. |
+| 3 | The skill drops findings that need no PR. It drops a low severity, a finding with no fix, and a fix younger than 3 days. It also drops a fix that `main` already holds and a package that an open PR already changes. |
+| 4 | It groups the rest into batches. All patch bumps go together. Up to 3 minor bumps go together. A major bump goes alone. Each service has its own rebuild. |
+| 5 | It starts one subagent for each batch. At most 3 PRs with the label `vulna-squash` are open at one time. |
+| 6 | Each subagent opens one PR, then does the assess, fix, report, and hand-off steps. |
+
+The PR automation also fires for these fix PRs. It stops at once, because they have the label `vulna-squash` and not `dependencies`.
 
 | Cause | Fix |
 |---|---|

@@ -27,8 +27,6 @@ flowchart LR
   patchRun -->|fix PR| pr
 ```
 
-For each step in order, and for each interaction between the jobs, the agent, and the people, read [How the parts work together](./docs/security/interactions.md).
-
 ## The three kinds
 
 | Kind | Tool | What blocks | Read |
@@ -44,6 +42,42 @@ For each step in order, and for each interaction between the jobs, the agent, an
 | 02:00 | The dependency update opens its PRs. Each new PR starts an agent run. |
 | 03:00 | The Trivy scan reads the published images, the lock files of `main`, and the Dockerfiles. It posts the Slack report. |
 | 05:00 | The patch run reads the findings and opens fix PRs. The cache warming also runs. |
+
+## Who starts what
+
+| Part | What it is | It starts when |
+|---|---|---|
+| Nightly dependency job | The workflow `deps-nightly.yaml` | 02:00 UTC |
+| Nightly Trivy scan | The workflow `security-trivy-nightly.yaml` | 03:00 UTC |
+| CI | The test, lint, and build workflows, the dependency review, and CodeQL | A PR opens or changes |
+| Gatekeeper | The check that waits for all other checks | A PR opens or changes |
+| Release gate | The workflow `security-release-gate.yaml` | A release PR opens or changes |
+| PR automation | The Cursor automation `dependency-pr-assess` | A PR opens |
+| Cron automation | The Cursor automation `nightly-vulna-patchy` | 05:00 UTC |
+| The skill | `vulna-squash`: the instructions that both automations run | An automation starts |
+| A person | An engineer with write access | A report, a Slack message, or a red check |
+
+## Labels
+
+| Label | Set by | Read by | Meaning |
+|---|---|---|---|
+| `dependencies` | Nightly job | PR automation, gatekeeper title check | The PR comes from the nightly job. |
+| `npm`, `uv`, `github-actions`, `docker` | Nightly job | A person | The ecosystem of the update. |
+| `vulna-squash` | Agent | Skill | A fix PR from the patch run. The skill counts these PRs for the cap of 3. |
+| `ai-assisted` | Agent | Agent, nightly job | The agent handled the PR. |
+| `human-required` | Agent | Agent, nightly job, person | A person must finish the PR. |
+| `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
+| `title-exception` | Person | Gatekeeper title check | Skip the PR title check. |
+
+## Where the state lives
+
+| State | Where |
+|---|---|
+| The result of an agent run | The report comment on the PR, and the labels |
+| What needs an image release | The Slack report and the Security tab |
+| Which version a person rejected | A closed PR |
+| Who skipped the release gate | The bot comment on the release PR |
+| Which dependencies stay fixed | The pins: `override-dependencies` and `pnpm.overrides` |
 
 ## Setup that needs an admin
 

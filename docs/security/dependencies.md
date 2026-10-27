@@ -3,19 +3,9 @@
 
 # Dependencies
 
-A nightly job updates our dependencies, direct and indirect. It opens one PR for each dependency. The PR changes that dependency in every project that uses it, so one dependency has one version everywhere. For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md). For each interaction step by step, read [How the parts work together](./interactions.md).
+A nightly job updates our dependencies, direct and indirect. It opens one PR for each dependency. The PR changes that dependency in every project that uses it, so one dependency has one version everywhere. For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md).
 
 ## The nightly update
-
-```mermaid
-flowchart TD
-  nightly[Nightly job] --> pr[One PR for each dependency]
-  pr --> ci[Full CI]
-  pr -->|Pull request opened| agent["Agent run: assess, wait for CI, fix a red CI, report, label ai-assisted"]
-  ci --> agent
-  agent -->|safe to merge| review[A person reads the report and merges]
-  agent -->|gap, do not merge, or still red| human[Label human-required and ask for a Jira ticket]
-```
 
 | Rule | Value |
 |---|---|
@@ -31,25 +21,76 @@ A manual run of the nightly job is a dry run by default. It writes the plan to t
 
 ## One agent run for every PR
 
-The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `dependency-pr-assess` starts it. Its trigger is "Pull request opened". The nightly job opens a PR, and the run starts. The agent stops at once for a PR without the label `dependencies`. The daily cron run of the same skill handles Trivy findings.
+The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `dependency-pr-assess` starts it. Its trigger is "Pull request opened". The daily cron run of the same skill handles Trivy findings.
 
-In one run the agent does these things:
-1. It assesses the PR: the release notes, our own usage, and the CI result.
-2. It fixes a red CI when the bump caused it. It tries at most 2 times and pushes to the PR branch.
-3. It posts one report comment with the verdict, and adds the label `ai-assisted`.
-4. It hands off to a person when the verdict is "do not merge" or "safe with a gap". It also hands off when the CI is still red after 2 attempts.
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Job as Nightly job
+  participant GH as GitHub
+  participant CI as CI and gatekeeper
+  participant Cur as Cursor
+  participant Agent as Agent with the skill
+  participant Slack
+  participant Person
+  Job->>GH: Open one PR for each dependency
+  GH->>CI: Start the checks
+  GH->>Cur: Event: Pull request opened
+  Cur->>Agent: Start mode pr for this PR
+  Agent->>GH: Read the PR and its labels
+  Agent->>CI: Wait for the checks, 45 minutes at most
+  CI-->>Agent: Green or red
+  Agent->>GH: Fix a red CI, 2 attempts at most
+  Agent->>GH: Post one report comment and add ai-assisted
+  Agent->>Slack: One message for the PR
+  Person->>GH: Read the report and merge
+```
 
-The agent never merges, never approves, and never edits a lockfile by hand. The agent waits for the CI of the PR. To run the agent again, remove the labels `ai-assisted` and `human-required`, convert the PR to a draft, and mark it ready for review.
+| Step | Who | What happens |
+|---|---|---|
+| 1 | Nightly job | It plans the updates. It opens one PR for each dependency or group. The PR has the labels `dependencies` and the ecosystem. |
+| 2 | GitHub | It starts the checks. The gatekeeper waits for every check. A red CI blocks the merge. |
+| 3 | GitHub, Cursor | GitHub sends the event "Pull request opened". Cursor starts the PR automation. |
+| 4 | Agent | It reads the PR. It stops with no change when the PR has no label `dependencies`. It also stops when the PR has `ai-assisted` or `human-required`. |
+| 5 | Agent | It reads the release notes and our own usage of the dependency. It waits for the checks. |
+| 6 | Agent | A red check that the bump caused gets a fix. The agent pushes the fix to the PR branch, and the checks run again. After 2 attempts, the agent stops. |
+| 7 | Agent | It posts one comment that starts with `<!-- vulna-squash-report -->`. It adds the label `ai-assisted`. A second run updates the same comment. |
+| 8 | Agent | It posts one Slack message to the channel `C0C1PR9CNMP`. |
+| 9 | Person | If the verdict is "safe to merge", the person reads the report and merges the PR. |
+
+The agent never merges, never approves, and never edits a lockfile by hand. To run the agent again, remove the labels `ai-assisted` and `human-required`, convert the PR to a draft, and mark it ready for review.
 
 ## Hand-off
 
-When a person is needed, the agent adds the label `human-required`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
+The agent hands off when the verdict is "do not merge" or "safe with a gap". It also hands off when the CI is still red after 2 attempts, when a check times out, and when GitHub holds the runs.
 
-The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
+```mermaid
+flowchart TD
+  agent[Agent cannot finish the PR] --> label[Add the label human-required]
+  label --> comment["Add the section Hand-off: log a Jira ticket to the report comment"]
+  comment --> slack[Slack message with the sign needs a human]
+  slack --> person[A person logs the Jira ticket]
+  person --> work[The person finishes the work and merges]
+```
+
+The section in the report comment lists the exact next steps. The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand, because the report already holds the full result.
 
 ## An open PR on the next night
 
-The nightly job runs again while a PR is open. It does this for each dependency.
+The nightly job runs again while a PR is open. It checks each dependency before it pushes anything.
+
+```mermaid
+flowchart TD
+  night[Next night, one dependency] --> closed{"A person closed a PR for this version without a merge?"}
+  closed -->|yes| skip[Skip this version]
+  closed -->|no| open{An open PR exists?}
+  open -->|no| create[Open a new PR]
+  open -->|yes| same{Same version?}
+  same -->|no| replace[Close the old PR with a comment and open a new PR]
+  same -->|yes| handled{"Has the label ai-assisted or human-required?"}
+  handled -->|yes| merge[Merge main into the branch and keep the commits]
+  handled -->|no| rebuild[Rebuild the branch from main and update the PR body]
+```
 
 | Case | What the job does |
 |---|---|
@@ -58,6 +99,8 @@ The nightly job runs again while a PR is open. It does this for each dependency.
 | A newer version exists | It closes the PR with a comment and opens a new PR. The new PR starts a new agent run. |
 | A person closed the PR without a merge | It skips that version. A newer version opens a new PR. This is how you ignore one version. |
 | A person merged the PR | Nothing. The plan finds no update. |
+
+Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A handled PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
 
 To ignore a dependency for good, add a pin. The job lists a pinned dependency in "Needs a person" and does not move it.
 
@@ -70,6 +113,15 @@ To ignore a dependency for good, add a pin. The job lists a pinned dependency in
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
 Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the root `package.json`. A pin holds a dependency at one version, so the nightly job cannot move it.
+
+## What can go wrong
+
+| Problem | What you see | What to do |
+|---|---|---|
+| The PR from the GitHub App does not start the agent. | The PR has no report comment after the checks end. | Convert the PR to a draft, then mark it ready for review. |
+| GitHub holds the workflow runs. | The report says that a maintainer must approve the runs. The PR has `human-required`. | Approve the runs. Then run the agent again. |
+| The agent run crashes. | The PR has no label `ai-assisted`. | Run the agent again. |
+| A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 
 ## Who fixes what
 
