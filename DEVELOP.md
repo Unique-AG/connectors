@@ -73,6 +73,35 @@ In every Python service, `uv run poe ci` runs the same script, and `uv run poe` 
 each check. Each shared package under `packages/` has the same task names, and its `ci` runs that
 package's checks.
 
+From the repository root, `uv run poe` lists the tasks that cover every project under `packages/`
+and `services/` that has a `pyproject.toml`. Each project keeps its own `uv.lock` and `.venv`, so a
+new one needs no entry at the root:
+
+- `uv run poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs it
+  in a new worktree.
+- `uv run poe ci` runs `ci` in every project, and `uv run poe ci services/<service> ...` in the ones
+  named. `format`, `lint`, `lint-fix`, `fix`, `typecheck` and `test` run that task in every
+  project. Each lists at the end the projects it failed in.
+- `uv run poe lock` runs `uv lock` in every project, for a change to a shared package's
+  `pyproject.toml` that the projects using it by path have to pick up.
+
+#### One version of each package
+
+Every project resolves the same version of each package. A dependency pinned in several projects
+is pinned to the same version in each, and Dependabot's `group-by: dependency-name` bumps it in all
+of them in one pull request. Nothing makes the locks agree on the rest: a Dependabot security update
+bumps one project at a time, and a project that has a package only through another package keeps
+its version when a grouped bump passes it by. The `Report Python version drift` job of
+`[CI] Python` lists the packages two locks resolve to different versions, as a warning, and never
+fails, so it never holds up a Dependabot pull request. `uv run poe drift` prints the same list.
+
+To align them again, run `uv run poe upgrade` on a branch of its own. It runs `uv lock --upgrade`
+in every project at once, which moves each to the newest versions its pins allow, and then prints
+what still drifts. Raise the pin of a package that drifts because a project pins it lower, and
+take a package that one project caps, such as `cachetools`, which `unique-toolkit` keeps below 6,
+down to the capped version in the others with `uv lock --upgrade-package <name>==<version>` in
+each. Run `uv run poe ci` and open a pull request.
+
 It runs, in this order:
 
 1. `uv sync --locked`
