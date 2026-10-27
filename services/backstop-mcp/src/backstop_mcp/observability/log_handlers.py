@@ -3,13 +3,15 @@ the standard `logging` API and nothing else.
 """
 
 import logging
+import traceback
 from typing import cast, override
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.trace import Status, StatusCode
 
-from backstop_mcp.observability.fields import span_attributes
+from backstop_mcp.observability.fields import failed_fields, span_attributes
+from backstop_mcp.observability.stacktrace import scrub_stacktrace
 
 _LOGGER_NAME = "backstop_mcp"
 # Tells the redaction processor that the failure on this span was caller-caused. An ERROR on the
@@ -23,19 +25,28 @@ _RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict_
 
 
 class SpanEventHandler(logging.Handler):
-    """Puts the record on the active span, then drops its stack below ERROR before the root
-    logger's output handlers see it."""
+    """Puts the record on the active span, then, before the root logger's output handlers see it,
+    drops its stack below ERROR and cuts every exception message out of it at ERROR."""
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
         exc = record.exc_info[1] if record.exc_info else None
+        if exc is not None:
+            record.error_type = type(exc).__qualname__
+            if getattr(record, "failed_fields", None) is None and (fields := failed_fields([exc])):
+                record.failed_fields = fields
         _add_to_span(record, exc)
         if exc is None:
             return
-        record.error_type = type(exc).__qualname__
         if record.levelno < logging.ERROR:
             record.exc_info = None
             record.exc_text = None
+            return
+        # The output formatter writes its own `err`, message included, only when there is none.
+        record.err = {
+            "name": type(exc).__name__,
+            "stack": scrub_stacktrace("".join(traceback.format_exception(exc))),
+        }
 
 
 def install_log_handlers() -> None:
@@ -55,8 +66,6 @@ def _add_to_span(record: logging.LogRecord, exc: BaseException | None) -> None:
         for key, value in cast("dict[str, object]", record.__dict__).items()
         if key not in _RECORD_FIELDS and not key.startswith("_")
     }
-    if exc is not None:
-        fields["error_type"] = type(exc).__qualname__
     span.add_event(event, {**span_attributes(fields), "log.severity": record.levelname})
     if record.levelno >= logging.ERROR:
         if exc is not None:

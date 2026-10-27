@@ -296,7 +296,11 @@ that `configure_logging` installs on the `backstop_mcp` logger adds every line t
 as an event. An ERROR also records its exception and marks the span failed. A line logged with
 `exc_info` names the exception in `error_type`, and only an ERROR keeps the stack: the handler
 drops it from the record after putting the exception on the span, and a logger calls its own
-handlers before its parents', so the output handlers on the root logger never see it. A failure
+handlers before its parents', so the output handlers on the root logger never see it. An ERROR's
+stack reaches the log as `err.stack` with every exception message cut out, frames and exception
+types only, the same scrubbing a span gets (`observability/stacktrace.py`). A line whose exception
+is, or was raised from, a pydantic `ValidationError` carries `failed_fields` on the record and the
+span, unless the call passed its own, as a batch does for all of its failures. A failure
 whose level depends on the exception is `logger.log(failure_level(exc), ..., exc_info=exc)`.
 `backstop_mcp.observability` is the only way to open a nested span. `operation` wraps one noisy
 sub-step (a paginated walk, a report poll, a catalog refresh) in a child span with an INFO line at

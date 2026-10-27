@@ -1,12 +1,14 @@
 """The observability helpers: a `backstop_mcp` log line is also an event on the active span."""
 
+import json
 import logging
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import httpx
 import pydantic
 import pytest
 from fastmcp.exceptions import ToolError, ValidationError
+from mcp_observability import PinoJsonFormatter
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
@@ -26,6 +28,7 @@ from backstop_mcp.utils import IdentifiableValue, PseudonymMode
 # Under `backstop_mcp`, where `install_log_handlers` attaches the span handler.
 logger = logging.getLogger("backstop_mcp.tests.observability")
 outsider = logging.getLogger("tests.observability")
+_CANARY = "zq-canary-value"
 
 
 class _Declared(Exception, DeclaresFailureLevel):
@@ -131,6 +134,99 @@ class TestWarningAndErrorLines:
         assert record.exc_info is not None
 
 
+class TestFailureDetailWithoutValues:
+    def test_a_warning_names_the_failed_fields_on_the_record_and_the_span(
+        self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
+    ) -> None:
+        caplog.set_level(logging.INFO)
+        failure = _custom_field_failure({_CANARY: [{"name": 5}]})
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("parent"):
+            logger.warning("widget.unreadable", exc_info=failure)
+
+        record = next(item for item in caplog.records if item.message == "widget.unreadable")
+        assert record.failed_fields == ["*.*.name (string_type)"]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        span = next(item for item in exporter.get_finished_spans() if item.name == "parent")
+        event = next(item for item in span.events if item.name == "widget.unreadable")
+        assert event.attributes is not None
+        assert event.attributes["failed_fields"] == ("*.*.name (string_type)",)
+        assert _CANARY not in str(span.events)
+
+    def test_a_tool_error_raised_from_a_validation_error_names_its_fields(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+        try:
+            raise ToolError(_CANARY) from _custom_field_failure({"k": [{"name": 5}]})
+        except ToolError as exc:
+            logger.warning("widget.rejected", exc_info=exc)
+
+        record = next(item for item in caplog.records if item.message == "widget.rejected")
+        assert record.failed_fields == ["*.*.name (string_type)"]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+    def test_failed_fields_the_call_passed_are_kept(self, caplog: pytest.LogCaptureFixture) -> None:
+        caplog.set_level(logging.INFO)
+        failure = _custom_field_failure({"k": [{"name": 5}]})
+
+        logger.warning(
+            "widget.unreadable", exc_info=failure, extra={"failed_fields": ["* (list_type)"]}
+        )
+
+        record = next(item for item in caplog.records if item.message == "widget.unreadable")
+        assert record.failed_fields == ["* (list_type)"]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+    def test_a_failure_without_a_validation_error_adds_no_failed_fields(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+
+        logger.warning("widget.skipped", exc_info=ToolError(_CANARY))
+
+        record = next(item for item in caplog.records if item.message == "widget.skipped")
+        assert not hasattr(record, "failed_fields")
+
+    def test_an_error_line_keeps_frames_and_types_but_no_message(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+        try:
+            try:
+                raise KeyError(_CANARY)
+            except KeyError as exc:
+                raise RuntimeError(_CANARY) from exc
+        except RuntimeError as exc:
+            logger.error("widget.broken", exc_info=exc)
+
+        record = next(item for item in caplog.records if item.message == "widget.broken")
+        line = PinoJsonFormatter().format(record)
+        err = cast("dict[str, str]", json.loads(line)["err"])
+        stack = err["stack"]
+        assert err["name"] == "RuntimeError"
+        assert 'File "' in stack
+        assert "\nKeyError\n" in stack
+        assert "direct cause" in stack
+        assert stack.endswith("RuntimeError")
+        assert "message" not in err
+        assert _CANARY not in line
+
+    def test_an_error_line_names_the_fields_of_a_validation_error_raised_from_none(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+        try:
+            try:
+                raise _custom_field_failure({"k": [{"name": {_CANARY: _CANARY}}]})
+            except pydantic.ValidationError:
+                raise ToolError("schema mismatch") from None
+        except ToolError as exc:
+            logger.error("widget.schema_error", exc_info=exc)
+
+        record = next(item for item in caplog.records if item.message == "widget.schema_error")
+        line = PinoJsonFormatter().format(record)
+        assert json.loads(line)["failed_fields"] == ["*.*.name (string_type)"]
+        assert _CANARY not in line
+
+
 class TestPseudonymOnTheSpan:
     def test_an_identifiable_value_is_the_pseudonym_in_the_record_and_the_span(
         self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
@@ -198,6 +294,17 @@ class TestFailedFields:
             "* (list_type)",
             "*.*.name (string_type)",
         ]
+
+    def test_follows_the_chain_to_a_validation_error(self) -> None:
+        try:
+            raise ToolError("wrapped") from _custom_field_failure({"k": [{"name": 5}]})
+        except ToolError as exc:
+            assert failed_fields([exc]) == ["*.*.name (string_type)"]
+
+    def test_looks_inside_an_exception_group(self) -> None:
+        group = ExceptionGroup("batch", [_custom_field_failure({"k": "not a list"})])
+
+        assert failed_fields([group]) == ["* (list_type)"]
 
     def test_caps_the_list(self) -> None:
         failure = _custom_field_failure({str(index): "not a list" for index in range(20)})

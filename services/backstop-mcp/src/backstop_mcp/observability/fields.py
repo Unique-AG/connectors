@@ -18,13 +18,14 @@ def span_attributes(fields: Mapping[str, object]) -> dict[str, AttributeValue]:
 
 
 def failed_fields(failures: Iterable[BaseException]) -> list[str]:
-    """`path (error type)` for each pydantic error in `failures`, never the input. A path part that
-    is not a field of one of our models, such as a list index or a key read from the record, is `*`.
+    """`path (error type)` for each pydantic error in `failures` or in what they were raised from,
+    never the input. A path part that is not a field of one of our models, such as a list index or
+    a key read from the record, is `*`.
     """
     known = _model_field_names()
     found = {
         f"{_masked_path(error['loc'], known)} ({error['type']})"
-        for failure in failures
+        for failure in _with_causes(failures)
         if isinstance(failure, ValidationError)
         for error in failure.errors(include_input=False, include_url=False, include_context=False)
     }
@@ -37,6 +38,23 @@ def _attribute_value(value: object) -> AttributeValue:
     if isinstance(value, list | tuple | set | frozenset):
         return tuple(str(item) for item in cast("Iterable[object]", value))
     return str(value)
+
+
+def _with_causes(failures: Iterable[BaseException]) -> list[BaseException]:
+    """`__context__` too: `raise ... from None` hides it from a traceback but still sets it."""
+    pending = list(failures)
+    seen: dict[int, BaseException] = {}
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen[id(current)] = current
+        pending.extend(
+            linked for linked in (current.__cause__, current.__context__) if linked is not None
+        )
+        if isinstance(current, BaseExceptionGroup):
+            pending.extend(current.exceptions)
+    return list(seen.values())
 
 
 def _masked_path(loc: tuple[int | str, ...], known: frozenset[str]) -> str:

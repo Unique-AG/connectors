@@ -25,7 +25,7 @@ import httpx
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from backstop_mcp.observability import DeclaresFailureLevel, failed_fields
+from backstop_mcp.observability import DeclaresFailureLevel
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +328,7 @@ def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail,
         logger.warning(
             "backstop.error_body.schema_error",
             exc_info=exc,
-            extra={"status_code": response.status_code, "failed_fields": failed_fields([exc])},
+            extra={"status_code": response.status_code},
         )
         return None
     if not body.errors:
