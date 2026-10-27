@@ -115,12 +115,12 @@ A new project needs a line in the `folders` of `connectors.code-workspace`.
 #### One version of each package
 
 Every project resolves the same version of each package. A dependency pinned in several projects
-is pinned to the same version in each, and Dependabot's `group-by: dependency-name` bumps it in all
+is pinned to the same version in each, and the nightly dependency job bumps it in all
 of them in one pull request. Nothing makes the locks agree on the rest: a Dependabot security update
 bumps one project at a time, and a project that has a package only through another package keeps
 its version when a grouped bump passes it by. The `Report Python version drift` job of
 `[CI] Python` lists the packages two locks resolve to different versions, as a warning, and never
-fails, so it never holds up a Dependabot pull request. `poe drift` prints the same list.
+fails, so it never holds up a dependency pull request. `poe drift` prints the same list.
 
 To align them again, run `poe upgrade` from the root on a branch of its own. It runs
 `uv lock --upgrade` in every project at once, which moves each to the newest versions its pins

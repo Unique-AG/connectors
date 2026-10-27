@@ -84,7 +84,7 @@ needs belongs in their code, put it in one of those packages instead.
 ## Versions
 
 - The `service*` dependency groups here are the versions a new MCP pins from PyPI, one group
-  per choice. They are not installed with the scaffold. Dependabot bumps them with every service
+  per choice. They are not installed with the scaffold. The nightly dependency job bumps them with every service
   in one pull request per dependency, so the next MCP starts current.
 - A shared package from `packages/` is pinned at the version in its own `pyproject.toml`.
 

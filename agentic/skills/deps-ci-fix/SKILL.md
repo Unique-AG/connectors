@@ -77,7 +77,7 @@ Take the run ID from the link of the failed check.
 
 ## 4. Decide if the bump caused the break
 
-Use `agentic/skills/dependabot-pr-review/SKILL.md` as the base. That skill is read-only. Use only its reading steps. Read step 1 (facts about the PR), step 2 (read CI before you trust it) and lens B (changes against our usage).
+Use `agentic/skills/dependency-pr-review/SKILL.md` as the base. That skill is read-only. Use only its reading steps. Read step 1 (facts about the PR), step 2 (read CI before you trust it) and lens B (changes against our usage).
 
 1. Name the dependency, the old version, the new version and the projects that use it.
 2. Read the release notes for every release between the two versions. Do not read only the last one.

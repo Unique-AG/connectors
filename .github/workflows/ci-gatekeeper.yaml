@@ -11,7 +11,7 @@ concurrency:
 jobs:
   conventional-pr-title:
     name: Validate PR title and scope
-    # These labels skip the job: the two release-please labels, the Dependabot label, and the title exception.
+    # These labels skip the job: the two release-please labels, the dependencies label, and the title exception.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&

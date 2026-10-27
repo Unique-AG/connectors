@@ -29,7 +29,7 @@ dev = [
     "ruff==0.17.3",
 ]
 # What a generated MCP pins, by the choice that brings it. The scaffold copies these versions,
-# so Dependabot bumping them here is what keeps the next MCP current. A shared package from
+# so the nightly dependency job bumping them here is what keeps the next MCP current. A shared package from
 # packages/ is not listed: the scaffold pins its version from that package's pyproject.toml.
 service = [
     "fastmcp==4.1.4",
