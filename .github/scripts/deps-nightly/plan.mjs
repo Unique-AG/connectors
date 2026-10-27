@@ -165,7 +165,13 @@ function interleave(entries) {
     .filter(Boolean);
 }
 
-export function buildPlan({ candidates, needsPerson, config, openBranches }) {
+function mentions(titles, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`, 'i');
+  return titles.some((title) => pattern.test(title));
+}
+
+export function buildPlan({ candidates, needsPerson, config, openBranches, patchTitles = [] }) {
   const buckets = Map.groupBy(candidates, (candidate) => {
     const group = config.groups.find(
       ({ ecosystem, patterns }) =>
@@ -202,8 +208,10 @@ export function buildPlan({ candidates, needsPerson, config, openBranches }) {
         Number(a.members.some(({ direct }) => direct)) || a.slug.localeCompare(b.slug),
   );
   const open = new Set(openBranches);
-  const skipped = ordered.filter(({ slug }) => open.has(`deps/${slug}`));
-  const fresh = interleave(ordered.filter(({ slug }) => !open.has(`deps/${slug}`)));
+  const isCovered = ({ slug, members }) =>
+    open.has(`deps/${slug}`) || members.some(({ name }) => mentions(patchTitles, name));
+  const skipped = ordered.filter(isCovered);
+  const fresh = interleave(ordered.filter((entry) => !isCovered(entry)));
   return {
     entries: fresh.slice(0, config.maxNewPullRequests),
     skipped,

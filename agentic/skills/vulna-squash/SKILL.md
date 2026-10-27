@@ -1,9 +1,6 @@
 ---
 name: vulna-squash
-description: >-
-  Fix CRITICAL and HIGH findings from the nightly Trivy image scan of Unique-AG/connectors. Plans
-  patch, minor, major and rebuild batches, runs one subagent per batch to open one PR, and posts one
-  Slack message per PR. Use from the nightly Vulna Squash Cursor automation or by hand.
+description: Use when asked to run Vulna Squash, or to fix CRITICAL or HIGH findings from the nightly Trivy scan. The nightly Vulna Squash Cursor automation uses it. Trigger words are "vulna squash", "Trivy findings", "patch the vulnerabilities".
 metadata:
   internal: true
 ---
@@ -98,6 +95,7 @@ Drop a finding, and do not open a PR for it, when any of these is true:
   - The age check does not apply to an operating system package. A rebuild takes what the base image holds.
 - The lockfile on `main` already holds the fixed version. The next release carries the fix.
 - An open PR with the label `vulna-squash` already changes the same package.
+- An open PR with the label `dependencies` already changes the same package. The nightly dependency job opened it, so it covers the package.
 - Automation memory says that a past fix failed CI, was reverted, or was rejected.
 
 When the fixed version field lists several versions, choose the lowest one that is above the installed version and has the same major version. If none has the same major version, choose the lowest one that is above the installed version.
@@ -119,7 +117,7 @@ Plan no more batches than the cap allows. Leave the rest for a later run.
 
 One version everywhere: a package that more than one project holds moves to the same version in every project that holds it. Put all of those projects into one batch.
 
-Major bumps: read the official release notes, the changelog and any migration guide for every release you cross. Include the intermediate patch and minor releases. Open the isolated major PR even when an easier batch exists. A human reviews the breaking changes.
+Major bumps: use the reading steps of `agentic/skills/dependency-pr-review/SKILL.md`. Read the official release notes, the changelog and any migration guide for every release you cross. Include the intermediate patch and minor releases. Open the isolated major PR even when an easier batch exists. A human reviews the breaking changes.
 
 If no CRITICAL or HIGH finding is left to fix, post the `:zzz:` stop message. Then exit.
 

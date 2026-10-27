@@ -1,10 +1,6 @@
 ---
 name: deps-ci-fix
-description: >-
-  Fix the red CI of one dependency PR in Unique-AG/connectors, the PR that carries the label
-  deps-ci-failed. Reads the failing checks, decides if the bump caused the break, makes the smallest
-  code change, pushes to the PR branch and checks CI again. Gives up after 2 attempts and hands the
-  PR to a human.
+description: Use when a dependency PR has the label deps-ci-failed, or when asked to fix the red CI of a dependency PR or a bump. Trigger words are "deps-ci-failed", "red CI", "dependency PR", "fix the bump".
 metadata:
   internal: true
 ---

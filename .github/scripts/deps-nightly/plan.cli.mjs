@@ -120,9 +120,22 @@ const terraform = await planTerraform({
   lookup: createTerraformLookup(process.env.GH_TOKEN),
   ...ecosystemOptions,
 });
-const openBranches = JSON.parse(
-  runOrThrow('gh', ['pr', 'list', '--state', 'open', '--limit', '500', '--json', 'headRefName']),
-).map(({ headRefName }) => headRefName);
+const openPullRequests = JSON.parse(
+  runOrThrow('gh', [
+    'pr',
+    'list',
+    '--state',
+    'open',
+    '--limit',
+    '500',
+    '--json',
+    'headRefName,title,labels',
+  ]),
+);
+const openBranches = openPullRequests.map(({ headRefName }) => headRefName);
+const patchTitles = openPullRequests
+  .filter(({ labels }) => labels.some(({ name }) => name === 'vulna-squash'))
+  .map(({ title }) => title);
 const plan = buildPlan({
   candidates: [...npm.candidates, ...uv.candidates, ...actions.candidates, ...docker.candidates],
   needsPerson: [
@@ -134,6 +147,7 @@ const plan = buildPlan({
   ],
   config,
   openBranches,
+  patchTitles,
 });
 
 const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');

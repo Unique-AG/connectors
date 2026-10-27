@@ -253,6 +253,28 @@ describe('buildPlan', () => {
     );
   });
 
+  it('skips a name that an open patch pull request names in its title', () => {
+    const { entries, skipped } = buildPlan({
+      candidates: [
+        candidate('uv', 'pillow'),
+        candidate('uv', 'pillow-heif'),
+        candidate('uv', 'pino'),
+      ],
+      needsPerson: [],
+      config,
+      openBranches: [],
+      patchTitles: ['build(main): vulna squash pillow 12.3.0→13.0.0'],
+    });
+    assert.deepStrictEqual(
+      entries.map(({ slug }) => slug),
+      ['uv-pillow-heif', 'uv-pino'],
+    );
+    assert.deepStrictEqual(
+      skipped.map(({ slug }) => slug),
+      ['uv-pillow'],
+    );
+  });
+
   it('caps new pull requests, mixes ecosystems and puts direct updates first', () => {
     const { entries, deferred } = buildPlan({
       candidates: [
