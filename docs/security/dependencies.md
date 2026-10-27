@@ -46,6 +46,19 @@ The agent edits only the paths in the PR. It never edits a lockfile by hand. The
 
 Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the root `package.json`. A pin holds a dependency at one version, so the nightly job cannot move it.
 
+## Who fixes what
+
+Four parts touch dependency PRs. Each has one job.
+
+| Part | It starts from | What it does |
+|---|---|---|
+| The nightly job | The schedule | Opens one PR for each dependency. |
+| The skill `deps-ci-fix` | The label `deps-ci-failed` on a nightly PR | Pushes a fix to the PR branch. It tries 2 times. |
+| The patch run, skill `vulna-squash` | A Trivy alert that has a fix | Opens a PR for a critical or high finding. At most 3 are open. Its own helper watches CI for 45 minutes, and a person takes over a red PR. |
+| The skill `dependency-pr-review` | A person, or one of the other skills | Reads the release notes and our own usage. It returns a report and changes nothing. |
+
+The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
+
 ## Dependency review
 
 The dependency review runs on a PR that changes a lockfile or a manifest. It fails for a known HIGH advisory or worse. It checks only what the PR adds. It checks runtime and development dependencies.
