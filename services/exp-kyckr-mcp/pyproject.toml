@@ -28,9 +28,21 @@ build-backend = "uv_build"
 dev = [
     "basedpyright==1.40.2",
     "mcp-openapi[codegen]==0.1.0",
+    "poethepoet==0.49.0",
     "pytest==9.1.1",
     "ruff==0.17.0",
 ]
+
+[tool.poe.tasks]
+# Run from the service's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+test = "pytest"
+codegen = "mcp-openapi-codegen"
+ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check CI runs, in its order" }
 
 [tool.ruff]
 line-length = 100

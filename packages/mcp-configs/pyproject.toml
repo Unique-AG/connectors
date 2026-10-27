@@ -18,9 +18,20 @@ packages = ["src/mcp_configs"]
 [dependency-groups]
 dev = [
     "basedpyright==1.40.2",
+    "poethepoet==0.49.0",
     "pytest==9.1.1",
     "ruff==0.17.0",
 ]
+
+[tool.poe.tasks]
+# Run from the package's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+test = "pytest"
+ci = { sequence = [{ cmd = "ruff format --check ." }, "lint", "typecheck", "test"], help = "every check CI runs, in its order" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
