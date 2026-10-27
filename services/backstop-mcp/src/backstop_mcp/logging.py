@@ -1,16 +1,16 @@
-"""Logging setup via `unique_mcp.logging` (pino-json on stderr)."""
+"""Logging setup via `mcp_observability` (pino-json on stderr)."""
 
 import logging
 from typing import override
 
-from unique_mcp.logging import configure_logging as configure_pino_logging
+from mcp_observability import configure_logging as configure_pino_logging
 
 from backstop_mcp.config import AppConfig
 from backstop_mcp.observability import install_log_handlers
 
 
 class _DuplicateMcpMetricsFilter(logging.Filter):
-    """Drop `unique_mcp` per-call lines. Metrics stay; our middleware writes the line."""
+    """Drop `mcp_observability` per-call lines. Metrics stay; our middleware writes the line."""
 
     @override
     def filter(self, record: logging.LogRecord) -> bool:
@@ -46,7 +46,7 @@ class _FastMcpArgumentDumpFilter(logging.Filter):
 
 
 def configure_logging(config: AppConfig) -> None:
-    configure_pino_logging(level=config.log_level.value.upper())
+    configure_pino_logging(config.log_level.value.upper())
     # Python warnings otherwise reach stderr as plain text the log pipeline cannot parse.
     logging.captureWarnings(True)
     _reclaim("fastmcp")
@@ -54,7 +54,7 @@ def configure_logging(config: AppConfig) -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     # sse-starlette logs each outbound event body at DEBUG, which is the tool result.
     logging.getLogger("sse_starlette").setLevel(logging.INFO)
-    _install("unique_mcp", _DuplicateMcpMetricsFilter)
+    _install("mcp_observability", _DuplicateMcpMetricsFilter)
     _install("fastmcp.server.server", _FastMcpToolErrorFilter)
     _install("fastmcp.server.mixins.mcp_operations", _FastMcpArgumentDumpFilter)
     install_log_handlers()

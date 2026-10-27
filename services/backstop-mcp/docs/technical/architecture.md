@@ -101,7 +101,7 @@ then adds four, outermost first:
 1. **Request body limit**, 4 MiB, the same cap as the MCP SDK's streamable HTTP transport. It also
    bounds the unauthenticated login POST.
 2. **OpenTelemetry ASGI** instrumentation.
-3. **HTTP request metrics** from `unique_mcp.monitoring.setup_ops`.
+3. **HTTP request metrics** from `mcp_observability.setup_ops`.
 4. **Session-revoked rewrite.** When a tool call confirms the user's Backstop credential is dead,
    this turns the in-flight `200` into `401` so the client reconnects at once. See
    [Authentication: When Backstop rejects the credential](../operator/authentication.md#When-Backstop-rejects-the-credential).
@@ -245,8 +245,8 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 
 ### Logs
 
-Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
-Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
+Structured JSON on stderr, through `mcp_observability.configure_logging` (the chart labels pods so
+Loki parses it). Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
 `backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
 `tenant_guidance.applied`. Backstop logins, emails and search terms go through
 `identifiable_value`: `hmac-sha256:<hex>` when `LOG_LEVEL` is info or above, plain `sha256:<hex>` at
@@ -263,8 +263,9 @@ stack, when it is a bug; `invalid_arguments` names the argument locations pydant
 their values. A tool does not write its own start and end lines: it adds its fields (`segment`,
 `entity_id`, `returned`) to the terminal line and to the tool span with `add_call_fields`.
 Queries and commands log what they learned or changed (`*.fetched`, `*.created`, `*.updated`,
-`*.deleted`) with `logger.info`, and the line also lands on the span. FastMCP's and `unique_mcp`'s
-per-call lines are dropped, because they repeat these and can quote the caller's input.
+`*.deleted`) with `logger.info`, and the line also lands on the span. FastMCP's and
+`mcp_observability`'s per-call lines are dropped, because they repeat these and can quote the
+caller's input.
 
 ### Metrics
 

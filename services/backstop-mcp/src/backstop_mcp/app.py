@@ -8,6 +8,8 @@ from mcp.server.transport_security import (
     DEFAULT_MAX_REQUEST_BODY_SIZE,
     RequestBodyLimitMiddleware,
 )
+from mcp_configs import TracingSettings
+from mcp_observability import configure_tracing, setup_ops
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from pydantic import SecretStr
@@ -17,8 +19,6 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from unique_mcp.monitoring import setup_ops
-from unique_toolkit.monitoring import configure_tracing
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.dependencies import (
@@ -69,7 +69,9 @@ def create_app() -> Starlette:
     )
     configure_metrics(config)
     # Before FastMCP is built. A no-op when no OTEL_* variable is set, so tests stay untraced.
-    configure_tracing(service_name="backstop-mcp", service_version=config.version)
+    configure_tracing(
+        TracingSettings(), service_name="backstop-mcp", service_version=config.version
+    )
     install_caller_failure_redaction()
 
     engine = get_engine()
@@ -140,7 +142,7 @@ def create_app() -> Starlette:
                 excluded_urls="/health$,/probe$,/ready$,/metrics$",
                 exclude_spans=["receive", "send"],
                 # The global meter is what `/metrics` scrapes. This middleware's histogram would
-                # duplicate unique_toolkit's HTTP one, in different units.
+                # duplicate mcp_observability's HTTP one, in different units.
                 meter_provider=NoOpMeterProvider(),
             ),
             ops_middleware,

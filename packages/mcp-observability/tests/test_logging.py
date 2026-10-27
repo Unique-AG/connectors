@@ -73,7 +73,9 @@ def test_configuring_twice_adds_one_handler() -> None:
     assert handlers[0].level == logging.DEBUG
 
 
-@pytest.mark.parametrize(("path", "kept"), [("/probe", False), ("/metrics", False), ("/mcp", True)])
+@pytest.mark.parametrize(
+    ("path", "kept"), [("/probe", False), ("/ready", False), ("/metrics", False), ("/mcp", True)]
+)
 def test_access_lines_of_the_ops_routes_are_dropped(
     capsys: pytest.CaptureFixture[str], path: str, kept: bool
 ) -> None:

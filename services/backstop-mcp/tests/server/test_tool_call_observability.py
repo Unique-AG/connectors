@@ -9,13 +9,12 @@ import pytest
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.server.auth.provider import AccessToken
+from mcp_observability import metrics_text, setup_ops
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 from pydantic import HttpUrl
 from starlette.testclient import TestClient
-from unique_mcp.monitoring import setup_ops
-from unique_toolkit.monitoring import get_metrics
 
 from backstop_mcp.config import AppConfig
 from backstop_mcp.logging import configure_logging
@@ -67,7 +66,7 @@ def _records(caplog: pytest.LogCaptureFixture, message: str) -> list[logging.Log
 
 
 def _echo_calls() -> float:
-    values = cast("list[str]", _ECHO_CALLS.findall(get_metrics().decode()))
+    values = cast("list[str]", _ECHO_CALLS.findall(metrics_text().decode()))
     return sum(float(value) for value in values)
 
 

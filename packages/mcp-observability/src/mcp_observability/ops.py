@@ -22,7 +22,9 @@ from mcp_observability.metrics import HttpMetricsMiddleware
 from mcp_observability.metrics import MetricNamespace
 from mcp_observability.metrics import metrics_text
 
-OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
+# Never counted or access-logged. An MCP whose readiness depends on its own backends serves `/ready`
+# itself, and Kubernetes calls it as often as the others.
+OPS_PATHS = frozenset({"/probe", "/health", "/ready", "/metrics"})
 
 _log = logging.getLogger("mcp_observability")
 _mcp_metrics = MetricNamespace("mcp")
