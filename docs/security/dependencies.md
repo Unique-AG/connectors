@@ -11,11 +11,14 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 flowchart TD
   nightly[Nightly job] --> pr[One PR for each dependency]
   pr --> ci[Full CI]
-  ci -->|green| review[A person reviews and merges]
+  ci -->|green| ready[Label deps-review-ready]
   ci -->|red| failed[Label deps-ci-failed]
   failed --> agent[Fix agent pushes a fix]
-  agent -->|CI green| review
+  agent -->|CI green| ready
   agent -->|second attempt fails| human[Label deps-needs-human]
+  ready --> report[Review skill posts a report and sets deps-reviewed]
+  report --> review[A person reviews and merges]
+  report -->|do not merge or a gap| human
 ```
 
 | Rule | Value |
@@ -36,10 +39,16 @@ The job adds the label `deps-ci-failed`. A Cursor Automation then starts the fix
 
 The agent edits only the paths in the PR. It never edits a lockfile by hand. The skill `dependency-pr-review` is the base for the review.
 
+## The review after a green CI
+
+When every CI workflow of a dependency PR passes, the job adds the label `deps-review-ready`. A Cursor Automation then starts the review. The review is always the step after the CI, so the order is the same every night.
+
+The review posts one comment with the verdict, and sets `deps-reviewed`. A new commit on the PR removes both labels, so the PR gets a new review.
+
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
-2. If a PR has a green CI, review it and merge it.
+2. If a PR has the label `deps-reviewed` and not `deps-needs-human`, read the report in its comment and merge the PR.
 3. If a PR has the label `deps-needs-human`, fix it or close it.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
@@ -55,7 +64,7 @@ Four parts touch dependency PRs. Each has one job.
 | The nightly job | The schedule | Opens one PR for each dependency. |
 | The skill `deps-ci-fix` | The label `deps-ci-failed` on a nightly PR | Pushes a fix to the PR branch. It tries 2 times. |
 | The patch run, skill `vulna-squash` | A Trivy alert that has a fix | Opens a PR for a critical or high finding. At most 3 are open. Its own helper watches CI for 45 minutes, and a person takes over a red PR. |
-| The skill `dependency-pr-review` | A person, or one of the other skills | Reads the release notes and our own usage. It returns a report and changes nothing. |
+| The skill `dependency-pr-review` | The label `deps-review-ready`, which comes after a green CI. A person can also start it. | Reads the release notes and our own usage. It posts one report comment and sets `deps-reviewed`. It sets `deps-needs-human` for a verdict of "do not merge" or "safe with a gap". It never pushes or merges. |
 
 The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
 

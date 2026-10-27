@@ -1,6 +1,6 @@
 ---
 name: dependency-pr-review
-description: Use when asked to review, check, or assess a dependency update PR, a version bump, a major bump, or a breaking change, or when asked if a bump is safe to merge. Trigger words are "dependency PR", "bump", "major version", "breaking change", "deps-needs-human", "safe to merge".
+description: Use when asked to review, check, or assess a dependency update PR, a version bump, a major bump, or a breaking change, or when asked if a bump is safe to merge, or when a dependency PR gets the label deps-review-ready. Trigger words are "dependency PR", "bump", "major version", "breaking change", "deps-review-ready", "deps-needs-human", "safe to merge".
 metadata:
   internal: true
 ---
@@ -18,6 +18,7 @@ The user gives one PR at a time. Review only that PR. Do not edit repo files, co
 |---|---|
 | Only a PR link | Full review: steps 1 to 6. |
 | "Code wise only, tests ran in CI" | Skip the scratch run (step 4, lens C). Read CI as evidence. |
+| The PR carries the label `deps-review-ready` | Label mode. Do the review of "code wise only". CI is green, so read it as evidence. At the end, do the label steps in step 6. |
 
 ## Step 1: Facts about the PR (do this yourself, no agent)
 
@@ -124,6 +125,21 @@ Rules for the report:
 
 Give the report in chat. Do not publish it as a file or comment unless the user asks.
 Wait for the next PR link.
+
+### Label mode
+
+In label mode, the review comes after the CI of the nightly dependency update. Only two actions are allowed: one comment on the PR, and label changes on the same PR. Never push, approve, or merge.
+
+1. Write the report as in step 5.
+2. Post the report as one comment. Start the comment with the line `<!-- dependency-pr-review -->`. If a comment with that line exists, update it in place.
+3. Remove the label `deps-review-ready`. Add the label `deps-reviewed`.
+4. If the verdict is "do not merge" or "safe with a gap", also add the label `deps-needs-human`.
+5. If the CI is not green any more, add nothing. Stop and say so.
+
+```bash
+gh pr comment <number> --repo Unique-AG/connectors --body-file report.md
+gh pr edit <number> --repo Unique-AG/connectors --remove-label deps-review-ready --add-label deps-reviewed
+```
 
 ## Verdict guide
 

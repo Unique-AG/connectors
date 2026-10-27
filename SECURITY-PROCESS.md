@@ -49,7 +49,7 @@ flowchart LR
 | The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
-| The Cursor automation `nightly-vulna-patchy`, and an automation for the label `deps-ci-failed` that uses the skill `deps-ci-fix` | The daily patch run and the fix of a red dependency PR. |
+| Three Cursor automations. The first is `nightly-vulna-patchy`. The second reacts to the label `deps-ci-failed` and uses the skill `deps-ci-fix`. The third reacts to the label `deps-review-ready` and uses the skill `dependency-pr-review`. | The daily patch run, the fix of a red dependency PR, and the review of a green one. |
 
 ## DEVIATION from monorepo setup
 
