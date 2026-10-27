@@ -139,6 +139,23 @@ jobs:
         run: |
           branch="deps/$SLUG"
           title=$(cat "$RUNNER_TEMP/pr-title.txt")
+          closed=$(gh pr list --head "$branch" --state closed --limit 100 --json title,mergedAt \
+            | jq --arg title "$title" '[.[] | select(.mergedAt == null and .title == $title)] | length')
+          if [ "$closed" -gt 0 ]; then
+            echo "- $title: skipped, because a person closed this version." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          existing=$(gh pr list --head "$branch" --state open --json number,title,labels | jq -c '.[0] // empty')
+          if [ -n "$existing" ]; then
+            number=$(jq -r .number <<<"$existing")
+            if [ "$(jq -r .title <<<"$existing")" = "$title" ]; then same_title=true; else same_title=false; fi
+            handled=$(jq -r '[.labels[].name] | (index("ai-assisted") or index("human-required")) | tostring' <<<"$existing")
+            if [ "$same_title" = true ] && [ "$handled" = true ]; then
+              gh pr update-branch "$number" || echo "::warning::#$number does not update from main. A person must resolve the conflict."
+              echo "- #$number: kept, because the agent handled it." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$branch"
@@ -152,12 +169,13 @@ jobs:
           gh label create dependencies --color 0366d6 --description "Updates to dependencies" || true
           gh label create "$ecosystem_label" --color 6f42c1 --description "Updates to $ecosystem_label packages" || true
 
-          number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
-            gh pr edit "$number" --remove-label ai-assisted --remove-label human-required || true
+          if [ -n "$existing" ] && [ "$same_title" = true ]; then
+            gh pr edit "$number" --body-file "$RUNNER_TEMP/pr-body.md"
             url=$(gh pr view "$number" --json url --jq .url)
           else
+            if [ -n "$existing" ]; then
+              gh pr close "$number" --comment "A newer version replaces this update. A new PR follows."
+            fi
             url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --label dependencies --label "$ecosystem_label")
           fi
           echo "- $url" >> "$GITHUB_STEP_SUMMARY"

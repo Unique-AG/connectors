@@ -15,13 +15,17 @@ Repository: `Unique-AG/connectors`. Base branch: `main`.
 
 | Mode | Start | Input | Parts |
 |------|-------|-------|-------|
-| `findings` | The cron automation. No PR exists. | The open Trivy alerts and the open dependency PRs | A, then for each batch B to F |
-| `pr` | A person, or the sweep in Part A | The number of a dependency PR | C to F |
+| `findings` | The cron automation. No PR exists. | The open Trivy alerts | A, then for each batch B to F |
+| `pr` | The PR automation, or a person | The number of a dependency PR | C to F |
 
 Both modes end in the same pipeline: Part C (assess), Part D (CI and fixes), Part E (verdict and report comment), Part F (hand off).
-In mode `findings`, one subagent for each batch opens a PR and continues with Parts C to F for it. The cron run also starts one subagent in mode `pr` for each open dependency PR that has no result yet. In mode `pr`, you do Parts C to F for the PR that the caller names. You return the [return contract](#return-contract). You post no Slack message unless the caller asks for one.
+In mode `findings`, one subagent for each batch opens a PR and continues with Parts C to F for it. In mode `pr`, you do Parts C to F for the PR that the caller names. You return the [return contract](#return-contract). You post no Slack message unless the caller asks for one.
 
 Policy behind the rules: a CRITICAL or HIGH finding has a patch window of 1 month. A fix that is younger than 3 days waits. A release needs no fixable CRITICAL or HIGH finding.
+
+## Mode `pr` from the PR automation
+
+The Cursor automation `dependency-pr-assess` starts mode `pr`. Its trigger is "Pull request opened" on `Unique-AG/connectors`. The nightly dependency job opens a PR, and the run starts. The trigger has no label filter, so it also fires for PRs that are not dependency PRs. Part C stops those PRs. Post one Slack message to channel `C0C1PR9CNMP` for each PR that you handle. Use the formats of Part A.
 
 ## Hard limits
 
@@ -37,12 +41,12 @@ These limits apply to every mode. They have no exceptions.
 - Never widen a batch to MEDIUM findings or below.
 - A subagent never posts to Slack.
 
-## Part A: Cron run (mode `findings` only)
+## Part A: Findings run (mode `findings` only)
 
 Fix CRITICAL and HIGH findings at their source. Stop early when a check fails.
 MEDIUM and below are out of scope. Open as few PRs as the rules allow.
 Post to Slack channel `C0C1PR9CNMP` on every exit.
-Post one Slack message for each opened PR and each swept PR. Never put two PRs in one message.
+Post one Slack message for each opened PR. Never put two PRs in one message.
 
 ### Wait for the dependency update
 
@@ -52,22 +56,7 @@ gh run list --repo Unique-AG/connectors --workflow deps-nightly.yaml --limit 1 \
   --json status,conclusion,createdAt,url
 ```
 
-If the status is `queued` or `in_progress`, stop. Post one stop message with the link of the run. The next run does the sweep and takes the findings. Then the PRs of the dependency job exist before this run decides which PRs to assess and which packages to fix.
-
-### Sweep the dependency PRs
-
-The nightly dependency job labels its PRs `dependencies`. The agent labels a PR `ai-assisted` when it handled the PR. It also labels the PR `human-required` when a person must finish it. List the open PRs that have neither label.
-```bash
-gh pr list --repo Unique-AG/connectors --state open --label dependencies --limit 100 \
-  --json number,title,url,labels \
-  --jq '.[] | select([.labels[].name] | (index("ai-assisted") or index("human-required")) | not) | {number, title, url}'
-```
-
-Start one subagent for each listed PR with the Task tool, at most 10 for each run. Start them in parallel. The next run takes the rest. The open-PR cap does not apply, because it counts only the label `vulna-squash`.
-
-The first line of each brief is `Invoked by: vulna-squash`. The second line tells the subagent to read the sections `Hard limits` and `Part C` to `Part F` of `agentic/skills/vulna-squash/SKILL.md` and to follow only those sections. Give the fields `repository`, `pr_number` and `memory_notes`.
-
-Wait for all of them. They return the [return contract](#return-contract). Post the Slack messages from their results. Then continue with the findings.
+If the status is `queued` or `in_progress`, stop. Post one stop message with the link of the run. The next run takes the findings. Then the PRs of the dependency job exist before this run decides which packages to fix.
 
 ### Open-PR cap
 
@@ -182,7 +171,7 @@ The subagents open the PRs, assess them, watch CI, fix a red CI and hand off. Th
 Use the Slack action. In a local run, print the same text and start the subagents the same way.
 Format: mrkdwn. Use `*bold*`, `<url|text>` and `•` bullets. Do not use `#` headers or tables.
 Show dates as `29 Sep, 13:07 UTC` or as relative time (`16h ago`). Never use ISO timestamps.
-For a swept PR (mode `pr`), leave out the `Cleared` bullet and the scan link.
+In mode `pr`, leave out the `Cleared` bullet and the scan link.
 
 Patch or minor, checks green, verdict `safe to merge`:
 ```
@@ -350,11 +339,12 @@ gh pr view <number> --repo Unique-AG/connectors --json state,labels,headRefName,
 
 Stop with no change when any of these is true:
 - The PR is not open, or it comes from a fork.
+- The PR does not carry the label `dependencies`.
 - The PR carries the label `ai-assisted` (the agent handled it) or `human-required` (a person has it), and no person asked for a new run.
 
 If the PR changes no manifest and no lockfile, it is not a dependency PR. Go to Part F and state this reason.
 
-Skip lens C when the PR has a CI result, green or red (Part D finds the cause of a red one), or when a person says "code wise only, tests ran in CI". Otherwise run lens C.
+Skip lens C. CI runs the checks on every PR, and Part D finds the cause of a red one. Run lens C only when a person asks for a real local run.
 
 ### Facts about the PR
 
