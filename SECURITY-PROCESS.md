@@ -16,6 +16,7 @@ flowchart LR
   codeql -->|new alert| prStop[PR cannot merge]
   review -->|new vulnerable dependency| prStop
   nightlyUpdate[Nightly dependency update] -->|one PR per dependency| pr
+  pr -->|PR opened| agent[Agent: assess, fix, report]
   pr -->|merge| main[main branch]
   main --> releasePr[Release PR]
   releasePr --> gate[Release gate]
@@ -25,6 +26,8 @@ flowchart LR
   nightlyScan -->|Slack report| patchRun[Daily patch run]
   patchRun -->|fix PR| pr
 ```
+
+For each step in order, and for each interaction between the jobs, the agent, and the people, read [How the parts work together](./docs/security/interactions.md).
 
 ## The three kinds
 
