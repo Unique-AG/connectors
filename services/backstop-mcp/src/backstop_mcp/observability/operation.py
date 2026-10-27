@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 from opentelemetry import trace
 
-from backstop_mcp.observability.events import failure_event, info_event
+from backstop_mcp.observability.failures import failure_level
 from backstop_mcp.observability.fields import span_attributes
 
 _tracer = trace.get_tracer("backstop_mcp")
@@ -38,22 +38,21 @@ def operation(logger: logging.Logger, event: str, **fields: object) -> Generator
         record_exception=False,
         set_status_on_exception=False,
     ) as span:
-        info_event(logger, f"{event}.start", **fields)
+        logger.info(f"{event}.start", extra=fields)
         outcome = OperationOutcome(span)
         try:
             yield outcome
         except Exception as exc:
-            failure_event(
-                logger,
+            logger.log(
+                failure_level(exc),
                 f"{event}.failed",
-                exc,
-                **{**fields, **outcome.fields, "duration_ms": _ms(started)},
+                exc_info=exc,
+                extra={**fields, **outcome.fields, "duration_ms": _ms(started)},
             )
             raise
-        info_event(
-            logger,
+        logger.info(
             f"{event}.completed",
-            **{**fields, **outcome.fields, "duration_ms": _ms(started)},
+            extra={**fields, **outcome.fields, "duration_ms": _ms(started)},
         )
 
 

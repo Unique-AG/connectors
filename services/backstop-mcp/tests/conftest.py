@@ -13,6 +13,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
+from backstop_mcp.observability import install_log_handlers
 from backstop_mcp.teardown import close_singletons
 from backstop_mcp.utils.identifiable_value import reset_identifiable_values
 
@@ -27,6 +28,12 @@ def _reset_pseudonym_mode() -> Iterator[None]:
     reset_identifiable_values()
     yield
     reset_identifiable_values()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _log_handlers() -> None:
+    """What `configure_logging` installs, so a test without `create_app` logs the same way."""
+    install_log_handlers()
 
 
 @pytest.fixture

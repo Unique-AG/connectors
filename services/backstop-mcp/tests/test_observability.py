@@ -1,4 +1,4 @@
-"""The observability helpers: one log line and the same event on the active span."""
+"""The observability helpers: a `backstop_mcp` log line is also an event on the active span."""
 
 import logging
 from typing import ClassVar
@@ -13,30 +13,29 @@ from opentelemetry.trace import StatusCode
 from backstop_mcp.observability import (
     DeclaresFailureLevel,
     add_call_fields,
-    error_event,
     failure_level,
-    info_event,
     operation,
     tool_call_scope,
-    warning_event,
 )
 from backstop_mcp.utils import IdentifiableValue, PseudonymMode
 
-logger = logging.getLogger(__name__)
+# Under `backstop_mcp`, where `install_log_handlers` attaches the span handler.
+logger = logging.getLogger("backstop_mcp.tests.observability")
+outsider = logging.getLogger("tests.observability")
 
 
 class _Declared(Exception, DeclaresFailureLevel):
     failure_level: ClassVar[int] = logging.INFO
 
 
-class TestInfoEvent:
+class TestInfoLine:
     def test_logs_and_adds_the_same_attributes_to_the_current_span(
         self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
     ) -> None:
         caplog.set_level(logging.INFO)
         tracer = trace.get_tracer("test")
         with tracer.start_as_current_span("parent"):
-            info_event(logger, "widget.fetched", entity_id="p1", returned=2)
+            logger.info("widget.fetched", extra={"entity_id": "p1", "returned": 2})
 
         record = next(item for item in caplog.records if item.message == "widget.fetched")
         assert record.levelno == logging.INFO
@@ -54,26 +53,41 @@ class TestInfoEvent:
     ) -> None:
         caplog.set_level(logging.INFO)
 
-        info_event(logger, "widget.fetched", returned=0)
+        logger.info("widget.fetched", extra={"returned": 0})
 
         assert any(item.message == "widget.fetched" for item in caplog.records)
 
+    def test_a_logger_outside_backstop_mcp_stays_off_the_span(
+        self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
+    ) -> None:
+        caplog.set_level(logging.INFO)
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("parent"):
+            outsider.info("widget.fetched")
 
-class TestWarningAndErrorEvents:
+        span = next(item for item in exporter.get_finished_spans() if item.name == "parent")
+        assert span.events == ()
+
+
+class TestWarningAndErrorLines:
     def test_warning_records_error_type_without_a_traceback_or_span_status(
         self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
     ) -> None:
         caplog.set_level(logging.INFO)
         tracer = trace.get_tracer("test")
         with tracer.start_as_current_span("parent"):
-            warning_event(logger, "widget.skipped", exc=ToolError("nope"), entity_id="p1")
+            logger.warning("widget.skipped", exc_info=ToolError("nope"), extra={"entity_id": "p1"})
 
         record = next(item for item in caplog.records if item.message == "widget.skipped")
         assert record.levelno == logging.WARNING
         assert record.error_type == "ToolError"  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         assert record.exc_info is None
         span = next(item for item in exporter.get_finished_spans() if item.name == "parent")
+        event = next(item for item in span.events if item.name == "widget.skipped")
+        assert event.attributes is not None
+        assert event.attributes["error_type"] == "ToolError"
         assert span.status.status_code == StatusCode.UNSET
+        assert not any(item.name == "exception" for item in span.events)
 
     def test_error_records_the_traceback_and_sets_span_status(
         self, caplog: pytest.LogCaptureFixture, exporter: InMemorySpanExporter
@@ -81,14 +95,36 @@ class TestWarningAndErrorEvents:
         caplog.set_level(logging.INFO)
         tracer = trace.get_tracer("test")
         with tracer.start_as_current_span("parent"):
-            error_event(logger, "widget.broken", exc=RuntimeError("boom"))
+            logger.error("widget.broken", exc_info=RuntimeError("boom"))
 
         record = next(item for item in caplog.records if item.message == "widget.broken")
         assert record.levelno == logging.ERROR
+        assert record.error_type == "RuntimeError"  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         assert record.exc_info is not None
         span = next(item for item in exporter.get_finished_spans() if item.name == "parent")
         assert span.status.status_code == StatusCode.ERROR
         assert any(event.name == "exception" for event in span.events)
+
+    def test_error_without_an_exception_sets_span_status(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("parent"):
+            logger.error("widget.inconsistent")
+
+        span = next(item for item in exporter.get_finished_spans() if item.name == "parent")
+        assert span.status.status_code == StatusCode.ERROR
+        assert not any(event.name == "exception" for event in span.events)
+
+    def test_a_logger_outside_backstop_mcp_keeps_its_warning_traceback(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        caplog.set_level(logging.INFO)
+
+        outsider.warning("widget.skipped", exc_info=ToolError("nope"))
+
+        record = next(item for item in caplog.records if item.message == "widget.skipped")
+        assert record.exc_info is not None
 
 
 class TestPseudonymOnTheSpan:
@@ -99,7 +135,7 @@ class TestPseudonymOnTheSpan:
         wrapped = IdentifiableValue("mlucas", mode=PseudonymMode.PLAIN)
         tracer = trace.get_tracer("test")
         with tracer.start_as_current_span("parent"):
-            info_event(logger, "widget.fetched", login=wrapped)
+            logger.info("widget.fetched", extra={"login": wrapped})
 
         record = next(item for item in caplog.records if item.message == "widget.fetched")
         rendered = str(record.login)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType, reportUnknownArgumentType]
@@ -171,6 +207,7 @@ class TestOperation:
 
         failed = next(item for item in caplog.records if item.message == "reports.fetch.failed")
         assert failed.levelno == logging.WARNING
+        assert failed.error_type == "ToolError"  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         assert failed.exc_info is None
         assert not any(item.message == "reports.fetch.completed" for item in caplog.records)
 

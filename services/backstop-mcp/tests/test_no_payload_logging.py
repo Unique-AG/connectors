@@ -6,16 +6,7 @@ import pathlib
 _SRC = pathlib.Path(__file__).parent.parent / "src" / "backstop_mcp"
 
 _LOG_METHODS = frozenset({"debug", "info", "warning", "error", "exception", "critical", "log"})
-_EVENT_FUNCTIONS = frozenset(
-    {
-        "info_event",
-        "warning_event",
-        "error_event",
-        "failure_event",
-        "operation",
-        "add_call_fields",
-    }
-)
+_EVENT_FUNCTIONS = frozenset({"operation", "add_call_fields"})
 _SPAN_METHODS = frozenset({"set_attribute", "set_attributes", "add_event"})
 _FORBIDDEN = frozenset(
     {
@@ -47,7 +38,7 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("backstop_client/client.py", "backstop.request.unauthorized"),
         # Phase 6a: str(exc) of a body that failed to parse.
         ("backstop_client/errors.py", "backstop.error_body.schema_error"),
-        # Phase 6b: str(exc) becomes warning_event(..., exc=exc).
+        # Phase 6b: str(exc) becomes logger.warning(..., exc_info=exc).
         (
             "features/elicitation_utils/elicit_entity_deletion.py",
             "elicitation.entity_deletion.degraded",

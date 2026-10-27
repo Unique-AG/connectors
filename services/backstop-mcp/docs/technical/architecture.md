@@ -280,11 +280,15 @@ in `server_filter_ignored`.
 
 ### Helpers
 
-`backstop_mcp.observability` is the only way to log a major event or open a nested span.
-`info_event`, `warning_event`, `error_event`, and `failure_event` write the log line and add the
-same event to the current span. `operation` wraps one noisy sub-step (a paginated walk, a report
-poll, a catalog refresh) in a child span with an INFO line at each end. `add_call_fields` adds
-fields to the current tool call. `failure_level` picks the level of a failure.
+Log with the standard `logging` API on a `backstop_mcp.*` logger, fields in `extra`. A handler
+that `configure_logging` installs on the `backstop_mcp` logger adds every line to the current span
+as an event. An ERROR also records its exception and marks the span failed. A line logged with
+`exc_info` names the exception in `error_type`, and only an ERROR keeps the stack. A failure whose
+level depends on the exception is `logger.log(failure_level(exc), ..., exc_info=exc)`.
+`backstop_mcp.observability` is the only way to open a nested span. `operation` wraps one noisy
+sub-step (a paginated walk, a report poll, a catalog refresh) in a child span with an INFO line at
+each end. `add_call_fields` adds fields to the current tool call. `failure_level` picks the level
+of a failure.
 
 What a line or span may carry:
 
