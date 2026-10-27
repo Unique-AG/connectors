@@ -1,0 +1,84 @@
+[project]
+name = "mcp-skeleton"
+version = "0.0.0"
+description = {{ quoted(options.description) }}
+classifiers = ["Development Status :: 3 - Alpha"]
+requires-python = ">=3.14"
+dependencies = [
+{% for dependency in dependencies.runtime %}
+    {{ quoted(dependency) }},
+{% endfor %}
+]
+
+[project.scripts]
+mcp-skeleton = "mcp_skeleton.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+{% for dependency in dependencies.dev %}
+    {{ quoted(dependency) }},
+{% endfor %}
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.poe.tasks]
+# Run from the MCP's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+imports = "lint-imports"
+architecture = { script = "mcp_architecture.check:main" }
+surface = { script = "mcp_architecture.check:main(update=True)", help = "record what a client sees in tests/tool_surface.generated.json" }
+test = "pytest"
+{% if spec is not none %}
+codegen = "mcp-openapi-codegen"
+{% endif %}
+ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check CI runs, in its order" }
+
+[tool.ruff]
+# The code style every MCP keeps. Add to it here; a rule turned off here is an exception for review.
+extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
+
+[tool.basedpyright]
+# The type check every MCP keeps. Make a report stricter here, but never turn one down.
+extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+include = ["src", "tests"]
+# A test may reach a private name of the code it tests. Here and not in the shared type check,
+# since basedpyright reads a root there from the folder of that file. `.` resolves `tests.*`.
+executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsage = false }]
+
+[tool.uv.sources]
+{% for package in dependencies.shared %}
+{{ package }} = { path = "../../packages/{{ package }}" }
+{% endfor %}
+{% if spec is not none %}
+
+[tool.mcp-openapi]
+spec = "src/mcp_skeleton/upstream/openapi.yml"
+{% if spec.url is not none %}
+spec-source = {{ quoted(spec.url) }}
+{% endif %}
+operation-ids = [{{ quoted(spec.operation) }}]
+operation-module = "mcp_openapi.upstream"
+models-module = "mcp_skeleton.upstream.generated.vendor_responses"
+models-output = "src/mcp_skeleton/upstream/generated/vendor_responses.py"
+operations-output = "src/mcp_skeleton/upstream/generated/operations.py"
+{% endif %}
+
+# The import contracts every MCP keeps, which packages/mcp-architecture/ARCHITECTURE.md explains.
+# Add the MCP's own below them.
+{{ importlinter }}

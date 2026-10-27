@@ -60,22 +60,46 @@ Jobs that build images, scan images, or run Docker stay on `ubuntu-24.04`.
 ## Python Services
 
 Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
-workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the `[CI] Python` workflow runs:
+workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the
+`[CI] Python` workflow runs `scripts/check-python-service.sh`, and you run the same script
+locally:
 
 ```bash
-pnpm install --frozen-lockfile          # from the repo root, for biome
-cd services/<service>
-uv sync --locked
-uv run ruff format --check . && uv run ruff check .
-pnpm exec biome check .
-uv run basedpyright
-uv run pytest
+pnpm install --frozen-lockfile          # once, from the repo root, for biome
+bash scripts/check-python-service.sh services/<service>
 ```
+
+In a scaffolded MCP, `uv run poe ci` runs the same script, and `uv run poe` lists the task for
+each check.
+
+It runs, in this order:
+
+1. `uv sync --locked`
+2. the generated-code drift checks, in a service that has a generator
+3. `uv run ruff format --check .` and `uv run ruff check .`
+4. `pnpm exec biome check .` and `uv run basedpyright`
+5. in a service whose `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one
+   that keeps `packages/mcp-architecture/ARCHITECTURE.md`, `uv run lint-imports`, then
+   `uv run poe architecture`. `ARCHITECTURE.md` lists what each enforces
+6. `uv run pytest`
+
+Every check runs even after one fails, and the run ends with the list of those that failed, so one
+run shows all there is to fix. Each failure names the command that fixes it, such as
+`uv run ruff format .`. In GitHub Actions each check is a collapsible group of the log, a failure
+is an error annotation on the run, and a lint or type error is an annotation on its line. Each step
+is a plain `uv run` command, so you can also run one alone from the service's folder.
 
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
-the shared-package consumers. `packages/mcp-openapi` works the same way.
+the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs`,
+`packages/mcp-observability` and `packages/mcp-architecture` work the same way.
+`packages/mcp-scaffold` also runs for a change to `packages/mcp-configs`,
+`packages/mcp-observability`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the
+MCPs its tests generate use all four: the last for an OpenAPI upstream. It runs as well for a change to a
+file it registers a new MCP in by matching its text: `.gitcommitizen`,
+`release-please-config.json`, `.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
+and for a change to the workflow files that list every service.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.

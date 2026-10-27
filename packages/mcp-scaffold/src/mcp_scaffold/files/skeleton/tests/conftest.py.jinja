@@ -1,0 +1,75 @@
+{% set parameters = [
+    options.opens_upstream and "upstream_settings: UpstreamSettings",
+    options.opens_persistence and "persistence: Persistence",
+    options.opens_upstream and "upstream_transport: httpx2.MockTransport",
+] | select | join(", ") %}
+{% set arguments = [
+    options.opens_upstream and "upstream_settings",
+    options.opens_persistence and "persistence",
+    options.opens_upstream and "upstream_transport",
+] | select | join(", ") %}
+{% set offline = [
+    "build_server",
+    options.opens_persistence and "open_fake_persistence",
+    options.opens_upstream and "fake_upstream_settings",
+    options.opens_upstream and "unanswered_upstream",
+] | select | join(", ") %}
+{% if options.opens_persistence %}
+from collections.abc import AsyncGenerator
+
+{% endif %}
+{% if options.opens_upstream %}
+import httpx2
+{% endif %}
+import pytest
+from fastmcp import FastMCP
+from mcp_configs import ServerSettings
+from pydantic import AnyHttpUrl
+
+{% if options.opens_persistence %}
+from mcp_skeleton.persistence import Persistence
+{% endif %}
+{% if options.opens_upstream %}
+from mcp_skeleton.upstream import UpstreamSettings
+{% endif %}
+from tests.offline_server import {{ offline }}
+
+
+@pytest.fixture
+def server_settings() -> ServerSettings:
+    """Every field given, so neither the environment nor `.env` changes what the tests see."""
+    return ServerSettings(
+        host="127.0.0.1",
+        port=8000,
+        mcp_base_url=AnyHttpUrl("http://127.0.0.1:8000"),
+        mcp_allowed_origins=[AnyHttpUrl("http://localhost:6274")],
+    )
+{% if options.opens_upstream %}
+
+
+@pytest.fixture
+def upstream_settings() -> UpstreamSettings:
+    return fake_upstream_settings()
+
+
+@pytest.fixture
+def upstream_transport() -> httpx2.MockTransport:
+    """Stands in for the upstream.
+
+    Answer each route the tools call with fixed data.
+    """
+    return unanswered_upstream()
+{% endif %}
+{% if options.opens_persistence %}
+
+
+@pytest.fixture
+async def persistence() -> AsyncGenerator[Persistence]:
+    async with open_fake_persistence() as fake:
+        yield fake
+{% endif %}
+
+
+@pytest.fixture
+def server({{ parameters }}) -> FastMCP:
+    return build_server({{ arguments }})

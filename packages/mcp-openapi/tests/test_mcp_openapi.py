@@ -187,6 +187,27 @@ def test_call_names_the_body_when_it_is_not_json() -> None:
         asyncio.run(client.call(Operation("getThings", ROWS)))
 
 
+def test_call_error_carries_the_status_of_an_error_response() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things({"detail": "Not found."}, status=404)
+    assert error.value.status_code == 404
+
+
+def test_call_error_carries_no_status_when_the_body_does_not_fit() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things([{"value": "x"}])
+    assert error.value.status_code is None
+
+
+def test_call_error_carries_no_status_when_the_upstream_does_not_answer() -> None:
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("refused", request=request)
+
+    with pytest.raises(UpstreamError) as error:
+        asyncio.run(api(refuse).call(Operation("getThings", ROWS)))
+    assert error.value.status_code is None
+
+
 def test_call_rejects_an_operation_that_is_not_in_the_spec() -> None:
     client = api(lambda _: httpx2.Response(200, json=[]))
     with pytest.raises(AssertionError, match="operationId getMissing is not in the spec"):
@@ -333,6 +354,46 @@ def test_policy_does_not_retry_a_status_it_does_not_list() -> None:
     result, sent = replay([httpx2.Response(500), ok()], NO_BACKOFF)
     assert sent == 1
     assert str(result) == "500 Internal Server Error for GET https://upstream.example/things"
+
+
+def replay_write(method: str, responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, int]:
+    """`replay` for a request that writes."""
+    remaining = iter(responses)
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: next(remaining)),
+    )
+    client = OperationClient(load_spec(SPEC), http, retry_policy=NO_BACKOFF)
+    try:
+        result: Row | UpstreamError = asyncio.run(
+            client.request_raw(method, "/hidden", TypeAdapter(Row), json={"label": "x"})
+        )
+    except UpstreamError as error:
+        result = error
+    return result, len(responses) - len(list(remaining))
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT", "DELETE"])
+def test_policy_sends_a_rate_limited_write_again(method: str) -> None:
+    assert replay_write(method, [rate_limited(), httpx2.Response(200, json={"value": 1})]) == (
+        Row(value=1),
+        2,
+    )
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+def test_policy_sends_an_idempotent_write_again_on_a_503(method: str) -> None:
+    responses = [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    assert replay_write(method, responses) == (Row(value=1), 2)
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_policy_does_not_send_a_non_idempotent_write_again_on_a_503(method: str) -> None:
+    result, sent = replay_write(
+        method, [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    )
+    assert sent == 1
+    assert str(result) == f"503 Service Unavailable for {method} https://upstream.example/hidden"
 
 
 def test_no_policy_sends_a_request_once() -> None:
@@ -708,6 +769,7 @@ def models_for(
     operation_ids: list[str],
     fields: dict[str, tuple[str, ...]] | None = None,
     allow_extra_fields: bool = False,
+    snake_case_fields: bool = True,
 ) -> str:
     spec = tmp_path / "spec.yml"
     spec.write_text(spec_text)
@@ -717,6 +779,7 @@ def models_for(
         operation_ids=operation_ids,
         fields=fields,
         allow_extra_fields=allow_extra_fields,
+        snake_case_fields=snake_case_fields,
         output=output,
     )
     return output.read_text()
@@ -748,6 +811,45 @@ def test_a_field_cut_by_fields_stays_as_an_extra_when_extra_fields_are_kept(
     models_for(tmp_path, SPEC, ["getThing"], fields={"Thing": ("name",)}, allow_extra_fields=True)
     assert "secret" not in _model(tmp_path, "Thing").model_fields
     assert validated(tmp_path, "Thing", {"name": "a", "secret": "s"})["secret"] == "s"
+
+
+CASED_SPEC = """
+openapi: 3.0.3
+info: {title: t, version: "1"}
+paths:
+  /bar:
+    get:
+      operationId: getBar
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Bar"}
+components:
+  schemas:
+    Bar:
+      type: object
+      properties:
+        adjClose: {type: number}
+        start-date: {type: string}
+"""
+
+
+def test_fields_are_snake_case_validate_from_the_spec_names_and_dump_back_to_them(
+    tmp_path: Path,
+) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"])
+    bar = _model(tmp_path, "Bar").model_validate({"adjClose": 1.5, "start-date": "2024-01-02"})
+
+    assert bar.model_dump() == {"adj_close": 1.5, "start_date": "2024-01-02"}
+    assert bar.model_dump(by_alias=True) == {"adjClose": 1.5, "start-date": "2024-01-02"}
+
+
+def test_fields_keep_the_spec_names_when_snake_case_is_turned_off(tmp_path: Path) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"], snake_case_fields=False)
+
+    assert set(_model(tmp_path, "Bar").model_fields) == {"adjClose", "start_date"}
 
 
 STRICT_SPEC = """
@@ -1306,3 +1408,82 @@ def test_cli_rejects_an_operation_id_reference_without_a_name(tmp_path: Path) ->
 
     with pytest.raises(ValidationError, match="module:NAME"):
         main([str(tmp_path)])
+
+
+def codegen_project(tmp_path: Path, config: str = CODEGEN_CONFIG) -> Path:
+    (tmp_path / "spec.yml").write_text(SPEC)
+    (tmp_path / "pyproject.toml").write_text(config)
+    (tmp_path / "out").mkdir()
+    return tmp_path
+
+
+def test_cli_check_passes_when_the_generated_files_are_current(tmp_path: Path) -> None:
+    main([str(codegen_project(tmp_path))])
+
+    main([str(tmp_path), "--check"])
+
+
+def test_cli_check_fails_on_a_stale_file_and_leaves_it_as_it_was(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main([str(codegen_project(tmp_path))])
+    operations = tmp_path / "out/operations.py"
+    edited = operations.read_text().replace("GET_THINGS", "GET_ROWS")
+    operations.write_text(edited)
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([str(tmp_path), "--check"])
+
+    assert exit_info.value.code == 1
+    assert f"{operations} is stale:" in capsys.readouterr().out
+    assert operations.read_text() == edited
+
+
+def test_cli_check_fails_on_a_file_never_generated_and_does_not_leave_it(tmp_path: Path) -> None:
+    codegen_project(tmp_path)
+
+    with pytest.raises(SystemExit) as exit_:
+        main([str(tmp_path), "--check"])
+
+    assert exit_.value.code == 1
+    assert not (tmp_path / "out/models.py").exists()
+
+
+def test_cli_refresh_spec_vendors_a_json_source_as_yaml_and_regenerates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec = "spec.yml"\nspec-source = "v2.json"'
+    )
+    codegen_project(tmp_path, config)
+    vendor = load_spec(SPEC)
+    paths = cast(dict[str, dict[str, object]], vendor["paths"])
+    del paths["/things/{name}"]["post"]
+    paths["/rows"] = paths["/things"]
+    (tmp_path / "v2.json").write_text(json.dumps(vendor))
+
+    main([str(tmp_path), "--refresh-spec"])
+
+    assert load_spec((tmp_path / "spec.yml").read_text()) == vendor
+    assert not (tmp_path / "spec.yml").read_text().startswith("{")
+    assert capsys.readouterr().out == "operationIds changed:\n- postThing\n"
+    assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
+
+
+def test_cli_refresh_spec_needs_a_spec_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as exit_:
+        main([str(codegen_project(tmp_path)), "--refresh-spec"])
+
+    assert exit_.value.code == 2
+    assert "--refresh-spec needs spec and spec-source" in capsys.readouterr().err
+
+
+def test_cli_rejects_a_spec_source_without_a_vendored_spec(tmp_path: Path) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec-url = "https://x"\nspec-source = "y"'
+    )
+
+    with pytest.raises(ValidationError, match="spec-source"):
+        main([str(codegen_project(tmp_path, config))])

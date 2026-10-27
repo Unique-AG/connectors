@@ -1,0 +1,172 @@
+# mcp-scaffold-commit: 9a91a8864afe, timestamp: 2026-10-21T12:09:32+00:00
+[project]
+name = "architecture-demo-mcp"
+version = "0.0.0"
+description = "Reference MCP showing every scaffold layer against Tiingo market data: OpenAPI operations served as tools, a Redis-cached price performance summary and a Postgres portfolio, behind Zitadel sign-in."
+classifiers = ["Development Status :: 3 - Alpha"]
+requires-python = ">=3.14"
+dependencies = [
+    "alembic==1.20.0",
+    "asyncpg==0.31.0",
+    "fastmcp==4.1.0",
+    "httpx2==2.13.1",
+    "mcp-configs==0.1.0",
+    "mcp-observability==0.1.0",
+    "mcp-openapi==0.1.0",
+    "mcp-types==2.3.0",
+    "py-key-value-aio[redis,wrappers-encryption]==0.4.6",
+    "pydantic-settings==2.15.0",
+    "pydantic==2.14.1",
+    "pyyaml==6.0.3",
+    "sqlalchemy[asyncio]==2.1.3",
+    "starlette==1.8.0",
+    "tenacity==9.1.4",
+    "unique-mcp==2026.44.1",
+    "unique-sdk==2026.44.1",
+    "unique-toolkit[monitoring,otel]==2026.44.1",
+    "uvicorn[standard]==0.53.0",
+]
+
+[project.scripts]
+architecture-demo-mcp = "architecture_demo_mcp.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "aiosqlite==0.22.1",
+    "basedpyright==1.40.2",
+    "mcp-architecture==0.1.0",
+    "mcp-openapi[codegen]==0.1.0",
+    "poethepoet==0.49.0",
+    "pytest-asyncio==1.4.0",
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
+
+[tool.poe.tasks]
+# Run from the MCP's folder: uv run poe <task>
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+fix = ["format", "lint-fix", "format"]
+typecheck = "basedpyright"
+imports = "lint-imports"
+architecture = { script = "mcp_architecture.check:main" }
+surface = { script = "mcp_architecture.check:main(update=True)", help = "record what a client sees in tests/tool_surface.generated.json" }
+test = "pytest"
+codegen = "mcp-openapi-codegen"
+ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check CI runs, in its order" }
+
+[tool.ruff]
+# The code style every MCP keeps. Add to it here; a rule turned off here is an exception for review.
+extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
+
+[tool.basedpyright]
+# The type check every MCP keeps. Make a report stricter here, but never turn one down.
+extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+include = ["src", "tests"]
+# A test may reach a private name of the code it tests. Here and not in the shared type check,
+# since basedpyright reads a root there from the folder of that file. `.` resolves `tests.*`.
+executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsage = false }]
+
+[tool.uv.sources]
+mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-configs = { path = "../../packages/mcp-configs" }
+mcp-observability = { path = "../../packages/mcp-observability" }
+mcp-openapi = { path = "../../packages/mcp-openapi" }
+
+[tool.mcp-openapi]
+spec = "src/architecture_demo_mcp/upstream/openapi.yml"
+operation-ids = ["getDailyMeta", "getDailyPrices"]
+operation-module = "mcp_openapi.upstream"
+models-module = "architecture_demo_mcp.upstream.generated.vendor_responses"
+models-output = "src/architecture_demo_mcp/upstream/generated/vendor_responses.py"
+operations-output = "src/architecture_demo_mcp/upstream/generated/operations.py"
+
+# The import contracts every MCP keeps, which packages/mcp-architecture/ARCHITECTURE.md explains.
+# Add the MCP's own below them.
+[tool.importlinter]
+root_package = "architecture_demo_mcp"
+include_external_packages = true
+contract_types = [
+    "feature_privacy: mcp_architecture.feature_privacy.FeaturePrivacyContract",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layers only import downwards"
+type = "layers"
+containers = ["architecture_demo_mcp"]
+layers = ["main", "mcp", "contexts", "upstream | persistence", "shared", "telemetry"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "mcp is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.mcp.*"]
+allowed_importers = ["architecture_demo_mcp.mcp"]
+
+[[tool.importlinter.contracts]]
+name = "contexts is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.contexts.*"]
+allowed_importers = ["architecture_demo_mcp.contexts"]
+
+[[tool.importlinter.contracts]]
+name = "upstream is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.upstream.*"]
+allowed_importers = ["architecture_demo_mcp.upstream"]
+
+[[tool.importlinter.contracts]]
+name = "persistence is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.persistence.*"]
+allowed_importers = ["architecture_demo_mcp.persistence"]
+
+[[tool.importlinter.contracts]]
+name = "shared is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.shared.*"]
+allowed_importers = ["architecture_demo_mcp.shared"]
+
+[[tool.importlinter.contracts]]
+name = "telemetry is imported through its top level only"
+type = "protected"
+protected_modules = ["architecture_demo_mcp.telemetry.*"]
+allowed_importers = ["architecture_demo_mcp.telemetry"]
+
+[[tool.importlinter.contracts]]
+name = "A context feature is imported through its top level only"
+type = "feature_privacy"
+container = "architecture_demo_mcp.contexts"
+
+[[tool.importlinter.contracts]]
+name = "No package imports its siblings in a cycle"
+type = "acyclic_siblings"
+ancestors = ["architecture_demo_mcp"]
+
+[[tool.importlinter.contracts]]
+name = "The domain, the storage and shared know nothing about MCP"
+type = "forbidden"
+source_modules = ["architecture_demo_mcp.contexts", "architecture_demo_mcp.persistence", "architecture_demo_mcp.shared"]
+forbidden_modules = ["fastmcp", "mcp", "mcp_types"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "The contracts in shared are types, not implementations"
+type = "forbidden"
+source_modules = ["architecture_demo_mcp.shared.contracts"]
+forbidden_modules = ["sqlalchemy", "httpx2", "cryptography"]

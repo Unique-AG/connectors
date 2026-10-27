@@ -41,6 +41,8 @@ exclude = [".venv"]
 extend-select = ["I"]
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "recommended"
 include = ["src", "tests"]

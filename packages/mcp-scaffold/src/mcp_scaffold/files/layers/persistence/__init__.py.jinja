@@ -1,0 +1,26 @@
+{% set postgres = "postgres" in options.persistence %}
+{% set redis = "redis" in options.persistence %}
+{% set auth = options.auth %}
+{% set names = [
+    auth and "AuthStoreSettings",
+    postgres and "Base",
+    postgres and "DatabaseSettings",
+    "Persistence",
+    "PersistenceSettings",
+    auth and "SqlAuthStore",
+    redis and "StoreSettings",
+    "open_persistence",
+] | select | list %}
+{% if auth %}
+from mcp_skeleton.persistence.auth import AuthStoreSettings, SqlAuthStore
+{% endif %}
+{% if postgres %}
+from mcp_skeleton.persistence.database import DatabaseSettings
+from mcp_skeleton.persistence.models import Base
+{% endif %}
+from mcp_skeleton.persistence.persistence import Persistence, PersistenceSettings, open_persistence
+{% if redis %}
+from mcp_skeleton.persistence.store import StoreSettings
+{% endif %}
+
+__all__ = {{ names | tojson }}
