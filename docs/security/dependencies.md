@@ -16,7 +16,7 @@ flowchart TD
   failed --> agent["Agent run: assess, fix a red CI, report"]
   ready --> agent
   agent -->|safe to merge| review[A person reads the report and merges]
-  agent -->|gap, do not merge, or still red| human[Label deps-needs-human and a follow-up issue]
+  agent -->|gap, do not merge, or still red| human[Label deps-needs-human and ask for a Jira ticket]
 ```
 
 | Rule | Value |
@@ -43,17 +43,17 @@ In one run the agent does these things:
 
 The agent never merges, never approves, and never edits a lockfile by hand. A new commit on the PR removes the labels `deps-reviewed` and `deps-review-ready`, so the PR gets a new run.
 
-## Hand-off and follow-up ticket
+## Hand-off
 
-When a person is needed, the agent adds the label `deps-needs-human` and creates a follow-up ticket in Jira. The ticket is a Task in the project `UN`, with the component `mcp-servers` and the labels `mcp-server` and `deps-follow-up`. It names the PR, the breaking changes that affect us with their file and line, what the agent tried, and the exact next steps.
+When a person is needed, the agent adds the label `deps-needs-human`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
 
-One ticket exists for each package. A second hand-off adds a comment to it. When the Jira tool is not connected, the agent creates a GitHub issue with the label `deps-follow-up` instead. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
+The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
 
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `deps-reviewed` and not `deps-needs-human`, read the report in its comment and merge the PR.
-3. If a PR has the label `deps-needs-human`, open its follow-up ticket. Search Jira with `project = UN AND labels = "deps-follow-up" AND statusCategory != Done`. Finish the work there.
+3. If a PR has the label `deps-needs-human`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
@@ -66,7 +66,7 @@ Two parts touch dependency PRs. Each has one job.
 | Part | It starts from | What it does |
 |---|---|---|
 | The nightly job | The schedule | Opens one PR for each dependency. |
-| The skill `vulna-squash` | The cron run, for a Trivy alert that has a fix. Or the label `deps-ci-failed` or `deps-review-ready` on a nightly PR. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a ticket. For a finding it opens the PR first. At most 3 such PRs are open. |
+| The skill `vulna-squash` | The cron run, for a Trivy alert that has a fix. Or the label `deps-ci-failed` or `deps-review-ready` on a nightly PR. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a comment. For a finding it opens the PR first. At most 3 such PRs are open. |
 
 The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
 
