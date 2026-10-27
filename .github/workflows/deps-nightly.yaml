@@ -147,8 +147,10 @@ jobs:
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push --force origin "$branch"
 
+          ecosystem_label="$ECOSYSTEM"
+          if [ "$ecosystem_label" = actions ]; then ecosystem_label=github-actions; fi
           gh label create dependencies --color 0366d6 --description "Updates to dependencies" || true
-          gh label create "$ECOSYSTEM" --color 6f42c1 --description "Updates to $ECOSYSTEM packages" || true
+          gh label create "$ecosystem_label" --color 6f42c1 --description "Updates to $ecosystem_label packages" || true
 
           number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$number" ]; then
@@ -156,6 +158,6 @@ jobs:
             gh pr edit "$number" --remove-label ai-assisted --remove-label human-required || true
             url=$(gh pr view "$number" --json url --jq .url)
           else
-            url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --label dependencies --label "$ECOSYSTEM")
+            url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --label dependencies --label "$ecosystem_label")
           fi
           echo "- $url" >> "$GITHUB_STEP_SUMMARY"
