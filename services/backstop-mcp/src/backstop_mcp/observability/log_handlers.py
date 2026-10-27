@@ -19,13 +19,8 @@ _RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict_
 
 
 class SpanEventHandler(logging.Handler):
-    """Adds the record to the active span as an event. An ERROR also records its exception and
-    sets the span status.
-
-    Then names the exception in `error_type` and, below ERROR, drops its stack: a WARNING is
-    nothing a developer must act on. A logger calls its own handlers before its parents', so the
-    output handlers on the root logger only ever see the record after this.
-    """
+    """Puts the record on the active span, then drops its stack below ERROR before the root
+    logger's output handlers see it."""
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
