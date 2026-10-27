@@ -38,14 +38,14 @@ export function createRegistryLookups(fetchImpl = fetch) {
   };
 }
 
-export async function listCommentBodies({
+export async function listComments({
   apiUrl,
   repository,
   pullRequestNumber,
   token,
   fetchImpl = fetch,
 }) {
-  const bodies = [];
+  const found = [];
   for (let page = 1; page <= MAX_COMMENT_PAGES; page++) {
     const url = `${apiUrl}/repos/${repository}/issues/${pullRequestNumber}/comments?per_page=100&page=${page}`;
     const response = await fetchImpl(url, {
@@ -60,9 +60,16 @@ export async function listCommentBodies({
       throw new Error(`GitHub comments request failed with HTTP ${response.status}`);
     }
     const comments = await response.json();
-    bodies.push(...comments.map((comment) => comment.body ?? ''));
+    found.push(
+      ...comments.map((comment) => ({
+        body: comment.body ?? '',
+        author: comment.user?.login ?? 'unknown',
+        url: comment.html_url ?? '',
+        createdAt: comment.created_at ?? '',
+      })),
+    );
     if (comments.length < 100) {
-      return bodies;
+      return found;
     }
   }
   throw new Error('GitHub comments response exceeded the pagination limit');

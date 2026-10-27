@@ -20,11 +20,22 @@ const report = (vulnerabilities, type = 'python-pkg') =>
 
 const registry = (dates) => async (name, version) => dates[`${name}@${version}`] ?? null;
 
+const HEAD_SHA = 'abc1234def5678';
+
+const comment = (body, overrides = {}) => ({
+  body,
+  author: 'alice',
+  url: 'https://github.com/unique-ag/connectors/pull/7#issuecomment-1',
+  createdAt: '2026-10-27T10:00:00Z',
+  ...overrides,
+});
+
 const gate = (overrides) =>
   runGate({
     reportText: report([vulnerability()]),
     hasLabel: false,
     comments: [],
+    headSha: HEAD_SHA,
     lookups: { 'python-pkg': registry({}), 'node-pkg': registry({}) },
     now: NOW,
     ...overrides,
@@ -118,24 +129,80 @@ test('passes with a warning when no fix exists', async () => {
 });
 
 test('fails when the label is set without a stamp', async () => {
-  const result = await gate({ hasLabel: true, comments: ['looks fine'] });
+  const result = await gate({ hasLabel: true, comments: [comment('looks fine')] });
   assert.equal(result.passed, false);
-  assert.match(result.message, /no comment starts with "Security exception approved by:"/);
+  assert.match(result.message, /no comment approves this commit/);
+  assert.match(result.message, /Security exception approved by: <names> for abc1234/);
 });
 
-test('passes when the label and a stamp exist and lists the skipped findings', async () => {
+test('passes when the label and a stamp for this commit exist and lists the skipped findings', async () => {
   const result = await gate({
     hasLabel: true,
-    comments: ['hello', 'Security exception approved by: @alice for UN-1'],
+    comments: [
+      comment('hello'),
+      comment('Security exception approved by: Alice and Bob for abc1234'),
+    ],
   });
   assert.equal(result.passed, true);
+  assert.match(result.message, /approved by Alice and Bob for abc1234/);
+  assert.match(result.summary, /Comment by @alice on 2026-10-27T10:00:00Z: https:\/\/github\.com/);
   assert.match(result.summary, /CVE-2026-0001 \| 30\.0 days \| advisory \| skipped by exception/);
   assert.match(result.annotations[0], /^::warning::/);
 });
 
-test('ignores a stamp when the label is not set', async () => {
-  const result = await gate({ comments: ['Security exception approved by: @alice'] });
+test('accepts a longer commit hash in any letter case', async () => {
+  const result = await gate({
+    hasLabel: true,
+    comments: [comment('Security exception approved by: Alice for ABC1234DEF5678')],
+  });
+  assert.equal(result.passed, true);
+});
+
+test('fails when the stamp is for another commit', async () => {
+  const result = await gate({
+    hasLabel: true,
+    comments: [comment('Security exception approved by: Alice for 1111111')],
+  });
   assert.equal(result.passed, false);
+  assert.match(result.message, /valid for one commit/);
+  assert.match(result.message, /for abc1234/);
+});
+
+test('fails when the stamp names nobody', async () => {
+  const result = await gate({
+    hasLabel: true,
+    comments: [comment('Security exception approved by: for abc1234')],
+  });
+  assert.equal(result.passed, false);
+});
+
+test('reads only the first line of a comment', async () => {
+  const result = await gate({
+    hasLabel: true,
+    comments: [comment('Please look.\nSecurity exception approved by: Alice for abc1234')],
+  });
+  assert.equal(result.passed, false);
+});
+
+test('ignores a stamp when the label is not set', async () => {
+  const result = await gate({
+    comments: [comment('Security exception approved by: Alice for abc1234')],
+  });
+  assert.equal(result.passed, false);
+  assert.match(result.message, /add the label security-exception/);
+});
+
+test('does not need the label when nothing blocks', async () => {
+  const result = await gate({
+    hasLabel: true,
+    reportText: JSON.stringify({ Results: [{ Type: 'debian' }] }),
+  });
+  assert.equal(result.passed, true);
+  assert.match(result.message, /not needed/);
+});
+
+test('fails closed without the head commit', async () => {
+  await assert.rejects(gate({ headSha: '' }), /head commit/);
 });
 
 test('fails closed when the Trivy report is missing or has no results', async () => {

@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import { runGate } from './gate.mjs';
-import { createRegistryLookups, listCommentBodies } from './sources.mjs';
+import { createRegistryLookups, listComments } from './sources.mjs';
 
 const {
   TRIVY_REPORT_PATH = '',
   HAS_LABEL = 'false',
+  HEAD_SHA = '',
   GITHUB_API_URL = '',
   GITHUB_REPOSITORY = '',
   PULL_REQUEST_NUMBER = '',
@@ -21,7 +22,7 @@ function appendSummary(text) {
 try {
   const hasLabel = HAS_LABEL === 'true';
   const comments = hasLabel
-    ? await listCommentBodies({
+    ? await listComments({
         apiUrl: GITHUB_API_URL,
         repository: GITHUB_REPOSITORY,
         pullRequestNumber: PULL_REQUEST_NUMBER,
@@ -34,6 +35,7 @@ try {
       : null,
     hasLabel,
     comments,
+    headSha: HEAD_SHA,
     lookups: createRegistryLookups(),
     now: Date.now(),
   });
