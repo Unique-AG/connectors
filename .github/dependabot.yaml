@@ -28,8 +28,15 @@ updates:
 
   - package-ecosystem: uv
     directories:
+      # The root pyproject.toml holds only poethepoet, for the tasks that run in every project.
+      - /
+      - packages/mcp-architecture
+      - packages/mcp-configs
       - packages/mcp-credential-auth
+      - packages/mcp-observability
       - packages/mcp-openapi
+      # Its `service*` dependency groups are the versions every new MCP pins.
+      - packages/mcp-scaffold
       - services/**/*
     schedule:
       interval: cron

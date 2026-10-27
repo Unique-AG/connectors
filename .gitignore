@@ -12,6 +12,7 @@ deno.lock
 .env
 .env.*
 !.env.example
+!.env.example.jinja
 !.env.*.example
 
 # Testing
@@ -112,6 +113,7 @@ services/**/src/tenant-configs/*
 **/.venv/
 **/.pytest_cache/
 **/.ruff_cache/
+**/.import_linter_cache/
 *.py[cod]
 
 # Local docs used by llm for apis which give us no other option

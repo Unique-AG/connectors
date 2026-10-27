@@ -3,13 +3,15 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import ModuleType
 from typing import cast
 
 import httpx2
 import pytest
+import tenacity
 import yaml
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType
@@ -19,8 +21,10 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from mcp_openapi.cli import main
 from mcp_openapi.codegen import generate_operations, generate_response_models
 from mcp_openapi.headers import only_headers
+from mcp_openapi.lock import LockConfig, RequestLock
 from mcp_openapi.openapi import mcp_name, route_map, set_tool_hints
-from mcp_openapi.upstream import Operation, OperationClient, UpstreamError
+from mcp_openapi.retry import RetryAfterPolicy, RetryPolicy
+from mcp_openapi.upstream import LockTimeoutError, Operation, OperationClient, UpstreamError
 
 
 class Row(BaseModel):
@@ -183,6 +187,27 @@ def test_call_names_the_body_when_it_is_not_json() -> None:
         asyncio.run(client.call(Operation("getThings", ROWS)))
 
 
+def test_call_error_carries_the_status_of_an_error_response() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things({"detail": "Not found."}, status=404)
+    assert error.value.status_code == 404
+
+
+def test_call_error_carries_no_status_when_the_body_does_not_fit() -> None:
+    with pytest.raises(UpstreamError) as error:
+        get_things([{"value": "x"}])
+    assert error.value.status_code is None
+
+
+def test_call_error_carries_no_status_when_the_upstream_does_not_answer() -> None:
+    def refuse(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("refused", request=request)
+
+    with pytest.raises(UpstreamError) as error:
+        asyncio.run(api(refuse).call(Operation("getThings", ROWS)))
+    assert error.value.status_code is None
+
+
 def test_call_rejects_an_operation_that_is_not_in_the_spec() -> None:
     client = api(lambda _: httpx2.Response(200, json=[]))
     with pytest.raises(AssertionError, match="operationId getMissing is not in the spec"):
@@ -230,6 +255,300 @@ def test_call_rejects_a_required_argument_that_is_missing(
     client = api(lambda _: httpx2.Response(200, json={}))
     with pytest.raises(ValueError, match=rf"postThing needs {re.escape(missing)}"):
         asyncio.run(client.call(Operation("postThing", OBJECT), **arguments))
+
+
+def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={"value": 1})
+
+    row = asyncio.run(
+        api(handler).request_raw(
+            "POST", "/hidden", TypeAdapter(Row), params={"dry": True}, json={"label": "x"}
+        )
+    )
+    assert row == Row(value=1)
+    request = seen[0]
+    assert (request.method, request.url.raw_path) == ("POST", b"/hidden?dry=true")
+    assert json.loads(request.content) == {"label": "x"}
+    assert request.headers["authorization"] == "Token k"
+
+
+def test_request_raw_names_the_field_that_does_not_fit() -> None:
+    client = api(lambda _: httpx2.Response(200, json={"value": "x"}))
+    with pytest.raises(UpstreamError, match=r"Unexpected response: value: "):
+        asyncio.run(client.request_raw("GET", "/hidden", TypeAdapter(Row)))
+
+
+@pytest.mark.parametrize("path", ["https://other.example/x", "//other.example/x", "hidden"])
+def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
+    client = api(lambda _: httpx2.Response(200, json={"value": 1}))
+    with pytest.raises(ValueError, match="is not a path"):
+        asyncio.run(client.request_raw("GET", path, TypeAdapter(Row)))
+
+
+RETRY_AFTER = RetryAfterPolicy()
+
+
+def replay(
+    responses: list[httpx2.Response], retry_policy: RetryPolicy | None = RETRY_AFTER
+) -> tuple[list[Row] | UpstreamError, int]:
+    """Answers each request with the next response, and returns the result and the count."""
+    remaining = iter(responses)
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: next(remaining)),
+    )
+    client = OperationClient(load_spec(SPEC), http, retry_policy=retry_policy)
+    try:
+        result: list[Row] | UpstreamError = asyncio.run(client.call(Operation("getThings", ROWS)))
+    except UpstreamError as error:
+        result = error
+    return result, len(responses) - len(list(remaining))
+
+
+def rate_limited(retry_after: str | None = None) -> httpx2.Response:
+    return httpx2.Response(429, headers={"Retry-After": retry_after} if retry_after else None)
+
+
+def ok() -> httpx2.Response:
+    return httpx2.Response(200, json=[{"value": 1}])
+
+
+NO_BACKOFF = RetryAfterPolicy(max_attempts=3, backoff=tenacity.wait_none())
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_default_policy_retries_after_the_delay_retry_after_asks_for(status: int) -> None:
+    responses = [httpx2.Response(status, headers={"Retry-After": "0"}), ok()]
+    assert replay(responses) == ([Row(value=1)], 2)
+
+
+def test_default_policy_reads_retry_after_as_an_http_date() -> None:
+    assert replay([rate_limited("Wed, 21 Oct 2015 07:28:00 GMT"), ok()]) == ([Row(value=1)], 2)
+
+
+@pytest.mark.parametrize("retry_after", ["31", "Fri, 01 Jan 9999 00:00:00 GMT"])
+def test_default_policy_gives_up_when_retry_after_asks_for_more_than_the_ceiling(
+    retry_after: str,
+) -> None:
+    result, sent = replay([rate_limited(retry_after), ok()])
+    assert sent == 1
+    assert str(result).startswith("429 Too Many Requests for GET")
+
+
+def test_policy_falls_back_to_backoff_without_retry_after_and_stops_after_max_attempts() -> None:
+    result, sent = replay([rate_limited(), rate_limited(), rate_limited(), ok()], NO_BACKOFF)
+    assert sent == 3
+    assert isinstance(result, UpstreamError)
+
+
+def test_policy_caps_backoff_at_the_ceiling() -> None:
+    policy = RetryAfterPolicy(max_wait_seconds=0, backoff=tenacity.wait_fixed(3600))
+    assert replay([rate_limited("not a date"), ok()], policy) == ([Row(value=1)], 2)
+
+
+def test_policy_does_not_retry_a_status_it_does_not_list() -> None:
+    result, sent = replay([httpx2.Response(500), ok()], NO_BACKOFF)
+    assert sent == 1
+    assert str(result) == "500 Internal Server Error for GET https://upstream.example/things"
+
+
+def replay_write(method: str, responses: list[httpx2.Response]) -> tuple[Row | UpstreamError, int]:
+    """`replay` for a request that writes."""
+    remaining = iter(responses)
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: next(remaining)),
+    )
+    client = OperationClient(load_spec(SPEC), http, retry_policy=NO_BACKOFF)
+    try:
+        result: Row | UpstreamError = asyncio.run(
+            client.request_raw(method, "/hidden", TypeAdapter(Row), json={"label": "x"})
+        )
+    except UpstreamError as error:
+        result = error
+    return result, len(responses) - len(list(remaining))
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT", "DELETE"])
+def test_policy_sends_a_rate_limited_write_again(method: str) -> None:
+    assert replay_write(method, [rate_limited(), httpx2.Response(200, json={"value": 1})]) == (
+        Row(value=1),
+        2,
+    )
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+def test_policy_sends_an_idempotent_write_again_on_a_503(method: str) -> None:
+    responses = [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    assert replay_write(method, responses) == (Row(value=1), 2)
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_policy_does_not_send_a_non_idempotent_write_again_on_a_503(method: str) -> None:
+    result, sent = replay_write(
+        method, [httpx2.Response(503), httpx2.Response(200, json={"value": 1})]
+    )
+    assert sent == 1
+    assert str(result) == f"503 Service Unavailable for {method} https://upstream.example/hidden"
+
+
+def test_no_policy_sends_a_request_once() -> None:
+    result, sent = replay([rate_limited("0"), ok()], retry_policy=None)
+    assert sent == 1
+    assert isinstance(result, UpstreamError)
+
+
+class SemaphoreLock:
+    """A `RequestLock` over an `asyncio.Semaphore`, as a service could write one."""
+
+    def __init__(self, limit: int) -> None:
+        self._semaphore: asyncio.Semaphore = asyncio.Semaphore(limit)
+
+    @asynccontextmanager
+    async def hold(self, _request: httpx2.Request) -> AsyncGenerator[None]:
+        async with self._semaphore:
+            yield
+
+
+class RecordingLock:
+    def __init__(self) -> None:
+        self.held: list[tuple[str, bytes, str | None]] = []
+
+    @asynccontextmanager
+    async def hold(self, request: httpx2.Request) -> AsyncGenerator[None]:
+        authorization = request.headers.get("authorization")
+        self.held.append((request.method, request.url.raw_path, authorization))
+        yield
+
+
+def locked_api(
+    handler: Callable[[httpx2.Request], Coroutine[None, None, httpx2.Response]],
+    lock: RequestLock,
+    acquire_timeout_seconds: float = 30,
+) -> OperationClient:
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        headers={"Authorization": "Token k"},
+        transport=httpx2.MockTransport(handler),
+    )
+    lock_config = LockConfig(lock=lock, acquire_timeout_seconds=acquire_timeout_seconds)
+    return OperationClient(load_spec(SPEC), http, retry_policy=RETRY_AFTER, lock_config=lock_config)
+
+
+async def answer_ok(_: httpx2.Request) -> httpx2.Response:
+    return ok()
+
+
+def test_the_lock_is_held_while_the_request_is_in_flight() -> None:
+    in_flight: list[int] = [0]
+    peak: list[int] = [0]
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        in_flight[0] += 1
+        peak[0] = max(peak[0], in_flight[0])
+        await asyncio.sleep(0.01)
+        in_flight[0] -= 1
+        return ok()
+
+    async def run() -> None:
+        client = locked_api(handler, SemaphoreLock(2))
+        await asyncio.gather(*(client.call(Operation("getThings", ROWS)) for _ in range(5)))
+
+    asyncio.run(run())
+    assert peak[0] == 2
+
+
+def test_a_request_fails_when_the_lock_is_not_acquired_in_time() -> None:
+    async def run() -> None:
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def handler(_: httpx2.Request) -> httpx2.Response:
+            started.set()
+            await release.wait()
+            return ok()
+
+        client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+        first = asyncio.create_task(client.call(Operation("getThings", ROWS)))
+        await started.wait()
+        with pytest.raises(
+            LockTimeoutError,
+            match=r"No lock acquired within 0\.01s for GET https://upstream\.example/things$",
+        ):
+            await client.call(Operation("getThings", ROWS))
+        release.set()
+        assert await first == [Row(value=1)]
+
+    asyncio.run(run())
+
+
+def test_the_lock_is_released_after_a_failed_request() -> None:
+    responses = iter([httpx2.Response(500), ok()])
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        return next(responses)
+
+    async def run() -> list[Row]:
+        client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+        with pytest.raises(UpstreamError):
+            await client.call(Operation("getThings", ROWS))
+        return await client.call(Operation("getThings", ROWS))
+
+    assert asyncio.run(run()) == [Row(value=1)]
+
+
+def test_the_lock_is_held_per_attempt_with_the_request() -> None:
+    responses = iter([rate_limited("0"), httpx2.Response(200, json={"value": 1})])
+
+    async def handler(_: httpx2.Request) -> httpx2.Response:
+        return next(responses)
+
+    lock = RecordingLock()
+    client = locked_api(handler, lock, acquire_timeout_seconds=5)
+    asyncio.run(client.call(Operation("getThing", TypeAdapter(Row)), name="a", since="2026-01-02"))
+    attempt = ("GET", b"/things/a?since=2026-01-02", "Token k")
+    assert lock.held == [attempt, attempt]
+
+
+def test_request_raw_holds_the_lock_with_its_request() -> None:
+    lock = RecordingLock()
+    client = locked_api(answer_ok, lock)
+    asyncio.run(client.request_raw("POST", "/hidden", ROWS, params={"dry": True}))
+    assert lock.held == [("POST", b"/hidden?dry=true", "Token k")]
+
+
+def test_only_acquiring_the_lock_counts_against_the_timeout() -> None:
+    async def slow(_: httpx2.Request) -> httpx2.Response:
+        await asyncio.sleep(0.05)
+        return ok()
+
+    client = locked_api(slow, SemaphoreLock(1), acquire_timeout_seconds=0.01)
+    assert asyncio.run(client.call(Operation("getThings", ROWS))) == [Row(value=1)]
+
+
+def test_a_timeout_error_of_the_lock_itself_is_not_reported_as_a_lock_timeout() -> None:
+    class BrokenLock:
+        def hold(self, _request: httpx2.Request) -> BrokenLock:
+            return self
+
+        async def __aenter__(self) -> None:
+            raise TimeoutError("socket timed out")
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    client = locked_api(answer_ok, BrokenLock())
+    with pytest.raises(TimeoutError, match="socket timed out") as error:
+        asyncio.run(client.call(Operation("getThings", ROWS)))
+    assert not isinstance(error.value, LockTimeoutError)
+
+
+def test_lock_config_rejects_something_that_is_not_a_lock() -> None:
+    with pytest.raises(ValidationError, match="Input should be an instance of RequestLock"):
+        LockConfig.model_validate({"lock": object(), "acquire_timeout_seconds": 1})
 
 
 def redirected_authorization(
@@ -406,8 +725,8 @@ def operations_for(tmp_path: Path, operation_ids: list[str], spec_text: str = SP
 
 def test_each_operation_gets_a_constant_typed_with_its_response(tmp_path: Path) -> None:
     generated = operations_for(tmp_path, ["getThings", "getThing"])
-    assert 'GET_THINGS = Operation("getThings", TypeAdapter(list[Thing]))' in generated
-    assert 'GET_THING = Operation("getThing", TypeAdapter(Thing))' in generated
+    assert 'GET_THINGS = Operation[list[Thing]]("getThings", TypeAdapter(list[Thing]))' in generated
+    assert 'GET_THING = Operation[Thing]("getThing", TypeAdapter(Thing))' in generated
     assert "from models import Thing\n" in generated
 
 
@@ -437,7 +756,10 @@ def test_a_response_written_in_place_gets_a_model_named_after_its_operation(
     tmp_path: Path,
 ) -> None:
     generated = operations_for(tmp_path, ["postThing"])
-    assert 'POST_THING = Operation("postThing", TypeAdapter(PostThingResponse))' in generated
+    assert (
+        'POST_THING = Operation[PostThingResponse]("postThing", TypeAdapter(PostThingResponse))'
+        in generated
+    )
     assert "from models import PostThingResponse\n" in generated
 
 
@@ -447,6 +769,7 @@ def models_for(
     operation_ids: list[str],
     fields: dict[str, tuple[str, ...]] | None = None,
     allow_extra_fields: bool = False,
+    snake_case_fields: bool = True,
 ) -> str:
     spec = tmp_path / "spec.yml"
     spec.write_text(spec_text)
@@ -456,6 +779,7 @@ def models_for(
         operation_ids=operation_ids,
         fields=fields,
         allow_extra_fields=allow_extra_fields,
+        snake_case_fields=snake_case_fields,
         output=output,
     )
     return output.read_text()
@@ -487,6 +811,45 @@ def test_a_field_cut_by_fields_stays_as_an_extra_when_extra_fields_are_kept(
     models_for(tmp_path, SPEC, ["getThing"], fields={"Thing": ("name",)}, allow_extra_fields=True)
     assert "secret" not in _model(tmp_path, "Thing").model_fields
     assert validated(tmp_path, "Thing", {"name": "a", "secret": "s"})["secret"] == "s"
+
+
+CASED_SPEC = """
+openapi: 3.0.3
+info: {title: t, version: "1"}
+paths:
+  /bar:
+    get:
+      operationId: getBar
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Bar"}
+components:
+  schemas:
+    Bar:
+      type: object
+      properties:
+        adjClose: {type: number}
+        start-date: {type: string}
+"""
+
+
+def test_fields_are_snake_case_validate_from_the_spec_names_and_dump_back_to_them(
+    tmp_path: Path,
+) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"])
+    bar = _model(tmp_path, "Bar").model_validate({"adjClose": 1.5, "start-date": "2024-01-02"})
+
+    assert bar.model_dump() == {"adj_close": 1.5, "start_date": "2024-01-02"}
+    assert bar.model_dump(by_alias=True) == {"adjClose": 1.5, "start-date": "2024-01-02"}
+
+
+def test_fields_keep_the_spec_names_when_snake_case_is_turned_off(tmp_path: Path) -> None:
+    models_for(tmp_path, CASED_SPEC, ["getBar"], snake_case_fields=False)
+
+    assert set(_model(tmp_path, "Bar").model_fields) == {"adjClose", "start_date"}
 
 
 STRICT_SPEC = """
@@ -635,9 +998,10 @@ def test_an_allof_envelope_written_in_place_is_generated_with_the_schemas_it_use
     generated = models.read_text()
     assert "class GetCompaniesResponse(BaseResponse):" in generated
     assert "data: list[Company] | None" in generated
-    assert 'GET_COMPANIES = Operation("get-companies", TypeAdapter(GetCompaniesResponse))' in (
-        operations_for(tmp_path, ["get-companies"], ENVELOPE_SPEC)
-    )
+    assert (
+        'GET_COMPANIES = Operation[GetCompaniesResponse]("get-companies", '
+        "TypeAdapter(GetCompaniesResponse))"
+    ) in operations_for(tmp_path, ["get-companies"], ENVELOPE_SPEC)
 
 
 def test_a_model_name_made_from_an_operation_cannot_replace_a_schema_of_the_spec(
@@ -735,7 +1099,10 @@ def test_a_response_defined_in_components_is_resolved(tmp_path: Path) -> None:
         models_module="models",
         output=output,
     )
-    assert 'GET_PARENTS = Operation("getParents", TypeAdapter(list[Parent]))' in output.read_text()
+    assert (
+        'GET_PARENTS = Operation[list[Parent]]("getParents", TypeAdapter(list[Parent]))'
+        in output.read_text()
+    )
 
 
 @pytest.mark.parametrize(
@@ -882,7 +1249,7 @@ def test_an_operation_id_with_characters_a_name_would_lose_is_refused(tmp_path: 
 
 def test_the_lowest_success_code_gives_the_model_of_an_operation(tmp_path: Path) -> None:
     generated = operations_for(tmp_path, ["getThing"], TWO_CODES_SPEC)
-    assert 'GET_THING = Operation("getThing", TypeAdapter(Thing))' in generated
+    assert 'GET_THING = Operation[Thing]("getThing", TypeAdapter(Thing))' in generated
 
 
 def test_arguments_that_are_none_are_not_sent() -> None:
@@ -1041,3 +1408,82 @@ def test_cli_rejects_an_operation_id_reference_without_a_name(tmp_path: Path) ->
 
     with pytest.raises(ValidationError, match="module:NAME"):
         main([str(tmp_path)])
+
+
+def codegen_project(tmp_path: Path, config: str = CODEGEN_CONFIG) -> Path:
+    (tmp_path / "spec.yml").write_text(SPEC)
+    (tmp_path / "pyproject.toml").write_text(config)
+    (tmp_path / "out").mkdir()
+    return tmp_path
+
+
+def test_cli_check_passes_when_the_generated_files_are_current(tmp_path: Path) -> None:
+    main([str(codegen_project(tmp_path))])
+
+    main([str(tmp_path), "--check"])
+
+
+def test_cli_check_fails_on_a_stale_file_and_leaves_it_as_it_was(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main([str(codegen_project(tmp_path))])
+    operations = tmp_path / "out/operations.py"
+    edited = operations.read_text().replace("GET_THINGS", "GET_ROWS")
+    operations.write_text(edited)
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([str(tmp_path), "--check"])
+
+    assert exit_info.value.code == 1
+    assert f"{operations} is stale:" in capsys.readouterr().out
+    assert operations.read_text() == edited
+
+
+def test_cli_check_fails_on_a_file_never_generated_and_does_not_leave_it(tmp_path: Path) -> None:
+    codegen_project(tmp_path)
+
+    with pytest.raises(SystemExit) as exit_:
+        main([str(tmp_path), "--check"])
+
+    assert exit_.value.code == 1
+    assert not (tmp_path / "out/models.py").exists()
+
+
+def test_cli_refresh_spec_vendors_a_json_source_as_yaml_and_regenerates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec = "spec.yml"\nspec-source = "v2.json"'
+    )
+    codegen_project(tmp_path, config)
+    vendor = load_spec(SPEC)
+    paths = cast(dict[str, dict[str, object]], vendor["paths"])
+    del paths["/things/{name}"]["post"]
+    paths["/rows"] = paths["/things"]
+    (tmp_path / "v2.json").write_text(json.dumps(vendor))
+
+    main([str(tmp_path), "--refresh-spec"])
+
+    assert load_spec((tmp_path / "spec.yml").read_text()) == vendor
+    assert not (tmp_path / "spec.yml").read_text().startswith("{")
+    assert capsys.readouterr().out == "operationIds changed:\n- postThing\n"
+    assert "GET_THINGS" in (tmp_path / "out/operations.py").read_text()
+
+
+def test_cli_refresh_spec_needs_a_spec_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as exit_:
+        main([str(codegen_project(tmp_path)), "--refresh-spec"])
+
+    assert exit_.value.code == 2
+    assert "--refresh-spec needs spec and spec-source" in capsys.readouterr().err
+
+
+def test_cli_rejects_a_spec_source_without_a_vendored_spec(tmp_path: Path) -> None:
+    config = CODEGEN_CONFIG.replace(
+        'spec = "spec.yml"', 'spec-url = "https://x"\nspec-source = "y"'
+    )
+
+    with pytest.raises(ValidationError, match="spec-source"):
+        main([str(codegen_project(tmp_path, config))])

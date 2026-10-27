@@ -6,10 +6,13 @@ set -euo pipefail
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  printf 'worktree-up: pnpm is missing. Enter the nix dev shell, then re-run bash scripts/worktree-up.sh\n' >&2
-  exit 1
-fi
+for tool in pnpm uv; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    printf 'worktree-up: %s is missing. Enter the nix dev shell, then re-run bash scripts/worktree-up.sh\n' "$tool" >&2
+    exit 1
+  fi
+done
 
 pnpm install --frozen-lockfile
+uv run --locked poe install
 bash "$root/agentic/skill-management/install-skills.sh"

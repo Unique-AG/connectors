@@ -100,6 +100,7 @@ jobs:
     permissions:
       contents: read # to let the called workflow read the repository
       packages: read # to let the called workflow read the cache image from GHCR
+      pull-requests: read # to let the called workflow read the live security-exception label
     uses: ./.github/workflows/_template-containerize.yaml
     with:
       service-name: ${{ inputs.service-name }}

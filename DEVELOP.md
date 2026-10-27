@@ -60,22 +60,76 @@ Jobs that build images, scan images, or run Docker stay on `ubuntu-24.04`.
 ## Python Services
 
 Services that carry a `pyproject.toml` (`services/office-365-mcp`, ...) sit outside the pnpm/turbo
-workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the `[CI] Python` workflow runs:
+workspace and are driven by [uv](https://docs.astral.sh/uv/). For each selected service, the
+`[CI] Python` workflow runs `scripts/check-python-service.sh`, and you run the same script
+locally:
 
 ```bash
-pnpm install --frozen-lockfile          # from the repo root, for biome
-cd services/<service>
-uv sync --locked
-uv run ruff format --check . && uv run ruff check .
-pnpm exec biome check .
-uv run basedpyright
-uv run pytest
+pnpm install --frozen-lockfile          # once, from the repo root, for biome
+bash scripts/check-python-service.sh services/<service>
 ```
+
+In every Python service, `uv run poe ci` runs the same script, and `uv run poe` lists the task for
+each check. Each shared package under `packages/` has the same task names, and its `ci` runs that
+package's checks.
+
+From the repository root, `uv run poe` lists the tasks that cover every project under `packages/`
+and `services/` that has a `pyproject.toml`. Each project keeps its own `uv.lock` and `.venv`, so a
+new one needs no entry at the root:
+
+- `uv run poe install` runs `uv sync --locked` in every project. `scripts/worktree-up.sh` runs it
+  in a new worktree.
+- `uv run poe ci` runs `ci` in every project, and `uv run poe ci services/<service> ...` in the ones
+  named. `format`, `lint`, `lint-fix`, `fix`, `typecheck` and `test` run that task in every
+  project. Each lists at the end the projects it failed in.
+- `uv run poe lock` runs `uv lock` in every project, for a change to a shared package's
+  `pyproject.toml` that the projects using it by path have to pick up.
+
+#### One version of each package
+
+Every project resolves the same version of each package. A dependency pinned in several projects
+is pinned to the same version in each, and Dependabot's `group-by: dependency-name` bumps it in all
+of them in one pull request. Nothing makes the locks agree on the rest: a Dependabot security update
+bumps one project at a time, and a project that has a package only through another package keeps
+its version when a grouped bump passes it by. The `Report Python version drift` job of
+`[CI] Python` lists the packages two locks resolve to different versions, as a warning, and never
+fails, so it never holds up a Dependabot pull request. `uv run poe drift` prints the same list.
+
+To align them again, run `uv run poe upgrade` on a branch of its own. It runs `uv lock --upgrade`
+in every project at once, which moves each to the newest versions its pins allow, and then prints
+what still drifts. Raise the pin of a package that drifts because a project pins it lower, and
+take a package that one project caps, such as `cachetools`, which `unique-toolkit` keeps below 6,
+down to the capped version in the others with `uv lock --upgrade-package <name>==<version>` in
+each. Run `uv run poe ci` and open a pull request.
+
+It runs, in this order:
+
+1. `uv sync --locked`
+2. the generated-code drift checks, in a service that has a generator
+3. `uv run ruff format --check .` and `uv run ruff check .`
+4. `pnpm exec biome check .` and `uv run basedpyright`
+5. in a service whose `pyproject.toml` names `mcp-architecture` or has `[tool.importlinter]`, one
+   that keeps `packages/mcp-architecture/ARCHITECTURE.md`, `uv run lint-imports`, then
+   `uv run poe architecture`. `ARCHITECTURE.md` lists what each enforces
+6. `uv run pytest`
+
+Every check runs even after one fails, and the run ends with the list of those that failed, so one
+run shows all there is to fix. Each failure names the command that fixes it, such as
+`uv run ruff format .`. In GitHub Actions each check is a collapsible group of the log, a failure
+is an error annotation on the run, and a lint or type error is an annotation on its line. Each step
+is a plain `uv run` command, so you can also run one alone from the service's folder.
 
 Changes under `packages/mcp-credential-auth` run the same uv formatting, linting, type-checking,
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
-the shared-package consumers. `packages/mcp-openapi` works the same way.
+the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs`,
+`packages/mcp-observability` and `packages/mcp-architecture` work the same way.
+`packages/mcp-scaffold` also runs for a change to `packages/mcp-configs`,
+`packages/mcp-observability`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the
+MCPs its tests generate use all four: the last for an OpenAPI upstream. It runs as well for a change to a
+file it registers a new MCP in by matching its text: `.gitcommitizen`,
+`release-please-config.json`, `.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
+and for a change to the workflow files that list every service.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm
 chart inputs, on the same terms as a TypeScript service. See `AGENTS.md` for what biome excludes.

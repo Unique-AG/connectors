@@ -5,7 +5,6 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.activity_tags import ListActivityTagsResponse
@@ -17,9 +16,9 @@ from tests.helpers import (
     resource,
     tool_client,
 )
-from tests.server.tools.helpers import object_dict, tool_model, tool_payload
+from tests.server.tools.helpers import input_adapter, object_dict, tool_model, tool_payload
 
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_activity_tags))
+_INPUT = input_adapter(list_activity_tags)
 _FETCH_LOGGER = "backstop_mcp.features.activity_tags.activity_tags_service"
 
 _LIVE_TAG_ID = "9001"

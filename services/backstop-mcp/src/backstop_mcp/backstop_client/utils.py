@@ -9,10 +9,13 @@ import functools
 import logging
 import re
 from types import GenericAlias
-from typing import TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import httpx
 from pydantic import TypeAdapter, ValidationError
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
 
 from backstop_mcp.backstop_client.errors import (
     BackstopResponseSchemaError,
@@ -55,7 +58,7 @@ def adapter_for(schema: SchemaInput) -> TypeAdapter[object]:
     Accepts ordinary classes and parameterized generics (`BackstopApiResource[Attrs]`,
     `_Page[Record]`, `dict[str, object]`, …) so every call site can share one compiled adapter.
     """
-    return TypeAdapter(schema)
+    return TypeAdapter(cast("TypeForm[object]", schema))
 
 
 def deserialize(content: bytes, schema: SchemaInput, *, path: str) -> object:

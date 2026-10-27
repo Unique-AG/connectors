@@ -1,0 +1,68 @@
+{% set postgres = "postgres" in options.persistence %}
+{% set redis = "redis" in options.persistence %}
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import ClassVar
+
+{% if redis or options.auth %}
+from mcp_configs import from_environment
+{% endif %}
+from pydantic import BaseModel, ConfigDict, Field
+
+{% if options.auth %}
+from mcp_skeleton.persistence.auth import AuthStoreSettings, SqlAuthStore
+{% endif %}
+{% if postgres %}
+from mcp_skeleton.persistence.database import Database, DatabaseSettings, open_database
+{% endif %}
+{% if redis %}
+from mcp_skeleton.persistence.store import Store, StoreSettings, open_store
+{% endif %}
+{% if options.auth %}
+from mcp_skeleton.shared import AuthStore
+{% endif %}
+
+
+class PersistenceSettings(BaseModel):
+    """Each store reads its own settings from the environment."""
+
+{% if postgres %}
+{# PostgresSettings checks its own required settings at runtime. #}
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+{% endif %}
+{% if options.auth %}
+    auth: AuthStoreSettings = Field(default_factory=lambda: from_environment(AuthStoreSettings))
+{% endif %}
+{% if redis %}
+    store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
+{% endif %}
+
+
+class Persistence(BaseModel):
+    """What the contexts receive: every store the MCP owns, opened once by the server lifespan."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+{% if postgres %}
+    database: Database
+{% endif %}
+{% if redis %}
+    store: Store
+{% endif %}
+{% if options.auth %}
+    # What the sign-in keeps, in `database`.
+    auth: AuthStore
+{% endif %}
+
+
+@asynccontextmanager
+async def open_persistence(settings: PersistenceSettings) -> AsyncGenerator[Persistence]:
+    async with (
+{% if postgres %}
+        open_database(settings.database) as database,
+{% endif %}
+{% if redis %}
+        open_store(settings.store) as store,
+{% endif %}
+    ):
+        yield Persistence({{ [postgres and "database=database", redis and "store=store", options.auth and "auth=SqlAuthStore(database, settings.auth)"] | select | join(", ") }})

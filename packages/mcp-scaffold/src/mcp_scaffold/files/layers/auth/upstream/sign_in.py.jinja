@@ -1,0 +1,40 @@
+import httpx2
+{% if options.upstream == "openapi" %}
+from mcp_openapi.upstream import UpstreamError
+{% endif %}
+
+{% if options.upstream == "custom" %}
+from mcp_skeleton.upstream.client import UpstreamError
+{% endif %}
+from mcp_skeleton.shared import UpstreamCredentials
+from mcp_skeleton.upstream.credentials import auth_for
+from mcp_skeleton.upstream.settings import UpstreamSettings
+
+
+async def verify_credentials(
+    settings: UpstreamSettings,
+    credentials: UpstreamCredentials,
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> bool:
+    """Whether the upstream accepts `credentials`, asked at `settings.verify_path`.
+
+    Only a 2xx is a yes, and a 401 or 403 is a no. Anything else, a redirect to a login page
+    included, says nothing about the credentials, so it is an UpstreamError, and the user is asked
+    to try again rather than signed in.
+    """
+    async with httpx2.AsyncClient(
+        base_url=str(settings.api_url).rstrip("/"),
+        timeout=settings.timeout_seconds,
+        transport=transport,
+    ) as http:
+        try:
+            response = await http.get(settings.verify_path, auth=auth_for(credentials))
+        except httpx2.HTTPError as error:
+            raise UpstreamError(str(error) or type(error).__name__) from error
+    if response.status_code in {401, 403}:
+        return False
+    if not response.is_success:
+        raise UpstreamError(
+            f"{response.status_code} {response.reason_phrase} for GET {settings.verify_path}"
+        )
+    return True

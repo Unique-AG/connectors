@@ -13,7 +13,7 @@ PING = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
 
 
 @pytest.fixture
-def client(settings: Settings) -> Generator[TestClient, None, None]:
+def client(settings: Settings) -> Generator[TestClient]:
     async def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json={"data": []})
 

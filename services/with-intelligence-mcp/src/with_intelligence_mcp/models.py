@@ -1,4 +1,4 @@
-from typing import ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from pydantic import (
     BaseModel,
@@ -7,6 +7,9 @@ from pydantic import (
     TypeAdapter,
     model_serializer,
 )
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
 
 
 class OmitNoneModel(BaseModel):
@@ -24,7 +27,9 @@ class OmitNoneModel(BaseModel):
 
 
 def published_output_schema(annotation: object) -> dict[str, object]:
-    raw = cast("object", TypeAdapter(annotation).json_schema(mode="validation"))
+    raw = cast(
+        "object", TypeAdapter(cast("TypeForm[object]", annotation)).json_schema(mode="validation")
+    )
     assert isinstance(raw, dict)
     schema = {str(key): value for key, value in cast("dict[object, object]", raw).items()}
     if schema.get("type") == "object" or "properties" in schema:

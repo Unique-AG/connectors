@@ -5,7 +5,6 @@ import httpx
 import pytest
 import respx
 from fastmcp.server.dependencies import without_injected_parameters
-from pydantic import TypeAdapter
 from pydantic.fields import FieldInfo
 
 from backstop_mcp.features.contact_sources import ListContactSourcesResponse
@@ -18,9 +17,9 @@ from tests.helpers import (
     resource,
     tool_client,
 )
-from tests.server.tools.helpers import object_dict, tool_model, tool_payload
+from tests.server.tools.helpers import input_adapter, object_dict, tool_model, tool_payload
 
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(list_contact_sources))
+_INPUT = input_adapter(list_contact_sources)
 _FETCH_LOGGER = "backstop_mcp.features.contact_sources.queries.list_contact_sources_query"
 
 _LIVE_SOURCE_ID = "194859"
