@@ -272,7 +272,14 @@ pydantic's own, so a model must never be keyed by a name or another value.
 `ERROR_DETAILS_POLICY=disclose` keeps the message and full stack at ERROR. It is separate from
 `LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login.
 
-Each tool call also logs one completion line with its name, status, and duration.
+`ToolCallObservabilityMiddleware`, the outermost FastMCP middleware, logs `Tool call started`
+and exactly one of `Tool call completed`, `Tool call failed` or `Tool call cancelled` per call,
+with `tool`, `argument_names`, `subject` (our internal user id), `duration_ms` and the values the
+tool's `@trace_arguments` declared. A failure is logged at its level: WARNING when the caller or
+Backstop caused it, ERROR when a developer has to act; an exception class declares its own level
+with `DeclaresFailureLevel`. An invalid argument is named in `failed_fields` without its value.
+FastMCP's own per-call failure lines and `setup_ops`'s per-call line for a tool are dropped,
+because they repeat these and can quote the caller's input.
 
 ### Metrics
 
@@ -315,6 +322,28 @@ does, and loses `exception.message`; the status keeps its code and loses its des
 not judge whether the caller or a bug caused the failure. The SDK ignores `set_status` once a span
 has ended and offers no way to edit events, so the processor replaces the span's private `_status`
 and `_events`. An SDK upgrade can break it; `mcp-observability`'s tests catch that.
+
+What a span carries is declared on the code it describes, from `mcp_observability`:
+
+- `@trace_arguments("search_type", "party_id", "status")`, under `@tool`, puts those arguments on
+  the `tools/call <tool>` span as `tool.argument.<name>` and on the tool call's log lines. It
+  opens no span.
+- `@traced(arguments=("search_type", "entity_id"), result=lambda r: {"total": r.total})` on a
+  query or command `run` opens a child span named `<Class>.run`, with the arguments as
+  `input.<name>` and the result as `result.<name>`. On an exception the span gets status ERROR
+  and `error.type`, no message.
+- An argument is a name, or a dotted path into a pydantic input model (`"person.owner_login"`).
+  `identifying=` values (logins, names) are hashed through `identifiable_value`. Strings,
+  numbers, booleans, `Literal`s, enums (as their value), dates (ISO) and sequences of those may
+  be declared. Nothing is traced unless declared.
+- `create_app` calls `validate_trace_declarations()`: an unknown argument or field, an annotation
+  that does not resolve or a type that cannot go on a span crashes the app at startup, naming the
+  function, the path and the reason. A test runs the same check in CI.
+- A lambda (`arguments=lambda args: {...}`) is the escape hatch for a computed value. It is not
+  checked at startup or by the type checker.
+- Tracing never fails the call: a value that cannot go on the span is skipped with one WARNING
+  (`Trace attribute skipped`) naming the function and the argument, never the value. A path
+  through `None` is skipped silently.
 
 No log line is written to a span and no span is read by the logging. The only thing they share is
 `trace_id`, `span_id` and `trace_flags` on each log line, for correlation.

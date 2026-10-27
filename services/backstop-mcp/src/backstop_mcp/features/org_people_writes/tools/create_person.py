@@ -6,6 +6,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(CreatedPersonResponse),
 )
+@trace_arguments("person.category_ids", identifying=("person.owner_login",))
 async def create_person(
     person: Annotated[CreatePersonInput, Field(description=CREATE_PERSON_INPUT_DESCRIPTION)],
     create_person_command: CreatePersonCommand = Depends(get_create_person_command_factory),

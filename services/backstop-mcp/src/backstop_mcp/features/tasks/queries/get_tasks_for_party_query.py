@@ -8,6 +8,8 @@ filterable; open vs completed is applied after the walk.
 import logging
 from typing import Literal
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.entity_types import SearchType, map_search_type_to_resource_type_bean
 from backstop_mcp.features.tasks.api_responses import TaskAttributes
@@ -32,6 +34,10 @@ class GetTasksForPartyQuery:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("search_type", "entity_id", "status"),
+        result=lambda tasks: {"total": tasks.total, "returned": len(tasks.tasks)},
+    )
     async def run(
         self,
         *,
