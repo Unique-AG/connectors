@@ -321,6 +321,15 @@ where the behaviour looks wrong, there is no scenario. These questions need an o
 - An answer that cannot be read (a 200 with an HTML page) gets the advice for an unreachable
   service: retry once. Is that wanted for a permanent fault? The outlines named "an answer that
   nobody can read" state today's behaviour and change with the answer.
+- A 2xx answer that is cut off or empty gives the assistant the text of the parser or of an assertion,
+  for example "Expecting ':' delimiter" or "Graph answered a message listing with no collection". The
+  text has no advice. For a write, a 2xx means that Microsoft made the change, but the text does not
+  say so. `outlook_draft_mail` gives "gave no id" or the parser text, and the assistant may make a
+  second draft. An HTML page in a 2xx gets the text of an unknown outcome. Which text is wanted for
+  the other cases? Measured on `outlook_list_mail` and `outlook_draft_mail`.
+- A listing with `"value": "text"`, `"value": null`, or fields of the wrong type gives a success with
+  no message, and the unread count of the folder still shows 1. Mia can hear that she has no mail.
+  Should the tool refuse this answer? Measured on `outlook_list_mail` only.
 - A read waits out up to 3 tries of the retry handler, and each try waits the time that Microsoft
   asks. The total is about 90 to 270 seconds. The tool limit of node-chat is 60 seconds, so Mia may
   see a timeout and never the advice. What is the wanted limit?

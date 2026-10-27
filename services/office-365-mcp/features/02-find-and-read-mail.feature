@@ -247,6 +247,7 @@ Feature: Finding and reading mail
         | refuses the search words as not valid                       | that Microsoft refused the search, and why                    |
         | stays busy at every try and asks to wait 30 seconds each time | that the search can run again after 30 seconds              |
         | cannot answer at every try and asks to wait 90 seconds each time | that the search can run again after 90 seconds           |
+        | stays busy at every try and gives no wait time               | that Microsoft is limiting the search, and that she must wait before it runs again |
 
     @unhappy @uc-02-32
     Scenario: One busy answer from Microsoft is waited out before a search

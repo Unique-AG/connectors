@@ -14,7 +14,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 | OneNote | 0 | 1 | 1 | 57 | 59 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
-Scenarios with an executable run: 15 of 547.
+Scenarios with an executable run: 19 of 547.
 
 ## Happy and unhappy paths by surface
 

@@ -390,6 +390,7 @@ Cases:
 - Microsoft refuses the search words as not valid. The assistant tells Mia that Microsoft refused the search, and why. It does not tell Mia that no message matches.
 - Microsoft stays busy at every try and asks to wait 30 seconds each time. The assistant tells Mia that the search can run again after 30 seconds. It does not tell Mia that no message matches.
 - Microsoft cannot answer at every try and asks to wait 90 seconds each time. The assistant tells Mia that the search can run again after 90 seconds. It does not tell Mia that no message matches.
+- Microsoft stays busy at every try and gives no wait time. The assistant tells Mia that Microsoft is limiting the search, and that she must wait before it runs again. It does not tell Mia that no message matches.
 
 **One busy answer from Microsoft is waited out before a search**
 

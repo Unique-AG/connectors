@@ -323,9 +323,25 @@ uc-04-26:
   chain:
     - tool: outlook_draft_mail
       args: {to: [anna.meier@example.com], subject: Contract, body_html: request for the contract by Friday}
+      expect:
+        tool_error: {shared.seam._outcome_unknown: [tools.outlook_draft_mail.CHANGE_SHOWN_BY]}
+        graph_calls: {POST /v1.0/me/messages: 1}
     - tool: outlook_list_mail
       args: {folder: drafts}
+      expect:
+        result: {messages: []}
+        graph_calls: {GET /v1.0/me/mailFolders/drafts: 1, GET /v1.0/me/mailFolders/drafts/messages: 1}
   note: "expected behaviour from shared/seam.py:451-470: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:207), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
+  variants:
+    fails:
+      cassette: uc-04-26
+      1: {fault: {graph: {status: 500, body: error.generalException.json}}}
+    no-answer-in-time:
+      cassette: uc-04-26
+      1: {fault: {transport: timeout}}
+    unreadable:
+      cassette: uc-04-26
+      1: {fault: {graph: {status: 201, headers: {Content-Type: text/html}, body: page.notData.html}}}
 
 uc-04-27:
   status: untested

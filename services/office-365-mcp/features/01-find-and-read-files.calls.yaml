@@ -288,6 +288,78 @@ uc-01-19:
       args: {convert_to: pdf}
       uses: {file: same handle as the first read}
   note: "expected behaviour for every row from shared/seam.py:546-553 (sharepoint_read_file is read only): retry once. Internal error and no answer in time come from graph_client/errors.py:218-227 and 238-247 and map to the same advice. An incomplete file comes from graph_client/download.py:121-131 (GraphUnavailable) and maps to the same advice."
+  variants:
+    fails-with-an-internal-error:
+      cassette: uc-01-19
+      1:
+        bind: {query: Brightway Launch Plan}
+      2:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        fault: {at: GET */content, graph: {status: 500, body: error.generalException.json}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
+              permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+      3:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        expect:
+          result: {"content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document}
+          graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
+    no-answer-in-time:
+      cassette: uc-01-19
+      1:
+        bind: {query: Brightway Launch Plan}
+      2:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        fault: {at: GET */content, transport: timeout}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
+              permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+      3:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        expect:
+          result: {"content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document}
+          graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
+
+    stops-before-the-end:
+      cassette: uc-01-19-short
+      1:
+        bind: {query: Brightway Launch Plan}
+      2:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        fault: {at: GET */download.aspx, graph: {status: 200, headers: {content-length: "24576"}, body: agreement.docx}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
+              permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+      3:
+        args: {}
+        bind: {file: "$1.files[0].uri"}
+        expect:
+          result: {"content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document}
+          graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
+
 
 uc-01-20:
   status: untested

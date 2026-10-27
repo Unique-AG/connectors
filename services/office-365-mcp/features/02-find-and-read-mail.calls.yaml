@@ -212,7 +212,9 @@ uc-02-17:
     valid, seam.py:579-584, a bad request that fails the same way, with the reason that Microsoft
     gives. Busy, seam.py:509-513, left alone for 30 seconds, retry after that and not sooner. Cannot
     answer now with a wait of 90 seconds, seam.py:514-518, retry after that and not sooner, and not
-    in a loop. The two waiting rows reach the assistant only when every try is busy: the search is
+    in a loop. No wait time, seam.py:503-508, wait before retrying and not in a loop; the SDK
+    waits a random time of about 4 seconds between tries then, so the run checks the 4 tries and not the
+    waits. The waiting rows reach the assistant only when every try is busy: the search is
     a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342,
     config.py:126), and the variant busy gives 4 busy answers. One busy answer is uc-02-32. OPEN: 4
     busy answers in a row take about 90 s (about 270 s at a wait of 90 seconds), longer than the 60 s
@@ -233,6 +235,20 @@ uc-02-17:
               forbidden: null
           graph_calls: {GET /v1.0/me/messages: 4}
           retry_sleeps: [30.0, 30.0, 30.0]
+    busy-without-a-wait-time:
+      cassette: uc-02-17
+      1:
+        fault: {graph: {status: 429, body: error.TooManyRequests.json}, times: 4}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphThrottled: {message: "", status: 429, code: null, request_id: null, retry_after_seconds: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 4}
 
 uc-02-18:
   status: untested
@@ -249,6 +265,61 @@ uc-02-18:
     reach or that failed internally, retry once. All three Examples rows give that one advice. A
     status of 500 or more, graph_client/errors.py:332-335. A timeout or lost connection,
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
+  variants:
+    fails-on-its-side:
+      cassette: uc-02-18
+      1:
+        fault: {graph: {status: 500, body: error.generalException.json}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 1}
+      2:
+        expect:
+          result: {"messages[0].subject": "Lunch on Friday?"}
+          graph_calls: {GET /v1.0/me/messages: 1, POST /v1.0/me/translateExchangeIds: 1}
+    no-answer-in-time:
+      cassette: uc-02-18
+      1:
+        fault: {transport: timeout}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 1}
+      2:
+        expect:
+          result: {"messages[0].subject": "Lunch on Friday?"}
+          graph_calls: {GET /v1.0/me/messages: 1, POST /v1.0/me/translateExchangeIds: 1}
+    unreadable:
+      cassette: uc-02-18
+      1:
+        fault: {graph: {status: 502, headers: {Content-Type: text/html}, body: page.badGateway.html}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: 502, code: null, request_id: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 1}
+      2:
+        expect:
+          result: {"messages[0].subject": "Lunch on Friday?"}
+          graph_calls: {GET /v1.0/me/messages: 1, POST /v1.0/me/translateExchangeIds: 1}
 
 uc-02-19:
   status: untested
@@ -263,6 +334,33 @@ uc-02-19:
   note: >-
     Expected behaviour from shared/seam.py:549-553, if it fails again the same way, stop and
     report it. The assistant calls the search twice and no third time.
+  variants:
+    fails-twice:
+      cassette: uc-02-17
+      1:
+        fault: {graph: {status: 500, body: error.generalException.json}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 1}
+      2:
+        fault: {graph: {status: 500, body: error.generalException.json}}
+        expect:
+          tool_error:
+            shared.seam._remedy:
+              failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
+              permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
+              not_found: null
+              repeatable: true
+              shown_by: []
+              forbidden: null
+          graph_calls: {GET /v1.0/me/messages: 1}
 
 uc-02-20:
   status: untested

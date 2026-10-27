@@ -1,0 +1,70 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "Brightway Launch Plan"
+          },
+          "size": 25
+        }
+      ]
+    },
+    "status": 200,
+    "body": "search.launch-plan.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNPLAN",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "body": "drive.item.launch-plan.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNPLAN",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "body": "drive.item.launch-plan.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNPLAN/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso.sharepoint.com/sites/Sales/_layouts/15/download.aspx?UniqueId=RUNPLAN-0001"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso.sharepoint.com",
+    "path": "/sites/Sales/_layouts/15/download.aspx",
+    "query": {
+      "UniqueId": "RUNPLAN-0001"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    "body": "agreement.docx"
+  }
+]
