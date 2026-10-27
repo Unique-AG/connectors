@@ -38,12 +38,25 @@ sequenceDiagram
   GH->>Cur: Event: Pull request opened
   Cur->>Agent: Start mode pr for this PR
   Agent->>GH: Read the PR and its labels
-  Agent->>CI: Wait for the checks, 45 minutes at most
-  CI-->>Agent: Green or red
-  Agent->>GH: Fix a red CI, 2 attempts at most
-  Agent->>GH: Post one report comment and add ai-assisted
-  Agent->>Slack: One message for the PR
-  Person->>GH: Read the report and merge
+  alt No label dependencies, or the label ai-assisted or human-required
+    Agent-->>Cur: Stop with no change
+  else A dependency PR with no result yet
+    Agent->>CI: Wait for the checks, 45 minutes at most
+    CI-->>Agent: Green or red
+    loop While a check is red and the bump caused it, 2 attempts at most
+      Agent->>GH: Push a fix to the PR branch
+      GH->>CI: Run the checks again
+      CI-->>Agent: Green or red
+    end
+    Agent->>GH: Post one report comment and add ai-assisted
+    Agent->>Slack: One message for the PR
+    alt Safe to merge
+      Person->>GH: Read the report and merge
+    else Gap, do not merge, or still red
+      Agent->>GH: Add human-required and the Hand-off section
+      Person->>GH: Log the Jira ticket and finish the work
+    end
+  end
 ```
 
 | Step | Who | What happens |
@@ -103,6 +116,18 @@ flowchart TD
 Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A handled PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
 
 To ignore a dependency for good, add a pin. The job lists a pinned dependency in "Needs a person" and does not move it.
+
+## Rebase a PR yourself
+
+Do not close a PR to get a rebuild. A closed PR skips that version. Use one of these ways.
+
+| What you want | What to do |
+|---|---|
+| Update the branch from `main` and keep the commits | Click "Update branch" in the PR, or run `gh pr update-branch <number>`. This merges `main` into the branch. |
+| Update the branch by a rebase | Run `gh pr update-branch <number> --rebase`. This rewrites the branch. |
+| Fix a conflict in a lock file | Check out the PR and merge or rebase `main`. Regenerate the lock file with `pnpm install --lockfile-only` or `uv lock`. Never edit it by hand. After a rebase, push with `git push --force-with-lease`. |
+| Rebuild the PR from `main` and drop every commit on it | Remove the labels `ai-assisted` and `human-required`. The next nightly run rebuilds the branch. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open up to 5 new PRs. Then run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
+| Keep your own commits on a PR | Add the label `human-required`. The job rebuilds a PR that has no label, and this drops your commits. |
 
 ## Each day
 
