@@ -51,15 +51,18 @@ If the dependency review blocks your PR, raise the version of the dependency you
 
 The policy needs written approval from the engineering council for a new dependency with a known critical or high vulnerability.
 
-## Dependabot
+## Not covered by the nightly job
 
-Dependabot version updates cover GitHub Actions, Docker, and Terraform. Dependabot security updates stay on for every ecosystem. Dependabot also opens an alert when a new advisory appears for a version on `main`. The nightly job clears most alerts with its next PR.
+The nightly job updates npm and Python. No bot updates GitHub Actions, Docker base images, or Terraform. A person updates them.
+
+- **GitHub Actions:** raise the pinned commit and keep the version comment. The pinned-actions check keeps the pins valid.
+- **Docker base images:** raise the digest in the Dockerfile. The change starts a release for that service.
+- **Terraform:** raise the provider or module version in the service folder.
 
 | File | What it holds |
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
 | `.github/workflows/deps-ci-label.yaml` | The job that sets `deps-ci-failed` |
 | `agentic/skills/deps-ci-fix/SKILL.md` | The skill that fixes a red dependency PR |
-| `.github/dependabot.yaml` | Dependabot for Actions, Docker, and Terraform |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
 | `agentic/skills/dependency-pr-review/SKILL.md` | The skill that reviews a dependency PR |
