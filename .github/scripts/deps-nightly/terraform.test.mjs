@@ -1,6 +1,13 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { createTerraformLookup, parseProviders, planTerraform, satisfies } from './terraform.mjs';
+import {
+  applyTerraform,
+  createTerraformLookup,
+  parseProviders,
+  planTerraform,
+  retargetConstraint,
+  satisfies,
+} from './terraform.mjs';
 
 const NOW = Date.parse('2026-10-27T00:00:00Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -134,7 +141,7 @@ describe('planTerraform', () => {
         time: '~> 0.12',
       }),
     };
-    assert.deepStrictEqual(await run(files, lookup), { needsPerson: [] });
+    assert.deepStrictEqual(await run(files, lookup), { candidates: [], needsPerson: [] });
     assert.deepStrictEqual(lookup.calls.sort(), [
       'hashicorp/terraform',
       'hashicorp/terraform-provider-azurerm',
@@ -142,19 +149,22 @@ describe('planTerraform', () => {
     ]);
   });
 
-  it('reports a provider whose newest eligible release is outside the constraint', async () => {
+  it('proposes a pull request for a provider whose newest eligible release is outside the constraint', async () => {
     const files = {
       'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', { azurerm: '~> 3' }),
     };
     assert.deepStrictEqual(await run(files, lookupOf()), {
-      needsPerson: [
+      candidates: [
         {
           ecosystem: 'terraform',
           name: 'azurerm',
-          reason:
-            'The newest release of azurerm is 4.9.0. It is outside "~> 3" in services/a/deploy/terraform/x.',
+          from: '~> 3',
+          to: '4.9.0',
+          direct: true,
+          data: { major: true },
         },
       ],
+      needsPerson: [],
     });
   });
 
@@ -162,14 +172,15 @@ describe('planTerraform', () => {
     const files = {
       'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', { azurerm: '< 5' }),
     };
-    assert.deepStrictEqual(await run(files, lookupOf()), { needsPerson: [] });
+    assert.deepStrictEqual(await run(files, lookupOf()), { candidates: [], needsPerson: [] });
   });
 
   it('reports the core version when it is outside required_version', async () => {
     const files = {
       'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 0.14', {}),
     };
-    const { needsPerson } = await run(files, lookupOf());
+    const { candidates, needsPerson } = await run(files, lookupOf());
+    assert.deepStrictEqual(candidates, []);
     assert.deepStrictEqual(
       needsPerson.map(({ name, reason }) => [name, reason]),
       [
@@ -187,12 +198,10 @@ describe('planTerraform', () => {
       'services/b/deploy/terraform/y/versions.tf': versionsTf('~> 1.10', { azurerm: '~> 3' }),
       'services/c/deploy/terraform/z/versions.tf': versionsTf('~> 1.10', { azurerm: '>= 4, < 6' }),
     };
-    const { needsPerson } = await run(files, lookupOf());
-    assert.strictEqual(needsPerson.length, 1);
-    assert.strictEqual(
-      needsPerson[0].reason,
-      'The newest release of azurerm is 4.9.0. It is outside "~> 3" in services/a/deploy/terraform/x, services/b/deploy/terraform/y.',
-    );
+    const { candidates, needsPerson } = await run(files, lookupOf());
+    assert.deepStrictEqual(needsPerson, []);
+    assert.strictEqual(candidates.length, 1);
+    assert.strictEqual(candidates[0].from, '~> 3');
   });
 
   it('reports a failed lookup and still checks the others', async () => {
@@ -203,14 +212,72 @@ describe('planTerraform', () => {
       }),
     };
     const lookup = lookupOf({ 'hashicorp/terraform-provider-time': new Error('boom') });
-    const { needsPerson } = await run(files, lookup);
-    assert.deepStrictEqual(needsPerson.map(({ name, reason }) => [name, reason]).sort(), [
-      [
-        'azurerm',
-        'The newest release of azurerm is 4.9.0. It is outside "~> 3" in services/a/deploy/terraform/x.',
-      ],
-      ['time', 'The release lookup failed.'],
+    const { candidates, needsPerson } = await run(files, lookup);
+    assert.deepStrictEqual(
+      candidates.map(({ name, to }) => [name, to]),
+      [['azurerm', '4.9.0']],
+    );
+    assert.deepStrictEqual(
+      needsPerson.map(({ name, reason }) => [name, reason]),
+      [['time', 'The release lookup failed.']],
+    );
+  });
+});
+
+describe('retargetConstraint', () => {
+  for (const [constraint, version, expected] of [
+    ['~> 3', '4.9.0', '~> 4'],
+    ['~> 0.12', '1.0.0', '~> 1.0'],
+    ['~> 0.12', '0.13.1', '~> 0.12'],
+    ['~> 1.2.3', '1.3.4', '~> 1.3.4'],
+    ['>= 4, < 6', '7.1.0', '>= 4, < 8'],
+    ['>= 4, < 6', '6.0.0', '>= 4, < 7'],
+    ['< 6.2', '7.1.3', '< 7.2'],
+    ['<= 4', '4.0.1', '<= 4.0.1'],
+    ['= 1.2.3', '1.2.4', '= 1.2.4'],
+    ['1.2.3', '1.2.4', '1.2.4'],
+    ['>= 4, < 6', '5.0.0', '>= 4, < 6'],
+  ]) {
+    it(`${constraint} fits ${version} as ${expected}`, () => {
+      assert.strictEqual(retargetConstraint(constraint, version), expected);
+    });
+  }
+
+  it('throws when the constraint excludes the version and cannot widen', () => {
+    assert.throws(() => retargetConstraint('!= 1.2.3', '1.2.3'), /Cannot fit 1\.2\.3/);
+  });
+});
+
+describe('applyTerraform', () => {
+  const files = {
+    'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', {
+      azurerm: '~> 3',
+      time: '~> 0.12',
+    }),
+    'services/b/deploy/terraform/y/versions.tf': versionsTf('~> 1.10', { azurerm: '>= 4, < 6' }),
+    'services/c/deploy/terraform/z/versions.tf': versionsTf('~> 1.10', { random: '~> 3' }),
+  };
+
+  it('changes only the named provider, in the files that need it', () => {
+    const changed = applyTerraform(files, { name: 'azurerm', to: '4.9.0' });
+    assert.deepStrictEqual(Object.keys(changed), ['services/a/deploy/terraform/x/versions.tf']);
+    const text = changed['services/a/deploy/terraform/x/versions.tf'];
+    assert.match(text, /azurerm = \{\n\s+source\s+= "hashicorp\/azurerm"\n\s+version = "~> 4"/);
+    assert.match(text, /version = "~> 0\.12"/);
+    assert.match(text, /required_version = "~> 1\.10"/);
+  });
+
+  it('widens a range in every folder when the release is outside it', () => {
+    const changed = applyTerraform(files, { name: 'azurerm', to: '7.0.0' });
+    assert.deepStrictEqual(Object.keys(changed).sort(), [
+      'services/a/deploy/terraform/x/versions.tf',
+      'services/b/deploy/terraform/y/versions.tf',
     ]);
+    assert.match(changed['services/b/deploy/terraform/y/versions.tf'], /version = ">= 4, < 8"/);
+  });
+
+  it('returns nothing when no file names the provider', () => {
+    assert.deepStrictEqual(applyTerraform(files, { name: 'google', to: '9.0.0' }), {});
   });
 });
 

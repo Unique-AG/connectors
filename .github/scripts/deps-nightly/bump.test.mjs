@@ -112,6 +112,25 @@ describe('renderBody', () => {
     assert.match(body, /None\. Only the lock file changed\./);
   });
 
+  it('describes a Terraform constraint change', () => {
+    const entry = {
+      ecosystem: 'terraform',
+      name: 'azurerm',
+      isGroup: false,
+      members: [{ name: 'azurerm', from: '~> 3', to: '4.9.0', direct: true, data: { major: true } }],
+    };
+    const body = renderBody({
+      entry,
+      changes: [{ name: 'azurerm', from: ['~> 3'], to: ['4.9.0'] }],
+      projects: ['services/a/deploy/terraform/x/versions.tf'],
+      cooldownDays: 3,
+    });
+    assert.match(body, /changes the version constraint of the provider `azurerm` from `~> 3`/);
+    assert.match(body, /release `4\.9\.0` fits/);
+    assert.match(body, /This is a major bump/);
+    assert.match(body, /Files that changed/);
+  });
+
   it('cuts a long list', () => {
     const many = Array.from({ length: 105 }, (_, index) => ({
       name: `p${index}`,

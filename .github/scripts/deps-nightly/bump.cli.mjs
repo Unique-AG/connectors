@@ -22,11 +22,13 @@ import {
   DOCKERFILES,
   readFiles,
   releaseAge,
+  TERRAFORM_FILES,
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
 import { run, runOrThrow } from './run.mjs';
 import { commitScope } from './scope.mjs';
+import { applyTerraform } from './terraform.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const entry = JSON.parse(process.env.ENTRY);
@@ -109,6 +111,7 @@ const bumpers = {
   uv: bumpUv,
   actions: () => bumpTextFiles(ACTION_FILES, applyActions),
   docker: () => bumpTextFiles(DOCKERFILES, applyDocker),
+  terraform: () => bumpTextFiles(TERRAFORM_FILES, applyTerraform),
 };
 assert.ok(entry.ecosystem in bumpers, `Unknown ecosystem ${entry.ecosystem}`);
 const { changes, projects } = bumpers[entry.ecosystem]();

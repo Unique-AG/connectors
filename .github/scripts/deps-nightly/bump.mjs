@@ -45,7 +45,9 @@ function listed(lines) {
 export function renderBody({ entry, changes, projects, cooldownDays }) {
   const intro = entry.isGroup
     ? `This pull request bumps the \`${entry.name}\` group. It holds ${entry.members.length} packages that move together.`
-    : `This pull request bumps \`${entry.name}\` from ${entry.members[0].from} to ${entry.members[0].to}.`;
+    : entry.ecosystem === 'terraform'
+      ? `This pull request changes the version constraint of the provider \`${entry.name}\` from \`${entry.members[0].from}\`, so that the release \`${entry.members[0].to}\` fits.`
+      : `This pull request bumps \`${entry.name}\` from ${entry.members[0].from} to ${entry.members[0].to}.`;
   const changeLines = [
     ...new Set(
       changes.map(

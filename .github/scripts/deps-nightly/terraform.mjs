@@ -62,6 +62,64 @@ export function satisfies(version, constraint) {
   return constraint.split(',').every((part) => satisfiesPart(version, part));
 }
 
+const PART_TEXT = /^(\s*(?:~>|>=|<=|!=|>|<|=)?\s*)(\d+(?:\.\d+)*)(\s*)$/;
+
+function retargetPart(part, version) {
+  if (satisfiesPart(version, part)) {
+    return part;
+  }
+  const [, prefix, limit, suffix] = PART_TEXT.exec(part);
+  const operator = /^\s*(~>|<=|<|=)?/.exec(prefix)[1] ?? '=';
+  const count = limit.split('.').length;
+  const release = version.split('.').map(Number);
+  const leading = Array.from({ length: count }, (_, index) => release[index] ?? 0);
+  switch (operator) {
+    case '~>':
+      return `${prefix}${leading.join('.')}${suffix}`;
+    case '<':
+      return `${prefix}${[...leading.slice(0, -1), leading.at(-1) + 1].join('.')}${suffix}`;
+    default:
+      return `${prefix}${version}${suffix}`;
+  }
+}
+
+export function retargetConstraint(constraint, version) {
+  const result = constraint
+    .split(',')
+    .map((part) => retargetPart(part, version))
+    .join(',');
+  assert.ok(satisfies(version, result), `Cannot fit ${version} into "${constraint}".`);
+  return result;
+}
+
+function applyToText(text, name, version) {
+  const opening = /required_providers\s*\{/.exec(text);
+  if (!opening) {
+    return text;
+  }
+  const start = opening.index + opening[0].length;
+  const body = blockBody(text, start);
+  const entry = new RegExp(`(\\b${name}\\s*=\\s*\\{[^{}]*?version\\s*=\\s*")([^"]+)(")`).exec(body);
+  if (!entry) {
+    return text;
+  }
+  const updated =
+    body.slice(0, entry.index) +
+    entry[1] +
+    retargetConstraint(entry[2], version) +
+    entry[3] +
+    body.slice(entry.index + entry[0].length);
+  return text.slice(0, start) + updated + text.slice(start + body.length);
+}
+
+export function applyTerraform(files, { name, to }) {
+  return Object.fromEntries(
+    Object.entries(files)
+      .map(([path, text]) => [path, applyToText(text, name, to)])
+      .filter(([path, text]) => text !== files[path]),
+  );
+}
+
 function usagesByRepo(files) {
   const usages = new Map();
   const add = (repo, name, constraint, folder) =>
@@ -96,17 +154,37 @@ async function checkRepo(repo, usages, lookup, cutoff) {
       ({ tag, publishedAt }) => isStable(tag) && Date.parse(publishedAt) <= cutoff,
     );
     if (eligible.length === 0) {
-      return [];
+      return {};
     }
     const newest = eligible.reduce((best, release) =>
       compareVersions(release.tag, best.tag) > 0 ? release : best,
     ).tag;
     const violations = usages.filter(({ constraint }) => !satisfies(newest, constraint));
-    return violations.length > 0
-      ? [{ ecosystem: 'terraform', name, reason: describeViolations(name, newest, violations) }]
-      : [];
+    if (violations.length === 0) {
+      return {};
+    }
+    if (repo === CORE_REPO) {
+      return {
+        needsPerson: {
+          ecosystem: 'terraform',
+          name,
+          reason: describeViolations(name, newest, violations),
+        },
+      };
+    }
+    violations.forEach(({ constraint }) => retargetConstraint(constraint, newest));
+    return {
+      candidate: {
+        ecosystem: 'terraform',
+        name,
+        from: [...new Set(violations.map(({ constraint }) => constraint))].join(' and '),
+        to: newest,
+        direct: true,
+        data: { major: true },
+      },
+    };
   } catch {
-    return [{ ecosystem: 'terraform', name, reason: 'The release lookup failed.' }];
+    return { needsPerson: { ecosystem: 'terraform', name, reason: 'The release lookup failed.' } };
   }
 }
 
@@ -115,7 +193,10 @@ export async function planTerraform({ files, lookup, now, cooldownDays }) {
   const checks = await Promise.all(
     [...usagesByRepo(files)].map(([repo, usages]) => checkRepo(repo, usages, lookup, cutoff)),
   );
-  return { needsPerson: checks.flat() };
+  return {
+    candidates: checks.flatMap(({ candidate }) => candidate ?? []),
+    needsPerson: checks.flatMap(({ needsPerson }) => needsPerson ?? []),
+  };
 }
 
 export function createTerraformLookup(token, fetchImpl = fetch) {

@@ -137,7 +137,13 @@ const patchTitles = openPullRequests
   .filter(({ labels }) => labels.some(({ name }) => name === 'vulna-squash'))
   .map(({ title }) => title);
 const plan = buildPlan({
-  candidates: [...npm.candidates, ...uv.candidates, ...actions.candidates, ...docker.candidates],
+  candidates: [
+    ...npm.candidates,
+    ...uv.candidates,
+    ...actions.candidates,
+    ...docker.candidates,
+    ...terraform.candidates,
+  ],
   needsPerson: [
     ...npm.needsPerson,
     ...uv.needsPerson,
