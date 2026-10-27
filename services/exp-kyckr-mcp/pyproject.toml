@@ -3,7 +3,7 @@ name = "kyckr-mcp"
 version = "0.1.0"
 description = "Experimental Kyckr MCP built on a vendored copy of the Companies V2 OpenAPI spec"
 classifiers = ["Development Status :: 3 - Alpha"]
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastmcp==4.1.0",
     "httpx2==2.13.1",
@@ -46,7 +46,7 @@ ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -58,7 +58,7 @@ extend-immutable-calls = ["fastmcp.dependencies.Depends", "fastmcp.dependencies.
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "recommended"
 include = ["src"]
 reportMissingTypeStubs = "none"

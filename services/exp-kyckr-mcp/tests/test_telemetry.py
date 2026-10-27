@@ -18,7 +18,7 @@ LITE = {"method": "GET", "path": "/companies/:kyckrId/lite"}
 
 
 @pytest.fixture(scope="module")
-def spans() -> Generator[InMemorySpanExporter, None, None]:
+def spans() -> Generator[InMemorySpanExporter]:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))

@@ -2,7 +2,7 @@
 name = "mcp-configs"
 version = "0.1.0"
 description = "The settings every Python MCP server reads, with the defaults we always use: server, Postgres, Redis, Zitadel, upstream retries, logging and elicitation"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.13,<3",
     "pydantic-settings>=2.15,<3",
@@ -39,7 +39,7 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -51,7 +51,7 @@ ban-relative-imports = "all"
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests"]
 reportMissingTypeStubs = false

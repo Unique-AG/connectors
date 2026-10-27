@@ -2,7 +2,7 @@
 name = "mcp-openapi"
 version = "0.1.0"
 description = "Shared building blocks for MCP servers generated from an OpenAPI spec with FastMCP"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastmcp>=4.1,<5",
     "httpx2>=2.13,<3",
@@ -57,7 +57,7 @@ pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -66,7 +66,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "all"
 include = ["src", "tests"]
 reportMissingTypeStubs = false

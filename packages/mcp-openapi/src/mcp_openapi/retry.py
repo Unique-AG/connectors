@@ -86,7 +86,7 @@ def _retry_after_seconds(response: httpx2.Response) -> float | None:
         pass
     try:
         when = parsedate_to_datetime(value)
-    except (TypeError, ValueError, IndexError):
+    except TypeError, ValueError, IndexError:
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
