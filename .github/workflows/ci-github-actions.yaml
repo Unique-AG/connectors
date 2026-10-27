@@ -1,0 +1,32 @@
+name: "[CI] GitHub Actions"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/ci-github-actions.yaml"
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: ci-github-actions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test composite actions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Run action unit tests
+        run: node --test .github/actions/container-image-vuln-gate/*.test.mjs .github/actions/pull-request-labels/*.test.mjs
