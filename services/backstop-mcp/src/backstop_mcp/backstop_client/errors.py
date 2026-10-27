@@ -19,10 +19,11 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Literal, cast
+from typing import ClassVar, Literal, cast
 
 import httpx
 from fastmcp.exceptions import ToolError
+from mcp_observability import FAILED_FIELDS_SHOWN, DeclaresFailureLevel, failed_fields
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -129,36 +130,55 @@ def _flag_from_http_request() -> _SessionRevokedFlag | None:
     return boxed if isinstance(boxed, _SessionRevokedFlag) else None
 
 
-class BackstopAuthError(Exception):
+class BackstopAuthError(Exception, DeclaresFailureLevel):
     """Raised when Backstop rejects the stored credential (401) while calling a real endpoint.
+
+    WARNING: a rejected credential is an ordinary outcome, not a bug in this service.
 
     Login-form verification catches this (a failed `/system-info` probe). Mid-session 401s
     re-check first and then raise `BackstopTransientAuthError` or `BackstopSessionRevokedError`
     instead of this base type, so a single 401 cannot log the user out.
     """
 
+    failure_level: ClassVar[int] = logging.WARNING
 
-class BackstopTransientAuthError(ToolError):
+
+class BackstopTransientAuthError(ToolError, DeclaresFailureLevel):
     """Mid-session 401 that re-verified as still valid. Session kept; the client should retry."""
+
+    failure_level: ClassVar[int] = logging.WARNING
 
 
 class BackstopSessionRevokedError(BackstopAuthError):
-    """Credential confirmed dead and MCP tokens revoked. The HTTP layer turns this into 401."""
+    """Credential confirmed dead and MCP tokens revoked. The HTTP layer turns this into 401.
+
+    INFO: the service did what it should, revoke and ask the client to reconnect.
+    """
+
+    failure_level: ClassVar[int] = logging.INFO
 
     def __init__(self) -> None:
         mark_mcp_session_revoked()
         super().__init__("Backstop rejected the stored credential — please reconnect.")
 
 
-class BackstopUnreachableError(Exception):
+class BackstopUnreachableError(Exception, DeclaresFailureLevel):
     """Credential check got any status other than 401/403, or the network failed.
 
     Distinct from invalid credentials — the caller should retry rather than blame the token.
+    WARNING: Backstop or the network caused it.
     """
 
+    failure_level: ClassVar[int] = logging.WARNING
 
-class BackstopApiError(ToolError):
-    """Raised for a Backstop 4xx/5xx response, carrying the JSON:API error(s) verbatim."""
+
+class BackstopApiError(ToolError, DeclaresFailureLevel):
+    """Raised for a Backstop 4xx/5xx response, carrying the JSON:API error(s) verbatim.
+
+    WARNING: Backstop answered; the caller's input or Backstop itself caused it.
+    """
+
+    failure_level: ClassVar[int] = logging.WARNING
 
     status_code: int
     detail: str
@@ -241,14 +261,17 @@ BATCH_ABORTING_ERRORS: tuple[type[Exception], ...] = (
 )
 
 
-class BackstopUntrustedUrlError(ToolError):
+class BackstopUntrustedUrlError(ToolError, DeclaresFailureLevel):
     """Raised when an upstream-supplied absolute URL points somewhere other than Backstop.
 
     Pagination follows `links.next` verbatim. Since every request carries
     `Authorization: Basic ...`, a `links.next` pointing at another origin — or the same
     host over a different scheme — would leak the caller's Backstop credential there, so
     scheme and host are pinned to the configured `base_url`.
+    WARNING: Backstop supplied the URL; refusing it is the service doing its job.
     """
+
+    failure_level: ClassVar[int] = logging.WARNING
 
     url: str
     expected_host: str
@@ -262,25 +285,24 @@ class BackstopUntrustedUrlError(ToolError):
         self.expected_host = expected_host
 
 
-class BackstopResponseSchemaError(ToolError):
-    """Raised when a successful Backstop response body fails caller-supplied schema validation.
+class BackstopResponseSchemaError(ToolError, DeclaresFailureLevel):
+    """A successful Backstop response whose body fails the caller's schema. The message names
+    only fields and input types; the values stay on `cause`. ERROR: our schema no longer fits."""
 
-    Unlike `BackstopApiError`, this isn't an HTTP-level failure — the request succeeded,
-    but the response body doesn't match the shape the caller expected. Wraps the underlying
-    `pydantic.ValidationError` as `cause`, along with the request `path` and `schema_name`,
-    so the failure can be logged with enough context to diagnose.
-    """
+    failure_level: ClassVar[int] = logging.ERROR
 
     path: str
     schema_name: str
     cause: ValidationError
 
     def __init__(self, path: str, schema_name: str, cause: ValidationError) -> None:
-        message = (
-            f"Backstop response for {path!r} failed schema validation "
-            + f"against {schema_name!r}: {cause}"
+        fields = failed_fields([cause])
+        more = len(fields) - FAILED_FIELDS_SHOWN
+        super().__init__(
+            f"Backstop response failed schema validation against {schema_name!r} at "
+            + ", ".join(fields[:FAILED_FIELDS_SHOWN])
+            + (f" and {more} more" if more > 0 else "")
         )
-        super().__init__(message)
         self.path = path
         self.schema_name = schema_name
         self.cause = cause
