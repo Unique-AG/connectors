@@ -8,7 +8,7 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
 
 - `configure_logging(level)`: every log record on stderr as one Pino-JSON line, which Loki parses
   under the `pino-json` label, with the trace and span of the call and the fields passed in
-  `extra`. The access log lines of the ops routes are dropped.
+  `extra`. The access log lines of the ops routes, and of an MCP's own `/ready`, are dropped.
 - `configure_tracing(settings, service_name=..., service_version=...)`: the trace provider
   `mcp_configs.TracingSettings` asks for, off unless the environment turns it on, with W3C trace
   context and baggage propagation.

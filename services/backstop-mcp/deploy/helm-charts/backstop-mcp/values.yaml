@@ -28,7 +28,7 @@ mcpConfig:
   tenantGuidance: {}
 
 # Loki scrapes use this label to parse stderr as pino-json
-# (unique_mcp.configure_logging).
+# (mcp_observability.configure_logging).
 podLabels:
   logging.unique.app/format: pino-json
 

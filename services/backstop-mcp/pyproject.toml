@@ -20,12 +20,13 @@ dependencies = [
     "cryptography==50.0.2",
     "jinja2==3.1.6",
     "tenacity==9.2.1",
-    "unique-mcp==2026.44.1",
     "markdownify==1.2.3",
     "beautifulsoup4==4.15.0",
     "starlette==1.9.0",
     "mcp==2.3.0",
+    "mcp-configs==0.1.0",
     "mcp-credential-auth==0.1.0",
+    "mcp-observability==0.1.0",
 ]
 
 [project.scripts]
@@ -97,4 +98,6 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv.sources]
+mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
+mcp-observability = { path = "../../packages/mcp-observability" }
