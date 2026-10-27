@@ -11,12 +11,10 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 flowchart TD
   nightly[Nightly job] --> pr[One PR for each dependency]
   pr --> ci[Full CI]
-  ci -->|red| failed[Label deps-ci-failed]
-  ci -->|green| ready[Label deps-review-ready]
-  failed --> agent["Agent run: assess, fix a red CI, report"]
-  ready --> agent
+  ci --> cron[Daily cron run at 05:00 UTC]
+  cron --> agent["Agent run: assess, fix a red CI, report, label ai-assisted"]
   agent -->|safe to merge| review[A person reads the report and merges]
-  agent -->|gap, do not merge, or still red| human[Label deps-human-needed and ask for a Jira ticket]
+  agent -->|gap, do not merge, or still red| human[Label human-required and ask for a Jira ticket]
 ```
 
 | Rule | Value |
@@ -24,7 +22,7 @@ flowchart TD
 | Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, and Docker base images |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*` |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
-| Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `actions`, or `docker` |
+| Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, or `docker` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Cap | At most 5 new PRs each night |
 | Merge | A person merges. The agent never merges. |
@@ -33,27 +31,27 @@ A manual run of the nightly job is a dry run by default. It writes the plan to t
 
 ## One agent run for every PR
 
-The skill `vulna-squash` does the whole job for a dependency PR in one run. A Cursor Automation starts it when the label `deps-ci-failed` or `deps-review-ready` appears. The cron run of the same skill starts it for a Trivy finding.
+The skill `vulna-squash` does the whole job for a dependency PR in one run. The daily cron run of the Cursor Automation `nightly-vulna-patchy` starts it. The cron run starts after the nightly job has finished. It takes each open PR with the label `dependencies` that has neither `ai-assisted` nor `human-required`, at most 10 for each run. The same cron run also handles Trivy findings.
 
 In one run the agent does these things:
 1. It assesses the PR: the release notes, our own usage, and the CI result.
 2. It fixes a red CI when the bump caused it. It tries at most 2 times and pushes to the PR branch.
-3. It posts one report comment with the verdict, and sets `deps-reviewed`.
+3. It posts one report comment with the verdict, and adds the label `ai-assisted`.
 4. It hands off to a person when the verdict is "do not merge" or "safe with a gap". It also hands off when the CI is still red after 2 attempts.
 
-The agent never merges, never approves, and never edits a lockfile by hand. A new commit on the PR removes the labels `deps-reviewed` and `deps-review-ready`, so the PR gets a new run.
+The agent never merges, never approves, and never edits a lockfile by hand. When the nightly job rebuilds a PR, it removes the labels `ai-assisted` and `human-required`, so the PR gets a new run.
 
 ## Hand-off
 
-When a person is needed, the agent adds the label `deps-human-needed`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
+When a person is needed, the agent adds the label `human-required`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
 
 The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
 
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
-2. If a PR has the label `deps-reviewed` and not `deps-human-needed`, read the report in its comment and merge the PR.
-3. If a PR has the label `deps-human-needed`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
+2. If a PR has the label `ai-assisted` and not `human-required`, read the report in its comment and merge the PR.
+3. If a PR has the label `human-required`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
@@ -66,7 +64,7 @@ Two parts touch dependency PRs. Each has one job.
 | Part | It starts from | What it does |
 |---|---|---|
 | The nightly job | The schedule | Opens one PR for each dependency. |
-| The skill `vulna-squash` | The cron run, for a Trivy alert that has a fix. Or the label `deps-ci-failed` or `deps-review-ready` on a nightly PR. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a comment. For a finding it opens the PR first. At most 3 such PRs are open. |
+| The skill `vulna-squash` | The daily cron run. It handles each open nightly PR and each Trivy alert that has a fix. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a comment. For a finding it opens the PR first. At most 3 such PRs are open. |
 
 The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
 
@@ -103,7 +101,6 @@ A lock file alert closes when the fixed lock file reaches `main`. It does not ne
 | File | What it holds |
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
-| `.github/workflows/deps-ci-label.yaml` | The job that sets `deps-ci-failed` |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill that handles every dependency PR in one run |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan, including the lock files of `main` |
