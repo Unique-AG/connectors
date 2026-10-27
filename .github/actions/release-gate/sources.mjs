@@ -38,6 +38,12 @@ export function createRegistryLookups(fetchImpl = fetch) {
   };
 }
 
+const githubHeaders = (token) => ({
+  Accept: 'application/vnd.github+json',
+  Authorization: `Bearer ${token}`,
+  'X-GitHub-Api-Version': '2022-11-28',
+});
+
 export async function listComments({
   apiUrl,
   repository,
@@ -49,28 +55,42 @@ export async function listComments({
   for (let page = 1; page <= MAX_COMMENT_PAGES; page++) {
     const url = `${apiUrl}/repos/${repository}/issues/${pullRequestNumber}/comments?per_page=100&page=${page}`;
     const response = await fetchImpl(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
+      headers: githubHeaders(token),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(`GitHub comments request failed with HTTP ${response.status}`);
     }
     const comments = await response.json();
-    found.push(
-      ...comments.map((comment) => ({
-        body: comment.body ?? '',
-        author: comment.user?.login ?? 'unknown',
-        url: comment.html_url ?? '',
-        createdAt: comment.created_at ?? '',
-      })),
-    );
+    found.push(...comments.map((comment) => ({ id: comment.id, body: comment.body ?? '' })));
     if (comments.length < 100) {
       return found;
     }
   }
   throw new Error('GitHub comments response exceeded the pagination limit');
+}
+
+export async function upsertComment({
+  apiUrl,
+  repository,
+  pullRequestNumber,
+  token,
+  marker,
+  build,
+  fetchImpl = fetch,
+}) {
+  const comments = await listComments({ apiUrl, repository, pullRequestNumber, token, fetchImpl });
+  const existing = comments.find((comment) => comment.body.startsWith(marker));
+  const url = existing
+    ? `${apiUrl}/repos/${repository}/issues/comments/${existing.id}`
+    : `${apiUrl}/repos/${repository}/issues/${pullRequestNumber}/comments`;
+  const response = await fetchImpl(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body: build(existing?.body) }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub comment write failed with HTTP ${response.status}`);
+  }
 }

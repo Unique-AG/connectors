@@ -1,17 +1,8 @@
 import fs from 'node:fs';
 import { runGate } from './gate.mjs';
-import { createRegistryLookups, listComments } from './sources.mjs';
+import { createRegistryLookups } from './sources.mjs';
 
-const {
-  TRIVY_REPORT_PATH = '',
-  HAS_LABEL = 'false',
-  HEAD_SHA = '',
-  GITHUB_API_URL = '',
-  GITHUB_REPOSITORY = '',
-  PULL_REQUEST_NUMBER = '',
-  GITHUB_TOKEN = '',
-  GITHUB_STEP_SUMMARY = '',
-} = process.env;
+const { TRIVY_REPORT_PATH = '', HAS_LABEL = 'false', GITHUB_STEP_SUMMARY = '' } = process.env;
 
 function appendSummary(text) {
   if (GITHUB_STEP_SUMMARY) {
@@ -20,22 +11,11 @@ function appendSummary(text) {
 }
 
 try {
-  const hasLabel = HAS_LABEL === 'true';
-  const comments = hasLabel
-    ? await listComments({
-        apiUrl: GITHUB_API_URL,
-        repository: GITHUB_REPOSITORY,
-        pullRequestNumber: PULL_REQUEST_NUMBER,
-        token: GITHUB_TOKEN,
-      })
-    : [];
   const result = await runGate({
     reportText: fs.existsSync(TRIVY_REPORT_PATH)
       ? fs.readFileSync(TRIVY_REPORT_PATH, 'utf8')
       : null,
-    hasLabel,
-    comments,
-    headSha: HEAD_SHA,
+    hasLabel: HAS_LABEL === 'true',
     lookups: createRegistryLookups(),
     now: Date.now(),
   });

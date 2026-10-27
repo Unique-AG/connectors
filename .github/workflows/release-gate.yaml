@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: read # to read the repository
       packages: read # to read the cache image from GHCR
-      pull-requests: read # to read the live security-exception label and the exception comment
+      pull-requests: read # to read the live security-exception label
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

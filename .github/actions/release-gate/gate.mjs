@@ -2,9 +2,6 @@ import assert from 'node:assert';
 
 const MIN_FIX_AGE_DAYS = 3;
 const MS_PER_DAY = 86_400_000;
-const STAMP_PREFIX = 'Security exception approved by:';
-const STAMP_PATTERN = /^Security exception approved by:\s*(\S.*?)\s+for\s+([0-9a-f]{7,40})\s*$/i;
-const SHORT_SHA_LENGTH = 7;
 const VERDICT_ORDER = ['block', 'skipped', 'warn'];
 
 export function extractFindings(text) {
@@ -118,24 +115,8 @@ export function evaluateFindings(findings, { lookups, now }) {
   return Promise.all(findings.map((finding) => evaluateFinding(finding, cached, now)));
 }
 
-const firstLine = (body) => body.trimStart().split(/\r?\n/, 1)[0];
-
-const stampExample = (headSha) =>
-  `${STAMP_PREFIX} <names> for ${headSha.slice(0, SHORT_SHA_LENGTH)}`;
-
-export function findStamp(comments, headSha) {
-  const head = headSha.toLowerCase();
-  const stamps = comments.flatMap((comment) => {
-    const match = STAMP_PATTERN.exec(firstLine(comment.body));
-    return match ? [{ ...comment, approvers: match[1], sha: match[2].toLowerCase() }] : [];
-  });
-  const current = stamps.filter((stamp) => head.startsWith(stamp.sha));
-  return { current: current.at(-1) ?? null, staleCount: stamps.length - current.length };
-}
-
-export function applyException(rows, { hasLabel, stamp, headSha }) {
+export function applyException(rows, { hasLabel }) {
   const blocking = rows.filter((row) => row.verdict === 'block');
-  const example = stampExample(headSha);
   if (blocking.length === 0) {
     return {
       passed: true,
@@ -149,25 +130,13 @@ export function applyException(rows, { hasLabel, stamp, headSha }) {
     return {
       passed: false,
       rows,
-      message: `${blocking.length} finding(s) with a usable fix block this release. To ship anyway, add the label security-exception and a comment: "${example}".`,
-    };
-  }
-  if (!stamp.current) {
-    const stale =
-      stamp.staleCount > 0
-        ? ' A stamp is valid for one commit, and the stamps on this pull request are for other commits.'
-        : '';
-    return {
-      passed: false,
-      rows,
-      message: `The label security-exception is set, but no comment approves this commit.${stale} Add a comment: "${example}".`,
+      message: `${blocking.length} finding(s) with a usable fix block this release. To ship anyway, add the label security-exception to this pull request.`,
     };
   }
   return {
     passed: true,
     rows: rows.map((row) => (row.verdict === 'block' ? { ...row, verdict: 'skipped' } : row)),
-    message: `The security exception is approved by ${stamp.current.approvers} for ${stamp.current.sha}. ${blocking.length} finding(s) are skipped.`,
-    stamp: stamp.current,
+    message: `The label security-exception is set. ${blocking.length} finding(s) are skipped. The comment on this pull request records who set the label.`,
   };
 }
 
@@ -197,16 +166,11 @@ const escapeCell = (value) => String(value).replaceAll('|', '\\|');
 const escapeAnnotation = (value) =>
   value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 
-function renderStamp(stamp) {
-  return stamp ? ['', `Comment by @${stamp.author} on ${stamp.createdAt}: ${stamp.url}`] : [];
-}
-
-export function renderSummary(rows, message, stamp) {
+export function renderSummary(rows, message) {
   const header = [
     '## Release gate',
     '',
     message,
-    ...renderStamp(stamp),
     '',
     '| Package | Installed | Fixed | Severity | CVE | Fix age | Age source | Verdict |',
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -226,23 +190,14 @@ export function renderAnnotations(rows) {
   });
 }
 
-export async function runGate({ reportText, hasLabel, comments, headSha, lookups, now }) {
-  assert.match(
-    headSha ?? '',
-    /^[0-9a-f]{7,40}$/i,
-    'The head commit of the pull request is missing.',
-  );
+export async function runGate({ reportText, hasLabel, lookups, now }) {
   const findings = extractFindings(reportText);
   const rows = await evaluateFindings(findings, { lookups, now });
-  const outcome = applyException(rows, {
-    hasLabel,
-    stamp: findStamp(comments, headSha),
-    headSha,
-  });
+  const outcome = applyException(rows, { hasLabel });
   return {
     passed: outcome.passed,
     message: outcome.message,
-    summary: renderSummary(outcome.rows, outcome.message, outcome.stamp),
+    summary: renderSummary(outcome.rows, outcome.message),
     annotations: renderAnnotations(outcome.rows),
   };
 }

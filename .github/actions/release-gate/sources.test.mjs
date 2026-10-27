@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRegistryLookups, listComments } from './sources.mjs';
+import { createRegistryLookups, listComments, upsertComment } from './sources.mjs';
 
 const jsonResponse = (payload, status = 200) => new Response(JSON.stringify(payload), { status });
 
@@ -37,17 +37,10 @@ test('returns null when the registry fails', async () => {
   assert.equal(await broken['node-pkg']('tar', '1.0.0'), null);
 });
 
-test('collects comments across pages with author, link and time', async () => {
+test('collects comments across pages', async () => {
   const pages = [
-    Array.from({ length: 100 }, () => ({ body: 'a' })),
-    [
-      {
-        body: 'Security exception approved by: Alice for abc1234',
-        user: { login: 'alice' },
-        html_url: 'https://github.com/unique-ag/connectors/pull/7#issuecomment-1',
-        created_at: '2026-10-27T10:00:00Z',
-      },
-    ],
+    Array.from({ length: 100 }, (_, index) => ({ id: index, body: 'a' })),
+    [{ id: 500, body: '<!-- release-gate-exception -->' }],
   ];
   const urls = [];
   const fetchImpl = async (url, request) => {
@@ -63,13 +56,7 @@ test('collects comments across pages with author, link and time', async () => {
     fetchImpl,
   });
   assert.equal(comments.length, 101);
-  assert.deepEqual(comments.at(-1), {
-    body: 'Security exception approved by: Alice for abc1234',
-    author: 'alice',
-    url: 'https://github.com/unique-ag/connectors/pull/7#issuecomment-1',
-    createdAt: '2026-10-27T10:00:00Z',
-  });
-  assert.deepEqual(comments[0], { body: 'a', author: 'unknown', url: '', createdAt: '' });
+  assert.deepEqual(comments.at(-1), { id: 500, body: '<!-- release-gate-exception -->' });
   assert.match(urls[1], /issues\/7\/comments\?per_page=100&page=2$/);
 });
 
@@ -83,5 +70,54 @@ test('throws when the comments request fails', async () => {
       fetchImpl: async () => jsonResponse({}, 403),
     }),
     /HTTP 403/,
+  );
+});
+
+const upsert = (fetchImpl, build = () => 'new body') =>
+  upsertComment({
+    apiUrl: 'https://api.github.com',
+    repository: 'unique-ag/connectors',
+    pullRequestNumber: '7',
+    token: 'token',
+    marker: '<!-- marker -->',
+    build,
+    fetchImpl,
+  });
+
+test('creates the comment when none has the marker', async () => {
+  const calls = [];
+  await upsert(async (url, request) => {
+    calls.push({ url, method: request.method, body: request.body });
+    return request.method ? jsonResponse({}, 201) : jsonResponse([{ id: 1, body: 'other' }]);
+  });
+  assert.equal(calls[1].method, 'POST');
+  assert.match(calls[1].url, /issues\/7\/comments$/);
+  assert.equal(JSON.parse(calls[1].body).body, 'new body');
+});
+
+test('updates the comment in place and passes the old body to the builder', async () => {
+  const calls = [];
+  let received;
+  await upsert(
+    async (url, request) => {
+      calls.push({ url, method: request.method });
+      return request.method
+        ? jsonResponse({})
+        : jsonResponse([{ id: 42, body: '<!-- marker -->\n- old' }]);
+    },
+    (existingBody) => {
+      received = existingBody;
+      return 'updated';
+    },
+  );
+  assert.equal(received, '<!-- marker -->\n- old');
+  assert.equal(calls[1].method, 'PATCH');
+  assert.match(calls[1].url, /issues\/comments\/42$/);
+});
+
+test('throws when the comment write fails', async () => {
+  await assert.rejects(
+    upsert(async (_url, request) => (request.method ? jsonResponse({}, 403) : jsonResponse([]))),
+    /write failed with HTTP 403/,
   );
 });

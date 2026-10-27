@@ -1,7 +1,7 @@
 name: Release gate
 description: >
   Fail a release pull request while its image has a fixable critical or high
-  vulnerability, unless security-exception is set and a comment approves the head commit.
+  vulnerability, unless the label security-exception is set.
 
 inputs:
   trivy_report:
@@ -29,7 +29,6 @@ runs:
       env:
         TRIVY_REPORT_PATH: ${{ inputs.trivy_report }}
         HAS_LABEL: ${{ steps.security-exception.outputs.has_label }}
-        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         GITHUB_API_URL: ${{ github.api_url }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
