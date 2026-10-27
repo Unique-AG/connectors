@@ -127,7 +127,10 @@ jobs:
 
       - name: Convert Trivy results to SARIF
         if: steps.resolve.outputs.found == 'true' && hashFiles('scan-report/trivy-results.json') != ''
-        run: trivy convert --format sarif --severity CRITICAL,HIGH scan-report/trivy-results.json -o trivy-image-scan-results.sarif
+        run: |
+          trivy convert --format sarif --severity CRITICAL,HIGH scan-report/trivy-results.json -o trivy-image-scan-results.sarif
+          jq --arg image "${IMAGE}:${VERSION}" '.runs[].results[]?.message.text |= ("Image: " + $image + "\n" + .)' trivy-image-scan-results.sarif > tagged.sarif
+          mv tagged.sarif trivy-image-scan-results.sarif
 
       - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         if: steps.resolve.outputs.found == 'true' && hashFiles('trivy-image-scan-results.sarif') != ''

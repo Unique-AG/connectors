@@ -285,7 +285,12 @@ jobs:
 
       - name: Convert Trivy results to SARIF
         if: always() && hashFiles('trivy-results.json') != ''
-        run: trivy convert --format sarif trivy-results.json -o trivy-image-scan-results.sarif
+        env:
+          IMAGE_TAG: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ inputs.service-version }}
+        run: |
+          trivy convert --format sarif trivy-results.json -o trivy-image-scan-results.sarif
+          jq --arg image "$IMAGE_TAG" '.runs[].results[]?.message.text |= ("Image: " + $image + "\n" + .)' trivy-image-scan-results.sarif > tagged.sarif
+          mv tagged.sarif trivy-image-scan-results.sarif
 
       - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         if: always() && hashFiles('trivy-image-scan-results.sarif') != ''
