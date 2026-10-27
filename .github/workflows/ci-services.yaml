@@ -9,8 +9,12 @@ on:
     paths:
       - "services/**"
       - "packages/**"
+      - "!packages/mcp-architecture/**"
+      - "!packages/mcp-configs/**"
       - "!packages/mcp-credential-auth/**"
+      - "!packages/mcp-observability/**"
       - "!packages/mcp-openapi/**"
+      - "!packages/mcp-scaffold/**"
       - "pnpm-lock.yaml"
       - ".github/workflows/ci-services.yaml"
       - ".github/workflows/_template-ci.yaml"
@@ -58,8 +62,12 @@ jobs:
               - 'services/**'
             packages:
               - 'packages/**'
+              - '!packages/mcp-architecture/**'
+              - '!packages/mcp-configs/**'
               - '!packages/mcp-credential-auth/**'
+              - '!packages/mcp-observability/**'
               - '!packages/mcp-openapi/**'
+              - '!packages/mcp-scaffold/**'
             lockfile:
               - 'pnpm-lock.yaml'
             workflow:

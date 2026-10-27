@@ -32,7 +32,7 @@ packages = ["src/mcp_openapi"]
 
 [dependency-groups]
 dev = [
-    "basedpyright==1.40.1",
+    "basedpyright==1.40.2",
     "datamodel-code-generator==0.83.0",
     "openapi-pydantic==0.6.0",
     "pytest==9.1.1",

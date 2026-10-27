@@ -6,7 +6,6 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
-from fastmcp.server.dependencies import without_injected_parameters
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
@@ -28,9 +27,15 @@ from tests.helpers import (
     resource,
     tool_client,
 )
-from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+from tests.server.tools.helpers import (
+    input_adapter,
+    object_dict,
+    object_list,
+    tool_model,
+    tool_payload,
+)
 
-_INPUT: TypeAdapter[object] = TypeAdapter(without_injected_parameters(search_opportunities))
+_INPUT = input_adapter(search_opportunities)
 _CONFIG = SearchConfig(result_size=100)
 
 
