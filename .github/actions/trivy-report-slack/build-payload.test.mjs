@@ -73,7 +73,7 @@ const baseEnv = {
   TRIGGER_LABEL: 'scheduled',
   REPOSITORY: 'Unique-AG/connectors',
   ACTOR: 'github-actions[bot]',
-  WORKFLOW_NAME: '[Security] Trivy Registry Image Scan',
+  WORKFLOW_NAME: '[Security] Trivy Nightly Scan',
   RUN_URL: 'https://github.com/Unique-AG/connectors/actions/runs/1',
 };
 
