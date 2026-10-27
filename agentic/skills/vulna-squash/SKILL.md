@@ -1,6 +1,6 @@
 ---
 name: vulna-squash
-description: Use when asked to run Vulna Squash, to fix CRITICAL or HIGH Trivy findings, to handle a dependency PR with the label deps-ci-failed or deps-review-ready, or to review or assess a dependency bump, a major bump, a breaking change or whether a bump is safe to merge.
+description: Use when asked to run Vulna Squash, to fix CRITICAL or HIGH Trivy findings, to handle an open dependency PR, or to review or assess a dependency bump, a major bump, a breaking change or whether a bump is safe to merge.
 metadata:
   internal: true
 ---
@@ -15,11 +15,11 @@ Repository: `Unique-AG/connectors`. Base branch: `main`.
 
 | Mode | Start | Input | Parts |
 |------|-------|-------|-------|
-| `findings` | The cron automation. No PR exists. | The open Trivy alerts | A, then for each batch B to F |
-| `pr` | A label automation or a person | The number of a nightly dependency PR | C to F |
+| `findings` | The cron automation. No PR exists. | The open Trivy alerts and the open dependency PRs | A, then for each batch B to F |
+| `pr` | A person, or the sweep in Part A | The number of a dependency PR | C to F |
 
 Both modes end in the same pipeline: Part C (assess), Part D (CI and fixes), Part E (verdict and report comment), Part F (hand off).
-In mode `findings`, one subagent for each batch opens a PR and continues with Parts C to F for it. In mode `pr`, you do Parts C to F for the PR that the caller names. You return the [return contract](#return-contract). You post no Slack message unless the caller asks for one.
+In mode `findings`, one subagent for each batch opens a PR and continues with Parts C to F for it. The cron run also starts one subagent in mode `pr` for each open dependency PR that has no result yet. In mode `pr`, you do Parts C to F for the PR that the caller names. You return the [return contract](#return-contract). You post no Slack message unless the caller asks for one.
 
 Policy behind the rules: a CRITICAL or HIGH finding has a patch window of 1 month. A fix that is younger than 3 days waits. A release needs no fixable CRITICAL or HIGH finding.
 
@@ -27,7 +27,7 @@ Policy behind the rules: a CRITICAL or HIGH finding has a patch window of 1 mont
 
 These limits apply to every mode. They have no exceptions.
 - Never merge a PR. Never approve a PR. Never enable auto-merge on a PR.
-- Make at most 2 fix attempts for a PR. The labels `deps-fix-attempt-1` and `deps-fix-attempt-2` count them.
+- Make at most 2 fix attempts for a PR in one run. A rerun of a failed check is an attempt.
 - Never edit a lockfile by hand. Regenerate it with `uv lock` or `pnpm`.
 - Never force-push. Never push to `main`. Push only to the PR branch.
 - Edit only files in the PR scope and the code that the bump broke.
@@ -37,12 +37,37 @@ These limits apply to every mode. They have no exceptions.
 - Never widen a batch to MEDIUM findings or below.
 - A subagent never posts to Slack.
 
-## Part A: Findings run (mode `findings` only)
+## Part A: Cron run (mode `findings` only)
 
 Fix CRITICAL and HIGH findings at their source. Stop early when a check fails.
 MEDIUM and below are out of scope. Open as few PRs as the rules allow.
 Post to Slack channel `C0C1PR9CNMP` on every exit.
-Post one Slack message for each opened PR. Never put two PRs in one message.
+Post one Slack message for each opened PR and each swept PR. Never put two PRs in one message.
+
+### Wait for the dependency update
+
+The nightly dependency job opens its PRs first. Check that it has finished.
+```bash
+gh run list --repo Unique-AG/connectors --workflow deps-nightly.yaml --limit 1 \
+  --json status,conclusion,createdAt,url
+```
+
+If the status is `queued` or `in_progress`, stop. Post one stop message with the link of the run. The next run does the sweep and takes the findings. Then the PRs of the dependency job exist before this run decides which PRs to assess and which packages to fix.
+
+### Sweep the dependency PRs
+
+The nightly dependency job labels its PRs `dependencies`. The agent labels a PR `ai-assisted` when it handled the PR. It also labels the PR `human-required` when a person must finish it. List the open PRs that have neither label.
+```bash
+gh pr list --repo Unique-AG/connectors --state open --label dependencies --limit 100 \
+  --json number,title,url,labels \
+  --jq '.[] | select([.labels[].name] | (index("ai-assisted") or index("human-required")) | not) | {number, title, url}'
+```
+
+Start one subagent for each listed PR with the Task tool, at most 10 for each run. Start them in parallel. The next run takes the rest. The open-PR cap does not apply, because it counts only the label `vulna-squash`.
+
+The first line of each brief is `Invoked by: vulna-squash`. The second line tells the subagent to read the sections `Hard limits` and `Part C` to `Part F` of `agentic/skills/vulna-squash/SKILL.md` and to follow only those sections. Give the fields `repository`, `pr_number` and `memory_notes`.
+
+Wait for all of them. They return the [return contract](#return-contract). Post the Slack messages from their results. Then continue with the findings.
 
 ### Open-PR cap
 
@@ -57,16 +82,6 @@ If the count is 3 or more, post one stop message that states the count. Then exi
 If the count is less than 3, plan at most `3 - count` batches for this run.
 Count again just before you start each subagent. Skip a batch when the cap is reached.
 Two runs at the same time can race between the count and the PR creation. The next run sees the labels.
-
-### Wait for the dependency update
-
-The nightly dependency job opens its PRs first. Check that it has finished.
-```bash
-gh run list --repo Unique-AG/connectors --workflow deps-nightly.yaml --limit 1 \
-  --json status,conclusion,createdAt,url
-```
-
-If the status is `queued` or `in_progress`, stop. Post one stop message with the link of the run. The next run takes the findings. Then the PRs of the dependency job exist before this run decides which packages to fix.
 
 ### Scan freshness
 
@@ -167,6 +182,7 @@ The subagents open the PRs, assess them, watch CI, fix a red CI and hand off. Th
 Use the Slack action. In a local run, print the same text and start the subagents the same way.
 Format: mrkdwn. Use `*bold*`, `<url|text>` and `•` bullets. Do not use `#` headers or tables.
 Show dates as `29 Sep, 13:07 UTC` or as relative time (`16h ago`). Never use ISO timestamps.
+For a swept PR (mode `pr`), leave out the `Cleared` bullet and the scan link.
 
 Patch or minor, checks green, verdict `safe to merge`:
 ```
@@ -334,12 +350,11 @@ gh pr view <number> --repo Unique-AG/connectors --json state,labels,headRefName,
 
 Stop with no change when any of these is true:
 - The PR is not open, or it comes from a fork.
-- The PR carries the label `deps-reviewed` (it was handled) or `deps-human-needed` (a person has it).
-- A label automation started the run, and the PR carries neither `deps-ci-failed` nor `deps-review-ready`. A label change that removed the label can start this run again.
+- The PR carries the label `ai-assisted` (the agent handled it) or `human-required` (a person has it), and no person asked for a new run.
 
 If the PR changes no manifest and no lockfile, it is not a dependency PR. Go to Part F and state this reason.
 
-Skip lens C when the PR carries `deps-review-ready` (CI is green) or `deps-ci-failed` (Part D finds the cause), or when a person says "code wise only, tests ran in CI". Otherwise run lens C.
+Skip lens C when the PR has a CI result, green or red (Part D finds the cause of a red one), or when a person says "code wise only, tests ran in CI". Otherwise run lens C.
 
 ### Facts about the PR
 
@@ -466,14 +481,7 @@ The second command is the control: the latest run of the same check on `main`.
 
 ### Count the attempts
 
-Do this before you change anything. Then a crashed run still counts.
-
-Neither attempt label on the PR: this is attempt 1. Only `deps-fix-attempt-1`: this is attempt 2. `deps-fix-attempt-2`: both attempts are used, so go to Part E, then Part F.
-Add the label for the current attempt. Create the label first when it does not exist. Use `deps-fix-attempt-2` for the second attempt.
-```bash
-gh label create deps-fix-attempt-1 --repo Unique-AG/connectors --description "Marks the first automatic fix of a dependency update." 2>/dev/null
-gh pr edit <number> --repo Unique-AG/connectors --add-label deps-fix-attempt-1
-```
+Keep the count in this run. A fix push is an attempt. A rerun of a failed check is an attempt. After attempt 2, go to Part E, then Part F.
 
 ### Make the smallest change
 
@@ -535,10 +543,10 @@ gh api --method PATCH repos/Unique-AG/connectors/issues/comments/<comment-id> -F
 
 Use the first command to find the comment. Use the second command when none exists. Use the third command when one exists.
 
-Then change the labels. Leave the attempt labels in place.
+Then add the label.
 ```bash
-gh label create deps-reviewed --repo Unique-AG/connectors --description "Marks a dependency update that the agent reviewed." 2>/dev/null
-gh pr edit <number> --repo Unique-AG/connectors --remove-label deps-review-ready --remove-label deps-ci-failed --add-label deps-reviewed
+gh label create ai-assisted --repo Unique-AG/connectors --description "Marks a pull request that the AI agent handled." 2>/dev/null
+gh pr edit <number> --repo Unique-AG/connectors --add-label ai-assisted
 ```
 
 Verdict `safe to merge`: stop here. A human reviews and merges the PR. Return `handoff: false`.
@@ -549,8 +557,8 @@ Verdict `safe with a gap` or `do not merge`, CI still red after the attempts, CI
 ### Label the PR
 
 ```bash
-gh label create deps-human-needed --repo Unique-AG/connectors --description "Marks a dependency update that a person must finish." 2>/dev/null
-gh pr edit <number> --repo Unique-AG/connectors --add-label deps-human-needed --remove-label deps-ci-failed
+gh label create human-required --repo Unique-AG/connectors --description "Marks a pull request that a person must finish." 2>/dev/null
+gh pr edit <number> --repo Unique-AG/connectors --add-label human-required
 ```
 
 When the PR is not a dependency PR, Part E did not run. Write one comment that states the reason, and stop.
