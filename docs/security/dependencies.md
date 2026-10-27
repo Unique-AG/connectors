@@ -9,10 +9,10 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 
 | Rule | Value |
 |---|---|
-| Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, and Docker base images |
+| Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, Docker base images, and Terraform providers |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*` |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
-| Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, or `docker` |
+| Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Cap | At most 5 new PRs each night |
 | Merge | A person merges. The agent never merges. |
@@ -109,7 +109,7 @@ To ignore a dependency for good, add a pin. The job lists a pinned dependency in
 1. Run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `ai-assisted` and not `human-required`, read the report in its comment and merge the PR.
 3. If a PR has the label `human-required`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
-4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
+4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
 Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the root `package.json`. A pin holds a dependency at one version, so the nightly job cannot move it.
@@ -154,9 +154,9 @@ The nightly job also updates these. The same rules apply: one PR for each item, 
 |---|---|
 | GitHub Actions | One PR for each action repository. It moves the pinned commit and the version comment in every workflow. A major bump says so in the PR body. |
 | Docker base images | One PR for each image, for example `node`. It moves the tag and the digest in every Dockerfile. It stays in the same major version. The change starts a release for each service. |
-| Terraform | No PR. The job lists a provider in the plan summary when its newest release is outside the version range. A person widens the range. |
+| Terraform providers | One PR for each provider whose newest release is outside our version constraint. The PR widens the constraint in every `versions.tf` that names the provider, so that the release fits. The repository has no Terraform lock file, so a release inside the constraint needs no PR. The CI job `validate-terraform` checks the change. |
 
-An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too.
+An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint.
 
 ## Advisories in lock files
 
