@@ -1,6 +1,8 @@
 ---
 name: dependabot-pr-review
 description: Use when the user gives a Dependabot PR link (or number) in Unique-AG/connectors and wants to know if the dependency update breaks our code. Starts from our own usage of the dependency, fans out read-only agents, and returns a short simple-english report with a snippet. Also use for "check this bump", "is this PR safe to merge", or "review the open dependency PRs".
+metadata:
+  internal: true
 ---
 
 # Dependabot PR review
