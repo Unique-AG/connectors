@@ -11,14 +11,12 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 flowchart TD
   nightly[Nightly job] --> pr[One PR for each dependency]
   pr --> ci[Full CI]
-  ci -->|green| ready[Label deps-review-ready]
   ci -->|red| failed[Label deps-ci-failed]
-  failed --> agent[Fix agent pushes a fix]
-  agent -->|CI green| ready
-  agent -->|second attempt fails| human[Label deps-needs-human]
-  ready --> report[Review skill posts a report and sets deps-reviewed]
-  report --> review[A person reviews and merges]
-  report -->|do not merge or a gap| human
+  ci -->|green| ready[Label deps-review-ready]
+  failed --> agent["Agent run: assess, fix a red CI, report"]
+  ready --> agent
+  agent -->|safe to merge| review[A person reads the report and merges]
+  agent -->|gap, do not merge, or still red| human[Label deps-needs-human and a follow-up issue]
 ```
 
 | Rule | Value |
@@ -33,23 +31,29 @@ flowchart TD
 
 A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. The job also opens no PR until the GitHub App exists. See [Setup that needs an admin](../../SECURITY-PROCESS.md#setup-that-needs-an-admin).
 
-## If CI is red
+## One agent run for every PR
 
-The job adds the label `deps-ci-failed`. A Cursor Automation then starts the fix agent. The agent pushes a fix to the PR branch and tries at most 2 times. After that, it adds `deps-needs-human` and a comment.
+The skill `vulna-squash` does the whole job for a dependency PR in one run. A Cursor Automation starts it when the label `deps-ci-failed` or `deps-review-ready` appears. The cron run of the same skill starts it for a Trivy finding.
 
-The agent edits only the paths in the PR. It never edits a lockfile by hand. The skill `dependency-pr-review` is the base for the review.
+In one run the agent does these things:
+1. It assesses the PR: the release notes, our own usage, and the CI result.
+2. It fixes a red CI when the bump caused it. It tries at most 2 times and pushes to the PR branch.
+3. It posts one report comment with the verdict, and sets `deps-reviewed`.
+4. It hands off to a person when the verdict is "do not merge" or "safe with a gap". It also hands off when the CI is still red after 2 attempts.
 
-## The review after a green CI
+The agent never merges, never approves, and never edits a lockfile by hand. A new commit on the PR removes the labels `deps-reviewed` and `deps-review-ready`, so the PR gets a new run.
 
-When every CI workflow of a dependency PR passes, the job adds the label `deps-review-ready`. A Cursor Automation then starts the review. The review is always the step after the CI, so the order is the same every night.
+## Hand-off and follow-up ticket
 
-The review posts one comment with the verdict, and sets `deps-reviewed`. A new commit on the PR removes both labels, so the PR gets a new review.
+When a person is needed, the agent adds the label `deps-needs-human` and creates a follow-up ticket. The ticket is a GitHub issue with the label `deps-follow-up`. It names the PR, the breaking changes that affect us with their file and line, what the agent tried, and the exact next steps.
+
+One issue exists for each package. A second hand-off adds a comment to it. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
 
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `deps-reviewed` and not `deps-needs-human`, read the report in its comment and merge the PR.
-3. If a PR has the label `deps-needs-human`, fix it or close it.
+3. If a PR has the label `deps-needs-human`, open its follow-up issue with `gh issue list --label deps-follow-up --state open`. Finish the work there.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
@@ -57,14 +61,12 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 
 ## Who fixes what
 
-Four parts touch dependency PRs. Each has one job.
+Two parts touch dependency PRs. Each has one job.
 
 | Part | It starts from | What it does |
 |---|---|---|
 | The nightly job | The schedule | Opens one PR for each dependency. |
-| The skill `deps-ci-fix` | The label `deps-ci-failed` on a nightly PR | Pushes a fix to the PR branch. It tries 2 times. |
-| The patch run, skill `vulna-squash` | A Trivy alert that has a fix | Opens a PR for a critical or high finding. At most 3 are open. Its own helper watches CI for 45 minutes, and a person takes over a red PR. |
-| The skill `dependency-pr-review` | The label `deps-review-ready`, which comes after a green CI. A person can also start it. | Reads the release notes and our own usage. It posts one report comment and sets `deps-reviewed`. It sets `deps-needs-human` for a verdict of "do not merge" or "safe with a gap". It never pushes or merges. |
+| The skill `vulna-squash` | The cron run, for a Trivy alert that has a fix. Or the label `deps-ci-failed` or `deps-review-ready` on a nightly PR. | Does the whole job for the PR in one run: assess, fix a red CI, report, and hand off with a ticket. For a finding it opens the PR first. At most 3 such PRs are open. |
 
 The nightly job and the patch run never open two PRs for one package. The patch run skips a package that an open nightly PR changes. The nightly job skips a package that an open patch PR names in its title.
 
@@ -102,8 +104,7 @@ A lock file alert closes when the fixed lock file reaches `main`. It does not ne
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
 | `.github/workflows/deps-ci-label.yaml` | The job that sets `deps-ci-failed` |
-| `agentic/skills/deps-ci-fix/SKILL.md` | The skill that fixes a red dependency PR |
+| `agentic/skills/vulna-squash/SKILL.md` | The skill that handles every dependency PR in one run |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan, including the lock files of `main` |
 | `.github/workflows/security-pinned-actions.yaml` | The check that an action is pinned to a commit |
-| `agentic/skills/dependency-pr-review/SKILL.md` | The skill that reviews a dependency PR |
