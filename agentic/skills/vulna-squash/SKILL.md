@@ -48,7 +48,7 @@ Two runs at the same time can race between the count and the PR creation. The ne
 
 ## 2. Scan freshness
 
-The nightly scan is the workflow `[Security] Trivy Nightly Scan`. It scans the published image of every service and the lock files of `main`. The lock file alerts have the category `trivy-lockfiles`. Fix a lock file alert like a dependency finding in an image.
+The nightly scan is the workflow `[Security] Trivy Nightly Scan`. It scans the published image of every service and the lock files of `main`. The lock file alerts have the category `trivy-lockfiles`. Fix a lock file alert like a dependency finding in an image. Skip alerts in the category `trivy-config`. They are misconfigurations of Dockerfiles, and they have no fixed version. A person fixes them.
 
 ```bash
 gh run list --repo Unique-AG/connectors --workflow security-trivy-registry.yaml \
