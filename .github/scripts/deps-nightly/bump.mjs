@@ -54,20 +54,25 @@ export function renderBody({ entry, changes, projects, cooldownDays }) {
       ),
     ),
   ];
+  const major = entry.members.some(({ data }) => data?.major);
+  const locked = entry.ecosystem === 'npm' || entry.ecosystem === 'uv';
   return [
     intro,
     '',
+    ...(major
+      ? ['This is a major bump. A person must read the release notes before the merge.', '']
+      : []),
     `The nightly dependency job made this change. It only uses versions that are at least ${cooldownDays} days old.`,
     '',
-    `### Packages that changed in the lock files (${changeLines.length})`,
+    `### ${locked ? 'Packages that changed in the lock files' : 'Versions that changed'} (${changeLines.length})`,
     '',
     ...listed(changeLines),
     '',
-    '### Projects that moved',
+    `### ${locked ? 'Projects that moved' : 'Files that changed'}`,
     '',
     ...(projects.length > 0
       ? listed(projects.map((project) => `\`${project}\``))
-      : ['- None. Only the lock file changed.']),
+      : [`- None. ${locked ? 'Only the lock file changed.' : 'No file changed.'}`]),
     '',
   ].join('\n');
 }

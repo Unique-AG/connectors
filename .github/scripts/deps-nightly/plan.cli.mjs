@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { createActionsLookup, planActions } from './actions.mjs';
+import { createDockerLookup, planDocker } from './docker.mjs';
 import {
   changedPackages,
   hasUvCooldown,
@@ -15,8 +17,18 @@ import {
   renderSummary,
   uvCandidates,
 } from './plan.mjs';
-import { config, releaseAge, uvProjectFolders } from './repo.mjs';
+import {
+  ACTION_FILES,
+  config,
+  DOCKERFILES,
+  readFiles,
+  releaseAge,
+  TERRAFORM_FILES,
+  trackedFiles,
+  uvProjectFolders,
+} from './repo.mjs';
 import { run, runOrThrow } from './run.mjs';
+import { createTerraformLookup, planTerraform } from './terraform.mjs';
 
 function planNpm() {
   const outdatedRun = run('pnpm', [
@@ -86,14 +98,40 @@ async function planUv() {
   });
 }
 
+function planFiles(pattern) {
+  return readFiles(trackedFiles(pattern));
+}
+
+const ecosystemOptions = { now: Date.now(), cooldownDays: config.cooldownDays };
 const npm = planNpm();
 const uv = await planUv();
+const actions = await planActions({
+  files: planFiles(ACTION_FILES),
+  lookup: createActionsLookup(process.env.GH_TOKEN),
+  ...ecosystemOptions,
+});
+const docker = await planDocker({
+  files: planFiles(DOCKERFILES),
+  lookup: createDockerLookup(),
+  ...ecosystemOptions,
+});
+const terraform = await planTerraform({
+  files: planFiles(TERRAFORM_FILES),
+  lookup: createTerraformLookup(process.env.GH_TOKEN),
+  ...ecosystemOptions,
+});
 const openBranches = JSON.parse(
   runOrThrow('gh', ['pr', 'list', '--state', 'open', '--limit', '500', '--json', 'headRefName']),
 ).map(({ headRefName }) => headRefName);
 const plan = buildPlan({
-  candidates: [...npm.candidates, ...uv.candidates],
-  needsPerson: [...npm.needsPerson, ...uv.needsPerson],
+  candidates: [...npm.candidates, ...uv.candidates, ...actions.candidates, ...docker.candidates],
+  needsPerson: [
+    ...npm.needsPerson,
+    ...uv.needsPerson,
+    ...actions.needsPerson,
+    ...docker.needsPerson,
+    ...terraform.needsPerson,
+  ],
   config,
   openBranches,
 });

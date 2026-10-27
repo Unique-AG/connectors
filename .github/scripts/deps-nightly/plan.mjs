@@ -187,11 +187,12 @@ export function buildPlan({ candidates, needsPerson, config, openBranches }) {
       slug: slugOf(members[0].ecosystem, name),
       name,
       isGroup,
-      members: members.map(({ name: memberName, from, to, direct }) => ({
+      members: members.map(({ name: memberName, from, to, direct, data }) => ({
         name: memberName,
         from,
         to,
         direct,
+        ...(data ? { data } : {}),
       })),
     };
   });

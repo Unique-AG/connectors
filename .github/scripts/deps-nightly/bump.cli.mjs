@@ -2,7 +2,9 @@ import assert from 'node:assert';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { applyActions } from './actions.mjs';
 import { pnpmCommands, renderBody, renderTitle, uvLockArgs } from './bump.mjs';
+import { applyDocker } from './docker.mjs';
 import {
   changedPackages,
   findDowngrades,
@@ -14,7 +16,15 @@ import {
   pinEdit,
   restoreUvLockHeader,
 } from './locks.mjs';
-import { config, releaseAge, uvProjectFolders } from './repo.mjs';
+import {
+  ACTION_FILES,
+  config,
+  DOCKERFILES,
+  readFiles,
+  releaseAge,
+  trackedFiles,
+  uvProjectFolders,
+} from './repo.mjs';
 import { run, runOrThrow } from './run.mjs';
 import { commitScope } from './scope.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
@@ -78,7 +88,30 @@ function bumpUv() {
   return { changes, projects };
 }
 
-const { changes, projects } = entry.ecosystem === 'npm' ? bumpNpm() : bumpUv();
+function bumpTextFiles(pattern, apply) {
+  const before = readFiles(trackedFiles(pattern));
+  let after = before;
+  for (const { name, to, data } of entry.members) {
+    after = { ...after, ...apply(after, { name, to, data }) };
+  }
+  const projects = Object.keys(after).filter((path) => after[path] !== before[path]);
+  for (const path of projects) {
+    writeFileSync(path, after[path]);
+  }
+  return {
+    changes: entry.members.map(({ name, from, to }) => ({ name, from: [from], to: [to] })),
+    projects,
+  };
+}
+
+const bumpers = {
+  npm: bumpNpm,
+  uv: bumpUv,
+  actions: () => bumpTextFiles(ACTION_FILES, applyActions),
+  docker: () => bumpTextFiles(DOCKERFILES, applyDocker),
+};
+assert.ok(entry.ecosystem in bumpers, `Unknown ecosystem ${entry.ecosystem}`);
+const { changes, projects } = bumpers[entry.ecosystem]();
 const files = runOrThrow('git', ['diff', '--name-only']).split('\n').filter(Boolean);
 const outputs = [`changed=${files.length > 0}`];
 
