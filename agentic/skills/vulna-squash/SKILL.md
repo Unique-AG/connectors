@@ -192,7 +192,7 @@ Hand-off (`handoff: true`). Use it for a red CI, a timeout, and the verdicts `sa
 :warning: *Vulna Squash* · <pr-url|#1234> · … · *needs a human*
 • Cleared … — <scan-url|scan run>
 • <one sentence: the verdict, or still red, or timed out>
-• Ticket: <issue-url|#5678>. The full report is on the PR. No review run is needed.
+• Ticket: <ticket-url>. The full report is on the PR. No review run is needed.
 ```
 
 #### Stop messages
@@ -311,7 +311,7 @@ If the check fails, do not create the PR. Return `status: skipped` with the erro
 
 Every PR carries the label `vulna-squash`. Pass `--label vulna-squash` to `gh pr create`. The cap counts this label.
 - Link `scan_run_url`.
-- Add the plain-text line `Refs: <ticket>`. Use the ticket from the brief. If the repository gets its own ticket for this work, the owner replaces it.
+- Add the plain-text line `Refs: <ticket>`. Use the ticket from the brief.
 - List each cleared CVE or GHSA ID with its severity and its alert URL.
 - List the exact packages, versions and files that change.
 - State that Vulna Squash opened the PR.
@@ -563,34 +563,21 @@ When the PR is not a dependency PR, Part E did not run. Write one comment that s
 
 ### Find or create the follow-up ticket
 
-The ticket is a GitHub issue in `Unique-AG/connectors`. The marker line `<!-- deps-follow-up: <package> -->` identifies it. Use the package that caused the problem. When the PR changes several packages and none caused it, use the first package of the PR title.
+The ticket is a Jira issue in the project `UN` on `https://unique-ch.atlassian.net`. Follow the rules of `agentic/skills/jira/SKILL.md`. Use the Jira tool of the run, and not the REST API. Do not add the label `mcp-server/unplanned`. Do not transition the issue. Do not log time.
 
-Search the open issues first.
-```bash
-gh issue list --repo Unique-AG/connectors --state open --label deps-follow-up --limit 100 \
-  --json number,url,body \
-  --jq '.[] | select(.body | contains("<!-- deps-follow-up: <package> -->")) | .url'
+The summary identifies the ticket. It starts with `Dependency follow-up: <package>`. Use the package that caused the problem. When the PR changes several packages and none caused it, use the first package of the PR title.
+
+1. Call `getAccessibleAtlassianResources`. Use the `cloudId` of `unique-ch.atlassian.net`.
+2. Search for an open ticket of the package with `searchJiraIssuesUsingJql`.
+```text
+project = UN AND labels = "deps-follow-up" AND statusCategory != Done AND summary ~ "\"Dependency follow-up: <package>\""
 ```
+3. When a ticket exists, add a comment with `addCommentToJiraIssue`. The comment has the PR link and the verdict in one sentence. Do not create a second ticket.
+4. When no ticket exists, call `createJiraIssue`. Use the project `UN`, the type `Task`, the component `mcp-servers`, and the labels `mcp-server` and `deps-follow-up`. The summary is `Dependency follow-up: <package> <old> -> <new>`. Write the description in markdown with the parts below. Leave the assignee unset.
 
-When an issue exists, add a comment with the PR link. Do not create a second issue.
-```bash
-gh issue comment <issue-number> --repo Unique-AG/connectors \
-  --body "PR <pr-url>: <verdict in one sentence>. The full report is in the PR comment."
-```
-
-When no issue exists, create the labels and the issue. The command prints the issue URL.
-```bash
-gh label create deps-follow-up --repo Unique-AG/connectors --description "A person must finish a dependency update" 2>/dev/null
-gh label create dependencies --repo Unique-AG/connectors --description "Pull requests that update a dependency file" 2>/dev/null
-gh issue create --repo Unique-AG/connectors \
-  --title "Dependency follow-up: <package> <old> -> <new>" \
-  --label deps-follow-up --label dependencies \
-  --body-file issue.md
-```
-
-The body has these parts. Use short sentences.
 ```markdown
-<!-- deps-follow-up: <package> -->
+Finish the update of <package> <old> -> <new> and merge <pr-url>.
+
 PR: <pr-url>
 
 Verdict: <one sentence>.
@@ -611,17 +598,26 @@ Verdict: <one sentence>.
 - <CVE or GHSA ID> (<severity>): <alert URL>
 
 Refs: <ticket>
+
+**Confirm:** `gh pr view <number> --repo Unique-AG/connectors --json state --jq .state` prints `MERGED`.
 ```
 
 - Write `No attempt made.` under `What the agent tried` when you made none.
 - Add `Cleared by the PR` only in mode `findings`. Add the line `Refs: <ticket>` only when the caller gave a ticket key.
 - Quote 20 lines of log at most. Do not copy tokens or secrets. State what did not run here.
+- Check the new ticket with `getJiraIssue`. It must show the component `mcp-servers` and the labels `mcp-server` and `deps-follow-up`.
+
+When the Jira tool is not connected, do not stop. Create a GitHub issue instead, with the same body and the first line `<!-- deps-follow-up: <package> -->`. Search the open issues with the label `deps-follow-up` first. State in the report comment that Jira was not available.
+```bash
+gh label create deps-follow-up --repo Unique-AG/connectors --description "A person must finish a dependency update" 2>/dev/null
+gh issue create --repo Unique-AG/connectors --title "Dependency follow-up: <package> <old> -> <new>" --label deps-follow-up --body-file issue.md
+```
 
 ### Link the ticket
 
-Update the report comment in place as in Part E. Add the line `Follow-up ticket: <issue-url>` and the line `No manual review run is needed. This comment holds the full report.` under the verdict.
+Update the report comment in place as in Part E. Add the line `Follow-up ticket: <ticket-url>` and the line `No manual review run is needed. This comment holds the full report.` under the verdict.
 
-Return the issue URL in the field `ticket` and set `handoff: true`. The caller puts the link in the Slack message.
+Return the ticket URL in the field `ticket` and set `handoff: true`. The caller puts the link in the Slack message.
 Do not merge. Do not close the PR. Stop.
 
 ## Return contract
@@ -636,7 +632,7 @@ packages: ...
 cleared: ...
 status: green|red|timed_out|held|skipped
 verdict: safe to merge|safe with a gap|do not merge|none
-ticket: <issue URL>|none
+ticket: <ticket URL>|none
 handoff: true|false
 reason: ...
 ```
