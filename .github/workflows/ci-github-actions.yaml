@@ -30,4 +30,4 @@ jobs:
           node-version: "26"
 
       - name: Run action and script unit tests
-        run: node --test .github/actions/pull-request-labels/*.test.mjs .github/actions/release-gate/*.test.mjs .github/actions/trivy-report-slack/*.test.mjs
+        run: node --test .github/actions/pull-request-labels/*.test.mjs .github/actions/release-gate/*.test.mjs .github/actions/trivy-report-slack/*.test.mjs .github/scripts/deps-nightly/*.test.mjs

@@ -7,24 +7,13 @@ updates:
       interval: cron
       cronjob: "0 6 * * 5"
       timezone: Europe/Berlin
-    cooldown:
-      default-days: 3
     labels:
       - dependencies
       - npm
     commit-message:
       prefix: build
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     rebase-strategy: disabled
-    groups:
-      per-dependency:
-        patterns:
-          - "*"
-        update-types:
-          - major
-          - minor
-          - patch
-        group-by: dependency-name
 
   - package-ecosystem: uv
     directories:
@@ -40,30 +29,13 @@ updates:
       interval: cron
       cronjob: "0 6 * * 5"
       timezone: Europe/Berlin
-    cooldown:
-      default-days: 3
     labels:
       - dependencies
       - uv
     commit-message:
       prefix: build
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     rebase-strategy: disabled
-    groups:
-      opentelemetry:
-        patterns:
-          - "opentelemetry-*"
-      unique:
-        patterns:
-          - "unique-*"
-      per-dependency:
-        patterns:
-          - "*"
-        update-types:
-          - major
-          - minor
-          - patch
-        group-by: dependency-name
 
   - package-ecosystem: docker
     directories:

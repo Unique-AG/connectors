@@ -1,0 +1,110 @@
+import assert from 'node:assert';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  changedPackages,
+  hasUvCooldown,
+  parsePnpmPackages,
+  parseRequirements,
+  parseUvDryRun,
+  pinnedVersion,
+} from './locks.mjs';
+import {
+  buildPlan,
+  latestEligibleVersions,
+  npmCandidates,
+  renderSummary,
+  uvCandidates,
+} from './plan.mjs';
+import { config, releaseAge, uvProjectFolders } from './repo.mjs';
+import { run, runOrThrow } from './run.mjs';
+
+function planNpm() {
+  const outdatedRun = run('pnpm', [
+    'outdated',
+    '-r',
+    '--format',
+    'json',
+    '--loglevel',
+    'error',
+    releaseAge,
+  ]);
+  assert.ok(
+    outdatedRun.stdout.trim().startsWith('{') || outdatedRun.status === 0,
+    `pnpm outdated failed:\n${outdatedRun.stdout}${outdatedRun.stderr}`,
+  );
+  const before = readFileSync('pnpm-lock.yaml', 'utf8');
+  runOrThrow('pnpm', ['update', '-r', '--lockfile-only', '--loglevel', 'error', releaseAge]);
+  const after = readFileSync('pnpm-lock.yaml', 'utf8');
+  writeFileSync('pnpm-lock.yaml', before);
+  return npmCandidates({
+    outdated: JSON.parse(outdatedRun.stdout.trim() || '{}'),
+    lockChanges: changedPackages(parsePnpmPackages(before), parsePnpmPackages(after)),
+    overrides: JSON.parse(readFileSync('package.json', 'utf8')).pnpm?.overrides ?? {},
+  });
+}
+
+async function planUv() {
+  const folders = uvProjectFolders();
+  const pyprojects = Object.fromEntries(
+    folders.map((folder) => [folder, readFileSync(`${folder}/pyproject.toml`, 'utf8')]),
+  );
+  const flag = hasUvCooldown(Object.values(pyprojects))
+    ? ''
+    : `--exclude-newer "${config.cooldownDays} days"`;
+  const dryRun = run('bash', [
+    '-c',
+    `bash scripts/each-python-project.sh uv lock --upgrade --dry-run ${flag} 2>&1`,
+  ]);
+  assert.strictEqual(dryRun.status, 0, `uv lock --dry-run failed:\n${dryRun.stdout}`);
+  const updates = parseUvDryRun(dryRun.stdout);
+  const pinnedNames = [
+    ...new Set(
+      Object.values(pyprojects).flatMap((text) =>
+        parseRequirements(text)
+          .filter(({ spec }) => pinnedVersion(spec))
+          .map(({ name }) => name),
+      ),
+    ),
+  ];
+  const latest = await latestEligibleVersions(
+    pinnedNames,
+    async (name) => {
+      const response = await fetch(`https://pypi.org/pypi/${name}/json`);
+      return response.ok ? response.json() : undefined;
+    },
+    Date.now(),
+    config.cooldownDays,
+  );
+  return uvCandidates({
+    projects: folders.map((folder) => ({
+      project: folder,
+      pyproject: pyprojects[folder],
+      lock: readFileSync(`${folder}/uv.lock`, 'utf8'),
+      updates: updates.get(folder) ?? [],
+    })),
+    latest,
+  });
+}
+
+const npm = planNpm();
+const uv = await planUv();
+const openBranches = JSON.parse(
+  runOrThrow('gh', ['pr', 'list', '--state', 'open', '--limit', '500', '--json', 'headRefName']),
+).map(({ headRefName }) => headRefName);
+const plan = buildPlan({
+  candidates: [...npm.candidates, ...uv.candidates],
+  needsPerson: [...npm.needsPerson, ...uv.needsPerson],
+  config,
+  openBranches,
+});
+
+const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');
+const entries = JSON.stringify(plan.entries);
+if (process.env.GITHUB_STEP_SUMMARY) {
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+}
+if (process.env.GITHUB_OUTPUT) {
+  appendFileSync(process.env.GITHUB_OUTPUT, `entries=${entries}\n`);
+}
+console.log(summary);
+console.log(entries);

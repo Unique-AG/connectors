@@ -1,0 +1,159 @@
+name: "[Deps] Nightly"
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # every night at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Write the plan to the job summary and open no pull request"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: deps-nightly
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # to read the repository
+      pull-requests: read # to list the open dependency pull requests
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      entries: ${{ steps.plan.outputs.entries }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          run_install: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.33"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Run the unit tests of the scripts
+        run: node --test .github/scripts/deps-nightly/*.test.mjs
+
+      - name: Decide the mode
+        id: mode
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          APP_CLIENT_ID: ${{ vars.DEPS_APP_CLIENT_ID }}
+          APP_KEY_SET: ${{ secrets.DEPS_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            mode="plan"
+            note="This run is a dry run. It opens no pull request."
+          elif [ -z "$APP_CLIENT_ID" ] || [ "$APP_KEY_SET" != "true" ]; then
+            mode="plan"
+            note="The variable DEPS_APP_CLIENT_ID or the secret DEPS_APP_PRIVATE_KEY is missing. This run opens no pull request."
+          else
+            mode="pr"
+            note="This run opens one pull request for each entry in the first list."
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "PLAN_NOTE=$note" >> "$GITHUB_ENV"
+
+      - name: List the updates
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/deps-nightly/plan.cli.mjs
+
+  bump:
+    name: Bump ${{ matrix.entry.slug }}
+    needs: plan
+    if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read # to read the repository, the App token does the writes
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        entry: ${{ fromJSON(needs.plan.outputs.entries) }}
+    steps:
+      - name: Create the App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.DEPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          run_install: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.11.33"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Make the update
+        id: bump
+        env:
+          ENTRY: ${{ toJSON(matrix.entry) }}
+        run: node .github/scripts/deps-nightly/bump.cli.mjs
+
+      - name: Push the branch and open the pull request
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ matrix.entry.slug }}
+          ECOSYSTEM: ${{ matrix.entry.ecosystem }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          branch="deps/$SLUG"
+          title=$(cat "$RUNNER_TEMP/pr-title.txt")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -u
+          git commit -m "$title"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push --force origin "$branch"
+
+          gh label create dependencies --color 0366d6 --description "Updates to dependencies" || true
+          gh label create "$ECOSYSTEM" --color 6f42c1 --description "Updates to $ECOSYSTEM packages" || true
+
+          number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
+            url=$(gh pr view "$number" --json url --jq .url)
+          else
+            url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --label dependencies --label "$ECOSYSTEM")
+          fi
+          echo "- $url" >> "$GITHUB_STEP_SUMMARY"
