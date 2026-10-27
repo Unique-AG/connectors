@@ -1,6 +1,6 @@
 ---
 name: dependency-pr-review
-description: Use when the user gives a dependency update PR link (or number) in Unique-AG/connectors and wants to know if the dependency update breaks our code. Starts from our own usage of the dependency, fans out read-only agents, and returns a short simple-english report with a snippet. Also use for "check this bump", "is this PR safe to merge", or "review the open dependency PRs".
+description: Use when asked to review, check, or assess a dependency update PR, a version bump, a major bump, or a breaking change, or when asked if a bump is safe to merge. Trigger words are "dependency PR", "bump", "major version", "breaking change", "deps-needs-human", "safe to merge".
 metadata:
   internal: true
 ---
