@@ -5,8 +5,9 @@
 
 All configuration is through environment variables. Every variable this service defines is listed
 on this page, grouped the way [`config.py`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/src/backstop_mcp/config.py)
-groups them. The `FASTMCP_*` and `OTEL_*` variables read by the FastMCP and OpenTelemetry libraries
-are not covered and not supported.
+groups them. The `FASTMCP_*` variables read by FastMCP, and the `OTEL_*` variables read by the
+OpenTelemetry libraries other than those under [Tracing](#Tracing), are not covered and not
+supported.
 
 - **App default** is what the server uses when the variable is unset.
 - **Chart default** is what the Helm chart's [`values.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/backstop-mcp/deploy/helm-charts/backstop-mcp/values.yaml)
@@ -106,7 +107,7 @@ mcpConfig:
 | `LOG_LEVEL` | `info` | `info`, from `mcpConfig.logging.level` | Level of backstop-mcp's own loggers: `debug`, `info`, `warning`, `error`, `critical`. Libraries are set by `LIBRARY_LOG_LEVELS` |
 | `LIBRARY_LOG_LEVELS` | `{}` | Unset. Set per deployment in `mcpConfig.logging.libraryLevels` | A JSON object of logger name to level, such as `{"httpx": "INFO"}`, merged over the defaults: `httpx` and `httpcore` at `WARNING` (their `INFO` lines are request URLs with query strings) and `sse_starlette` at `INFO` (its `DEBUG` lines are tool results). A library not named logs at `INFO`. In the chart, set `mcpConfig.logging.libraryLevels` as a map; it is rendered as JSON |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | `conceal`, from `mcpConfig.logging.diagnosticsDataPolicy` | `conceal` makes tool-level events write identifying values such as Backstop logins as `hmac-sha256:<hex>`, keyed with a secret derived from `BACKSTOP_MCP_ENCRYPTION_KEY`, so lines can be correlated without the value; at `LOG_LEVEL=debug` they are plain `sha256:<hex>`, so a developer can hash a login to find its lines. `disclose` writes the original. The Backstop HTTP client's request and re-check events (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either setting, so treat logs as containing Backstop logins. API tokens are never logged |
-| `ERROR_DETAILS_POLICY` | `redact` | `redact`, from `mcpConfig.logging.errorDetailsPolicy` | `redact` keeps exception messages and stack text out of logs, which can quote a Backstop record or the caller's input: every line logged with an exception names it in `error_type`, a line at `error` keeps the stack's frames and exception types, and a pydantic validation error adds `failed_fields` (field path, error type and the type of the input, never the value) and `failed_field_count`. `disclose` keeps the message and full stack at `error`, for debugging. Separate from `LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login |
+| `ERROR_DETAILS_POLICY` | `redact` | `redact`, from `mcpConfig.logging.errorDetailsPolicy` | `redact` keeps exception messages and stack text out of logs and spans, which can quote a Backstop record or the caller's input: every line logged with an exception names it in `error_type`, a line at `error` keeps the stack's frames and exception types, and a pydantic validation error adds `failed_fields` (field path, error type and the type of the input, never the value) and `failed_field_count`. `disclose` keeps the message and full stack at `error` and on spans, for debugging. Separate from `LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login |
 | `PUBLIC_BASE_URL` | `http://localhost:9010` | Set per deployment in `mcpConfig.app.publicBaseUrl` | See [Required](#Required) |
 | `VERSION` | Package version | `image.tag`, falling back to the chart `appVersion` (set by the base chart) | Reported as the MCP server version and on metrics. Not meant to be set by hand |
 
@@ -293,6 +294,21 @@ Migrations (`alembic upgrade head`) read the same variables as the server.
 
 Token lifetimes (15-minute access, 30-day refresh) are fixed in code. See
 [Authentication: Token lifetimes](./authentication.md#Token-Lifetimes).
+
+## Tracing
+
+Tracing is off unless one of these turns it on. The server then exports a span per HTTP request
+(not for `/health`, `/probe`, `/ready` and `/metrics`), FastMCP's `tools/call <tool>` span inside
+it, and the spans of queries and commands inside that. Exception messages are cut from every span
+unless `ERROR_DETAILS_POLICY=disclose`; see [Architecture: Traces](../technical/architecture.md#Traces).
+
+| Variable | App default | Description |
+|---|---|---|
+| `OTEL_TRACES_EXPORTER` | unset | `otlp`, `console` or `none`. Wins over the others |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | unset | The full URL traces are sent to. Set alone, it turns on `otlp` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | The collector's base URL; traces go to `<url>/v1/traces`. Set alone, it turns on `otlp` |
+| `ENABLE_OPENTELEMETRY` | unset | `true` turns tracing on with `OTEL_SPAN_PROCESSOR` as the exporter, `otlp` when that is unset. The name the Node services' charts set |
+| `OTEL_SPAN_PROCESSOR` | unset | See `ENABLE_OPENTELEMETRY` |
 
 ## Related
 

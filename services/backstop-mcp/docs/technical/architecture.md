@@ -298,10 +298,26 @@ in `server_filter_ignored`.
 
 ### Traces
 
-Several tools, queries, and commands open OpenTelemetry spans (for example `reports.run`,
-`accounts.product_investors`, `opportunity_writes.command.update`), and the ASGI middleware spans each
-HTTP request. The server does not install a trace exporter, so with the shipped
-image these spans are not exported anywhere.
+`mcp_observability.configure_tracing` installs a trace provider when an `OTEL_*` variable turns
+tracing on (see [Configuration: Tracing](../operator/configuration.md#Tracing)), before FastMCP is
+built. The ASGI middleware spans each HTTP request except `/health`, `/probe`, `/ready` and
+`/metrics`, without `send`/`receive` child spans and without a second HTTP duration histogram on
+`/metrics`. FastMCP opens a `tools/call <tool>` span inside the request, in the trace of the
+request that carried the call, and several queries and commands open spans inside that (for
+example `reports.run`, `accounts.product_investors`, `opportunity_writes.command.update`).
+
+FastMCP records every exception a tool raises on its span, with the message, the stack and the
+message again as the status description, and has no option to stop. A message can quote the
+caller's input or a Backstop record. So, unless `ERROR_DETAILS_POLICY=disclose`, the span
+processor `ErrorDetailsRedaction` rewrites each span as it ends, before export: an `exception`
+event keeps `exception.type` and a stack of frames and exception types, as an ERROR log line
+does, and loses `exception.message`; the status keeps its code and loses its description. It does
+not judge whether the caller or a bug caused the failure. The SDK ignores `set_status` once a span
+has ended and offers no way to edit events, so the processor replaces the span's private `_status`
+and `_events`. An SDK upgrade can break it; `mcp-observability`'s tests catch that.
+
+No log line is written to a span and no span is read by the logging. The only thing they share is
+`trace_id`, `span_id` and `trace_flags` on each log line, for correlation.
 
 ## Related Documentation
 

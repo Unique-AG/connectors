@@ -7,8 +7,10 @@ from mcp.server.transport_security import (
     DEFAULT_MAX_REQUEST_BODY_SIZE,
     RequestBodyLimitMiddleware,
 )
-from mcp_observability import setup_ops
+from mcp_configs import TracingSettings
+from mcp_observability import OPS_PATHS, configure_tracing, setup_ops
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+from opentelemetry.metrics import NoOpMeterProvider
 from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -53,8 +55,16 @@ def create_app() -> Starlette:
     config = get_app_config()
     auth_config = get_auth_config()
 
-    configure_logging(get_logging_settings(), encryption_key=get_encryption_key())
+    logging_settings = get_logging_settings()
+    configure_logging(logging_settings, encryption_key=get_encryption_key())
     configure_metrics(config)
+    # Before FastMCP is built. Tracing is off unless an OTEL_* variable turns it on.
+    configure_tracing(
+        TracingSettings(),
+        service_name="backstop-mcp",
+        service_version=config.version,
+        error_details_policy=logging_settings.error_details_policy,
+    )
 
     engine = get_engine()
     session_factory = get_session_factory()
@@ -116,7 +126,14 @@ def create_app() -> Starlette:
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
             Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),
-            Middleware(OpenTelemetryMiddleware),
+            Middleware(
+                OpenTelemetryMiddleware,
+                excluded_urls=",".join(f"{path}$" for path in sorted(OPS_PATHS)),
+                exclude_spans=["receive", "send"],
+                # The global meter is what `/metrics` scrapes. This middleware's histogram would
+                # duplicate mcp_observability's HTTP one, in different units.
+                meter_provider=NoOpMeterProvider(),
+            ),
             ops_middleware,
             # Innermost: Starlette wraps last-listed first, so the rewritten 401 is what
             # request-metrics / OTel see. First-listed would rewrite on the raw send after they
