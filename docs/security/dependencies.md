@@ -16,7 +16,7 @@ flowchart TD
   failed --> agent["Agent run: assess, fix a red CI, report"]
   ready --> agent
   agent -->|safe to merge| review[A person reads the report and merges]
-  agent -->|gap, do not merge, or still red| human[Label deps-needs-human and ask for a Jira ticket]
+  agent -->|gap, do not merge, or still red| human[Label deps-human-needed and ask for a Jira ticket]
 ```
 
 | Rule | Value |
@@ -45,15 +45,15 @@ The agent never merges, never approves, and never edits a lockfile by hand. A ne
 
 ## Hand-off
 
-When a person is needed, the agent adds the label `deps-needs-human`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
+When a person is needed, the agent adds the label `deps-human-needed`. It adds the section "Hand-off: log a Jira ticket" to its report comment. The section lists the exact next steps.
 
 The agent has no Jira access, so it creates no ticket. A person logs the Jira ticket and finishes the work. No one needs to run a review by hand after a hand-off, because the report is already in the PR comment.
 
 ## Each day
 
 1. Run `gh pr list --label dependencies --state open`.
-2. If a PR has the label `deps-reviewed` and not `deps-needs-human`, read the report in its comment and merge the PR.
-3. If a PR has the label `deps-needs-human`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
+2. If a PR has the label `deps-reviewed` and not `deps-human-needed`, read the report in its comment and merge the PR.
+3. If a PR has the label `deps-human-needed`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example a Terraform provider that is outside its range.
 5. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
