@@ -1,8 +1,12 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { FAILED_LABEL, failureLabelAction } from './ci-label.mjs';
+import { FAILED_LABEL, failureLabelAction, READY_LABEL, reviewLabelAction } from './ci-label.mjs';
 
-const run = (workflowName, conclusion) => ({ workflowName, conclusion });
+const run = (workflowName, conclusion, status = 'completed') => ({
+  workflowName,
+  conclusion,
+  status,
+});
 
 describe('failureLabelAction', () => {
   it('adds the label when a watched workflow failed', () => {
@@ -30,5 +34,39 @@ describe('failureLabelAction', () => {
 
   it('ignores workflows that are not watched', () => {
     assert.strictEqual(failureLabelAction([run('[CI] Helm', 'failure')], []), 'none');
+  });
+});
+
+describe('reviewLabelAction', () => {
+  const green = [run('[CI] Python', 'success'), run('[CI] Services', 'success')];
+
+  it('adds the label when every watched workflow passed', () => {
+    assert.strictEqual(reviewLabelAction(green, ['dependencies']), 'add');
+  });
+
+  it('waits while a watched workflow still runs', () => {
+    const runs = [run('[CI] Python', 'success'), run('[CI] Services', '', 'in_progress')];
+    assert.strictEqual(reviewLabelAction(runs, []), 'none');
+  });
+
+  it('adds nothing when a watched workflow failed', () => {
+    assert.strictEqual(reviewLabelAction([run('[CI] Python', 'failure')], []), 'none');
+  });
+
+  it('adds nothing when no watched workflow ran', () => {
+    assert.strictEqual(reviewLabelAction([run('[CI] Helm', 'success')], []), 'none');
+  });
+
+  it('adds nothing after the review is done or a person has the update', () => {
+    assert.strictEqual(reviewLabelAction(green, ['deps-reviewed']), 'none');
+    assert.strictEqual(reviewLabelAction(green, ['deps-needs-human']), 'none');
+  });
+
+  it('does nothing when the label is already there', () => {
+    assert.strictEqual(reviewLabelAction(green, [READY_LABEL]), 'none');
+  });
+
+  it('removes the label when the CI is not green any more', () => {
+    assert.strictEqual(reviewLabelAction([run('[CI] Python', 'failure')], [READY_LABEL]), 'remove');
   });
 });

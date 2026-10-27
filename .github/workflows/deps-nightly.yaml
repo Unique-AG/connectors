@@ -153,6 +153,7 @@ jobs:
           number=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md"
+            gh pr edit "$number" --remove-label deps-reviewed --remove-label deps-review-ready || true
             url=$(gh pr view "$number" --json url --jq .url)
           else
             url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr-body.md" --label dependencies --label "$ECOSYSTEM")

@@ -43,6 +43,17 @@ If the count is less than 3, plan at most `3 - count` batches for this run.
 Count again just before you start each subagent. Skip a batch when the cap is reached.
 Two runs at the same time can race between the count and the PR creation. The next run sees the labels.
 
+## 1b. Wait for the dependency update
+
+The nightly dependency job opens its PRs first. Check that it has finished.
+
+```bash
+gh run list --repo Unique-AG/connectors --workflow deps-nightly.yaml --limit 1 \
+  --json status,conclusion,createdAt,url
+```
+
+If the status is `queued` or `in_progress`, stop. Post one stop message with the link of the run. The next run takes the findings. Then the PRs of the dependency job exist before this run decides which packages to fix.
+
 ## 2. Scan freshness
 
 The nightly scan is the workflow `[Security] Trivy Nightly Scan`. It scans the published image of every service and the lock files of `main`. The lock file alerts have the category `trivy-lockfiles`. Fix a lock file alert like a dependency finding in an image. Skip alerts in the category `trivy-config`. They are misconfigurations of Dockerfiles, and they have no fixed version. A person fixes them.
