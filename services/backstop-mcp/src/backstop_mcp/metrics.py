@@ -3,6 +3,7 @@ from opentelemetry.exporter.prometheus import PrometheusMetricReader
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+from unique_toolkit.monitoring import REGISTRY
 
 from backstop_mcp.config import AppConfig
 
@@ -42,16 +43,16 @@ CATALOG_DURATION_VIEW = View(
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
-    """Install the OTel→Prometheus reader so domain instruments land on the default REGISTRY.
+    """Install the OTel→Prometheus reader on the registry `/metrics` serves.
 
-    HTTP `/metrics` itself is served by `unique_mcp.monitoring.setup_ops` (via
-    `unique_toolkit.monitoring.get_metrics`), which reads that same registry.
+    `unique_mcp.monitoring.setup_ops` serves `unique_toolkit.monitoring.REGISTRY`, not
+    `prometheus_client`'s default one, which is where the reader would otherwise register.
     """
     global _provider
     if _provider is not None:
         return _provider
     resource = Resource.create({SERVICE_NAME: "backstop-mcp", SERVICE_VERSION: config.version})
-    reader = PrometheusMetricReader()
+    reader = PrometheusMetricReader(registry=REGISTRY)
     provider = MeterProvider(
         resource=resource, metric_readers=[reader], views=[CATALOG_DURATION_VIEW]
     )
