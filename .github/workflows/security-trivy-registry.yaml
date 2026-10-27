@@ -2,7 +2,7 @@ name: "[Security] Trivy Registry Image Scan"
 
 on:
   schedule:
-    - cron: "0 6 * * 3" # Every Wednesday at 6 AM UTC
+    - cron: "0 3 * * *" # Every night at 3 AM UTC
   workflow_dispatch:
     inputs:
       services:
@@ -72,6 +72,7 @@ jobs:
     env:
       IMAGE: ghcr.io/unique-ag/connectors/services/${{ matrix.service.service }}
       VERSION: ${{ matrix.service.version }}
+      SERVICE: ${{ matrix.service.service }}
       TRIVY_DISABLE_VEX_NOTICE: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,6 +89,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Write scan metadata
+        run: |
+          mkdir -p scan-report
+          jq -n --arg service "$SERVICE" --arg version "$VERSION" \
+            '{service: $service, version: $version, found: false}' > scan-report/meta.json
+
       - name: Resolve published digest
         id: resolve
         run: |
@@ -95,6 +102,8 @@ jobs:
           if digest=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}' 2>/dev/null); then
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "ref=${IMAGE}@${digest}" >> "$GITHUB_OUTPUT"
+            jq '.found = true' scan-report/meta.json > scan-report/meta.next.json
+            mv scan-report/meta.next.json scan-report/meta.json
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
             echo "::warning title=No published image::${IMAGE}:${VERSION} is in the release manifest, and the registry does not hold it."
@@ -107,8 +116,8 @@ jobs:
           scan-type: image
           image-ref: ${{ steps.resolve.outputs.ref }}
           format: json
-          output: trivy-results.json
-          severity: CRITICAL,HIGH
+          output: scan-report/trivy-results.json
+          severity: CRITICAL,HIGH,MEDIUM
           scanners: vuln
           ignore-unfixed: true
           trivyignores: .github/trivyignore.yaml
@@ -117,8 +126,8 @@ jobs:
           cache: true
 
       - name: Convert Trivy results to SARIF
-        if: steps.resolve.outputs.found == 'true' && hashFiles('trivy-results.json') != ''
-        run: trivy convert --format sarif trivy-results.json -o trivy-image-scan-results.sarif
+        if: steps.resolve.outputs.found == 'true' && hashFiles('scan-report/trivy-results.json') != ''
+        run: trivy convert --format sarif --severity CRITICAL,HIGH scan-report/trivy-results.json -o trivy-image-scan-results.sarif
 
       - uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         if: steps.resolve.outputs.found == 'true' && hashFiles('trivy-image-scan-results.sarif') != ''
@@ -126,24 +135,32 @@ jobs:
           sarif_file: trivy-image-scan-results.sarif
           category: trivy-image/${{ matrix.service.service }}
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: trivy-registry-${{ matrix.service.service }}
+          path: scan-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Evaluate registry findings
         if: steps.resolve.outputs.found == 'true'
         env:
           SUMMARY_TEMPLATE: .github/trivy-templates/image-summary-markdown.tpl
         run: |
           set -euo pipefail
-          if [ ! -s trivy-results.json ]; then
+          if [ ! -s scan-report/trivy-results.json ]; then
             echo "No trivy results file — treating as clean."
             echo "✅ ${IMAGE}:${VERSION} reports no CRITICAL,HIGH findings." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if [ -f "$SUMMARY_TEMPLATE" ]; then
-            trivy convert --format template --template @"$SUMMARY_TEMPLATE" trivy-results.json > trivy-report.md || true
+            trivy convert --format template --template @"$SUMMARY_TEMPLATE" scan-report/trivy-results.json > trivy-report.md || true
             if [ -s trivy-report.md ]; then
               cat trivy-report.md >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
-          fixable_json=$(jq -c '[.Results[]?.Vulnerabilities[]? | select(.FixedVersion != null and .FixedVersion != "")]' trivy-results.json)
+          fixable_json=$(jq -c '[.Results[]?.Vulnerabilities[]? | select((.Severity == "CRITICAL" or .Severity == "HIGH") and .FixedVersion != null and .FixedVersion != "")]' scan-report/trivy-results.json)
           fixable_count=$(echo "$fixable_json" | jq 'length')
           echo "Fixable CRITICAL,HIGH in ${IMAGE}:${VERSION}: ${fixable_count}"
           if [ "$fixable_count" -eq 0 ]; then
@@ -153,3 +170,53 @@ jobs:
           echo "$fixable_json" | jq -r '.[] | "::error title=Patchable finding::\(.PkgName) \(.InstalledVersion) → \(.FixedVersion) \(.VulnerabilityID) (\(.Severity))"'
           echo "::error::Patchable CRITICAL,HIGH findings: ${fixable_count} in ${IMAGE}:${VERSION}. Rebuild and release this service."
           exit 1
+
+  report:
+    name: Slack report
+    needs:
+      - detect-services
+      - scan
+    if: always() && needs.detect-services.result == 'success'
+    permissions:
+      contents: read # to read the report action
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+    steps:
+      - name: Check the Slack webhook
+        id: webhook
+        run: |
+          if [ -z "$SLACK_SECURITY_WEBHOOK_URL" ]; then
+            echo "::notice title=Slack report skipped::The secret SLACK_SECURITY_WEBHOOK_URL is empty, so the report is not posted."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.webhook.outputs.configured == 'true'
+        with:
+          sparse-checkout: .github/actions/trivy-report-slack
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.webhook.outputs.configured == 'true'
+        continue-on-error: true
+        with:
+          pattern: trivy-registry-*
+          path: trivy-reports
+
+      - uses: ./.github/actions/trivy-report-slack
+        if: steps.webhook.outputs.configured == 'true'
+        with:
+          webhook: ${{ env.SLACK_SECURITY_WEBHOOK_URL }}
+          title: Security Trivy Scan (Registry)
+          version_label: published-images
+          reports_path: trivy-reports
+          services: ${{ needs.detect-services.outputs.services }}
+          trigger_label: ${{ github.event_name == 'schedule' && 'scheduled' || 'manual' }}
+          repository: ${{ github.repository }}
+          actor: ${{ github.actor }}
+          workflow_name: ${{ github.workflow }}
+          run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
