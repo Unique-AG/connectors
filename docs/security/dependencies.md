@@ -22,7 +22,7 @@ flowchart TD
 |---|---|
 | Scope | Direct and indirect dependencies, in pnpm (Node) and uv (Python) |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*` |
-| Cooldown | A version younger than 3 days waits. pnpm: `minimumReleaseAge: 4320`. uv: `exclude-newer = "3 days"`. |
+| Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and `npm` or `uv` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Cap | At most 5 new PRs each night |
@@ -53,11 +53,13 @@ The policy needs written approval from the engineering council for a new depende
 
 ## Dependabot
 
-Dependabot updates GitHub Actions, Docker, and Terraform. It also opens an alert when a new advisory appears for a version on `main`. The nightly job clears most alerts with its next PR.
+Dependabot version updates cover GitHub Actions, Docker, and Terraform. Dependabot security updates stay on for every ecosystem. Dependabot also opens an alert when a new advisory appears for a version on `main`. The nightly job clears most alerts with its next PR.
 
 | File | What it holds |
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
+| `.github/workflows/deps-ci-label.yaml` | The job that sets `deps-ci-failed` |
+| `agentic/skills/deps-ci-fix/SKILL.md` | The skill that fixes a red dependency PR |
 | `.github/dependabot.yaml` | Dependabot for Actions, Docker, and Terraform |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
 | `agentic/skills/dependabot-pr-review/SKILL.md` | The skill that reviews a dependency PR |

@@ -63,7 +63,7 @@ A Cursor Automation reads the findings every day. It opens fix PRs for critical 
 - The base image is pinned to one exact digest.
 - The final stage removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build.
 - A release pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record.
-- A PR builds the image without a push. It does not scan it.
+- A PR builds the image without a push. It scans the image and reports warnings. The warnings do not block.
 
 ## Files
 
