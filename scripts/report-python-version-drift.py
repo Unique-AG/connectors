@@ -1,9 +1,4 @@
-"""List every PyPI package that two Python projects' uv.lock files resolve to different versions.
-
-Each project keeps its own uv.lock, and a Dependabot security update bumps one project at a time,
-so drift returns between alignments. This only reports it and always exits 0, so it never blocks a
-pull request. Re-locking every project at once (`uv run poe upgrade`) aligns them again.
-"""
+"""Report the PyPI packages two projects' locks resolve to different versions; never fails."""
 
 import os
 import sys

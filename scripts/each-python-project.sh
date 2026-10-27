@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Run a command in every Python project under packages/ and services/, or in the folders PROJECTS
-# names, one after another, and end with the list of projects it failed in. Each project has its
-# own uv.lock and .venv.
-# Usage: bash scripts/each-python-project.sh uv sync --locked
+# Run a command in every Python project, or in the folders PROJECTS names, and list where it failed.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."

@@ -1,6 +1,4 @@
-# Tasks that run across every Python project: uv run poe <task> from the repository root.
-# Each project under packages/ and services/ keeps its own uv.lock and .venv. This is not a uv
-# workspace, and its own uv.lock holds only poethepoet.
+# Tasks that run in every Python project. Not a uv workspace: each keeps its own uv.lock and .venv.
 [project]
 name = "connectors"
 version = "0"
