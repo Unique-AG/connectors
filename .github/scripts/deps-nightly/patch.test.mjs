@@ -35,6 +35,19 @@ describe('assertAllowedChanges', () => {
     );
   });
 
+  it('accepts a new lock file in a Terraform update and nowhere else', () => {
+    const status = ' M a/versions.tf\n?? a/.terraform.lock.hcl\n';
+    assert.doesNotThrow(() => assertAllowedChanges({ ...ok, ecosystem: 'terraform', status }));
+    assert.throws(
+      () => assertAllowedChanges({ ...ok, ecosystem: 'terraform', status: '?? a/main.tf\n' }),
+      /not an edit/,
+    );
+    assert.throws(
+      () => assertAllowedChanges({ ...ok, ecosystem: 'uv', status: '?? a/.terraform.lock.hcl\n' }),
+      /not an edit/,
+    );
+  });
+
   it('rejects an unknown ecosystem', () => {
     assert.throws(() => assertAllowedChanges({ ...ok, ecosystem: 'pip' }), /Unknown ecosystem/);
   });

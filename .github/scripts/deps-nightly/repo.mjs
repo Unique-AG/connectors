@@ -15,6 +15,7 @@ export function uvProjectFolders() {
 export const ACTION_FILES = /^\.github\/(workflows\/[^/]+\.ya?ml|actions\/.+\/action\.ya?ml)$/;
 export const DOCKERFILES = /(^|\/)Dockerfile(\.[^/]*)?$/;
 export const TERRAFORM_FILES = /(^|\/)versions\.tf$/;
+export const TERRAFORM_LOCKS = /(^|\/)\.terraform\.lock\.hcl$/;
 
 export function trackedFiles(pattern) {
   return runOrThrow('git', ['ls-files'])

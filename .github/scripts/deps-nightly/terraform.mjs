@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { dirname } from 'node:path/posix';
-import { compareVersions, isStable } from './versions.mjs';
+import { LOCK_FILE, parseLock, providerAddress } from './terraform-lock.mjs';
+import { compareVersions, isMajorBump, isStable } from './versions.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TIMEOUT_MS = 20_000;
@@ -127,19 +128,25 @@ export function applyTerraform(files, { name, to }) {
   );
 }
 
-function usagesByRepo(files) {
+function usagesByRepo(files, locks) {
   const usages = new Map();
-  const add = (repo, name, constraint, folder) =>
-    usages.set(repo, [...(usages.get(repo) ?? []), { name, constraint, folder }]);
+  const add = (repo, usage) => usages.set(repo, [...(usages.get(repo) ?? []), usage]);
   for (const [path, text] of Object.entries(files)) {
     const { requiredVersion, providers } = parseProviders(text);
     const folder = dirname(path);
     if (requiredVersion) {
-      add(CORE_REPO, 'terraform', requiredVersion, folder);
+      add(CORE_REPO, { name: 'terraform', constraint: requiredVersion, folder });
     }
+    const locked = parseLock(locks[`${folder}/${LOCK_FILE}`]);
     for (const { name, source, constraint } of providers) {
       const [namespace, type] = source.split('/').slice(-2);
-      add(`${namespace}/terraform-provider-${type}`, name, constraint, folder);
+      add(`${namespace}/terraform-provider-${type}`, {
+        name,
+        source,
+        constraint,
+        folder,
+        locked: locked.get(providerAddress(source)) ?? null,
+      });
     }
   }
   return usages;
@@ -167,7 +174,11 @@ async function checkRepo(repo, usages, lookup, cutoff) {
       compareVersions(release.tag, best.tag) > 0 ? release : best,
     ).tag;
     const violations = usages.filter(({ constraint }) => !satisfies(newest, constraint));
-    if (violations.length === 0) {
+    const stale =
+      repo === CORE_REPO
+        ? []
+        : usages.filter(({ locked }) => !locked || compareVersions(locked, newest) < 0);
+    if (violations.length === 0 && stale.length === 0) {
       return {};
     }
     if (repo === CORE_REPO) {
@@ -180,14 +191,24 @@ async function checkRepo(repo, usages, lookup, cutoff) {
       };
     }
     violations.forEach(({ constraint }) => retargetConstraint(constraint, newest));
+    const lockedVersions = stale.flatMap(({ locked }) => (locked ? [locked] : []));
     return {
       candidate: {
         ecosystem: 'terraform',
         name,
-        from: [...new Set(violations.map(({ constraint }) => constraint))].join(' and '),
+        from:
+          violations.length > 0
+            ? [...new Set(violations.map(({ constraint }) => constraint))].join(' and ')
+            : [...new Set(stale.map(({ locked }) => locked ?? 'no lock'))].join(' and '),
         to: newest,
         direct: true,
-        data: { major: true },
+        data: {
+          source: usages[0].source,
+          ...(violations.length > 0 ||
+          (lockedVersions.length > 0 && isMajorBump(lockedVersions, newest))
+            ? { major: true }
+            : {}),
+        },
       },
     };
   } catch (error) {
@@ -197,10 +218,12 @@ async function checkRepo(repo, usages, lookup, cutoff) {
   }
 }
 
-export async function planTerraform({ files, lookup, now, cooldownDays }) {
+export async function planTerraform({ files, locks = {}, lookup, now, cooldownDays }) {
   const cutoff = now - cooldownDays * DAY_MS;
   const checks = await Promise.all(
-    [...usagesByRepo(files)].map(([repo, usages]) => checkRepo(repo, usages, lookup, cutoff)),
+    [...usagesByRepo(files, locks)].map(([repo, usages]) =>
+      checkRepo(repo, usages, lookup, cutoff),
+    ),
   );
   return {
     candidates: checks.flatMap(({ candidate }) => candidate ?? []),

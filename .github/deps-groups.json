@@ -3,6 +3,7 @@
   "maxNewPullRequests": 5,
   "maxOpenPullRequests": 15,
   "ignore": [],
+  "terraformPlatforms": ["linux_amd64", "linux_arm64", "darwin_arm64"],
   "groups": [
     { "name": "nestjs", "ecosystem": "npm", "patterns": ["@nestjs/*", "nestjs-*"] },
     { "name": "opentelemetry", "ecosystem": "npm", "patterns": ["@opentelemetry/*"] },

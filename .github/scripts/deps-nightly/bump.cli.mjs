@@ -1,7 +1,7 @@
 import assert from 'node:assert';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { applyActions } from './actions.mjs';
 import { pnpmCommands, renderBody, renderTitle, uvLockArgs } from './bump.mjs';
 import { applyDocker } from './docker.mjs';
@@ -29,7 +29,8 @@ import {
 } from './repo.mjs';
 import { run, runOrThrow, sandboxEnv } from './run.mjs';
 import { commitScope } from './scope.mjs';
-import { applyTerraform } from './terraform.mjs';
+import { generateLock, LOCK_FILE, mergeLockBlock } from './terraform-lock.mjs';
+import { applyTerraform, parseProviders } from './terraform.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const entry = JSON.parse(process.env.ENTRY);
@@ -113,12 +114,38 @@ function bumpTextFiles(pattern, apply) {
   };
 }
 
+function bumpTerraform() {
+  const edited = bumpTextFiles(TERRAFORM_FILES, applyTerraform);
+  const locks = [];
+  for (const { to, data } of entry.members) {
+    const generated = generateLock({
+      source: data.source,
+      version: to,
+      platforms: config.terraformPlatforms,
+    });
+    for (const path of trackedFiles(TERRAFORM_FILES)) {
+      const provider = parseProviders(readFileSync(path, 'utf8')).providers.find(
+        ({ source }) => source === data.source,
+      );
+      const lockPath = join(dirname(path), LOCK_FILE);
+      const before = existsSync(lockPath) ? readFileSync(lockPath, 'utf8') : null;
+      const merged = provider && mergeLockBlock(before, generated, provider.constraint);
+      if (provider && merged !== before) {
+        writeFileSync(lockPath, merged);
+        runOrThrow('git', ['add', '--intent-to-add', lockPath]);
+        locks.push(lockPath);
+      }
+    }
+  }
+  return { changes: edited.changes, projects: [...edited.projects, ...locks] };
+}
+
 const bumpers = {
   npm: bumpNpm,
   uv: bumpUv,
   actions: () => bumpTextFiles(ACTION_FILES, applyActions),
   docker: () => bumpTextFiles(DOCKERFILES, applyDocker),
-  terraform: () => bumpTextFiles(TERRAFORM_FILES, applyTerraform),
+  terraform: bumpTerraform,
 };
 assert.ok(entry.ecosystem in bumpers, `Unknown ecosystem ${entry.ecosystem}`);
 const { changes, projects } = bumpers[entry.ecosystem]();

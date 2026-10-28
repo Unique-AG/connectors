@@ -131,7 +131,17 @@ describe('planTerraform', () => {
       },
     };
   };
-  const run = (files, lookup) => planTerraform({ files, lookup, now: NOW, cooldownDays: 3 });
+  const run = (files, lookup, locks) =>
+    planTerraform({ files, locks, lookup, now: NOW, cooldownDays: 3 });
+  const FOLDER = 'services/a/deploy/terraform/x';
+  const lockOf = (versions) => ({
+    [`${FOLDER}/.terraform.lock.hcl`]: Object.entries(versions)
+      .map(
+        ([type, version]) =>
+          `provider "registry.terraform.io/hashicorp/${type}" {\n  version     = "${version}"\n  constraints = "x"\n}\n`,
+      )
+      .join('\n'),
+  });
 
   it('reports nothing when every constraint holds', async () => {
     const lookup = lookupOf();
@@ -141,7 +151,8 @@ describe('planTerraform', () => {
         time: '~> 0.12',
       }),
     };
-    assert.deepStrictEqual(await run(files, lookup), { candidates: [], needsPerson: [] });
+    const locks = lockOf({ azurerm: '4.9.0', time: '0.13.1' });
+    assert.deepStrictEqual(await run(files, lookup, locks), { candidates: [], needsPerson: [] });
     assert.deepStrictEqual(lookup.calls.sort(), [
       'hashicorp/terraform',
       'hashicorp/terraform-provider-azurerm',
@@ -161,18 +172,47 @@ describe('planTerraform', () => {
           from: '~> 3',
           to: '4.9.0',
           direct: true,
-          data: { major: true },
+          data: { source: 'hashicorp/azurerm', major: true },
         },
       ],
       needsPerson: [],
     });
   });
 
+  it('proposes a lock update when the lock is behind a release inside the constraint', async () => {
+    const files = { [`${FOLDER}/versions.tf`]: versionsTf('~> 1.10', { azurerm: '>= 3, < 6' }) };
+    const behind = await run(files, lookupOf(), lockOf({ azurerm: '4.5.0' }));
+    assert.deepStrictEqual(behind.candidates, [
+      {
+        ecosystem: 'terraform',
+        name: 'azurerm',
+        from: '4.5.0',
+        to: '4.9.0',
+        direct: true,
+        data: { source: 'hashicorp/azurerm' },
+      },
+    ]);
+    const major = await run(files, lookupOf(), lockOf({ azurerm: '3.117.0' }));
+    assert.deepStrictEqual(major.candidates[0].data, { source: 'hashicorp/azurerm', major: true });
+  });
+
+  it('proposes a lock for a module that has none', async () => {
+    const files = { [`${FOLDER}/versions.tf`]: versionsTf('~> 1.10', { azurerm: '>= 4, < 6' }) };
+    const { candidates } = await run(files, lookupOf());
+    assert.deepStrictEqual(
+      candidates.map(({ from, to }) => [from, to]),
+      [['no lock', '4.9.0']],
+    );
+  });
+
   it('ignores a release inside the cooldown and a prerelease', async () => {
     const files = {
       'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', { azurerm: '< 5' }),
     };
-    assert.deepStrictEqual(await run(files, lookupOf()), { candidates: [], needsPerson: [] });
+    assert.deepStrictEqual(await run(files, lookupOf(), lockOf({ azurerm: '4.9.0' })), {
+      candidates: [],
+      needsPerson: [],
+    });
   });
 
   it('reports the core version when it is outside required_version', async () => {

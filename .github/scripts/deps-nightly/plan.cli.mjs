@@ -25,6 +25,7 @@ import {
   readFiles,
   releaseAge,
   TERRAFORM_FILES,
+  TERRAFORM_LOCKS,
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
@@ -140,6 +141,7 @@ const docker = await planDocker({
 });
 const terraform = await planTerraform({
   files: planFiles(TERRAFORM_FILES),
+  locks: planFiles(TERRAFORM_LOCKS),
   lookup: createTerraformLookup(process.env.GH_TOKEN),
   ...ecosystemOptions,
 });
