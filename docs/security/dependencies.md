@@ -203,7 +203,13 @@ The nightly job also updates these. The same rules apply: one PR for each item, 
 |---|---|
 | GitHub Actions | One PR for each action repository. It moves the pinned commit and the version comment in every workflow. A major bump says so in the PR body. An action with no GitHub Release uses its tags, and the date of the tag commit. If the pinned tag now points to another commit than the pin, the job lists the action in "Needs a person". |
 | Docker base images | One PR for each image, for example `node`. It moves the tag and the digest in every Dockerfile, in the `FROM` lines and in the `COPY --from` lines. It stays in the same major version. A new digest for the same tag opens no PR when every platform image is the same. The change starts a release for each service. A rate limit or a server error of the registry goes to "Needs a person". |
-| Terraform providers | One PR for each provider whose newest release is outside our version constraint. The PR widens the constraint in every `versions.tf` that names the provider, so that the release fits. A part `!=` that excludes the new release is dropped. The repository has no Terraform lock file, so a release inside the constraint needs no PR. The CI job `validate-terraform` checks the change. |
+| Terraform providers | One PR for each provider that has a release newer than the locked version in any module. The PR updates `.terraform.lock.hcl` in every module that names the provider. If the release is outside our version constraint, the PR also widens the constraint in every `versions.tf` that names the provider. A part `!=` that excludes the new release is dropped. A module with no lock file gets one. The CI job `validate-terraform` checks the change. |
+
+The lock files hold hashes for `linux_amd64`, `linux_arm64`, and `darwin_arm64`. The list is `terraformPlatforms` in `.github/deps-groups.json`. To lock a new module by hand, run this command in the module, inside `nix develop`:
+
+```bash
+terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64
+```
 
 An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too, for example the `uv` image in `COPY --from`. An npm version that its publisher deprecated goes there as well. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint.
 
