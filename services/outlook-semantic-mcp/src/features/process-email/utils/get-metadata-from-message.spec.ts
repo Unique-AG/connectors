@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GraphMessage } from '../dtos/microsoft-graph.dtos';
+import { GraphMessage, graphMessageSchema } from '../dtos/microsoft-graph.dtos';
 import { getMetadataFromMessage } from './get-metadata-from-message';
 
 const baseMessage: GraphMessage = {
@@ -25,6 +25,21 @@ describe('getMetadataFromMessage', () => {
 
     expect(metadata.attachmentNames).toEqual(['offer.pdf', 'logo.png', 'terms.docx']);
     expect(metadata.inlineAttachmentNames).toEqual(['logo.png']);
+  });
+
+  it('accepts an attachment without a name and leaves it out', () => {
+    const message = graphMessageSchema.parse({
+      ...baseMessage,
+      attachments: [
+        { name: null, isInline: true },
+        { name: 'offer.pdf', isInline: false },
+      ],
+    });
+
+    const metadata = getMetadataFromMessage(message);
+
+    expect(metadata.attachmentNames).toEqual(['offer.pdf']);
+    expect(metadata.inlineAttachmentNames).toEqual([]);
   });
 
   it('stores no attachment names when Graph returned none', () => {

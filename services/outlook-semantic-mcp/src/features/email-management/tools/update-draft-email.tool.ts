@@ -19,7 +19,7 @@ const UpdateDraftEmailInputSchema = z
       .string()
       .optional()
       .describe(
-        'Replacement HTML body, sent to Outlook unchanged. Do not send Markdown. It replaces the WHOLE body, so start from the HTML `open_email` returned in `text` and change only what the user asked to change. Do not rebuild it from `chunks`. Keep styles, tables, the signature, the quoted thread, and `cid:` images. Fragment only — no html, head, or body wrappers. Omit to keep the current body.',
+        'Replacement HTML body, sent to Outlook unchanged. Do not send Markdown. It replaces the WHOLE body, so start from the HTML `open_email` returned in `text` and change only what the user asked to change. Do not rebuild it from `chunks`. Send back the whole HTML document, including `<head>` and its `<style>` blocks, and keep tables, the signature, the quoted thread, and `cid:` images. Omit to keep the current body.',
       ),
     toRecipients: DraftRecipientsSchema.min(1)
       .optional()

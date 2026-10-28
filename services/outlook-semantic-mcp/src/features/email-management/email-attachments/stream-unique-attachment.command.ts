@@ -7,6 +7,7 @@ import { type Dispatcher, fetch } from 'undici';
 import { UniqueConfigNamespaced } from '~/config';
 import {
   AttachmentUploadResult,
+  draftAttachmentsRequest,
   ResolvedUniqueIdentity,
   UPLOAD_CHUNK_SIZE,
   UploadSessionSchema,
@@ -29,6 +30,7 @@ export class StreamUniqueAttachmentCommand {
     chatId,
     userProfileId,
     mailbox,
+    idIsImmutable,
   }: {
     client: Client;
     draftId: string;
@@ -40,6 +42,7 @@ export class StreamUniqueAttachmentCommand {
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
     mailbox?: string;
+    idIsImmutable?: boolean;
   }): Promise<AttachmentUploadResult> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
@@ -141,6 +144,7 @@ export class StreamUniqueAttachmentCommand {
         totalChunks,
         userProfileId,
         mailbox,
+        idIsImmutable,
       });
     } finally {
       reader.cancel();
@@ -159,6 +163,7 @@ export class StreamUniqueAttachmentCommand {
     totalChunks,
     userProfileId,
     mailbox,
+    idIsImmutable,
   }: {
     reader: {
       read(): Promise<{ done: boolean; value?: Uint8Array }>;
@@ -172,14 +177,20 @@ export class StreamUniqueAttachmentCommand {
     totalChunks: number;
     userProfileId: string;
     mailbox?: string;
+    idIsImmutable?: boolean;
   }): Promise<void> {
     let offset = 0;
     let chunkIndex = 0;
     let pending = Buffer.alloc(0);
-    const prefix = mailbox ? `/users/${mailbox}` : '/me';
 
     const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`${prefix}/messages/${draftId}/attachments/createUploadSession`).post({
+      await draftAttachmentsRequest({
+        client,
+        draftId,
+        mailbox,
+        idIsImmutable,
+        subPath: '/createUploadSession',
+      }).post({
         AttachmentItem: {
           attachmentType: 'file',
           name: fileName.value,

@@ -404,14 +404,19 @@ describe('SemanticSearchEmailsQuery', () => {
       });
     });
 
-    it('rejects a match without a Graph id', async () => {
+    it('skips a match without a Graph id and keeps the others', async () => {
       const { instance } = createMockQuery({
-        searchResults: [[{ ...makeSearchItem('mail-1'), metadata: {} }]],
+        searchResults: [
+          [
+            { ...makeSearchItem('mail-1'), metadata: {} },
+            { ...makeSearchItem('mail-2'), metadata: { id: 'graph-2', isDraft: 'false' } },
+          ],
+        ],
       });
 
-      await expect(instance.run(testUserId, [baseInput])).rejects.toThrow(
-        'Ingested email mail-1 has no Graph message id',
-      );
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results.map((result) => result.uniqueContentId)).toEqual(['mail-2']);
     });
 
     it('returns every email of every search without a count cap', async () => {

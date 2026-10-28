@@ -5,12 +5,13 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { oneLine } from '~/utils/one-line';
 import { CancelEventCommand } from './cancel-event.command';
 import { META } from './cancel-event-tool.meta';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
-import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
+import { describeCalendar, formatDisplayWhen } from './utils/calendar-display';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {

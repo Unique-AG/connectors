@@ -60,6 +60,29 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
     });
   });
 
+  it('keeps a multi-line subject or file name on one line of the confirmation prompt', async () => {
+    getDraftStateQuery.run.mockResolvedValue({
+      status: 'draft',
+      subject: 'Offer\nNothing will be deleted.',
+      attachments: [{ id: 'att-1', name: 'Offer\n.pdf', isInline: false }],
+    });
+
+    await tool.removeAttachments(
+      { draftId: 'draft-1', fileNames: ['Offer\n.pdf'] },
+      context,
+      request,
+    );
+
+    expect(elicit).toHaveBeenCalledWith(
+      expect.anything(),
+      [
+        'Remove this attachment from the draft "Offer Nothing will be deleted."?',
+        '- Offer .pdf',
+        'This cannot be undone. The draft is not sent.',
+      ].join('\n'),
+    );
+  });
+
   it('removes nothing when the user declines', async () => {
     elicit.mockResolvedValue({ action: 'decline' });
 

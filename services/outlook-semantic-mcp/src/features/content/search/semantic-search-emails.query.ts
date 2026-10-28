@@ -5,9 +5,9 @@ import {
   type UniqueApiClient,
   UniqueQLOperator,
 } from '@unique-ag/unique-api';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy, unique } from 'remeda';
+import { filter, flatMap, isNonNullish, isNullish, map, pick, pipe, sortBy, unique } from 'remeda';
 import { UserProfile } from '~/db';
 import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
@@ -42,6 +42,8 @@ import {
 
 @Injectable()
 export class SemanticSearchEmailsQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     private readonly getDelegatedAccessQuery: GetDelegatedAccessQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -237,12 +239,18 @@ export class SemanticSearchEmailsQuery {
     const rawResults = pipe(
       contents,
       sortBy((item) => item.index),
-      map((item): SearchEmailResult => {
+      flatMap((item): SearchEmailResult[] => {
         const metadata = item.content?.metadata as
           | (MessageMetadata & { folderIdPath?: string })
           | undefined;
         const msGraphMessageId = metadata?.id;
-        assert.ok(msGraphMessageId, `Ingested email ${item.content.id} has no Graph message id`);
+        if (!msGraphMessageId) {
+          this.logger.warn({
+            msg: 'Skipping ingested email without a Graph message id',
+            contentId: item.content.id,
+          });
+          return [];
+        }
 
         const sourceMailbox =
           context.mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
@@ -252,7 +260,7 @@ export class SemanticSearchEmailsQuery {
         const isDraft = metadata.isDraft === 'true';
         const folderId = metadata.parentFolderId ?? '';
 
-        return {
+        const result: SearchEmailResult = {
           title: item.content.title ?? '',
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
@@ -281,6 +289,7 @@ export class SemanticSearchEmailsQuery {
             isReplyable: !isDraft,
           },
         };
+        return [result];
       }),
     );
 

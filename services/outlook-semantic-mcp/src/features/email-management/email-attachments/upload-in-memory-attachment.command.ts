@@ -3,7 +3,7 @@ import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { fetch } from 'undici';
-import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
+import { draftAttachmentsRequest, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
@@ -20,6 +20,7 @@ export class UploadInMemoryAttachmentCommand {
     mimeType,
     userProfileId,
     mailbox,
+    idIsImmutable,
   }: {
     client: Client;
     draftId: string;
@@ -29,8 +30,9 @@ export class UploadInMemoryAttachmentCommand {
     mimeType: string;
     userProfileId: string;
     mailbox?: string;
+    idIsImmutable?: boolean;
   }): Promise<{ status: 'success' }> {
-    const prefix = mailbox ? `/users/${mailbox}` : '/me';
+    const draftTarget = { client, draftId, mailbox, idIsImmutable };
     if (totalSize <= 3 * 1024 * 1024) {
       const logInfo = {
         userProfileId,
@@ -39,7 +41,7 @@ export class UploadInMemoryAttachmentCommand {
         sizeBytes: totalSize,
       };
       this.logger.log({ ...logInfo, msg: 'Uploading attachment via simple POST' });
-      await client.api(`${prefix}/messages/${draftId}/attachments`).post({
+      await draftAttachmentsRequest(draftTarget).post({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: fileName.value,
         contentBytes: data.toString('base64'),
@@ -60,7 +62,7 @@ export class UploadInMemoryAttachmentCommand {
     });
 
     const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`${prefix}/messages/${draftId}/attachments/createUploadSession`).post({
+      await draftAttachmentsRequest({ ...draftTarget, subPath: '/createUploadSession' }).post({
         AttachmentItem: {
           attachmentType: 'file',
           name: fileName.value,
