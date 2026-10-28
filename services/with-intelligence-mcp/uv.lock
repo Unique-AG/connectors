@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.15'",
 ]
 
+[manifest]
+overrides = [
+    { name = "filelock", specifier = ">=4.2.1" },
+    { name = "pillow", specifier = ">=13.0.0" },
+]
+
 [[package]]
 name = "aiofile"
 version = "3.12.3"

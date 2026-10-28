@@ -107,3 +107,9 @@ include = ["src", "tests"]
 extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
+
+[tool.uv]
+override-dependencies = [
+    "filelock>=4.2.1",
+    "pillow>=13.0.0",
+]
