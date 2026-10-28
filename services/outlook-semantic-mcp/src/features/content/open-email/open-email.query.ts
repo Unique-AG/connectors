@@ -109,10 +109,11 @@ export class OpenEmailQuery {
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const encodedMessageId = encodeGraphItemIdForUrlPath(messageId);
-    const messagePath =
-      mailbox && folderId
+    const messagePath = !mailbox
+      ? `/me/messages/${encodedMessageId}`
+      : folderId
         ? `/users/${mailbox}/mailFolders/${encodeGraphItemIdForUrlPath(folderId)}/messages/${encodedMessageId}`
-        : `/me/messages/${encodedMessageId}`;
+        : `/users/${mailbox}/messages/${encodedMessageId}`;
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
       .api(messagePath)

@@ -24,8 +24,8 @@ const FAILED =
  * Runs the confirmation gate for a write that cannot be undone.
  *
  * Every outcome other than an explicit accept means no Graph write happens. That includes the
- * failure modes: a write tool here sends mail to third parties and cannot be undone, so a
- * confirmation we did not get is treated as a confirmation the user did not give. The failures are
+ * failure modes: a write gated here cannot be undone (it may send mail to third parties or delete
+ * data), so a confirmation we did not get is treated as a confirmation the user did not give. The failures are
  * turned into a typed result rather than propagating as a raw MCP error, so the model can relay
  * something useful and retry instead of surfacing a protocol error to the user.
  *

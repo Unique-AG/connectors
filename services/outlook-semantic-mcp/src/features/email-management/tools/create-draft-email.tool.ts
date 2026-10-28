@@ -68,6 +68,12 @@ const CreateDraftEmailOutputSchema = z.object({
     .describe(
       'Microsoft Graph message ID of the created draft. Present only when success is true.',
     ),
+  idIsImmutable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether `draftId` is an immutable ID. Present only when success is true. Pass it as `idIsImmutable` with `draftId` to `open_email` and to the draft editing tools.',
+    ),
   webLink: z
     .string()
     .optional()

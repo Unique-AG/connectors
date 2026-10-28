@@ -10,55 +10,50 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
-const OpenEmailByIdInputSchema = z
-  .object({
-    id: z
-      .string()
-      .describe(
-        'Microsoft Graph message id. Use `openEmailParams.id` from a `search_emails` result. Pass the whole object.',
-      ),
-    mailbox: z
-      .email()
-      .optional()
-      .describe(
-        'Delegated mailbox address. Use `openEmailParams.mailbox` from a `search_emails` result.',
-      ),
-    parentFolderId: z
-      .string()
-      .regex(/^[A-Za-z0-9+/_=-]+$/)
-      .optional()
-      .describe(
-        'The folder containing this email. Use `openEmailParams.parentFolderId` from a `search_emails` result.',
-      ),
-    idIsImmutable: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether the id is an immutable ID. Use `openEmailParams.idIsImmutable` from a `search_emails` result.',
-      ),
-    bodyContentType: z
-      .enum(['text', 'html'])
-      .optional()
-      .describe(
-        "Body format. `openEmailParams` sets this to `html` when the message is a draft, and omits it otherwise so the body is plain text. Pass the object through. Edit a draft's HTML and send it back as `content` to `update_draft_email`.",
-      ),
-    uniqueContentId: z
-      .string()
-      .optional()
-      .describe(
-        'Ingested content id from `openEmailParams`. When set, the matched chunks are returned in `chunks` alongside the live Graph body. Pass it through.',
-      ),
-    chunkIds: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Ids of the semantically matched chunks from `openEmailParams`. Pass them through with `uniqueContentId`.',
-      ),
-  })
-  .refine((val) => !val.mailbox || val.parentFolderId !== undefined, {
-    message: 'parentFolderId is required when mailbox is provided',
-    path: ['parentFolderId'],
-  });
+const OpenEmailByIdInputSchema = z.object({
+  id: z
+    .string()
+    .describe(
+      'Microsoft Graph message id. Use `openEmailParams.id` from a `search_emails` result. Pass the whole object.',
+    ),
+  mailbox: z
+    .email()
+    .optional()
+    .describe(
+      'Delegated mailbox address. Use `openEmailParams.mailbox` from a `search_emails` result, or the `mailbox` you passed to `draft_email`.',
+    ),
+  parentFolderId: z
+    .string()
+    .regex(/^[A-Za-z0-9+/_=-]+$/)
+    .optional()
+    .describe(
+      'The folder containing this email. Use `openEmailParams.parentFolderId` from a `search_emails` result when it is set.',
+    ),
+  idIsImmutable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether the id is an immutable ID. Use `openEmailParams.idIsImmutable` from a `search_emails` result, or the `idIsImmutable` that `draft_email` returned.',
+    ),
+  bodyContentType: z
+    .enum(['text', 'html'])
+    .optional()
+    .describe(
+      "Body format. `openEmailParams` sets this to `html` when the message is a draft, and omits it otherwise so the body is plain text. Pass the object through. Edit a draft's HTML and send it back as `content` to `update_draft_email`.",
+    ),
+  uniqueContentId: z
+    .string()
+    .optional()
+    .describe(
+      'Ingested content id from `openEmailParams`. When set, the matched chunks are returned in `chunks` alongside the live Graph body. Pass it through.',
+    ),
+  chunkIds: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Ids of the semantically matched chunks from `openEmailParams`. Pass them through with `uniqueContentId`.',
+    ),
+});
 
 export const EmailDataSchema = z.object({
   id: z.string(),
