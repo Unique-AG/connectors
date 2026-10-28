@@ -181,6 +181,21 @@ class TestTraced:
         assert span.name == "WindowQuery.run"
         assert span.attributes == {"input.window_days": 7}
 
+    async def test_a_lambda_keeps_identifying_values_pseudonymised(
+        self, exporter: InMemorySpanExporter
+    ) -> None:
+        class LoginQuery:
+            @traced(arguments=lambda args: {"kind": "login"}, identifying=("login",))
+            async def run(self, *, login: str) -> None:
+                del login
+
+        await LoginQuery().run(login=_LAST_NAME)
+
+        assert _span(exporter).attributes == {
+            "input.kind": "login",
+            "input.login": _hashed(_LAST_NAME),
+        }
+
 
 class TestCallTime:
     def test_a_path_through_none_is_skipped_silently(

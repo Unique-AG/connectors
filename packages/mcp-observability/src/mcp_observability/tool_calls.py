@@ -21,14 +21,9 @@ _MAX_TOOL_NAME = 64
 
 
 class ToolCallObservabilityMiddleware(Middleware):
-    """Logs `Tool call started` and exactly one of `Tool call completed`, `failed` or `cancelled`,
-    with the tool, the names of the arguments it was given, the caller's subject, the duration and
-    the values `@trace_arguments` declared. A failure is logged at its `failure_level`, with the
-    exception for the output handler to clean, and an invalid argument as `failed_fields`.
-
-    Make it the outermost FastMCP middleware. FastMCP's own per-call failure lines and the
-    `setup_ops` line for a tool call are dropped: they repeat these, and can quote the input.
-    """
+    """Logs one `started` and one `completed`, `failed` or `cancelled` line per tool call, a failure
+    at its `failure_level`. Make it the outermost FastMCP middleware: it drops FastMCP's own
+    per-call lines, which repeat these and can quote the input."""
 
     def __init__(self) -> None:
         super().__init__()

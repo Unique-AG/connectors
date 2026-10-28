@@ -141,11 +141,14 @@ class _Declaration(BaseModel):
         return f"{self.function.__module__}.{self.function.__qualname__}"
 
     def argument_attributes(self, bound: Mapping[str, object]) -> dict[str, AttributeValue]:
+        identifying = self._paths(bound, self.identifying, identifying=True)
         if callable(self.arguments):
             compute = cast("Callable[[Mapping[str, object]], Mapping[str, object]]", self.arguments)
-            return self._converted(self._attempt("lambda", lambda: compute(bound)) or {}, "lambda")
-        attributes = self._paths(bound, self.arguments, identifying=False)
-        return attributes | self._paths(bound, self.identifying, identifying=True)
+            computed = self._converted(
+                self._attempt("lambda", lambda: compute(bound)) or {}, "lambda"
+            )
+            return computed | identifying
+        return self._paths(bound, self.arguments, identifying=False) | identifying
 
     def result_attributes(self, value: object) -> dict[str, AttributeValue]:
         if self.result is None:
