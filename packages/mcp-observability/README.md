@@ -28,9 +28,12 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   email or search term logged as `hmac-sha256:<hex>` keyed with `secret`, as plain `sha256:<hex>`
   at DEBUG, or as itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Derive `secret` from a key
   the MCP holds; never pass that key itself.
-- `configure_tracing(settings, service_name=..., service_version=...)`: the trace provider
-  `mcp_configs.TracingSettings` asks for, off unless the environment turns it on, with W3C trace
-  context and baggage propagation.
+- `configure_tracing(settings, service_name=..., service_version=..., error_details_policy=...)`:
+  the trace provider `mcp_configs.TracingSettings` asks for, off unless the environment turns it
+  on, with W3C trace context and baggage propagation. Unless `ERROR_DETAILS_POLICY=disclose`,
+  every exported span, on a provider installed before this too, loses its exception messages and
+  its status description: an `exception` event keeps `exception.type` and a stack of frames and
+  exception types. FastMCP records every exception a tool raises on its span, message included.
 - `setup_ops(mcp)`: serves `/probe`, `/health` and `/metrics` from the server, counts, times and
   logs every tool, resource and prompt call (`mcp_calls_total`, `mcp_call_duration_seconds`), and
   returns the HTTP metrics middleware (`python_http_requests_total`,

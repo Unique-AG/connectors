@@ -14,7 +14,10 @@ SERVICE_NAME = "mcp-skeleton"
 def init_telemetry(settings: LoggingSettings) -> None:
     """Runs before anything logs. Tracing reads its settings (OTEL_*) from the environment."""
     configure_tracing(
-        TracingSettings(), service_name=SERVICE_NAME, service_version=version(SERVICE_NAME)
+        TracingSettings(),
+        service_name=SERVICE_NAME,
+        service_version=version(SERVICE_NAME),
+        error_details_policy=settings.error_details_policy,
     )
     configure_logging(settings, own_loggers=("mcp_skeleton",))
 
