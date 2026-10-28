@@ -8,8 +8,8 @@ dependencies = [
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
     # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
     # the Graph SDK stops depending on them, OBO must not break silently.
-    "fastmcp[azure]==4.1.3",
-    # fastmcp already depends on py-key-value-aio[filetree,keyring,memory]; declared here for
+    "fastmcp[azure]==4.1.4",
+    # fastmcp already depends on py-key-value-aio[filetree,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.6",
     # The official Microsoft Graph SDK. `msgraph-core` (the request-adapter/telemetry layer),
@@ -19,7 +19,7 @@ dependencies = [
     "uvicorn[standard]==0.54.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
-    "starlette==1.9.0",
+    "starlette==1.10.0",
     "pydantic==2.14.1",
     "pydantic-settings==2.16.1",
     "python-dotenv==1.2.4",
@@ -33,22 +33,22 @@ dependencies = [
     "opentelemetry-instrumentation-asgi==0.66b1",
     "asyncpg==0.32.0",
     "cryptography==50.0.2",
-    "unique-mcp==2026.44.1",
+    "unique-mcp==2026.44.2",
     # unique-mcp already depends on unique-toolkit[monitoring,otel]; declared here for the
     # monitoring extra (prometheus-client) and because metrics.py imports the toolkit REGISTRY
     # directly to aim the Prometheus reader at the registry `/metrics` scrapes.
-    "unique-toolkit[monitoring,otel]==2026.44.1",
+    "unique-toolkit[monitoring,otel]==2026.44.2",
     "mcp==2.3.0",
     # `shared/calendar.py` converts every calendar time through `zoneinfo`; this is its fallback
     # when a base image ships no system tz database, which otherwise refuses every IANA zone name.
-    "tzdata==2026.5",
+    "tzdata==2026.6",
 ]
 
 [project.scripts]
 office-365-mcp = "office_365_mcp.main:main"
 
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -59,10 +59,10 @@ packages = ["src/office_365_mcp"]
 
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
-    "hatchling==1.32.4",
-    "ruff==0.17.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
+    "hatchling==1.33.0",
+    "ruff==0.17.3",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
@@ -107,9 +107,3 @@ include = ["src", "tests"]
 extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
-
-[tool.uv]
-override-dependencies = [
-    "filelock>=4.2.1",
-    "pillow>=13.0.0",
-]
