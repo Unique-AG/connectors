@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Sequence
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.includes import (
@@ -30,6 +32,12 @@ class GetOrganizationQuery:
         self._client: BackstopClient = client
         self._custom_fields_service: CustomFieldsService = custom_fields_service
 
+    @traced(
+        arguments=lambda args: {
+            "party_id": args["party_id"],
+            "include": args["include"],
+        }
+    )
     async def run(
         self,
         *,

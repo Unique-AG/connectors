@@ -246,6 +246,44 @@ class TestAuthRecheck:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_logs_the_recheck_with_a_route_and_a_pseudonymised_username(
+        self,
+        factory: BackstopClientFactory,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.backstop_client.client.asyncio.sleep", _instant_sleep)
+
+        async def on_auth_failure() -> None:
+            return None
+
+        respx.get(f"{_BASE_URL}/people/123").mock(return_value=httpx.Response(401))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+
+        client = factory.for_credential(_credential(), on_auth_failure=on_auth_failure)
+        with caplog.at_level(logging.INFO), pytest.raises(BackstopSessionRevokedError):
+            await client.raw_request("GET", "/people/123")
+
+        recheck = [
+            item
+            for item in caplog.records
+            if item.message
+            in (
+                "Re-checked the Backstop credential",
+                "Decided on the Backstop credential after re-check",
+            )
+        ]
+        assert {item.message for item in recheck} == {
+            "Re-checked the Backstop credential",
+            "Decided on the Backstop credential after re-check",
+        }
+        for record in recheck:
+            assert record.__dict__["trigger_route"] == "/people/:id"
+            assert "trigger_path" not in record.__dict__
+            assert str(cast("object", record.__dict__["username"])) == _sha256("bob.smith")
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_revokes_only_when_every_probe_is_unauthorized(
         self, factory: BackstopClientFactory, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -358,10 +396,10 @@ class TestAuthRecheck:
 class TestUnauthorizedLogging:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_logs_parsed_json_api_errors_and_caller_identity(
+    async def test_logs_status_code_and_caller_identity_without_the_error_text(
         self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
     ) -> None:
-        respx.get(f"{_BASE_URL}/people").mock(
+        respx.get(f"{_BASE_URL}/people/123").mock(
             return_value=httpx.Response(
                 401,
                 json={
@@ -372,23 +410,24 @@ class TestUnauthorizedLogging:
 
         with caplog.at_level(logging.INFO), pytest.raises(BackstopAuthError):
             await factory.for_credential(_credential(), subject="user-42").raw_request(
-                "GET", "/people"
+                "GET", "/people/123"
             )
 
         record = next(
-            item for item in caplog.records if item.message == "backstop.request.unauthorized"
+            item for item in caplog.records if item.message == "Backstop rejected the credential"
         )
         assert record.__dict__["status_code"] == 401
-        assert record.__dict__["detail"] == "token rejected"
-        assert record.__dict__["title"] == "Unauthorized"
         assert record.__dict__["code"] == "401"
+        assert record.__dict__["error_count"] == 1
+        assert record.__dict__["route"] == "/people/:id"
         assert str(cast("object", record.__dict__["username"])) == _sha256("bob.smith")
         assert record.__dict__["subject"] == "user-42"
-        assert "body_excerpt" not in record.__dict__
+        for dropped in ("detail", "title", "errors", "path", "body_excerpt"):
+            assert dropped not in record.__dict__
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_logs_a_redacted_excerpt_when_the_body_does_not_parse(
+    async def test_logs_nothing_of_a_body_that_does_not_parse(
         self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
     ) -> None:
         token = "p@55W0rd321!"
@@ -400,10 +439,76 @@ class TestUnauthorizedLogging:
             await factory.for_credential(_credential()).raw_request("GET", "/people")
 
         record = next(
-            item for item in caplog.records if item.message == "backstop.request.unauthorized"
+            item for item in caplog.records if item.message == "Backstop rejected the credential"
         )
-        assert record.__dict__["body_excerpt"] == "rejected token *** and more"
-        assert token not in record.__dict__["body_excerpt"]
+        assert record.__dict__["code"] is None
+        assert record.__dict__["error_count"] == 0
+        assert token not in str(record.__dict__)
+
+
+class TestRequestFailedLogging:
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("status", [422, 500])
+    async def test_a_backstop_error_is_a_warning_with_status_code_and_error_count_only(
+        self, status: int, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/people/123").mock(
+            return_value=httpx.Response(
+                status,
+                json={
+                    "errors": [
+                        {"detail": "Last name is invalid", "title": "Invalid", "code": "invalid"},
+                        {"detail": "Second", "code": "other"},
+                    ]
+                },
+            )
+        )
+
+        with caplog.at_level(logging.INFO), pytest.raises(BackstopApiError):
+            await factory.for_credential(_credential(), subject="user-42").raw_request(
+                "GET", "/people/123"
+            )
+
+        record = next(item for item in caplog.records if item.message == "Backstop request failed")
+        assert record.levelno == logging.WARNING
+        assert record.exc_info is None
+        assert record.__dict__["status_code"] == status
+        assert record.__dict__["code"] == "invalid"
+        assert record.__dict__["error_count"] == 2
+        assert record.__dict__["route"] == "/people/:id"
+        assert str(cast("object", record.__dict__["username"])) == _sha256("bob.smith")
+        for dropped in ("detail", "title", "errors", "path"):
+            assert dropped not in record.__dict__
+        assert "Last name is invalid" not in str(record.__dict__)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_timeout_is_a_warning(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/people").mock(side_effect=httpx.ReadTimeout("slow"))
+
+        with caplog.at_level(logging.INFO), pytest.raises(httpx.ReadTimeout):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        record = next(item for item in caplog.records if item.message == "Backstop request failed")
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["route"] == "/people"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_unexpected_exception_is_an_error_with_its_stack(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/people").mock(side_effect=RuntimeError("bug"))
+
+        with caplog.at_level(logging.INFO), pytest.raises(RuntimeError):
+            await factory.for_credential(_credential()).raw_request("GET", "/people")
+
+        record = next(item for item in caplog.records if item.message == "Backstop request failed")
+        assert record.levelno == logging.ERROR
+        assert record.exc_info is not None
 
 
 class TestHeaders:
@@ -1188,6 +1293,28 @@ class TestSchemaAwareDeserialization:
         assert isinstance(result, _Widget)
         assert result.id == "1"
         assert result.label == "Widget One"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_schema_mismatch_logs_the_route_and_schema_but_not_the_record(
+        self, factory: BackstopClientFactory, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{_BASE_URL}/widgets/123").mock(
+            return_value=httpx.Response(200, json={"id": "123", "label": 7})
+        )
+
+        with caplog.at_level(logging.INFO), pytest.raises(BackstopResponseSchemaError):
+            await factory.for_credential(_credential()).get("/widgets/123", schema=_Widget)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Backstop response failed schema validation"
+        )
+        assert record.levelno == logging.ERROR
+        assert record.__dict__["route"] == "/widgets/:id"
+        assert record.__dict__["schema"] == "_Widget"
+        assert "path" not in record.__dict__
 
     @pytest.mark.asyncio
     @respx.mock

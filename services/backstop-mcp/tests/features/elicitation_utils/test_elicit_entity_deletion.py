@@ -1,5 +1,7 @@
 """Classify a hard-delete elicit as CONFIRMED, NOT_AVAILABLE, or DECLINED."""
 
+import logging
+
 import pytest
 from fastmcp.server.elicitation import AcceptedElicitation
 
@@ -115,6 +117,22 @@ class TestElicitEntityDeletion:
             await elicit_entity_deletion(ctx_unsupported(), "Delete this note?")
             is EntityDeletion.DECLINED
         )
+
+    async def test_elicit_error_is_logged_with_its_type_and_not_its_text(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            await elicit_entity_deletion(ctx_unsupported(), "Delete this note?")
+
+        [degraded] = [
+            record
+            for record in caplog.records
+            if record.getMessage() == "Deletion confirmation degraded"
+        ]
+        assert degraded.exc_info is not None
+        assert isinstance(degraded.exc_info[1], RuntimeError)
+        assert "error" not in degraded.__dict__
+        assert "elicitation not supported" not in degraded.getMessage()
 
     async def test_prompt_is_passed_through_as_a_choice_dropdown(self) -> None:
         captured: dict[str, object] = {}

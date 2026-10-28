@@ -20,6 +20,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -72,6 +73,7 @@ type GetAccountsForPartyResponse = (
     ),
     output_schema=published_output_schema(GetAccountsForPartyResponse),
 )
+@trace_arguments("search_type", "party_id", "include_closed", identifying=("search",))
 async def get_accounts_for_party(
     ctx: Context,
     search_type: Annotated[
@@ -144,37 +146,18 @@ async def get_accounts_for_party(
         return unresolved_party_response(result)
 
     party = result.value
-    logger.info(
-        "accounts.for_party.start",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "include_closed": include_closed,
-        },
-    )
     listing = await get_holdings_query.run(owner_id=party.id, include_closed=include_closed)
     if _listing_is_empty(listing) and party.name is None:
         confirmed = await _confirm_party(get_party_name_query, party)
         if confirmed is None:
             logger.info(
-                "accounts.for_party.unverified_party_id",
+                "Party id not confirmed by Backstop",
                 extra={"segment": party.search_type, "entity_id": party.id},
             )
             # `NotFoundResponse` is the shared shape and carries no free-text field; the
             # reason this check ran at all is in the module docstring and the log line above.
             return NotFoundResponse(query=party.id, scope=party.search_type)
         party = confirmed
-    logger.info(
-        "accounts.for_party.completed",
-        extra={
-            "segment": party.search_type,
-            "entity_id": party.id,
-            "source": listing.source,
-            "returned": len(listing.rows),
-            "closed_omitted": listing.closed_omitted,
-            "rows_dropped": listing.rows_dropped,
-        },
-    )
     return PartyAccountsResolvedResponse.from_holdings(
         listing,
         resolved=ResolvedPartyResponse.from_party(party),

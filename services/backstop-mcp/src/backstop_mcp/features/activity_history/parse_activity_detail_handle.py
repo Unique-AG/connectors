@@ -23,7 +23,7 @@ def parse_activity_detail_handle(activity_id: str) -> ParsedActivityHandle:
     """
     parsed = parse_activity_handle(activity_id)
     if parsed.resource_type in _EMAIL_RESOURCE_TYPES:
-        logger.info("activity_history.handle.email_id", extra={"activity_id": parsed.handle})
+        logger.info("Rejected email activity handle", extra={"activity_id": parsed.handle})
         raise ToolError(
             f"{activity_id!r} is a get_activity_history email handle, not an "
             + "activity_id `get_activity_detail` can fetch. History emails come from "
@@ -31,5 +31,5 @@ def parse_activity_detail_handle(activity_id: str) -> ParsedActivityHandle:
             + "`search_activities` for the email body (`include_description`)."
         )
     if parsed.resource_type is None:
-        logger.info("activity_history.handle.bare_id", extra={"activity_id": parsed.handle})
+        logger.info("Parsed bare activity id", extra={"activity_id": parsed.handle})
     return parsed

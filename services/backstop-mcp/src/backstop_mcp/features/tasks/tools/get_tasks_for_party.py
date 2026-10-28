@@ -1,6 +1,5 @@
 """`get_tasks_for_party`: open and completed follow-ups on one party."""
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
@@ -31,8 +30,6 @@ from backstop_mcp.features.tasks import GetTasksForPartyQuery, TaskFilter, Tasks
 from backstop_mcp.features.tasks.dependencies import get_tasks_for_party_query_factory
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 type GetTasksForPartyResponse = PartyAmbiguousResponse | NotFoundResponse | TasksResolvedResponse
 
 
@@ -45,7 +42,7 @@ type GetTasksForPartyResponse = PartyAmbiguousResponse | NotFoundResponse | Task
     ),
     output_schema=published_output_schema(GetTasksForPartyResponse),
 )
-@trace_arguments("search_type", "party_id", "status")
+@trace_arguments("search_type", "party_id", "status", identifying=("search",))
 async def get_tasks_for_party(
     ctx: Context,
     search_type: Annotated[
@@ -88,10 +85,6 @@ async def get_tasks_for_party(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    logger.info(
-        "tasks.get.start",
-        extra={"segment": party.search_type, "entity_id": party.id, "status": status},
-    )
     fetched = await get_tasks_for_party_query.run(
         search_type=party.search_type,
         entity_id=party.id,

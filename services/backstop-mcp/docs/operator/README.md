@@ -272,11 +272,9 @@ internalServices:
 - [ ] `/metrics` is not reachable from outside the cluster.
 - [ ] `LOGS_DIAGNOSTICS_DATA_POLICY` is `conceal` and `ERROR_DETAILS_POLICY` is `redact` (the
       defaults; in the chart, `mcpConfig.logging.diagnosticsDataPolicy` and
-      `mcpConfig.logging.errorDetailsPolicy`), so tool-level events write Backstop logins as
-      `hmac-sha256:<hex>` and exception
-      text stays out of logs. The Backstop HTTP client's request and re-check events
-      (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either
-      setting, so treat logs as containing Backstop logins. API tokens are never logged.
+      `mcpConfig.logging.errorDetailsPolicy`), so log lines write Backstop logins, including those
+      of the client's request and login lines, as `hmac-sha256:<hex>` and exception text stays out
+      of logs. API tokens are never logged.
 - [ ] Database backups follow your policy for credentials. The table `backstop_credentials` holds
       encrypted API tokens.
 

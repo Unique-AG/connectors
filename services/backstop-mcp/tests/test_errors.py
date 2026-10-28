@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import override
 
@@ -162,6 +163,23 @@ class TestParseJsonApiErrorMalformedBody:
         assert len(error.errors) == 1
         assert error.errors[0].message is None
 
+    def test_a_body_that_fails_the_error_schema_logs_the_status_but_not_the_body(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        response = httpx.Response(500, json={"errors": "canary-leak-detail"})
+
+        with caplog.at_level(logging.WARNING):
+            BackstopApiError.from_response(response)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Backstop error body failed schema validation"
+        )
+        assert record.__dict__["status_code"] == 500
+        assert record.exc_info is not None
+        assert "error" not in record.__dict__
+
 
 class TestParseJsonApiErrorRateLimit:
     def test_recognizes_concurrency_limit_kind(self) -> None:
@@ -245,6 +263,25 @@ class TestParseJsonApiErrorRateLimit:
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds is None
+
+    def test_unparseable_retry_after_logs_without_the_header_value(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        response = httpx.Response(
+            429,
+            headers={"Retry-After": "not-a-number"},
+            json={"errors": [{"detail": "Too many requests"}]},
+        )
+
+        with caplog.at_level(logging.WARNING):
+            BackstopApiError.from_response(response)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Ignored unparseable Retry-After header"
+        )
+        assert "not-a-number" not in str(record.__dict__)
 
     def test_retry_after_http_date(self, monkeypatch: pytest.MonkeyPatch) -> None:
         now = datetime(2026, 8, 7, 12, 0, 0, tzinfo=UTC)

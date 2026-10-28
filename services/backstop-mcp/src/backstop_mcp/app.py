@@ -107,7 +107,7 @@ def create_app() -> Starlette:
             entry = guidance.tools.get(tool.name)
             mcp.add_tool(tool if entry is None else with_tool_guidance(tool, entry))
     logger.info(
-        "tenant_guidance.applied",
+        "Applied tenant guidance",
         extra={
             "server_instructions_chars": len(guidance.server_instructions or ""),
             "tools": sorted(guidance.tools),

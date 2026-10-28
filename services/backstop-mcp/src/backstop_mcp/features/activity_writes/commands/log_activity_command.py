@@ -2,6 +2,8 @@
 
 from typing import assert_never
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
@@ -34,6 +36,9 @@ class LogActivityCommand:
         self._log_meeting_or_call_command: LogMeetingOrCallCommand = log_meeting_or_call_command
         self._log_task_command: LogTaskCommand = log_task_command
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+    )
     async def run(
         self,
         *,

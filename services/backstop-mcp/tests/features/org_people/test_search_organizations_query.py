@@ -1,11 +1,16 @@
+import logging
+from typing import NoReturn, Protocol
+
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
     LocationFilter,
+    SearchOrganizationsQuery,
     SearchOrganizationsResolvedResponse,
 )
 from tests.features.org_people.conftest import make_search_organizations_query, serve_pages
@@ -21,6 +26,7 @@ from tests.helpers import (
 
 _FIELDS = frozenset({"id", "name", "legal_name", "email", "city", "country"})
 _RESULT_SIZE = 100
+_QUERY_LOGGER = "backstop_mcp.features.org_people.queries.search_organizations_query"
 
 
 def _page(
@@ -55,6 +61,11 @@ def _org(
     if custom_fields is not None:
         attributes["regularCustomFieldValues"] = custom_fields
     return resource(org_id, "organizations", name, **attributes)
+
+
+class _Identified(Protocol):
+    @property
+    def id(self) -> str: ...
 
 
 class TestSearchOrganizationsQuery:
@@ -608,3 +619,58 @@ class TestSearchOrganizationsQuery:
         assert [row.id for row in exact.rows] == ["1"]
         assert lowercase.rows == ()
         assert partial.rows == ()
+
+
+class TestUnreadableOrganizations:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_are_one_warning_with_capped_sample_ids(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def unreadable(
+            self: object, resource: _Identified, *args: object, **kwargs: object
+        ) -> NoReturn:
+            _ = self, args, kwargs
+            raise ValidationError.from_exception_data(resource.id, [])
+
+        monkeypatch.setattr(SearchOrganizationsQuery, "_row", unreadable)
+        base_url = f"{BASE_URL}/organizations-search-unreadable"
+        respx.get(f"{base_url}/organizations").mock(
+            return_value=_page(
+                *(_org(str(index), name=f"Organization {index}") for index in range(1, 8))
+            )
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            async with tool_client(base_url) as client:
+                result = await make_search_organizations_query(client).run(
+                    result_size=_RESULT_SIZE, fields=_FIELDS
+                )
+
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert [record.getMessage() for record in warnings] == ["Skipped unreadable organizations"]
+        assert warnings[0].__dict__["count"] == 7
+        assert warnings[0].__dict__["sample_ids"] == ["1", "2", "3", "4", "5"]
+        debug_ids = [
+            record.__dict__["organization_id"]
+            for record in caplog.records
+            if record.getMessage() == "Organization record unreadable"
+        ]
+        assert debug_ids == ["1", "2", "3", "4", "5", "6", "7"]
+        assert result.coverage.rows_dropped == 7
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_readable_page_logs_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        base_url = f"{BASE_URL}/organizations-search-readable"
+        respx.get(f"{base_url}/organizations").mock(
+            return_value=_page(_org("1", name="West Capital"))
+        )
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            async with tool_client(base_url) as client:
+                await make_search_organizations_query(client).run(
+                    result_size=_RESULT_SIZE, fields=_FIELDS
+                )
+
+        assert [record.getMessage() for record in caplog.records] == ["Fetched organizations"]

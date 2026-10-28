@@ -12,7 +12,7 @@ AND together, so "any of the three" is not one request.
 import logging
 from collections.abc import Sequence
 
-from opentelemetry import trace
+from mcp_observability import traced
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import (
@@ -56,9 +56,9 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, PersonLinkTarget
+from backstop_mcp.utils import presence_flags, sample_ids
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 _PAGE_SIZE = 500
 # The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
@@ -79,6 +79,34 @@ class SearchPeopleQuery:
         self._employment_index_factory: EmploymentIndexFactory = employment_index_factory
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=lambda args: {
+            **presence_flags(
+                args,
+                "name",
+                "last_name",
+                "email",
+                "other_id",
+                "email_domain",
+                "first_name",
+                "job_title",
+                "company_name",
+                "department",
+                "location_filter",
+                "website",
+                "cursor",
+            ),
+            "custom_field_count": len(args["custom_fields"]),
+            "min_current_organizations": args["min_current_organizations"] or 0,
+            "exclude_custom_fields": args["exclude_custom_fields"],
+        },
+        result=lambda page: {
+            "rows_scanned": page.coverage.rows_scanned,
+            "matched": len(page.rows),
+            "rows_dropped": page.coverage.rows_dropped,
+            "has_continuation": page.continuation is not None,
+        },
+    )
     async def run(
         self,
         *,
@@ -160,13 +188,12 @@ class SearchPeopleQuery:
             ),
             **location_filter_params(location_filter),
         }
-        dropped = 0
+        dropped_ids: list[str] = []
 
         def select(
             resources: Sequence[PersonResource], included: Included
         ) -> tuple[tuple[int, SearchPersonRowResponse], ...]:
-            nonlocal dropped
-            matches, page_dropped = self._select(
+            matches, page_dropped_ids = self._select(
                 resources,
                 included,
                 employments=self._employments_by_person(included) if with_employments else None,
@@ -180,7 +207,7 @@ class SearchPeopleQuery:
                 website=website,
                 predicates=predicates,
             )
-            dropped += page_dropped
+            dropped_ids.extend(page_dropped_ids)
             return matches
 
         async def read_at(offset: int) -> SinglePage[PersonResource]:
@@ -193,45 +220,44 @@ class SearchPeopleQuery:
             projected = projected | {"employments"}
         if not exclude_custom_fields:
             projected = projected | {"custom_field_values"}
-        with _tracer.start_as_current_span("org_people.query.search_people") as span:
-            span.set_attribute("memory", should_filter_in_memory)
-            span.set_attribute("start_offset", start_offset)
-            page = await collect_page(
-                read_at=read_at,
-                select=lambda fetched: select(fetched.items, Included(fetched.included)),
-                start_offset=start_offset,
-                output_page_size=result_size,
-                api_page_size=_PAGE_SIZE,
-                concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+        page = await collect_page(
+            read_at=read_at,
+            select=lambda fetched: select(fetched.items, Included(fetched.included)),
+            start_offset=start_offset,
+            output_page_size=result_size,
+            api_page_size=_PAGE_SIZE,
+            concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+        )
+        if dropped_ids:
+            logger.warning(
+                "Skipped unreadable people",
+                extra={"count": len(dropped_ids), "sample_ids": sample_ids(dropped_ids)},
             )
-            span.set_attribute("rows_scanned", page.records_scanned)
-            span.set_attribute("matched", len(page.rows))
-            span.set_attribute("stop_reason", page.stop_reason)
-            logger.info(
-                "org_people.search_people.fetched",
-                extra={
-                    "memory": should_filter_in_memory,
-                    "start_offset": start_offset,
-                    "rows_scanned": page.records_scanned,
-                    "matched": len(page.rows),
-                    "dropped": dropped,
-                    "total_count": page.total_count,
-                    "stop_reason": page.stop_reason,
-                },
-            )
-            return self._to_response(
-                page.rows,
-                fields=projected,
-                rows_scanned=page.records_scanned,
-                rows_dropped=dropped,
-                total_count=page.total_count,
-                next_page=continuation(
-                    stop_reason=page.stop_reason,
-                    next_offsets=() if page.next_offset is None else (page.next_offset,),
-                    fingerprint=fingerprint,
-                    rows_returned=len(page.rows),
-                ),
-            )
+        logger.info(
+            "Fetched people",
+            extra={
+                "memory": should_filter_in_memory,
+                "start_offset": start_offset,
+                "rows_scanned": page.records_scanned,
+                "matched": len(page.rows),
+                "dropped": len(dropped_ids),
+                "total_count": page.total_count,
+                "stop_reason": page.stop_reason,
+            },
+        )
+        return self._to_response(
+            page.rows,
+            fields=projected,
+            rows_scanned=page.records_scanned,
+            rows_dropped=len(dropped_ids),
+            total_count=page.total_count,
+            next_page=continuation(
+                stop_reason=page.stop_reason,
+                next_offsets=() if page.next_offset is None else (page.next_offset,),
+                fingerprint=fingerprint,
+                rows_returned=len(page.rows),
+            ),
+        )
 
     def _query_params(
         self,
@@ -316,10 +342,10 @@ class SearchPeopleQuery:
         location_filter: LocationFilter | None,
         website: str | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[tuple[int, SearchPersonRowResponse], ...], int]:
-        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+    ) -> tuple[tuple[tuple[int, SearchPersonRowResponse], ...], tuple[str, ...]]:
+        """`(index, row)` for each match in `resources`, and the ids of the unreadable ones."""
         selected: list[tuple[int, SearchPersonRowResponse]] = []
-        dropped = 0
+        dropped_ids: list[str] = []
         for index, resource in enumerate(resources):
             try:
                 row = self._row(
@@ -337,16 +363,14 @@ class SearchPeopleQuery:
                     predicates=predicates,
                 )
             except ValidationError as exc:
-                dropped += 1
-                logger.warning(
-                    "org_people.search_people.record.unreadable",
-                    extra={"person_id": resource.id},
-                    exc_info=exc,
+                dropped_ids.append(resource.id)
+                logger.debug(
+                    "Person record unreadable", extra={"person_id": resource.id}, exc_info=exc
                 )
                 continue
             if row is not None:
                 selected.append((index, row))
-        return tuple(selected), dropped
+        return tuple(selected), tuple(dropped_ids)
 
     def _row(
         self,

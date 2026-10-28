@@ -2,6 +2,8 @@
 
 import logging
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -39,6 +41,10 @@ class AttachDocumentCommand:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(
         self,
         *,
@@ -75,7 +81,7 @@ class AttachDocumentCommand:
         )
         document = await self._client.post("/documents", schema=_DocumentDocument, json=payload)
         logger.info(
-            "activity_writes.document.created",
+            "Created document",
             extra={"id": document.data.id, "party_id": party_id},
         )
         return AttachedFileResponse(

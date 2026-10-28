@@ -7,7 +7,7 @@ from typing import NoReturn, cast, overload
 
 import httpx
 from fastmcp.exceptions import ToolError
-from mcp_observability import identifiable_value
+from mcp_observability import failure_level, identifiable_value
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
@@ -22,7 +22,6 @@ from backstop_mcp.backstop_client.credential import CallerSession, CallerSession
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
-    BackstopErrorDetail,
     BackstopSessionRevokedError,
     BackstopTransientAuthError,
     unauthorized_log_fields,
@@ -60,10 +59,6 @@ SYSTEM_INFO_PATH = "/system-info"
 # report-sized page default; everything else gets the ordinary CRUD profile. Each slow call
 # holds a per-user slot for as long as it runs; only `run_report` collects one in the background.
 _SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
-
-
-def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
-    return [error.model_dump() for error in errors]
 
 
 def _mark_failed(span: trace.Span, exc: Exception) -> None:
@@ -335,7 +330,7 @@ class BackstopClient:
             return response
 
         logger.debug(
-            "backstop.request.start", extra=self._log_extra(session, method=method, path=path)
+            "Sending Backstop request", extra=self._log_extra(session, method=method, route=route)
         )
         # `route`, never `path`: from page 2 the path is a `links.next` URL with the search filters.
         with _tracer.start_as_current_span(
@@ -348,36 +343,37 @@ class BackstopClient:
             try:
                 response: httpx.Response = await retrying(make_request)
             except BackstopAuthError, BackstopTransientAuthError:
-                # Logged at the 401 site (`backstop.request.unauthorized` / re-check events). A
-                # rejected credential is an ordinary outcome rather than a fault, so no traceback.
+                # Logged at the 401 site and by the re-check lines. A rejected credential is an
+                # ordinary outcome rather than a fault, so no traceback.
                 span.set_attribute("http.response.status_code", 401)
                 raise
             except BackstopApiError as exc:
                 span.set_attribute("http.response.status_code", exc.status_code)
                 if exc.status_code >= 500:
                     _mark_failed(span, exc)
-                # Expected upstream failures — surface the full JSON:API `errors[]` in the
-                # console without a traceback. Unexpected transport errors still use
-                # `logger.exception` below.
-                logger.error(
-                    "backstop.request.failed",
+                # Backstop answered, so the caller's input or Backstop caused it: no stack. The
+                # JSON:API `detail` and `title` can echo what the caller submitted, so only the
+                # status, the `code` and the number of errors are logged.
+                logger.warning(
+                    "Backstop request failed",
                     extra=self._log_extra(
                         session,
                         method=method,
-                        path=path,
+                        route=route,
                         status_code=exc.status_code,
-                        detail=exc.detail,
                         code=exc.code,
-                        errors=_errors_for_log(exc.errors),
+                        error_count=len(exc.errors),
                     ),
                 )
                 raise
             except Exception as exc:
                 if isinstance(exc, httpx.TransportError):
                     _mark_failed(span, exc)
-                logger.exception(
-                    "backstop.request.failed",
-                    extra=self._log_extra(session, method=method, path=path),
+                logger.log(
+                    failure_level(exc),
+                    "Backstop request failed",
+                    exc_info=exc,
+                    extra=self._log_extra(session, method=method, route=route),
                 )
                 raise
             span.set_attribute("http.response.status_code", response.status_code)
@@ -399,14 +395,12 @@ class BackstopClient:
         probes `/system-info` with backoff and only revokes when every probe is unauthorized.
         """
         logger.info(
-            "backstop.request.unauthorized",
+            "Backstop rejected the credential",
             extra=self._log_extra(
                 session,
                 method=method,
-                path=path,
-                **unauthorized_log_fields(
-                    response, secret=session.credential.api_token.get_secret_value()
-                ),
+                route=metric_route(path),
+                **unauthorized_log_fields(response),
             ),
         )
         if session.on_auth_failure is None:
@@ -445,7 +439,7 @@ class BackstopClient:
             # Confirmed rejection: revoke the stored credential.
             await on_auth_failure()
         except Exception:
-            logger.exception("backstop.auth_failure_hook.failed")
+            logger.exception("Revoking the rejected credential failed")
             self._log_recheck_decision(
                 session, trigger_path, clock, attempts=len(outcomes), revoked=False
             )
@@ -471,10 +465,10 @@ class BackstopClient:
         outcome: ProbeOutcome,
     ) -> None:
         logger.info(
-            "backstop.auth_recheck.attempt",
+            "Re-checked the Backstop credential",
             extra=self._log_extra(
                 session,
-                trigger_path=trigger_path,
+                trigger_route=metric_route(trigger_path),
                 attempt=attempt,
                 outcome=outcome,
                 elapsed_ms=clock.elapsed_ms,
@@ -491,10 +485,10 @@ class BackstopClient:
         revoked: bool,
     ) -> None:
         logger.info(
-            "backstop.auth_recheck.decision",
+            "Decided on the Backstop credential after re-check",
             extra=self._log_extra(
                 session,
-                trigger_path=trigger_path,
+                trigger_route=metric_route(trigger_path),
                 attempts=attempts,
                 elapsed_ms=clock.elapsed_ms,
                 revoked=revoked,

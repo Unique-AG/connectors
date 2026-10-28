@@ -1,11 +1,11 @@
 """`backfill_opportunity_stage_history`: append history rows. Does not move a deal's stage."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.opportunity_writes import (
@@ -17,8 +17,6 @@ from backstop_mcp.features.opportunity_writes import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -29,6 +27,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(BackfillOpportunityStageHistoryResponse),
 )
+@trace_arguments(lambda args: {"record_count": len(args["backfill"].records)})
 async def backfill_opportunity_stage_history(
     backfill: Annotated[
         BackfillOpportunityStageHistoryInput,
@@ -50,8 +49,4 @@ async def backfill_opportunity_stage_history(
     Call like: {"backfill": {"records": [{"opportunity_id": "<id from get_opportunities>",
     "stage": "<stage name from get_opportunities>", "effective_date": "2026-02-01"}]}}
     """
-    logger.info(
-        "opportunity_writes.backfill_stage_history.start",
-        extra={"record_count": len(backfill.records)},
-    )
     return await backfill_opportunity_stage_history_command.run(backfill=backfill)

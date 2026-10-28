@@ -3,12 +3,12 @@ from datetime import timedelta
 from typing import Self, overload
 
 from fastmcp.exceptions import ToolError
-from mcp_observability import identifiable_value
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, relationship_to_one
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.system_users.api_responses import SystemUserAttributes
 from backstop_mcp.features.system_users.internal_dto import SystemUserDto
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto
     )
 
     users_by_login: dict[str, SystemUserDto] = {}
+    conflicting_ids: list[str] = []
     for resource in page.items:
         user = SystemUserDto.from_resource(resource)
         if user is None or user.user_name is None:
@@ -52,10 +53,13 @@ async def _fetch_system_users(client: BackstopClient) -> dict[str, SystemUserDto
         if existing is None:
             users_by_login[login] = user
         elif existing != user:
-            logger.warning(
-                "Conflicting system users for duplicate login %s; retaining first user",
-                identifiable_value(login),
-            )
+            conflicting_ids.append(user.id)
+            logger.debug("Ignored conflicting system user", extra={"id": user.id})
+    if conflicting_ids:
+        logger.warning(
+            "Ignored conflicting system users for duplicate logins",
+            extra={"count": len(conflicting_ids), "sample_ids": sample_ids(conflicting_ids)},
+        )
     return users_by_login
 
 
@@ -81,7 +85,6 @@ class SystemUsersService:
             ttl=ttl,
             snapshot=dict,
             name="system-user",
-            log_prefix="system_users",
             caching_enabled=caching_enabled,
         )
 

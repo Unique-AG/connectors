@@ -4,14 +4,13 @@ A firm-wide `search_activities` sweep saturates at 10000 rows, so a party missin
 unknown, not inactive. This asks Backstop once per party instead.
 """
 
-import logging
 from datetime import date
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from opentelemetry import trace
+from mcp_observability import trace_arguments
 from pydantic import BaseModel, Field
 
 from backstop_mcp.features.activity_history import (
@@ -29,9 +28,6 @@ from backstop_mcp.features.activity_history.dependencies import (
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.models import CoercedId, published_output_schema
 from backstop_mcp.utils import date_window
-
-logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 _MAX_PARTIES = 100
 _SUBSTANTIVE_TYPES: tuple[EntityActivityType, ...] = tuple(
@@ -71,6 +67,12 @@ class PartyRef(BaseModel):
         open_world_hint=False,
     ),
     output_schema=published_output_schema(GetLastActivityForPartiesResponse),
+)
+@trace_arguments(
+    lambda args: {
+        "party_count": len(args["parties"]),
+        "type_count": len(args["types"] or ()),
+    }
 )
 async def get_last_activity_for_parties(
     parties: Annotated[
@@ -134,15 +136,9 @@ async def get_last_activity_for_parties(
     selected_types = tuple(types) if types else _SUBSTANTIVE_TYPES
     keys: list[tuple[str, SearchType]] = [(party.party_id, party.search_type) for party in parties]
     distinct = tuple(dict.fromkeys(keys))
-    with _tracer.start_as_current_span("activity_history.last_activity") as span:
-        span.set_attribute("parties", len(distinct))
-        logger.info(
-            "activity_history.last_activity.start",
-            extra={"parties": len(distinct), "types": list(selected_types)},
-        )
-        outcomes = await get_last_activity_for_parties_query.run(
-            parties=distinct, start_date=start, end_date=end, types=selected_types
-        )
+    outcomes = await get_last_activity_for_parties_query.run(
+        parties=distinct, start_date=start, end_date=end, types=selected_types
+    )
     if all(outcome.error is not None for outcome in outcomes):
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
     rows = tuple(PartyLastActivityResponse.from_dto(outcome, end_date=end) for outcome in outcomes)

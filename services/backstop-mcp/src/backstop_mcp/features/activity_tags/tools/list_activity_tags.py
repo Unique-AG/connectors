@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.activity_tags import (
@@ -20,6 +21,9 @@ from backstop_mcp.features.activity_tags import (
         idempotent_hint=True,
         open_world_hint=False,
     ),
+)
+@trace_arguments(
+    lambda args: {"has_search": args["search"] is not None, "refresh": args["refresh"]}
 )
 async def list_activity_tags(
     search: Annotated[

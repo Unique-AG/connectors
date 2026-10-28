@@ -164,7 +164,9 @@ class TestPeopleForOrganizationQuery:
         )
 
         assert [row.employment.person_id for row in listing.people] == ["p1"]
-        assert [record.message for record in caplog.records] == ["org_people.side_load.unreadable"]
+        assert [record.message for record in caplog.records] == [
+            "Dropped unreadable side-loaded resources"
+        ]
 
     @pytest.mark.asyncio
     @respx.mock

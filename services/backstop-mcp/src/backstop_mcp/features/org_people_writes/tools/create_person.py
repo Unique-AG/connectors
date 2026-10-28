@@ -1,6 +1,5 @@
 """`create_person`: POST one person."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
@@ -17,8 +16,6 @@ from backstop_mcp.features.org_people_writes import (
     get_create_person_command_factory,
 )
 from backstop_mcp.models import published_output_schema
-
-logger = logging.getLogger(__name__)
 
 
 @tool(
@@ -45,5 +42,4 @@ async def create_person(
     Call like: {"person": {"last_name": "Smith", "gender": "Female",
     "category_ids": ["<id from list_contact_categories>"]}}
     """
-    logger.info("org_people_writes.create_person.start")
     return await create_person_command.run(person=person)

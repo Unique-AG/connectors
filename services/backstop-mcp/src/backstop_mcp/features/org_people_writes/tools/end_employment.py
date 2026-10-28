@@ -1,12 +1,12 @@
 """`end_employment`: write `endDate` on the person↔organization employment row."""
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -24,8 +24,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -35,6 +33,13 @@ logger = logging.getLogger(__name__)
         open_world_hint=False,
     ),
     output_schema=published_output_schema(EndEmploymentResponse),
+)
+@trace_arguments(
+    "employment.search_type",
+    "employment.party_id",
+    "employment.organization_id",
+    "employment.end_date",
+    identifying=("employment.search", "employment.organization_search"),
 )
 async def end_employment(
     ctx: Context,
@@ -75,14 +80,6 @@ async def end_employment(
         return unresolved_party_response(organization_result)
     person = person_result.value
     organization = organization_result.value
-    logger.info(
-        "org_people_writes.end_employment.start",
-        extra={
-            "person_id": person.id,
-            "person_search_type": person.search_type,
-            "organization_id": organization.id,
-        },
-    )
     return await end_employment_command.run(
         person_id=person.id,
         person_search_type=person.search_type,

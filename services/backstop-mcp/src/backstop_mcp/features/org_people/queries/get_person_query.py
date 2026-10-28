@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Sequence
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters, CustomFieldsService
 from backstop_mcp.features.data_hygiene import (
@@ -30,6 +32,7 @@ class GetPersonQuery:
         self._employment_index_factory: EmploymentIndexFactory = employment_index_factory
         self._custom_fields_service: CustomFieldsService = custom_fields_service
 
+    @traced(arguments=("search_type", "party_id", "include"))
     async def run(
         self,
         *,

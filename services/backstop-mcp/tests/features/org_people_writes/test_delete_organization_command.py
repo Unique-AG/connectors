@@ -1,5 +1,6 @@
 """`DeletePartyWithLocationsCommand` against `/organizations/{id}`."""
 
+import logging
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
@@ -20,6 +21,9 @@ _ID = "org-1"
 _NAME = "Acme Advisors"
 _LOC_1 = "loc-1"
 _LOC_2 = "loc-2"
+_COMMAND_LOGGER = (
+    "backstop_mcp.features.org_people_writes.commands.delete_party_with_locations_command"
+)
 
 
 @pytest.fixture
@@ -89,6 +93,30 @@ class TestDeletePartyWithLocationsAgainstOrganizations:
             ("DELETE", f"/contact-locations/{_LOC_2}"),
             ("DELETE", f"/organizations/{_ID}"),
         ]
+
+    @respx.mock
+    async def test_a_successful_delete_is_logged_as_a_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/{_ID}").mock(
+            return_value=httpx.Response(200, json=_organization_document())
+        )
+        respx.delete(f"{BASE_URL}/contact-locations/{_LOC_1}").mock(
+            return_value=httpx.Response(204)
+        )
+        respx.delete(f"{BASE_URL}/contact-locations/{_LOC_2}").mock(
+            return_value=httpx.Response(204)
+        )
+        respx.delete(f"{BASE_URL}/organizations/{_ID}").mock(return_value=httpx.Response(204))
+
+        with caplog.at_level(logging.INFO, logger=_COMMAND_LOGGER):
+            await make_command(client).run(collection="organizations", party_id=_ID)
+
+        [record] = [r for r in caplog.records if r.getMessage() == "Deleted party"]
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["id"] == _ID
+        assert record.__dict__["collection"] == "organizations"
+        assert record.__dict__["deleted_location_ids"] == (_LOC_1, _LOC_2)
 
     @respx.mock
     async def test_failed_location_delete_aborts_before_deleting_the_party(

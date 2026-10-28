@@ -1,6 +1,7 @@
 import hashlib
 import logging
 from collections.abc import Mapping
+from collections.abc import Sequence
 from datetime import date
 from enum import StrEnum
 from typing import Literal
@@ -282,6 +283,13 @@ class TestValidation:
             *, segment: Segment, status: Status, party: Person | Organization, person: Person
         ) -> None:
             del segment, status, party, person
+
+        validate_trace_declarations()
+
+    def test_accepts_a_sequence_of_an_alias(self) -> None:
+        @traced(arguments=("includes",))
+        def query(*, includes: Sequence[Segment | Status]) -> None:
+            del includes
 
         validate_trace_declarations()
 

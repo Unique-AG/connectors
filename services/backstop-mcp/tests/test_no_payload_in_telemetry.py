@@ -1,13 +1,16 @@
 """A canary in a tool's input or a mocked Backstop body never reaches a pino line or an exported
 span. Each case also proves its code path ran, so the absence check is not vacuous."""
 
+import hashlib
 import io
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Protocol, cast
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
@@ -24,6 +27,7 @@ from testcontainers.community.postgres import PostgresContainer
 from backstop_mcp.app import create_app
 from backstop_mcp.db import BackstopCredential, transaction
 from backstop_mcp.features.auth import BackstopOAuthProvider
+from tests.helpers import resource
 from tests.test_app import _set_app_env  # pyright: ignore[reportPrivateUsage]
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
@@ -83,12 +87,16 @@ def _post(client: TestClient, body: dict[str, object], headers: Mapping[str, str
 
 @asynccontextmanager
 async def _connected(
-    db: DatabaseFixture, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    db: DatabaseFixture,
+    postgres_container: PostgresContainer,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    username: str | None = None,
 ) -> AsyncGenerator[_Session]:
     """The real app at DEBUG with an initialized MCP session and a stored Backstop credential."""
     key = Fernet.generate_key()
     subject = f"subject-{uuid.uuid4()}"
-    username = f"svc-{uuid.uuid4().hex[:12]}"
+    username = username or f"svc-{uuid.uuid4().hex[:12]}"
     _set_app_env(monkeypatch, postgres_container)
     monkeypatch.setenv("BACKSTOP_MCP_ENCRYPTION_KEY", key.decode())
     monkeypatch.setenv("LOG_LEVEL", "debug")
@@ -110,13 +118,7 @@ async def _connected(
 
     monkeypatch.setattr(BackstopOAuthProvider, "load_access_token", load_access_token)
     app = create_app()
-    logs = io.StringIO()
-    (output,) = [
-        cast("logging.StreamHandler[io.TextIOBase]", handler)
-        for handler in logging.getLogger().handlers
-        if isinstance(handler.formatter, PinoJsonFormatter)
-    ]
-    output.setStream(logs)
+    logs = _redirected_logs()
     with TestClient(app) as client:
         initialize = _post(
             client,
@@ -141,6 +143,17 @@ async def _connected(
         )
         assert initialized.status_code == 202, initialized.text
         yield _Session(client, session_id, logs)
+
+
+def _redirected_logs() -> io.StringIO:
+    logs = io.StringIO()
+    (output,) = [
+        cast("logging.StreamHandler[io.TextIOBase]", handler)
+        for handler in logging.getLogger().handlers
+        if isinstance(handler.formatter, PinoJsonFormatter)
+    ]
+    output.setStream(logs)
+    return logs
 
 
 @pytest.fixture
@@ -179,6 +192,50 @@ def _tool_span(exporter: InMemorySpanExporter, tool: str) -> ReadableSpan:
     return span
 
 
+def _submit_login(client: TestClient, *, username: str, api_token: str) -> int:
+    """Register a client, start the authorization and submit the real login form."""
+    redirect_uri = "https://client.example/callback"
+    registered = client.post(
+        "/register",
+        json={
+            "redirect_uris": [redirect_uri],
+            "client_name": "canary",
+            "token_endpoint_auth_method": "none",
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    authorized = client.get(
+        "/authorize",
+        params={
+            "response_type": "code",
+            "client_id": registered.json()["client_id"],
+            "redirect_uri": redirect_uri,
+            "code_challenge": "x" * 43,
+            "code_challenge_method": "S256",
+            "state": "state-1",
+        },
+        follow_redirects=False,
+    )
+    assert authorized.status_code == 302, authorized.text
+    login_url = urlparse(authorized.headers["location"])
+    form = client.get(f"{login_url.path}?{login_url.query}")
+    csrf_token = re.search(r'name="csrf_token" value="([^"]+)"', form.text)
+    assert csrf_token is not None, form.text
+    submitted = client.post(
+        login_url.path,
+        data={
+            "request_id": parse_qs(login_url.query)["request_id"][0],
+            "csrf_token": csrf_token.group(1),
+            "username": username,
+            "api_token": api_token,
+        },
+        follow_redirects=False,
+    )
+    return submitted.status_code
+
+
 def _tasks(*attributes: dict[str, object]) -> httpx.Response:
     return httpx.Response(
         200,
@@ -194,6 +251,7 @@ def _tasks(*attributes: dict[str, object]) -> httpx.Response:
 
 
 _ORGANIZATION = {"data": {"type": "organizations", "id": "org-1", "attributes": {"name": "Acme"}}}
+_CANARY_PSEUDONYM = f"sha256:{hashlib.sha256(_CANARY.encode()).hexdigest()}"
 
 
 @pytest.mark.usefixtures("stderr_restored")
@@ -300,6 +358,112 @@ class TestCanaryStaysOutOfTelemetry:
             "data.0.attributes.title (string_type, got dict[str, str])"
         ]
         _assert_absent(session, exporter)
+
+    @respx.mock
+    async def test_a_backstop_error_body(
+        self, session: _Session, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(url__regex=rf"{_API}/organizations/org-1").mock(
+            return_value=httpx.Response(200, json=_ORGANIZATION)
+        )
+        respx.get(url__regex=rf"{_API}/tasks").mock(
+            return_value=httpx.Response(
+                422,
+                json={"errors": [{"detail": _CANARY, "title": _CANARY, "code": "invalid"}]},
+            )
+        )
+
+        session.call(
+            "get_tasks_for_party",
+            {"search_type": "organizations", "party_id": "org-1"},
+            expect_error=True,
+        )
+
+        assert session.tool_call("Tool call failed")["error_type"] == "BackstopApiError"
+        request = session.tool_call("Backstop request failed")
+        assert request["log_level"] == "warn"
+        assert request["status_code"] == 422
+        assert request["code"] == "invalid"
+        assert request["error_count"] == 1
+        assert request["route"] == "/tasks"
+        (client_span,) = [
+            span for span in exporter.get_finished_spans() if span.name == "backstop GET /tasks"
+        ]
+        assert client_span.attributes is not None
+        assert client_span.attributes["http.response.status_code"] == 422
+        _assert_absent(session, exporter)
+
+    @respx.mock
+    async def test_a_stored_backstop_username(
+        self,
+        db: DatabaseFixture,
+        postgres_container: PostgresContainer,
+        monkeypatch: pytest.MonkeyPatch,
+        exporter: InMemorySpanExporter,
+    ) -> None:
+        respx.get(url__regex=rf"{_API}/organizations/org-1").mock(
+            return_value=httpx.Response(200, json=_ORGANIZATION)
+        )
+        respx.get(url__regex=rf"{_API}/tasks").mock(return_value=_tasks())
+
+        async with _connected(db, postgres_container, monkeypatch, username=_CANARY) as session:
+            exporter.clear()
+            session.call(
+                "get_tasks_for_party",
+                {"search_type": "organizations", "party_id": "org-1"},
+                expect_error=False,
+            )
+
+            requests = [
+                line for line in session.lines() if line["msg"] == "Sending Backstop request"
+            ]
+            assert requests
+            assert {line["username"] for line in requests} == {_CANARY_PSEUDONYM}
+            _assert_absent(session, exporter)
+
+    @respx.mock
+    @pytest.mark.usefixtures("db")
+    @pytest.mark.parametrize("accepted", [False, True])
+    async def test_the_login_form(
+        self,
+        postgres_container: PostgresContainer,
+        monkeypatch: pytest.MonkeyPatch,
+        exporter: InMemorySpanExporter,
+        accepted: bool,
+    ) -> None:
+        _set_app_env(monkeypatch, postgres_container)
+        monkeypatch.setenv("LOG_LEVEL", "debug")
+        respx.get(f"{_API}/system-info").mock(
+            return_value=httpx.Response(200 if accepted else 401, json={})
+        )
+        respx.get(url__regex=rf"{_API}/system-users").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource("su-1", "system-users", name="Service User", userName=_CANARY)
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+        app = create_app()
+        logs = _redirected_logs()
+        exporter.clear()
+
+        with TestClient(app, base_url="https://backstop-mcp.example") as client:
+            status = _submit_login(client, username=_CANARY, api_token=f"{_CANARY}-token")
+
+        lines = [
+            cast("dict[str, object]", json.loads(line)) for line in logs.getvalue().splitlines()
+        ]
+        message = "Login succeeded" if accepted else "Login rejected"
+        assert status == (302 if accepted else 200)
+        (line,) = [line for line in lines if line["msg"] == message]
+        assert line["username"] == _CANARY_PSEUDONYM
+        assert _CANARY not in json.dumps(lines)
+        for span in exporter.get_finished_spans():
+            assert _CANARY not in _span_text(span), span.name
 
 
 # Logs only: the tracer provider keeps the redaction once any `create_app` installed it.

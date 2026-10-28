@@ -8,6 +8,7 @@ A conversion that raises returns the original HTML.
 """
 
 import importlib
+import logging
 
 import pytest
 
@@ -299,6 +300,40 @@ class TestDeeplyNestedHtml:
         gist = extract_gist_from_html(html)
 
         assert gist == Gist(text=html, truncated=False, full_length=len(html))
+
+
+class TestLogging:
+    def test_a_conversion_bug_logs_an_error_sentence_without_the_html(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        html = "<p>Tailspin confidential</p>"
+
+        def _boom(_html: str) -> str:
+            raise RuntimeError("markdownify broke on Tailspin")
+
+        monkeypatch.setattr(_gist_module, "markdownify", _boom)
+
+        with caplog.at_level(logging.WARNING, logger=_gist_module.__name__):
+            extract_gist_from_html(html)
+
+        [record] = caplog.records
+        assert record.levelno == logging.ERROR
+        assert record.message == "Converting activity HTML to markdown failed"
+        assert record.__dict__["html_chars"] == len(html)
+        assert "Tailspin" not in record.getMessage()
+
+    def test_a_capped_nesting_logs_one_warning_sentence(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        html = ("<div>" * 600) + "buried note" + ("</div>" * 600)
+
+        with caplog.at_level(logging.WARNING, logger=_gist_module.__name__):
+            extract_gist_from_html(html)
+
+        [record] = caplog.records
+        assert record.levelno == logging.WARNING
+        assert record.message == "Capped activity HTML nesting"
+        assert record.__dict__["html_chars"] == len(html)
 
 
 class TestNoBudget:

@@ -1,11 +1,11 @@
 """`update_custom_field_values`: write catalog-validated values on one entity."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import (
@@ -17,8 +17,6 @@ from backstop_mcp.features.custom_fields import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -29,6 +27,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(UpdateCustomFieldValuesResponse),
 )
+@trace_arguments("update.entity_type", "update.entity_id")
 async def update_custom_field_values(
     update: Annotated[
         UpdateCustomFieldValuesInput,
@@ -52,11 +51,4 @@ async def update_custom_field_values(
     Call like: {"update": {"entity_type": "people", "entity_id": "<id from get_person>",
     "values": [{"definition_id": "<id from list_custom_fields>", "value": "Direct"}]}}
     """
-    logger.info(
-        "custom_fields.update_values.start",
-        extra={
-            "entity_type": update.entity_type,
-            "record_count": len(update.values),
-        },
-    )
     return await update_custom_field_values_command.run(update=update)

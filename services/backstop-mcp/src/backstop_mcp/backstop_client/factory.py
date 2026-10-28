@@ -94,7 +94,7 @@ class _GateRegistry:
         for username in idle:
             del self._gates[username]
         logger.debug(
-            "backstop.gates.evicted",
+            "Evicted idle request gates",
             extra={"evicted": len(idle), "retained": len(self._gates)},
         )
 

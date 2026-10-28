@@ -4,6 +4,7 @@ import time
 from datetime import date
 from typing import ClassVar
 
+from mcp_observability import identifiable_value
 from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.features.reports.responses import RunReportResponse
@@ -80,6 +81,6 @@ class ReportRunCache:
         if not run.task.done():
             run.task.cancel()
             logger.info(
-                "reports.run.evicted",
-                extra={"report_name": key.report_name, "reason": reason},
+                "Evicted report run",
+                extra={"report_name": identifiable_value(key.report_name), "reason": reason},
             )

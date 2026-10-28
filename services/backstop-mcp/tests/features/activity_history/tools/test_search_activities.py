@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 import httpx
@@ -6,9 +7,10 @@ import respx
 from fastmcp.decorators import get_fastmcp_meta
 from fastmcp.exceptions import ToolError
 from fastmcp.tools.function_tool import ToolMeta
+from mcp_observability.trace_declarations import tool_call_record
 from pydantic import ValidationError
 
-from backstop_mcp.backstop_client import BackstopAuthError, BackstopClient
+from backstop_mcp.backstop_client import BackstopApiError, BackstopAuthError, BackstopClient
 from backstop_mcp.config import SearchConfig
 from backstop_mcp.features.activity_history import (
     EntityActivitiesFetchDto,
@@ -31,6 +33,7 @@ from tests.helpers import BASE_URL, client_factory, credential, recorded_json_bo
 from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _URL = f"{BASE_URL}/entity-activities"
+_TOOL_LOGGER = "backstop_mcp.features.activity_history.tools.search_activities"
 _PARTY_ID = "354566359"
 _SEARCH_CONFIG = SearchConfig(result_size=100)
 
@@ -709,3 +712,87 @@ class TestSearchActivities:
         assert result.coverage.truncated is True
         assert result.coverage.disclaimer is not None
         assert "partial" in result.coverage.disclaimer
+
+
+def _tool_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.name == _TOOL_LOGGER]
+
+
+class TestObservability:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_backstop_failure_is_a_warning_sentence_without_the_error_text(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(_URL).mock(
+            return_value=httpx.Response(404, json={"errors": [{"title": "Tailspin missing"}]})
+        )
+
+        with caplog.at_level(logging.WARNING, logger=_TOOL_LOGGER):
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
+            )
+
+        [record] = _tool_records(caplog)
+        assert record.levelno == logging.WARNING
+        assert record.message == "Activity search unavailable"
+        assert record.exc_info is not None
+        assert record.exc_info[0] is BackstopApiError
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_bug_in_the_search_stays_an_error(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(_URL).mock(side_effect=ZeroDivisionError("bug"))
+
+        with caplog.at_level(logging.WARNING, logger=_TOOL_LOGGER):
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
+            )
+
+        [record] = _tool_records(caplog)
+        assert record.levelno == logging.ERROR
+        assert record.message == "Activity search unavailable"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_the_declared_arguments_are_flags_and_counts_not_the_filter_values(
+        self, client: BackstopClient
+    ) -> None:
+        respx.post(_URL).mock(return_value=_page(_row(), total=1))
+
+        with tool_call_record() as declared:
+            await search_activities(
+                ctx_never_elicit(),
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+                search_type="people",
+                party_id=_PARTY_ID,
+                authors=["ada@example.com", "sam@example.com"],
+                activity_tag_ids=["9001"],
+                resolve_party_query=make_resolve_party_query(client),
+                search_activities_query=make_search_activities_query(client),
+                search_config=_SEARCH_CONFIG,
+            )
+
+        assert declared == {
+            "mode": "rows",
+            "include_description": False,
+            "has_search": False,
+            "type_count": 0,
+            "activity_tag_count": 1,
+            "author_count": 2,
+            "attendee_count": 0,
+            "has_cursor": False,
+        }

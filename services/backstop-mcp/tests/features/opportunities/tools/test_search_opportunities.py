@@ -1,11 +1,15 @@
+import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Literal, TypedDict, Unpack, cast, get_args
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from mcp_observability import identifiable_value
+from mcp_observability.trace_declarations import tool_call_record
 from pydantic import TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
 
@@ -36,7 +40,16 @@ from tests.server.tools.helpers import (
 )
 
 _INPUT = input_adapter(search_opportunities)
+_QUERY_LOGGER = "backstop_mcp.features.opportunities.queries.search_opportunities_query"
 _CONFIG = SearchConfig(result_size=100)
+
+
+def _validation_error() -> ValidationError:
+    try:
+        TypeAdapter(int).validate_python("not-a-number")
+    except ValidationError as error:
+        return error
+    raise AssertionError("validation unexpectedly passed")
 
 
 def tenant(name: str) -> str:
@@ -438,6 +451,74 @@ class TestSearchOpportunities:
         buckets = [object_dict(item) for item in object_list(payload["aggregates"])]
         assert buckets[0]["label"] == "Stage B"
         assert buckets[0]["count"] == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_declares_representative_and_stage_only_as_identifiable_values(self) -> None:
+        base_url = tenant("so-declared")
+        respx.get(f"{base_url}/opportunities").mock(return_value=_page(total=0))
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            with tool_call_record() as declared:
+                await search_opportunities(
+                    representative="jdoe",
+                    stage="Stage B",
+                    product=["NWON"],
+                    search_opportunities_query=make_search_opportunities_query(client),
+                    search_config=_CONFIG,
+                )
+
+        assert declared["representative"] == str(identifiable_value("jdoe"))
+        assert declared["stage"] == str(identifiable_value("Stage B"))
+        assert declared["mode"] == "rows"
+        assert "jdoe" not in repr(declared)
+        assert "Stage B" not in repr(declared)
+        assert "NWON" not in repr(declared)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("mode", ["rows", "aggregate"])
+    async def test_unreadable_records_log_one_warning_with_a_capped_sample(
+        self, caplog: pytest.LogCaptureFixture, mode: Literal["rows", "aggregate"]
+    ) -> None:
+        base_url = tenant(f"so-unreadable-{mode}")
+        ids = [f"bad-{index}" for index in range(7)]
+        respx.get(f"{base_url}/opportunities").mock(
+            return_value=_page(
+                *(_deal(deal_id, name="x", stage_id="42482") for deal_id in ids),
+                included=_included(),
+                total=7,
+            )
+        )
+        _stub_supporting_collections(base_url)
+
+        async with tool_client(base_url) as client:
+            query = make_search_opportunities_query(client)
+            with (
+                patch.object(
+                    query.map_opportunity_to_response_util,
+                    "run",
+                    AsyncMock(side_effect=_validation_error()),
+                ),
+                caplog.at_level(logging.WARNING, logger=_QUERY_LOGGER),
+            ):
+                result = tool_model(
+                    await search_opportunities(
+                        mode=mode,
+                        group_by="stage" if mode == "aggregate" else None,
+                        search_opportunities_query=query,
+                        search_config=_CONFIG,
+                    ),
+                    SearchOpportunitiesResolvedResponse,
+                )
+
+        assert result.coverage.rows_dropped == 7
+        [warning] = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        assert warning.levelno == logging.WARNING
+        assert warning.getMessage() == "Skipped unreadable opportunities"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @pytest.mark.asyncio
     @respx.mock

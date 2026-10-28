@@ -246,9 +246,12 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 ### Logs
 
 Structured JSON on stderr, through `mcp_observability.configure_logging` (the chart labels pods so
-Loki parses it). FastMCP, uvicorn and Python warnings join the same stream. Events use dotted names
-with fields in `extra`, for example `auth.login.succeeded`, `backstop.request.failed`,
-`backstop.auth_recheck.decision`, `resolution.elicit.timed_out`, `tenant_guidance.applied`.
+Loki parses it). FastMCP, uvicorn and Python warnings join the same stream.
+
+A message is a fixed sentence and values stay in `extra`, never interpolated, so every occurrence of
+a line has the same `msg` and groups in Loki: `Fetched tasks for party`, `Backstop request failed`,
+`Login rejected`, `Applied tenant guidance`. Outcomes are past tense, state is present tense, with
+no trailing period and no ids in the text.
 
 `LOG_LEVEL` is the level of the `backstop_mcp` loggers. `LIBRARY_LOG_LEVELS` sets libraries over
 defaults that keep `httpx` and `httpcore` at WARNING, because their INFO lines are request URLs
@@ -257,9 +260,33 @@ FastMCP's DEBUG line that prints a tool call's arguments is dropped.
 
 Identifying values go through `identifiable_value`: Backstop logins are `hmac-sha256:<hex>`, keyed
 with a secret derived from `BACKSTOP_MCP_ENCRYPTION_KEY`, plain `sha256:<hex>` at `LOG_LEVEL=debug`,
-and the value itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events
-(`backstop.request.*`, `backstop.auth_recheck.*`) currently carry the username in clear. API
-tokens are never logged.
+and the value itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. That covers the Backstop
+client's request and re-check lines and the login lines (`Login succeeded`, `Login rejected`,
+`Login throttled`), which carry the keyed username only, and every search term, `representative`,
+report name and stored login a tool logs. API tokens are never logged.
+
+What a line may carry:
+
+- Safe raw fields are Backstop record ids, our `subject`, enums defined in our code (`kind`,
+  `segment`, `mode`, `source`, `series`, `stream`, resource types), counts and lengths, presence
+  flags, the HTTP status and JSON:API `code`, route templates, durations, argument and field
+  names, figure names, the date windows the caller asked for, and an IANA `time_zone`. Search
+  filters are logged as presence flags (`has_name`) and counts, and a stage as `stage_id`.
+- No URL. The client logs the `route` template, never the path: from page 2 the path is the
+  `links.next` URL with the search filters in its query string. `path`, `url` and `next_path` reach
+  no log or span except as the argument of `metric_route()`.
+- No Backstop error text. `Backstop request failed` and `Backstop rejected the credential` keep
+  `status_code`, the JSON:API `code` and `error_count`, and drop `detail`, `title`, `errors` and the
+  body, which can echo what the caller submitted.
+
+Levels: a Backstop 4xx or 5xx or a timeout is WARNING without a stack, because it is not a bug. A
+broad `except Exception` fallback logs at `failure_level(exc)`, so a bug there is still ERROR with
+its scrubbed stack. A successful delete is WARNING on purpose, so a destructive write stands out.
+
+One line per call, not per row: unreadable rows, failed fan-out items and duplicate catalog ids
+become one WARNING per call with `count` and `sample_ids` (at most five), and the per-row detail is
+DEBUG. Tools write no `started` or `completed` line of their own; the tool-call middleware's lines
+carry the declared arguments.
 
 Exception text is kept out of logs, because a pydantic error quotes its input and a Backstop error
 can quote a record. A line logged with an exception names it in `error_type`; below ERROR it has
@@ -310,8 +337,9 @@ tracing on (see [Configuration: Tracing](../operator/configuration.md#Tracing)),
 built. The ASGI middleware spans each HTTP request except `/health`, `/probe`, `/ready` and
 `/metrics`, without `send`/`receive` child spans and without a second HTTP duration histogram on
 `/metrics`. FastMCP opens a `tools/call <tool>` span inside the request, in the trace of the
-request that carried the call, and several queries and commands open spans inside that (for
-example `reports.run`, `accounts.product_investors`, `opportunity_writes.command.update`).
+request that carried the call, and the `run` method of every query and command opens a span inside
+that, named after its class (`GetTasksForPartyQuery.run`). The Backstop client opens the only
+hand-written span.
 
 Each logical Backstop request, retries included, is one CLIENT span named
 `backstop <METHOD> <route>`, with `http.request.method`, the route template as `url.template` and

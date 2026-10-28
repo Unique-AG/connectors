@@ -19,13 +19,13 @@ a 404 `BackstopApiError` (`/entity-activity-details` answers 200 with null prima
 those, which the query maps to a 404).
 """
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.activity_history import (
@@ -35,8 +35,6 @@ from backstop_mcp.features.activity_history import (
 )
 from backstop_mcp.features.activity_history.dependencies import get_activity_detail_query_factory
 from backstop_mcp.models import published_output_schema
-
-logger = logging.getLogger(__name__)
 
 
 @tool(
@@ -48,6 +46,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(ActivityDetailResponse),
 )
+@trace_arguments("activity_id")
 async def get_activity_detail(
     ctx: Context,
     activity_id: Annotated[
@@ -86,23 +85,4 @@ async def get_activity_detail(
     """
     _ = ctx
     handle = parse_activity_detail_handle(activity_id)
-    logger.info(
-        "activity_history.detail.get.start",
-        extra={
-            "activity_id": activity_id,
-            "resource_type": handle.resource_type,
-            "resource_id": handle.resource_id,
-            "meeting_or_call": handle.resource_type == "meeting-or-calls",
-        },
-    )
-    result = await get_activity_detail_query.run(activity_id=activity_id, handle=handle)
-    logger.info(
-        "activity_history.detail.get.completed",
-        extra={
-            "activity_id": activity_id,
-            "type": result.type,
-            "attendees": len(result.attendees),
-            "has_body": bool(result.body),
-        },
-    )
-    return result
+    return await get_activity_detail_query.run(activity_id=activity_id, handle=handle)

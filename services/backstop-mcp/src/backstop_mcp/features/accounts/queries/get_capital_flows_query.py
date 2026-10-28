@@ -22,11 +22,14 @@ from collections.abc import Sequence
 from datetime import date
 from typing import Literal, NamedTuple
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiResource,
     BackstopClient,
     Included,
     IncludedResource,
+    metric_route,
 )
 from backstop_mcp.features.accounts.api_responses import (
     AccountAttributes,
@@ -64,6 +67,14 @@ class GetCapitalFlowsQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("start_date", "end_date", "owner_id", "account_ids"),
+        result=lambda flows: {
+            "total": flows.total,
+            "request_count": flows.request_count,
+            "scan_truncated": flows.scan_truncated,
+        },
+    )
     async def run(
         self,
         *,
@@ -144,9 +155,9 @@ class GetCapitalFlowsQuery:
         )
         if page.truncated:
             logger.warning(
-                "accounts.capital_flows.scan_ceiling_reached",
+                "Capital flows scan ceiling reached",
                 extra={
-                    "path": path,
+                    "route": metric_route(path),
                     "ceiling": MAX_CAPITAL_FLOW_SCAN_RECORDS,
                     "total_count": page.total_count,
                 },

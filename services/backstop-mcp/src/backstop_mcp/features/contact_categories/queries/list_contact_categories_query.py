@@ -1,6 +1,8 @@
 import logging
 from datetime import timedelta
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.contact_categories.api_responses import ContactCategoryAttributes
@@ -9,6 +11,7 @@ from backstop_mcp.features.contact_categories.responses import (
     ContactCategoryResponse,
     ListContactCategoriesResponse,
 )
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,6 @@ class ListContactCategoriesQuery:
             ttl=ttl,
             snapshot=dict,
             name="contact-category",
-            log_prefix="contact_categories",
             caching_enabled=caching_enabled,
         )
 
@@ -38,6 +40,13 @@ class ListContactCategoriesQuery:
     ) -> tuple[dict[str, ContactCategoryDto], CacheFreshness]:
         return await self._cache.get(self._fetch, refresh=refresh)
 
+    @traced(
+        arguments=lambda args: {
+            "has_search": args["search"] is not None,
+            "refresh": args["refresh"],
+        },
+        result=lambda response: {"returned": len(response.categories)},
+    )
     async def run(
         self, *, search: str | None = None, refresh: bool = False
     ) -> ListContactCategoriesResponse:
@@ -65,6 +74,7 @@ class ListContactCategoriesQuery:
         )
 
         categories_by_id: dict[str, ContactCategoryDto] = {}
+        conflicting_ids: list[str] = []
         for resource in page.items:
             category = ContactCategoryDto.from_resource(resource)
             if category is None:
@@ -73,8 +83,10 @@ class ListContactCategoriesQuery:
             if existing is None:
                 categories_by_id[category.id] = category
             elif existing != category:
-                logger.warning(
-                    "Conflicting contact categories for duplicate id %r; retaining first category",
-                    category.id,
-                )
+                conflicting_ids.append(category.id)
+        if conflicting_ids:
+            logger.warning(
+                "Ignored duplicate contact category ids",
+                extra={"count": len(conflicting_ids), "sample_ids": sample_ids(conflicting_ids)},
+            )
         return categories_by_id

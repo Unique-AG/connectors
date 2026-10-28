@@ -9,6 +9,7 @@ that a short raw page (or, for activities, a since-cutoff) is what "exhausted" m
 """
 
 import asyncio
+import logging
 from collections.abc import KeysView
 from datetime import date
 from urllib.parse import quote
@@ -1070,3 +1071,110 @@ class TestAttendeeJoin:
             )
             is None
         )
+
+
+_QUERY_LOGGER = "backstop_mcp.features.activity_history.queries.get_activity_history_query"
+
+
+def _meeting_rows(count: int) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json=collection(
+            *(
+                resource(
+                    f"m{index}",
+                    "activities",
+                    title=f"Meeting {index}",
+                    effectiveDate="2026-01-01",
+                    specificResource={
+                        "resourceType": "meeting-or-calls",
+                        "resourceId": str(1000 + index),
+                    },
+                )
+                for index in range(count)
+            )
+        ),
+    )
+
+
+class TestLogging:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_attendee_lookups_log_one_warning_per_call_with_sample_ids(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(return_value=_meeting_rows(7))
+        for index in range(7):
+            respx.get(f"{BASE_URL}/meeting-or-calls/{1000 + index}/attendees").mock(
+                return_value=httpx.Response(500, json={"errors": [{"title": "down"}]})
+            )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await _run_stream(client, segment="organizations", entity_id="42", stream="meeting")
+
+        records = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        [warning] = [record for record in records if record.levelno == logging.WARNING]
+        assert warning.message == "Attendee lookups failed"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == [str(1000 + index) for index in range(5)]
+        details = [record for record in records if record.message == "Attendee lookup failed"]
+        assert len(details) == 7
+        assert {record.levelno for record in details} == {logging.DEBUG}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_successful_attendee_lookups_log_no_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(return_value=_meeting_rows(1))
+        respx.get(f"{BASE_URL}/meeting-or-calls/1000/attendees").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await _run_stream(client, segment="organizations", entity_id="42", stream="meeting")
+
+        assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_forbidden_stream_logs_status_and_code_without_backstops_text(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_party("organizations", "42")
+        respx.get(f"{BASE_URL}/organizations/42/activities").mock(
+            return_value=httpx.Response(
+                403,
+                json={
+                    "errors": [
+                        {
+                            "code": "AccessDenied",
+                            "title": "Denied",
+                            "detail": "Not allowed to read Tailspin notes",
+                        }
+                    ]
+                },
+            )
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            result = await make_get_activity_history_query(client).run(
+                segment="organizations",
+                entity_id="42",
+                party=ResolvedPartyDto(id="42", search_type="organizations", name="Party"),
+                continuations={"note": ActivityContinuationResponse(limit=10, offset=0)},
+                gist_max_chars=300,
+            )
+
+        assert result.groups["note"].error is not None
+        [record] = [
+            record
+            for record in caplog.records
+            if record.name == _QUERY_LOGGER and record.levelno == logging.WARNING
+        ]
+        assert record.message == "Activity stream forbidden"
+        assert record.__dict__["status_code"] == 403
+        assert record.__dict__["code"] == "AccessDenied"
+        assert record.__dict__["stream"] == "note"
+        assert "detail" not in record.__dict__
+        assert "Tailspin" not in str(record.__dict__)

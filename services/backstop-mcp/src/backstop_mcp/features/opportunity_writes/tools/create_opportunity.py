@@ -1,12 +1,12 @@
 """`create_opportunity`: POST one deal. Investor is a party, never a raw id."""
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.opportunity_writes import (
@@ -24,8 +24,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -35,6 +33,11 @@ logger = logging.getLogger(__name__)
         open_world_hint=False,
     ),
     output_schema=published_output_schema(CreateOpportunityResponse),
+)
+@trace_arguments(
+    "opportunity.search_type",
+    "opportunity.party_id",
+    identifying=("opportunity.search", "opportunity.name", "opportunity.owner_login"),
 )
 async def create_opportunity(
     ctx: Context,
@@ -71,8 +74,4 @@ async def create_opportunity(
     if not isinstance(investor_result, Resolved):
         return unresolved_party_response(investor_result)
     investor = investor_result.value
-    logger.info(
-        "opportunity_writes.create_opportunity.start",
-        extra={"investor_id": investor.id, "investor_search_type": investor.search_type},
-    )
     return await create_opportunity_command.run(opportunity=opportunity, investor_id=investor.id)

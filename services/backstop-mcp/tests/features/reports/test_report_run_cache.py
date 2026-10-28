@@ -1,11 +1,14 @@
 """`get_report_run_cache`: the production cache keeps 1,000 runs for an hour each."""
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncGenerator
 from datetime import date
+from typing import cast
 
 import pytest
+from mcp_observability import identifiable_value
 
 from backstop_mcp.features.reports import (
     ReportRun,
@@ -55,6 +58,23 @@ async def runs() -> AsyncGenerator[_Runs]:
     for run in parked.started:
         run.task.cancel()
     await asyncio.gather(*(run.task for run in parked.started), return_exceptions=True)
+
+
+class TestEvictionLog:
+    @pytest.mark.asyncio
+    async def test_an_evicted_run_logs_the_hashed_report_name(
+        self, runs: _Runs, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        cache = ReportRunCache(maxsize=1, ttl_seconds=_HOUR)
+        cache.add(_key(0), runs.park())
+
+        with caplog.at_level(logging.INFO, logger="backstop_mcp.features.reports.queries"):
+            cache.add(_key(1), runs.park())
+
+        [record] = [r for r in caplog.records if r.getMessage() == "Evicted report run"]
+        logged = str(cast("object", record.__dict__["report_name"]))
+        assert logged == str(identifiable_value("Report 0"))
+        assert record.__dict__["reason"] == "full"
 
 
 class TestProductionDefaults:

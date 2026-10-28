@@ -8,6 +8,7 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.elicitation_utils import (
@@ -45,6 +46,7 @@ _COLLECTION = "organizations"
     ),
     output_schema=published_output_schema(DeleteOrganizationResponse),
 )
+@trace_arguments("organization.search_type", "organization.party_id")
 async def delete_organization(
     ctx: Context,
     organization: Annotated[
@@ -75,10 +77,6 @@ async def delete_organization(
     if not isinstance(result, Resolved):
         return unresolved_party_response(result)
     party = result.value
-    logger.info(
-        "org_people_writes.delete_organization.start",
-        extra={"search_type": party.search_type, "party_id": party.id},
-    )
 
     async def prompt() -> str:
         return await delete_party_with_locations_command.preview(
@@ -90,13 +88,13 @@ async def delete_organization(
         return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
-            "org_people_writes.delete_organization.not_confirmed",
+            "Organization deletion not confirmed",
             extra={"search_type": party.search_type, "party_id": party.id},
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
         logger.info(
-            "org_people_writes.delete_organization.elicit.not_available",
+            "Elicitation not available for organization deletion",
             extra={"search_type": party.search_type, "party_id": party.id},
         )
     deleted_location_ids = await delete_party_with_locations_command.run(
