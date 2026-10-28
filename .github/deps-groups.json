@@ -1,6 +1,8 @@
 {
   "cooldownDays": 3,
   "maxNewPullRequests": 5,
+  "maxOpenPullRequests": 15,
+  "ignore": [],
   "groups": [
     { "name": "nestjs", "ecosystem": "npm", "patterns": ["@nestjs/*", "nestjs-*"] },
     { "name": "opentelemetry", "ecosystem": "npm", "patterns": ["@opentelemetry/*"] },

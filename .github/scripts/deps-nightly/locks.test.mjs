@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   changedPackages,
   findDowngrades,
+  findMissing,
   hasUvCooldown,
   movedPnpmImporters,
   normalizeName,
@@ -225,13 +226,20 @@ Resolved 3 packages in 1ms
 
 describe('hasUvCooldown', () => {
   it('finds an exclude-newer setting in any project', () => {
-    assert.strictEqual(hasUvCooldown(['[tool.uv]\nexclude-newer = "3 days"\n']), true);
-    assert.strictEqual(hasUvCooldown(['[tool.uv]\npackage = false\n']), false);
+    assert.strictEqual(hasUvCooldown('[tool.uv]\nexclude-newer = "3 days"\n'), true);
+    assert.strictEqual(hasUvCooldown('[tool.uv]\npackage = false\n'), false);
   });
 });
 
 describe('normalizeName', () => {
   it('lowercases and joins separators with a dash', () => {
     assert.strictEqual(normalizeName('Typing_Extensions.Core'), 'typing-extensions-core');
+  });
+});
+
+describe('findMissing', () => {
+  it('lists the names that a lock lost', () => {
+    const lock = new Map([['ruff', ['0.17.2']]]);
+    assert.deepStrictEqual(findMissing(lock, ['ruff', 'httpx']), ['httpx']);
   });
 });

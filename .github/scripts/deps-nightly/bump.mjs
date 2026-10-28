@@ -1,3 +1,5 @@
+import { markerOf } from './state.mjs';
+
 const MAX_LISTED = 100;
 
 export function pnpmCommands(entry, releaseAge) {
@@ -75,6 +77,8 @@ export function renderBody({ entry, changes, projects, cooldownDays }) {
     ...(projects.length > 0
       ? listed(projects.map((project) => `\`${project}\``))
       : [`- None. ${locked ? 'Only the lock file changed.' : 'No file changed.'}`]),
+    '',
+    markerOf(entry.key),
     '',
   ].join('\n');
 }

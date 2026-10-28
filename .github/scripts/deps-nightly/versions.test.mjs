@@ -6,6 +6,7 @@ import {
   isStable,
   newestVersion,
   oldestVersion,
+  updateType,
 } from './versions.mjs';
 
 describe('compareVersions', () => {
@@ -65,5 +66,18 @@ describe('isMajorBump', () => {
     assert.strictEqual(isMajorBump('0.28.2', '0.29.0'), false);
     assert.strictEqual(isMajorBump(['1.2.0'], ['1.3.0']), false);
     assert.strictEqual(isMajorBump('workspace:*', '2.0.0'), false);
+  });
+});
+
+describe('updateType', () => {
+  it('names the first part that changes', () => {
+    assert.strictEqual(updateType('4.6.5', '5.0.0'), 'major');
+    assert.strictEqual(updateType('4.6.5', '4.7.0'), 'minor');
+    assert.strictEqual(updateType('4.6.5', '4.6.7'), 'patch');
+    assert.strictEqual(updateType('v1.2', '1.2.1'), 'patch');
+  });
+
+  it('is unknown for text that is not a version', () => {
+    assert.strictEqual(updateType('main', '1.0.0'), 'unknown');
   });
 });

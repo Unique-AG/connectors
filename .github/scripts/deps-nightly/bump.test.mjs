@@ -106,6 +106,16 @@ describe('renderBody', () => {
     assert.match(body, /- `packages\/utils`/);
   });
 
+  it('ends with the marker that holds the key of the entry', () => {
+    const body = renderBody({
+      entry: { ...single, key: 'npm-zod:0123456789ab' },
+      changes,
+      projects: [],
+      cooldownDays: 3,
+    });
+    assert.match(body, /<!-- deps-nightly:npm-zod:0123456789ab -->\n$/);
+  });
+
   it('says so when no project moved', () => {
     const body = renderBody({ entry: group, changes, projects: [], cooldownDays: 3 });
     assert.match(body, /bumps the `rollup` group/);
@@ -117,7 +127,9 @@ describe('renderBody', () => {
       ecosystem: 'terraform',
       name: 'azurerm',
       isGroup: false,
-      members: [{ name: 'azurerm', from: '~> 3', to: '4.9.0', direct: true, data: { major: true } }],
+      members: [
+        { name: 'azurerm', from: '~> 3', to: '4.9.0', direct: true, data: { major: true } },
+      ],
     };
     const body = renderBody({
       entry,

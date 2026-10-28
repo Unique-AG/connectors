@@ -2,12 +2,13 @@ import assert from 'node:assert';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createActionsLookup, planActions } from './actions.mjs';
 import { createDockerLookup, planDocker } from './docker.mjs';
+import { createNpmDeprecationLookup, dropDeprecated } from './npm-deprecated.mjs';
 import {
   changedPackages,
   hasUvCooldown,
   parsePnpmPackages,
   parseRequirements,
-  parseUvDryRun,
+  parseUvUpdates,
   pinnedVersion,
 } from './locks.mjs';
 import {
@@ -28,6 +29,7 @@ import {
   uvProjectFolders,
 } from './repo.mjs';
 import { run, runOrThrow, sandboxEnv } from './run.mjs';
+import { closedKeysOf } from './state.mjs';
 import { createTerraformLookup, planTerraform } from './terraform.mjs';
 
 function planNpm() {
@@ -60,16 +62,23 @@ async function planUv() {
   const pyprojects = Object.fromEntries(
     folders.map((folder) => [folder, readFileSync(`${folder}/pyproject.toml`, 'utf8')]),
   );
-  const flag = hasUvCooldown(Object.values(pyprojects))
-    ? ''
-    : `--exclude-newer "${config.cooldownDays} days"`;
-  const dryRun = run(
-    'bash',
-    ['-c', `bash scripts/each-python-project.sh uv lock --upgrade --dry-run ${flag} 2>&1`],
-    { env: sandboxEnv() },
+  const updates = new Map(
+    folders.map((folder) => {
+      const flag = hasUvCooldown(pyprojects[folder])
+        ? []
+        : ['--exclude-newer', `${config.cooldownDays} days`];
+      const dryRun = run('uv', ['lock', '--upgrade', '--dry-run', ...flag], {
+        cwd: folder,
+        env: sandboxEnv(),
+      });
+      assert.strictEqual(
+        dryRun.status,
+        0,
+        `uv lock --dry-run failed in ${folder}:\n${dryRun.stdout}${dryRun.stderr}`,
+      );
+      return [folder, parseUvUpdates(`${dryRun.stdout}\n${dryRun.stderr}`)];
+    }),
   );
-  assert.strictEqual(dryRun.status, 0, `uv lock --dry-run failed:\n${dryRun.stdout}`);
-  const updates = parseUvDryRun(dryRun.stdout);
   const pinnedNames = [
     ...new Set(
       Object.values(pyprojects).flatMap((text) =>
@@ -104,7 +113,15 @@ function planFiles(pattern) {
 }
 
 const ecosystemOptions = { now: Date.now(), cooldownDays: config.cooldownDays };
-const npm = planNpm();
+const npmPlan = planNpm();
+const checkedNpm = await dropDeprecated({
+  candidates: npmPlan.candidates,
+  lookup: createNpmDeprecationLookup(),
+});
+const npm = {
+  candidates: checkedNpm.candidates,
+  needsPerson: [...npmPlan.needsPerson, ...checkedNpm.needsPerson],
+};
 const uv = await planUv();
 const ledgerPath = process.env.TAG_LEDGER;
 const actions = await planActions({
@@ -126,8 +143,11 @@ const terraform = await planTerraform({
   lookup: createTerraformLookup(process.env.GH_TOKEN),
   ...ecosystemOptions,
 });
+const repository = process.env.GITHUB_REPOSITORY;
+const baseBranch = process.env.BASE_BRANCH ?? 'main';
+const gh = (...args) => runOrThrow('gh', args);
 const openPullRequests = JSON.parse(
-  runOrThrow('gh', [
+  gh(
     'pr',
     'list',
     '--state',
@@ -135,10 +155,39 @@ const openPullRequests = JSON.parse(
     '--limit',
     '500',
     '--json',
-    'headRefName,title,labels',
-  ]),
+    'number,headRefName,title,labels,body',
+  ),
 );
-const openBranches = openPullRequests.map(({ headRefName }) => headRefName);
+const openPulls = openPullRequests
+  .filter(({ headRefName }) => headRefName.startsWith('deps/'))
+  .map(({ number, headRefName, labels, body }) => ({
+    number,
+    branch: headRefName,
+    body,
+    labels: labels.map(({ name }) => name),
+    behindBy: Number(
+      gh('api', `repos/${repository}/compare/${baseBranch}...${headRefName}`, '--jq', '.behind_by'),
+    ),
+    humanCommits: JSON.parse(
+      gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
+    ).some((login) => login !== 'github-actions[bot]'),
+  }));
+const closedBodies = gh(
+  'api',
+  '--method',
+  'GET',
+  'search/issues',
+  '-f',
+  `q=repo:${repository} is:pr is:closed is:unmerged label:dependencies -label:superseded`,
+  '-f',
+  'per_page=100',
+  '--paginate',
+  '--jq',
+  '.items[].body | @json',
+)
+  .split('\n')
+  .filter(Boolean)
+  .map((line) => JSON.parse(line));
 const patchTitles = openPullRequests
   .filter(({ labels }) => labels.some(({ name }) => name === 'vulna-squash'))
   .map(({ title }) => title);
@@ -158,17 +207,27 @@ const plan = buildPlan({
     ...terraform.needsPerson,
   ],
   config,
-  openBranches,
+  openPulls,
+  closedKeys: closedKeysOf(closedBodies),
   patchTitles,
 });
 
 const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');
-const entries = JSON.stringify(plan.entries);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
 }
+if (process.env.DASHBOARD_FILE) {
+  const openList = openPulls.map(({ number, branch }) => `#${number} \`${branch}\``);
+  writeFileSync(
+    process.env.DASHBOARD_FILE,
+    `${summary}\n### Open dependency pull requests (${openList.length})\n\n${openList.map((item) => `- ${item}`).join('\n')}\n`,
+  );
+}
 if (process.env.GITHUB_OUTPUT) {
-  appendFileSync(process.env.GITHUB_OUTPUT, `entries=${entries}\n`);
+  appendFileSync(
+    process.env.GITHUB_OUTPUT,
+    `entries=${JSON.stringify(plan.entries)}\nupdates=${JSON.stringify(plan.updates)}\n`,
+  );
 }
 console.log(summary);
-console.log(entries);
+console.log(JSON.stringify(plan.entries));

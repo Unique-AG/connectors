@@ -97,22 +97,27 @@ export function restoreUvLockHeader(after, before) {
   return revision ? withoutCooldown.replace(/^revision = \d+$/m, revision) : withoutCooldown;
 }
 
+export function parseUvUpdates(output) {
+  return [...output.matchAll(/^Update (\S+) v(\S+) -> v(\S+)$/gm)].map((match) => ({
+    name: match[1],
+    from: match[2],
+    to: match[3],
+  }));
+}
+
 export function parseUvDryRun(output) {
   const [, ...blocks] = output.split(/^== (\S+): .*$/m);
   const updates = new Map();
   for (let index = 0; index < blocks.length; index += 2) {
-    updates.set(
-      blocks[index],
-      [...blocks[index + 1].matchAll(/^Update (\S+) v(\S+) -> v(\S+)$/gm)].map((match) => ({
-        name: match[1],
-        from: match[2],
-        to: match[3],
-      })),
-    );
+    updates.set(blocks[index], parseUvUpdates(blocks[index + 1]));
   }
   return updates;
 }
 
-export function hasUvCooldown(pyprojects) {
-  return pyprojects.some((pyproject) => /^exclude-newer\b/m.test(pyproject));
+export function hasUvCooldown(pyproject) {
+  return /^exclude-newer\b/m.test(pyproject);
+}
+
+export function findMissing(lock, names) {
+  return names.filter((name) => !lock.has(name));
 }

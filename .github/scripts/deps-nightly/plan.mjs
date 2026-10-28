@@ -1,10 +1,12 @@
 import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
+import { classifyOpenPull, entryKey } from './state.mjs';
 import {
   compareVersions,
   isMajorBump,
   isStable,
   newestVersion,
   oldestVersion,
+  updateType,
 } from './versions.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -189,26 +191,49 @@ function mentions(titles, name) {
   return titles.some((title) => pattern.test(title));
 }
 
-export function buildPlan({ candidates, needsPerson, config, openBranches, patchTitles = [] }) {
-  const buckets = Map.groupBy(candidates, (candidate) => {
-    const group = config.groups.find(
-      ({ ecosystem, patterns }) =>
-        ecosystem === candidate.ecosystem &&
-        patterns.some((pattern) => matchesPattern(pattern, candidate.name)),
-    );
-    return JSON.stringify(
-      group
-        ? [candidate.ecosystem, 'group', group.name]
-        : [candidate.ecosystem, 'package', candidate.name],
-    );
-  });
-  const entries = [...buckets].map(([key, members]) => {
-    const [, kind, groupName] = JSON.parse(key);
+function isIgnored(rules, candidate) {
+  return rules.some(
+    ({ ecosystem, name, updateTypes }) =>
+      (!ecosystem || ecosystem === candidate.ecosystem) &&
+      matchesPattern(name, candidate.name) &&
+      (!updateTypes || updateTypes.includes(updateType(candidate.from, candidate.to))),
+  );
+}
+
+export function buildPlan({
+  candidates,
+  needsPerson,
+  config,
+  openPulls = [],
+  closedKeys = new Set(),
+  patchTitles = [],
+}) {
+  const ignored = candidates.filter((candidate) => isIgnored(config.ignore ?? [], candidate));
+  const buckets = Map.groupBy(
+    candidates.filter((candidate) => !ignored.includes(candidate)),
+    (candidate) => {
+      const group = config.groups.find(
+        ({ ecosystem, patterns }) =>
+          ecosystem === candidate.ecosystem &&
+          patterns.some((pattern) => matchesPattern(pattern, candidate.name)),
+      );
+      return JSON.stringify(
+        group
+          ? [candidate.ecosystem, 'group', group.name, Boolean(candidate.data?.major)]
+          : [candidate.ecosystem, 'package', candidate.name],
+      );
+    },
+  );
+  const entries = [...buckets].map(([bucket, members]) => {
+    const [, kind, groupName, major] = JSON.parse(bucket);
     const isGroup = kind === 'group' && members.length > 1;
     const name = isGroup ? groupName : members[0].name;
-    return {
+    const entry = {
       ecosystem: members[0].ecosystem,
-      slug: slugOf(members[0].ecosystem, name),
+      slug: slugOf(
+        members[0].ecosystem,
+        kind === 'group' ? `${groupName}${major ? '-major' : ''}` : name,
+      ),
       name,
       isGroup,
       members: members.map(({ name: memberName, from, to, direct, data }) => ({
@@ -219,21 +244,43 @@ export function buildPlan({ candidates, needsPerson, config, openBranches, patch
         ...(data ? { data } : {}),
       })),
     };
+    return { ...entry, key: entryKey(entry) };
   });
   const ordered = entries.sort(
     (a, b) =>
       Number(b.members.some(({ direct }) => direct)) -
         Number(a.members.some(({ direct }) => direct)) || a.slug.localeCompare(b.slug),
   );
-  const open = new Set(openBranches);
-  const isCovered = ({ slug, members }) =>
-    open.has(`deps/${slug}`) || members.some(({ name }) => mentions(patchTitles, name));
-  const skipped = ordered.filter(isCovered);
-  const fresh = interleave(ordered.filter((entry) => !isCovered(entry)));
+  const openByBranch = new Map(openPulls.map((pull) => [pull.branch, pull]));
+  const decisions = ordered.map((entry) => {
+    if (closedKeys.has(entry.key)) {
+      return { entry, skip: 'a person closed this version' };
+    }
+    if (entry.members.some(({ name }) => mentions(patchTitles, name))) {
+      return { entry, skip: 'an open patch pull request names it' };
+    }
+    const pull = openByBranch.get(`deps/${entry.slug}`);
+    if (!pull) {
+      return { entry: { ...entry, action: 'new' } };
+    }
+    const action = classifyOpenPull({ key: entry.key, pull });
+    return action === 'keep'
+      ? { entry, skip: `#${pull.number} is up to date` }
+      : { entry: { ...entry, action, number: pull.number } };
+  });
+  const withAction = (action) =>
+    decisions.flatMap(({ entry }) => (entry.action === action ? [entry] : []));
+  const fresh = interleave(withAction('new'));
+  const room = Math.min(
+    config.maxNewPullRequests,
+    Math.max(0, (config.maxOpenPullRequests ?? Number.POSITIVE_INFINITY) - openPulls.length),
+  );
   return {
-    entries: fresh.slice(0, config.maxNewPullRequests),
-    skipped,
-    deferred: fresh.slice(config.maxNewPullRequests),
+    entries: [...withAction('rebuild'), ...withAction('replace'), ...fresh.slice(0, room)],
+    updates: withAction('update'),
+    skipped: decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
+    ignored,
+    deferred: fresh.slice(room),
     needsPerson,
   };
 }
@@ -245,28 +292,37 @@ function describe({ name, isGroup, members }) {
   return `${name}: ${members[0].from} -> ${members[0].to}`;
 }
 
-export function renderSummary({ entries, skipped, deferred, needsPerson }, modeNote) {
+const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR' };
+
+export function renderSummary(
+  { entries, updates = [], skipped, ignored = [], deferred, needsPerson },
+  modeNote,
+) {
   const section = (title, items) =>
     items.length > 0
       ? [`### ${title} (${items.length})`, '', ...items.map((item) => `- ${item}`), '']
       : [];
+  const line = (entry) =>
+    `${entry.ecosystem} ${describe(entry)}${ACTION_LABELS[entry.action] ? ` (${ACTION_LABELS[entry.action]})` : ''}`;
   return [
     '## Dependency plan',
     '',
     modeNote,
     '',
+    ...section('Pull requests for this run', entries.map(line)),
     ...section(
-      'Pull requests for this run',
-      entries.map((entry) => `${entry.ecosystem} ${describe(entry)}`),
+      'Branches that get main merged in',
+      updates.map((entry) => `${entry.ecosystem} ${entry.name} (#${entry.number})`),
     ),
     ...section(
-      'Skipped because a pull request is open',
-      skipped.map((entry) => `${entry.ecosystem} ${entry.name}`),
+      'Skipped',
+      skipped.map((entry) => `${entry.ecosystem} ${entry.name}: ${entry.reason}`),
     ),
     ...section(
-      'Left for a later run',
-      deferred.map((entry) => `${entry.ecosystem} ${describe(entry)}`),
+      'Ignored by the configuration',
+      ignored.map(({ ecosystem, name, from, to }) => `${ecosystem} ${name}: ${from} -> ${to}`),
     ),
+    ...section('Left for a later run', deferred.map(line)),
     ...section(
       'Needs a person',
       needsPerson.map(({ ecosystem, name, reason }) => `${ecosystem} ${name}: ${reason}`),

@@ -58,3 +58,16 @@ export function isMajorBump(from, to) {
   const majors = (versions) => [versions].flat().map((version) => Number(/\d+/.exec(version)?.[0]));
   return Math.max(...majors(to)) > Math.min(...majors(from));
 }
+
+export function updateType(from, to) {
+  const [before, after] = [from, to].map((version) =>
+    /\d+(?:\.\d+)*/.exec(version)?.[0].split('.').map(Number),
+  );
+  if (!(before && after)) {
+    return 'unknown';
+  }
+  if (after[0] !== before[0]) {
+    return 'major';
+  }
+  return (after[1] ?? 0) === (before[1] ?? 0) ? 'patch' : 'minor';
+}

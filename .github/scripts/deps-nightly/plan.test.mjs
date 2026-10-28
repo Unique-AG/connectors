@@ -7,6 +7,7 @@ import {
   renderSummary,
   uvCandidates,
 } from './plan.mjs';
+import { markerOf } from './state.mjs';
 
 const NOW = Date.parse('2026-10-27T00:00:00Z');
 const file = (uploaded, yanked = false) => ({ upload_time_iso_8601: uploaded, yanked });
@@ -241,7 +242,6 @@ describe('buildPlan', () => {
       ],
       needsPerson: [],
       config,
-      openBranches: [],
     });
     assert.deepStrictEqual(
       entries.map(({ slug, isGroup, members }) => [slug, isGroup, members.length]),
@@ -257,7 +257,6 @@ describe('buildPlan', () => {
       candidates: [candidate('npm', '@types/node'), candidate('uv', 'Typing_Extensions')],
       needsPerson: [],
       config,
-      openBranches: [],
     });
     assert.deepStrictEqual(entries.map(({ slug }) => slug).sort(), [
       'npm-types-node',
@@ -265,30 +264,150 @@ describe('buildPlan', () => {
     ]);
   });
 
-  it('treats a group with one member as a plain package', () => {
+  it('names a group with one member as a plain package and keeps the group branch', () => {
     const { entries } = buildPlan({
       candidates: [candidate('uv', 'fastmcp')],
       needsPerson: [],
       config,
-      openBranches: [],
     });
-    assert.deepStrictEqual([entries[0].slug, entries[0].isGroup], ['uv-fastmcp', false]);
-  });
-
-  it('skips a name that has an open pull request', () => {
-    const { entries, skipped } = buildPlan({
-      candidates: [candidate('npm', 'zod'), candidate('npm', 'pino')],
+    assert.deepStrictEqual(
+      [entries[0].slug, entries[0].name, entries[0].isGroup],
+      ['uv-fastmcp', 'fastmcp', false],
+    );
+    const single = buildPlan({
+      candidates: [candidate('uv', 'opentelemetry-api')],
       needsPerson: [],
       config,
-      openBranches: ['deps/npm-zod', 'feature/other'],
+    }).entries[0];
+    assert.deepStrictEqual([single.slug, single.name], ['uv-opentelemetry', 'opentelemetry-api']);
+  });
+
+  it('puts the major bumps of a group in a pull request of their own', () => {
+    const major = { ...candidate('uv', 'opentelemetry-sdk'), data: { major: true } };
+    const { entries } = buildPlan({
+      candidates: [candidate('uv', 'opentelemetry-api'), major],
+      needsPerson: [],
+      config,
+    });
+    assert.deepStrictEqual(entries.map(({ slug }) => slug).sort(), [
+      'uv-opentelemetry',
+      'uv-opentelemetry-major',
+    ]);
+  });
+
+  describe('with open pull requests', () => {
+    const [zod] = buildPlan({
+      candidates: [candidate('npm', 'zod')],
+      needsPerson: [],
+      config,
+    }).entries;
+    const pull = (overrides) => ({
+      number: 7,
+      branch: 'deps/npm-zod',
+      body: markerOf(zod.key),
+      labels: [],
+      behindBy: 2,
+      humanCommits: false,
+      ...overrides,
+    });
+    const plan = (openPulls, extra = {}) =>
+      buildPlan({
+        candidates: [candidate('npm', 'zod'), candidate('npm', 'pino')],
+        needsPerson: [],
+        config,
+        openPulls,
+        ...extra,
+      });
+
+    it('skips a pull request that is up to date with main', () => {
+      const { entries, skipped } = plan([pull({ behindBy: 0 })]);
+      assert.deepStrictEqual(
+        entries.map(({ slug }) => slug),
+        ['npm-pino'],
+      );
+      assert.deepStrictEqual(
+        skipped.map(({ slug, reason }) => [slug, reason]),
+        [['npm-zod', '#7 is up to date']],
+      );
+    });
+
+    it('rebuilds an unhandled pull request that is behind main', () => {
+      const { entries } = plan([pull()]);
+      assert.deepStrictEqual(
+        entries.map(({ slug, action, number }) => [slug, action, number]),
+        [
+          ['npm-zod', 'rebuild', 7],
+          ['npm-pino', 'new', undefined],
+        ],
+      );
+    });
+
+    it('only merges main into a pull request that the agent or a person touched', () => {
+      for (const touched of [
+        { labels: ['ai-assisted'] },
+        { labels: ['human-required'] },
+        { humanCommits: true },
+      ]) {
+        const { entries, updates } = plan([pull(touched)]);
+        assert.deepStrictEqual(
+          updates.map(({ slug, number }) => [slug, number]),
+          [['npm-zod', 7]],
+        );
+        assert.deepStrictEqual(
+          entries.map(({ slug }) => slug),
+          ['npm-pino'],
+        );
+      }
+    });
+
+    it('replaces a pull request for another version', () => {
+      const { entries } = plan([pull({ body: markerOf('npm-zod:0123456789ab') })]);
+      assert.strictEqual(entries[0].action, 'replace');
+    });
+
+    it('skips a version that a person closed and counts open pull requests against the cap', () => {
+      const closed = plan([], { closedKeys: new Set([zod.key]) });
+      assert.deepStrictEqual(
+        closed.entries.map(({ slug }) => slug),
+        ['npm-pino'],
+      );
+      assert.strictEqual(closed.skipped[0].reason, 'a person closed this version');
+      const full = buildPlan({
+        candidates: [candidate('npm', 'pino')],
+        needsPerson: [],
+        config: { ...config, maxOpenPullRequests: 1 },
+        openPulls: [pull({ branch: 'deps/npm-other' })],
+      });
+      assert.deepStrictEqual(
+        full.deferred.map(({ slug }) => slug),
+        ['npm-pino'],
+      );
+    });
+  });
+
+  it('leaves out a candidate that an ignore rule names', () => {
+    const { entries, ignored } = buildPlan({
+      candidates: [
+        candidate('npm', 'zod'),
+        { ...candidate('npm', 'eslint'), to: '2.0.0' },
+        { ...candidate('npm', 'pino'), to: '2.0.0' },
+      ],
+      needsPerson: [],
+      config: {
+        ...config,
+        ignore: [
+          { name: 'zod', reason: 'Pinned by a person.' },
+          { ecosystem: 'npm', name: 'e*', updateTypes: ['major'], reason: 'Wait for the rewrite.' },
+        ],
+      },
     });
     assert.deepStrictEqual(
-      entries.map(({ slug }) => slug),
-      ['npm-pino'],
+      ignored.map(({ name }) => name),
+      ['zod', 'eslint'],
     );
     assert.deepStrictEqual(
-      skipped.map(({ slug }) => slug),
-      ['npm-zod'],
+      entries.map(({ name }) => name),
+      ['pino'],
     );
   });
 
@@ -301,7 +420,6 @@ describe('buildPlan', () => {
       ],
       needsPerson: [],
       config,
-      openBranches: [],
       patchTitles: ['build(main): vulna squash pillow 12.3.0→13.0.0'],
     });
     assert.deepStrictEqual(
@@ -325,7 +443,6 @@ describe('buildPlan', () => {
       ],
       needsPerson: [],
       config,
-      openBranches: [],
     });
     assert.deepStrictEqual(
       entries.map(({ slug }) => slug),

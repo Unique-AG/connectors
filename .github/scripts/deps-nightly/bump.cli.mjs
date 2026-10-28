@@ -8,6 +8,7 @@ import { applyDocker } from './docker.mjs';
 import {
   changedPackages,
   findDowngrades,
+  findMissing,
   hasUvCooldown,
   movedPnpmImporters,
   normalizeName,
@@ -51,9 +52,8 @@ function bumpUv() {
   const pyprojects = new Map(
     folders.map((folder) => [folder, readFileSync(`${folder}/pyproject.toml`, 'utf8')]),
   );
-  const cooldownFlag = hasUvCooldown([...pyprojects.values()])
-    ? []
-    : ['--exclude-newer', `${config.cooldownDays} days`];
+  const cooldownFlag = (folder) =>
+    hasUvCooldown(pyprojects.get(folder)) ? [] : ['--exclude-newer', `${config.cooldownDays} days`];
   for (const [folder, text] of pyprojects) {
     const edited = entry.members.reduce(
       (current, { name, to }) => pinEdit(current, normalizeName(name), to),
@@ -74,9 +74,14 @@ function bumpUv() {
     if (behind.length === 0) {
       continue;
     }
-    runOrThrow('uv', uvLockArgs(behind, cooldownFlag), { cwd: folder, env: sandboxEnv() });
+    runOrThrow('uv', uvLockArgs(behind, cooldownFlag(folder)), { cwd: folder, env: sandboxEnv() });
     const after = restoreUvLockHeader(readFileSync(`${folder}/uv.lock`, 'utf8'), before);
     writeFileSync(`${folder}/uv.lock`, after);
+    const missing = findMissing(
+      parseUvPackages(after),
+      behind.map(({ name }) => name),
+    );
+    assert.deepStrictEqual(missing, [], `The lock in ${folder} lost: ${missing.join(', ')}`);
     const downgrades = findDowngrades(held, parseUvPackages(after));
     assert.deepStrictEqual(
       downgrades,
