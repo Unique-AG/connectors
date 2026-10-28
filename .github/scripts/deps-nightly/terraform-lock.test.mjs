@@ -6,6 +6,7 @@ import {
   generateLock,
   LOCK_FILE,
   mergeLockBlock,
+  normalizeConstraint,
   parseLock,
   providerAddress,
 } from './terraform-lock.mjs';
@@ -52,17 +53,45 @@ describe('parseLock', () => {
   });
 });
 
+describe('normalizeConstraint', () => {
+  for (const [constraint, expected] of [
+    ['~> 3', '~> 3.0'],
+    ['~> 3.0', '~> 3.0'],
+    ['~> 0.12', '~> 0.12'],
+    ['~> 4.1.2', '~> 4.1.2'],
+    ['>= 4, < 6', '>= 4.0.0, < 6.0.0'],
+    ['< 6, >= 4', '>= 4.0.0, < 6.0.0'],
+    ['>= 4,<6', '>= 4.0.0, < 6.0.0'],
+    ['>= 1.2', '>= 1.2.0'],
+    ['= 1.2.3', '1.2.3'],
+    ['1.2.3', '1.2.3'],
+    ['> 1', '> 1.0.0'],
+    ['<= 2.5', '<= 2.5.0'],
+    ['!= 4.9.0, >= 4', '>= 4.0.0, != 4.9.0'],
+    ['>= 1.0, < 2.0, != 1.5', '>= 1.0.0, != 1.5.0, < 2.0.0'],
+    ['< 5, <= 5', '<= 5.0.0, < 5.0.0'],
+    ['>= 1, > 1', '> 1.0.0, >= 1.0.0'],
+    ['~> 3, != 3.5', '~> 3.0, != 3.5.0'],
+    ['< 6, < 5, >= 1', '>= 1.0.0, < 5.0.0, < 6.0.0'],
+    ['<= 9, ~> 3.1', '~> 3.1, <= 9.0.0'],
+  ]) {
+    it(`writes ${constraint} as Terraform does`, () => {
+      assert.strictEqual(normalizeConstraint(constraint), expected);
+    });
+  }
+});
+
 describe('mergeLockBlock', () => {
   const generated = lock(block('azurerm', '4.9.0', '4.9.0'));
 
   it('replaces the block of the provider, keeps the others, and sets the real constraint', () => {
     const existing = lock(
-      block('azurerm', '4.5.0', '>= 4, < 6'),
+      block('azurerm', '4.5.0', '>= 4.0.0, < 6.0.0'),
       block('time', '0.13.1', '~> 0.13'),
     );
     assert.strictEqual(
       mergeLockBlock(existing, generated, '>= 4, < 6'),
-      lock(block('azurerm', '4.9.0', '>= 4, < 6'), block('time', '0.13.1', '~> 0.13')),
+      lock(block('azurerm', '4.9.0', '>= 4.0.0, < 6.0.0'), block('time', '0.13.1', '~> 0.13')),
     );
   });
 
@@ -78,12 +107,12 @@ describe('mergeLockBlock', () => {
   it('creates the file, with the header, when there is none', () => {
     assert.strictEqual(
       mergeLockBlock(null, generated, '>= 4, < 6'),
-      lock(block('azurerm', '4.9.0', '>= 4, < 6')),
+      lock(block('azurerm', '4.9.0', '>= 4.0.0, < 6.0.0')),
     );
   });
 
   it('changes nothing when the lock already holds the block', () => {
-    const existing = lock(block('azurerm', '4.9.0', '>= 4, < 6'));
+    const existing = lock(block('azurerm', '4.9.0', '>= 4.0.0, < 6.0.0'));
     assert.strictEqual(mergeLockBlock(existing, generated, '>= 4, < 6'), existing);
   });
 
