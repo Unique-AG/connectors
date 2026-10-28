@@ -5,7 +5,7 @@ scope: team_visible
 model: cursor-grok-4.6-high
 git_repo: https://github.com/Unique-AG/connectors
 git_branch: main
-memory_enabled: true
+memory_enabled: false
 trigger:
   - cron:
       schedule: 0 5 * * *
