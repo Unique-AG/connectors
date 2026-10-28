@@ -106,9 +106,8 @@ export function uvCandidates({ projects, latest }) {
   );
   for (const { project, lock, updates } of projects) {
     for (const [name, versions] of parseUvPackages(lock)) {
-      const key = normalizeName(name);
-      holders.set(key, [
-        ...(holders.get(key) ?? []),
+      holders.set(name, [
+        ...(holders.get(name) ?? []),
         { project, current: newestVersion(versions) },
       ]);
     }

@@ -26,7 +26,7 @@ export function parsePnpmPackages(lock) {
 
 export function parseUvPackages(lock) {
   return [...lock.matchAll(UV_PACKAGE)].reduce(
-    (packages, match) => addVersion(packages, match[1], match[2]),
+    (packages, match) => addVersion(packages, normalizeName(match[1]), match[2]),
     new Map(),
   );
 }

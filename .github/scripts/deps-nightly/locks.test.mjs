@@ -77,6 +77,15 @@ describe('parseUvPackages', () => {
   it('reads registry packages and skips local ones', () => {
     assert.deepStrictEqual([...parseUvPackages(uvLock('2.14.0'))], [['httpx2', ['2.14.0']]]);
   });
+
+  it('normalizes the package names', () => {
+    const lock = `[[package]]
+name = "Typing_Extensions"
+version = "4.15.0"
+source = { registry = "https://pypi.org/simple" }
+`;
+    assert.deepStrictEqual([...parseUvPackages(lock)], [['typing-extensions', ['4.15.0']]]);
+  });
 });
 
 describe('changedPackages', () => {
