@@ -6,7 +6,6 @@ import {
   SHAREPOINT_REST_PAGE_SIZE,
   SharepointRestClientService,
   type SiteGroupMembership,
-  SiteGroupMembersNotReadableError,
 } from './sharepoint-rest-client.service';
 import { SharepointRestError, SharepointRestHttpService } from './sharepoint-rest-http.service';
 
@@ -51,7 +50,7 @@ describe('SharepointRestClientService', () => {
       managedPath,
       `web/sitegroups/getById(12)/users?$top=${SHAREPOINT_REST_PAGE_SIZE}&$skip=0`,
     );
-    expect(result).toEqual({ '12': members });
+    expect(result).toEqual({ membershipsByGroupId: { '12': members }, unreadableGroupIds: [] });
   });
 
   const membershipPage = (groupId: string, skip: number) =>
@@ -77,7 +76,10 @@ describe('SharepointRestClientService', () => {
 
     const result = await service.getSiteGroupsMemberships(siteName, managedPath, ['12']);
 
-    expect(result).toEqual({ '12': [...firstPage, ...secondPage] });
+    expect(result).toEqual({
+      membershipsByGroupId: { '12': [...firstPage, ...secondPage] },
+      unreadableGroupIds: [],
+    });
     expect(requestedPaths().sort()).toEqual(
       [membershipPage('12', 0), membershipPage('12', SHAREPOINT_REST_PAGE_SIZE)].sort(),
     );
@@ -97,7 +99,10 @@ describe('SharepointRestClientService', () => {
 
     const result = await service.getSiteGroupsMemberships(siteName, managedPath, ['12', '34']);
 
-    expect(result).toEqual({ '12': [...fullPage, ...lastPage], '34': shortPage });
+    expect(result).toEqual({
+      membershipsByGroupId: { '12': [...fullPage, ...lastPage], '34': shortPage },
+      unreadableGroupIds: [],
+    });
     expect(requestedPaths().sort()).toEqual(
       [
         membershipPage('12', 0),
@@ -107,22 +112,44 @@ describe('SharepointRestClientService', () => {
     );
   });
 
-  it('names every site group whose members SharePoint refuses to list', async () => {
+  const forbidden = () =>
+    new SharepointRestError('Forbidden', 403, '-2147024891, System.UnauthorizedAccessException');
+
+  it('reports site groups whose members SharePoint refuses to list and keeps the others', async () => {
+    const readableMembers = [createMembership(1)];
     requestSingle.mockImplementation(async (_siteName, _managedPath, path: string) => {
       if (path === membershipPage('34', 0)) {
-        return { value: [createMembership(1)] };
+        return { value: readableMembers };
       }
-      throw new SharepointRestError(
-        'Forbidden',
-        403,
-        '-2147024891, System.UnauthorizedAccessException',
-      );
+      throw forbidden();
     });
 
-    const failure = service.getSiteGroupsMemberships(siteName, managedPath, ['12', '34', '56']);
+    const result = await service.getSiteGroupsMemberships(siteName, managedPath, [
+      '12',
+      '34',
+      '56',
+    ]);
 
-    await expect(failure).rejects.toBeInstanceOf(SiteGroupMembersNotReadableError);
-    await expect(failure).rejects.toThrow(/site groups 12, 56 .*Who can view the membership/);
+    expect(result).toEqual({
+      membershipsByGroupId: { '34': readableMembers },
+      unreadableGroupIds: ['12', '56'],
+    });
+  });
+
+  it('drops the members of a site group that becomes unreadable on a later page', async () => {
+    const firstPage = Array.from({ length: SHAREPOINT_REST_PAGE_SIZE }, (_, index) =>
+      createMembership(index + 1),
+    );
+    requestSingle.mockImplementation(async (_siteName, _managedPath, path: string) => {
+      if (path === membershipPage('12', 0)) {
+        return { value: firstPage };
+      }
+      throw forbidden();
+    });
+
+    const result = await service.getSiteGroupsMemberships(siteName, managedPath, ['12']);
+
+    expect(result).toEqual({ membershipsByGroupId: {}, unreadableGroupIds: ['12'] });
   });
 
   it('rethrows other failures of a site group request', async () => {
@@ -138,7 +165,7 @@ describe('SharepointRestClientService', () => {
     const result = await service.getSiteGroupsMemberships(siteName, managedPath, []);
 
     expect(requestSingle).not.toHaveBeenCalled();
-    expect(result).toEqual({});
+    expect(result).toEqual({ membershipsByGroupId: {}, unreadableGroupIds: [] });
   });
 
   it('loads attachment names and sizes from the per-item attachment folders', async () => {

@@ -6,7 +6,10 @@ import {
   filter,
   forEach,
   fromEntries,
+  keys,
   map,
+  omit,
+  partition,
   pipe,
   prop,
   sumBy,
@@ -27,18 +30,6 @@ const LIST_ATTACHMENTS_HEADERS_TIMEOUT_MS = 120_000;
 // retried: four retries only delay the site abort by about 45 s and hide the error code.
 const LIST_ATTACHMENTS_RETRY_STATUS_CODES = [429, 502, 503, 504];
 
-export class SiteGroupMembersNotReadableError extends Error {
-  public constructor(siteName: Smeared, groupIds: string[]) {
-    super(
-      `Cannot read the members of site groups ${groupIds.join(', ')} on site "${siteName}": ` +
-        `SharePoint answered 403. The groups' "Who can view the membership of the group?" ` +
-        `setting is most likely not "Everyone". Set it to "Everyone", or make the app a member ` +
-        `or owner of these groups.`,
-    );
-    this.name = 'SiteGroupMembersNotReadableError';
-  }
-}
-
 @Injectable()
 export class SharepointRestClientService {
   private readonly logger = new Logger(this.constructor.name);
@@ -49,11 +40,12 @@ export class SharepointRestClientService {
     siteName: Smeared,
     managedPath: ManagedPath,
     siteGroupIds: string[],
-  ): Promise<Record<string, SiteGroupMembership[]>> {
+  ): Promise<SiteGroupsMemberships> {
     const logPrefix = `[Site: ${siteName}]`;
     const limit = pLimit(SITE_GROUP_MEMBERSHIP_CONCURRENCY);
     let skip = 0;
     let remainingGroupIds = [...siteGroupIds];
+    const unreadableGroupIds: string[] = [];
     const membershipsByGroupId: Record<string, SiteGroupMembership[]> = fromEntries(
       siteGroupIds.map((id): [string, SiteGroupMembership[]] => [id, []]),
     );
@@ -66,19 +58,15 @@ export class SharepointRestClientService {
         ),
       );
 
-      const unreadableGroupIds = pipe(
+      const [readablePages, unreadablePages] = partition(
         zip(remainingGroupIds, pages),
-        filter(([, page]) => page === undefined),
-        map(([groupId]) => groupId),
+        (entry): entry is [string, SiteGroupMembership[]] => entry[1] !== undefined,
       );
-      if (unreadableGroupIds.length > 0) {
-        throw new SiteGroupMembersNotReadableError(siteName, unreadableGroupIds);
-      }
+      unreadableGroupIds.push(...unreadablePages.map(([groupId, _]) => groupId));
 
       remainingGroupIds = pipe(
-        zip(remainingGroupIds, pages),
-        map(([groupId, page]) => {
-          const pageMembers = page ?? [];
+        readablePages,
+        map(([groupId, pageMembers]) => {
           const existingMembers = membershipsByGroupId[groupId];
           assert(existingMembers, `No existing members found for group ${groupId}`);
           return {
@@ -101,15 +89,17 @@ export class SharepointRestClientService {
       skip += SHAREPOINT_REST_PAGE_SIZE;
     }
 
+    const readableMemberships = omit(membershipsByGroupId, unreadableGroupIds);
     if (siteGroupIds.length > 0) {
-      const membershipCount = sumBy(values(membershipsByGroupId), (members) => members.length);
+      const membershipCount = sumBy(values(readableMemberships), (members) => members.length);
       this.logger.log(
-        `${logPrefix} Fetched ${membershipCount} memberships across ${siteGroupIds.length} site ` +
-          `groups in ${skip / SHAREPOINT_REST_PAGE_SIZE} page(s)`,
+        `${logPrefix} Fetched ${membershipCount} memberships across ` +
+          `${keys(readableMemberships).length} site groups in ` +
+          `${skip / SHAREPOINT_REST_PAGE_SIZE} page(s)`,
       );
     }
 
-    return membershipsByGroupId;
+    return { membershipsByGroupId: readableMemberships, unreadableGroupIds };
   }
 
   // Gives undefined when SharePoint refuses to list the group's members.
@@ -194,6 +184,13 @@ interface RestAttachmentFile {
 interface RestAttachmentFolder {
   Name: string;
   Files: RestAttachmentFile[];
+}
+
+interface SiteGroupsMemberships {
+  membershipsByGroupId: Record<string, SiteGroupMembership[]>;
+  // Groups SharePoint refused (403) to list the members of. They are left out of
+  // `membershipsByGroupId`, even when an earlier page was readable.
+  unreadableGroupIds: string[];
 }
 
 export interface SiteGroupMembership {

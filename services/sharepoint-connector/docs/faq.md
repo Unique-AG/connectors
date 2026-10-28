@@ -57,7 +57,7 @@ Without `GroupMember.Read.All`, group-based permissions cannot be synchronized.
 
 **Answer:** SharePoint site groups have a visibility setting: "Who can view the membership of the group?"
 
-If this is **not** set to "Everyone", the connector cannot read group members.
+If this is **not** set to "Everyone", the connector cannot read group members. It syncs such a group without members, so its members lose access in Unique to content shared through it, and logs a warning that names the site and the group ids.
 
 **Solutions:**
 

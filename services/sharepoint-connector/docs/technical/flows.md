@@ -297,7 +297,7 @@ The connector handles different permission sources:
 
 ### Group Visibility Requirement
 
-IMPORTANT: For SharePoint site groups, the connector must be able to read group members. If "Who can view the membership of the group?" is **not** set to "Everyone", the connector cannot read members.
+IMPORTANT: For SharePoint site groups, the connector must be able to read group members. If "Who can view the membership of the group?" is **not** set to "Everyone", the connector cannot read members. SharePoint answers 403, and the connector syncs the group without members and logs a site-scoped warning instead of failing the site's permission sync.
 
 **Mitigation:**
 
