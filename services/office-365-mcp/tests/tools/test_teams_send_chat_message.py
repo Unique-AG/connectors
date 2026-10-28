@@ -156,6 +156,26 @@ class TestThePersonBeforeTheSend:
         assert _MESSAGE in asked[0]
         assert "cannot be recalled" in asked[0]
 
+    async def test_the_question_lists_a_link_that_starts_after_the_preview_cut(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message="x" * 300 + " [pay](https://evil.example/pay)",
+            confirm=capturing,
+        )
+
+        assert "It links to 'https://evil.example/pay'." in asked[0]
+
     async def test_the_question_carries_the_destination(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -628,7 +648,7 @@ class TestTheEraWithNoBackChannel:
         assert post.call_count == 1, "the label of the request is part of what the answer binds"
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "content": '<p><at id="0">Jane Smith</at> Ship it Friday.</p>',
             "contentType": "html",
         }
 
@@ -711,7 +731,7 @@ class TestWhatItAsksGraphFor:
         made = cast("Sequence[Call]", graph.calls)
         assert made[0].request.method == "POST"
 
-    async def test_the_post_body_carries_the_message_as_plain_text(
+    async def test_the_post_body_carries_the_message_as_html(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         post = _posts(graph)
@@ -720,8 +740,8 @@ class TestWhatItAsksGraphFor:
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         sent = cast("Mapping[str, object]", body["body"])
-        assert sent["content"] == _MESSAGE
-        assert sent["contentType"] == "text"
+        assert sent["content"] == f"<p>{_MESSAGE}</p>"
+        assert sent["contentType"] == "html"
         assert "mentions" not in body
 
     async def test_the_post_body_carries_the_subject_as_given(
@@ -809,7 +829,7 @@ class TestWhatItAsksGraphFor:
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "content": '<p><at id="0">Jane Smith</at> Ship it Friday.</p>',
             "contentType": "html",
         }
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
@@ -840,7 +860,7 @@ class TestWhatItAsksGraphFor:
         sent = post.calls.last.request.content.decode()
         body = cast("Mapping[str, object]", json.loads(sent))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Ship it Friday.',
+            "content": '<p><at id="0">Jane Smith</at> Ship it Friday.</p>',
             "contentType": "html",
         }
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])

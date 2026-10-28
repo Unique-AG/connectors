@@ -44,6 +44,7 @@ from office_365_mcp.shared.mail import (
     copied_and_marked,
     one_address_each,
 )
+from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -70,7 +71,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
     "mode": "reply",
-    "body_html": "Thanks — Friday works.",
+    "body": "Thanks — Friday works.",
 }
 
 GRAPH_NOT_FOUND = (
@@ -539,14 +540,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ],
-        body_html: Annotated[
+        body: Annotated[
             str,
             Field(
                 min_length=1,
-                description=(
-                    "What to say, as HTML; escape `&`, `<`, `>`, and use `<p>`/`<br>` for "
-                    + "structure."
-                ),
+                description="What to say, as Markdown. This tool turns it into HTML.",
             ),
         ],
         to: Annotated[
@@ -602,7 +600,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             message_ref=message_ref,
             mode=mode,
-            body_html=body_html,
+            body_html=markdown_to_html(body),
             confirm=a_person_agrees(ctx),
             to=to,
             cc=cc,

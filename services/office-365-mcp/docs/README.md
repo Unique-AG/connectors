@@ -1418,7 +1418,7 @@ messages. It stores only an OAuth token.
 | Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
 | Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
 | Filter the list of chats by type or by topic | Yes | No |
-| Send a message with a mention, a subject, an importance, or a thread reply | Yes | No, plain text only |
+| Send a message with a mention, a subject, an importance, a thread reply, or Markdown formatting | Yes | No, plain text only |
 | Send a message with a file | Yes, if the file is already in SharePoint | No |
 | Edit, delete, or react to a message | Yes, edit and delete for own messages only | No |
 | Create a chat, change its members, or rename it | Yes | No |

@@ -345,6 +345,22 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
         assert sent["transactionId"], "nothing told Microsoft what to dedupe a retry on"
         assert _ONE_ATTENDEE in json.dumps(sent), "the address the call named never reached Graph"
 
+    async def test_the_markdown_of_the_body_reaches_graph_as_html(
+        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        arguments = {**_INVITING, "body": "Agenda:\n\n- **Budget**\n- Hiring"}
+
+        _ = await every_calendar_tool.call_tool(outlook_create_event.TOOL_NAME, arguments)
+
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+        assert sent["body"] == {
+            "contentType": "html",
+            "content": (
+                "<p>Agenda:</p>\n<ul>\n<li><strong>Budget</strong></li>\n<li>Hiring</li>\n</ul>"
+            ),
+        }
+
     async def test_an_agreed_room_booking_posts_the_room_as_a_resource_with_its_options(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
     ) -> None:

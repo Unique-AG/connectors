@@ -26,6 +26,7 @@ from office_365_mcp.shared.messages import (
     OutgoingMention,
     TeamsMessage,
     chat_in_question,
+    links_in_question,
     mention_fields,
     mentioned_members,
     message_in_question,
@@ -79,13 +80,48 @@ _TO_THE_CHANNEL = f"to channel {_CHANNEL_ID!r} in team {_TEAM_ID!r}"
 
 
 class TestOutgoingMessage:
-    def test_a_message_with_no_mention_is_plain_text(self) -> None:
+    def test_a_message_with_no_mention_is_html(self) -> None:
+        built = outgoing_message("Ship it Friday.")
+
+        assert built.body is not None
+        assert built.body.content == "<p>Ship it Friday.</p>"
+        assert built.body.content_type == BodyType.Html
+        assert built.mentions is None
+
+    def test_markdown_becomes_the_formatting_that_teams_shows(self) -> None:
+        built = outgoing_message("**Ship** _it_ ~~Monday~~ [plan](https://example.com)")
+
+        assert built.body is not None
+        assert built.body.content == (
+            "<p><strong>Ship</strong> <em>it</em> <s>Monday</s> "
+            + '<a href="https://example.com">plan</a></p>'
+        )
+
+    def test_html_in_the_text_is_escaped(self) -> None:
         built = outgoing_message("Ship it <b>Friday</b>.")
 
         assert built.body is not None
-        assert built.body.content == "Ship it <b>Friday</b>."
-        assert built.body.content_type == BodyType.Text
-        assert built.mentions is None
+        assert built.body.content == "<p>Ship it &lt;b&gt;Friday&lt;/b&gt;.</p>"
+
+    def test_an_image_becomes_a_link_and_not_an_img_tag(self) -> None:
+        built = outgoing_message("![x](https://example.com/p.png)")
+
+        assert built.body is not None
+        assert built.body.content == '<p>!<a href="https://example.com/p.png">x</a></p>'
+
+    def test_a_script_link_stays_text(self) -> None:
+        built = outgoing_message("[y](javascript:alert(1))")
+
+        assert built.body is not None
+        assert built.body.content == "<p>[y](javascript:alert(1))</p>"
+
+    def test_a_list_after_a_mention_stays_a_list(self) -> None:
+        built = outgoing_message("- one\n- two", mentions=[_JANE])
+
+        assert built.body is not None
+        assert built.body.content == (
+            '<at id="0">Jane Smith</at> <ul>\n<li>one</li>\n<li>two</li>\n</ul>'
+        )
 
     def test_the_mentions_come_first_in_the_order_given(self) -> None:
         built = outgoing_message("Ship it Friday.", mentions=[_JANE, _ADA])
@@ -93,7 +129,7 @@ class TestOutgoingMessage:
         assert built.body is not None
         assert built.body.content_type == BodyType.Html
         assert built.body.content == (
-            '<at id="0">Jane Smith</at> <at id="1">Ada Lovelace</at> Ship it Friday.'
+            '<p><at id="0">Jane Smith</at> <at id="1">Ada Lovelace</at> Ship it Friday.</p>'
         )
 
     def test_each_mention_names_its_person_by_the_entra_id(self) -> None:
@@ -119,7 +155,8 @@ class TestOutgoingMessage:
 
         assert built.body is not None
         assert built.body.content == (
-            '<at id="0">Jane &lt;b&gt; &amp; &quot;Co&quot;</at> a &lt; b &amp; &quot;c&quot;'
+            '<p><at id="0">Jane &lt;b&gt; &amp; &quot;Co&quot;</at> '
+            + "a &lt; b &amp; &quot;c&quot;</p>"
         )
         assert built.mentions is not None
         assert built.mentions[0].mention_text == 'Jane <b> & "Co"'
@@ -128,7 +165,9 @@ class TestOutgoingMessage:
         built = outgoing_message("first line\nsecond line", mentions=[_JANE])
 
         assert built.body is not None
-        assert built.body.content == '<at id="0">Jane Smith</at> first line<br>second line'
+        assert built.body.content == (
+            '<p><at id="0">Jane Smith</at> first line<br />\nsecond line</p>'
+        )
 
     @pytest.mark.parametrize("mentions", [(), (_JANE,)])
     def test_a_message_built_without_them_sets_no_importance_and_no_subject(
@@ -159,13 +198,13 @@ class TestOutgoingMessage:
     ) -> None:
         assert outgoing_message("Ship it.", mentions=mentions).attachments is None
 
-    def test_an_attachment_makes_the_text_escaped_html_with_the_tag_after_it(self) -> None:
+    def test_an_attachment_tag_comes_after_the_html(self) -> None:
         built = outgoing_message('a < b & "c"\nnext', attachments=[_BUDGET])
 
         assert built.body is not None
         assert built.body.content_type == BodyType.Html
         assert built.body.content == (
-            "a &lt; b &amp; &quot;c&quot;<br>next "
+            "<p>a &lt; b &amp; &quot;c&quot;<br />\nnext</p> "
             + '<attachment id="153fa47d-18c9-4179-be08-9879815a9f90"></attachment>'
         )
         assert built.mentions is None
@@ -187,7 +226,7 @@ class TestOutgoingMessage:
 
         assert built.body is not None
         assert built.body.content == (
-            '<at id="0">Jane Smith</at> Ship it. '
+            '<p><at id="0">Jane Smith</at> Ship it.</p> '
             + '<attachment id="153fa47d-18c9-4179-be08-9879815a9f90"></attachment> '
             + '<attachment id="0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"></attachment>'
         )
@@ -200,7 +239,7 @@ class TestOutgoingMessage:
         built = outgoing_message("Ship it.", mentions=[member])
 
         assert built.body is not None
-        assert built.body.content == '<at id="0">Jane Smith (Finance)</at> Ship it.'
+        assert built.body.content == '<p><at id="0">Jane Smith (Finance)</at> Ship it.</p>'
         assert built.mentions is not None
         assert built.mentions[0].mention_text == "Jane Smith (Finance)"
         mentioned = built.mentions[0].mentioned
@@ -1028,3 +1067,23 @@ class TestUnknownEnumHeaders:
 
     def test_every_call_builds_its_own_collection(self) -> None:
         assert unknown_enum_headers() is not unknown_enum_headers()
+
+
+class TestLinksInQuestion:
+    def test_a_message_with_no_link_adds_nothing(self) -> None:
+        assert links_in_question("Ship it **Friday**.") == ""
+
+    def test_every_destination_is_listed_in_order_once(self) -> None:
+        message = "[a](https://one.example) <https://two.example> [b](https://one.example)"
+
+        assert links_in_question(message) == (
+            " It links to 'https://one.example', 'https://two.example'."
+        )
+
+    def test_a_link_after_the_preview_cut_is_still_listed(self) -> None:
+        message = "x" * 300 + " [pay](https://evil.example/pay)"
+
+        assert links_in_question(message) == " It links to 'https://evil.example/pay'."
+
+    def test_a_script_link_is_not_a_destination(self) -> None:
+        assert links_in_question("[y](javascript:alert(1))") == ""
