@@ -12,8 +12,8 @@ flowchart LR
   gate -->|clean or skip label| publish[Image published]
   publish --> scan[Nightly scan of published images]
   scan --> slack[Slack report with image tag and CVE]
-  slack --> patch[Daily patch run opens fix PRs]
-  patch --> releasePr
+  slack --> person[A person opens fix PRs]
+  person --> releasePr
 ```
 
 ## Rules
@@ -106,43 +106,23 @@ Four facts follow from this:
 
 The nightly Slack report is the list of images that still need a release.
 
-## The daily patch run
+## Patch a finding
 
-The cron automation `nightly-vulna-patchy` reads the findings every day. It opens fix PRs for critical and high findings. It opens at most 3 PRs at a time, and it never merges. Each fix PR gets the same assess, fix, report, and hand-off run as a nightly dependency PR. See [Dependencies](./dependencies.md#one-agent-run-for-every-pr).
+A person reads the Slack report each day and opens the fix PRs. A critical or high finding must ship within 1 month.
 
 ```mermaid
-sequenceDiagram
-  autonumber
-  participant Scan as Nightly scan
-  participant Tab as Security tab
-  participant Slack
-  participant Cron as Cron automation
-  participant Agent as Agent with the skill
-  participant GH as GitHub
-  Scan->>Tab: Upload alerts for images and lock files
-  Scan->>Slack: Report with image tag and CVE
-  Cron->>Agent: Start mode findings at 05:00
-  Agent->>GH: Wait for the nightly dependency job
-  Agent->>Tab: Read open critical and high alerts
-  Agent->>GH: Open fix PRs, 3 open PRs at most
-  Agent->>GH: Assess, fix a red CI, report
-  Agent->>Slack: One message for each PR
+flowchart LR
+  scan[Nightly scan] --> slack[Slack report with image tag and CVE]
+  slack --> person[A person reads the report]
+  person --> fix[A fix PR, or the Rebuild Service workflow]
+  fix --> release[Release PR and release gate]
 ```
 
-| Step | What happens |
-|---|---|
-| 1 | The scan reads every published image, `pnpm-lock.yaml`, every `uv.lock`, and the Dockerfiles of `main`. It posts the report. It ends red when a fixable critical or high finding exists. |
-| 2 | At 05:00 the cron automation starts the skill. The skill stops if the nightly dependency job still runs, or if the scan is 24 hours old or older. |
-| 3 | The skill drops findings that need no PR. It drops a low severity, a finding with no fix, and a fix younger than 3 days. It also drops a fix that `main` already holds and a package that an open PR already changes. |
-| 4 | It groups the rest into batches. All patch bumps go together. Up to 3 minor bumps go together. A major bump goes alone. Each service has its own rebuild. |
-| 5 | It starts one subagent for each batch. At most 3 PRs with the label `vulna-squash` are open at one time. |
-| 6 | Each subagent opens one PR, then does the assess, fix, report, and hand-off steps. |
-
-The PR automation also fires for these fix PRs. It stops at once, because they have the label `vulna-squash` and not `dependencies`.
+Use this table to find the fix for each cause.
 
 | Cause | Fix |
 |---|---|
-| A Python or Node dependency | The nightly dependency PR, or a fix PR from the patch run |
+| A Python or Node dependency | The nightly dependency PR, or a PR that a person opens |
 | An operating system package | Run the Rebuild Service workflow. The new build takes the patch. |
 | The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
@@ -162,5 +142,4 @@ The PR automation also fires for these fix PRs. It stops at once, because they h
 | `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
-| `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date |

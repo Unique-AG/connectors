@@ -16,15 +16,15 @@ flowchart LR
   codeql -->|new alert| prStop[PR cannot merge]
   review -->|new vulnerable dependency| prStop
   nightlyUpdate[Nightly dependency update] -->|one PR per dependency| pr
-  pr -->|PR opened| agent[Agent: assess, fix, report]
+  pr -->|before the merge| manual[Manual review with the dependency review skill]
   pr -->|merge| main[main branch]
   main --> releasePr[Release PR]
   releasePr --> gate[Release gate]
   gate -->|fixable critical or high| relStop[Release cannot merge]
   gate -->|clean| published[Image published]
   published --> nightlyScan["Nightly scan: images, lock files, configuration"]
-  nightlyScan -->|Slack report| patchRun[Daily patch run]
-  patchRun -->|fix PR| pr
+  nightlyScan -->|Slack report| person[A person opens fix PRs]
+  person --> pr
 ```
 
 ## The three kinds
@@ -39,9 +39,9 @@ flowchart LR
 
 | Time (UTC) | What runs |
 |---|---|
-| 02:00 | The dependency update opens its PRs. Each new PR starts an agent run. |
+| 02:00 | The dependency update opens its PRs. |
 | 03:00 | The Trivy scan reads the published images, the lock files of `main`, and the Dockerfiles. It posts the Slack report. |
-| 05:00 | The patch run reads the findings and opens fix PRs. The cache warming also runs. |
+| 05:00 | The cache warming runs. |
 
 ## Who starts what
 
@@ -52,22 +52,17 @@ flowchart LR
 | CI | The test, lint, and build workflows, the dependency review, and CodeQL | A PR opens or changes |
 | Gatekeeper | The check that waits for all other checks | A PR opens or changes |
 | Release gate | The workflow `security-release-gate.yaml` | A release PR opens or changes |
-| PR automation | The Cursor automation `dependency-pr-assess` | A PR opens |
-| Cron automation | The Cursor automation `nightly-vulna-patchy` | 05:00 UTC |
-| The skill | `vulna-squash`: the instructions that both automations run | An automation starts |
+| Review | The skill `dependency-pr-review` | A person runs it on a dependency PR |
 | A person | An engineer with write access | A report, a Slack message, or a red check |
 
 ## Labels
 
 | Label | Set by | Read by | Meaning |
 |---|---|---|---|
-| `dependencies` | Nightly job | PR automation, gatekeeper title check | The PR comes from the nightly job. |
+| `dependencies` | Nightly job | Gatekeeper title check, person | The PR comes from the nightly job. |
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
-| `vulna-squash` | Agent | Skill | A fix PR from the patch run. The skill counts these PRs for the cap of 3. |
 | `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
 | `dependency-dashboard` | Nightly job | Person | The one issue that lists the plan and the open dependency PRs. |
-| `ai-assisted` | Agent | Agent, nightly job | The agent handled the PR. |
-| `human-required` | Agent | Agent, nightly job, person | A person must finish the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
 | `title-exception` | Person | Gatekeeper title check | Skip the PR title check. |
 
@@ -75,7 +70,7 @@ flowchart LR
 
 | State | Where |
 |---|---|
-| The result of an agent run | The report comment on the PR, and the labels |
+| The result of a review | The report of the person who ran the review, in the chat |
 | What needs an image release | The Slack report and the Security tab |
 | Which version a person rejected | A closed PR |
 | Who skipped the release gate | The bot comment on the release PR |
@@ -88,16 +83,6 @@ flowchart LR
 | The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
-| The two Cursor automations `nightly-vulna-patchy` and `dependency-pr-assess`. See [Cursor automations](#cursor-automations). | The daily patch run, and the whole job for each nightly dependency PR: assess, fix a red CI, report, and a hand-off comment. |
-
-## Cursor automations
-
-This repository does not define the automations. The Terraform of the monorepo defines them. Copy these settings there. Both automations use the repository `Unique-AG/connectors`, the branch `main`, and the Slack channel `C0C1PR9CNMP`. Memory is off, because the skill never uses it.
-
-| Name | Trigger | Prompt |
-|---|---|---|
-| `nightly-vulna-patchy` | Cron `0 5 * * *` (05:00 UTC) | Vulna Squash automation run on Unique-AG/connectors main. Read `agentic/skills/vulna-squash/SKILL.md` end to end and follow it. Use the Slack action for every message that the skill requires. Do not change code in this run except through subagents. |
-| `dependency-pr-assess` | "Pull request opened" | Run the skill `vulna-squash` in mode `pr` for the PR of this event. |
 
 ## DEVIATION from monorepo setup
 
