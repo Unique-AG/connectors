@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   echo "usage: set-pin.sh argocd <file> <service> tag <version>" >&2
   echo "       set-pin.sh argocd <file> <service> sha <full-sha> <version>" >&2
-  echo "       set-pin.sh argocd <file> <service> dev <release-to-remember>" >&2
+  echo "       set-pin.sh argocd <file> <service> dev" >&2
   echo "       set-pin.sh terraform <file> <service> <full-sha> <version>" >&2
   exit 2
 }
@@ -62,9 +62,8 @@ case "$mode" in
         rewrite "$pattern" "${5} # ${marker}: ${service}@${6}"
         ;;
       dev)
-        [ $# -eq 5 ] || usage
-        require_version "$5"
-        rewrite "$pattern" "dev/${service}/main # ${marker}: ${service}@${5}"
+        [ $# -eq 4 ] || usage
+        rewrite "$pattern" "dev/${service}/main # ${marker}: rolling dev of main"
         ;;
       *)
         usage

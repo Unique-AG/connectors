@@ -71,9 +71,9 @@ A pin has one of three shapes:
 |---|---|
 | `targetRevision: <service>@<version> # x-<service>-version` | `tag` |
 | `targetRevision: <40-character SHA> # x-<service>-version: <service>@<version>` | `sha` |
-| `targetRevision: dev/<service>/main # x-<service>-version: <service>@<release>` | `dev` |
+| `targetRevision: dev/<service>/main # x-<service>-version: rolling dev of main` | `dev` |
 
-In a `dev` pin, the version after the marker is the release to return to. Do not change it by hand.
+A `dev` pin has no fixed version. It follows the latest build of `main`.
 
 When the target is a release, keep the shape of the line you change. A `dev` line takes the shape that the other deployments of the service use. If no other deployment exists, use `sha`.
 
@@ -115,7 +115,7 @@ cd "${TMPDIR:-/tmp}/bump-service/monorepo"
 git checkout -q -B bump-<service>-<VERSION or dev>-<slug> origin/master
 <skill dir>/scripts/set-pin.sh argocd <file> <service> tag <VERSION>
 <skill dir>/scripts/set-pin.sh argocd <file> <service> sha <FULL_SHA> <VERSION>
-<skill dir>/scripts/set-pin.sh argocd <file> <service> dev <RELEASE_TO_RETURN_TO>
+<skill dir>/scripts/set-pin.sh argocd <file> <service> dev
 git diff --stat
 git add -A && git commit --no-verify -q -m "<title>"
 git push -q -u origin bump-<service>-<VERSION or dev>-<slug>
@@ -123,8 +123,10 @@ git push -q -u origin bump-<service>-<VERSION or dev>-<slug>
 
 Run only the one `set-pin.sh` line that matches the shape. `<slug>` is the cluster and environment with `/` changed to `-`. The `git diff --stat` must show one file. A file can hold more than one pin of the service, and the script changes all of them. Use `--no-verify` because the monorepo hooks run the full lint on a clone that has no build.
 
-Title for a release: `chore(<service>): bump <service> to <VERSION> in <cluster>/<env>`.
-Title for the dev target: `chore(<service>): run <service> from its dev branch in <cluster>/<env>`.
+Title for a release: `chore(<scope>): bump <service> to <VERSION> in <cluster>/<env>`.
+Title for the dev target: `chore(<scope>): run <service> from its dev branch in <cluster>/<env>`.
+
+The monorepo uses `mcp` as `<scope>` for a service whose name ends in `-mcp`, and `connectors` for the other services.
 
 Body:
 
@@ -137,7 +139,7 @@ Body:
 - [ ] ArgoCD syncs the new pin after the merge.
 ```
 
-For the `dev` target, use this summary: "ArgoCD follows the branch `dev/<service>/main`. Each `[Release] Dev Build` and each release of the service moves the branch. The cluster follows without a new PR. The marker keeps release <RELEASE_TO_RETURN_TO>. Bump to a release to return."
+For the `dev` target, use this summary: "ArgoCD follows the branch `dev/<service>/main`. Each `[Release] Dev Build` and each release of the service moves the branch. The cluster follows without a new PR. The comment says that the pin is a rolling dev of main. Bump to a release to return."
 
 If the cluster has a customer name, write it in brackets after the cluster name in the body.
 
