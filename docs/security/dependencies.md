@@ -17,6 +17,10 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | Cap | At most 5 new PRs each night |
 | Merge | A person merges. The agent never merges. |
 
+For a GitHub Action, the age of the release is not enough, because a publisher can move a tag to another commit. The job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
+
+A package build can run code. The `uv` tool builds a package that has no wheel. So a first job makes the update with no secret and saves a patch. A second job applies the patch to a fresh checkout and checks that the patch changes only the files of that ecosystem. Only then does it create the App token and push.
+
 A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. The job also opens no PR until the GitHub App exists. See [Setup that needs an admin](../../SECURITY-PROCESS.md#setup-that-needs-an-admin).
 
 ## One agent run for every PR
