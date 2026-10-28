@@ -6,5 +6,6 @@ export class PermissionsSyncError extends Error {
     cause: unknown,
   ) {
     super(`Permissions sync failed at step: ${step}`, { cause });
+    this.name = 'PermissionsSyncError';
   }
 }

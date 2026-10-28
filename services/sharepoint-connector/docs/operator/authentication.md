@@ -28,11 +28,11 @@ The app registration requests the following application permissions.
 | `GroupMember.Read.All` | Application | Read group members |
 | `User.ReadBasic.All`   | Application | Read user details  |
 
-**SharePoint REST API** (permission sync — optional):
+**SharePoint REST API** (list attachment sync when `listAttachmentsScan` is enabled, and permission sync when enabled):
 
-| Permission       | Type        | Description                  |
-| ---------------- | ----------- | ---------------------------- |
-| `Sites.Selected` | Application | Read site groups and members |
+| Permission       | Type        | Description                                              |
+| ---------------- | ----------- | -------------------------------------------------------- |
+| `Sites.Selected` | Application | List and download attachments; read site groups         |
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -330,7 +330,7 @@ https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
 
 #### SharePoint REST API
 
-For permission sync, the connector also authenticates with the SharePoint REST API using the same certificate. Only certificate-based authentication is supported (OIDC is not available).
+List attachment sync and permission sync authenticate to the SharePoint REST API with the same certificate. SharePoint REST rejects app-only tokens obtained with a client secret. Only certificate-based authentication is supported (OIDC is not available).
 
 Token endpoint:
 

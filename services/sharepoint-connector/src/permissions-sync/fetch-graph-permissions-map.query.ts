@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { isNonNullish } from 'remeda';
+import { filter, groupBy, isNonNullish, pipe, values } from 'remeda';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import {
   SimpleIdentitySet,
@@ -16,7 +16,10 @@ import { ALL_USERS_GROUP_ID_PREFIX, normalizeMsGroupId, OWNERS_SUFFIX } from './
 // the local type name.
 type Permission = Membership;
 export type PermissionsMap = Record<string, Permission[]>;
-type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<SimplePermission[]>>;
+type PermissionsFetcher = Record<
+  Exclude<AnySharepointItem['itemType'], 'listItemAttachment'>,
+  () => Promise<SimplePermission[]>
+>;
 
 const PERMISSIONS_FETCH_PROGRESS_LOG_INTERVAL = 100;
 
@@ -34,8 +37,43 @@ export class FetchGraphPermissionsMapQuery {
     const logPrefix = `[Site: ${siteId}]`;
     const permissionsMap: PermissionsMap = {};
     let itemsFetched = 0;
-    // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
+
+    const attachmentGroups = pipe(
+      items,
+      filter((item) => item.itemType === 'listItemAttachment'),
+      groupBy((item) => `${item.siteId.value}/${item.driveId}/${item.item.id}`),
+      values(),
+    );
+
+    for (const group of attachmentGroups) {
+      const item = group[0];
+      const sharePointPermissions = await this.graphApiService.getListItemPermissions(
+        item.siteId,
+        item.driveId,
+        item.item.id,
+      );
+      const mapped = this.mapSharePointPermissionsToOurPermissions(
+        sharePointPermissions,
+        item.item.id,
+        rootSiteName,
+      );
+      for (const attachment of group) {
+        permissionsMap[buildIngestionItemKey(attachment)] = mapped;
+        itemsFetched++;
+        if (itemsFetched % PERMISSIONS_FETCH_PROGRESS_LOG_INTERVAL === 0) {
+          this.logger.log(
+            `${logPrefix} Fetching permissions, ${itemsFetched}/${items.length} items ` +
+              `processed so far`,
+          );
+        }
+      }
+    }
+
     for (const item of items) {
+      if (item.itemType === 'listItemAttachment') {
+        continue;
+      }
+
       const permissionsFetcher: PermissionsFetcher = {
         driveItem: () => this.graphApiService.getDriveItemPermissions(item.driveId, item.item.id),
         listItem: () =>

@@ -138,7 +138,8 @@ For Multi Tenant deployments, grant site access to Unique's shared app ID `29a02
 
 - [ ] Kubernetes namespace created
 - [ ] Network egress to Microsoft Graph allowed
-- [ ] Network egress to SharePoint REST API allowed (if permission sync enabled)
+- [ ] Network egress to `{tenant}.sharepoint.com/_api` allowed (list attachment sync when `listAttachmentsScan` is enabled, and permission sync when enabled)
+- [ ] SharePoint `Sites.Selected` application permission and site grant, with certificate authentication (required for list sync; SharePoint REST rejects client-secret app-only tokens)
 - [ ] Connectivity to Unique API verified
 
 ### 2. Microsoft Entra ID

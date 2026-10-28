@@ -8,7 +8,11 @@ import { EnabledDisabledMode } from '../../constants/enabled-disabled-mode.enum'
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '../../constants/ingestion.constants';
 import { ModerationStatusValue } from '../../constants/moderation-status.constants';
 import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
-import { SharePointUser } from '../../microsoft-apis/graph/types/sharepoint.types';
+import type {
+  DriveItemFields,
+  ListItem,
+  SharePointUser,
+} from '../../microsoft-apis/graph/types/sharepoint.types';
 import { SharepointContentItem } from '../../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import { UniqueFileIngestionService } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.service';
 import {
@@ -17,7 +21,7 @@ import {
   ContentRegistrationRequest,
 } from '../../unique-api/unique-file-ingestion/unique-file-ingestion.types';
 import { sanitizeError } from '../../utils/normalize-error';
-import { buildIngestionItemKey } from '../../utils/sharepoint.util';
+import { buildIngestionItemKey, smearContentKey } from '../../utils/sharepoint.util';
 import { createSmeared } from '../../utils/smeared';
 import type { ProcessingContext } from '../types/processing-context';
 import { PipelineStep } from '../types/processing-context';
@@ -75,7 +79,7 @@ export class ContentRegistrationStep implements IPipelineStep {
         {
           url: createSmeared(contentRegistrationRequest.url ?? ''),
           baseUrl: createSmeared(contentRegistrationRequest.baseUrl ?? ''),
-          key: createSmeared(contentRegistrationRequest.key),
+          key: smearContentKey(contentRegistrationRequest.key),
           correlationId: context.correlationId,
           sourceName: contentRegistrationRequest.sourceName,
         },
@@ -118,22 +122,15 @@ export class ContentRegistrationStep implements IPipelineStep {
   // resolve them to full user objects (email, displayName) via MS Graph API like the
   // SharePoint REST API does.
   private extractMetadata(item: SharepointContentItem): ContentMetadata {
-    const isListItem = item.itemType === 'listItem';
-    const baseFields = isListItem ? item.item.fields : item.item.listItem.fields;
-    const webUrl = isListItem ? item.item.webUrl : item.item.listItem.webUrl;
-    const createdBy = isListItem ? item.item.createdBy : item.item.listItem.createdBy;
-
-    const moderationStatus = isListItem
-      ? (baseFields._ModerationStatus as ModerationStatusValue)
-      : undefined;
-    const metadata: ContentMetadata = {
-      ...baseFields,
-      Url: webUrl,
+    const { fields, url, fileName, createdBy, moderationStatus } = this.metadataSource(item);
+    return {
+      ...fields,
+      Url: url,
       Path: item.folderPath,
       DriveId: item.driveId,
-      Link: webUrl,
+      Link: url,
       ItemInternalId: item.item.id,
-      Filename: baseFields.FileLeafRef,
+      Filename: fileName,
       ...(moderationStatus !== undefined && {
         ModerationStatus: moderationStatus,
       }),
@@ -141,8 +138,44 @@ export class ContentRegistrationStep implements IPipelineStep {
         Author: this.extractAuthor(createdBy),
       }),
     };
+  }
 
-    return metadata;
+  // A drive file's metadata comes from its list item. SitePages and list attachments read their
+  // own item; only SitePages and generic lists carry a moderation status.
+  private metadataSource(item: SharepointContentItem): {
+    fields: ListItem['fields'] | DriveItemFields;
+    url: string;
+    fileName: string;
+    createdBy: { user: SharePointUser } | undefined;
+    moderationStatus?: ModerationStatusValue;
+  } {
+    switch (item.itemType) {
+      case 'driveItem': {
+        const { listItem } = item.item;
+        return {
+          fields: listItem.fields,
+          url: listItem.webUrl,
+          fileName: listItem.fields.FileLeafRef,
+          createdBy: listItem.createdBy,
+        };
+      }
+      case 'listItem':
+        return {
+          fields: item.item.fields,
+          url: item.item.webUrl,
+          fileName: item.item.fields.FileLeafRef,
+          createdBy: item.item.createdBy,
+          moderationStatus: item.item.fields._ModerationStatus,
+        };
+      case 'listItemAttachment':
+        return {
+          fields: item.item.fields,
+          url: item.attachment.absoluteUrl,
+          fileName: item.fileName,
+          createdBy: item.item.createdBy,
+          moderationStatus: item.item.fields._ModerationStatus,
+        };
+    }
   }
 
   private extractAuthor(createdBy: { user: SharePointUser }): AuthorMetadata {

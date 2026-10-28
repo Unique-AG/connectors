@@ -110,6 +110,27 @@ describe('AspxProcessingStep', () => {
       expect(mockApiService.getAspxPageContent).not.toHaveBeenCalled();
     });
 
+    it('leaves an aspx list attachment as a plain file', async () => {
+      const contextWithAttachment = {
+        ...mockContext,
+        pipelineItem: {
+          ...mockContext.pipelineItem,
+          itemType: 'listItemAttachment' as const,
+          fileName: 'page.aspx',
+          attachment: {
+            absoluteUrl: 'https://contoso.sharepoint.com/sites/Contoso/Attachments/1/page.aspx',
+            size: 1024,
+          },
+        },
+      } as ProcessingContext;
+
+      const result = await step.execute(contextWithAttachment);
+
+      expect(result).toBe(contextWithAttachment);
+      expect(result.htmlContent).toBeUndefined();
+      expect(mockApiService.getAspxPageContent).not.toHaveBeenCalled();
+    });
+
     it('fetches ASPX content and returns context with HTML content', async () => {
       const result = await step.execute(mockContext);
 

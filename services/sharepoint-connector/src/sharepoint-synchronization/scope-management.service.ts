@@ -17,13 +17,19 @@ import {
   buildActiveScopesPrefix,
   buildDriveExternalId,
   buildFolderExternalId,
+  buildListExternalId,
+  buildListItemExternalId,
   buildSitePagesExternalId,
   buildStaleScopesPrefix,
   buildSubsiteExternalId,
   buildUnknownExternalId,
   toPendingDeleteExternalId,
 } from '../utils/scope-external-id';
-import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
+import {
+  getUniqueListFolderPathFromItem,
+  getUniqueParentPathFromItem,
+  getUniquePathFromItem,
+} from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 import { FindScopeSuccessorQuery } from './find-scope-successor.query';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -503,6 +509,19 @@ export class ScopeManagementService {
           directory.driveId,
         );
       }
+    }
+
+    // List and item folders have no directory items, so their scopes get ids from the attachments.
+    // The ids hold no names, so renaming a list or item moves the files instead of re-ingesting.
+    for (const item of items) {
+      if (item.itemType !== 'listItemAttachment') {
+        continue;
+      }
+
+      pathToExternalIdMap[getUniqueListFolderPathFromItem(item, rootPath).value] ??=
+        buildListExternalId(rootSiteId, item.siteId.value, item.driveId);
+      pathToExternalIdMap[getUniqueParentPathFromItem(item, rootPath, siteName).value] ??=
+        buildListItemExternalId(rootSiteId, item.siteId.value, item.driveId, item.item.id);
     }
 
     // Register drive-level mappings from items for drives that had no subdirectories.

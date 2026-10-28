@@ -207,6 +207,43 @@ describe('sanitizeError', () => {
     expect(result.statusCode).toBe(500);
   });
 
+  it('serialises the cause of a wrapping error', () => {
+    const error = new Error('Permissions sync failed', { cause: new Error('403 on site group') });
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.cause).toMatchObject({ name: 'Error', message: '403 on site group' });
+  });
+
+  it('keeps the name an Error subclass sets in its constructor, also on the cause', () => {
+    class SiteGroupError extends Error {
+      public constructor(message: string) {
+        super(message);
+        this.name = 'SiteGroupError';
+      }
+    }
+    const error = new Error('Permissions sync failed', { cause: new SiteGroupError('403') });
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.name).toBe('Error');
+    expect(result.cause).toMatchObject({ name: 'SiteGroupError', message: '403' });
+  });
+
+  it('strips raw variables from a GraphQL client error used as a cause', () => {
+    const cause = createGraphqlClientError('Internal server error', {
+      input: { title: 'Secret Report.docx' },
+    });
+
+    const result = sanitizeError(new Error('Content sync failed', { cause })) as Record<
+      string,
+      unknown
+    >;
+
+    expect(result.cause).toMatchObject({ message: 'Internal server error' });
+    expect(JSON.stringify(result)).not.toContain('Secret Report.docx');
+  });
+
   it('does not treat non-ClientError with response/request as GraphQL error', () => {
     const error = new Error('boom') as Error & { response: object; request: object };
     error.response = { status: 500 };

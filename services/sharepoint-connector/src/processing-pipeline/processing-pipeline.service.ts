@@ -67,6 +67,9 @@ export class ProcessingPipelineService {
     if (pipelineItem.itemType === 'driveItem') {
       context.fileSize = pipelineItem.item.size;
     }
+    if (pipelineItem.itemType === 'listItemAttachment') {
+      context.fileSize = pipelineItem.attachment.size;
+    }
 
     const { siteId } = syncContext.siteConfig;
     const logPrefix = `[Site: ${siteId}][CorrelationId: ${correlationId}]`;
@@ -127,6 +130,9 @@ export class ProcessingPipelineService {
   }
 
   private resolveItemMimeType(pipelineItem: SharepointContentItem): string {
+    if (pipelineItem.itemType === 'listItemAttachment') {
+      return this.mimeTypeResolverService.resolve(pipelineItem.fileName, undefined);
+    }
     if (pipelineItem.itemType !== 'driveItem') {
       return DEFAULT_MIME_TYPE;
     }

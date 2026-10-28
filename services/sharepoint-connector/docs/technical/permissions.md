@@ -19,6 +19,16 @@ The SharePoint Connector requires specific permissions to access Microsoft Graph
 
 **Important:** These two permissions are **not interchangeable**. If library-level grants were issued (via `Grant-PnPAzureADAppSitePermission -List`) but the app registration only has `Sites.Selected`, requests to those libraries will return **403 Forbidden**. The app registration must include `Lists.SelectedOperations.Selected` to honour library-level grants.
 
+### List item attachments (required when `listAttachmentsScan` is enabled, including `content_only`)
+
+Microsoft Graph cannot list or download list attachments. That uses SharePoint REST, even when permission sync is off.
+
+| API | Permission | Type | Description |
+|-----|------------|------|-------------|
+| SharePoint REST | `Sites.Selected` | Application | List and download list attachments, and read `ReadSecurity` |
+
+The SharePoint API permission is separate from the Graph `Sites.Selected` permission. The app also needs a site grant, certificate authentication (SharePoint REST rejects app-only tokens obtained with a client secret), and network access to `https://{tenant}.sharepoint.com/_api`.
+
 ### Permission Sync (Optional)
 
 | API | Permission | Type | Description |
@@ -59,10 +69,15 @@ These APIs are used when permission sync is enabled:
 
 ## SharePoint REST Permissions
 
-These APIs are only used when permission sync is enabled:
+List attachment sync uses these endpoints in every sync mode, including `content_only`, on sites with `listAttachmentsScan` enabled. Group membership endpoints are used only when permission sync is enabled.
+
+SharePoint REST rejects app-only tokens obtained with a client secret. Use certificate authentication, grant the SharePoint `Sites.Selected` application permission on the site, and allow network access to `https://{tenant}.sharepoint.com/_api`.
 
 | API Endpoint | Method | Use Case | Permission |
 |--------------|--------|----------|------------|
+| `/_api/web/lists(guid'{listId}')/RootFolder/Folders('Attachments')/Folders?$expand=Files` | GET | List item attachment names and sizes | `Sites.Selected` |
+| `/_api/web/lists(guid'{listId}')/items({itemId})/AttachmentFiles('{fileName}')/$value` | GET | Download an attachment | `Sites.Selected` |
+| `/_api/web/lists(guid'{listId}')?$select=ReadSecurity` | GET | Reject lists users can read only their own items of | `Sites.Selected` |
 | `/_api/web/sitegroups/getById({groupId})` | GET | Read site group details | `Sites.Selected` |
 | `/_api/web/sitegroups/getById({groupId})/users` | GET | Read site group members | `Sites.Selected`* |
 

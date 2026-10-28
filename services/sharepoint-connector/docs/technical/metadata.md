@@ -42,7 +42,7 @@ SitePages (pages created directly in SharePoint such as news posts or wiki pages
 | `ItemInternalId` | `id` property from Graph API response | Sequential list item ID (e.g. 1, 2, 3), unique only within that SitePages list |
 | `Filename` | `FileLeafRef` SharePoint field | The page's file name |
 | `Author` | `createdBy` property | Structured object with `email`, `displayName`, and `id` |
-| `ModerationStatus` | `_ModerationStatus` SharePoint field | Content approval status (only present for SitePages) |
+| `ModerationStatus` | `_ModerationStatus` SharePoint field | Content approval status |
 
 SitePages carry a **reduced set** of SharePoint column values: `FileLeafRef`, `FileSizeDisplay`, `Title`, `AuthorLookupId`, `EditorLookupId`, `_ModerationStatus`, and the sync flag column.
 
@@ -54,14 +54,40 @@ GET /sites/{siteId}/lists/{listId}/items
     &$expand=fields($select=FileLeafRef,FileSizeDisplay,_ModerationStatus,Title,AuthorLookupId,EditorLookupId)
 ```
 
-### Key Differences Between Regular Documents and SitePages
+### List Item Attachments
 
-| Aspect | Regular Documents | SitePages |
-| ------ | ----------------- | --------- |
-| **Metadata fields** | Full set of all SharePoint column values | Reduced set (`FileLeafRef`, `FileSizeDisplay`, `Title`, `AuthorLookupId`, `EditorLookupId`, `_ModerationStatus`, sync column) |
-| **ItemInternalId** | Graph API drive item ID (long unique identifier) | Sequential list item ID (e.g. 1, 2, 3), unique only within that SitePages list |
-| **DriveId** | Document library drive ID | SitePages list ID |
-| **ModerationStatus** | Not present | Content approval status from `_ModerationStatus` field |
+Each attachment of an in-scope list item is ingested as its own document. It carries **all SharePoint column values of its list item** (the full `fields` bag from Graph), so every attachment of an item has the same column values, plus the following derived fields:
+
+| Field | Source | Description |
+| ----- | ------ | ----------- |
+| `Url` | Attachment's server-relative URL on the SharePoint origin | The attachment's absolute URL |
+| `Link` | Same as `Url` | Alias for the attachment's URL |
+| `Path` | Item folder name | `/{item folder}`, the item's folder within its list folder in Unique |
+| `DriveId` | List ID | The list identifier (not a document library drive ID) |
+| `ItemInternalId` | `id` property from Graph API response | Sequential list item ID, unique only within that list |
+| `Filename` | Attachment file name | The attachment's file name |
+| `Author` | `createdBy` property of the list item | Structured object with `email`, `displayName`, and `id` |
+| `ModerationStatus` | `_ModerationStatus` SharePoint field | Content approval status (only present on lists with content approval) |
+
+Graph returns `_ModerationStatus` only on lists with content approval enabled, so the column and the derived `ModerationStatus` are absent on other lists.
+
+#### Graph API Call
+
+```
+GET /sites/{siteId}/lists/{listId}/items
+    ?$select=id,createdDateTime,lastModifiedDateTime,webUrl,createdBy,lastModifiedBy
+    &$expand=fields
+```
+
+### Key Differences Between Regular Documents, SitePages and List Item Attachments
+
+| Aspect | Regular Documents | SitePages | List Item Attachments |
+| ------ | ----------------- | --------- | --------------------- |
+| **Metadata fields** | Full set of all SharePoint column values | Reduced set (`FileLeafRef`, `FileSizeDisplay`, `Title`, `AuthorLookupId`, `EditorLookupId`, `_ModerationStatus`, sync column) | Full set of the list item's column values |
+| **Path** | Folder path within the drive | Page's web URL | `/{item folder}` |
+| **ItemInternalId** | Graph API drive item ID (long unique identifier) | Sequential list item ID (e.g. 1, 2, 3), unique only within that SitePages list | Sequential list item ID, unique only within that list |
+| **DriveId** | Document library drive ID | SitePages list ID | List ID |
+| **ModerationStatus** | Not present | Content approval status from `_ModerationStatus` field | Content approval status, only on lists with content approval |
 
 ## Related Documentation
 

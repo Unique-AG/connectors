@@ -208,6 +208,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `siteId`                     | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites)                      |
 | `syncColumnName`             | Single line text | Column that marks files for sync                                                                                  |
+| `itemNameColumnName`         | Single line text | Column used to name the folder of a synced list item. Defaults to `Title` when omitted                            |
 | `ingestionMode`              | Choice           | `flat` or `recursive`                                                                                             |
 | `uniqueScopeId`              | Single line text | Unique scope ID. Either `scope_<id>` (existing root) or `in_parent:scope_<parentId>` (auto-resolve under parent). |
 | `maxFilesToIngest`           | Number           | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                   |
@@ -216,6 +217,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncMode`                   | Choice           | `content_only` or `content_and_permissions`                                                                       |
 | `permissionsInheritanceMode` | Choice           | Optional inheritance mode                                                                                         |
 | `subsitesScan`               | Choice           | `enabled` or `disabled` (default: `disabled`)                                                                     |
+| `listAttachmentsScan`        | Choice           | `enabled` or `disabled` (default: `disabled`)                                                                     |
 
 ### Benefits of SharePoint List Configuration
 
@@ -232,6 +234,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | ---------------------------- | --------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `siteId`                     | UUID or compound ID                                                   | — (required)               | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId`                                                                            |
 | `syncColumnName`             | String                                                                | `FinanceGPTKnowledge`      | Display name or internal name of the sync flag column (display name takes priority)                                                                            |
+| `itemNameColumnName`         | String                                                                | `Title`                    | Display name or internal name of the column used as the folder name for a synced list item                                                                     |
 | `ingestionMode`              | `flat`, `recursive`                                                   | — (required)               | Flat ingests all to one scope; recursive maintains hierarchy                                                                                                   |
 | `scopeId`                    | `scope_<id>` or `in_parent:scope_<parentId>`                          | — (required)               | Where to mount this site's content, see [Choosing between fixed scope and `in_parent:` auto-resolve](#Choosing-between-fixed-scope-and-in_parent:-auto-resolve) |
 | `maxFilesToIngest`           | Number                                                                | — (unlimited)              | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                                                                |
@@ -240,6 +243,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `syncMode`                   | `content_only`, `content_and_permissions`                             | — (required)               | What to sync                                                                                                                                                   |
 | `permissionsInheritanceMode` | `none`, `inherit_files`, `inherit_scopes`, `inherit_scopes_and_files` | `inherit_scopes_and_files` | Inheritance settings for content_only, see [Permissions Inheritance Modes](#Permissions-Inheritance-Modes) mode                                                |
 | `subsitesScan`               | `enabled`, `disabled`                                                 | `disabled`                 | Recursively discover and sync content from subsites                                                                                                            |
+| `listAttachmentsScan`        | `enabled`, `disabled`                                                 | `disabled`                 | Sync attachments of list items, see [Syncing list item attachments](#Syncing-list-item-attachments)                                                            |
 
 ### Choosing between fixed scope and `in_parent:` auto-resolve
 
@@ -331,10 +335,12 @@ The fields below have schema-level defaults applied even when you do not provide
 | Field                        | Schema Default             |
 | ---------------------------- | -------------------------- |
 | `syncColumnName`             | `FinanceGPTKnowledge`      |
+| `itemNameColumnName`         | `Title`                    |
 | `storeInternally`            | `enabled`                  |
 | `syncStatus`                 | `active`                   |
 | `permissionsInheritanceMode` | `inherit_scopes_and_files` |
 | `subsitesScan`               | `disabled`                 |
+| `listAttachmentsScan`        | `disabled`                 |
 
 The remaining defaultable fields (`ingestionMode`, `scopeId`, `maxFilesToIngest`, `syncMode`) have no schema default — they take effect only if you set them under `siteDefaults` or per site.
 
@@ -467,6 +473,30 @@ If a subsite is also configured as a standalone site (using its compound site ID
 This means you can configure `syncColumnName` using the human-readable display name shown in the SharePoint UI (e.g., `Sync to Unique`) even if the underlying internal name is different (e.g., `Sync_Unique`). When a display name is resolved to a different internal name, the connector logs the mapping for transparency.
 
 **Note on column renaming:** If a column was created as `UniqueAI` and later renamed to `SyncToUnique` in the UI, only the display name changes — the internal name remains `UniqueAI`. You can configure `syncColumnName` as either `SyncToUnique` (the current display name) or `UniqueAI` (the internal name). Using the display name is recommended as it is easier to verify in the SharePoint UI, but please be aware of this behavior in case of conflicts.
+
+### Syncing list item attachments
+
+With `listAttachmentsScan` set to `enabled` on a site, the connector also ingests attachments of list items. A list on that site is in scope when it has the sync column, resolved the same way as for document libraries. Hidden lists, system lists, libraries and SitePages are not scanned this way. The sync log names every list in scope with its id. Setting `listAttachmentsScan` back to `disabled` deletes the attachments ingested from the site.
+
+An item's attachments are ingested when its sync column is **Yes**, it is approved (items of lists without content approval count as approved), and it has attachments. An attachment is skipped when its MIME type, derived from the file extension and `processing.mimeTypeOverridesByExtension`, is not in `processing.allowedMimeTypes`, or when it is empty or larger than `processing.maxFileSizeToIngestBytes`.
+
+Attachments are stored as `{list folder}/{item folder}/{attachment}`:
+
+- The list folder is the list's display name. When a library URL name or a synced subsite on the site has the same name, it becomes `{name} (List)`. When two lists still clash, each becomes `{name} ({list id})`.
+- The item folder is the value of `itemNameColumnName` (default `Title`), with characters a scope name cannot contain replaced, or the item id when the value is empty. Items of a list that share a name each get `{name} ({item id})`.
+
+Changing `itemNameColumnName` renames the item folders on the next sync and moves their files. A list without that column is skipped with a warning, and its ingested attachments are deleted. In `content_only` mode, set permissions on the list folders manually in Unique.
+
+Attachments are downloaded through SharePoint REST, which requires certificate authentication. With a client secret, the connector skips list attachments, deletes the ones ingested earlier, and keeps syncing drives and SitePages.
+
+#### Unsupported lists
+
+The connector aborts the site's sync, in every sync mode, and logs the list's name and id, when a list in scope:
+
+- has `ReadSecurity` set to **2** (users can read only items they created). The setting applies to the connector's app as well, so the list would read as empty.
+- has more than 5,000 items, SharePoint's list view threshold. It counts every item in the list, flagged or not, and cannot be raised. SharePoint refuses to list the attachments of such a list.
+
+Skipping the list instead would delete its ingested attachments. To sync the site again, fix the list (set item-level permissions back to "Read all items", or bring it under 5,000 items), or remove its sync column, which deletes its ingested attachments.
 
 #### Drive and List Skipping
 

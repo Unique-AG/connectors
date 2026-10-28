@@ -65,7 +65,10 @@ export interface ListItem {
   createdBy: { user: SharePointUser };
   fields: {
     '@odata.etag': string;
-    _ModerationStatus: ModerationStatusValue;
+    // Missing on generic list items from lists without content approval: they are read with a
+    // plain `$expand=fields`, which leaves the column out there, and are treated as approved.
+    // SitePages select the column, which then comes back as approved (0) when approval is off.
+    _ModerationStatus?: ModerationStatusValue;
     CanvasContent1?: string; // This is the HTML content of the page for modern pages
     WikiField?: string; // This is the wiki content of the page for classic pages
     Title: string;

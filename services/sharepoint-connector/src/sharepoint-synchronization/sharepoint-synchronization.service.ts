@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Histogram } from '@opentelemetry/api';
+import { filter, map, pipe, unique } from 'remeda';
 import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import { isAutoScope, type SiteConfig } from '../config/sharepoint.schema';
@@ -23,6 +24,7 @@ import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { FetchSiteItemsQuery } from './fetch-site-items.query';
 import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
 import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
@@ -54,6 +56,7 @@ export class SharepointSynchronizationService {
     private readonly initializeRootScopeCommand: InitializeRootScopeCommand,
     private readonly findRootScopeQuery: FindRootScopeQuery,
     private readonly deduplicateSitesQuery: DeduplicateSitesQuery,
+    private readonly fetchSiteItemsQuery: FetchSiteItemsQuery,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {}
@@ -296,9 +299,15 @@ export class SharepointSynchronizationService {
     let directories: SharepointDirectoryItem[];
 
     try {
-      const result = await this.graphApiService.getAllSiteItems(
+      const result = await this.fetchSiteItemsQuery.execute(
         context.siteConfig.siteId,
         context.siteConfig.syncColumnName,
+        {
+          scanListAttachments:
+            context.siteConfig.listAttachmentsScan === EnabledDisabledMode.Enabled,
+          itemNameColumnName: context.siteConfig.itemNameColumnName,
+          subsiteFolderNames: childSubsiteFolderNames(subsites, ''),
+        },
       );
       items = result.items;
       directories = result.directories;
@@ -413,16 +422,26 @@ export class SharepointSynchronizationService {
       this.logger.log(
         `${logPrefix} Fetching items for subsite ${smearPath(subsite.name)} with ID ${subsite.siteId}`,
       );
-      const result = await this.graphApiService.getAllSiteItems(
+      const result = await this.fetchSiteItemsQuery.execute(
         subsite.siteId,
         context.siteConfig.syncColumnName,
+        {
+          scanListAttachments:
+            context.siteConfig.listAttachmentsScan === EnabledDisabledMode.Enabled,
+          itemNameColumnName: context.siteConfig.itemNameColumnName,
+          subsiteFolderNames: childSubsiteFolderNames(subsites, subsite.relativePath.value),
+        },
       );
       // Key subsite items under the parent siteId so they share the same ingestion key prefix.
       // This ensures the file diff (scoped to parentSiteId) sees all items and detects deletions
       // when a subsite is removed or reconfigured as a standalone site. The original siteId stays
       // intact for API calls (e.g. ASPX page content fetching).
       for (const item of result.items) {
-        items.push({ ...item, syncSiteId });
+        items.push(
+          item.itemType === 'listItemAttachment'
+            ? { ...item, syncSiteId, subsiteRelativePath: subsite.relativePath.value }
+            : { ...item, syncSiteId },
+        );
       }
       for (const dir of result.directories) {
         directories.push({ ...dir, syncSiteId });
@@ -431,4 +450,23 @@ export class SharepointSynchronizationService {
 
     return { items, directories };
   }
+}
+
+// Names of the folders that synced subsites take directly inside the folder of the web at
+// `webRelativePath` ('' for the root site). The web's list folders must not reuse them.
+function childSubsiteFolderNames(subsites: DiscoveredSubsite[], webRelativePath: string): string[] {
+  const prefix = webRelativePath ? `${webRelativePath}/` : '';
+  return pipe(
+    subsites,
+    map((subsite) => subsite.relativePath.value),
+    // Subsites below this web. The trailing slash excludes the web itself and siblings such as
+    // `HR2` for web `HR`.
+    filter((relativePath) => relativePath.startsWith(prefix)),
+    // The first segment below the web. `HR/Payroll/2024` takes the folder `Payroll` inside `HR`,
+    // even when `HR/Payroll` itself is not synced.
+    map((relativePath) => relativePath.slice(prefix.length).split('/')[0] ?? ''),
+    filter((folderName) => folderName.length > 0),
+    // Several deeper subsites can share the same first segment.
+    unique(),
+  );
 }

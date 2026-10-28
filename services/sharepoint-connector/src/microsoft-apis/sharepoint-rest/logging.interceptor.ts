@@ -1,8 +1,9 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
-import { smearSiteNameFromPath } from '../../utils/logging.util';
+import { smearSharepointRestPath } from '../../utils/logging.util';
 import { sanitizeError } from '../../utils/normalize-error';
+import { extractODataErrorCode } from './odata-error';
 
 export function createLoggingInterceptor(
   shouldConcealLogs: boolean,
@@ -17,7 +18,7 @@ export function createLoggingInterceptor(
       logger.debug({
         msg: 'SharePoint REST request started',
         method,
-        path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+        path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
       });
 
       let statusCode: number | undefined;
@@ -58,7 +59,7 @@ export function createLoggingInterceptor(
           logger.error({
             msg: 'SharePoint REST request failed with error',
             method,
-            path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+            path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
             error: sanitizeError(error),
             duration,
           });
@@ -84,35 +85,33 @@ export function createLoggingInterceptor(
             logger.debug({
               msg: 'SharePoint REST request completed',
               method,
-              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
               statusCode,
               duration,
             });
           } else if (isServerError) {
-            const errorBody = Buffer.concat(bodyChunks).toString('utf-8').slice(0, 500);
             logger.error({
               msg: 'SharePoint REST request failed with server error',
               method,
-              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
               statusCode,
               duration,
-              errorBody,
+              ...describeErrorBody(bodyChunks, shouldConcealLogs),
             });
           } else if (isClientError) {
-            const errorBody = Buffer.concat(bodyChunks).toString('utf-8').slice(0, 500);
             logger.warn({
               msg: 'SharePoint REST request failed with client error',
               method,
-              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
               statusCode,
               duration,
-              errorBody,
+              ...describeErrorBody(bodyChunks, shouldConcealLogs),
             });
           } else {
             logger.warn({
               msg: 'SharePoint REST request completed with unexpected status code',
               method,
-              path: shouldConcealLogs ? smearSiteNameFromPath(path) : path,
+              path: shouldConcealLogs ? smearSharepointRestPath(path) : path,
               statusCode,
               duration,
             });
@@ -125,4 +124,23 @@ export function createLoggingInterceptor(
       return dispatch(opts, wrappedHandler);
     };
   };
+}
+
+function describeErrorBody(
+  bodyChunks: Buffer[],
+  shouldConcealLogs: boolean,
+): { errorBody: string } | { errorCode: string | undefined } {
+  const body = Buffer.concat(bodyChunks).toString('utf-8');
+  if (!shouldConcealLogs) {
+    return { errorBody: body.slice(0, 500) };
+  }
+  return { errorCode: extractODataErrorCode(parseJsonOrUndefined(body)) };
+}
+
+function parseJsonOrUndefined(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }

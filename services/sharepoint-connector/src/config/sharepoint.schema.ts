@@ -85,6 +85,7 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // ==========================================
 
 const DEFAULT_SYNC_COLUMN_NAME = 'FinanceGPTKnowledge';
+const DEFAULT_ITEM_NAME_COLUMN_NAME = 'Title';
 
 export type ScopeIdConfig =
   | { type: 'fixed'; scopeId: string }
@@ -124,6 +125,14 @@ const syncColumnNameField = z
   .string()
   .trim()
   .describe('Name of the SharePoint column indicating sync flag');
+
+const itemNameColumnNameField = z
+  .string()
+  .trim()
+  .describe(
+    'Display name or internal name of the column used to name the folder of a synced list item. ' +
+      'Applies to generic lists. Defaults to Title.',
+  );
 
 const ingestionModeField = z
   .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
@@ -213,9 +222,14 @@ const subsitesScanField = z
   .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
   .describe('Whether to recursively discover and sync content from subsites.');
 
+const listAttachmentsScanField = z
+  .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+  .describe('Whether to sync attachments of list items flagged with the sync column.');
+
 export const SiteConfigSchema = z.object({
   siteId: siteIdField,
   syncColumnName: syncColumnNameField,
+  itemNameColumnName: itemNameColumnNameField,
   ingestionMode: ingestionModeField,
   scopeId: parsedScopeIdField,
   maxFilesToIngest: maxFilesToIngestField,
@@ -224,6 +238,7 @@ export const SiteConfigSchema = z.object({
   syncMode: syncModeField,
   permissionsInheritanceMode: permissionsInheritanceModeField,
   subsitesScan: subsitesScanField,
+  listAttachmentsScan: listAttachmentsScanField,
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
@@ -231,6 +246,7 @@ export type SiteConfig = z.infer<typeof SiteConfigSchema>;
 export const SiteDefaultsSchema = z
   .object({
     syncColumnName: syncColumnNameField.prefault(DEFAULT_SYNC_COLUMN_NAME),
+    itemNameColumnName: itemNameColumnNameField.prefault(DEFAULT_ITEM_NAME_COLUMN_NAME),
     ingestionMode: ingestionModeField.optional(),
     scopeId: rawScopeIdField.optional(),
     maxFilesToIngest: maxFilesToIngestField,
@@ -239,6 +255,7 @@ export const SiteDefaultsSchema = z
     syncMode: syncModeField.optional(),
     permissionsInheritanceMode: permissionsInheritanceModeField.default('inherit_scopes_and_files'),
     subsitesScan: subsitesScanField.default(EnabledDisabledMode.Disabled),
+    listAttachmentsScan: listAttachmentsScanField.default(EnabledDisabledMode.Disabled),
   })
   .prefault({});
 
@@ -247,6 +264,7 @@ export type SiteDefaults = z.infer<typeof SiteDefaultsSchema>;
 export const PartialSiteConfigSchema = z.object({
   siteId: siteIdField,
   syncColumnName: syncColumnNameField.optional(),
+  itemNameColumnName: itemNameColumnNameField.optional(),
   ingestionMode: ingestionModeField.optional(),
   scopeId: rawScopeIdField.optional(),
   maxFilesToIngest: maxFilesToIngestField,
@@ -255,6 +273,7 @@ export const PartialSiteConfigSchema = z.object({
   syncMode: syncModeField.optional(),
   permissionsInheritanceMode: permissionsInheritanceModeField.optional(),
   subsitesScan: subsitesScanField.optional(),
+  listAttachmentsScan: listAttachmentsScanField.optional(),
 });
 
 export type PartialSiteConfig = z.infer<typeof PartialSiteConfigSchema>;

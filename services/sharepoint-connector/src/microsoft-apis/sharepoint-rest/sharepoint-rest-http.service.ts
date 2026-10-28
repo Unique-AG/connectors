@@ -1,23 +1,44 @@
-import assert from 'node:assert';
-import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Readable } from 'node:stream';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { chunk, identity } from 'remeda';
-import { Dispatcher, interceptors } from 'undici';
+import { Dispatcher, interceptors, type RetryHandler } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
-import { shouldDiscloseLogs } from '../../utils/logging.util';
+import { shouldDiscloseLogs, smearSharepointRestPath } from '../../utils/logging.util';
 import { encodeSiteNameForPath, type ManagedPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
+import { extractODataErrorCode } from './odata-error';
 import { createTokenRefreshInterceptor } from './token-refresh.interceptor';
 
-const BATCH_SIZE = 20;
+interface SharepointRestRequestOptions {
+  headersTimeout?: number;
+  // Replaces the response status codes the retry interceptor retries for this request.
+  retryStatusCodes?: number[];
+}
+
+export class SharepointRestError extends Error {
+  public constructor(
+    message: string,
+    public readonly statusCode: number,
+    // For example "-2147024860, Microsoft.SharePoint.SPQueryThrottledException".
+    public readonly errorCode: string | undefined,
+  ) {
+    super(message);
+    this.name = 'SharepointRestError';
+  }
+}
+
+export function isListViewThresholdError(error: unknown): boolean {
+  return (
+    error instanceof SharepointRestError &&
+    (error.errorCode?.includes('SPQueryThrottledException') ?? false)
+  );
+}
 
 @Injectable()
 export class SharepointRestHttpService {
-  private readonly logger = new Logger(this.constructor.name);
   private readonly client: Dispatcher;
   private readonly shouldConcealLogs: boolean;
   private readonly origin: string;
@@ -40,10 +61,6 @@ export class SharepointRestHttpService {
         // be transient, as we encounter it for only some sites during a single sync.
         maxRetries: 4,
         minTimeout: 3_000,
-        // We retry on POST because batch endpoint is using POST method. We are not supposed to do
-        // any modifications on SharePoint so all called endpoints should be safe to retry,
-        // requestSingle is not even allowing non-GET requests at this time.
-        methods: ['GET', 'POST'],
         errorCodes: [
           // Error that we encounter occasionally on QA when calling SharePoint REST API
           'ETIMEDOUT',
@@ -69,165 +86,65 @@ export class SharepointRestHttpService {
   }
 
   // Call a single SharePoint REST API endpoint and gives back the body as a JSON object.
+  // `apiPath` is appended after `/_api/` (it is not prefixed with `web/`).
   public async requestSingle<T>(
     siteName: Smeared,
     managedPath: ManagedPath,
     apiPath: string,
+    options: SharepointRestRequestOptions = {},
   ): Promise<T> {
-    const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
-    const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
-    const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
-    const path = `/${managedPath}/${encodedSiteName.value}/_api/${cleanedApiPath}`;
-    const { statusCode, body } = await this.client.request({
-      origin: this.origin,
-      method: 'GET',
-      path,
-      headers: {
-        'Content-Type': 'application/json;odata=nometadata',
-        Accept: 'application/json;odata=nometadata',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    assert.ok(
-      200 <= statusCode && statusCode < 300,
-      `Failed to request SharePoint endpoint ${path.replace(encodedSiteName.value, `${encodedSiteName}`)}: ${statusCode}`,
-    );
-
+    const { body } = await this.dispatch(this.siteApiPath(siteName, managedPath, apiPath), options);
     return body.json() as Promise<T>;
   }
 
-  // Uses /$batch endpoint to split calls provided into apiPaths into multiple requests batched by
-  // 20 requests at a time.
-  // It is built to typings-wise support multiple calls to the same endpoint, mixing responses is
-  // not possible to type.
-  public async requestBatch<T>(
+  public async requestDownload(
     siteName: Smeared,
     managedPath: ManagedPath,
-    apiPaths: string[],
-  ): Promise<T[]> {
-    const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
-    const responses: T[] = [];
-    const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
-
-    this.logger.debug({
-      msg: 'Starting SharePoint batch request',
-      siteName,
-      totalPaths: apiPaths.length,
-      batchChunks: chunkedApiPaths.length,
-    });
-
-    for (const [chunkIndex, apiPathsChunk] of chunkedApiPaths.entries()) {
-      const boundary = `batch_${randomUUID()}`;
-      const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
-      const fullApiPaths = apiPathsChunk
-        .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
-        .map((apiPath) => `/${managedPath}/${encodedSiteName.value}/_api/web/${apiPath}`);
-      const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
-
-      const redactedApiPaths = fullApiPaths.map((path) =>
-        path.replace(encodedSiteName.value, `${encodedSiteName}`),
-      );
-
-      this.logger.debug({
-        msg: 'Executing batch chunk',
-        chunkIndex: chunkIndex + 1,
-        totalChunks: chunkedApiPaths.length,
-        pathsInChunk: fullApiPaths.length,
-        paths: redactedApiPaths,
-      });
-
-      const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
-      const path = `/${managedPath}/${encodedSiteName.value}/_api/$batch`;
-
-      const requestStartTime = Date.now();
-      const { statusCode, body, headers } = await this.client.request({
-        origin: this.origin,
-        method: 'POST',
-        path,
-        headers: {
-          'Content-Type': `multipart/mixed; boundary=${boundary}`,
-          Authorization: `Bearer ${token}`,
-        },
-        body: requestBody,
-      });
-
-      const duration = Date.now() - requestStartTime;
-      const isSuccess = 200 <= statusCode && statusCode < 300;
-
-      if (!isSuccess) {
-        const redactedPath = path.replace(encodedSiteName.value, `${encodedSiteName}`);
-
-        const errorBody = await body.text();
-        this.logger.error({
-          msg: 'Failed to request SharePoint batch endpoint',
-          path: redactedPath,
-          chunkIndex: chunkIndex + 1,
-          paths: redactedApiPaths,
-          statusCode,
-          duration,
-          errorBody,
-        });
-        assert.fail(
-          `Failed to request SharePoint batch endpoint: Code: ${statusCode}. Response: ${errorBody}`,
-        );
-      }
-
-      // Example: multipart/mixed; boundary=batchresponse_a1182996-c482-49d1-ac38-16ae3788d990
-      const responseBoundary = headers['content-type']?.toString().split(';')[1]?.split('=')[1];
-      assert.ok(responseBoundary, 'Response boundary not found');
-      const responseBody = await body.text();
-      const responsesChunk = responseBody
-        .split(`--${responseBoundary}`)
-        .slice(1, -1)
-        .map((singleResponse, index): T => {
-          const lines = singleResponse.split('\r\n').filter(identity());
-          const responseCodeLine = lines.find((line) => line.startsWith('HTTP/1.1'));
-          const statusCode = Number(responseCodeLine?.split(' ')[1]);
-          const responseLine = lines[lines.length - 1];
-          // TODO: Add proper handling for retrying on 429 / 5XX errors
-          // TODO: Add some errors handling in general - currently we just swallow errors
-          if (statusCode === 200) {
-            return JSON.parse(responseLine ?? '{}');
-          }
-
-          this.logger.error({
-            msg: 'Non-200 response in batch item',
-            path: redactedApiPaths[index],
-            statusCode,
-            responseCodeLine,
-          });
-          return assert.fail(`Non-200 response ${responseCodeLine} from Batch Request`);
-        });
-
-      this.logger.debug({
-        msg: 'Batch chunk completed successfully',
-        chunkIndex: chunkIndex + 1,
-        pathsInChunk: fullApiPaths.length,
-        duration,
-      });
-
-      responses.push(...responsesChunk);
-    }
-
-    this.logger.debug({
-      msg: 'SharePoint batch request completed',
-      totalResponses: responses.length,
-      totalChunks: chunkedApiPaths.length,
-    });
-
-    return responses;
+    apiPath: string,
+  ): Promise<Readable> {
+    const { body } = await this.dispatch(this.siteApiPath(siteName, managedPath, apiPath));
+    return Readable.from(body);
   }
 
-  private buildBatchItem(apiPath: string, boundary: string): string {
-    return [
-      `--${boundary}`,
-      'Content-Type: application/http',
-      'Content-Transfer-Encoding: binary',
-      '', // Empty line to separate headers from body
-      `GET ${apiPath} HTTP/1.1`,
-      `Accept: application/json;odata=nometadata`,
-      '', // Empty line to separate current batch from the next
-    ].join('\r\n');
+  private siteApiPath(siteName: Smeared, managedPath: ManagedPath, apiPath: string): string {
+    const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
+    const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
+    return `/${managedPath}/${encodedSiteName.value}/_api/${cleanedApiPath}`;
+  }
+
+  private async dispatch(
+    path: string,
+    { headersTimeout, retryStatusCodes }: SharepointRestRequestOptions = {},
+  ): Promise<{ body: Dispatcher.ResponseData['body'] }> {
+    const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
+    const requestOptions: Dispatcher.RequestOptions & { retryOptions?: RetryHandler.RetryOptions } =
+      {
+        origin: this.origin,
+        method: 'GET',
+        path,
+        headers: {
+          'Content-Type': 'application/json;odata=nometadata',
+          Accept: 'application/json;odata=nometadata',
+          Authorization: `Bearer ${token}`,
+        },
+        ...(headersTimeout === undefined ? {} : { headersTimeout }),
+        ...(retryStatusCodes === undefined
+          ? {}
+          : { retryOptions: { statusCodes: retryStatusCodes } }),
+      };
+    const { statusCode, body } = await this.client.request(requestOptions);
+
+    if (200 <= statusCode && statusCode < 300) {
+      return { body };
+    }
+
+    const errorCode = extractODataErrorCode(await body.json().catch(() => undefined));
+    throw new SharepointRestError(
+      `Failed to request SharePoint endpoint ` +
+        `${this.shouldConcealLogs ? smearSharepointRestPath(path) : path}: ` +
+        `${statusCode}${errorCode ? ` ${errorCode}` : ''}`,
+      statusCode,
+      errorCode,
+    );
   }
 }

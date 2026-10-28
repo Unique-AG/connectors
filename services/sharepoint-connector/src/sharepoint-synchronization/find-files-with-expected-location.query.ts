@@ -4,7 +4,7 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import type { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
+import { buildFileDiffKey, getItemUrl, smearContentKey } from '../utils/sharepoint.util';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -72,7 +72,7 @@ export class FindFilesWithExpectedLocationQuery {
     const item = itemsByKey.get(diffKey);
     if (isNullish(item)) {
       this.logger.warn(
-        `${logPrefix} Could not find SharePoint item for file with key: ${file.key}`,
+        `${logPrefix} Could not find SharePoint item for file with key: ${smearContentKey(file.key)}`,
       );
       return { diffKey };
     }
@@ -83,7 +83,9 @@ export class FindFilesWithExpectedLocationQuery {
       context,
     );
     if (isNullish(expectedScopeId)) {
-      this.logger.warn(`${logPrefix} Could not determine scope for file with key: ${file.key}`);
+      this.logger.warn(
+        `${logPrefix} Could not determine scope for file with key: ${smearContentKey(file.key)}`,
+      );
       return { diffKey };
     }
 
