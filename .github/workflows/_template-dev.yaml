@@ -1,0 +1,121 @@
+name: "[Template] Dev"
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Name of the service (for example teams-mcp)"
+        required: true
+        type: string
+
+jobs:
+  plan:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read # to read the repository
+    env:
+      SERVICE: ${{ inputs.service-name }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - name: Refuse a re-run
+        if: github.run_attempt > 1
+        run: |
+          echo "::error::Do not re-run a dev build. A re-run can build another commit under the same version. Start a new run of the workflow Dev Build."
+          exit 1
+
+      - name: Start from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start a dev build from main. It builds only main, and the image signature check accepts only a workflow from main."
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve the dev version
+        id: version
+        run: |
+          set -euo pipefail
+          chart="services/$SERVICE/deploy/helm-charts/$SERVICE/Chart.yaml"
+          if [ ! -f "$chart" ] || [ ! -f "services/$SERVICE/deploy/Dockerfile" ]; then
+            echo "::error::$SERVICE has no Dockerfile or no Helm chart on main."
+            exit 1
+          fi
+          base=$(jq -r --arg path "services/$SERVICE" '.[$path] // empty' .release-please-manifest.json)
+          if [ -z "$base" ]; then
+            echo "::error::.release-please-manifest.json has no version for $SERVICE."
+            exit 1
+          fi
+          counter=0
+          if [ -n "$(git ls-remote --heads origin "refs/heads/dev/$SERVICE/main")" ]; then
+            git fetch --quiet --depth 1 origin "refs/heads/dev/$SERVICE/main"
+            current=$(git show "FETCH_HEAD:$chart" | sed -n 's/^version: //p')
+            if [[ $current =~ ^([0-9]+\.[0-9]+\.[0-9]+)-dev\.([0-9]+)$ ]]; then
+              if [ "$base" = "${BASH_REMATCH[1]}" ]; then
+                counter=$((10#${BASH_REMATCH[2]} + 1))
+              fi
+            fi
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$base-dev.$counter" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    permissions:
+      contents: read # to let the called workflow read the repository
+      id-token: write # to let the called workflow sign in to Azure and sign the image
+      packages: write # to let the called workflow push the image to GHCR
+      security-events: write # to let the called workflow declare the scan permission
+    uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
+    with:
+      service-name: ${{ inputs.service-name }}
+      service-version: ${{ needs.plan.outputs.version }}
+      ref: ${{ needs.plan.outputs.sha }}
+      publish-docs: false
+      dev: true
+
+  publish-branch:
+    needs: [plan, build]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: write # to push the dev branch of the service
+    env:
+      SERVICE: ${{ inputs.service-name }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+
+      - name: Stamp the dev version and push the dev branch
+        run: |
+          set -euo pipefail
+          chart="services/$SERVICE/deploy/helm-charts/$SERVICE"
+          sed -i -E "s/^(version|appVersion): .*/\1: $VERSION/" "$chart/Chart.yaml"
+          sed -i -E "s/^(  tag: ).* (# x-release-please-version)$/\1$VERSION \2/" "$chart/values.yaml"
+          stat=$(git diff --shortstat)
+          if [ "$stat" != " 2 files changed, 3 insertions(+), 3 deletions(-)" ]; then
+            echo "::error::The stamp must change 3 lines in 2 files. It changed: $stat"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet --all --message "chore($SERVICE): stamp dev build $VERSION"
+          git push --force origin "HEAD:refs/heads/dev/$SERVICE/main"
+
+      - name: Write the summary
+        run: |
+          {
+            echo "## Dev build $VERSION"
+            echo
+            echo "- Image: \`ghcr.io/$GITHUB_REPOSITORY/services/$SERVICE:$VERSION\`"
+            echo "- Source commit: \`$SOURCE_SHA\`"
+            echo "- Branch for ArgoCD: \`dev/$SERVICE/main\`"
+          } >> "$GITHUB_STEP_SUMMARY"

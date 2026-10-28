@@ -47,7 +47,13 @@ The re-run builds from the release tag. It reuses an image that exists only if t
 
 To publish docs before a release, run `[Docs] Publish to Confluence` from `main` and choose the docs directory. Use it also when the docs job of a release failed.
 
-Both manual workflows list the services in a dropdown. When you add a service, add it to `release-rerun.yaml`, and to `docs-confluence.yaml` if it has docs.
+To put `main` in QA before the next release, run `[Release] Dev Build`. Start it from `main` and choose the service. The run builds and signs the image `<release>-dev.<n>` from the latest commit of `main`. It builds no branch, no tag, and no pull request. It pushes no chart, starts no image scan, publishes no docs, and writes no build cache. It creates no tag and no release, and release-please does not see it. A release of a service also starts a dev build.
+
+The run moves the branch `dev/<service>/main`. ArgoCD in QA can follow this branch, so each dev build reaches the cluster without a new pin. The file `docs/ROLLING-DEV.md` explains the flow, the number `n`, the setup, and the edge cases. Use the `bump-service` skill to set the pin and to return to a release.
+
+Do not point a prod cluster at a dev branch. Do not re-run a dev build. The run stops with an error. Start a new run.
+
+The three manual workflows list the services in a dropdown. When you add a service, add it to `release-rerun.yaml` and to `release-dev.yaml`. Add it to `docs-confluence.yaml` if it has docs.
 
 ## Runners
 
