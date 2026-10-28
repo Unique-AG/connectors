@@ -4,6 +4,7 @@ import { compareVersions, isStable, newestVersion, oldestVersion } from './versi
 const DAY_MS = 24 * 60 * 60 * 1000;
 const API = 'https://api.github.com';
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_TAG_FALLBACK = 10;
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const USES = /^(\s*(?:-\s+)?uses:\s*)([^\s@]+)@([0-9a-f]{40})(?:\s+#\s*(\S*))?(.*)$/;
 
@@ -49,6 +50,10 @@ async function planRepo({ repo, uses, lookup, cutoff, ledger, now }) {
     const tags = uses.map(({ tag }) => tag);
     const newestCurrent = newestVersion(tags);
     const adopted = uses.find(({ tag }) => compareVersions(tag, newestCurrent) === 0);
+    const adoptedSha = await lookup.commitSha(repo, adopted.tag);
+    const rewritten =
+      FULL_SHA.test(adoptedSha ?? '') &&
+      uses.some(({ tag, sha }) => tag === adopted.tag && sha !== adoptedSha);
     const observed = {};
     const trusted = new Map();
     const moved = [];
@@ -74,6 +79,15 @@ async function planRepo({ repo, uses, lookup, cutoff, ledger, now }) {
       }
     }
     const warnings = [
+      ...(rewritten
+        ? [
+            {
+              ecosystem: 'actions',
+              name: repo,
+              reason: `The tag ${adopted.tag} now points to another commit than the pin in a workflow file. Read the release before you trust it.`,
+            },
+          ]
+        : []),
       ...moved.map((tag) => ({
         ecosystem: 'actions',
         name: repo,
@@ -168,9 +182,25 @@ export function createActionsLookup(token, fetchImpl = fetch) {
     });
     return response.status === 200 ? response.json() : null;
   };
+  const tagReleases = async (repo) => {
+    const names = ((await get(`${repo}/tags?per_page=30`)) ?? [])
+      .map(({ name }) => name)
+      .filter(isStable)
+      .sort((a, b) => compareVersions(b, a))
+      .slice(0, MAX_TAG_FALLBACK);
+    return Promise.all(
+      names.map(async (tag) => ({
+        tag,
+        publishedAt: (await get(`${repo}/commits/${tag}`))?.commit?.committer?.date,
+      })),
+    );
+  };
   return {
     async releases(repo) {
       const body = await get(`${repo}/releases?per_page=30`);
+      if (body?.length === 0) {
+        return tagReleases(repo);
+      }
       return (body ?? [])
         .filter(({ draft, prerelease }) => !draft && !prerelease)
         .map(({ tag_name, published_at }) => ({ tag: tag_name, publishedAt: published_at }));

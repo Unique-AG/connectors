@@ -111,6 +111,47 @@ describe('planActions', () => {
     assert.deepEqual(needsPerson, []);
   });
 
+  it('warns next to the candidate when the adopted tag points to another commit', async () => {
+    const { candidates, needsPerson } = await plan({
+      files: { 'a.yaml': files['a.yaml'] },
+      lookup: fakeLookup({
+        releases: {
+          'actions/checkout': [
+            release('v7.0.2', '2026-10-20T00:00:00Z'),
+            release('v7.0.1', '2026-09-01T00:00:00Z'),
+          ],
+        },
+        shas: { 'actions/checkout@v7.0.1': sha('c'), 'actions/checkout@v7.0.2': NEW_SHA },
+      }),
+    });
+    assert.equal(candidates[0].to, 'v7.0.2');
+    assert.deepEqual(needsPerson, [
+      {
+        ecosystem: 'actions',
+        name: 'actions/checkout',
+        reason:
+          'The tag v7.0.1 now points to another commit than the pin in a workflow file. Read the release before you trust it.',
+      },
+    ]);
+  });
+
+  it('does not warn when the adopted tag still points to the pinned commit', async () => {
+    const { candidates, needsPerson } = await plan({
+      files: { 'a.yaml': files['a.yaml'] },
+      lookup: fakeLookup({
+        releases: {
+          'actions/checkout': [
+            release('v7.0.2', '2026-10-20T00:00:00Z'),
+            release('v7.0.1', '2026-09-01T00:00:00Z'),
+          ],
+        },
+        shas: { 'actions/checkout@v7.0.1': OLD_SHA, 'actions/checkout@v7.0.2': NEW_SHA },
+      }),
+    });
+    assert.equal(candidates.length, 1);
+    assert.deepEqual(needsPerson, []);
+  });
+
   it('picks the previous release when the newest is inside the cooldown', async () => {
     const { candidates } = await planActions({
       files,
@@ -163,7 +204,7 @@ describe('planActions', () => {
 
   it('skips a repo that is already at the newest eligible release', async () => {
     const { candidates, needsPerson } = await plan({
-      files: { 'a.yaml': `uses: actions/checkout@${OLD_SHA} # v7.0.2\n` },
+      files: { 'a.yaml': `uses: actions/checkout@${NEW_SHA} # v7.0.2\n` },
     });
     assert.deepEqual(candidates, []);
     assert.deepEqual(needsPerson, []);
@@ -396,6 +437,66 @@ describe('createActionsLookup', () => {
       Authorization: 'Bearer secret',
     });
     assert.ok(calls[0].init.signal instanceof AbortSignal);
+  });
+
+  describe('without any release', () => {
+    const tagNames = ['v1.0.0', 'v1.1.0', 'v2.0.0-rc1', 'latest'];
+    const tagFetch = (tags) =>
+      record((url) => {
+        if (url.includes('/releases')) {
+          return respond(200, []);
+        }
+        if (url.includes('/tags')) {
+          return respond(
+            200,
+            tags.map((name) => ({ name })),
+          );
+        }
+        return respond(200, {
+          sha: NEW_SHA,
+          commit: { committer: { date: `date-of-${url.split('/commits/')[1]}` } },
+        });
+      });
+
+    it('reads stable tags and their commit dates', async () => {
+      const { calls, fetchImpl } = tagFetch(tagNames);
+      const lookup = createActionsLookup(undefined, fetchImpl);
+      assert.deepEqual(await lookup.releases('a/b'), [
+        { tag: 'v1.1.0', publishedAt: 'date-of-v1.1.0' },
+        { tag: 'v1.0.0', publishedAt: 'date-of-v1.0.0' },
+      ]);
+      assert.deepEqual(
+        calls.map(({ url }) => url.replace('https://api.github.com/repos/a/b', '')),
+        ['/releases?per_page=30', '/tags?per_page=30', '/commits/v1.1.0', '/commits/v1.0.0'],
+      );
+    });
+
+    it('reads the commit dates of the 10 newest tags only', async () => {
+      const tags = Array.from({ length: 15 }, (_, index) => `v1.${index}.0`);
+      const { calls, fetchImpl } = tagFetch(tags);
+      const releases = await createActionsLookup(undefined, fetchImpl).releases('a/b');
+      assert.equal(releases.length, 10);
+      assert.equal(releases[0].tag, 'v1.14.0');
+      assert.equal(releases.at(-1).tag, 'v1.5.0');
+      assert.equal(calls.length, 12);
+    });
+
+    it('leaves the date empty when the commit is unreadable', async () => {
+      const lookup = createActionsLookup(undefined, async (url) =>
+        url.includes('/commits/')
+          ? respond(404, {})
+          : respond(200, url.includes('/tags') ? [{ name: 'v1.0.0' }] : []),
+      );
+      assert.deepEqual(await lookup.releases('a/b'), [{ tag: 'v1.0.0', publishedAt: undefined }]);
+    });
+  });
+
+  it('does not read tags when the repo has releases', async () => {
+    const { calls, fetchImpl } = record(() =>
+      respond(200, [{ tag_name: 'v1.0.0', published_at: 'x', draft: false, prerelease: true }]),
+    );
+    assert.deepEqual(await createActionsLookup(undefined, fetchImpl).releases('a/b'), []);
+    assert.equal(calls.length, 1);
   });
 
   it('reads the commit sha of a tag', async () => {
