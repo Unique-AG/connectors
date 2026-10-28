@@ -343,7 +343,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Microsoft Graph message id. Use `openEmailParams.id`. |
 | `mailbox` | email | No | Use `mailbox` from that object when present. |
-| `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Required when `mailbox` is provided. |
+| `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Without it, a `mailbox` message is read from `/users/{mailbox}/messages/{id}`. |
 | `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
 | `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
 | `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. |
@@ -433,6 +433,7 @@ Supports two modes selected by `recipientsData.type`:
   success: boolean;
   message: string;
   draftId?: string;             // Microsoft message ID (present when success is true)
+  idIsImmutable?: boolean;      // whether draftId is an immutable ID (true for reply drafts of an immutable id)
   webLink?: string;             // link to open draft in Outlook (present when success is true and Graph returned one)
   attachmentsFailed?: Array<{
     fileName: string;
@@ -459,7 +460,7 @@ All three tools take the same target fields:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
-| `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result. Omit for a `draftId` returned by `create_draft_email`. |
+| `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `create_draft_email`. |
 | `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
 
 Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
@@ -491,7 +492,7 @@ At least one of `subject`, `content`, `toRecipients`, or `ccRecipients` is requi
 **Usage notes:**
 
 - Because `content` replaces the whole body, the agent reads the draft with `open_email` (`openEmailParams` sets `bodyContentType` to `"html"`, so `text` is HTML) and edits that HTML, keeping everything the user did not ask to change. `chunks` are matched passages, not the body to write back. The server does not convert Markdown. A body written from scratch drops fonts, tables, the HTML signature, the quoted thread, and inline images.
-- A draft created earlier in the conversation is opened as `{ id: draftId, bodyContentType: "html" }` rather than through search.
+- A draft created earlier in the conversation is opened as `{ id: draftId, idIsImmutable, bodyContentType: "html" }`, with the values `draft_email` returned and the `mailbox` passed to it, rather than through search.
 - This tool does not touch attachments.
 
 ### `add_attachments_to_draft_email`

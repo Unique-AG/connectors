@@ -325,8 +325,8 @@ export class SemanticSearchEmailsQuery {
     return results;
   }
 
-  // Ingested ids are immutable. A delegated mailbox needs its folder or open_email cannot address
-  // /users/{mailbox}/mailFolders/{folder}/messages/{id}.
+  // Ingested ids are immutable. A delegation scoped to folders only reaches the message through
+  // /users/{mailbox}/mailFolders/{folder}/messages/{id}, so the folder is passed whenever it is known.
   private openEmailParamsForMessage({
     uniqueContentId,
     chunkIds,
@@ -350,9 +350,8 @@ export class SemanticSearchEmailsQuery {
         : undefined;
     return {
       id: msGraphMessageId,
-      ...(delegatedMailbox && folderId
-        ? { mailbox: delegatedMailbox, parentFolderId: folderId }
-        : {}),
+      ...(delegatedMailbox ? { mailbox: delegatedMailbox } : {}),
+      ...(delegatedMailbox && folderId ? { parentFolderId: folderId } : {}),
       idIsImmutable: true,
       ...(isDraft ? { bodyContentType: 'html' as const } : {}),
       uniqueContentId,

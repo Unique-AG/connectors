@@ -387,6 +387,32 @@ describe('SemanticSearchEmailsQuery', () => {
       });
     });
 
+    it('keeps the shared mailbox on a delegated match without a stored folder', async () => {
+      const folderIdPath =
+        'uniquepathid://scope:/__Outlook MCP/scope:Outlook_delegated-provider-id_uncategoried/inbox';
+      const { instance } = createMockQuery({
+        delegatedAccesses: [delegatedAccess],
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              metadata: { id: 'graph-1', isDraft: 'false', folderIdPath },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.openEmailParams).toEqual({
+        id: 'graph-1',
+        mailbox: DELEGATED_EMAIL,
+        idIsImmutable: true,
+        uniqueContentId: 'mail-1',
+        chunkIds: ['chunk-mail-1'],
+      });
+    });
+
     it('opens a non-draft from Graph as text and still names the matched chunks', async () => {
       const { instance } = createMockQuery({
         searchResults: [

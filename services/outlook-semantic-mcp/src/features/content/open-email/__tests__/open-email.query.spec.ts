@@ -54,6 +54,17 @@ describe('OpenEmailQuery', () => {
     );
   });
 
+  it('reads a shared mailbox message without a folder from the mailbox messages', async () => {
+    await instance.run({
+      userProfileId: 'user-1',
+      id: 'AAk/draft=',
+      mailbox: 'shared@example.com',
+      idIsImmutable: true,
+    });
+
+    expect(api).toHaveBeenCalledWith('/users/shared@example.com/messages/AAk-draft=');
+  });
+
   it('returns the matched chunks next to the Graph body', async () => {
     getContentById.mockResolvedValue({
       id: 'cont-1',

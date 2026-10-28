@@ -40,6 +40,7 @@ export type CreateDraftEmailResult =
   | {
       success: true;
       draftId: string;
+      idIsImmutable: boolean;
       webLink?: string;
       message: string;
       attachmentsFailed?: AttachmentFailure[];
@@ -77,6 +78,7 @@ export class CreateDraftEmailCommand {
       attachments,
       chatId: input.chatId,
       mailbox: input.mailbox,
+      idIsImmutable: createDraftResult.idIsImmutable,
     });
 
     if (!attachmentResult.attachmentsFailed.length) {
@@ -153,6 +155,7 @@ export class CreateDraftEmailCommand {
       return {
         success: true,
         draftId: message.id,
+        idIsImmutable: apiParams.idIsImmutable,
         ...(webLink && { webLink }),
         message: apiParams.successMessage,
       };

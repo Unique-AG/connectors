@@ -35,7 +35,7 @@ export const ExistingDraftTargetShape = {
     .boolean()
     .optional()
     .describe(
-      'Whether `draftId` is an immutable ID. Use `openEmailParams.idIsImmutable` from the `search_emails` result; omit for a `draftId` returned by `draft_email`.',
+      'Whether `draftId` is an immutable ID. Use `openEmailParams.idIsImmutable` from the `search_emails` result, or the `idIsImmutable` that `draft_email` returned with the `draftId`.',
     ),
   mailbox: z
     .string()
