@@ -7,6 +7,7 @@ export const globalConfig: ViteUserConfig = {
     environment: 'node',
     passWithNoTests: true,
     clearMocks: true,
+    fsModuleCache: false,
     reporters: ['verbose'],
   },
   plugins: [
