@@ -53,3 +53,8 @@ export function oldestVersion(versions) {
     compareVersions(version, oldest) < 0 ? version : oldest,
   );
 }
+
+export function isMajorBump(from, to) {
+  const majors = (versions) => [versions].flat().map((version) => Number(/\d+/.exec(version)?.[0]));
+  return Math.max(...majors(to)) > Math.min(...majors(from));
+}

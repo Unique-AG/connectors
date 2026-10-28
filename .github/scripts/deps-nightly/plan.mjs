@@ -1,5 +1,11 @@
 import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
-import { compareVersions, isStable, newestVersion, oldestVersion } from './versions.mjs';
+import {
+  compareVersions,
+  isMajorBump,
+  isStable,
+  newestVersion,
+  oldestVersion,
+} from './versions.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -16,6 +22,8 @@ function violatesCap(version, spec) {
   });
 }
 
+const majorData = (from, to) => (isMajorBump(from, to) ? { data: { major: true } } : {});
+
 function overrideNames(overrides) {
   return new Set(Object.keys(overrides).map((key) => /^(@?[^@]+)/.exec(key)[1]));
 }
@@ -27,7 +35,14 @@ export function npmCandidates({ outdated, lockChanges, overrides }) {
     if (order === 0) {
       return [];
     }
-    const found = { ecosystem: 'npm', name, from: wanted, to: latest, direct: true };
+    const found = {
+      ecosystem: 'npm',
+      name,
+      from: wanted,
+      to: latest,
+      direct: true,
+      ...majorData(wanted, latest),
+    };
     if (order < 0) {
       return [{ ...found, reason: `The newest version ${latest} is older than ${wanted}.` }];
     }
@@ -41,6 +56,7 @@ export function npmCandidates({ outdated, lockChanges, overrides }) {
       from: from.join(', '),
       to: to.join(', '),
       direct: false,
+      ...majorData(from, to),
     }));
   const all = [...direct, ...transitive];
   return {
@@ -90,8 +106,9 @@ export function uvCandidates({ projects, latest }) {
   );
   for (const { project, lock, updates } of projects) {
     for (const [name, versions] of parseUvPackages(lock)) {
-      holders.set(name, [
-        ...(holders.get(name) ?? []),
+      const key = normalizeName(name);
+      holders.set(key, [
+        ...(holders.get(key) ?? []),
         { project, current: newestVersion(versions) },
       ]);
     }
@@ -138,12 +155,14 @@ export function uvCandidates({ projects, latest }) {
     }
     const behind = current.filter((holder) => compareVersions(holder.current, target) < 0);
     if (behind.length > 0) {
+      const from = oldestVersion(behind.map((holder) => holder.current));
       candidates.push({
         ecosystem: 'uv',
         name,
-        from: oldestVersion(behind.map((holder) => holder.current)),
+        from,
         to: target,
         direct: pinnedNames.has(name),
+        ...majorData(from, target),
       });
     }
   }

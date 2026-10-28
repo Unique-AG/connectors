@@ -40,6 +40,21 @@ describe('npmCandidates', () => {
     );
   });
 
+  it('marks a major bump, direct or indirect', () => {
+    const { candidates } = npmCandidates({
+      outdated: { zod: { wanted: '4.6.5', latest: '5.0.0' } },
+      lockChanges: [{ name: 'undici', from: ['7.9.0'], to: ['8.0.0'] }],
+      overrides: {},
+    });
+    assert.deepStrictEqual(
+      candidates.map(({ name, data }) => [name, data]),
+      [
+        ['zod', { major: true }],
+        ['undici', { major: true }],
+      ],
+    );
+  });
+
   it('leaves a package that an override pins for a person', () => {
     assert.deepStrictEqual(
       result.needsPerson.map(({ name }) => name),
@@ -120,6 +135,30 @@ source = { registry = "https://pypi.org/simple" }
     });
     assert.deepStrictEqual(candidates, [
       { ecosystem: 'uv', name: 'tomlkit', from: '0.15.1', to: '0.15.2', direct: false },
+    ]);
+  });
+
+  it('marks a major bump and matches a lock that spells the name with an underscore', () => {
+    const { candidates } = uvCandidates({
+      projects: [
+        project(
+          'a',
+          [],
+          [['typing_extensions', '4.15.0']],
+          [{ name: 'typing_extensions', from: '4.15.0', to: '5.0.0' }],
+        ),
+      ],
+      latest: new Map(),
+    });
+    assert.deepStrictEqual(candidates, [
+      {
+        ecosystem: 'uv',
+        name: 'typing-extensions',
+        from: '4.15.0',
+        to: '5.0.0',
+        direct: false,
+        data: { major: true },
+      },
     ]);
   });
 

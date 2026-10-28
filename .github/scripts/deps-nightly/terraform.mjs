@@ -131,8 +131,8 @@ function usagesByRepo(files) {
       add(CORE_REPO, 'terraform', requiredVersion, folder);
     }
     for (const { name, source, constraint } of providers) {
-      const [namespace] = source.split('/').slice(-2);
-      add(`${namespace}/terraform-provider-${name}`, name, constraint, folder);
+      const [namespace, type] = source.split('/').slice(-2);
+      add(`${namespace}/terraform-provider-${type}`, name, constraint, folder);
     }
   }
   return usages;

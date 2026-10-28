@@ -1,6 +1,12 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { compareVersions, isStable, newestVersion, oldestVersion } from './versions.mjs';
+import {
+  compareVersions,
+  isMajorBump,
+  isStable,
+  newestVersion,
+  oldestVersion,
+} from './versions.mjs';
 
 describe('compareVersions', () => {
   it('orders numeric parts as numbers', () => {
@@ -46,5 +52,18 @@ describe('newestVersion and oldestVersion', () => {
     assert.strictEqual(newestVersion(versions), '1.10.0');
     assert.strictEqual(oldestVersion(versions), '1.2.0');
     assert.deepStrictEqual(versions, ['1.2.0', '1.10.0', '1.9.0']);
+  });
+});
+
+describe('isMajorBump', () => {
+  it('is true when a target has a higher first number', () => {
+    assert.strictEqual(isMajorBump('4.6.5', '5.0.0'), true);
+    assert.strictEqual(isMajorBump(['8.1.0', '9.0.0'], ['10.0.0']), true);
+  });
+
+  it('is false inside one major version and for text that is not a version', () => {
+    assert.strictEqual(isMajorBump('0.28.2', '0.29.0'), false);
+    assert.strictEqual(isMajorBump(['1.2.0'], ['1.3.0']), false);
+    assert.strictEqual(isMajorBump('workspace:*', '2.0.0'), false);
   });
 });

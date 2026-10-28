@@ -246,6 +246,8 @@ jobs:
     needs:
       - detect-services
       - scan
+      - lockfiles
+      - config
     if: always() && needs.detect-services.result == 'success'
     permissions:
       contents: read # to read the report action

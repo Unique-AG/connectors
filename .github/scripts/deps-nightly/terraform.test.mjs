@@ -204,6 +204,27 @@ describe('planTerraform', () => {
     assert.strictEqual(candidates[0].from, '~> 3');
   });
 
+  it('asks for the repository of the provider type, not of the local name', async () => {
+    const lookup = lookupOf();
+    const files = {
+      'a/versions.tf': `terraform {
+  required_providers {
+    azure = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+}
+`,
+    };
+    const { candidates } = await run(files, lookup);
+    assert.deepStrictEqual(lookup.calls, ['hashicorp/terraform-provider-azurerm']);
+    assert.deepStrictEqual(
+      candidates.map(({ name, to }) => [name, to]),
+      [['azure', '4.9.0']],
+    );
+  });
+
   it('reports a failed lookup and still checks the others', async () => {
     const files = {
       'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', {
