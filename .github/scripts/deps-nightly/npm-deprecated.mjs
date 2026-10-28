@@ -7,9 +7,12 @@ export function createNpmDeprecationLookup(fetchImpl = fetch) {
   return {
     async deprecated(name, version) {
       try {
-        const response = await fetchImpl(`${REGISTRY_URL}/${name.replace('/', '%2F')}/${version}`, {
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
+        const response = await fetchImpl(
+          `${REGISTRY_URL}/${name.replaceAll('/', '%2F')}/${version}`,
+          {
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+          },
+        );
         if (response.status !== 200) {
           return null;
         }

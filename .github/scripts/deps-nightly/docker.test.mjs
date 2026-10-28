@@ -444,7 +444,7 @@ describe('createDockerLookup', () => {
     const calls = [];
     const fetchImpl = async (url, options) => {
       calls.push({ url, headers: options.headers });
-      return url.startsWith('https://auth.docker.io')
+      return new URL(url).host === 'auth.docker.io'
         ? answer({ token: 'tkn' })
         : answer({
             manifests: [
