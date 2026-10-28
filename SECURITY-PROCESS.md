@@ -88,8 +88,16 @@ flowchart LR
 | The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The ruleset in [Code vulnerabilities](./docs/security/code-vulnerabilities.md#the-ruleset) | CodeQL, `gatekeeper`, and `release-gate` become required. |
-| The Cursor automation `nightly-vulna-patchy`. It runs the skill `vulna-squash` every day. | The daily patch run for Trivy findings. |
-| The Cursor automation `dependency-pr-assess`. Its trigger is "Pull request opened" on this repository. Its prompt is "Run the skill `vulna-squash` in mode `pr` for the PR of this event." Its Slack action posts to the channel `C0C1PR9CNMP`. | The whole job for each nightly dependency PR: assess, fix a red CI, report, and a hand-off comment. |
+| The two Cursor automations `nightly-vulna-patchy` and `dependency-pr-assess`. See [Cursor automations](#cursor-automations). | The daily patch run, and the whole job for each nightly dependency PR: assess, fix a red CI, report, and a hand-off comment. |
+
+## Cursor automations
+
+This repository does not define the automations. The Terraform of the monorepo defines them. Copy these settings there. Both automations use the repository `Unique-AG/connectors`, the branch `main`, and the Slack channel `C0C1PR9CNMP`. Memory is off, because the skill never uses it.
+
+| Name | Trigger | Prompt |
+|---|---|---|
+| `nightly-vulna-patchy` | Cron `0 5 * * *` (05:00 UTC) | Vulna Squash automation run on Unique-AG/connectors main. Read `agentic/skills/vulna-squash/SKILL.md` end to end and follow it. Use the Slack action for every message that the skill requires. Do not change code in this run except through subagents. |
+| `dependency-pr-assess` | "Pull request opened" | Run the skill `vulna-squash` in mode `pr` for the PR of this event. |
 
 ## DEVIATION from monorepo setup
 

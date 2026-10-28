@@ -162,6 +162,5 @@ The PR automation also fires for these fix PRs. It stops at once, because they h
 | `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
-| `.cursor/automations/workflows/nightly-vulna-patchy.yaml` | The daily patch run |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date |
