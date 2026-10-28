@@ -7,6 +7,8 @@ const TIMEOUT_MS = 20_000;
 const CORE_REPO = 'hashicorp/terraform';
 const PART = /^(~>|>=|<=|!=|>|<|=)?\s*(\d+(?:\.\d+)*)$/;
 
+class UnwidenableConstraint extends Error {}
+
 function blockBody(text, start) {
   let depth = 1;
   let index = start;
@@ -86,9 +88,14 @@ function retargetPart(part, version) {
 export function retargetConstraint(constraint, version) {
   const result = constraint
     .split(',')
+    .filter((part) => satisfiesPart(version, part) || !/^\s*!=/.test(part))
     .map((part) => retargetPart(part, version))
-    .join(',');
-  assert.ok(satisfies(version, result), `Cannot fit ${version} into "${constraint}".`);
+    .join(',')
+    .trim();
+  assert.ok(
+    result.length > 0 && satisfies(version, result),
+    new UnwidenableConstraint(`The constraint ${constraint} cannot be widened to ${version}.`),
+  );
   return result;
 }
 
@@ -183,8 +190,10 @@ async function checkRepo(repo, usages, lookup, cutoff) {
         data: { major: true },
       },
     };
-  } catch {
-    return { needsPerson: { ecosystem: 'terraform', name, reason: 'The release lookup failed.' } };
+  } catch (error) {
+    const reason =
+      error instanceof UnwidenableConstraint ? error.message : 'The release lookup failed.';
+    return { needsPerson: { ecosystem: 'terraform', name, reason } };
   }
 }
 

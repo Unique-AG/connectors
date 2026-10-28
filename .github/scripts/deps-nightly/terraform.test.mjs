@@ -243,6 +243,18 @@ describe('planTerraform', () => {
       [['time', 'The release lookup failed.']],
     );
   });
+
+  it('reports a constraint that cannot be widened apart from a failed lookup', async () => {
+    const files = {
+      'services/a/deploy/terraform/x/versions.tf': versionsTf('~> 1.10', { azurerm: '!= 4.9.0' }),
+    };
+    const { candidates, needsPerson } = await run(files, lookupOf());
+    assert.deepStrictEqual(candidates, []);
+    assert.deepStrictEqual(
+      needsPerson.map(({ name, reason }) => [name, reason]),
+      [['azurerm', 'The constraint != 4.9.0 cannot be widened to 4.9.0.']],
+    );
+  });
 });
 
 describe('retargetConstraint', () => {
@@ -258,14 +270,21 @@ describe('retargetConstraint', () => {
     ['= 1.2.3', '1.2.4', '= 1.2.4'],
     ['1.2.3', '1.2.4', '1.2.4'],
     ['>= 4, < 6', '5.0.0', '>= 4, < 6'],
+    ['>= 1, != 1.2.3', '1.2.3', '>= 1'],
+    ['!= 1.2.3, >= 1', '1.2.3', '>= 1'],
+    ['~> 3, != 4.9.0', '4.9.0', '~> 4'],
+    ['>= 1, != 1.2.2', '1.2.3', '>= 1, != 1.2.2'],
   ]) {
     it(`${constraint} fits ${version} as ${expected}`, () => {
       assert.strictEqual(retargetConstraint(constraint, version), expected);
     });
   }
 
-  it('throws when the constraint excludes the version and cannot widen', () => {
-    assert.throws(() => retargetConstraint('!= 1.2.3', '1.2.3'), /Cannot fit 1\.2\.3/);
+  it('throws when dropping the exclusion leaves nothing', () => {
+    assert.throws(
+      () => retargetConstraint('!= 1.2.3', '1.2.3'),
+      /The constraint != 1\.2\.3 cannot be widened to 1\.2\.3\./,
+    );
   });
 });
 
