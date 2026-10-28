@@ -1,12 +1,27 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { applyActions, createActionsLookup, parseActionUses, planActions } from './actions.mjs';
+import {
+  applyActions,
+  createActionsLookup,
+  parseActionUses,
+  planActions as planWithLedger,
+} from './actions.mjs';
 
 const NOW = Date.parse('2026-10-27T00:00:00Z');
 const sha = (character) => character.repeat(40);
 const OLD_SHA = sha('a');
 const NEW_SHA = sha('b');
 const release = (tag, publishedAt) => ({ tag, publishedAt });
+const DAY_MS = 24 * 60 * 60 * 1000;
+const seen = (shas, daysAgo) =>
+  Object.fromEntries(
+    Object.entries(shas).map(([key, value]) => [
+      key,
+      { sha: value, firstSeen: NOW - daysAgo * DAY_MS },
+    ]),
+  );
+const planActions = (options) =>
+  planWithLedger({ ledger: seen(options.lookup.shas, 10), ...options });
 
 const WORKFLOW = [
   'jobs:',
@@ -23,6 +38,7 @@ const WORKFLOW = [
 
 function fakeLookup({ releases, shas = {}, failing = [] }) {
   return {
+    shas,
     async releases(repo) {
       assert.ok(!failing.includes(repo), `lookup failed for ${repo}`);
       return releases[repo] ?? [];
@@ -275,6 +291,60 @@ describe('applyActions', () => {
       () => applyActions(files, { ...change, data: { toSha: 'abc' } }),
       /Not a full commit SHA/,
     );
+  });
+});
+
+describe('planActions ledger', () => {
+  const files = { 'a.yaml': `      - uses: actions/checkout@${OLD_SHA} # v7.0.1` };
+  const lookup = fakeLookup({
+    releases: {
+      'actions/checkout': [
+        release('v7.0.2', '2026-10-20T00:00:00Z'),
+        release('v7.0.1', '2026-09-01T00:00:00Z'),
+      ],
+    },
+    shas: { 'actions/checkout@v7.0.1': OLD_SHA, 'actions/checkout@v7.0.2': NEW_SHA },
+  });
+  const run = (ledger) => planWithLedger({ files, lookup, now: NOW, cooldownDays: 3, ledger });
+
+  it('records a tag on first sight and proposes nothing yet', async () => {
+    const result = await run({});
+    assert.deepEqual(result.candidates, []);
+    assert.deepEqual(result.ledger['actions/checkout@v7.0.2'], { sha: NEW_SHA, firstSeen: NOW });
+  });
+
+  it('waits until the same commit has been seen for the cooldown', async () => {
+    const ledger = seen(lookup.shas, 1);
+    const result = await run(ledger);
+    assert.deepEqual(result.candidates, []);
+    assert.deepEqual(result.ledger, {
+      'actions/checkout@v7.0.2': ledger['actions/checkout@v7.0.2'],
+    });
+  });
+
+  it('pins the commit that the job saw, once it has been stable for the cooldown', async () => {
+    const result = await run(seen(lookup.shas, 4));
+    assert.equal(result.candidates[0].data.toSha, NEW_SHA);
+  });
+
+  it('flags a tag that moved to another commit and keeps the first commit on record', async () => {
+    const ledger = seen({ ...lookup.shas, 'actions/checkout@v7.0.2': sha('c') }, 10);
+    const result = await run(ledger);
+    assert.deepEqual(result.candidates, []);
+    assert.match(result.needsPerson[0].reason, /v7\.0\.2 points to a new commit/);
+    assert.equal(result.ledger['actions/checkout@v7.0.2'].sha, sha('c'));
+  });
+
+  it('keeps the old records of a repo when the lookup fails', async () => {
+    const ledger = seen(lookup.shas, 10);
+    const result = await planWithLedger({
+      files,
+      lookup: fakeLookup({ releases: {}, failing: ['actions/checkout'] }),
+      now: NOW,
+      cooldownDays: 3,
+      ledger,
+    });
+    assert.deepEqual(result.ledger, ledger);
   });
 });
 

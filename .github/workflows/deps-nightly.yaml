@@ -72,11 +72,25 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "PLAN_NOTE=$note" >> "$GITHUB_ENV"
 
+      - name: Restore the tag ledger
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tag-ledger.json
+          key: deps-tag-ledger-${{ github.run_id }}
+          restore-keys: deps-tag-ledger-
+
       - name: List the updates
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG_LEDGER: ${{ runner.temp }}/tag-ledger.json
         run: node .github/scripts/deps-nightly/plan.cli.mjs
+
+      - name: Save the tag ledger
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tag-ledger.json
+          key: deps-tag-ledger-${{ github.run_id }}
 
   bump:
     name: Bump ${{ matrix.entry.slug }}

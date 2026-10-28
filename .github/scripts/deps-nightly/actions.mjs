@@ -28,7 +28,7 @@ function needsPerson(name, reason) {
   return { needsPerson: { ecosystem: 'actions', name, reason } };
 }
 
-async function planRepo({ repo, uses, lookup, cutoff }) {
+async function planRepo({ repo, uses, lookup, cutoff, ledger, now }) {
   const unpinned = uses.find(({ tag }) => !isStable(tag));
   if (unpinned) {
     return needsPerson(
@@ -39,33 +39,74 @@ async function planRepo({ repo, uses, lookup, cutoff }) {
     );
   }
   try {
-    const eligible = (await lookup.releases(repo))
-      .filter(({ tag, publishedAt }) => isStable(tag) && Date.parse(publishedAt) <= cutoff)
+    const stable = (await lookup.releases(repo)).filter(({ tag }) => isStable(tag));
+    const eligible = stable
+      .filter(({ publishedAt }) => Date.parse(publishedAt) <= cutoff)
       .map(({ tag }) => tag);
     if (eligible.length === 0) {
       return needsPerson(repo, 'No stable release is old enough.');
     }
     const tags = uses.map(({ tag }) => tag);
-    const to = newestVersion(eligible);
     const newestCurrent = newestVersion(tags);
-    if (
-      compareVersions(to, newestCurrent) < 0 ||
-      tags.every((tag) => compareVersions(tag, to) === 0)
-    ) {
-      return {};
+    const adopted = uses.find(({ tag }) => compareVersions(tag, newestCurrent) === 0);
+    const observed = {};
+    const trusted = new Map();
+    const moved = [];
+    const missing = [];
+    for (const { tag } of stable.filter(({ tag }) => compareVersions(tag, newestCurrent) >= 0)) {
+      if (tag === adopted.tag) {
+        if (eligible.includes(tag)) {
+          trusted.set(tag, adopted.sha);
+        }
+        continue;
+      }
+      const sha = await lookup.commitSha(repo, tag);
+      if (!FULL_SHA.test(sha ?? '')) {
+        missing.push(tag);
+        continue;
+      }
+      const key = `${repo}@${tag}`;
+      observed[key] = ledger[key] ?? { sha, firstSeen: now };
+      if (observed[key].sha !== sha) {
+        moved.push(tag);
+      } else if (eligible.includes(tag) && observed[key].firstSeen <= cutoff) {
+        trusted.set(tag, sha);
+      }
     }
-    const toSha = await lookup.commitSha(repo, to);
-    if (!FULL_SHA.test(toSha ?? '')) {
-      return needsPerson(repo, `The lookup found no commit for ${to}.`);
+    const warnings = [
+      ...moved.map((tag) => ({
+        ecosystem: 'actions',
+        name: repo,
+        reason: `The tag ${tag} points to a new commit since the job first saw it. Read the release before you trust it.`,
+      })),
+      ...missing
+        .filter((tag) => eligible.includes(tag))
+        .map((tag) => ({
+          ecosystem: 'actions',
+          name: repo,
+          reason: `The lookup found no commit for ${tag}.`,
+        })),
+    ];
+    if (trusted.size === 0) {
+      return { observed, needsPerson: warnings };
+    }
+    const to = newestVersion([...trusted.keys()]);
+    if (tags.every((tag) => compareVersions(tag, to) === 0)) {
+      return { observed, needsPerson: warnings };
     }
     return {
+      observed,
+      needsPerson: warnings,
       candidate: {
         ecosystem: 'actions',
         name: repo,
         from: oldestVersion(tags),
         to,
         direct: true,
-        data: { toSha, major: /\d+/.exec(to)[0] !== /\d+/.exec(newestCurrent)[0] },
+        data: {
+          toSha: trusted.get(to),
+          major: /\d+/.exec(to)[0] !== /\d+/.exec(newestCurrent)[0],
+        },
       },
     };
   } catch (error) {
@@ -76,18 +117,25 @@ async function planRepo({ repo, uses, lookup, cutoff }) {
   }
 }
 
-export async function planActions({ files, lookup, now, cooldownDays }) {
+export async function planActions({ files, lookup, now, cooldownDays, ledger }) {
   const cutoff = now - cooldownDays * DAY_MS;
   const byRepo = Map.groupBy(
     Object.values(files).flatMap((text) => parseActionUses(text)),
     ({ repo }) => repo,
   );
   const results = await Promise.all(
-    [...byRepo].map(([repo, uses]) => planRepo({ repo, uses, lookup, cutoff })),
+    [...byRepo].map(([repo, uses]) => planRepo({ repo, uses, lookup, cutoff, ledger, now })),
   );
   return {
     candidates: results.flatMap(({ candidate }) => candidate ?? []),
     needsPerson: results.flatMap((result) => result.needsPerson ?? []),
+    ledger: Object.fromEntries(
+      [...byRepo.keys()].flatMap((repo, index) =>
+        results[index].observed
+          ? Object.entries(results[index].observed)
+          : Object.entries(ledger).filter(([key]) => key.startsWith(`${repo}@`)),
+      ),
+    ),
   };
 }
 

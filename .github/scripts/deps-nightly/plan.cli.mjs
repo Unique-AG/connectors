@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createActionsLookup, planActions } from './actions.mjs';
 import { createDockerLookup, planDocker } from './docker.mjs';
 import {
@@ -106,11 +106,16 @@ function planFiles(pattern) {
 const ecosystemOptions = { now: Date.now(), cooldownDays: config.cooldownDays };
 const npm = planNpm();
 const uv = await planUv();
+const ledgerPath = process.env.TAG_LEDGER;
 const actions = await planActions({
   files: planFiles(ACTION_FILES),
   lookup: createActionsLookup(process.env.GH_TOKEN),
+  ledger: ledgerPath && existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, 'utf8')) : {},
   ...ecosystemOptions,
 });
+if (ledgerPath) {
+  writeFileSync(ledgerPath, JSON.stringify(actions.ledger));
+}
 const docker = await planDocker({
   files: planFiles(DOCKERFILES),
   lookup: createDockerLookup(),
