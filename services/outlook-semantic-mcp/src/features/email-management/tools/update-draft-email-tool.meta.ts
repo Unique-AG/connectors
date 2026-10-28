@@ -15,7 +15,7 @@ export const META = createMeta({
     This tool does not touch attachments. Use \`add_attachments_to_draft_email\` to add files and \`remove_attachments_from_draft_email\` to remove them. Inline images are left in place unless the user explicitly asked to remove them.
 
     ### Body Formatting
-    \`content\` is **HTML**, stored exactly as you send it. Do not convert the body to Markdown and do not write a new body from scratch. Use the HTML \`open_email\` returned. Fragment only — no \`html\`, \`head\`, or \`body\` wrappers. Use \`<p>\` for paragraphs, \`<br>\` for line breaks, \`<strong>\` bold, \`<em>\` italic, \`<ul>\`/\`<ol>\`/\`<li>\` lists, and \`<a href="https://example.com">\` links when you add formatting the original body did not have.`,
+    \`content\` is **HTML**, stored exactly as you send it. Do not convert the body to Markdown and do not write a new body from scratch. Use the HTML \`open_email\` returned and send back the whole document, including \`<head>\` and its \`<style>\` blocks — Outlook keeps the draft's styles there, so removing it drops the formatting. Use \`<p>\` for paragraphs, \`<br>\` for line breaks, \`<strong>\` bold, \`<em>\` italic, \`<ul>\`/\`<ol>\`/\`<li>\` lists, and \`<a href="https://example.com">\` links when you add formatting the original body did not have.`,
   toolFormatInformation: `## Format for Draft Update Confirmation
   📩 **{subject}**[ — [Open in Outlook]({webLink})]
   {message}

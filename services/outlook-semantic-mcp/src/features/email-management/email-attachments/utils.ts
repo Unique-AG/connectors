@@ -1,4 +1,6 @@
+import { Client, GraphRequest } from '@microsoft/microsoft-graph-client';
 import z from 'zod';
+import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 
 export const UploadSessionSchema = z.object({ uploadUrl: z.string() });
 
@@ -17,3 +19,23 @@ export interface AttachmentFailure {
 export type AttachmentUploadResult =
   | { status: 'failed'; failedInfo: AttachmentFailure }
   | { status: 'success' };
+
+export function draftAttachmentsRequest({
+  client,
+  draftId,
+  mailbox,
+  idIsImmutable,
+  subPath = '',
+}: {
+  client: Client;
+  draftId: string;
+  mailbox?: string;
+  idIsImmutable?: boolean;
+  subPath?: string;
+}): GraphRequest {
+  const prefix = mailbox ? `/users/${mailbox}` : '/me';
+  const request = client.api(
+    `${prefix}/messages/${encodeGraphItemIdForUrlPath(draftId)}/attachments${subPath}`,
+  );
+  return idIsImmutable ? request.header('Prefer', 'IdType="ImmutableId"') : request;
+}

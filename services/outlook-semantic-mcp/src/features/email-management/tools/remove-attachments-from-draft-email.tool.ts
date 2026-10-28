@@ -5,6 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { oneLine } from '~/utils/one-line';
 import { ExistingDraftTargetShape } from '../draft-input.schemas';
 import { DraftAttachment, GetDraftStateQuery } from '../get-draft-state.query';
 import { RemoveAttachmentsFromDraftEmailCommand } from '../remove-attachments-from-draft-email.command';
@@ -170,10 +171,12 @@ export class RemoveAttachmentsFromDraftEmailTool {
   }
 
   private elicitMessage(subject: string | null, toRemove: DraftAttachment[]): string {
+    const draftSubject = subject ? oneLine(subject) : '';
     return [
-      `Remove ${toRemove.length === 1 ? 'this attachment' : 'these attachments'} from the draft "${subject ?? '(no subject)'}"?`,
+      `Remove ${toRemove.length === 1 ? 'this attachment' : 'these attachments'} from the draft "${draftSubject || '(no subject)'}"?`,
       ...toRemove.map(
-        (attachment) => `- ${attachment.name}${attachment.isInline ? ' (inline image)' : ''}`,
+        (attachment) =>
+          `- ${oneLine(attachment.name)}${attachment.isInline ? ' (inline image)' : ''}`,
       ),
       'This cannot be undone. The draft is not sent.',
     ].join('\n');

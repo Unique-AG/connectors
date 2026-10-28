@@ -27,9 +27,9 @@ const graphMessageSchema = z.object({
   attachments: z
     .array(
       z.object({
-        name: z.string(),
-        size: z.number().optional(),
-        isInline: z.boolean().optional(),
+        name: z.string().nullish(),
+        size: z.number().nullish(),
+        isInline: z.boolean().nullish(),
       }),
     )
     .default([]),
@@ -142,11 +142,9 @@ export class OpenEmailQuery {
         webLink: message.webLink,
         hasAttachments: message.hasAttachments === true,
         isDraft: message.isDraft === true,
-        attachments: message.attachments.map(({ name, size, isInline }) => ({
-          name,
-          size,
-          isInline: isInline === true,
-        })),
+        attachments: message.attachments.flatMap(({ name, size, isInline }) =>
+          name ? [{ name, size: size ?? undefined, isInline: isInline === true }] : [],
+        ),
       },
       text: message.body?.content ?? '',
       bodyContentType,

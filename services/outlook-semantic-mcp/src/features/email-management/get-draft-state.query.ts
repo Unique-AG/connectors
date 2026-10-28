@@ -11,9 +11,8 @@ const DraftStateResponseSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        name: z.string(),
-        size: z.number().optional(),
-        isInline: z.boolean().optional(),
+        name: z.string().nullish(),
+        isInline: z.boolean().nullish(),
       }),
     )
     .default([]),
@@ -54,7 +53,7 @@ export class GetDraftStateQuery {
       let request = client
         .api(`${prefix}/messages/${encodeGraphItemIdForUrlPath(draftId)}`)
         .select('isDraft,subject')
-        .expand('attachments($select=id,name,size,isInline)');
+        .expand('attachments($select=id,name,isInline)');
       if (idIsImmutable) {
         request = request.header('Prefer', 'IdType="ImmutableId"');
       }
@@ -70,11 +69,9 @@ export class GetDraftStateQuery {
       return {
         status: 'draft',
         subject: message.subject ?? null,
-        attachments: message.attachments.map(({ id, name, isInline }) => ({
-          id,
-          name,
-          isInline: isInline === true,
-        })),
+        attachments: message.attachments.flatMap(({ id, name, isInline }) =>
+          name ? [{ id, name, isInline: isInline === true }] : [],
+        ),
       };
     } catch (err) {
       this.logger.error({

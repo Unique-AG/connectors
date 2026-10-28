@@ -25,7 +25,7 @@ function makeCommand(draftState: DraftState = DRAFT_STATE) {
     buildWebLinksCommand as never,
     { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'user@test.com' }) } as never,
   );
-  return { command, api, graphRequest, getDraftStateQuery, buildWebLinksCommand };
+  return { command, api, graphRequest, webLinks };
 }
 
 describe('UpdateDraftEmailCommand', () => {
@@ -66,10 +66,11 @@ describe('UpdateDraftEmailCommand', () => {
     });
   });
 
-  it('targets the shared mailbox and applies the ImmutableId header', async () => {
-    const { command, api, graphRequest, buildWebLinksCommand } = makeCommand();
+  it('targets the shared mailbox, applies the ImmutableId header and returns its web link', async () => {
+    const { command, api, graphRequest, webLinks } = makeCommand();
+    webLinks.set('shared@example.com', 'draft-1', 'https://owa.test/shared-draft');
 
-    await command.run(USER_PROFILE_ID, {
+    const result = await command.run(USER_PROFILE_ID, {
       draftId: 'immutable-1',
       idIsImmutable: true,
       mailbox: 'shared@example.com',
@@ -78,18 +79,12 @@ describe('UpdateDraftEmailCommand', () => {
 
     expect(api).toHaveBeenCalledWith('/users/shared@example.com/messages/immutable-1');
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'IdType="ImmutableId"');
-    expect(buildWebLinksCommand.run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ids: [
-          {
-            id: 'draft-1',
-            isImmutable: true,
-            mailbox: 'shared@example.com',
-            webLink: 'https://outlook.test/draft',
-          },
-        ],
-      }),
-    );
+    expect(result).toEqual({
+      success: true,
+      draftId: 'draft-1',
+      webLink: 'https://owa.test/shared-draft',
+      message: 'Draft email updated successfully.',
+    });
   });
 
   it('does not patch when the message is no longer a draft', async () => {

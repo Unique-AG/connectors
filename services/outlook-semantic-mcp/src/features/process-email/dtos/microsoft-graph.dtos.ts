@@ -36,7 +36,12 @@ export const graphMessageSchema = z.object({
   from: graphRecipientSchema.optional().nullable(),
   hasAttachments: z.boolean().optional().nullable(),
   attachments: z
-    .array(z.object({ name: z.string(), isInline: z.boolean().optional().nullable() }))
+    .array(
+      z.object({
+        name: z.string().optional().nullable(),
+        isInline: z.boolean().optional().nullable(),
+      }),
+    )
     .optional()
     .nullable(),
   id: z.string(),

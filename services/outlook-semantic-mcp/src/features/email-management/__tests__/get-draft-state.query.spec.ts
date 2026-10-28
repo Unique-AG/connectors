@@ -32,8 +32,9 @@ describe('GetDraftStateQuery', () => {
       isDraft: true,
       subject: 'Offer',
       attachments: [
-        { id: 'att-1', name: 'offer.pdf', size: 10, isInline: false },
-        { id: 'att-2', name: 'logo.png', size: 4, isInline: true },
+        { id: 'att-1', name: 'offer.pdf', isInline: false },
+        { id: 'att-2', name: 'logo.png', isInline: true },
+        { id: 'att-3', name: null, isInline: null },
       ],
     });
 

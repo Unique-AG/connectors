@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { draftAttachmentsRequest } from './email-attachments/utils';
 import { DraftAttachment } from './get-draft-state.query';
 
 interface RemoveAttachmentsInput {
@@ -30,19 +31,17 @@ export class RemoveAttachmentsFromDraftEmailCommand {
   ): Promise<RemoveAttachmentsResult> {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
-    const prefix = mailbox ? `/users/${mailbox}` : '/me';
-    const messagePath = `${prefix}/messages/${encodeGraphItemIdForUrlPath(draftId)}`;
 
     const result: RemoveAttachmentsResult = { removed: [], failed: [] };
     for (const attachment of attachments) {
       try {
-        let request = client.api(
-          `${messagePath}/attachments/${encodeGraphItemIdForUrlPath(attachment.id)}`,
-        );
-        if (idIsImmutable) {
-          request = request.header('Prefer', 'IdType="ImmutableId"');
-        }
-        await request.delete();
+        await draftAttachmentsRequest({
+          client,
+          draftId,
+          mailbox,
+          idIsImmutable,
+          subPath: `/${encodeGraphItemIdForUrlPath(attachment.id)}`,
+        }).delete();
         result.removed.push(attachment.name);
       } catch (err) {
         this.logger.warn({

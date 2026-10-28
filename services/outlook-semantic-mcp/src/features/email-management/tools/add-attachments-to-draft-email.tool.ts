@@ -82,6 +82,7 @@ export class AddAttachmentsToDraftEmailTool {
       attachments: input.attachments,
       chatId: isString(chatId) ? chatId : null,
       mailbox: input.mailbox,
+      idIsImmutable: input.idIsImmutable,
     });
 
     if (!attachmentsFailed.length) {

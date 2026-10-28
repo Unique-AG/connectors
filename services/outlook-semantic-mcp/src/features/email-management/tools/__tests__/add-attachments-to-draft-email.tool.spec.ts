@@ -29,7 +29,7 @@ describe('AddAttachmentsToDraftEmailTool', () => {
 
   it('adds the attachments to the draft', async () => {
     const result = await tool.addAttachments(
-      { draftId: 'draft-1', mailbox: 'shared@example.com', attachments },
+      { draftId: 'draft-1', idIsImmutable: true, mailbox: 'shared@example.com', attachments },
       context,
       request,
     );
@@ -40,6 +40,7 @@ describe('AddAttachmentsToDraftEmailTool', () => {
       attachments,
       chatId: 'chat-1',
       mailbox: 'shared@example.com',
+      idIsImmutable: true,
     });
   });
 
