@@ -73,7 +73,7 @@ jobs:
             org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
 
       - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
@@ -94,7 +94,7 @@ jobs:
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Login to ACR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.UNIQUECR_REGISTRY }}
           username: 00000000-0000-0000-0000-000000000000
@@ -254,7 +254,7 @@ jobs:
           sparse-checkout: .github/trivy-templates
           persist-credentials: false
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
@@ -305,7 +305,7 @@ jobs:
       GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
       TRIVY_DISABLE_VEX_NOTICE: "true"
     steps:
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
