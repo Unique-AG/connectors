@@ -64,6 +64,22 @@ describe('parseFromLines', () => {
   });
 });
 
+describe('parseFromLines with COPY --from', () => {
+  it('reads a COPY --from line, with and without other flags', () => {
+    const uv = `ghcr.io/astral-sh/uv:0.12.10@${digest('e')}`;
+    const text = dockerfile(
+      `COPY --from=${uv} /uv /bin/uv`,
+      `COPY --chown=1000:1000 --from=${uv} /uv /bin/uvx`,
+      'COPY --from=builder /app /app',
+      'COPY . .',
+    );
+    assert.deepStrictEqual(parseFromLines(text), [
+      { image: 'ghcr.io/astral-sh/uv', tag: '0.12.10', digest: digest('e') },
+      { image: 'ghcr.io/astral-sh/uv', tag: '0.12.10', digest: digest('e') },
+    ]);
+  });
+});
+
 describe('planDocker', () => {
   it('moves a patch tag to the newest eligible patch of the same suffix and major', async () => {
     const { candidates, needsPerson } = await plan(
@@ -192,6 +208,69 @@ describe('planDocker', () => {
     ]);
   });
 
+  it('sends a COPY --from image to needsPerson', async () => {
+    const text = dockerfile(`COPY --from=ghcr.io/astral-sh/uv:0.12.10@${digest('e')} /uv /bin/uv`);
+    const { candidates, needsPerson } = await plan({ 'a/Dockerfile': text }, {});
+    assert.deepStrictEqual(candidates, []);
+    assert.deepStrictEqual(needsPerson, [
+      {
+        ecosystem: 'docker',
+        name: 'ghcr.io/astral-sh/uv',
+        reason: 'Only Docker Hub official images are updated.',
+      },
+    ]);
+  });
+
+  describe('digest-only refresh', () => {
+    const current = `FROM python:3.14-slim-trixie@${digest('a')} AS runtime`;
+    const planWith = (platforms, newPlatforms) =>
+      planDocker({
+        files: { 'a/Dockerfile': dockerfile(current) },
+        lookup: {
+          tags: async () => [{ ...pythonTags[0], platforms: newPlatforms }],
+          platforms: platforms,
+        },
+        now: NOW,
+        cooldownDays: 3,
+      });
+
+    it('produces no candidate when every platform digest is unchanged', async () => {
+      const { candidates } = await planWith(
+        async () => [digest('1'), digest('2')],
+        [digest('1'), digest('2')],
+      );
+      assert.deepStrictEqual(candidates, []);
+    });
+
+    it('keeps the candidate when a platform digest changed', async () => {
+      const { candidates } = await planWith(
+        async () => [digest('1'), digest('2')],
+        [digest('1'), digest('3')],
+      );
+      assert.strictEqual(candidates.length, 1);
+    });
+
+    it('keeps the candidate when the old digest cannot be read', async () => {
+      const { candidates, needsPerson } = await planWith(async () => {
+        throw new Error('boom');
+      }, [digest('1')]);
+      assert.strictEqual(candidates.length, 1);
+      assert.deepStrictEqual(needsPerson, []);
+    });
+
+    it('keeps a tag move even when the platform digests match', async () => {
+      const files = { 'a/Dockerfile': dockerfile(NODE_OLD) };
+      const tags = nodeTags.map((tag) => ({ ...tag, platforms: [digest('1')] }));
+      const { candidates } = await planDocker({
+        files,
+        lookup: { tags: async () => tags, platforms: async () => [digest('1')] },
+        now: NOW,
+        cooldownDays: 3,
+      });
+      assert.strictEqual(candidates.length, 1);
+    });
+  });
+
   it('reports a failed lookup and still plans the other images', async () => {
     const lookup = {
       tags: async (image) => {
@@ -226,6 +305,17 @@ describe('applyDocker', () => {
       toRef: `3.14-slim-trixie@${digest('c')}`,
     },
   };
+
+  it('rewrites a COPY --from line and keeps its flags and paths', () => {
+    const uv = {
+      name: 'ghcr.io/astral-sh/uv',
+      data: { fromRef: `0.12.10@${digest('e')}`, toRef: `0.12.11@${digest('f')}` },
+    };
+    const text = `COPY --chown=1:1 --from=ghcr.io/astral-sh/uv:0.12.10@${digest('e')} /uv /bin/uv\n`;
+    assert.deepStrictEqual(applyDocker({ 'a/Dockerfile': text }, uv), {
+      'a/Dockerfile': `COPY --chown=1:1 --from=ghcr.io/astral-sh/uv:0.12.11@${digest('f')} /uv /bin/uv\n`,
+    });
+  });
 
   it('rewrites FROM lines and returns only the changed files', () => {
     const files = {
@@ -298,8 +388,8 @@ describe('createDockerLookup', () => {
       'https://hub.docker.com/v2/repositories/library/node/tags?page=2',
     ]);
     assert.deepStrictEqual(tags, [
-      { name: '26.1.0', digest: digest('1'), pushedAt: daysAgo(5) },
-      { name: '26.0.0', digest: digest('2'), pushedAt: daysAgo(30) },
+      { name: '26.1.0', digest: digest('1'), pushedAt: daysAgo(5), platforms: [] },
+      { name: '26.0.0', digest: digest('2'), pushedAt: daysAgo(30), platforms: [] },
     ]);
   });
 
@@ -313,13 +403,70 @@ describe('createDockerLookup', () => {
         ],
       });
     assert.deepStrictEqual(await createDockerLookup(fetchImpl).tags('node'), [
-      { name: '1.0', digest: digest('3'), pushedAt: daysAgo(4) },
+      { name: '1.0', digest: digest('3'), pushedAt: daysAgo(4), platforms: [digest('3')] },
     ]);
   });
 
-  it('returns an empty list on a non-200 answer', async () => {
-    const fetchImpl = async () => answer({}, 429);
+  it('returns an empty list when the repository is not found', async () => {
+    const fetchImpl = async () => answer({}, 404);
     assert.deepStrictEqual(await createDockerLookup(fetchImpl).tags('node'), []);
+  });
+
+  it('throws on a rate limit or a server error', async () => {
+    for (const status of [429, 500, 503]) {
+      const fetchImpl = async () => answer({}, status);
+      await assert.rejects(createDockerLookup(fetchImpl).tags('node'), new RegExp(`${status}`));
+    }
+  });
+
+  it('lists the real platform digests of the tag, without attestations', async () => {
+    const fetchImpl = async () =>
+      answer({
+        next: null,
+        results: [
+          {
+            name: '1.0',
+            digest: digest('3'),
+            images: [
+              { digest: digest('b'), architecture: 'arm64' },
+              { digest: digest('a'), architecture: 'amd64' },
+              { digest: digest('c'), architecture: 'unknown' },
+            ],
+            last_updated: daysAgo(4),
+          },
+        ],
+      });
+    const [tag] = await createDockerLookup(fetchImpl).tags('node');
+    assert.deepStrictEqual(tag.platforms, [digest('a'), digest('b')]);
+  });
+
+  it('reads the platform digests of an old digest with an anonymous token', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, headers: options.headers });
+      return url.startsWith('https://auth.docker.io')
+        ? answer({ token: 'tkn' })
+        : answer({
+            manifests: [
+              { digest: digest('b'), platform: { architecture: 'arm64' } },
+              { digest: digest('a'), platform: { architecture: 'amd64' } },
+              { digest: digest('c'), platform: { architecture: 'unknown' } },
+            ],
+          });
+    };
+    assert.deepStrictEqual(await createDockerLookup(fetchImpl).platforms('node', digest('9')), [
+      digest('a'),
+      digest('b'),
+    ]);
+    assert.deepStrictEqual(
+      calls.map(({ url }) => url),
+      [
+        'https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull',
+        `https://registry-1.docker.io/v2/library/node/manifests/${digest('9')}`,
+      ],
+    );
+    assert.strictEqual(calls[1].headers.Authorization, 'Bearer tkn');
+    assert.match(calls[1].headers.Accept, /application\/vnd\.oci\.image\.index\.v1\+json/);
   });
 
   it('stops after ten pages', async () => {
