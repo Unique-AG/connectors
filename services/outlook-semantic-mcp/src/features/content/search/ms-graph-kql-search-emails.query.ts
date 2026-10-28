@@ -229,6 +229,13 @@ export class MsGraphKqlSearchEmailsQuery {
       const translatedId = idsTranslationMaps.get(hit.mailbox)?.get(hit.restId);
       const idIsImmutable = translatedId !== undefined;
       const id = translatedId ?? hit.restId;
+      const openEmailParams = {
+        id,
+        mailbox: hit.isDelegated ? hit.mailbox : undefined,
+        parentFolderId: hit.isDelegated ? hit.parentFolderId : undefined,
+        idIsImmutable,
+        ...(hit.isDraft ? { bodyContentType: 'html' as const } : {}),
+      };
 
       return {
         msGraphMessageId: id,
@@ -242,13 +249,7 @@ export class MsGraphKqlSearchEmailsQuery {
         text: hit.bodyPreview,
         uniqueContentUrl: undefined,
         backend: SearchBackend.MsGraph,
-        openEmailParams: {
-          id,
-          idType: SearchBackend.MsGraph,
-          mailbox: hit.isDelegated ? hit.mailbox : undefined,
-          parentFolderId: hit.isDelegated ? hit.parentFolderId : undefined,
-          idIsImmutable,
-        },
+        openEmailParams,
         replyToParams: {
           inReplyToMessageId: id,
           idIsImmutable,

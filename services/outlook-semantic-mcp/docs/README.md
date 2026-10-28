@@ -201,7 +201,7 @@ The `create_draft_email` tool creates a draft in the user's Outlook Drafts folde
 
 See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) for the detailed sequence diagram.
 
-Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_email`, and `remove_attachments_from_draft_email` after the agent finds them (`search_emails` results carry `isDraft`) and reads them with `open_email`. See [Email Draft Editing Flow](./technical/flows.md#Email-Draft-Editing-Flow).
+Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_email`, and `remove_attachments_from_draft_email` after the agent finds them (`search_emails` results carry `isDraft`) and reads the live HTML with `open_email` (`openEmailParams`). See [Email Draft Editing Flow](./technical/flows.md#Email-Draft-Editing-Flow).
 
 ### User Workflow
 

@@ -21,8 +21,8 @@ describe('RemoveAttachmentsFromDraftEmailCommand', () => {
     const result = await command.run(USER_PROFILE_ID, {
       draftId: 'draft-1',
       attachments: [
-        { id: 'att-1', name: 'a.pdf' },
-        { id: 'att-2', name: 'b.pdf' },
+        { id: 'att-1', name: 'a.pdf', isInline: false },
+        { id: 'att-2', name: 'b.pdf', isInline: false },
       ],
     });
 
@@ -38,7 +38,7 @@ describe('RemoveAttachmentsFromDraftEmailCommand', () => {
       draftId: 'immutable-1',
       idIsImmutable: true,
       mailbox: 'shared@example.com',
-      attachments: [{ id: 'att-1', name: 'a.pdf' }],
+      attachments: [{ id: 'att-1', name: 'a.pdf', isInline: false }],
     });
 
     expect(api).toHaveBeenCalledWith(
@@ -57,8 +57,8 @@ describe('RemoveAttachmentsFromDraftEmailCommand', () => {
     const result = await command.run(USER_PROFILE_ID, {
       draftId: 'draft-1',
       attachments: [
-        { id: 'att-1', name: 'a.pdf' },
-        { id: 'att-2', name: 'b.pdf' },
+        { id: 'att-1', name: 'a.pdf', isInline: false },
+        { id: 'att-2', name: 'b.pdf', isInline: false },
       ],
     });
 

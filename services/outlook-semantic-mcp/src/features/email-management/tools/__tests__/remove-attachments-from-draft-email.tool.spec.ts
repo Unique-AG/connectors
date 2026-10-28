@@ -12,8 +12,9 @@ const DRAFT_STATE: DraftState = {
   status: 'draft',
   subject: 'Offer',
   attachments: [
-    { id: 'att-1', name: 'Offer.pdf' },
-    { id: 'att-2', name: 'terms.docx' },
+    { id: 'att-1', name: 'Offer.pdf', isInline: false },
+    { id: 'att-2', name: 'terms.docx', isInline: false },
+    { id: 'att-3', name: 'logo.png', isInline: true },
   ],
 };
 const request = {} as McpAuthenticatedRequest;
@@ -50,7 +51,7 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
       draftId: 'draft-1',
       idIsImmutable: undefined,
       mailbox: undefined,
-      attachments: [{ id: 'att-1', name: 'Offer.pdf' }],
+      attachments: [{ id: 'att-1', name: 'Offer.pdf', isInline: false }],
     });
     expect(result).toEqual({
       success: true,
@@ -98,7 +99,7 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
     expect(result).toEqual({
       success: false,
       message:
-        'The draft has no attachment named "missing.txt". Nothing was removed. The draft\'s attachments are: "Offer.pdf", "terms.docx".',
+        'The draft has no attachment named "missing.txt". Nothing was removed. The draft\'s attachments are: "Offer.pdf", "terms.docx", "logo.png" (inline image).',
     });
     expect(elicit).not.toHaveBeenCalled();
   });
@@ -114,6 +115,63 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
 
     expect(result).toEqual({ success: false, message: 'Already sent.' });
     expect(elicit).not.toHaveBeenCalled();
+  });
+
+  it('leaves inline images in place unless includeInline is set', async () => {
+    const result = await tool.removeAttachments(
+      { draftId: 'draft-1', fileNames: ['logo.png'] },
+      context,
+      request,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Left inline images in place: "logo.png" (inline image)');
+    expect(elicit).not.toHaveBeenCalled();
+    expect(removeCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('removes a file and reports the inline image it skipped', async () => {
+    const result = await tool.removeAttachments(
+      { draftId: 'draft-1', fileNames: ['Offer.pdf', 'logo.png'] },
+      context,
+      request,
+    );
+
+    expect(removeCommand.run).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        attachments: [{ id: 'att-1', name: 'Offer.pdf', isInline: false }],
+      }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.removed).toEqual(['Offer.pdf']);
+    expect(result.message).toContain('Left inline images in place');
+  });
+
+  it('removes an inline image when the caller asks for it', async () => {
+    removeCommand.run.mockResolvedValue({ removed: ['logo.png'], failed: [] });
+
+    const result = await tool.removeAttachments(
+      { draftId: 'draft-1', fileNames: ['logo.png'], includeInline: true },
+      context,
+      request,
+    );
+
+    expect(elicit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('- logo.png (inline image)'),
+    );
+    expect(removeCommand.run).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        attachments: [{ id: 'att-3', name: 'logo.png', isInline: true }],
+      }),
+    );
+    expect(result).toEqual({
+      success: true,
+      message: 'Attachments removed from the draft.',
+      removed: ['logo.png'],
+    });
   });
 
   it('reports the attachments Graph failed to remove', async () => {

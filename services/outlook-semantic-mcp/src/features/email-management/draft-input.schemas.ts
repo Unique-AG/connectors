@@ -29,7 +29,7 @@ export const ExistingDraftTargetShape = {
   draftId: z
     .string()
     .describe(
-      'Microsoft Graph message ID of the draft. Use `msGraphMessageId` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`.',
+      'Microsoft Graph message ID of the draft. Use `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`.',
     ),
   idIsImmutable: z
     .boolean()
@@ -41,6 +41,6 @@ export const ExistingDraftTargetShape = {
     .string()
     .optional()
     .describe(
-      'UPN of the shared mailbox that holds the draft (e.g. "support@company.com"). Use `sourceMailbox` from the `search_emails` result when it is not the signed-in user\'s own mailbox. Omit for the signed-in user\'s own mailbox.',
+      'UPN of the shared mailbox that holds the draft (e.g. "support@company.com"). Use `openEmailParams.mailbox` when it is set. Omit for the signed-in user\'s own mailbox.',
     ),
 };

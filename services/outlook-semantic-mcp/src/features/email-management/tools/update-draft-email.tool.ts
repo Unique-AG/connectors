@@ -19,7 +19,7 @@ const UpdateDraftEmailInputSchema = z
       .string()
       .optional()
       .describe(
-        'Replacement body of the draft, written in Markdown. It replaces the WHOLE body, including any quoted earlier thread of a reply draft, so start from the body you read with `open_email` and keep what the user did not ask to change. Raw HTML is not rendered (it is escaped). Omit to keep the current body.',
+        'Replacement HTML body, sent to Outlook unchanged. Do not send Markdown. It replaces the WHOLE body, so start from the HTML `open_email` returned in `text` and change only what the user asked to change. Do not rebuild it from `chunks`. Keep styles, tables, the signature, the quoted thread, and `cid:` images. Fragment only — no html, head, or body wrappers. Omit to keep the current body.',
       ),
     toRecipients: DraftRecipientsSchema.min(1)
       .optional()
@@ -61,7 +61,7 @@ export class UpdateDraftEmailTool {
     name: 'update_draft_email',
     title: 'Update Draft Email',
     description:
-      'Edits an existing unsent draft in Outlook: subject, body, To and CC recipients. Only the fields you pass change; the body and recipient lists you pass replace the existing ones entirely. **Always read the draft with `open_email` first** (find it with `search_emails` restricted to the Drafts folder, or use the `draftId` returned by `draft_email`) so you keep the parts the user did not ask to change. Fails when the message is no longer a draft. To add or remove attachments use `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`.',
+      'Edits an existing unsent draft in Outlook: subject, body, To and CC recipients. Only the fields you pass change; the body and recipient lists you pass replace the existing ones entirely. **Always read the live draft first**: pass `openEmailParams` to `open_email` (a draft returns HTML in `text`). Edit that HTML and pass it back as `content` — this tool does not convert Markdown. Do not rebuild the body from `chunks`. For a draft you just created, open `{ id: draftId, bodyContentType: "html" }` instead of searching. Fails when the message is no longer a draft. To add or remove attachments use `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`.',
     parameters: UpdateDraftEmailInputSchema,
     outputSchema: UpdateDraftEmailOutputSchema,
     annotations: {

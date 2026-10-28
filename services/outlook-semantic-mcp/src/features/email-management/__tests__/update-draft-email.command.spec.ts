@@ -35,7 +35,7 @@ describe('UpdateDraftEmailCommand', () => {
     const result = await command.run(USER_PROFILE_ID, {
       draftId: 'draft-1',
       subject: 'Offer (final)',
-      content: 'Thanks **a lot**.',
+      content: '<p>Thanks <strong>a lot</strong>.</p>',
     });
 
     expect(result).toEqual({
@@ -47,7 +47,7 @@ describe('UpdateDraftEmailCommand', () => {
     expect(api).toHaveBeenCalledWith('/me/messages/draft-1');
     expect(graphRequest.patch).toHaveBeenCalledWith({
       subject: 'Offer (final)',
-      body: { contentType: 'HTML', content: '<p>Thanks <strong>a lot</strong>.</p>\n' },
+      body: { contentType: 'HTML', content: '<p>Thanks <strong>a lot</strong>.</p>' },
     });
   });
 

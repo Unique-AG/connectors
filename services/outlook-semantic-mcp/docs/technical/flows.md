@@ -276,9 +276,9 @@ sequenceDiagram
     participant MSGraph as Microsoft Graph API
 
     MCPClient->>OutlookMCP: search_emails (Drafts folder)
-    OutlookMCP->>MCPClient: Results with isDraft and msGraphMessageId
-    MCPClient->>OutlookMCP: open_email
-    OutlookMCP->>MSGraph: GET /me/messages/{id} (isDraft, body, attachments)
+    OutlookMCP->>MCPClient: Results with isDraft and openEmailParams
+    MCPClient->>OutlookMCP: open_email (openEmailParams, HTML body)
+    OutlookMCP->>MSGraph: GET /me/messages/{id} (isDraft, HTML body, attachments)
     MSGraph->>OutlookMCP: Draft body, recipients, attachment names
     OutlookMCP->>MCPClient: Email data with metadata.isDraft and metadata.attachments
 
@@ -300,7 +300,9 @@ sequenceDiagram
 **Key points:**
 
 - Microsoft Graph only accepts edits to subject, body, and recipients while the message is a draft, so every editing tool re-checks `isDraft` itself instead of trusting the earlier read.
-- `update_draft_email` sends only the fields that were passed, and body and recipient lists replace the existing ones.
+- The agent opens a draft with `openEmailParams`. That reads the live HTML from Graph. When the object includes `uniqueContentId` and `chunkIds`, the response also carries those matched ingested passages in `chunks`.
+- `update_draft_email` sends only the fields that were passed. `content` is HTML stored unchanged. Body and recipient lists replace the existing ones.
+- Inline attachments are not removed unless `includeInline` is set.
 - Attachment removal waits for the user's confirmation. If the user declines or the client cannot show the prompt, nothing is deleted.
 - In a shared or delegated mailbox the same calls go to `/users/{mailbox}/messages/...`.
 

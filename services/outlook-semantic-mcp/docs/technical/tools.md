@@ -245,8 +245,8 @@ Semantic `isRead` and `flagStatus` are ingested metadata, refreshed by live catc
   }>;
   results?: Array<{
     uniqueContentId?: string;     // Unique KB content ID. Present for semantic-backend results only.
-    isDraft: boolean;             // true when the message is an unsent draft; edit it with update_draft_email after reading it with open_email
-    msGraphMessageId?: string;    // Microsoft Graph message ID. Present for Graph-backend results; also present for semantic results when both backends matched the same email.
+    isDraft: boolean;             // true when the message is an unsent draft; openEmailParams.bodyContentType is then "html"
+    msGraphMessageId: string;     // Microsoft Graph message ID, the same as openEmailParams.id. Present for results of both backends.
     backend: "Unique" | "MsGraph"; // which backend returned this result
     folderId: string;              // internal folder ID — do not display to users
     title: string;                 // email subject
@@ -256,11 +256,13 @@ Semantic `isRead` and `flagStatus` are ingested metadata, refreshed by live catc
     outlookWebLink: string;        // direct URL to open in Outlook Web — use as link target when non-empty
     sourceMailbox?: string | null; // mailbox this email belongs to
     openEmailParams: {             // pass directly to open_email without modification
-      id: string;
-      idType: "Unique" | "MsGraph";
+      id: string;                  // live Graph message id, for results of both backends
       mailbox?: string;
       parentFolderId?: string;
       idIsImmutable?: boolean;
+      bodyContentType?: "html";    // set only when isDraft is true; otherwise the body is plain text
+      uniqueContentId?: string;    // semantic match: open_email also returns these chunks
+      chunkIds?: string[];
     };
   }>;
 }
@@ -299,7 +301,7 @@ One response holds at most 150 results (`maxResultsPerResponse`). Page sizes are
 
 **Usage notes:**
 
-- Pass the `openEmailParams` object from a result directly to `open_email` to retrieve the full email body.
+- Pass the `openEmailParams` object from a result directly to `open_email`. It addresses the live Microsoft Graph message for results of both backends. A draft sets `bodyContentType` to `"html"`; every other message is plain text. `uniqueContentId` and `chunkIds`, when present, make `open_email` also return the matched ingested passages.
 - Targeted questions: up to 3 queries per backend, follow cursors only when the answer is not found yet. Overview or listing questions: one query per backend, then follow every cursor until `hasMore` is false.
 - If `syncWarning` is present (Mode A only), display it to the user and call `sync_progress` to check ingestion status — results may be incomplete.
 - If `searchNotes` is present, display it to the user after showing results.
@@ -339,11 +341,13 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | Email identifier. Use `openEmailParams.id` from a `search_emails` result. |
-| `idType` | `"Unique"` \| `"MsGraph"` | Yes | Backend type. Use `openEmailParams.idType` from a `search_emails` result. |
-| `mailbox` | email | No | Use `openEmailParams.mailbox` when present. |
-| `parentFolderId` | string | No | Use `openEmailParams.parentFolderId` when present. Required when `mailbox` is provided. |
-| `idIsImmutable` | boolean | No | Use `openEmailParams.idIsImmutable` when present. |
+| `id` | string | Yes | Microsoft Graph message id. Use `openEmailParams.id`. |
+| `mailbox` | email | No | Use `mailbox` from that object when present. |
+| `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Required when `mailbox` is provided. |
+| `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
+| `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
+| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. |
+| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. |
 
 **Return shape:**
 
@@ -355,18 +359,20 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   emailData?: {
     id: string;
     title: string | null;
-    metadata: unknown | null;  // includes isDraft and attachments (name, isInline; Graph results also carry size)
-    text: string;              // full email body or the matched chunks depending on which search returned the results
+    metadata: unknown | null;  // includes isDraft and attachments (name, size, isInline)
+    text: string;              // live body. Plain text, or HTML when bodyContentType is "html"
+    bodyContentType: "text" | "html";
+    chunks?: string;           // matched ingested passages, including attachment text, when uniqueContentId was passed
   };
 }
 ```
 
 **Usage notes:**
 
-- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually.
-- The `text` field in `emailData` contains the full email body. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
-- The response is not capped: an email ingested with large attachments (Mode A) returns all of its text.
-- `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email). `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like), which [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) takes. In Mode A the names of semantic results come from the `attachmentNames` and `inlineAttachmentNames` metadata written at ingestion; emails ingested before that metadata existed show an empty list until they are re-ingested, which happens when the message changes.
+- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
+- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`.
+- The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
+- `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
 
 ---
 
@@ -446,15 +452,15 @@ Supports two modes selected by `recipientsData.type`:
 
 ## Draft Editing
 
-Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `create_draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads it with [`open_email`](#open_email), and then edits it.
+Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `create_draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with [`open_email`](#open_email) by passing `openEmailParams`, and then edits `text`.
 
 All three tools take the same target fields:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `draftId` | string | Yes | Microsoft Graph message ID of the draft: `msGraphMessageId` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
+| `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
 | `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result. Omit for a `draftId` returned by `create_draft_email`. |
-| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`sourceMailbox` from the search result). Omit for the signed-in user's own mailbox. |
+| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
 
 Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
 
@@ -465,7 +471,7 @@ Edit the subject, body, and recipients of an existing draft.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `subject` | string | No | Replacement subject. Omit to keep it. |
-| `content` | string | No | Replacement body in Markdown. It replaces the **whole** body, including the quoted earlier thread of a reply draft. Omit to keep it. |
+| `content` | string | No | Replacement HTML body, stored unchanged. It replaces the **whole** body, including styles, tables, the signature, the quoted thread, and `cid:` images. Omit to keep it. |
 | `toRecipients` | array | No | Replacement To list (at least one entry). Replaces the whole list. Omit to keep it. |
 | `ccRecipients` | array | No | Replacement CC list. Replaces the whole list; an empty array removes every CC recipient. Omit to keep it. |
 
@@ -484,7 +490,8 @@ At least one of `subject`, `content`, `toRecipients`, or `ccRecipients` is requi
 
 **Usage notes:**
 
-- Because `content` replaces the whole body, the agent is instructed to read the draft with `open_email` first and rewrite from what it read, keeping everything the user did not ask to change.
+- Because `content` replaces the whole body, the agent reads the draft with `open_email` (`openEmailParams` sets `bodyContentType` to `"html"`, so `text` is HTML) and edits that HTML, keeping everything the user did not ask to change. `chunks` are matched passages, not the body to write back. The server does not convert Markdown. A body written from scratch drops fonts, tables, the HTML signature, the quoted thread, and inline images.
+- A draft created earlier in the conversation is opened as `{ id: draftId, bodyContentType: "html" }` rather than through search.
 - This tool does not touch attachments.
 
 ### `add_attachments_to_draft_email`
@@ -516,11 +523,12 @@ Remove attachments from an existing draft, by file name.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `fileNames` | string[] | Yes | File names to remove, as listed in `metadata.attachments` from `open_email`. Matching ignores case, and every attachment with a given name is removed. |
+| `fileNames` | string[] | Yes | File names to remove, as listed in `metadata.attachments` from `open_email`. Matching ignores case. Inline attachments (`isInline: true`) are skipped. |
+| `includeInline` | boolean | No | Set true only when the user explicitly asked to remove an inline image. Otherwise those attachments stay, because the body still references them. |
 
 **Confirmation:** the user is asked to confirm the removal in an MCP elicitation prompt that names the draft and the files, because a removed attachment cannot be restored. If the user declines, or the client cannot show the prompt, nothing is removed. There is no parameter that skips the prompt.
 
-If a requested name is not on the draft, nothing is removed and the response lists the draft's actual attachment names.
+If a requested name is not on the draft, nothing is removed and the response lists the draft's actual attachment names. A name that matches only an inline image is left in place unless `includeInline` is true, and the response says so. `success` is true only when every requested attachment was removed.
 
 **Return shape:**
 
