@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 import respx
@@ -39,6 +41,58 @@ _CATALOG = (
 
 def _filter_params(params: httpx.QueryParams) -> list[str]:
     return [name for name, _value in params.multi_items() if name.startswith("filter[")]
+
+
+class TestDuplicateZoneIds:
+    @respx.mock
+    async def test_conflicting_duplicates_are_one_warning_with_capped_sample_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("tz-duplicates")
+        respx.get(f"{base_url}/time-zones").mock(
+            return_value=_collection_page(
+                *(
+                    _zone(f"zone_{index}", short_name=f"Zone/{index}", name="Zone")
+                    for index in range(7)
+                ),
+                *(
+                    _zone(f"zone_{index}", short_name=f"Other/{index}", name="Other zone")
+                    for index in range(7)
+                ),
+            )
+        )
+
+        with caplog.at_level(
+            logging.DEBUG, logger="backstop_mcp.features.time_zones.time_zones_service"
+        ):
+            async with tool_client(base_url) as client:
+                catalog, _freshness = await time_zones_service(client).get()
+
+        assert len(catalog) == 7
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert [record.getMessage() for record in warnings] == [
+            "Ignored conflicting time zones for duplicate ids"
+        ]
+        assert warnings[0].__dict__["count"] == 7
+        assert warnings[0].__dict__["sample_ids"] == [f"zone_{index}" for index in range(5)]
+
+    @respx.mock
+    async def test_identical_duplicates_log_nothing(self, caplog: pytest.LogCaptureFixture) -> None:
+        base_url = tenant("tz-identical-duplicates")
+        respx.get(f"{base_url}/time-zones").mock(
+            return_value=_collection_page(
+                _zone("zone_0", short_name="Zone/0", name="Zone"),
+                _zone("zone_0", short_name="Zone/0", name="Zone"),
+            )
+        )
+
+        with caplog.at_level(
+            logging.DEBUG, logger="backstop_mcp.features.time_zones.time_zones_service"
+        ):
+            async with tool_client(base_url) as client:
+                await time_zones_service(client).get()
+
+        assert caplog.records == []
 
 
 class TestResolve:

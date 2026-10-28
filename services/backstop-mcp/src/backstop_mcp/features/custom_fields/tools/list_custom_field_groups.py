@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import (
@@ -63,6 +64,7 @@ def _members_for(
         open_world_hint=False,
     ),
 )
+@trace_arguments("refresh")
 async def list_custom_field_groups(
     refresh: Annotated[
         bool,

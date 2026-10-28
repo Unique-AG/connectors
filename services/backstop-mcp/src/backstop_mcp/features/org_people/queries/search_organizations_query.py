@@ -31,7 +31,7 @@ requests, so a call with in-memory predicates requests later pages in parallel.
 import logging
 from collections.abc import Sequence
 
-from opentelemetry import trace
+from mcp_observability import traced
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient, Included, SinglePage
@@ -61,9 +61,9 @@ from backstop_mcp.features.org_people.utils import (
     party_locations,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
+from backstop_mcp.utils import presence_flags, sample_ids
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 _PAGE_SIZE = 500
 # The per-user gate allows five concurrent requests; a sparse in-memory filter uses them.
@@ -79,6 +79,31 @@ class SearchOrganizationsQuery:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=lambda args: {
+            **presence_flags(
+                args,
+                "name",
+                "email",
+                "other_id",
+                "matching_domain",
+                "legal_name",
+                "location_filter",
+                "website",
+                "ria",
+                "internal_organization",
+                "cursor",
+            ),
+            "custom_field_count": len(args["custom_fields"]),
+            "exclude_custom_fields": args["exclude_custom_fields"],
+        },
+        result=lambda page: {
+            "rows_scanned": page.coverage.rows_scanned,
+            "matched": len(page.rows),
+            "rows_dropped": page.coverage.rows_dropped,
+            "has_continuation": page.continuation is not None,
+        },
+    )
     async def run(
         self,
         *,
@@ -145,7 +170,7 @@ class SearchOrganizationsQuery:
             ),
             **location_filter_params(location_filter),
         }
-        dropped = 0
+        dropped_ids: list[str] = []
 
         async def read_at(offset: int) -> SinglePage[OrganizationResource]:
             return await self._client.fetch_page(
@@ -159,8 +184,7 @@ class SearchOrganizationsQuery:
         def select(
             page: SinglePage[OrganizationResource],
         ) -> tuple[tuple[int, SearchOrganizationRowResponse], ...]:
-            nonlocal dropped
-            matches, page_dropped = self._select(
+            matches, page_dropped_ids = self._select(
                 page.items,
                 Included(page.included),
                 legal_name=legal_name,
@@ -170,58 +194,57 @@ class SearchOrganizationsQuery:
                 internal_organization=internal_organization,
                 predicates=predicates,
             )
-            dropped += page_dropped
+            dropped_ids.extend(page_dropped_ids)
             return matches
 
-        with _tracer.start_as_current_span("org_people.query.search_organizations") as span:
-            span.set_attribute("memory", should_filter_in_memory)
-            span.set_attribute("start_offset", start_offset)
-            page = await collect_page(
-                read_at=read_at,
-                select=select,
-                start_offset=start_offset,
-                output_page_size=result_size,
-                api_page_size=_PAGE_SIZE,
-                concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+        page = await collect_page(
+            read_at=read_at,
+            select=select,
+            start_offset=start_offset,
+            output_page_size=result_size,
+            api_page_size=_PAGE_SIZE,
+            concurrency=_SPARSE_CONCURRENCY if should_filter_in_memory else 1,
+        )
+        if dropped_ids:
+            logger.warning(
+                "Skipped unreadable organizations",
+                extra={"count": len(dropped_ids), "sample_ids": sample_ids(dropped_ids)},
             )
-            span.set_attribute("rows_scanned", page.records_scanned)
-            span.set_attribute("matched", len(page.rows))
-            span.set_attribute("stop_reason", page.stop_reason)
-            logger.info(
-                "org_people.search.fetched",
-                extra={
-                    "memory": should_filter_in_memory,
-                    "start_offset": start_offset,
-                    "rows_scanned": page.records_scanned,
-                    "matched": len(page.rows),
-                    "dropped": dropped,
-                    "total_count": page.total_count,
-                    "request_count": page.request_count,
-                    "stop_reason": page.stop_reason,
-                },
-            )
-            projected = fields | {"id"}
-            if not exclude_custom_fields:
-                projected = projected | {"custom_field_values"}
-            return SearchOrganizationsResolvedResponse(
-                coverage=scan_coverage(
-                    rows_scanned=page.records_scanned,
-                    visible_count=page.total_count,
-                    rows_dropped=dropped,
-                    # No ceiling of ours: a page stops when it is full or the collection ends.
-                    ceiling=None,
-                    ceiling_clamped=False,
-                    # Every page is one request: a failed page raises.
-                    partial_due_to_error=False,
-                ),
-                rows=self._project(page.rows, fields=projected),
-                continuation=continuation(
-                    stop_reason=page.stop_reason,
-                    next_offsets=() if page.next_offset is None else (page.next_offset,),
-                    fingerprint=fingerprint,
-                    rows_returned=len(page.rows),
-                ),
-            )
+        logger.info(
+            "Fetched organizations",
+            extra={
+                "memory": should_filter_in_memory,
+                "start_offset": start_offset,
+                "rows_scanned": page.records_scanned,
+                "matched": len(page.rows),
+                "dropped": len(dropped_ids),
+                "total_count": page.total_count,
+                "request_count": page.request_count,
+                "stop_reason": page.stop_reason,
+            },
+        )
+        projected = fields | {"id"}
+        if not exclude_custom_fields:
+            projected = projected | {"custom_field_values"}
+        return SearchOrganizationsResolvedResponse(
+            coverage=scan_coverage(
+                rows_scanned=page.records_scanned,
+                visible_count=page.total_count,
+                rows_dropped=len(dropped_ids),
+                # No ceiling of ours: a page stops when it is full or the collection ends.
+                ceiling=None,
+                ceiling_clamped=False,
+                # Every page is one request: a failed page raises.
+                partial_due_to_error=False,
+            ),
+            rows=self._project(page.rows, fields=projected),
+            continuation=continuation(
+                stop_reason=page.stop_reason,
+                next_offsets=() if page.next_offset is None else (page.next_offset,),
+                fingerprint=fingerprint,
+                rows_returned=len(page.rows),
+            ),
+        )
 
     def _query_params(
         self,
@@ -276,10 +299,10 @@ class SearchOrganizationsQuery:
         ria: bool | None,
         internal_organization: bool | None,
         predicates: tuple[CustomFieldMatch, ...],
-    ) -> tuple[tuple[tuple[int, SearchOrganizationRowResponse], ...], int]:
-        """`(index, row)` for each match in `resources`, and how many were unreadable."""
+    ) -> tuple[tuple[tuple[int, SearchOrganizationRowResponse], ...], tuple[str, ...]]:
+        """`(index, row)` for each match in `resources`, and the ids of the unreadable ones."""
         selected: list[tuple[int, SearchOrganizationRowResponse]] = []
-        dropped = 0
+        dropped_ids: list[str] = []
         for index, resource in enumerate(resources):
             try:
                 row = self._row(
@@ -293,16 +316,16 @@ class SearchOrganizationsQuery:
                     predicates=predicates,
                 )
             except ValidationError as exc:
-                dropped += 1
-                logger.warning(
-                    "org_people.search.record.unreadable",
+                dropped_ids.append(resource.id)
+                logger.debug(
+                    "Organization record unreadable",
                     extra={"organization_id": resource.id},
                     exc_info=exc,
                 )
                 continue
             if row is not None:
                 selected.append((index, row))
-        return tuple(selected), dropped
+        return tuple(selected), tuple(dropped_ids)
 
     def _row(
         self,

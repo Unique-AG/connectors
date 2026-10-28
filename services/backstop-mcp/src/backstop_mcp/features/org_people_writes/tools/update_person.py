@@ -1,12 +1,12 @@
 """`update_person`: PATCH one person and optionally edit postal addresses."""
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -27,8 +27,6 @@ from backstop_mcp.features.party_resolver import (
 from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, input_required
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -38,6 +36,11 @@ logger = logging.getLogger(__name__)
         open_world_hint=False,
     ),
     output_schema=published_output_schema(UpdatePersonResponse),
+)
+@trace_arguments(
+    "person.search_type",
+    "person.party_id",
+    identifying=("person.search", "person.owner_login"),
 )
 async def update_person(
     ctx: Context,
@@ -72,10 +75,6 @@ async def update_person(
         return unresolved_party_response(result)
     party = result.value
     search_type = as_person_collection(party.search_type)
-    logger.info(
-        "org_people_writes.update_person.start",
-        extra={"search_type": search_type, "party_id": party.id},
-    )
     return await update_person_command.run(
         person=person, party_id=party.id, search_type=search_type
     )

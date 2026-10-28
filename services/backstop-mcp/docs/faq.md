@@ -256,9 +256,9 @@ configuration, not in the database. Connection tokens are stored only as one-way
 
 ### Do logs contain user names or tokens?
 
-API tokens are never logged. By default, Backstop usernames in tool logs are replaced by a one-way
-hash; an administrator can switch to plain text. The log lines of the connection to Backstop itself
-always contain the plain username. See [Configuration](./operator/configuration.md).
+API tokens are never logged. By default, Backstop usernames in logs are replaced by a one-way hash,
+in the log lines of the connection to Backstop and the login form too; an administrator can switch
+to plain text. See [Configuration](./operator/configuration.md).
 
 ### Where does Backstop data go?
 

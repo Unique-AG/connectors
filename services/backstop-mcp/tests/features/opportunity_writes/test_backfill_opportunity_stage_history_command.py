@@ -1,5 +1,6 @@
 """`BackfillOpportunityStageHistoryCommand`: pointer shape and bulkLoadSummary outcomes."""
 
+import logging
 from collections.abc import AsyncGenerator
 from datetime import date
 
@@ -30,6 +31,9 @@ _BACKFILL: TypeAdapter[BackfillOpportunityStageHistoryInput] = TypeAdapter(
 )
 _IDD = "42482"
 _PROJECT = "42480"
+_COMMAND_LOGGER = (
+    "backstop_mcp.features.opportunity_writes.commands.backfill_opportunity_stage_history_command"
+)
 
 
 @pytest.fixture
@@ -368,6 +372,29 @@ class TestBackfillOpportunityStageHistoryCommand:
         assert result.records[0].status == "applied"
         assert result.records[1].status == "failed"
         assert result.records[1].error == "Opportunity 9 was not found."
+
+    @respx.mock
+    async def test_unanswered_lookups_log_one_warning_with_a_capped_sample(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [str(5755200 + index) for index in range(7)]
+        respx.get(f"{BASE_URL}/opportunity-stages").mock(return_value=_stages_page())
+        respx.get(url__regex=rf"{BASE_URL}/opportunities/[^/?]+").mock(
+            side_effect=httpx.ReadTimeout("timed out")
+        )
+        respx.post(f"{BASE_URL}/bulk-opportunity-stage-history")
+
+        with caplog.at_level(logging.WARNING, logger=_COMMAND_LOGGER):
+            result = await make_command(client).run(
+                backfill=_backfill(*(_record(opportunity_id) for opportunity_id in ids))
+            )
+
+        assert result.applied_count == 0
+        [warning] = [record for record in caplog.records if record.name == _COMMAND_LOGGER]
+        assert warning.levelno == logging.WARNING
+        assert warning.getMessage() == "Backstop did not answer for opportunities"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @respx.mock
     async def test_every_unreadable_opportunity_skips_the_bulk_post(

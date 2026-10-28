@@ -15,6 +15,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import BaseModel, Field
 
 from backstop_mcp.features.accounts import (
@@ -115,6 +116,17 @@ async def _record(
         open_world_hint=False,
     ),
     output_schema=published_output_schema(ProductResolvedResponse),
+)
+@trace_arguments(
+    lambda args: {
+        "has_name": args["name"] is not None,
+        "product_id_count": len(args["product_ids"]),
+        "has_modified_since": args["modified_since"] is not None,
+        "has_product_type": args["product_type"] is not None,
+        "has_is_onshore": args["is_onshore"] is not None,
+        "custom_field_count": len(args["custom_fields"] or ()),
+        "custom_field_name_count": len(args["custom_field_names"]),
+    }
 )
 async def search_products(
     name: Annotated[

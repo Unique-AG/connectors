@@ -7,10 +7,12 @@ each feature's own test file. Wiring that a service `get()` hits Backstop once i
 
 import asyncio
 import gc
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
+import httpx
 import pytest
 
 from backstop_mcp.caching import CachedValue, CacheSource
@@ -30,7 +32,6 @@ def _cache(
         ttl=ttl,
         snapshot=dict,
         name=name,
-        log_prefix="test_cache",
         caching_enabled=caching_enabled,
         serve_stale=serve_stale,
         on_load=on_load,
@@ -345,6 +346,62 @@ class TestInMemoryTtl:
         await cache.get(fetch)
 
         assert sources == ["backstop", "stale"]
+
+
+class TestLogging:
+    @pytest.mark.asyncio
+    async def test_a_refresh_logs_the_catalog_name_and_item_count(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        cache = _cache(name="tags")
+        fetch, _ = _fetch_returning({"a": "A", "b": "B"})
+
+        with caplog.at_level(logging.INFO):
+            await cache.get(fetch)
+
+        record = next(item for item in caplog.records if item.message == "Refreshed catalog")
+        assert record.__dict__["catalog"] == "tags"
+        assert record.__dict__["items"] == 2
+
+    @pytest.mark.asyncio
+    async def test_serving_stale_after_an_upstream_failure_is_a_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        cache = _cache(name="tags")
+        fetch, _ = _fetch_sequence({"old": "Entry"}, httpx.ConnectError("down"))
+        await cache.get(fetch)
+        _age_past_ttl(cache)
+
+        with caplog.at_level(logging.INFO):
+            await cache.get(fetch)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Refresh failed, serving stale catalog"
+        )
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["catalog"] == "tags"
+
+    @pytest.mark.asyncio
+    async def test_serving_stale_after_a_bug_is_an_error_with_its_stack(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        cache = _cache()
+        fetch, _ = _fetch_sequence({"old": "Entry"}, RuntimeError("bug"))
+        await cache.get(fetch)
+        _age_past_ttl(cache)
+
+        with caplog.at_level(logging.INFO):
+            await cache.get(fetch)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Refresh failed, serving stale catalog"
+        )
+        assert record.levelno == logging.ERROR
+        assert record.exc_info is not None
 
 
 class TestServeStaleDisabled:

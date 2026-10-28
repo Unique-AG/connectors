@@ -4,6 +4,7 @@ from datetime import date
 from typing import Literal
 from urllib.parse import quote
 
+from mcp_observability import traced
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
@@ -19,6 +20,7 @@ from backstop_mcp.features.opportunities.responses import (
     PartyOpportunitiesResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,19 @@ class GetOpportunitiesQuery:
         self._custom_fields_service: CustomFieldsService = custom_fields_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=lambda args: {
+            "segment": args["segment"],
+            "entity_id": args["entity_id"],
+            "status": args["status"],
+            "custom_field_definition_ids": args["custom_fields_filters"].definition_ids,
+            "custom_field_name_count": len(args["custom_fields_filters"].names),
+        },
+        result=lambda response: {
+            "total": response.total,
+            "returned": len(response.opportunities),
+        },
+    )
     async def run(
         self,
         *,
@@ -71,6 +86,7 @@ class GetOpportunitiesQuery:
         )
         stage_id_to_name = get_stage_id_to_name_map(pages.included)
         opportunities_mapped: list[OpportunityResponse] = []
+        unreadable_ids: list[str] = []
         for opportunity in pages.items:
             try:
                 opportunity_mapped = await self.map_opportunity_to_response_util.run(
@@ -84,11 +100,17 @@ class GetOpportunitiesQuery:
                 )
                 opportunities_mapped.append(opportunity_mapped)
             except ValidationError as exc:
-                logger.warning(
-                    "opportunities.record.unreadable",
+                unreadable_ids.append(opportunity.id)
+                logger.debug(
+                    "Skipped unreadable opportunity",
                     extra={"opportunity_id": opportunity.id},
                     exc_info=exc,
                 )
+        if unreadable_ids:
+            logger.warning(
+                "Skipped unreadable opportunities",
+                extra={"count": len(unreadable_ids), "sample_ids": sample_ids(unreadable_ids)},
+            )
 
         selected = tuple(
             opportunity
@@ -108,7 +130,7 @@ class GetOpportunitiesQuery:
             custom_fields_unavailable=catalog is None,
         )
         logger.info(
-            "opportunities.fetched",
+            "Fetched opportunities",
             extra={
                 "segment": segment,
                 "entity_id": entity_id,

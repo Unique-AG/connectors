@@ -9,6 +9,8 @@ feed, which is what `get_activity_history` reads.
 
 import logging
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -45,6 +47,10 @@ class LogNoteCommand:
         self._client: BackstopClient = client
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(
         self,
         *,
@@ -78,7 +84,7 @@ class LogNoteCommand:
         )
         document = await self._client.post("/notes", schema=_NoteDocument, json=payload)
         logger.info(
-            "activity_writes.note.created",
+            "Created note",
             extra={"id": document.data.id, "party_id": party_id},
         )
         return LoggedNoteResponse(

@@ -1,6 +1,8 @@
 import asyncio
+import hashlib
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -29,6 +31,18 @@ from tests.helpers import client_factory
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 _REDIRECT_URI = "https://client.example/callback"
+
+
+def _pseudonym(username: str) -> str:
+    return f"sha256:{hashlib.sha256(username.encode()).hexdigest()}"
+
+
+def _username(record: logging.LogRecord) -> str:
+    return str(cast("object", record.__dict__["username"]))
+
+
+def _logged(caplog: pytest.LogCaptureFixture, message: str) -> logging.LogRecord:
+    return next(item for item in caplog.records if item.message == message)
 
 
 async def _stub_system_user(username: str, _api_token: str) -> tuple[str, dict[str, object]] | None:
@@ -285,9 +299,11 @@ class TestLoginFormSubmission:
             )
 
         assert response.status_code == 302
-        record = next(item for item in caplog.records if item.message == "auth.login.succeeded")
+        record = next(item for item in caplog.records if item.message == "Login succeeded")
         assert record.__dict__["had_previous_credential"] is False
         assert record.__dict__["credential_changed"] is False
+        assert _username(record) == _pseudonym("pv-new.user")
+        assert "pv-new.user" not in str(record.__dict__)
 
     @pytest.mark.asyncio
     async def test_reconnect_logs_whether_the_token_changed(
@@ -314,9 +330,7 @@ class TestLoginFormSubmission:
                 _login_post_request(same_id, "pv-returning.user", "token-same")
             )
         assert same.status_code == 302
-        same_record = next(
-            item for item in caplog.records if item.message == "auth.login.succeeded"
-        )
+        same_record = next(item for item in caplog.records if item.message == "Login succeeded")
         assert same_record.__dict__["had_previous_credential"] is True
         assert same_record.__dict__["credential_changed"] is False
 
@@ -328,15 +342,16 @@ class TestLoginFormSubmission:
                 _login_post_request(new_id, "pv-returning.user", "token-rotated")
             )
         assert changed.status_code == 302
-        changed_record = next(
-            item for item in caplog.records if item.message == "auth.login.succeeded"
-        )
+        changed_record = next(item for item in caplog.records if item.message == "Login succeeded")
         assert changed_record.__dict__["had_previous_credential"] is True
         assert changed_record.__dict__["credential_changed"] is True
 
     @pytest.mark.asyncio
     async def test_invalid_credentials_rerender_form_without_minting_code(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_invalid)
         provider = _make_provider(db)
@@ -344,12 +359,18 @@ class TestLoginFormSubmission:
         redirect_url = await provider.authorize(client_info, _authorization_params())
         request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
 
-        response = await provider.handle_login_post(
-            _login_post_request(request_id, "pv-bob.smith", "wrong-token")
-        )
+        with caplog.at_level(logging.INFO):
+            response = await provider.handle_login_post(
+                _login_post_request(request_id, "pv-bob.smith", "wrong-token")
+            )
 
         assert response.status_code == 200
         assert b"Invalid username or API token" in response.body
+        rejected = _logged(caplog, "Login rejected")
+        assert rejected.__dict__["reason"] == "invalid_credential"
+        assert _username(rejected) == _pseudonym("pv-bob.smith")
+        assert "pv-bob.smith" not in str(rejected.__dict__)
+        assert "wrong-token" not in str(rejected.__dict__)
 
         # the pending request must still be there — nothing was consumed
         _, factory = db
@@ -583,7 +604,10 @@ class TestLoginThrottling:
 
     @pytest.mark.asyncio
     async def test_stops_calling_backstop_once_the_budget_is_spent(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         calls = 0
 
@@ -611,12 +635,17 @@ class TestLoginThrottling:
         assert calls == 2
 
         request_id = await self._pending_request_id(provider, "throttle-client-blocked")
-        blocked = await provider.handle_login_post(
-            _login_post_request(request_id, "th-mallory", "guess")
-        )
+        with caplog.at_level(logging.INFO):
+            blocked = await provider.handle_login_post(
+                _login_post_request(request_id, "th-mallory", "guess")
+            )
 
         assert blocked.status_code == 429
         assert b"Too many failed attempts" in blocked.body
+        throttled = _logged(caplog, "Login throttled")
+        assert throttled.levelno == logging.WARNING
+        assert _username(throttled) == _pseudonym("th-mallory")
+        assert "th-mallory" not in str(throttled.__dict__)
         # The assertion the whole feature is for: Backstop was not contacted again.
         assert calls == 2
 
@@ -691,7 +720,10 @@ class TestLoginThrottling:
 
     @pytest.mark.asyncio
     async def test_an_overlong_username_is_rejected_without_being_stored(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self,
+        db: DatabaseFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """The throttle table must not be a place an attacker can write unbounded rows."""
         called = False
@@ -708,13 +740,17 @@ class TestLoginThrottling:
         request_id = await self._pending_request_id(provider, "throttle-longname-client")
         username = "x" * (MAX_USERNAME_LENGTH + 1)
 
-        response = await provider.handle_login_post(
-            _login_post_request(request_id, username, "token")
-        )
+        with caplog.at_level(logging.INFO):
+            response = await provider.handle_login_post(
+                _login_post_request(request_id, username, "token")
+            )
 
         assert response.status_code == 200
         assert b"Invalid username or API token" in response.body
         assert called is False
+        rejected = _logged(caplog, "Login rejected")
+        assert rejected.__dict__["reason"] == "username_too_long"
+        assert username not in str(rejected.__dict__)
 
         _, session_factory = db
         async with session_factory() as session:

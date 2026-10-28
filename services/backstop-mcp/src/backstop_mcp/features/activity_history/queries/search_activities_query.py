@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import ClassVar, Literal
 
+from mcp_observability import traced
 from pydantic import BaseModel, ConfigDict
 
 from backstop_mcp.backstop_client import (
@@ -33,6 +34,7 @@ from backstop_mcp.features.activity_history.internal_dto import (
 from backstop_mcp.features.collection_scan import SearchCursor, continuation
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.metrics import BACKSTOP_FILTER_IGNORED
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,7 @@ class _ProjectedPage(BaseModel):
 
     rows: tuple[tuple[int, EntityActivityDto], ...]
     dropped: tuple[int, ...]
+    unreadable: tuple[tuple[int, str | None], ...]
     violating: dict[str, int]
 
 
@@ -76,6 +79,28 @@ class SearchActivitiesQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=(
+            "start_date",
+            "end_date",
+            "party_id",
+            "resource_type",
+            "activity_tags",
+            "attendee_ids",
+            "include_description",
+            "min_result_size",
+        ),
+        identifying=("authors",),
+        result=lambda fetch: {
+            "pages": fetch.pages_fetched,
+            "returned": len(fetch.rows),
+            "dropped": fetch.rows_dropped,
+            "received": fetch.rows_received,
+            "ceiling_clamped": fetch.ceiling_clamped,
+            "partial_due_to_error": fetch.partial_due_to_error,
+            "has_continuation": fetch.continuation is not None,
+        },
+    )
     async def run(
         self,
         *,
@@ -120,6 +145,7 @@ class SearchActivitiesQuery:
         )
         start_offset = 0 if resume is None else resume.offsets[0]
         collected: list[EntityActivityDto] = []
+        unreadable: list[str | None] = []
         dropped = 0
         rows_received = 0
         pages_fetched = 0
@@ -165,7 +191,7 @@ class SearchActivitiesQuery:
                 if pages_fetched == 0:
                     raise
                 logger.warning(
-                    "activity_history.entity_activities.later_page_failed_returning_partial",
+                    "Later activity page failed, returning partial result",
                     extra={"page_num": page_num, "pages_fetched": pages_fetched},
                     exc_info=exc,
                 )
@@ -201,6 +227,7 @@ class SearchActivitiesQuery:
             skip = min(max(0, start_offset - page_offset), len(page.results))
             collected.extend(row for index, row in projected.rows if index >= skip)
             dropped += sum(1 for index in projected.dropped if index >= skip)
+            unreadable.extend(row_id for index, row_id in projected.unreadable if index >= skip)
             rows_received += len(page.results) - skip
             # A short page is not the end: an activity with no `regarding` party keeps its
             # position but is omitted. The end is positions reaching totalCount, or at the wall
@@ -222,20 +249,14 @@ class SearchActivitiesQuery:
                 break
             page_num += 1
 
-        logger.info(
-            "activity_history.entity_activities.fetched",
-            extra={
-                "pages": pages_fetched,
-                "returned": len(collected),
-                "dropped": dropped,
-                "received": rows_received,
-                "total_count": total_count,
-                "start_offset": start_offset,
-                "next_offset": next_offset,
-                "ceiling_clamped": ceiling_clamped,
-                "partial_due_to_error": partial_due_to_error,
-            },
-        )
+        if unreadable:
+            logger.warning(
+                "Unreadable activity rows",
+                extra={
+                    "count": len(unreadable),
+                    "sample_ids": sample_ids(unreadable),
+                },
+            )
         return EntityActivitiesFetchDto(
             rows=tuple(collected),
             total_count=total_count,
@@ -350,14 +371,14 @@ class SearchActivitiesQuery:
         readable = 0
         party_hits = 0
         party_contradictions = 0
-        unreadable: list[int] = []
+        unreadable: list[tuple[int, str | None]] = []
         unprojectable: list[int] = []
         projected: list[tuple[int, EntityActivityDto]] = []
         for index, raw in enumerate(results):
             attributes = EntityActivityAttributes.safe_model_validate(raw)
             if attributes is None:
-                logger.warning("activity_history.entity_activities.row_unreadable")
-                unreadable.append(index)
+                logger.debug("Unreadable activity row", extra={"index": index})
+                unreadable.append((index, self._raw_id(raw)))
                 continue
             readable += 1
             row_violation = False
@@ -408,9 +429,18 @@ class SearchActivitiesQuery:
             violating["total_count"] = 0
         return _ProjectedPage(
             rows=tuple(projected),
-            dropped=tuple(sorted((*unreadable, *unprojectable))),
+            dropped=tuple(sorted((*(index for index, _ in unreadable), *unprojectable))),
+            unreadable=tuple(unreadable),
             violating=violating,
         )
+
+    @staticmethod
+    def _raw_id(raw: Mapping[str, object]) -> str | None:
+        """The row's own id when it is a plain Backstop record id, else `None`."""
+        value = raw.get("id")
+        if isinstance(value, int) and not isinstance(value, bool):
+            return str(value)
+        return value if isinstance(value, str) and value.isdigit() else None
 
     def _party_relation(
         self,
@@ -468,7 +498,7 @@ class SearchActivitiesQuery:
                 continue
             logger.log(
                 logging.INFO if name == "total_count" else logging.WARNING,
-                "activity_history.entity_activities.filter_ignored",
+                "Backstop ignored an activity search filter",
                 extra={
                     "filter": name,
                     "rows_violating": rows_violating,

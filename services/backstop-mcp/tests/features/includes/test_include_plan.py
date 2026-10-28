@@ -427,7 +427,7 @@ class TestAMalformedSideLoadIsDroppedNotFatal:
             ).project(document=document)
 
         assert included.email_addresses == []
-        assert [record.message for record in caplog.records] == ["includes.side_load.unreadable"]
+        assert [record.message for record in caplog.records] == ["Included resource unreadable"]
 
 
 class TestASideLoadOfTheWrongTypeIsDropped:
@@ -465,7 +465,7 @@ class TestASideLoadOfTheWrongTypeIsDropped:
         assert locations is not None
         assert [location.location_title for location in locations] == ["Home"]
         assert [record.message for record in caplog.records] == [
-            "includes.side_load.unexpected_type"
+            "Included resource has unexpected type"
         ]
 
     def test_a_to_one_include_whose_only_resource_is_dropped_is_none(self) -> None:
@@ -500,7 +500,9 @@ class TestALinkageThatResolvesToNothing:
             )
 
         assert included.locations == []
-        assert [record.message for record in caplog.records] == ["includes.side_load.unresolved"]
+        assert [record.message for record in caplog.records] == [
+            "Include relationship did not resolve"
+        ]
 
     def test_a_relationship_with_no_linkage_is_not_warned_about(
         self, caplog: pytest.LogCaptureFixture

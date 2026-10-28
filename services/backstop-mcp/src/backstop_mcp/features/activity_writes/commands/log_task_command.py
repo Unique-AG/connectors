@@ -8,6 +8,8 @@ it to `true`, which mails the assignee — verified live.
 
 import logging
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -45,6 +47,11 @@ class LogTaskCommand:
         self._system_users_service: SystemUsersService = system_users_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+        identifying=("activity.assigned_user",),
+        result=lambda response: {"id": response.id},
+    )
     async def run(
         self,
         *,
@@ -80,7 +87,7 @@ class LogTaskCommand:
         )
         document = await self._client.post("/tasks", schema=_TaskDocument, json=payload)
         logger.info(
-            "activity_writes.task.created",
+            "Created task",
             extra={
                 "id": document.data.id,
                 "party_id": party_id,

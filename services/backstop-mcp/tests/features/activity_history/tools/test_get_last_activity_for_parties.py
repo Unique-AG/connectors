@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Mapping
 from datetime import date
 from typing import cast
@@ -23,12 +24,14 @@ from backstop_mcp.features.activity_history.tools.get_last_activity_for_parties 
     PartyRef,
     get_last_activity_for_parties,
 )
+from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.server.tools import TOOLS
 from tests.features.activity_history.conftest import make_search_activities_query
 from tests.helpers import BASE_URL, recorded_json_bodies
 from tests.server.tools.helpers import object_dict, object_list, tool_model
 
 _URL = f"{BASE_URL}/entity-activities"
+_QUERY_LOGGER = "backstop_mcp.features.activity_history.queries.get_last_activity_for_parties_query"
 _END = date(2026, 9, 30)
 _START = date(2025, 9, 30)
 
@@ -311,3 +314,37 @@ class TestLastActivityBatchAborts:
             _ = _query(client)._outcome(  # pyright: ignore[reportPrivateUsage]
                 "100", "organizations", failure
             )
+
+
+class TestFailedPartyLogging:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_parties_log_one_warning_per_call_with_sample_ids(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        failing = [str(100 + index) for index in range(7)]
+        _by_entity(
+            {
+                **{int(party_id): httpx.Response(404, json={"errors": []}) for party_id in failing},
+                1: _page(_row("1", row_id=11, effective_date="8/20/2026"), total=1),
+            }
+        )
+        parties: list[tuple[str, SearchType]] = [
+            ("1", "organizations"),
+            *((party_id, "organizations") for party_id in failing),
+        ]
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            outcomes = await _query(client).run(
+                parties=parties, start_date=_START, end_date=_END, types=("meeting",)
+            )
+
+        assert [outcome.party_id for outcome in outcomes if outcome.error] == failing
+        records = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        [warning] = [record for record in records if record.levelno == logging.WARNING]
+        assert warning.message == "Last activity lookups failed"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == failing[:5]
+        details = [record for record in records if record.message == "Last activity lookup failed"]
+        assert len(details) == 7
+        assert {record.levelno for record in details} == {logging.DEBUG}

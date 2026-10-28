@@ -1,12 +1,12 @@
 """`attach_file`: resolve the party, then upload a document or import an email file."""
 
-import logging
 from typing import Annotated
 
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.activity_writes import (
@@ -27,8 +27,6 @@ from backstop_mcp.features.resolution import Resolved, elicit_if_ambiguous, inpu
 from backstop_mcp.features.system_users import SystemUserDto, get_current_caller_system_user
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -38,6 +36,12 @@ logger = logging.getLogger(__name__)
         open_world_hint=False,
     ),
     output_schema=published_output_schema(AttachFileResponse),
+)
+@trace_arguments(
+    "activity.kind",
+    "activity.search_type",
+    "activity.party_id",
+    identifying=("activity.search",),
 )
 async def attach_file(
     ctx: Context,
@@ -79,14 +83,6 @@ async def attach_file(
     party = result.value
     secondary_party_id = (
         activity.secondary_party_id if isinstance(activity, DocumentFileInput) else None
-    )
-    logger.info(
-        "activity_writes.attach.start",
-        extra={
-            "kind": activity.kind,
-            "search_type": party.search_type,
-            "party_id": party.id,
-        },
     )
     return await attach_file_command.run(
         activity=activity,

@@ -391,7 +391,8 @@ def _supported(member: object, identifying: bool) -> bool:
     origin = typing.get_origin(member)
     if isinstance(origin, type) and issubclass(origin, _SEQUENCES):
         elements = [element for element in _arguments(member) if element is not Ellipsis]
-        return bool(elements) and all(_supported_scalar(e, identifying) for e in elements)
+        members = [member for element in elements for member in _members(element)]
+        return bool(members) and all(_supported_scalar(m, identifying) for m in members)
     return _supported_scalar(member, identifying)
 
 

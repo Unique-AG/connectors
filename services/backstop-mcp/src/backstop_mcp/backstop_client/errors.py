@@ -64,7 +64,6 @@ class _JsonApiErrorBody(BaseModel):
 
 _ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
-_BODY_EXCERPT_LIMIT = 500
 
 # Mutable box on the ASGI scope (and a ContextVar of the same object for same-task tests).
 # A bool ContextVar cannot cross FastMCP's session task; this object can. See
@@ -308,25 +307,15 @@ class BackstopResponseSchemaError(ToolError, DeclaresFailureLevel):
         self.cause = cause
 
 
-def unauthorized_log_fields(response: httpx.Response, *, secret: str) -> dict[str, object]:
-    """Fields for `backstop.request.unauthorized`: parsed JSON:API errors, or a redacted excerpt."""
-    fields: dict[str, object] = {"status_code": response.status_code}
-    parsed = _parse_error_details(response)
-    if parsed is not None:
-        first = parsed[0]
-        fields["detail"] = first.detail
-        fields["title"] = first.title
-        fields["code"] = first.code
-        return fields
-    fields["body_excerpt"] = _body_excerpt(response.content, secret=secret)
-    return fields
-
-
-def _body_excerpt(content: bytes, *, secret: str) -> str:
-    text = content.decode("utf-8", errors="replace")
-    if secret:
-        text = text.replace(secret, "***")
-    return text[:_BODY_EXCERPT_LIMIT]
+def unauthorized_log_fields(response: httpx.Response) -> dict[str, object]:
+    """Fields for the 401 line: the status and the JSON:API `code`. `detail`, `title` and the body
+    can echo what the caller submitted, so none of them is logged."""
+    parsed = _parse_error_details(response) or ()
+    return {
+        "status_code": response.status_code,
+        "code": _first_code(parsed),
+        "error_count": len(parsed),
+    }
 
 
 def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail, ...] | None:
@@ -334,8 +323,9 @@ def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail,
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
     except ValidationError as exc:
         logger.warning(
-            "backstop.error_body.schema_error",
-            extra={"status_code": response.status_code, "error": str(exc)},
+            "Backstop error body failed schema validation",
+            extra={"status_code": response.status_code},
+            exc_info=exc,
         )
         return None
     if not body.errors:
@@ -359,7 +349,7 @@ def _first_code(errors: tuple[BackstopErrorDetail, ...]) -> str | None:
 
 def _fallback_message(response: httpx.Response) -> str:
     logger.debug(
-        "backstop.error_body.unparseable",
+        "Backstop error body is not parseable",
         extra={"status_code": response.status_code, "body_length": len(response.content)},
     )
     return f"Backstop returned status {response.status_code} with an unparseable response body"
@@ -388,10 +378,7 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
     try:
         when = parsedate_to_datetime(retry_after)
     except TypeError, ValueError, IndexError:
-        logger.warning(
-            "backstop.retry_after.unparseable",
-            extra={"retry_after": retry_after},
-        )
+        logger.warning("Ignored unparseable Retry-After header")
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)

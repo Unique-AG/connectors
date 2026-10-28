@@ -3,6 +3,7 @@
 from typing import assert_never
 
 from fastmcp.exceptions import ToolError
+from mcp_observability import traced
 
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_writes.attach_file_input import AttachFileInput
@@ -33,6 +34,9 @@ class AttachFileCommand:
         self._attach_document_command: AttachDocumentCommand = attach_document_command
         self._attach_email_command: AttachEmailCommand = attach_email_command
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+    )
     async def run(
         self,
         *,

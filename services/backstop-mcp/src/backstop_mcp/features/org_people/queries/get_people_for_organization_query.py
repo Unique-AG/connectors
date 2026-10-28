@@ -4,6 +4,7 @@ import logging
 from collections.abc import Sequence
 from urllib.parse import quote
 
+from mcp_observability import traced
 from pydantic import BaseModel
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient, Included
@@ -50,6 +51,14 @@ class GetPeopleForOrganizationQuery:
         self._employment_index_factory: EmploymentIndexFactory = employment_index_factory
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("organization_id", "include_former"),
+        result=lambda people: {
+            "returned": len(people.people),
+            "former_omitted": people.former_omitted,
+            "people_omitted": people.people_omitted,
+        },
+    )
     async def run(self, *, organization_id: str, include_former: bool) -> PartyOrgPeopleResponse:
         quoted_organization_id = quote(organization_id, safe="")
         employees_page = await self._client.paginate(
@@ -161,7 +170,7 @@ class GetPeopleForOrganizationQuery:
         dropped = selected - len(chips)
         if dropped:
             logger.warning(
-                "org_people.side_load.unreadable",
+                "Dropped unreadable side-loaded resources",
                 extra={"resource_type": resource_type, "dropped": dropped},
             )
         return chips

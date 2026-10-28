@@ -2,6 +2,8 @@
 
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver._party_search_types import PARTY_SPARSE_FIELDS
@@ -20,6 +22,7 @@ class GetPartyNameQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(arguments=("search_type", "party_id"))
     async def run(self, *, search_type: SearchType, party_id: str) -> str | None:
         path = f"/{search_type}/{quote(party_id, safe='')}"
         document = await self._client.get(

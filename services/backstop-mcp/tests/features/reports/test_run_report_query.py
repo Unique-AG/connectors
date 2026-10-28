@@ -1,12 +1,15 @@
 """`RunReportQuery`: one GET /reports page, flattened to columns and rows."""
 
 import asyncio
+import logging
 import time
 from datetime import date
+from typing import cast
 
 import httpx
 import pytest
 import respx
+from mcp_observability import identifiable_value
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.reports import (
@@ -24,6 +27,7 @@ from tests.helpers import BASE_URL, client_factory, credential, recorded_params
 _REPORT_NAME = "Quarterly Registrants"
 _AS_OF = date(2026, 8, 31)
 _REPORTS_URL = f"{BASE_URL}/reports"
+_QUERY_LOGGER = "backstop_mcp.features.reports.queries.run_report_query"
 
 
 def _column(name: str, title: str | None = None) -> dict[str, object]:
@@ -320,6 +324,76 @@ class TestRunReportQuery:
         await _run(client)
 
         assert route.call_count == 1
+
+
+class TestRunReportQueryLogs:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_are_one_warning_with_a_count(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(
+            return_value=_report_page(
+                {"Email": "ok@example.com"}, extra_values=["bad-1", "bad-2", "bad-3"]
+            )
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await _run(client, limit=10)
+
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert [record.getMessage() for record in warnings] == ["Skipped unreadable report rows"]
+        assert warnings[0].__dict__["count"] == 3
+        debug_offsets = [
+            record.__dict__["row_offset"]
+            for record in caplog.records
+            if record.getMessage() == "Report row unreadable"
+        ]
+        assert debug_offsets == [1, 2, 3]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_readable_report_logs_no_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(return_value=_report_page({"Email": "ok@example.com"}))
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            await _run(client)
+
+        assert [record.getMessage() for record in caplog.records] == ["Fetched report"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_the_report_name_is_logged_as_an_identifiable_value(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_REPORTS_URL).mock(return_value=_report_page({"Email": "ok@example.com"}))
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            await _run(client)
+
+        logged = str(cast("object", caplog.records[0].__dict__["report_name"]))
+        assert logged == str(identifiable_value(_REPORT_NAME))
+        assert _REPORT_NAME not in logged
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_pending_run_logs_the_hashed_report_name(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        build = _ColdBuild(_report_page())
+        respx.get(_REPORTS_URL).mock(side_effect=build)
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            await make_run_report_query(client, wait_seconds=0.05).run(
+                report_name=_REPORT_NAME, as_of_date=_AS_OF, limit=3, offset=0
+            )
+
+        record = next(r for r in caplog.records if r.getMessage() == "Report run pending")
+        assert str(cast("object", record.__dict__["report_name"])) == str(
+            identifiable_value(_REPORT_NAME)
+        )
 
 
 class TestRunReportQueryColdBuild:

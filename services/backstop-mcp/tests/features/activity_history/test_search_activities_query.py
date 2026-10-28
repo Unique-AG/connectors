@@ -22,6 +22,7 @@ from tests.helpers import BASE_URL, recorded_json_bodies
 from tests.server.tools.helpers import object_dict
 
 _URL = f"{BASE_URL}/entity-activities"
+_QUERY_LOGGER = "backstop_mcp.features.activity_history.queries.search_activities_query"
 
 
 def _body_attributes(body: dict[str, object]) -> dict[str, object]:
@@ -278,6 +279,49 @@ class TestFetchEntityActivities:
 
         assert [row.id for row in result.rows] == ["9"]
         assert result.rows_dropped == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_log_one_warning_per_call_with_sample_ids(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unreadable: list[dict[str, object]] = [
+            {"id": 500 + index, "attendees": "nope"} for index in range(7)
+        ]
+        respx.post(_URL).mock(return_value=_page(*unreadable, _meeting(9), total=8))
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            result = await make_search_activities_query(client).run(
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+            )
+
+        assert result.rows_dropped == 7
+        records = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        [warning] = [record for record in records if record.levelno == logging.WARNING]
+        assert warning.message == "Unreadable activity rows"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ["500", "501", "502", "503", "504"]
+        details = [record for record in records if record.message == "Unreadable activity row"]
+        assert len(details) == 7
+        assert {record.levelno for record in details} == {logging.DEBUG}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_without_an_id_are_counted_and_not_sampled(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.post(_URL).mock(return_value=_page({"attendees": "nope"}, _meeting(9), total=2))
+
+        with caplog.at_level(logging.WARNING, logger=_QUERY_LOGGER):
+            await make_search_activities_query(client).run(
+                start_date=date(2024, 1, 1),
+                end_date=date(2026, 8, 20),
+            )
+
+        [warning] = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        assert warning.__dict__["count"] == 1
+        assert warning.__dict__["sample_ids"] == []
 
     @pytest.mark.asyncio
     @respx.mock
@@ -632,7 +676,7 @@ class TestIgnoredEntityActivityFilters:
         ignored_logs = [
             record
             for record in caplog.records
-            if record.message == "activity_history.entity_activities.filter_ignored"
+            if record.message == "Backstop ignored an activity search filter"
         ]
         assert len(ignored_logs) == 1
         assert ignored_logs[0].__dict__["filter"] == "effective_date"
@@ -678,7 +722,7 @@ class TestIgnoredEntityActivityFilters:
         assert result.rows[0].attendees == ("Jane Doe", "Sam Roe")
         assert result.server_filter_ignored == ()
         assert not any(
-            record.message == "activity_history.entity_activities.filter_ignored"
+            record.message == "Backstop ignored an activity search filter"
             for record in caplog.records
         )
 
@@ -956,7 +1000,7 @@ class TestFilterIgnoredMetric:
         ignored_logs = [
             record
             for record in caplog.records
-            if record.message == "activity_history.entity_activities.filter_ignored"
+            if record.message == "Backstop ignored an activity search filter"
         ]
         assert [record.levelno for record in ignored_logs] == [logging.INFO]
 
@@ -984,6 +1028,6 @@ class TestFilterIgnoredMetric:
         levels = {
             record.__dict__["filter"]: record.levelno
             for record in caplog.records
-            if record.message == "activity_history.entity_activities.filter_ignored"
+            if record.message == "Backstop ignored an activity search filter"
         }
         assert levels == {"activity_tags": logging.WARNING, "total_count": logging.INFO}

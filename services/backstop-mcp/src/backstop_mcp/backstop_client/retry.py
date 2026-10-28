@@ -79,7 +79,7 @@ def _build_retry_predicate(settings: RetrySettings) -> RetryPredicate:
         # attempts and won't resolve.
         if exc.limit_kind != "concurrency":
             logger.info(
-                "backstop.rate_limit.quota_exceeded",
+                "Backstop quota exceeded",
                 extra={"limit_kind": exc.limit_kind},
             )
             _record_rate_limit(exc, retried=False)
@@ -88,7 +88,7 @@ def _build_retry_predicate(settings: RetrySettings) -> RetryPredicate:
         wait_seconds = _computed_wait_seconds(exc, retry_state.attempt_number)
         if wait_seconds > max_wait_seconds:
             logger.info(
-                "backstop.rate_limit.wait_exceeds_ceiling",
+                "Rate-limit wait exceeds the retry ceiling",
                 extra={
                     "wait_seconds": wait_seconds,
                     "max_retry_wait_ms": settings.max_wait_ms,
@@ -123,7 +123,7 @@ def _build_wait_strategy() -> WaitStrategy:
 def _before_sleep(retry_state: tenacity.RetryCallState) -> None:
     sleep_seconds = retry_state.next_action.sleep if retry_state.next_action is not None else None
     logger.info(
-        "backstop.rate_limit.retry",
+        "Retrying after a rate limit",
         extra={
             "attempt_number": retry_state.attempt_number,
             "wait_seconds": sleep_seconds,

@@ -5,8 +5,7 @@ from datetime import date
 from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
-from mcp_observability import identifiable_value
-from opentelemetry import trace
+from mcp_observability import identifiable_value, traced
 
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
@@ -36,7 +35,6 @@ from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkT
 from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 _Document = BackstopApiSingleResourceDocument[OpportunityResourceAttributes]
 _RESOURCE_TYPE = "opportunities"
@@ -58,62 +56,60 @@ class UpdateOpportunityCommand:
         self._system_users_service: SystemUsersService = system_users_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("new_opportunity.opportunity_id",),
+        result=lambda updated: {"id": updated.id},
+    )
     async def run(self, *, new_opportunity: UpdateOpportunityInput) -> UpdatedOpportunityResponse:
-        with _tracer.start_as_current_span("opportunity_writes.command.update") as span:
-            span.set_attribute("opportunity_id", new_opportunity.opportunity_id)
-            current = await self._read(new_opportunity.opportunity_id)
-            catalog = await self._opportunity_stages_service.get_catalog()
-            requested_stage = (
-                await self._opportunity_stages_service.find_by_stage_name(
-                    name=new_opportunity.stage,
-                    entity_type_id=opportunity_entity_type_id(current),
-                )
-                if new_opportunity.stage is not None
-                else None
+        current = await self._read(new_opportunity.opportunity_id)
+        catalog = await self._opportunity_stages_service.get_catalog()
+        requested_stage = (
+            await self._opportunity_stages_service.find_by_stage_name(
+                name=new_opportunity.stage,
+                entity_type_id=opportunity_entity_type_id(current),
             )
-            self._raise_if_backdated(
-                requested=new_opportunity.stage_effective_date,
-                date_entered_current_stage=current.data.attributes.date_entered_current_stage,
-            )
-            owner = await self._system_users_service.resolve_relationship(
-                new_opportunity.owner_login
-            )
-            add_notify, add_skipped = await self._resolve_logins(
-                new_opportunity.add_users_to_notify
-            )
-            replace_notify, replace_skipped = await self._resolve_logins(
-                new_opportunity.replace_users_to_notify
-            )
-            await self._patch(
-                new_opportunity,
-                requested_stage=requested_stage,
-                owner=owner,
-                add_notify=add_notify,
-                replace_notify=replace_notify,
-            )
-            written = await self._read(new_opportunity.opportunity_id)
-            stage_name, stage_id = self._stage_from_document(written, catalog)
-            warnings = self._stage_warnings(
-                requested=requested_stage, landed_name=stage_name, landed_id=stage_id
-            ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
-            logger.info(
-                "opportunity_writes.opportunity.updated",
-                extra={
-                    "id": new_opportunity.opportunity_id,
-                    "stage": stage_name,
-                    "warnings": len(warnings),
-                },
-            )
-            return UpdatedOpportunityResponse(
-                id=new_opportunity.opportunity_id,
-                resource_type=_RESOURCE_TYPE,
-                stage=stage_name,
-                stage_id=stage_id,
-                warnings=warnings,
-                url=self._build_entity_link_util.canonical_url(
-                    target=OpportunityLinkTarget(entity_id=new_opportunity.opportunity_id),
-                ),
-            )
+            if new_opportunity.stage is not None
+            else None
+        )
+        self._raise_if_backdated(
+            requested=new_opportunity.stage_effective_date,
+            date_entered_current_stage=current.data.attributes.date_entered_current_stage,
+        )
+        owner = await self._system_users_service.resolve_relationship(new_opportunity.owner_login)
+        add_notify, add_skipped = await self._resolve_logins(new_opportunity.add_users_to_notify)
+        replace_notify, replace_skipped = await self._resolve_logins(
+            new_opportunity.replace_users_to_notify
+        )
+        await self._patch(
+            new_opportunity,
+            requested_stage=requested_stage,
+            owner=owner,
+            add_notify=add_notify,
+            replace_notify=replace_notify,
+        )
+        written = await self._read(new_opportunity.opportunity_id)
+        stage_name, stage_id = self._stage_from_document(written, catalog)
+        warnings = self._stage_warnings(
+            requested=requested_stage, landed_name=stage_name, landed_id=stage_id
+        ) + self._skipped_login_warnings((*add_skipped, *replace_skipped))
+        logger.info(
+            "Updated opportunity",
+            extra={
+                "id": new_opportunity.opportunity_id,
+                "stage_id": stage_id,
+                "warnings": len(warnings),
+            },
+        )
+        return UpdatedOpportunityResponse(
+            id=new_opportunity.opportunity_id,
+            resource_type=_RESOURCE_TYPE,
+            stage=stage_name,
+            stage_id=stage_id,
+            warnings=warnings,
+            url=self._build_entity_link_util.canonical_url(
+                target=OpportunityLinkTarget(entity_id=new_opportunity.opportunity_id),
+            ),
+        )
 
     async def _read(self, opportunity_id: str) -> _Document:
         path = f"/{_RESOURCE_TYPE}/{quote(opportunity_id, safe='')}"
@@ -196,13 +192,13 @@ class UpdateOpportunityCommand:
             user = await self._system_users_service.find_by_user_name(login)
             if user is None:
                 logger.warning(
-                    "opportunity_writes.login.unresolved",
+                    "Notify login not found",
                     extra={"login": identifiable_value(login)},
                 )
                 skipped.append(login)
                 continue
             logger.info(
-                "opportunity_writes.login.resolved",
+                "Resolved notify login",
                 extra={"login": identifiable_value(login), "id": user.id},
             )
             ids.append(user.id)

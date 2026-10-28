@@ -3,6 +3,8 @@
 import logging
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -33,6 +35,10 @@ class UpdateEmailCommand:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("activity.kind", "activity.activity_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(self, *, activity: UpdateEmailInput) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
         collection, resource_id = extract_collection(handle, kind=activity.kind)
@@ -45,5 +51,5 @@ class UpdateEmailCommand:
             or None,
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
-        logger.info("activity_writes.email.updated", extra={"id": document.data.id})
+        logger.info("Updated email", extra={"id": document.data.id})
         return UpdatedActivityResponse(id=document.data.id, resource_type="emails")

@@ -1,11 +1,14 @@
 """`GetOpportunitiesQuery`: a party's pipeline walk, projected, filtered, and ordered."""
 
+import logging
 from collections.abc import Sequence
 from datetime import date
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
 import respx
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields import CustomFieldFilters
@@ -22,6 +25,7 @@ _OPPORTUNITIES_URL = f"{BASE_URL}/organizations/{_ENTITY_ID}/opportunities"
 _STAGES_URL = f"{BASE_URL}/opportunity-stages"
 _NEXT_PAGE = f"/organizations/{_ENTITY_ID}/opportunities?page[offset]=100"
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
+_QUERY_LOGGER = "backstop_mcp.features.opportunities.queries.get_opportunities_query"
 
 
 @pytest.fixture(autouse=True)
@@ -143,6 +147,51 @@ async def _run(
         status=status,
         custom_fields_filters=CustomFieldFilters(),
     )
+
+
+def _validation_error() -> ValidationError:
+    try:
+        TypeAdapter(int).validate_python("not-a-number")
+    except ValidationError as error:
+        return error
+    raise AssertionError("validation unexpectedly passed")
+
+
+class TestUnreadableRecords:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_records_log_one_warning_with_a_capped_sample(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [f"bad-{index}" for index in range(7)]
+        respx.get(_OPPORTUNITIES_URL).mock(
+            return_value=_page(*(_opportunity(opportunity_id) for opportunity_id in ids))
+        )
+        respx.get(_STAGES_URL).mock(return_value=_stages_response())
+        query = make_get_opportunities_query(client)
+        unreadable = _validation_error()
+
+        with (
+            patch.object(
+                query.map_opportunity_to_response_util,
+                "run",
+                AsyncMock(side_effect=unreadable),
+            ),
+            caplog.at_level(logging.WARNING, logger=_QUERY_LOGGER),
+        ):
+            result = await query.run(
+                segment="organizations",
+                entity_id=_ENTITY_ID,
+                status="all",
+                custom_fields_filters=CustomFieldFilters(),
+            )
+
+        assert result.total == 0
+        [warning] = [record for record in caplog.records if record.name == _QUERY_LOGGER]
+        assert warning.levelno == logging.WARNING
+        assert warning.getMessage() == "Skipped unreadable opportunities"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
 
 class TestTheRequest:

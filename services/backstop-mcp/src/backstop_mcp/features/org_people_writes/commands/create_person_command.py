@@ -63,7 +63,7 @@ class CreatePersonCommand:
         written = await self._client.get(
             f"/{_RESOURCE_TYPE}/{quote(created_id, safe='')}", schema=_Document
         )
-        logger.info("org_people_writes.person.created", extra={"id": created_id})
+        logger.info("Created person", extra={"id": created_id})
         return CreatedPersonResponse(
             id=created_id,
             resource_type=_RESOURCE_TYPE,

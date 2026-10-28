@@ -6,6 +6,7 @@ from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.custom_fields.api_responses import CustomFieldGroupAttributes
 from backstop_mcp.features.custom_fields.internal_dto import CustomFieldGroupDto
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ async def _fetch_custom_field_groups(client: BackstopClient) -> dict[str, Custom
     )
 
     groups_by_id: dict[str, CustomFieldGroupDto] = {}
+    conflicting_ids: list[str] = []
     for resource in page.items:
         group = CustomFieldGroupDto.from_resource(resource)
         if group is None:
@@ -28,10 +30,12 @@ async def _fetch_custom_field_groups(client: BackstopClient) -> dict[str, Custom
         if existing is None:
             groups_by_id[group.id] = group
         elif existing != group:
-            logger.warning(
-                "Conflicting custom-field groups for duplicate id %r; retaining first group",
-                group.id,
-            )
+            conflicting_ids.append(group.id)
+    if conflicting_ids:
+        logger.warning(
+            "Ignored duplicate custom field group ids",
+            extra={"count": len(conflicting_ids), "sample_ids": sample_ids(conflicting_ids)},
+        )
     return groups_by_id
 
 
@@ -53,7 +57,6 @@ class CustomFieldGroupsService:
             ttl=ttl,
             snapshot=dict,
             name="custom-field group",
-            log_prefix="custom_fields.groups",
             caching_enabled=caching_enabled,
         )
 

@@ -5,6 +5,7 @@ from typing import Literal
 from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
+from mcp_observability import traced
 
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
@@ -68,6 +69,10 @@ class DeletePartyWithLocationsCommand:
             location_count=len(location_ids),
         )
 
+    @traced(
+        arguments=("collection", "party_id"),
+        result=lambda location_ids: {"deleted_location_count": len(location_ids)},
+    )
     async def run(self, *, collection: PartyCollection, party_id: str) -> tuple[str, ...]:
         _document, location_ids = await self._get(collection=collection, party_id=party_id)
         deleted_location_ids = await self._delete_contact_locations(
@@ -77,7 +82,7 @@ class DeletePartyWithLocationsCommand:
         )
         await self._client.delete(f"/{collection}/{quote(party_id, safe='')}")
         logger.warning(
-            "org_people_writes.party.deleted",
+            "Deleted party",
             extra={
                 "id": party_id,
                 "collection": collection,

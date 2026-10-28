@@ -57,7 +57,7 @@ class GetTasksForPartyQuery:
         )
         if page.truncated:
             logger.warning(
-                "tasks.party.scan_ceiling_reached",
+                "Task scan ceiling reached",
                 extra={
                     "entity_id": entity_id,
                     "ceiling": MAX_TASK_SCAN_RECORDS,
@@ -84,7 +84,7 @@ class GetTasksForPartyQuery:
             scan_truncated=page.truncated,
         )
         logger.info(
-            "tasks.fetched",
+            "Fetched tasks for party",
             extra={
                 "entity_id": entity_id,
                 "status": status,

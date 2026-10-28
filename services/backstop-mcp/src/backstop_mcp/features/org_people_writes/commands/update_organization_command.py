@@ -7,7 +7,7 @@ Re-reads the organization so the tool can publish the same top-level scalars as
 import logging
 from urllib.parse import quote
 
-from opentelemetry import trace
+from mcp_observability import traced
 
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
@@ -33,7 +33,6 @@ from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OrganizationLinkTarget
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 _PatchDocument = BackstopApiSingleResourceDocument[OrganizationWriteAttributes]
 _ReadDocument = BackstopApiSingleResourceDocument[OrganizationAttributes]
@@ -58,34 +57,37 @@ class UpdateOrganizationCommand:
         )
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("party_id",),
+        identifying=("new_organization_fields.owner_login",),
+        result=lambda updated: {"location_count": len(updated.location_ids)},
+    )
     async def run(
         self, *, new_organization_fields: UpdateOrganizationInput, party_id: str
     ) -> UpdatedOrganizationResponse:
-        with _tracer.start_as_current_span("org_people_writes.command.update_organization") as span:
-            span.set_attribute("party_id", party_id)
-            owner = await self._system_users_service.resolve_relationship(
-                new_organization_fields.owner_login
-            )
-            await self._patch(new_organization_fields, party_id=party_id, owner=owner)
-            location_ids = await self._modify_contact_location_command.run(
-                party_id=party_id,
-                locations=new_organization_fields.locations or (),
-                delete_location_ids=new_organization_fields.delete_location_ids or (),
-            )
-            written = await self._read(party_id)
-            logger.info(
-                "org_people_writes.organization.updated",
-                extra={"id": party_id, "location_ids": location_ids},
-            )
-            return UpdatedOrganizationResponse(
-                id=party_id,
-                resource_type=_RESOURCE_TYPE,
-                organization=OrganizationRecordResponse.from_attributes(written.data.attributes),
-                location_ids=location_ids,
-                url=self._build_entity_link_util.canonical_url(
-                    target=OrganizationLinkTarget(party_id=party_id)
-                ),
-            )
+        owner = await self._system_users_service.resolve_relationship(
+            new_organization_fields.owner_login
+        )
+        await self._patch(new_organization_fields, party_id=party_id, owner=owner)
+        location_ids = await self._modify_contact_location_command.run(
+            party_id=party_id,
+            locations=new_organization_fields.locations or (),
+            delete_location_ids=new_organization_fields.delete_location_ids or (),
+        )
+        written = await self._read(party_id)
+        logger.info(
+            "Updated organization",
+            extra={"id": party_id, "location_ids": location_ids},
+        )
+        return UpdatedOrganizationResponse(
+            id=party_id,
+            resource_type=_RESOURCE_TYPE,
+            organization=OrganizationRecordResponse.from_attributes(written.data.attributes),
+            location_ids=location_ids,
+            url=self._build_entity_link_util.canonical_url(
+                target=OrganizationLinkTarget(party_id=party_id)
+            ),
+        )
 
     async def _read(self, party_id: str) -> _ReadDocument:
         path = f"/{_RESOURCE_TYPE}/{quote(party_id, safe='')}"

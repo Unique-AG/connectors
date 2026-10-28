@@ -6,7 +6,6 @@ from a product resolve — never invent one. Do not iterate every account in a f
 number is this tool on the product's `aums`.
 """
 
-import logging
 from datetime import date
 from http import HTTPStatus
 from typing import Annotated
@@ -15,6 +14,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
@@ -31,8 +31,6 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_time_series_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved, input_required
 from backstop_mcp.models import published_output_schema
-
-logger = logging.getLogger(__name__)
 
 type GetTimeSeriesResponse = (
     ProductAmbiguousResponse | NotFoundResponse | TimeSeriesResolvedResponse
@@ -79,6 +77,7 @@ _SERIES_HELP = (
     ),
     output_schema=published_output_schema(GetTimeSeriesResponse),
 )
+@trace_arguments("entity_type", "series", "start_date", "end_date", identifying=("entity_id",))
 async def get_time_series(
     ctx: Context,
     entity_type: Annotated[
@@ -158,18 +157,8 @@ async def get_time_series(
             return ProductAmbiguousResponse.from_unresolved(outcome)
         resolved_id = outcome.value.id
 
-    logger.info(
-        "accounts.time_series.start",
-        extra={
-            "entity_type": entity_type,
-            "entity_id": resolved_id,
-            "series": series,
-            "start_date": None if start_date is None else start_date.isoformat(),
-            "end_date": None if end_date is None else end_date.isoformat(),
-        },
-    )
     try:
-        result = await get_time_series_query.run(
+        return await get_time_series_query.run(
             entity_type=entity_type,
             entity_id=resolved_id,
             series=series,
@@ -180,14 +169,3 @@ async def get_time_series(
         if entity_type != "accounts" or exc.status_code != HTTPStatus.NOT_FOUND:
             raise
         return NotFoundResponse(query=entity_id, scope=entity_type)
-
-    logger.info(
-        "accounts.time_series.completed",
-        extra={
-            "entity_type": entity_type,
-            "entity_id": resolved_id,
-            "series": series,
-            "points": len(result.points),
-        },
-    )
-    return result

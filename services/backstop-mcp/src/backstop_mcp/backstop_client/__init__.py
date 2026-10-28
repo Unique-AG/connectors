@@ -62,8 +62,10 @@ from backstop_mcp.backstop_client.pagination import (
 )
 from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
+from backstop_mcp.backstop_client.utils import metric_route
 
 __all__ = [
+    "metric_route",
     "AuthFailureHook",
     "BATCH_ABORTING_ERRORS",
     "BackstopApiCollectionDocument",

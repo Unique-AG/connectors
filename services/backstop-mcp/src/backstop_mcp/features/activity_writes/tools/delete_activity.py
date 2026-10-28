@@ -9,6 +9,7 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -48,6 +49,7 @@ _DETAIL_OPTIONAL_KINDS = frozenset({"email", "task"})
     ),
     output_schema=published_output_schema(DeleteActivityResponse),
 )
+@trace_arguments("activity.kind", "activity.activity_id")
 async def delete_activity(
     ctx: Context,
     activity: Annotated[DeleteActivityInput, Field(description=DELETE_ACTIVITY_INPUT_DESCRIPTION)],
@@ -69,10 +71,6 @@ async def delete_activity(
 
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>"}}
     """
-    logger.info(
-        "activity_writes.delete.start",
-        extra={"kind": activity.kind, "activity_id": activity.activity_id},
-    )
 
     async def prompt() -> str:
         return await _deletion_prompt(
@@ -84,13 +82,13 @@ async def delete_activity(
         return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
-            "activity_writes.delete.not_confirmed",
+            "Activity deletion not confirmed",
             extra={"kind": activity.kind, "activity_id": activity.activity_id},
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
         logger.info(
-            "activity_writes.delete.elicit.not_available",
+            "Deleting activity without confirmation, client cannot elicit",
             extra={"kind": activity.kind, "activity_id": activity.activity_id},
         )
     return await delete_activity_command.run(activity=activity)
@@ -104,7 +102,7 @@ async def _deletion_prompt(
         handle = parse_activity_detail_handle(activity.activity_id)
     except ToolError:
         logger.info(
-            "activity_writes.delete.detail.skipped",
+            "Skipped activity detail in deletion prompt",
             extra={
                 "kind": activity.kind,
                 "activity_id": activity.activity_id,
@@ -119,7 +117,7 @@ async def _deletion_prompt(
     except BackstopApiError as exc:
         if exc.status_code == HTTPStatus.NOT_FOUND and activity.kind in _DETAIL_OPTIONAL_KINDS:
             logger.info(
-                "activity_writes.delete.detail.skipped",
+                "Skipped activity detail in deletion prompt",
                 extra={
                     "kind": activity.kind,
                     "activity_id": activity.activity_id,

@@ -11,7 +11,6 @@ receive an authoritative-looking empty answer for `status="open"`. One party's p
 small enough that the whole sub-collection is walked.
 """
 
-import logging
 from collections.abc import Sequence
 from typing import Annotated
 
@@ -19,6 +18,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import CustomFieldFilters
@@ -47,8 +47,6 @@ from backstop_mcp.features.resolution import (
 )
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
-logger = logging.getLogger(__name__)
-
 type GetOpportunitiesResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OpportunitiesResolvedResponse
 )
@@ -63,6 +61,7 @@ type GetOpportunitiesResponse = (
     ),
     output_schema=published_output_schema(GetOpportunitiesResponse),
 )
+@trace_arguments("search_type", "party_id", "status", identifying=("search",))
 async def get_opportunities(
     ctx: Context,
     search_type: Annotated[
@@ -146,10 +145,6 @@ async def get_opportunities(
         return unresolved_party_response(result)
 
     party = result.value
-    logger.info(
-        "opportunities.get.start",
-        extra={"segment": party.search_type, "entity_id": party.id, "status": status},
-    )
     fetched = await get_opportunities_query.run(
         segment=party.search_type,
         entity_id=party.id,

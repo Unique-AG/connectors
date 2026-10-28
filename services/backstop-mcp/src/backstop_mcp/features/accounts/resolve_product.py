@@ -181,7 +181,7 @@ async def _index_products(client: BackstopClient) -> tuple[ResolvedProductDto, .
     )
     if len(products) > _LARGE_CATALOG:
         logger.warning(
-            "accounts.products.index_large",
+            "Product catalog is large",
             extra={
                 "returned": len(products),
                 "total_count": page.total_count,

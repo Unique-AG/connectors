@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import cast
 
 import httpx
 import pytest
@@ -7,6 +8,7 @@ import respx
 from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.shared.exceptions import MCPError
 from mcp.types import METHOD_NOT_FOUND, ClientCapabilities
+from mcp_observability import identifiable_value
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
@@ -1344,6 +1346,67 @@ def _log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogReco
     return next(r for r in caplog.records if r.getMessage() == event)
 
 
+class TestElicitFailureLogs:
+    """A degraded elicitation logs a fixed sentence and the exception type, never its text."""
+
+    @pytest.mark.asyncio
+    async def test_a_client_protocol_error_is_a_warning_without_its_text(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        async def elicit(*, message: str, response_type: object) -> object:
+            _ = message, response_type
+            raise MCPError(code=METHOD_NOT_FOUND, message="Northwind is not a method")
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(as_context(FakeContext(elicit)), ambiguous, prompt="Which one?")
+
+        record = _log_record(caplog, "Elicitation degraded")
+        assert record.levelno == logging.WARNING
+        assert "error" not in record.__dict__
+        assert isinstance(record.exc_info and record.exc_info[1], MCPError)
+
+    @pytest.mark.asyncio
+    async def test_an_unexpected_elicit_failure_is_an_error(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        async def elicit(*, message: str, response_type: object) -> object:
+            _ = message, response_type
+            raise RuntimeError("client session is in a weird state")
+
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+        with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(as_context(FakeContext(elicit)), ambiguous, prompt="Which one?")
+
+        record = _log_record(caplog, "Elicitation degraded")
+        assert record.levelno == logging.ERROR
+        assert "error" not in record.__dict__
+
+    @pytest.mark.asyncio
+    async def test_a_capability_check_failure_is_logged_as_a_sentence(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        class _BrokenSession:
+            def check_client_capability(self, capability: ClientCapabilities) -> bool:
+                _ = capability
+                raise RuntimeError("client session is in a weird state")
+
+        async def elicit(*, message: str, response_type: object) -> object:
+            _ = message, response_type
+            raise AssertionError("elicit must not be attempted")
+
+        fake = FakeContext(elicit)
+        object.__setattr__(fake.request_context, "session", _BrokenSession())
+        ambiguous = _ambiguous(_candidate("o1", "A"), _candidate("o2", "B"))
+
+        with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
+            await elicit_choice(as_context(fake), ambiguous, prompt="Which one?")
+
+        record = _log_record(caplog, "Failed to check client elicitation capability")
+        assert "error" not in record.__dict__
+        assert isinstance(record.exc_info and record.exc_info[1], RuntimeError)
+
+
 class TestElicitTimeout:
     """An unanswered prompt has to end in a payload, not in the client cancelling the call."""
 
@@ -1376,9 +1439,11 @@ class TestElicitTimeout:
         with caplog.at_level(logging.WARNING, logger="backstop_mcp.features.resolution"):
             await elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?", timeout_seconds=0.01)
 
-        record = _log_record(caplog, "resolution.elicit.timed_out")
+        record = _log_record(caplog, "Elicitation timed out")
         assert record.levelno == logging.WARNING
-        assert record.__dict__["query"] == "Northwind"
+        logged_query = str(cast("object", record.__dict__["query"]))
+        assert logged_query == str(identifiable_value("Northwind"))
+        assert "Northwind" not in logged_query
         assert record.__dict__["scope"] == "organizations"
         assert record.__dict__["candidates"] == 2
         assert record.__dict__["timeout_seconds"] == 0.01
@@ -1412,7 +1477,7 @@ class TestElicitTimeout:
             result = await elicit_choice(ctx_stalls(), ambiguous, prompt="Which one?")
 
         assert result is ambiguous
-        assert _log_record(caplog, "resolution.elicit.timed_out").__dict__[
+        assert _log_record(caplog, "Elicitation timed out").__dict__[
             "timeout_seconds"
         ] == pytest.approx(0.01)
 
@@ -1430,7 +1495,7 @@ class TestElicitTimeout:
         with caplog.at_level(logging.INFO, logger="backstop_mcp.features.resolution"):
             await elicit_choice(ctx_decline(), ambiguous, prompt="Which one?")
 
-        assert _log_record(caplog, "resolution.elicit.dismissed").__dict__["action"] == "declined"
+        assert _log_record(caplog, "Elicitation dismissed").__dict__["action"] == "declined"
 
     @pytest.mark.asyncio
     async def test_cancelled_prompt_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -1439,5 +1504,5 @@ class TestElicitTimeout:
         with caplog.at_level(logging.INFO, logger="backstop_mcp.features.resolution"):
             await elicit_choice(ctx_cancel(), ambiguous, prompt="Which one?")
 
-        record = _log_record(caplog, "resolution.elicit.dismissed")
+        record = _log_record(caplog, "Elicitation dismissed")
         assert record.__dict__["action"] == "cancelled"

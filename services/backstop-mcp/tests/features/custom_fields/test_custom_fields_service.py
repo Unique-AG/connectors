@@ -334,6 +334,27 @@ class TestRegularCustomFieldValues:
         assert [row.value for row in parsed.regular_custom_field_values] == [0.3]
 
 
+class TestUnreadableRows:
+    def test_unreadable_rows_log_one_warning_with_a_capped_sample_of_definition_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [str(500 + index) for index in range(7)]
+        unreadable = [
+            {"definitionId": definition_id, "name": {"not": "a name"}} for definition_id in ids
+        ]
+
+        with caplog.at_level(logging.WARNING):
+            parsed = RegularCustomFieldValuesAttributes.model_validate(
+                {"regularCustomFieldValues": [*unreadable, {"definitionId": "1", "value": 0.3}]}
+            )
+
+        assert [row.definition_id for row in parsed.regular_custom_field_values] == ["1"]
+        [warning] = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert warning.getMessage() == "Skipped unreadable custom field values"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
+
+
 class TestJoinValues:
     @pytest.mark.asyncio
     async def test_joins_stored_rows_to_field_type(self) -> None:
@@ -390,12 +411,28 @@ class TestJoinValues:
         matching = [
             record
             for record in caplog.records
-            if record.message == "custom_fields.values.definition_missing"
+            if record.message == "Skipped custom field values without a definition"
         ]
         assert len(matching) == 1
         extras = matching[0].__dict__
-        assert extras["definition_id"] == "999"
+        assert extras["count"] == 1
+        assert extras["sample_ids"] == ["999"]
         assert extras["remedy"] == "list_custom_fields(refresh=true)"
+
+    @pytest.mark.asyncio
+    async def test_missing_definitions_log_one_warning_with_a_capped_sample(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [str(900 + index) for index in range(7)]
+        stored = _rows(*({"definitionId": definition_id, "value": "x"} for definition_id in ids))
+
+        with caplog.at_level(logging.WARNING):
+            published = await _join({}, stored)
+
+        assert published == []
+        [warning] = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @pytest.mark.asyncio
     async def test_empty_dump_yields_no_rows(self) -> None:
@@ -419,6 +456,28 @@ class TestLoadCatalog:
 
 
 class TestJoinValuesCatalog:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("failure", "level"),
+        [(httpx.ConnectError("down"), logging.WARNING), (RuntimeError("bug"), logging.ERROR)],
+    )
+    async def test_an_unavailable_catalog_is_logged_at_the_level_of_its_cause(
+        self, caplog: pytest.LogCaptureFixture, failure: Exception, level: int
+    ) -> None:
+        service = _service(cast(BackstopClient, MagicMock()))
+        service.get = AsyncMock(side_effect=failure)
+
+        with caplog.at_level(logging.WARNING):
+            catalog = await service.load_catalog()
+
+        assert catalog is None
+        [logged] = [
+            r for r in caplog.records if r.getMessage() == "Custom field catalog unavailable"
+        ]
+        assert logged.levelno == level
+        assert logged.exc_info is not None
+        assert logged.exc_info[1] is failure
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_empty_when_catalog_is_unavailable(self, clients: ClientBuilder) -> None:

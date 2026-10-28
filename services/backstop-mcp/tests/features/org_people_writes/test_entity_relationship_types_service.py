@@ -1,4 +1,5 @@
 import inspect
+import logging
 from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -254,6 +255,27 @@ class TestFailureCooldown:
 
         with pytest.raises(httpx.ConnectError):
             await _service(clients(base_url)).get_catalog()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_failed_fetch_logs_a_warning_sentence_for_an_upstream_failure(
+        self, clients: ClientBuilder, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = f"{BASE_URL}/ert-failure-log"
+        respx.get(f"{base_url}/entity-relationship-types").mock(
+            side_effect=httpx.ConnectError("backstop down")
+        )
+
+        with caplog.at_level(logging.WARNING), pytest.raises(httpx.ConnectError):
+            await _service(clients(base_url)).get_catalog()
+
+        [record] = [
+            r
+            for r in caplog.records
+            if r.getMessage() == "Failed to fetch entity relationship types"
+        ]
+        assert record.levelno == logging.WARNING
+        assert isinstance(record.exc_info and record.exc_info[1], httpx.ConnectError)
 
     @pytest.mark.asyncio
     @respx.mock

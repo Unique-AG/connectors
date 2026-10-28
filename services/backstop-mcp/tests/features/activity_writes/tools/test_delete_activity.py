@@ -94,7 +94,7 @@ class TestDeleteActivity:
         record = next(
             item
             for item in caplog.records
-            if item.getMessage() == "activity_writes.delete.elicit.not_available"
+            if item.getMessage() == "Deleting activity without confirmation, client cannot elicit"
         )
         assert record.__dict__["kind"] == "note"
         assert record.__dict__["activity_id"] == _NOTE_ID

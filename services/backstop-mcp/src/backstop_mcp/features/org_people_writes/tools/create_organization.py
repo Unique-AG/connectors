@@ -1,11 +1,11 @@
 """`create_organization`: POST one organization."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -17,8 +17,6 @@ from backstop_mcp.features.org_people_writes import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -29,6 +27,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(CreatedOrganizationResponse),
 )
+@trace_arguments("organization.category_ids", identifying=("organization.owner_login",))
 async def create_organization(
     organization: Annotated[
         CreateOrganizationInput, Field(description=CREATE_ORGANIZATION_INPUT_DESCRIPTION)
@@ -47,5 +46,4 @@ async def create_organization(
     Call like: {"organization": {"name": "Acme Advisors",
     "category_ids": ["<id from list_contact_categories>"]}}
     """
-    logger.info("org_people_writes.create_organization.start")
     return await create_organization_command.run(organization=organization)

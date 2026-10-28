@@ -3,6 +3,8 @@
 import logging
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
@@ -21,6 +23,10 @@ class DeleteActivityCommand:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("activity.kind", "activity.activity_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(self, *, activity: DeleteActivityInput) -> DeletedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
         collection, resource_id = extract_collection(handle, kind=activity.kind)
@@ -30,7 +36,7 @@ class DeleteActivityCommand:
         except BackstopApiError as exc:
             reraise_activity_write_error(exc)
         logger.warning(
-            "activity_writes.activity.deleted",
+            "Deleted activity",
             extra={
                 "id": resource_id,
                 "kind": activity.kind,

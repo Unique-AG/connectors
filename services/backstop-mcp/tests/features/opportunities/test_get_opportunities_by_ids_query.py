@@ -1,5 +1,6 @@
 """`GetOpportunitiesByIdsQuery`: per-id GET, catalog join, not-found, and opt-in history."""
 
+import logging
 from collections.abc import Sequence
 
 import httpx
@@ -274,6 +275,32 @@ class TestGetOpportunitiesByIdsQuery:
         assert len(result.errors) == 1
         assert result.errors[0].id == "slow"
         assert result.errors[0].detail == "Backstop did not answer for this id"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unanswered_ids_log_one_warning_with_a_capped_sample(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ids = [f"slow-{index}" for index in range(7)]
+        for opportunity_id in ids:
+            respx.get(f"{BASE_URL}/opportunities/{opportunity_id}").mock(
+                side_effect=httpx.ReadTimeout("timed out")
+            )
+
+        with caplog.at_level(logging.WARNING):
+            result = await _run(client, ids=ids)
+
+        assert len(result.errors) == 7
+        [warning] = [
+            r
+            for r in caplog.records
+            if r.name
+            == "backstop_mcp.features.opportunities.queries.get_opportunities_by_ids_query"
+        ]
+        assert warning.levelno == logging.WARNING
+        assert warning.getMessage() == "Failed to read opportunities by id"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @pytest.mark.asyncio
     @respx.mock
