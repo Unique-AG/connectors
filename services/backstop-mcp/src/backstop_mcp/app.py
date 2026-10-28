@@ -7,6 +7,7 @@ from mcp.server.transport_security import (
     DEFAULT_MAX_REQUEST_BODY_SIZE,
     RequestBodyLimitMiddleware,
 )
+from mcp_observability import setup_ops
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from pydantic import SecretStr
 from sqlalchemy import text
@@ -15,7 +16,6 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.dependencies import (

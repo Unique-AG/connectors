@@ -104,7 +104,7 @@ uv run backstop-mcp
 ```
 
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
-- Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
+- Health: `GET /health` — liveness via `mcp_observability.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
 - Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)

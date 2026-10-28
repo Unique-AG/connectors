@@ -101,7 +101,7 @@ then adds four, outermost first:
 1. **Request body limit**, 4 MiB, the same cap as the MCP SDK's streamable HTTP transport. It also
    bounds the unauthenticated login POST.
 2. **OpenTelemetry ASGI** instrumentation.
-3. **HTTP request metrics** from `unique_mcp.monitoring.setup_ops`.
+3. **HTTP request metrics** from `mcp_observability.setup_ops`.
 4. **Session-revoked rewrite.** When a tool call confirms the user's Backstop credential is dead,
    this turns the in-flight `200` into `401` so the client reconnects at once. See
    [Authentication: When Backstop rejects the credential](../operator/authentication.md#When-Backstop-rejects-the-credential).
@@ -245,8 +245,8 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 
 ### Logs
 
-Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
-Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
+Structured JSON on stderr, through `mcp_observability.configure_logging` (the chart labels pods so
+Loki parses it). Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
 `backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
 `tenant_guidance.applied`. Tool-level events conceal Backstop logins as `sha256:<hex>` unless
 `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events (`backstop.request.*`,

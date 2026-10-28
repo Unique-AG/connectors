@@ -137,7 +137,7 @@ _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.
 
 
 class LogLevel(StrEnum):
-    """Matches `unique_mcp.logging.configure_logging` accepted names (case-insensitive)."""
+    """Python logging level names, upper-cased for `mcp_observability.configure_logging`."""
 
     DEBUG = "debug"
     INFO = "info"
