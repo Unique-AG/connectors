@@ -10,11 +10,12 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | Rule | Value |
 |---|---|
 | Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, Docker base images, and Terraform providers |
-| One PR for | One dependency, or one group that must move together, for example `opentelemetry-*` |
+| One PR for | One dependency, or one group that must move together, for example `opentelemetry-*`. A major bump of a group member gets its own PR. |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
-| Cap | At most 5 new PRs each night |
+| Cap | At most 5 new PRs each night, and at most 15 open PRs |
+| Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
 | Merge | A person merges. The agent never merges. |
 
 For a GitHub Action, the age of the release is not enough, because a publisher can move a tag to another commit. The job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
@@ -94,32 +95,51 @@ The section in the report comment lists the exact next steps. The agent has no J
 
 ## An open PR on the next night
 
-The nightly job runs again while a PR is open. It checks each dependency before it pushes anything.
+The nightly job runs again while a PR is open. It decides for each dependency before it builds anything. Each PR body ends with a hidden marker. The marker holds the branch and the target versions.
 
 ```mermaid
 flowchart TD
-  night[Next night, one dependency] --> closed{"A person closed a PR for this version without a merge?"}
-  closed -->|yes| skip[Skip this version]
+  night[Next night, one dependency] --> closed{"A person closed a PR with these target versions?"}
+  closed -->|yes| skip[Skip these versions]
   closed -->|no| open{An open PR exists?}
   open -->|no| create[Open a new PR]
-  open -->|yes| same{Same version?}
-  same -->|no| replace[Close the old PR with a comment and open a new PR]
-  same -->|yes| handled{"Has the label ai-assisted or human-required?"}
-  handled -->|yes| merge[Merge main into the branch and keep the commits]
-  handled -->|no| rebuild[Rebuild the branch from main and update the PR body]
+  open -->|yes| same{Same target versions?}
+  same -->|no| replace[Label the old PR superseded, close it, and open a new PR]
+  same -->|yes| behind{Is the branch behind main?}
+  behind -->|no| keep[Do nothing]
+  behind -->|yes| touched{"Agent label, or a commit from a person?"}
+  touched -->|yes| merge[Merge main into the branch and keep the commits]
+  touched -->|no| rebuild[Rebuild the branch from main and update the PR body]
 ```
 
 | Case | What the job does |
 |---|---|
-| The version is the same, and the agent has not handled the PR | It rebuilds the branch from `main` and updates the PR body. |
-| The version is the same, and the PR has the label `ai-assisted` or `human-required` | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
-| A newer version exists | It closes the PR with a comment and opens a new PR. The new PR starts a new agent run. |
-| A person closed the PR without a merge | It skips that version. A newer version opens a new PR. This is how you ignore one version. |
+| The target versions are the same, and the branch has all of `main` | Nothing. |
+| The target versions are the same and the branch is behind `main`. Nobody touched the PR. | It rebuilds the branch from `main` and updates the PR body. |
+| The target versions are the same, and the PR has an agent label or a commit from a person | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
+| A target version changed | It labels the old PR `superseded`, closes it with a comment, and opens a new PR. The new PR starts a new agent run. |
+| A person closed the PR without a merge | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
 | A person merged the PR | Nothing. The plan finds no update. |
 
-Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A handled PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
+Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A touched PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
 
-To ignore a dependency for good, add a pin. The job lists a pinned dependency in "Needs a person" and does not move it.
+## Ignore a dependency
+
+Use one of these ways.
+
+| What you want | What to do |
+|---|---|
+| Skip one version | Close the PR without a merge. |
+| Never update a dependency, or never take a major version | Add a rule to the list `ignore` in `.github/deps-groups.json`. |
+| Hold a dependency at one version | Add a pin. The job lists a pinned dependency in "Needs a person" and does not move it. |
+
+A rule in `ignore` has a `name` (a pattern with `*` is legal) and a `reason`. It can also have an `ecosystem` and `updateTypes`, which is a list of `major`, `minor`, or `patch`. This example skips the major versions of `eslint` packages:
+
+```json
+{ "ecosystem": "npm", "name": "eslint*", "updateTypes": ["major"], "reason": "Waits for the flat config move." }
+```
+
+The job lists each ignored update in its summary.
 
 ## Rebase a PR yourself
 
@@ -130,12 +150,12 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 | Update the branch from `main` and keep the commits | Click "Update branch" in the PR, or run `gh pr update-branch <number>`. This merges `main` into the branch. |
 | Update the branch by a rebase | Run `gh pr update-branch <number> --rebase`. This rewrites the branch. |
 | Fix a conflict in a lock file | Check out the PR and merge or rebase `main`. Regenerate the lock file with `pnpm install --lockfile-only` or `uv lock`. Never edit it by hand. After a rebase, push with `git push --force-with-lease`. |
-| Rebuild the PR from `main` and drop every commit on it | Remove the labels `ai-assisted` and `human-required`. The next nightly run rebuilds the branch. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open up to 5 new PRs. Then run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
-| Keep your own commits on a PR | Add the label `human-required`. The job rebuilds a PR that has no label, and this drops your commits. |
+| Rebuild the PR from `main` and drop every commit on it | Remove the labels `ai-assisted` and `human-required`. Make sure that no commit from a person is on the branch. The next nightly run rebuilds the branch when it is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open up to 5 new PRs. Then run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
+| Keep your own commits on a PR | Push the commit. The job sees a commit from a person and only merges `main` into the branch. |
 
 ## Each day
 
-1. Run `gh pr list --label dependencies --state open`.
+1. Read the issue with the label `dependency-dashboard`. The nightly job updates it. It lists the plan and the open dependency PRs. You can also run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `ai-assisted` and not `human-required`, read the report in its comment and merge the PR.
 3. If a PR has the label `human-required`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
 4. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
@@ -181,11 +201,11 @@ The nightly job also updates these. The same rules apply: one PR for each item, 
 
 | What | What the job does |
 |---|---|
-| GitHub Actions | One PR for each action repository. It moves the pinned commit and the version comment in every workflow. A major bump says so in the PR body. |
-| Docker base images | One PR for each image, for example `node`. It moves the tag and the digest in every Dockerfile. It stays in the same major version. The change starts a release for each service. |
-| Terraform providers | One PR for each provider whose newest release is outside our version constraint. The PR widens the constraint in every `versions.tf` that names the provider, so that the release fits. The repository has no Terraform lock file, so a release inside the constraint needs no PR. The CI job `validate-terraform` checks the change. |
+| GitHub Actions | One PR for each action repository. It moves the pinned commit and the version comment in every workflow. A major bump says so in the PR body. An action with no GitHub Release uses its tags, and the date of the tag commit. If the pinned tag now points to another commit than the pin, the job lists the action in "Needs a person". |
+| Docker base images | One PR for each image, for example `node`. It moves the tag and the digest in every Dockerfile, in the `FROM` lines and in the `COPY --from` lines. It stays in the same major version. A new digest for the same tag opens no PR when every platform image is the same. The change starts a release for each service. A rate limit or a server error of the registry goes to "Needs a person". |
+| Terraform providers | One PR for each provider whose newest release is outside our version constraint. The PR widens the constraint in every `versions.tf` that names the provider, so that the release fits. A part `!=` that excludes the new release is dropped. The repository has no Terraform lock file, so a release inside the constraint needs no PR. The CI job `validate-terraform` checks the change. |
 
-An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint.
+An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too, for example the `uv` image in `COPY --from`. An npm version that its publisher deprecated goes there as well. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint.
 
 ## Advisories in lock files
 

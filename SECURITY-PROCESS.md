@@ -64,6 +64,8 @@ flowchart LR
 | `dependencies` | Nightly job | PR automation, gatekeeper title check | The PR comes from the nightly job. |
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
 | `vulna-squash` | Agent | Skill | A fix PR from the patch run. The skill counts these PRs for the cap of 3. |
+| `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
+| `dependency-dashboard` | Nightly job | Person | The one issue that lists the plan and the open dependency PRs. |
 | `ai-assisted` | Agent | Agent, nightly job | The agent handled the PR. |
 | `human-required` | Agent | Agent, nightly job, person | A person must finish the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
