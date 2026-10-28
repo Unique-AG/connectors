@@ -246,11 +246,31 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 ### Logs
 
 Structured JSON on stderr, through `mcp_observability.configure_logging` (the chart labels pods so
-Loki parses it). Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
-`backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
-`tenant_guidance.applied`. Tool-level events conceal Backstop logins as `sha256:<hex>` unless
-`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events (`backstop.request.*`,
-`backstop.auth_recheck.*`) currently carry the username in clear. API tokens are never logged.
+Loki parses it). FastMCP, uvicorn and Python warnings join the same stream. Events use dotted names
+with fields in `extra`, for example `auth.login.succeeded`, `backstop.request.failed`,
+`backstop.auth_recheck.decision`, `resolution.elicit.timed_out`, `tenant_guidance.applied`.
+
+`LOG_LEVEL` is the level of the `backstop_mcp` loggers. `LIBRARY_LOG_LEVELS` sets libraries over
+defaults that keep `httpx` and `httpcore` at WARNING, because their INFO lines are request URLs
+with query strings, and `sse_starlette` at INFO, because its DEBUG lines are tool results.
+FastMCP's DEBUG line that prints a tool call's arguments is dropped.
+
+Identifying values go through `identifiable_value`: Backstop logins are `hmac-sha256:<hex>`, keyed
+with a secret derived from `BACKSTOP_MCP_ENCRYPTION_KEY`, plain `sha256:<hex>` at `LOG_LEVEL=debug`,
+and the value itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events
+(`backstop.request.*`, `backstop.auth_recheck.*`) currently carry the username in clear. API
+tokens are never logged.
+
+Exception text is kept out of logs, because a pydantic error quotes its input and a Backstop error
+can quote a record. A line logged with an exception names it in `error_type`; below ERROR it has
+no stack, and at ERROR its `err` keeps the frames and exception types but no message. A pydantic
+validation error, or one it was raised from (even `from None`), adds `failed_fields`: the path,
+the error type and the type of the input of each error, never the input, such as
+`data.3.attributes.title (string_type, got int)`. Ten are listed and `failed_field_count` gives
+the total: one broken field fails once per record, and a page holds thousands. The path is
+pydantic's own, so a model must never be keyed by a name or another value.
+`ERROR_DETAILS_POLICY=disclose` keeps the message and full stack at ERROR. It is separate from
+`LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login.
 
 Each tool call also logs one completion line with its name, status, and duration.
 

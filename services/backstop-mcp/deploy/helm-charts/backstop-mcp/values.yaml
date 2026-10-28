@@ -26,6 +26,19 @@ mcpConfig:
     formerRelationshipTypeMarkers: null
   # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}
+  logging:
+    # LOG_LEVEL, the level of backstop-mcp's own loggers.
+    level: info
+    # LIBRARY_LOG_LEVELS, rendered as JSON. Logger name to level, over the app's defaults (httpx
+    # and httpcore WARNING, sse_starlette INFO), e.g. {httpx: INFO}. A library not named logs at
+    # INFO.
+    libraryLevels: {}
+    # LOGS_DIAGNOSTICS_DATA_POLICY. conceal: identifying strings in logs become
+    # hmac-sha256:<hex>, so they correlate without leaking. disclose: the original (debugging).
+    diagnosticsDataPolicy: conceal
+    # ERROR_DETAILS_POLICY. redact: exception messages and stack text stay out of logs and spans;
+    # the exception type, the frames at error and the failed field paths stay. disclose: all.
+    errorDetailsPolicy: redact
 
 # Loki scrapes use this label to parse stderr as pino-json
 # (mcp_observability.configure_logging).
@@ -34,13 +47,10 @@ podLabels:
 
 env:
   APP_ENV: production
-  LOG_LEVEL: info
-  # conceal (default): identifying strings in logs become sha256:<hex> so they can
-  # be correlated without leaking. disclose: print the original (local debugging).
-  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   PORT: "8000"
   # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL, the employment relationship
-  # types and BACKSTOP_MCP_TENANT_GUIDANCE are set through mcpConfig above.
+  # types, BACKSTOP_MCP_TENANT_GUIDANCE and the logging settings (LOG_LEVEL, LIBRARY_LOG_LEVELS,
+  # LOGS_DIAGNOSTICS_DATA_POLICY, ERROR_DETAILS_POLICY) are set through mcpConfig above.
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide
   # `{id: dto}` map (custom-field definitions and groups, activity tags, system users,

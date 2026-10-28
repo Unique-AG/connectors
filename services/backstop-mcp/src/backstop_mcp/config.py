@@ -25,8 +25,6 @@ from pydantic import (
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
-from backstop_mcp.utils import LogsDiagnosticDataPolicy
-
 PKG_VERSION = pkg_version("backstop-mcp")
 
 _HTTP_URL = TypeAdapter(HttpUrl)
@@ -136,25 +134,12 @@ class AppEnv(StrEnum):
 _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "::"})
 
 
-class LogLevel(StrEnum):
-    """Python logging level names, upper-cased for `mcp_observability.configure_logging`."""
-
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
 class AppConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict()
 
     app_env: AppEnv = AppEnv.PRODUCTION
     version: str = PKG_VERSION
     port: int = Field(default=9010, ge=0, le=65535)
-    log_level: LogLevel = LogLevel.INFO
-    # conceal (default): IdentifiableValue logs as sha256:<hex>. disclose: the original.
-    logs_diagnostics_data_policy: LogsDiagnosticDataPolicy = LogsDiagnosticDataPolicy.CONCEAL
 
     # The externally-reachable URL of this service — used as the OAuth issuer/base URL
     # (discovery metadata, /authorize, /token, and the Backstop login form all hang off it).

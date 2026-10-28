@@ -1,55 +1,93 @@
 """Pino-JSON logs on stderr, which Loki parses under the `pino-json` label."""
 
+import copy
 import json
 import logging
 import re
 import sys
 import traceback
+from collections.abc import Sequence
 from types import TracebackType
 from typing import cast
 from typing import override
 
+from mcp_configs import ErrorDetailsPolicy
+from mcp_configs import LoggingSettings
+from mcp_configs import LogLevel
 from opentelemetry import trace
 
+from mcp_observability.failed_fields import FAILED_FIELDS_SHOWN
+from mcp_observability.failed_fields import failed_fields
 from mcp_observability.ops import OPS_PATHS
+from mcp_observability.stacktrace import scrub_stacktrace
+
+# httpx logs every request URL, query string included, at INFO. sse-starlette logs each outbound
+# event body, which is the tool result, at DEBUG.
+_DEFAULT_LIBRARY_LOG_LEVELS: dict[str, LogLevel] = {
+    "httpx": LogLevel.WARNING,
+    "httpcore": LogLevel.WARNING,
+    "sse_starlette": LogLevel.INFO,
+}
 
 _ACCESS_PATH = re.compile(
     r'(?:^|[\s"])(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\s+([^?\s"]+)', re.IGNORECASE
 )
 _ACCESS_LOGGERS = ("uvicorn.access", "uvicorn.asgi")
+# Loki's pino-json pipeline reads the number in `level`; `log_level` is the same level for people.
 _PINO_LEVEL = {
-    logging.DEBUG: 20,
-    logging.INFO: 30,
-    logging.WARNING: 40,
-    logging.ERROR: 50,
-    logging.CRITICAL: 60,
+    logging.DEBUG: (20, "debug"),
+    logging.INFO: (30, "info"),
+    logging.WARNING: (40, "warn"),
+    logging.ERROR: (50, "error"),
+    logging.CRITICAL: (60, "fatal"),
 }
 # What every record carries, so the rest is what the call passed in `extra`.
 _RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {"message"}
 
 
-def configure_logging(level: str) -> None:
+def configure_logging(settings: LoggingSettings, *, own_loggers: Sequence[str]) -> None:
     """Send every log record to stderr as Pino JSON, with the trace and span of the call, and
-    drop the access log lines of the ops routes. Safe to call more than once."""
+    without exception text unless `ERROR_DETAILS_POLICY=disclose`. Safe to call more than once.
+
+    `own_loggers` (the MCP's package, such as `("backstop_mcp",)`) and this package log at
+    `LOG_LEVEL`; a library at its `LIBRARY_LOG_LEVELS` entry, else its default, else INFO. The app
+    must run uvicorn with `log_config=None`, or uvicorn puts its own lines on plain-text handlers.
+    """
     root = logging.getLogger()
-    root.setLevel(level)
-    if not any(isinstance(handler.formatter, PinoJsonFormatter) for handler in root.handlers):
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(PinoJsonFormatter())
-        root.addHandler(handler)
-    for handler in root.handlers:
-        handler.setLevel(level)
+    root.setLevel(logging.INFO)
+    output = next(
+        (handler for handler in root.handlers if isinstance(handler.formatter, PinoJsonFormatter)),
+        None,
+    )
+    if output is None:
+        output = logging.StreamHandler(sys.stderr)
+        output.setFormatter(PinoJsonFormatter())
+        root.addHandler(output)
+    output.setLevel(logging.NOTSET)
+    for stale in [kept for kept in output.filters if isinstance(kept, _ErrorDetails)]:
+        output.removeFilter(stale)
+    output.addFilter(_ErrorDetails(settings.error_details_policy))
+
+    _reclaim("fastmcp")
+    for name in (*own_loggers, "mcp_observability"):
+        logging.getLogger(name).setLevel(settings.log_level)
+    for name, level in {**_DEFAULT_LIBRARY_LOG_LEVELS, **settings.library_log_levels}.items():
+        logging.getLogger(name).setLevel(level)
+
+    # Python warnings otherwise reach stderr as plain text the log pipeline cannot parse.
+    logging.captureWarnings(True)
+    _install("fastmcp.server.mixins.mcp_operations", _FastMcpArgumentDump)
     for name in _ACCESS_LOGGERS:
-        access = logging.getLogger(name)
-        if not any(isinstance(kept, _QuietOpsRoutes) for kept in access.filters):
-            access.addFilter(_QuietOpsRoutes())
+        _install(name, _QuietOpsRoutes)
 
 
 class PinoJsonFormatter(logging.Formatter):
     @override
     def format(self, record: logging.LogRecord) -> str:
+        level, log_level = _PINO_LEVEL.get(record.levelno, _PINO_LEVEL[logging.INFO])
         payload: dict[str, object] = {
-            "level": _PINO_LEVEL.get(record.levelno, 30),
+            "level": level,
+            "log_level": log_level,
             "time": int(record.created * 1000),
             "msg": record.getMessage(),
             "context": record.name,
@@ -65,11 +103,70 @@ class PinoJsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str, ensure_ascii=False)
 
 
+class _ErrorDetails(logging.Filter):
+    """Names the error on a record and, unless disclosed, drops its stack below ERROR and its
+    messages at ERROR. Returns a copy, so another handler still sees the record as logged."""
+
+    def __init__(self, policy: ErrorDetailsPolicy) -> None:
+        super().__init__()
+        self._policy: ErrorDetailsPolicy = policy
+
+    @override
+    def filter(self, record: logging.LogRecord) -> logging.LogRecord:
+        error = record.exc_info[1] if record.exc_info else None
+        if error is None:
+            return record
+        cleaned = copy.copy(record)
+        cleaned.error_type = type(error).__qualname__
+        if not hasattr(record, "failed_fields") and (fields := failed_fields([error])):
+            cleaned.failed_fields = fields[:FAILED_FIELDS_SHOWN]
+            cleaned.failed_field_count = len(fields)
+        if record.levelno < logging.ERROR:
+            cleaned.exc_info = None
+            cleaned.exc_text = None
+        elif self._policy is ErrorDetailsPolicy.REDACT and not hasattr(record, "err"):
+            # The formatter writes its own `err`, message included, only when there is none.
+            cleaned.err = {
+                "name": type(error).__name__,
+                "stack": scrub_stacktrace("".join(traceback.format_exception(error))),
+            }
+        return cleaned
+
+
+class _FastMcpArgumentDump(logging.Filter):
+    """FastMCP's DEBUG line for a tool call or prompt prints its argument dict."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.msg
+        if not isinstance(message, str):
+            return True
+        return (
+            "Handler called: call_tool" not in message
+            and "Handler called: get_prompt" not in message
+        )
+
+
 class _QuietOpsRoutes(logging.Filter):
     @override
     def filter(self, record: logging.LogRecord) -> bool:
         match = _ACCESS_PATH.search(record.getMessage())
         return match is None or (match.group(1).rstrip("/") or "/") not in OPS_PATHS
+
+
+def _reclaim(name: str) -> None:
+    """`fastmcp` installs its own stderr handler with `propagate=False` at import time."""
+    reclaimed = logging.getLogger(name)
+    for handler in list(reclaimed.handlers):
+        reclaimed.removeHandler(handler)
+    reclaimed.propagate = True
+    reclaimed.setLevel(logging.NOTSET)
+
+
+def _install(logger_name: str, filter_type: type[logging.Filter]) -> None:
+    target = logging.getLogger(logger_name)
+    if not any(isinstance(existing, filter_type) for existing in target.filters):
+        target.addFilter(filter_type())
 
 
 def _trace_fields() -> dict[str, str | int]:

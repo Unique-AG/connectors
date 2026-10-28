@@ -23,6 +23,7 @@ from backstop_mcp.dependencies import (
     get_encryption_config,
     get_encryption_key,
     get_engine,
+    get_logging_settings,
     get_product_investors_config,
     get_resolution_config,
     get_search_config,
@@ -125,6 +126,7 @@ class CachedProvider(Protocol):
 
 PROVIDERS: tuple[CachedProvider, ...] = (
     get_app_config,
+    get_logging_settings,
     get_backstop_config,
     get_database_config,
     get_encryption_config,

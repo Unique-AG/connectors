@@ -5,6 +5,7 @@ from datetime import date
 from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
+from mcp_observability import identifiable_value
 from opentelemetry import trace
 
 from backstop_mcp.backstop_client import (
@@ -32,7 +33,7 @@ from backstop_mcp.features.opportunity_writes.responses import UpdatedOpportunit
 from backstop_mcp.features.opportunity_writes.update_opportunity_input import UpdateOpportunityInput
 from backstop_mcp.features.system_users import SystemUsersService
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
-from backstop_mcp.utils import first_item, identifiable_value
+from backstop_mcp.utils import first_item
 
 logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)

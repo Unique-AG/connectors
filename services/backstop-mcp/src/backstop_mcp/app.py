@@ -23,7 +23,9 @@ from backstop_mcp.dependencies import (
     get_auth_config,
     get_auth_provider,
     get_backstop_client_factory,
+    get_encryption_key,
     get_engine,
+    get_logging_settings,
     get_session_factory,
     get_tenant_guidance_config,
 )
@@ -51,7 +53,7 @@ def create_app() -> Starlette:
     config = get_app_config()
     auth_config = get_auth_config()
 
-    configure_logging(config)
+    configure_logging(get_logging_settings(), encryption_key=get_encryption_key())
     configure_metrics(config)
 
     engine = get_engine()

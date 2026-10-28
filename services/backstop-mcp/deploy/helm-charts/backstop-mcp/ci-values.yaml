@@ -20,3 +20,9 @@ mcpConfig:
     formerRelationshipTypeMarkers: []
   tenantGuidance:
     server_instructions: Fund short names are upper case.
+  logging:
+    level: debug
+    libraryLevels:
+      httpx: INFO
+    diagnosticsDataPolicy: disclose
+    errorDetailsPolicy: disclose

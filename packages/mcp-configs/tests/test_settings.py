@@ -2,10 +2,12 @@ from pathlib import Path
 
 import pytest
 from pydantic import AnyHttpUrl, SecretStr, ValidationError
+from pydantic_settings import SettingsError
 
 from mcp_configs import (
     DiagnosticsDataPolicy,
     ElicitationSettings,
+    ErrorDetailsPolicy,
     LoggingSettings,
     LogLevel,
     RedisSettings,
@@ -95,8 +97,11 @@ def test_logging_defaults_to_info_and_conceals_diagnostics() -> None:
     settings = LoggingSettings()
 
     assert settings.log_level is LogLevel.INFO
+    assert settings.library_log_levels == {}
     assert settings.diagnostics_data_policy is DiagnosticsDataPolicy.CONCEAL
     assert not settings.discloses_diagnostics
+    assert settings.error_details_policy is ErrorDetailsPolicy.REDACT
+    assert not settings.discloses_error_details
 
 
 def test_logging_reads_the_lowercase_level_the_charts_set(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,6 +124,54 @@ def test_logging_reads_the_diagnostics_policy_in_any_case(
 
 def test_logging_rejects_an_unknown_level(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", "verbose")
+
+    with pytest.raises(ValidationError):
+        LoggingSettings()
+
+
+def test_logging_reads_library_levels_as_json_in_any_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LIBRARY_LOG_LEVELS", '{"httpx": "info", "sqlalchemy.engine": "WARNING"}')
+
+    assert LoggingSettings().library_log_levels == {
+        "httpx": LogLevel.INFO,
+        "sqlalchemy.engine": LogLevel.WARNING,
+    }
+
+
+def test_logging_rejects_library_levels_that_are_not_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LIBRARY_LOG_LEVELS", "httpx=INFO")
+
+    with pytest.raises(SettingsError):
+        LoggingSettings()
+
+
+@pytest.mark.parametrize("levels", ['{"httpx": "verbose"}', '["httpx"]'])
+def test_logging_rejects_library_levels_that_are_not_an_object_of_levels(
+    monkeypatch: pytest.MonkeyPatch, levels: str
+) -> None:
+    monkeypatch.setenv("LIBRARY_LOG_LEVELS", levels)
+
+    with pytest.raises(ValidationError):
+        LoggingSettings()
+
+
+def test_logging_reads_the_error_details_policy_in_any_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ERROR_DETAILS_POLICY", "Disclose")
+
+    settings = LoggingSettings()
+
+    assert settings.discloses_error_details
+    assert not settings.discloses_diagnostics
+
+
+def test_logging_rejects_an_unknown_error_details_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ERROR_DETAILS_POLICY", "conceal")
 
     with pytest.raises(ValidationError):
         LoggingSettings()
