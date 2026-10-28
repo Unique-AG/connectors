@@ -27,7 +27,7 @@ import {
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
-import { run, runOrThrow } from './run.mjs';
+import { run, runOrThrow, sandboxEnv } from './run.mjs';
 import { createTerraformLookup, planTerraform } from './terraform.mjs';
 
 function planNpm() {
@@ -63,10 +63,11 @@ async function planUv() {
   const flag = hasUvCooldown(Object.values(pyprojects))
     ? ''
     : `--exclude-newer "${config.cooldownDays} days"`;
-  const dryRun = run('bash', [
-    '-c',
-    `bash scripts/each-python-project.sh uv lock --upgrade --dry-run ${flag} 2>&1`,
-  ]);
+  const dryRun = run(
+    'bash',
+    ['-c', `bash scripts/each-python-project.sh uv lock --upgrade --dry-run ${flag} 2>&1`],
+    { env: sandboxEnv() },
+  );
   assert.strictEqual(dryRun.status, 0, `uv lock --dry-run failed:\n${dryRun.stdout}`);
   const updates = parseUvDryRun(dryRun.stdout);
   const pinnedNames = [

@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyActions } from './actions.mjs';
@@ -26,7 +26,7 @@ import {
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
-import { run, runOrThrow } from './run.mjs';
+import { run, runOrThrow, sandboxEnv } from './run.mjs';
 import { commitScope } from './scope.mjs';
 import { applyTerraform } from './terraform.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
@@ -74,7 +74,7 @@ function bumpUv() {
     if (behind.length === 0) {
       continue;
     }
-    runOrThrow('uv', uvLockArgs(behind, cooldownFlag), { cwd: folder });
+    runOrThrow('uv', uvLockArgs(behind, cooldownFlag), { cwd: folder, env: sandboxEnv() });
     const after = restoreUvLockHeader(readFileSync(`${folder}/uv.lock`, 'utf8'), before);
     writeFileSync(`${folder}/uv.lock`, after);
     const downgrades = findDowngrades(held, parseUvPackages(after));
@@ -86,7 +86,9 @@ function bumpUv() {
     changes.push(...changedPackages(held, parseUvPackages(after)));
     projects.push(folder);
   }
-  runOrThrow('bash', ['scripts/each-python-project.sh', 'uv', 'lock', '--check']);
+  runOrThrow('bash', ['scripts/each-python-project.sh', 'uv', 'lock', '--check'], {
+    env: sandboxEnv(),
+  });
   return { changes, projects };
 }
 
@@ -130,7 +132,9 @@ if (files.length > 0) {
       `cz rejects the title "${title}":\n${lint.stdout}${lint.stderr}`,
     );
   }
-  const outDirectory = process.env.RUNNER_TEMP ?? tmpdir();
+  const outDirectory = join(process.env.RUNNER_TEMP ?? tmpdir(), 'patch');
+  mkdirSync(outDirectory, { recursive: true });
+  writeFileSync(join(outDirectory, 'changes.patch'), runOrThrow('git', ['diff', '--binary']));
   writeFileSync(join(outDirectory, 'pr-title.txt'), title);
   writeFileSync(
     join(outDirectory, 'pr-body.md'),

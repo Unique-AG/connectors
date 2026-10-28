@@ -20,3 +20,10 @@ export function runOrThrow(command, args, options = {}) {
   }
   return result.stdout;
 }
+
+const PRIVILEGED =
+  /^(GH_TOKEN|GITHUB_TOKEN|GITHUB_(OUTPUT|ENV|PATH|STATE|STEP_SUMMARY)|ACTIONS_.+)$/;
+
+export function sandboxEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => !PRIVILEGED.test(key)));
+}
