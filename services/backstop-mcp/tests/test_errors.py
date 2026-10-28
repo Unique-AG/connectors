@@ -3,35 +3,50 @@ from typing import override
 
 import httpx
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
 )
-
-
-class _Schema(BaseModel):
-    name: str
+from backstop_mcp.features.tasks import TaskAttributes
 
 
 class TestBackstopResponseSchemaError:
-    def test_message_includes_path_and_schema_name(self) -> None:
+    def test_message_names_the_schema_and_failed_fields_only(self) -> None:
         try:
-            _Schema.model_validate({})
+            TaskAttributes.model_validate({"title": 42, "status": "Open"})
         except ValidationError as exc:
             cause = exc
         else:
             raise AssertionError("expected ValidationError")
 
-        error = BackstopResponseSchemaError("/parties/123", _Schema.__name__, cause)
+        error = BackstopResponseSchemaError(
+            "/tasks?filter[entityId][eq]=org-1", "TaskAttributes", cause
+        )
 
-        assert error.path == "/parties/123"
-        assert error.schema_name == "_Schema"
+        assert error.path == "/tasks?filter[entityId][eq]=org-1"
+        assert error.schema_name == "TaskAttributes"
         assert error.cause is cause
-        assert "/parties/123" in str(error)
-        assert "_Schema" in str(error)
+        assert str(error) == (
+            "Backstop response failed schema validation against 'TaskAttributes' "
+            + "at title (string_type, got int)"
+        )
+
+    def test_message_lists_ten_failed_fields_and_counts_the_rest(self) -> None:
+        try:
+            TypeAdapter(list[TaskAttributes]).validate_python([{"title": 1}] * 12)
+        except ValidationError as exc:
+            cause = exc
+        else:
+            raise AssertionError("expected ValidationError")
+
+        error = BackstopResponseSchemaError("/tasks", "list[TaskAttributes]", cause)
+
+        assert "9.title (string_type, got int)" in str(error)
+        assert "10.title" not in str(error)
+        assert str(error).endswith(" and 2 more")
 
 
 class TestParseJsonApiErrorWellFormed:

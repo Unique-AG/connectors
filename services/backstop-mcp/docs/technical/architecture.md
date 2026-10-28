@@ -313,6 +313,16 @@ built. The ASGI middleware spans each HTTP request except `/health`, `/probe`, `
 request that carried the call, and several queries and commands open spans inside that (for
 example `reports.run`, `accounts.product_investors`, `opportunity_writes.command.update`).
 
+Each logical Backstop request, retries included, is one CLIENT span named
+`backstop <METHOD> <route>`, with `http.request.method`, the route template as `url.template` and
+`http.response.status_code` (a 401 included). It never carries the path, the URL or the query
+string: from page 2 the path is the `links.next` URL with the search filters. Only a 5xx or a
+transport error marks it as an error, with `error.type` and no message. Each Backstop error type
+declares how loud its tool call's failure line is with `DeclaresFailureLevel`: a schema mismatch is
+ERROR, a revoked session INFO, the others WARNING. A schema mismatch names the schema and its
+up to ten `failed_fields`, never pydantic's text, which quotes the record; the pydantic error stays on
+`.cause` and is not chained.
+
 FastMCP records every exception a tool raises on its span, with the message, the stack and the
 message again as the status description, and has no option to stop. A message can quote the
 caller's input or a Backstop record. So, unless `ERROR_DETAILS_POLICY=disclose`, the span

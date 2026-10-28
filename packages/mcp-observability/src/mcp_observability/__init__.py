@@ -1,3 +1,5 @@
+from mcp_observability.failed_fields import FAILED_FIELDS_SHOWN
+from mcp_observability.failed_fields import failed_fields
 from mcp_observability.failures import DeclaresFailureLevel
 from mcp_observability.identifiable_value import configure_identifiable_values
 from mcp_observability.identifiable_value import identifiable_value
@@ -16,6 +18,7 @@ from mcp_observability.trace_declarations import validate_trace_declarations
 from mcp_observability.tracing import configure_tracing
 
 __all__ = [
+    "FAILED_FIELDS_SHOWN",
     "OPS_PATHS",
     "REGISTRY",
     "DeclaresFailureLevel",
@@ -25,6 +28,7 @@ __all__ = [
     "configure_identifiable_values",
     "configure_logging",
     "configure_tracing",
+    "failed_fields",
     "identifiable_value",
     "metrics_text",
     "reset_identifiable_values",
