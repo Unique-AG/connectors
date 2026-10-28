@@ -28,6 +28,7 @@ export interface SearchEmailResult {
   sourceMailbox: Nullish<string>;
   outlookWebLink: string;
   receivedDateTime: string | null;
+  isDraft: boolean;
   text: string;
   uniqueContentUrl: string | undefined;
   backend: SearchBackend;

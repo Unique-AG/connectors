@@ -65,6 +65,7 @@ function createMockGraphApi() {
   const api: Record<string, any> = {
     header: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
+    expand: vi.fn().mockReturnThis(),
     filter: vi.fn().mockReturnThis(),
     orderby: vi.fn().mockReturnThis(),
     top: vi.fn().mockReturnThis(),

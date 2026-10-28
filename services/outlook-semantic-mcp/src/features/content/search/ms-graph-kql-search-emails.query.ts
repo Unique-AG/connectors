@@ -238,6 +238,7 @@ export class MsGraphKqlSearchEmailsQuery {
         sourceMailbox: hit.mailbox,
         outlookWebLink: hit.webLink,
         receivedDateTime: hit.receivedDateTime,
+        isDraft: hit.isDraft,
         text: hit.bodyPreview,
         uniqueContentUrl: undefined,
         backend: SearchBackend.MsGraph,

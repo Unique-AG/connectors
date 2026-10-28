@@ -1,4 +1,5 @@
 import { describe, expect, it, type Mock, vi } from 'vitest';
+import { WebLinks } from '~/features/graph-utils/build-web-links.command';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
@@ -26,7 +27,7 @@ function makeCommand() {
   const command = new CreateDraftEmailCommand(
     graphClientFactory,
     { run: vi.fn() } as never,
-    { run: vi.fn().mockResolvedValue(new Map()) } as never,
+    { run: vi.fn().mockResolvedValue(new WebLinks()) } as never,
     { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
   );
 
@@ -77,7 +78,7 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
       { run: vi.fn() } as never,
-      { run: vi.fn().mockResolvedValue(new Map()) } as never,
+      { run: vi.fn().mockResolvedValue(new WebLinks()) } as never,
       { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
     );
 
@@ -105,7 +106,7 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
       { run: vi.fn() } as never,
-      { run: vi.fn().mockResolvedValue(new Map()) } as never,
+      { run: vi.fn().mockResolvedValue(new WebLinks()) } as never,
       { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
     );
 

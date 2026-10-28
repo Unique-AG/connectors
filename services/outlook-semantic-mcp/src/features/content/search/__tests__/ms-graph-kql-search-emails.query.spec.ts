@@ -433,6 +433,17 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('isDraft', () => {
+    it.each([true, false])('exposes the Graph isDraft flag %s', async (isDraft) => {
+      const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('msg-1', { isDraft })] });
+      const { instance } = createQuery({ mockPost });
+
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(results[0]?.isDraft).toBe(isDraft);
+    });
+  });
+
   describe('replyToParams', () => {
     it('marks draft messages as not replyable', async () => {
       const mockPost = makeSuccessPost({

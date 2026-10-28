@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CancelEventCommand } from './cancel-event.command';
 import { META } from './cancel-event-tool.meta';
@@ -11,7 +12,6 @@ import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
 import { ConsentRequiredSchema } from './utils/calendar-output.schema';
-import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,

@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
-import {
-  BuildWebLinksCommand,
-  webLinkMapKey,
-} from '~/features/graph-utils/build-web-links.command';
+import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { markdownToHtml } from '~/utils/markdown-to-html';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
+import { toGraphRecipients } from './draft-recipients';
 import { AttachmentFailure } from './email-attachments/utils';
 
 const CreateMessageResponseSchema = z.object({
@@ -121,19 +119,8 @@ export class CreateDraftEmailCommand {
                 content: htmlContent,
               },
               subject: recipientsData.subject,
-              toRecipients: recipientsData.toRecipients.map((item) => ({
-                emailAddress: {
-                  address: item.email,
-                  ...(item.name && { name: item.name }),
-                },
-              })),
-              ccRecipients:
-                recipientsData.ccRecipients?.map((item) => ({
-                  emailAddress: {
-                    address: item.email,
-                    ...(item.name && { name: item.name }),
-                  },
-                })) ?? [],
+              toRecipients: toGraphRecipients(recipientsData.toRecipients),
+              ccRecipients: toGraphRecipients(recipientsData.ccRecipients ?? []),
             },
             successMessage: 'Draft email created successfully.',
             idIsImmutable: false,
@@ -147,14 +134,21 @@ export class CreateDraftEmailCommand {
 
       const message = CreateMessageResponseSchema.parse(await graphRequest.post(apiParams.body));
 
-      const webLink = await this.buildWebLink({
+      // See BuildWebLinksCommand for why the Graph webLink cannot be used directly for delegated mailboxes.
+      const messageMailbox = input.mailbox ?? userProfile.email;
+      const webLinks = await this.buildWebLinksCommand.run({
         userProfileId: userProfileIdString,
         userProfileEmail: userProfile.email,
-        messageId: message.id,
-        graphWebLink: message.webLink,
-        idIsImmutable: apiParams.idIsImmutable,
-        mailbox: input.mailbox,
+        ids: [
+          {
+            id: message.id,
+            isImmutable: apiParams.idIsImmutable,
+            mailbox: messageMailbox,
+            webLink: message.webLink ?? '',
+          },
+        ],
       });
+      const webLink = webLinks.get(messageMailbox, message.id);
 
       return {
         success: true,
@@ -173,38 +167,5 @@ export class CreateDraftEmailCommand {
         message: 'Failed to create draft email via Microsoft Graph',
       };
     }
-  }
-
-  // See BuildWebLinksCommand for a full explanation of why we cannot use the Graph webLink
-  // directly for delegated mailboxes (cloud.microsoft format, broken OWA ItemID).
-  private async buildWebLink({
-    userProfileId,
-    userProfileEmail,
-    messageId,
-    graphWebLink,
-    idIsImmutable,
-    mailbox,
-  }: {
-    userProfileId: string;
-    userProfileEmail: string;
-    messageId: string;
-    graphWebLink: string | undefined;
-    idIsImmutable: boolean;
-    mailbox: string | null | undefined;
-  }): Promise<string | undefined> {
-    const messageMailbox = mailbox ?? userProfileEmail;
-    const webLinksMap = await this.buildWebLinksCommand.run({
-      userProfileId,
-      userProfileEmail,
-      ids: [
-        {
-          id: messageId,
-          isImmutable: idIsImmutable,
-          mailbox: messageMailbox,
-          webLink: graphWebLink ?? '',
-        },
-      ],
-    });
-    return webLinksMap.get(webLinkMapKey(messageMailbox, messageId));
   }
 }
