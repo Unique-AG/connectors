@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import logging
 import time
 import traceback
@@ -37,6 +38,10 @@ from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential, recorded_params
 
 _BASIC_AUTH = "Basic " + base64.b64encode(b"bob.smith:p@55W0rd321!").decode()
+
+
+def _sha256(value: str) -> str:
+    return f"sha256:{hashlib.sha256(value.encode()).hexdigest()}"
 
 
 class _Record(BaseModel):
@@ -377,7 +382,7 @@ class TestUnauthorizedLogging:
         assert record.__dict__["detail"] == "token rejected"
         assert record.__dict__["title"] == "Unauthorized"
         assert record.__dict__["code"] == "401"
-        assert record.__dict__["username"] == "bob.smith"
+        assert str(cast("object", record.__dict__["username"])) == _sha256("bob.smith")
         assert record.__dict__["subject"] == "user-42"
         assert "body_excerpt" not in record.__dict__
 

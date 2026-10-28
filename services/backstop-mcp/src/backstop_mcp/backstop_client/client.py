@@ -7,6 +7,7 @@ from typing import NoReturn, cast, overload
 
 import httpx
 from fastmcp.exceptions import ToolError
+from mcp_observability import identifiable_value
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
@@ -384,7 +385,7 @@ class BackstopClient:
 
     def _log_extra(self, session: CallerSession, **fields: object) -> dict[str, object]:
         return {
-            "username": session.credential.username,
+            "username": identifiable_value(session.credential.username),
             "subject": session.subject,
             **fields,
         }
