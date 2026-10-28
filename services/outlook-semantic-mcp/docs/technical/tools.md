@@ -370,7 +370,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 **Usage notes:**
 
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
-- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`.
+- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, the body is still returned and `chunks` is left out.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
 

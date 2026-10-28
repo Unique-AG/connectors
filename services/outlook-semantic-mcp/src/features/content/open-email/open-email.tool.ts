@@ -71,7 +71,7 @@ export const EmailDataSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Semantically matched passages from the ingested email, including attachment text. Present when `uniqueContentId` was passed. The live message body is `text`. When editing a draft, change `text`, not `chunks`.',
+      'Semantically matched passages from the ingested email, including attachment text. Present when `uniqueContentId` was passed and the ingested email could be read. The live message body is `text`. When editing a draft, change `text`, not `chunks`.',
     ),
 });
 
