@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BuildWebLinksCommand, webLinkMapKey } from '../build-web-links.command';
+import { BuildWebLinksCommand, WebLinks } from '../build-web-links.command';
 
 const OWN_EMAIL = 'user@example.com';
 const SHARED_EMAIL = 'shared@example.com';
@@ -9,6 +9,23 @@ function makeCommand(translateResult: Map<string, string> = new Map()) {
   const translateQuery = { run: vi.fn().mockResolvedValue(translateResult) };
   return { command: new BuildWebLinksCommand(translateQuery as never), translateQuery };
 }
+
+describe('WebLinks', () => {
+  it.each([
+    [null, 'msg-1'],
+    [OWN_EMAIL, undefined],
+    [OWN_EMAIL, null],
+  ])('returns an empty string for mailbox %s and id %s', (mailbox, id) => {
+    const webLinks = new WebLinks();
+    webLinks.set(OWN_EMAIL, 'msg-1', 'https://outlook.test/own');
+
+    expect(webLinks.get(mailbox, id)).toBe('');
+  });
+
+  it('returns an empty string for an unknown message', () => {
+    expect(new WebLinks().get(OWN_EMAIL, 'msg-1')).toBe('');
+  });
+});
 
 describe('BuildWebLinksCommand', () => {
   it('returns own-mailbox webLink as-is without calling translation', async () => {
@@ -21,7 +38,7 @@ describe('BuildWebLinksCommand', () => {
       ],
     });
 
-    expect(result.get(webLinkMapKey(OWN_EMAIL, 'msg-1'))).toBe('https://outlook.test/own');
+    expect(result.get(OWN_EMAIL, 'msg-1')).toBe('https://outlook.test/own');
     expect(translateQuery.run).not.toHaveBeenCalled();
   });
 
@@ -33,7 +50,7 @@ describe('BuildWebLinksCommand', () => {
       ids: [{ id: 'immutable-1', isImmutable: true, mailbox: SHARED_EMAIL, webLink: '' }],
     });
 
-    expect(result.get(webLinkMapKey(SHARED_EMAIL, 'immutable-1'))).toBe(
+    expect(result.get(SHARED_EMAIL, 'immutable-1')).toBe(
       'https://outlook.office365.com/owa/?ItemID=rest-1&exvsurl=1&viewmodel=ReadMessageItem',
     );
   });
@@ -46,7 +63,7 @@ describe('BuildWebLinksCommand', () => {
       ids: [{ id: 'rest-1', isImmutable: false, mailbox: SHARED_EMAIL, webLink: '' }],
     });
 
-    expect(result.get(webLinkMapKey(SHARED_EMAIL, 'rest-1'))).toBe(
+    expect(result.get(SHARED_EMAIL, 'rest-1')).toBe(
       'https://outlook.office365.com/owa/?ItemID=rest-1&exvsurl=1&viewmodel=ReadMessageItem',
     );
     expect(translateQuery.run).not.toHaveBeenCalled();
@@ -60,7 +77,7 @@ describe('BuildWebLinksCommand', () => {
       ids: [{ id: 'immutable-1', isImmutable: true, mailbox: SHARED_EMAIL, webLink: '' }],
     });
 
-    expect(result.get(webLinkMapKey(SHARED_EMAIL, 'immutable-1'))).toBe('');
+    expect(result.get(SHARED_EMAIL, 'immutable-1')).toBe('');
   });
 
   it('URL-encodes special characters in RestIds', async () => {
@@ -71,8 +88,6 @@ describe('BuildWebLinksCommand', () => {
       ids: [{ id: 'immutable-1', isImmutable: true, mailbox: SHARED_EMAIL, webLink: '' }],
     });
 
-    expect(result.get(webLinkMapKey(SHARED_EMAIL, 'immutable-1'))).toContain(
-      'ItemID=rest%2Bid%2Fwith%3Dchars',
-    );
+    expect(result.get(SHARED_EMAIL, 'immutable-1')).toContain('ItemID=rest%2Bid%2Fwith%3Dchars');
   });
 });

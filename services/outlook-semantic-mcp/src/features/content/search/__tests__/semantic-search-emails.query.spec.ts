@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { WebLinks } from '~/features/graph-utils/build-web-links.command';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SearchConditionSchema, SearchEmailsInputSchema } from '../search-conditions.dto';
 import { SearchBackend, SearchPageStatus } from '../search-results.types';
@@ -168,7 +169,7 @@ function createMockQuery(
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-  const buildWebLinksMock = { run: vi.fn().mockResolvedValue(new Map()) } as any;
+  const buildWebLinksMock = { run: vi.fn().mockResolvedValue(new WebLinks()) } as any;
   const instance = new SemanticSearchEmailsQuery(
     getDelegatedAccessQuery,
     apiMock,
@@ -305,6 +306,21 @@ describe('SemanticSearchEmailsQuery', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0]?.text).toBe('from first search');
+    });
+
+    it.each([
+      ['true', true],
+      ['false', false],
+    ])('exposes metadata isDraft %s as isDraft %s', async (metadataIsDraft, expected) => {
+      const { instance } = createMockQuery({
+        searchResults: [
+          [{ ...makeSearchItem('mail-1'), metadata: { id: 'graph-1', isDraft: metadataIsDraft } }],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.isDraft).toBe(expected);
     });
 
     it('returns every email of every search without a count cap', async () => {

@@ -10,10 +10,7 @@ import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy, unique } from 'remeda';
 import { UserProfile } from '~/db';
 import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
-import {
-  BuildWebLinksCommand,
-  webLinkMapKey,
-} from '~/features/graph-utils/build-web-links.command';
+import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { traceError } from '~/features/tracing.utils';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
@@ -259,6 +256,7 @@ export class SemanticSearchEmailsQuery {
           receivedDateTime:
             convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone) ?? '',
           backend: SearchBackend.Unique,
+          isDraft: metadata?.isDraft === 'true',
           text: concatChunks(Array.from(item.chunks.values())),
           openEmailParams: {
             id: item.content.id,
@@ -292,22 +290,16 @@ export class SemanticSearchEmailsQuery {
       ];
     });
 
-    const webLinksMap = await this.buildWebLinksCommand.run({
+    const webLinks = await this.buildWebLinksCommand.run({
       userProfileId: userProfile.id,
       userProfileEmail: userProfile.email,
       ids: buildWebLinksForIds,
     });
 
-    const results = rawResults.map((message) => {
-      const outlookWebLink =
-        message.msGraphMessageId && message.sourceMailbox
-          ? (webLinksMap.get(webLinkMapKey(message.sourceMailbox, message.msGraphMessageId)) ?? '')
-          : '';
-      return {
-        ...message,
-        outlookWebLink,
-      };
-    });
+    const results = rawResults.map((message) => ({
+      ...message,
+      outlookWebLink: webLinks.get(message.sourceMailbox, message.msGraphMessageId),
+    }));
 
     return results;
   }

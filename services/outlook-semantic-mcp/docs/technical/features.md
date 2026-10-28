@@ -55,6 +55,26 @@ Available in both modes. Behaviour is identical.
 
 ---
 
+## Draft Editing
+
+Available in both modes. Behaviour is identical.
+
+**What's supported**
+
+- Edit an existing unsent draft — subject, body, To and CC recipients — via `update_draft_email`. This works for drafts created by the MCP and for drafts the user wrote in Outlook.
+- Add attachments to an existing draft via `add_attachments_to_draft_email`.
+- Remove attachments from an existing draft via `remove_attachments_from_draft_email`. The user must confirm the removal in a prompt first.
+- Find drafts with `search_emails` (results carry `isDraft`) and read them with `open_email` before editing. Edits in a shared or delegated mailbox use the `mailbox` parameter.
+
+**What's not supported**
+
+- Editing a message that was already sent. Every editing tool re-reads the message from Microsoft Graph and refuses when it is no longer a draft.
+- Editing only part of the body. `update_draft_email` replaces the whole body (including the quoted thread of a reply draft), so the agent rewrites it from what it read.
+
+**See also:** [Tools — Draft Editing](./tools.md#Draft-Editing)
+
+---
+
 ## Contact Resolution
 
 Available in both modes. Behaviour is identical.

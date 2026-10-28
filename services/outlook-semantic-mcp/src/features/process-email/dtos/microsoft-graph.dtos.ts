@@ -35,6 +35,10 @@ export const graphMessageSchema = z.object({
   flag: graphFollowupFlagSchema.optional().nullable(),
   from: graphRecipientSchema.optional().nullable(),
   hasAttachments: z.boolean().optional().nullable(),
+  attachments: z
+    .array(z.object({ name: z.string(), isInline: z.boolean().optional().nullable() }))
+    .optional()
+    .nullable(),
   id: z.string(),
   importance: z.enum(['low', 'normal', 'high']).optional().nullable(),
   inferenceClassification: z.enum(['focused', 'other']).optional().nullable(),
@@ -54,7 +58,10 @@ export const graphMessageSchema = z.object({
 
 export type GraphMessage = z.infer<typeof graphMessageSchema>;
 
-export const GraphMessageFields = asAllOptions<keyof GraphMessage>()([
+// `attachments` is a navigation property: Graph returns it through $expand, not $select.
+export const GRAPH_MESSAGE_ATTACHMENTS_EXPAND = 'attachments($select=name,isInline)';
+
+export const GraphMessageFields = asAllOptions<Exclude<keyof GraphMessage, 'attachments'>>()([
   `categories`,
   `ccRecipients`,
   `conversationId`,

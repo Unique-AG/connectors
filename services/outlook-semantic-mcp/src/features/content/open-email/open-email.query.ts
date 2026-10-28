@@ -25,6 +25,16 @@ const graphMessageSchema = z.object({
   receivedDateTime: z.string().optional(),
   webLink: z.string().optional(),
   hasAttachments: z.boolean().optional(),
+  isDraft: z.boolean().optional(),
+  attachments: z
+    .array(
+      z.object({
+        name: z.string(),
+        size: z.number().optional(),
+        isInline: z.boolean().optional(),
+      }),
+    )
+    .default([]),
 });
 
 export interface OpenEmailResult {
@@ -37,6 +47,8 @@ export interface OpenEmailResult {
     receivedDateTime: Nullish<string>;
     webLink: Nullish<string>;
     hasAttachments: boolean;
+    isDraft: boolean;
+    attachments?: { name: string; size?: number; isInline: boolean }[];
   };
   text: string;
 }
@@ -97,8 +109,9 @@ export class OpenEmailQuery {
       .api(messagePath)
       .header('Prefer', `outlook.body-content-type="text"${immutableIdHeader}`)
       .select(
-        'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments',
+        'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments,isDraft',
       )
+      .expand('attachments($select=name,size,isInline)')
       .get();
 
     const message = graphMessageSchema.parse(raw);
@@ -121,6 +134,12 @@ export class OpenEmailQuery {
         receivedDateTime: convertDateTimeToTimezone(message.receivedDateTime, outputTimeZone),
         webLink: message.webLink,
         hasAttachments: message.hasAttachments === true,
+        isDraft: message.isDraft === true,
+        attachments: message.attachments.map(({ name, size, isInline }) => ({
+          name,
+          size,
+          isInline: isInline === true,
+        })),
       },
       text: message.body?.content ?? '',
     };
@@ -143,6 +162,11 @@ export class OpenEmailQuery {
         receivedDateTime: convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone),
         webLink: metadata?.webLink,
         hasAttachments: metadata?.hasAttachments === 'true',
+        isDraft: metadata?.isDraft === 'true',
+        attachments: (metadata?.attachmentNames ?? []).map((name) => ({
+          name,
+          isInline: metadata?.inlineAttachmentNames?.includes(name) ?? false,
+        })),
       },
       text: concatChunks(emailData.chunks ?? []),
     };

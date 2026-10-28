@@ -27,6 +27,11 @@ const SearchEmailResultSchema = z.object({
     .optional()
     .nullable()
     .describe('Date and time the email was received, in ISO 8601 format.'),
+  isDraft: z
+    .boolean()
+    .describe(
+      'True when this message is an unsent draft. A draft can be edited with `update_draft_email` (read it with `open_email` first), but it cannot be replied to.',
+    ),
   text: z
     .string()
     .describe(

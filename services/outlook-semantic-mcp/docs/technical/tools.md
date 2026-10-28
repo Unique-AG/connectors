@@ -17,6 +17,9 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`fetch_next_search_pages`](#fetch_next_search_pages) | Email Search | No | Both |
 | [`open_email`](#open_email) | Email Search | No | Both |
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
+| [`update_draft_email`](#update_draft_email) | Draft Editing | Yes | Both |
+| [`add_attachments_to_draft_email`](#add_attachments_to_draft_email) | Draft Editing | Yes | Both |
+| [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) | Draft Editing | Yes | Both |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | Both |
 | [`list_mailboxes_and_directories`](#list_mailboxes_and_directories) | Mailbox Utilities | Yes | Both |
@@ -49,6 +52,9 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | Tool | What it mutates |
 |------|----------------|
 | `create_draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
+| `update_draft_email` | Replaces the subject, body, or recipient lists of an existing draft via Microsoft Graph |
+| `add_attachments_to_draft_email` | Adds attachments to an existing draft via Microsoft Graph |
+| `remove_attachments_from_draft_email` | Deletes attachments from an existing draft via Microsoft Graph, after the user confirms |
 | `list_mailboxes_and_directories` | Refreshes the folder cache in the internal database by re-fetching the folder tree from Microsoft Graph |
 | `reconnect_inbox` | Creates or renews the Microsoft Graph webhook subscription and writes the subscription record to the internal database |
 | `delete_inbox_data` | Cancels the Microsoft Graph webhook subscription and deletes the subscription record, folder cache, root scope, and all ingested email content from the Unique knowledge base |
@@ -239,6 +245,7 @@ Semantic `isRead` and `flagStatus` are ingested metadata, refreshed by live catc
   }>;
   results?: Array<{
     uniqueContentId?: string;     // Unique KB content ID. Present for semantic-backend results only.
+    isDraft: boolean;             // true when the message is an unsent draft; edit it with update_draft_email after reading it with open_email
     msGraphMessageId?: string;    // Microsoft Graph message ID. Present for Graph-backend results; also present for semantic results when both backends matched the same email.
     backend: "Unique" | "MsGraph"; // which backend returned this result
     folderId: string;              // internal folder ID — do not display to users
@@ -348,7 +355,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   emailData?: {
     id: string;
     title: string | null;
-    metadata: unknown | null;
+    metadata: unknown | null;  // includes isDraft and attachments (name, isInline; Graph results also carry size)
     text: string;              // full email body or the matched chunks depending on which search returned the results
   };
 }
@@ -359,6 +366,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually.
 - The `text` field in `emailData` contains the full email body. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - The response is not capped: an email ingested with large attachments (Mode A) returns all of its text.
+- `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email). `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like), which [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) takes. In Mode A the names of semantic results come from the `attachmentNames` and `inlineAttachmentNames` metadata written at ingestion; emails ingested before that metadata existed show an empty list until they are re-ingested, which happens when the message changes.
 
 ---
 
@@ -433,6 +441,97 @@ Supports two modes selected by `recipientsData.type`:
 - If attachments partially fail, the draft is still created and `draftId` is returned alongside the `attachmentsFailed` list.
 - The `webLink` in the response opens the draft directly in Outlook Web.
 - For shared mailbox reply drafts: in Outlook Web the reply appears in the **Drafts** folder rather than inline in the thread — this is expected Outlook Web behaviour. The draft sends correctly regardless. In Outlook desktop the reply appears and sends normally.
+
+---
+
+## Draft Editing
+
+Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `create_draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads it with [`open_email`](#open_email), and then edits it.
+
+All three tools take the same target fields:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `draftId` | string | Yes | Microsoft Graph message ID of the draft: `msGraphMessageId` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
+| `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result. Omit for a `draftId` returned by `create_draft_email`. |
+| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`sourceMailbox` from the search result). Omit for the signed-in user's own mailbox. |
+
+Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
+
+### `update_draft_email`
+
+Edit the subject, body, and recipients of an existing draft.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `subject` | string | No | Replacement subject. Omit to keep it. |
+| `content` | string | No | Replacement body in Markdown. It replaces the **whole** body, including the quoted earlier thread of a reply draft. Omit to keep it. |
+| `toRecipients` | array | No | Replacement To list (at least one entry). Replaces the whole list. Omit to keep it. |
+| `ccRecipients` | array | No | Replacement CC list. Replaces the whole list; an empty array removes every CC recipient. Omit to keep it. |
+
+At least one of `subject`, `content`, `toRecipients`, or `ccRecipients` is required. Only the fields passed are sent to Graph (`PATCH /me/messages/{id}`).
+
+**Return shape:**
+
+```typescript
+{
+  success: boolean;
+  message: string;
+  draftId?: string;   // present when success is true
+  webLink?: string;   // link to open the draft in Outlook
+}
+```
+
+**Usage notes:**
+
+- Because `content` replaces the whole body, the agent is instructed to read the draft with `open_email` first and rewrite from what it read, keeping everything the user did not ask to change.
+- This tool does not touch attachments.
+
+### `add_attachments_to_draft_email`
+
+Attach files to an existing draft. The files already on the draft stay.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `attachments` | array | Yes | Files to attach. Same `fileName` / `data` shape and URI schemes as `create_draft_email`. |
+
+**Return shape:**
+
+```typescript
+{
+  success: boolean;   // true when at least one attachment was added
+  message: string;
+  attachmentsFailed?: Array<{ fileName: string; reason: string }>;
+}
+```
+
+**Usage notes:**
+
+- Adding a file whose name is already on the draft attaches a second copy. To replace a file, remove the old one first.
+- The `unique://content/{contentId}` scheme has the same availability restriction as in `create_draft_email`.
+
+### `remove_attachments_from_draft_email`
+
+Remove attachments from an existing draft, by file name.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `fileNames` | string[] | Yes | File names to remove, as listed in `metadata.attachments` from `open_email`. Matching ignores case, and every attachment with a given name is removed. |
+
+**Confirmation:** the user is asked to confirm the removal in an MCP elicitation prompt that names the draft and the files, because a removed attachment cannot be restored. If the user declines, or the client cannot show the prompt, nothing is removed. There is no parameter that skips the prompt.
+
+If a requested name is not on the draft, nothing is removed and the response lists the draft's actual attachment names.
+
+**Return shape:**
+
+```typescript
+{
+  success: boolean;   // true when every requested attachment was removed
+  message: string;
+  removed?: string[];
+  failed?: Array<{ fileName: string; reason: string }>;
+}
+```
 
 ---
 

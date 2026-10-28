@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when `CALENDAR_INTEGRATION` is enabled.
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 13 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when `CALENDAR_INTEGRATION` is enabled.
 
 **Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
@@ -17,7 +17,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 10 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when `CALENDAR_INTEGRATION` is enabled
+**What it does:** Provides AI clients with 13 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when `CALENDAR_INTEGRATION` is enabled
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -59,6 +59,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 - Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `create_draft_email`
 - Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
 - Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
+- Edit an existing draft (including one the user wrote in Outlook) — subject, body, recipients — via `update_draft_email`, and add or remove its attachments via `add_attachments_to_draft_email` and `remove_attachments_from_draft_email` (removal asks the user to confirm)
 
 **Contact Lookup**
 
@@ -200,6 +201,8 @@ The `create_draft_email` tool creates a draft in the user's Outlook Drafts folde
 
 See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) for the detailed sequence diagram.
 
+Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_email`, and `remove_attachments_from_draft_email` after the agent finds them (`search_emails` results carry `isDraft`) and reads them with `open_email`. See [Email Draft Editing Flow](./technical/flows.md#Email-Draft-Editing-Flow).
+
 ### User Workflow
 
 1. **User Setup** (One-time)
@@ -221,7 +224,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
    - Open specific messages with `open_email`
-   - Compose drafts with `create_draft_email`
+   - Compose drafts with `create_draft_email` and edit them with `update_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
    - When calendar is enabled: list calendars, search events, check availability, and create or update meetings
