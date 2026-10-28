@@ -149,24 +149,14 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseBranch = process.env.BASE_BRANCH ?? 'main';
 const gh = (...args) => runOrThrow('gh', args);
 const openPullRequests = JSON.parse(
-  gh(
-    'pr',
-    'list',
-    '--state',
-    'open',
-    '--limit',
-    '500',
-    '--json',
-    'number,headRefName,title,labels,body',
-  ),
+  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,body'),
 );
 const openPulls = openPullRequests
   .filter(({ headRefName }) => headRefName.startsWith('deps/'))
-  .map(({ number, headRefName, labels, body }) => ({
+  .map(({ number, headRefName, body }) => ({
     number,
     branch: headRefName,
     body,
-    labels: labels.map(({ name }) => name),
     behindBy: Number(
       gh('api', `repos/${repository}/compare/${baseBranch}...${headRefName}`, '--jq', '.behind_by'),
     ),
@@ -190,9 +180,6 @@ const closedBodies = gh(
   .split('\n')
   .filter(Boolean)
   .map((line) => JSON.parse(line));
-const patchTitles = openPullRequests
-  .filter(({ labels }) => labels.some(({ name }) => name === 'vulna-squash'))
-  .map(({ title }) => title);
 const plan = buildPlan({
   candidates: [
     ...npm.candidates,
@@ -211,7 +198,6 @@ const plan = buildPlan({
   config,
   openPulls,
   closedKeys: closedKeysOf(closedBodies),
-  patchTitles,
 });
 
 const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');

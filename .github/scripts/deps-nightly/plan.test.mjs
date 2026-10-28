@@ -305,7 +305,6 @@ describe('buildPlan', () => {
       number: 7,
       branch: 'deps/npm-zod',
       body: markerOf(zod.key),
-      labels: [],
       behindBy: 2,
       humanCommits: false,
       ...overrides,
@@ -342,22 +341,16 @@ describe('buildPlan', () => {
       );
     });
 
-    it('only merges main into a pull request that the agent or a person touched', () => {
-      for (const touched of [
-        { labels: ['ai-assisted'] },
-        { labels: ['human-required'] },
-        { humanCommits: true },
-      ]) {
-        const { entries, updates } = plan([pull(touched)]);
-        assert.deepStrictEqual(
-          updates.map(({ slug, number }) => [slug, number]),
-          [['npm-zod', 7]],
-        );
-        assert.deepStrictEqual(
-          entries.map(({ slug }) => slug),
-          ['npm-pino'],
-        );
-      }
+    it('only merges main into a pull request that has a commit from a person', () => {
+      const { entries, updates } = plan([pull({ humanCommits: true })]);
+      assert.deepStrictEqual(
+        updates.map(({ slug, number }) => [slug, number]),
+        [['npm-zod', 7]],
+      );
+      assert.deepStrictEqual(
+        entries.map(({ slug }) => slug),
+        ['npm-pino'],
+      );
     });
 
     it('replaces a pull request for another version', () => {
@@ -408,27 +401,6 @@ describe('buildPlan', () => {
     assert.deepStrictEqual(
       entries.map(({ name }) => name),
       ['pino'],
-    );
-  });
-
-  it('skips a name that an open patch pull request names in its title', () => {
-    const { entries, skipped } = buildPlan({
-      candidates: [
-        candidate('uv', 'pillow'),
-        candidate('uv', 'pillow-heif'),
-        candidate('uv', 'pino'),
-      ],
-      needsPerson: [],
-      config,
-      patchTitles: ['build(main): vulna squash pillow 12.3.0→13.0.0'],
-    });
-    assert.deepStrictEqual(
-      entries.map(({ slug }) => slug),
-      ['uv-pillow-heif', 'uv-pino'],
-    );
-    assert.deepStrictEqual(
-      skipped.map(({ slug }) => slug),
-      ['uv-pillow'],
     );
   });
 

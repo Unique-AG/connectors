@@ -162,7 +162,7 @@ jobs:
           NUMBER: ${{ matrix.entry.number }}
         run: |
           gh pr update-branch "$NUMBER" || echo "::warning::#$NUMBER does not update from main. A person must resolve the conflict."
-          echo "- #$NUMBER: main merged in, because the agent or a person touched this pull request." >> "$GITHUB_STEP_SUMMARY"
+          echo "- #$NUMBER: main merged in, because a person pushed a commit to this pull request." >> "$GITHUB_STEP_SUMMARY"
 
   bump:
     name: Bump ${{ matrix.entry.slug }}

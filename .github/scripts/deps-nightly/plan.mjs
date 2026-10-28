@@ -185,12 +185,6 @@ function interleave(entries) {
     .filter(Boolean);
 }
 
-function mentions(titles, name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`, 'i');
-  return titles.some((title) => pattern.test(title));
-}
-
 function isIgnored(rules, candidate) {
   return rules.some(
     ({ ecosystem, name, updateTypes }) =>
@@ -206,7 +200,6 @@ export function buildPlan({
   config,
   openPulls = [],
   closedKeys = new Set(),
-  patchTitles = [],
 }) {
   const ignored = candidates.filter((candidate) => isIgnored(config.ignore ?? [], candidate));
   const buckets = Map.groupBy(
@@ -255,9 +248,6 @@ export function buildPlan({
   const decisions = ordered.map((entry) => {
     if (closedKeys.has(entry.key)) {
       return { entry, skip: 'a person closed this version' };
-    }
-    if (entry.members.some(({ name }) => mentions(patchTitles, name))) {
-      return { entry, skip: 'an open patch pull request names it' };
     }
     const pull = openByBranch.get(`deps/${entry.slug}`);
     if (!pull) {

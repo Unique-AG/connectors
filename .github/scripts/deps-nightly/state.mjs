@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 
 const MARKER = /<!-- deps-nightly:(\S+) -->/;
-const HANDLED_LABELS = ['ai-assisted', 'human-required'];
 
 export function entryKey({ slug, members }) {
   const targets = members
@@ -24,6 +23,5 @@ export function classifyOpenPull({ key, pull }) {
   if (pull.behindBy === 0) {
     return 'keep';
   }
-  const handled = pull.humanCommits || pull.labels.some((label) => HANDLED_LABELS.includes(label));
-  return handled ? 'update' : 'rebuild';
+  return pull.humanCommits ? 'update' : 'rebuild';
 }
