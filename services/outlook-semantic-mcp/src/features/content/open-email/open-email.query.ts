@@ -1,5 +1,5 @@
 import { type UniqueApiClient } from '@unique-ag/unique-api';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
@@ -56,6 +56,8 @@ export interface OpenEmailResult {
 
 @Injectable()
 export class OpenEmailQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -95,7 +97,16 @@ export class OpenEmailQuery {
     if (!uniqueContentId) {
       return message;
     }
-    return { ...message, chunks: await this.readRelevantChunks(uniqueContentId, chunkIds) };
+    try {
+      return { ...message, chunks: await this.readRelevantChunks(uniqueContentId, chunkIds) };
+    } catch (err) {
+      this.logger.warn({
+        msg: 'Failed to read matched chunks from Unique; returning the Graph body without them',
+        uniqueContentId,
+        err,
+      });
+      return message;
+    }
   }
 
   private async readMessageFromMsGraph(

@@ -88,6 +88,20 @@ describe('OpenEmailQuery', () => {
     expect(result.chunks).toBe('attachment clause');
   });
 
+  it('returns the Graph body without chunks when the ingested email cannot be read', async () => {
+    getContentById.mockRejectedValue(new Error('Unique API Content not found'));
+
+    const result = await instance.run({
+      userProfileId: 'user-1',
+      id: 'msg-1',
+      uniqueContentId: 'cont-1',
+      chunkIds: ['chunk-kept'],
+    });
+
+    expect(result.text).toBe('Hello');
+    expect(result.chunks).toBeUndefined();
+  });
+
   it('does not load ingested chunks when the params have none', async () => {
     const result = await run();
 
