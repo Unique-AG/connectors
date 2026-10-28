@@ -72,7 +72,7 @@ async def test_every_tool_call_is_counted_with_its_outcome(server: FastMCP) -> N
     assert 'mcp_call_duration_seconds_count{kind="tool",name="greet"}' in text
 
 
-async def test_a_failed_call_is_logged_once_with_a_traceback_only_for_an_unexpected_error(
+async def test_a_failed_call_is_logged_once_with_its_exception_out_of_the_message(
     server: FastMCP, caplog: pytest.LogCaptureFixture
 ) -> None:
     setup_ops(server)
@@ -82,16 +82,14 @@ async def test_a_failed_call_is_logged_once_with_a_traceback_only_for_an_unexpec
             await client.call_tool("fail", {}, raise_on_error=False)
             await client.call_tool("crash", {}, raise_on_error=False)
 
-    tracebacks = [record.getMessage() for record in caplog.records if record.exc_info]
     outcomes = [
-        (record.levelno, record.getMessage())
+        (record.levelno, record.getMessage(), record.exc_info is not None)
         for record in caplog.records
         if record.name == "mcp_observability"
     ]
-    assert tracebacks == ["Error calling tool 'crash'"]
     assert outcomes == [
-        (logging.WARNING, "tool 'fail' failed: no"),
-        (logging.WARNING, "tool 'crash' failed: Error calling tool 'crash': bug"),
+        (logging.WARNING, "tool 'fail' failed", True),
+        (logging.WARNING, "tool 'crash' failed", True),
     ]
 
 

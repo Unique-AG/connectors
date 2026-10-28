@@ -7,6 +7,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.entity_types import SearchType
@@ -44,6 +45,7 @@ type GetTasksForPartyResponse = PartyAmbiguousResponse | NotFoundResponse | Task
     ),
     output_schema=published_output_schema(GetTasksForPartyResponse),
 )
+@trace_arguments("search_type", "party_id", "status")
 async def get_tasks_for_party(
     ctx: Context,
     search_type: Annotated[

@@ -607,11 +607,15 @@ that is not enough to see *which query ran* or *why a walk was empty*. Put spans
 structured logs on the feature path so a trace reads tool → resolve → query/command →
 Backstop.
 
-**Spans.** Open a span around each tool entry and each query/command `run` (and around a
-util only when it is a real unit of work, not a one-line map). Name them after the
-operation (`opportunities.get`, `opportunities.query.get`, `opportunities.command.close`),
-and set attributes the reader will filter on (`segment`, `entity_id`, `status`, counts).
-Use `opentelemetry.trace`. Do not invent a wrapper.
+**Spans.** FastMCP spans each tool call (`tools/call <tool>`). Declare on the tool, under
+`@tool`, the arguments the reader will filter on with `@trace_arguments("search_type",
+"party_id")`, and give each query/command `run` its own span with `@traced(arguments=...,
+result=lambda r: {...})`, both from `mcp_observability`. Declare names or dotted paths into an
+input model (`"person.owner_login"`); a login, email or name goes in `identifying=` and is
+hashed. Nothing is traced unless declared, and a free-text value (a search term, a note) never
+is. `create_app` checks every name and path at startup and crashes on a bad one. A lambda is the
+escape hatch for a computed value; it is not checked. Do not log to put something on a span,
+and do not open spans by hand.
 
 **Logs.** Dotted event names, structured `extra`, no interpolated messages:
 

@@ -1732,6 +1732,7 @@ version = "0.1.0"
 source = { directory = "../../packages/mcp-observability" }
 dependencies = [
     { name = "fastmcp" },
+    { name = "httpx" },
     { name = "mcp-configs" },
     { name = "mcp-types" },
     { name = "opentelemetry-api" },
@@ -1745,6 +1746,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=4.1,<5" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "mcp-configs", directory = "../../packages/mcp-configs" },
     { name = "mcp-types", specifier = ">=2.3,<3" },
     { name = "opentelemetry-api", specifier = ">=1.40,<2" },

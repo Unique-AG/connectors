@@ -8,7 +8,13 @@ from mcp.server.transport_security import (
     RequestBodyLimitMiddleware,
 )
 from mcp_configs import TracingSettings
-from mcp_observability import OPS_PATHS, configure_tracing, setup_ops
+from mcp_observability import (
+    OPS_PATHS,
+    ToolCallObservabilityMiddleware,
+    configure_tracing,
+    setup_ops,
+    validate_trace_declarations,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from pydantic import SecretStr
@@ -88,8 +94,11 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
+        # Outermost MCP middleware. `setup_ops` appends metrics inside it.
+        middleware=[ToolCallObservabilityMiddleware()],
     )
     registered = tuple(mcp.add_tool(fn) for fn in TOOLS)
+    validate_trace_declarations()
     check_guidance_targets(guidance, registered)
     if guidance.tools:
         for tool in registered:

@@ -76,9 +76,9 @@ def configure_logging(settings: LoggingSettings, *, own_loggers: Sequence[str]) 
 
     # Python warnings otherwise reach stderr as plain text the log pipeline cannot parse.
     logging.captureWarnings(True)
-    _install("fastmcp.server.mixins.mcp_operations", _FastMcpArgumentDump)
+    add_filter_once("fastmcp.server.mixins.mcp_operations", _FastMcpArgumentDump)
     for name in _ACCESS_LOGGERS:
-        _install(name, _QuietOpsRoutes)
+        add_filter_once(name, _QuietOpsRoutes)
 
 
 class PinoJsonFormatter(logging.Formatter):
@@ -163,7 +163,7 @@ def _reclaim(name: str) -> None:
     reclaimed.setLevel(logging.NOTSET)
 
 
-def _install(logger_name: str, filter_type: type[logging.Filter]) -> None:
+def add_filter_once(logger_name: str, filter_type: type[logging.Filter]) -> None:
     target = logging.getLogger(logger_name)
     if not any(isinstance(existing, filter_type) for existing in target.filters):
         target.addFilter(filter_type())

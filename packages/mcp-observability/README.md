@@ -34,6 +34,19 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   every exported span, on a provider installed before this too, loses its exception messages and
   its status description: an `exception` event keeps `exception.type` and a stack of frames and
   exception types. FastMCP records every exception a tool raises on its span, message included.
+- `@traced(arguments=..., identifying=..., result=...)` opens a child span named `Class.method`,
+  or the function's name, with the declared arguments as `input.<name>` and the result as
+  `result.<name>`. `@trace_arguments(...)` under
+  a FastMCP `@tool` puts the declared arguments on the `tools/call <tool>` span as
+  `tool.argument.<name>`. An argument is a name or a dotted path into a pydantic model, checked by
+  `validate_trace_declarations()` at startup, or a lambda, which is not checked. `identifying`
+  values are hashed. A value that cannot go on the span is skipped with one WARNING; tracing
+  never fails the call.
+- `ToolCallObservabilityMiddleware(packages=(...))`: the outermost FastMCP middleware. Logs
+  `Tool call started` and one of `Tool call completed`, `failed` or `cancelled` per call, with the
+  values `@trace_arguments` declared, a failure at its level (an exception class can declare one
+  with `DeclaresFailureLevel`) and an invalid argument as `failed_fields`. It drops FastMCP's and
+  `setup_ops`'s per-call lines for a tool, which repeat it and can quote the input.
 - `setup_ops(mcp)`: serves `/probe`, `/health` and `/metrics` from the server, counts, times and
   logs every tool, resource and prompt call (`mcp_calls_total`, `mcp_call_duration_seconds`), and
   returns the HTTP metrics middleware (`python_http_requests_total`,
