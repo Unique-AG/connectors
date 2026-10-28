@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "root": true,
   "vcs": {
     "enabled": true,
@@ -9,6 +9,16 @@
   "html": {
     "parser": {
       "interpolation": true
+    }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
     }
   },
   "files": {
@@ -25,6 +35,7 @@
       "!**/*.generated.*",
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",
+      "!**/helm-charts/**/templates",
       "!**/.github",
       "!**/scripts"
     ]
