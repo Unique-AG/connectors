@@ -67,7 +67,9 @@ dev = [
     "respx==0.23.1",
     "testcontainers==4.15.0",
     "certifi==2026.10.23",
+    "gherkin-official==42.0.1",
     "poethepoet==0.49.0",
+    "pyyaml==6.0.3",
 ]
 
 [tool.poe.tasks]
@@ -97,6 +99,9 @@ exclude = [".venv"]
 # ANN: requires type annotations on function arguments (ANN001-003) and return
 # values (ANN2xx) — enforced everywhere, not just public functions.
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/dogfood/**" = ["E402", "E501", "ANN001", "ANN401"]
 
 [tool.basedpyright]
 venvPath = "."

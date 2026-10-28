@@ -1,0 +1,64 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": { "$select": "displayName,totalItemCount,unreadItemCount" },
+    "status": 200,
+    "body": "me.mailFolders.inbox.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "query": {
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "25",
+      "$orderby": "receivedDateTime desc"
+    },
+    "status": 200,
+    "body": "me.messages.three.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": { "$select": "displayName,totalItemCount,unreadItemCount" },
+    "status": 200,
+    "body": "me.mailFolders.inbox.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "query": {
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "25",
+      "$orderby": "receivedDateTime desc"
+    },
+    "status": 200,
+    "body": "me.messages.three.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/AAMkAGI2RUN-0001=/move",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "json": { "DestinationId": "archive" },
+    "status": 201,
+    "body": "me.messages.0001.move.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/AAMkAGI2RUN-0002=/move",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "json": { "DestinationId": "archive" },
+    "status": 201,
+    "body": "me.messages.0001.move.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/AAMkAGI2RUN-0003=/move",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "json": { "DestinationId": "archive" },
+    "status": 201,
+    "body": "me.messages.0003.move.json"
+  }
+]

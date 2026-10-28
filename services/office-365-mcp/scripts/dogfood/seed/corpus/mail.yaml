@@ -1,0 +1,472 @@
+# Every mail the seed creates. People are persona keys from personas.yaml, never addresses.
+# owner:    the mailbox that holds the item (the run that creates it signs in as this persona)
+# folder:   inbox | sentitems | drafts (Graph well-known names) or a key from folders.yaml
+# received: "-<days>d HH:MM" in UTC, relative to the anchor date (default: the day of the run)
+# body:     {type: text|html, content: ...}; content "" is an empty body
+# subject:  leave it out for a message with no subject
+# thread:   a key from `threads`; messages of one thread share one conversation index
+threads:
+  relaunch:
+    topic: "Website relaunch: launch checklist"
+  budget:
+    topic: Q3 budget review
+  offsite_dinner:
+    topic: "Offsite: dinner reservation"
+  laptop_thanks:
+    topic: "Laptop rollout: thanks"
+
+messages:
+  # Thread 1: 12 messages, Mia's replies are in her Sent Items.
+  - id: m01
+    thread: relaunch
+    folder: sentitems
+    from: mia
+    to: [tom, anna]
+    subject: "Website relaunch: launch checklist"
+    body: {type: text, content: "Hi both, here is the first launch checklist for the website relaunch. Please add what is missing by Friday."}
+    received: "-9d 08:05"
+    read: true
+    categories: [Website]
+  - id: m02
+    thread: relaunch
+    folder: inbox
+    from: tom
+    to: [mia]
+    cc: [anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "I added the DNS switch and the certificate renewal. The staging server is ready."}
+    received: "-9d 10:40"
+    read: true
+    categories: [Website]
+  - id: m03
+    thread: relaunch
+    folder: sentitems
+    from: mia
+    to: [tom]
+    cc: [anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "Thanks Tom. Can we test the redirects on staging this week?"}
+    received: "-8d 07:55"
+    read: true
+    categories: [Website]
+  - id: m04
+    thread: relaunch
+    folder: inbox
+    from: anna
+    to: [mia, tom]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "From the finance side: the hosting contract changes on the first of next month. Please keep the old hosting until then."}
+    received: "-8d 09:20"
+    read: true
+    categories: [Website, Finance]
+  - id: m05
+    thread: relaunch
+    folder: inbox
+    from: tom
+    to: [mia, anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "Redirect test done: 212 of 214 old pages redirect correctly. Two press pages are missing."}
+    received: "-7d 14:02"
+    read: true
+    categories: [Website]
+  - id: m06
+    thread: relaunch
+    folder: sentitems
+    from: mia
+    to: [tom, anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "Good result. I will ask the agency for the two press pages."}
+    received: "-7d 15:30"
+    read: true
+    categories: [Website]
+  - id: m07
+    thread: relaunch
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "The agency sent the press pages. I put them on staging."}
+    received: "-5d 11:15"
+    read: true
+    flag: flagged
+    categories: [Website]
+  - id: m08
+    thread: relaunch
+    folder: inbox
+    from: anna
+    to: [mia, tom]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "The purchase order for the agency is approved. Order number PO-4471."}
+    received: "-4d 08:45"
+    read: true
+    categories: [Website, Finance]
+  - id: m09
+    thread: relaunch
+    folder: sentitems
+    from: mia
+    to: [tom, anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "We go live next Tuesday at 07:00. Tom, please confirm the DNS window."}
+    received: "-3d 16:10"
+    read: true
+    categories: [Website]
+  - id: m10
+    thread: relaunch
+    folder: inbox
+    from: tom
+    to: [mia]
+    cc: [anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "DNS window confirmed: Tuesday 06:30 to 07:30."}
+    received: "-2d 09:05"
+    read: false
+    categories: [Website]
+  - id: m11
+    thread: relaunch
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "Who signs the go-live protocol? I need the name for the invoice."}
+    received: "-1d 08:30"
+    read: false
+    categories: [Website, Finance]
+  - id: m12
+    thread: relaunch
+    folder: inbox
+    from: tom
+    to: [mia, anna]
+    subject: "RE: Website relaunch: launch checklist"
+    body: {type: text, content: "Final check list is green. Only the cookie banner text is still open."}
+    received: "-1d 13:50"
+    read: false
+    importance: high
+    categories: [Website]
+
+  # Thread 2: 5 messages.
+  - id: m13
+    thread: budget
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: Q3 budget review
+    body: {type: text, content: "Mia, the Q3 review is due. Your project spent 18 percent more on external services than planned."}
+    received: "-6d 09:00"
+    read: true
+    categories: [Finance]
+  - id: m14
+    thread: budget
+    folder: sentitems
+    from: mia
+    to: [anna]
+    subject: "RE: Q3 budget review"
+    body: {type: text, content: "The agency work for the press pages was not planned. I will write a short explanation."}
+    received: "-6d 11:30"
+    read: true
+    categories: [Finance]
+  - id: m15
+    thread: budget
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "RE: Q3 budget review"
+    body: {type: text, content: "Thanks. Please also add the forecast for Q4."}
+    received: "-5d 08:10"
+    read: true
+    categories: [Finance]
+  - id: m16
+    thread: budget
+    folder: sentitems
+    from: mia
+    to: [anna]
+    subject: "RE: Q3 budget review"
+    body: {type: text, content: "Forecast for Q4: no more agency costs, hosting stays the same."}
+    received: "-4d 17:20"
+    read: true
+    categories: [Finance]
+  - id: m17
+    thread: budget
+    folder: inbox
+    from: anna
+    to: [mia]
+    cc: [tom]
+    subject: "RE: Q3 budget review"
+    body: {type: text, content: "Accepted. I attach the final numbers. Please check line 7 before Thursday."}
+    received: "-1d 10:05"
+    read: false
+    flag: flagged
+    importance: high
+    categories: [Finance]
+    attachments: [q3-numbers]
+
+  # Single messages in the Inbox.
+  - id: m18
+    folder: inbox
+    from: tom
+    to: [mia]
+    cc: [anna]
+    subject: Office move to the third floor
+    body: {type: text, content: "The office move is on the 14th. Please pack your desk by the evening before."}
+    received: "-1d 07:40"
+    read: false
+  - id: m19
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "Laptop rollout: your new device"
+    body: {type: text, content: "Your new laptop is ready. You can collect it at the IT desk from 10:00."}
+    received: "-1d 09:25"
+    read: false
+    importance: high
+  - id: m20
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "Laptop rollout: reminder"
+    body: {type: text, content: "Reminder: please back up your files before the laptop exchange."}
+    received: "-2d 15:00"
+    read: false
+  - id: m21
+    folder: inbox
+    from: anna
+    to: [mia, tom]
+    subject: "Team offsite in Lucerne: agenda"
+    body: {type: text, content: "Here is the agenda for the offsite. The boat trip is on the second day."}
+    received: "-2d 10:30"
+    read: false
+    categories: [Offsite]
+    attachments: [offsite-agenda]
+  - id: m22
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "Team offsite in Lucerne: hotel booking"
+    body: {type: text, content: "The hotel is booked for two nights. Check-in is from 15:00."}
+    received: "-3d 12:00"
+    read: true
+    categories: [Offsite]
+  - id: m23
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "Print vendor contract: Alpine Print offer"
+    body: {type: text, content: "Alpine Print sent their offer for the brochures. The PDF is attached."}
+    received: "-3d 14:45"
+    read: false
+    flag: flagged
+    attachments: [print-offer]
+  - id: m24
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "Print vendor contract: questions"
+    body: {type: text, content: "Do we need the paper samples before we sign?"}
+    received: "-4d 10:10"
+    read: true
+  - id: m25
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "Hiring: junior designer interview slots"
+    body: {type: text, content: "Three candidates are available on Wednesday morning. Which slots do you want?"}
+    received: "-4d 13:35"
+    read: false
+  - id: m26
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "Hiring: feedback form"
+    body: {type: text, content: "The feedback form for the interviews is on the team site."}
+    received: "-5d 09:50"
+    read: true
+  - id: m27
+    folder: inbox
+    from: anna
+    to: [mia, tom]
+    subject: Monthly newsletter
+    body: {type: html, content: "<html><body><h1>Lakeside news</h1><p>The canteen has a new <b>vegetarian menu</b> on Mondays.</p><ul><li>Office move on the 14th</li><li>Offsite in Lucerne</li></ul></body></html>"}
+    received: "-5d 07:00"
+    read: false
+  - id: m28
+    folder: inbox
+    from: tom
+    to: [mia]
+    body: {type: text, content: "Sent from the meeting room: the projector cable is in the second drawer."}
+    received: "-6d 16:20"
+    read: false
+  - id: m29
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: Quick question
+    body: {type: text, content: ""}
+    received: "-6d 17:05"
+    read: false
+  - id: m30
+    folder: inbox
+    from: tom
+    to: [mia, anna]
+    subject: Server maintenance on Saturday
+    body: {type: text, content: "The file server is offline on Saturday from 08:00 to 12:00."}
+    received: "-7d 11:00"
+    read: false
+    importance: high
+  - id: m31
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: Expense report reminder
+    body: {type: text, content: "Please submit your September expense report by the end of the week."}
+    received: "-8d 08:00"
+    read: false
+    categories: [Finance]
+  - id: m32
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: Coffee machine on the second floor
+    body: {type: text, content: "The coffee machine on the second floor works again."}
+    received: "-10d 09:30"
+    read: true
+  - id: m33
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: Welcome to the team
+    body: {type: text, content: "Welcome to Lakeside Demo AG. Your first week plan is on the team site."}
+    received: "-20d 08:00"
+    read: true
+  - id: m34
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: "Website relaunch: design review notes"
+    body: {type: text, content: "Notes from the design review: bigger buttons on mobile, darker footer."}
+    received: "-1d 11:20"
+    read: false
+    categories: [Website]
+  - id: m35
+    folder: inbox
+    from: anna
+    to: [mia]
+    subject: "Q3 budget: travel costs"
+    body: {type: text, content: "Travel costs for the offsite go to cost center 4100."}
+    received: "-1d 15:45"
+    read: false
+    categories: [Finance, Offsite]
+
+  # Messages in the seed folders.
+  - id: m36
+    folder: archive
+    from: tom
+    to: [mia]
+    subject: Office keys
+    body: {type: text, content: "Your office key has the number 312."}
+    received: "-30d 10:00"
+    read: true
+  - id: m37
+    folder: archive
+    from: anna
+    to: [mia]
+    subject: Parking permits 2026
+    body: {type: text, content: "The parking permits for 2026 are at the reception."}
+    received: "-28d 09:15"
+    read: true
+  - id: m38
+    folder: handled
+    from: anna
+    to: [mia]
+    subject: Room booking for the board meeting
+    body: {type: text, content: "Room Rigi is booked for the board meeting."}
+    received: "-12d 14:00"
+    read: true
+    flag: complete
+  - id: m39
+    folder: handled
+    from: tom
+    to: [mia]
+    subject: VPN access request
+    body: {type: text, content: "Your VPN access is active."}
+    received: "-11d 08:30"
+    read: true
+    flag: complete
+  - id: m40
+    folder: projects
+    from: anna
+    to: [mia, tom]
+    subject: "Project charter: website relaunch"
+    body: {type: text, content: "The project charter is signed. Budget owner is the marketing team."}
+    received: "-15d 10:00"
+    read: true
+    categories: [Website]
+  - id: m41
+    folder: website
+    from: tom
+    to: [mia]
+    subject: "Website relaunch: sitemap draft"
+    body: {type: text, content: "Sitemap draft with 41 pages. The blog moves to a subfolder."}
+    received: "-13d 15:10"
+    read: false
+    categories: [Website]
+  - id: m42
+    folder: website
+    from: anna
+    to: [mia]
+    subject: "Website relaunch: image rights"
+    body: {type: text, content: "We own the rights for all images from the photo shoot in May."}
+    received: "-14d 11:40"
+    read: true
+    categories: [Website]
+
+  # A draft for the send_draft scenario. It stays a draft in every mail mode.
+  - id: m43
+    folder: drafts
+    draft: true
+    from: mia
+    to: [anna]
+    subject: "Offsite: budget for the dinner"
+    body: {type: text, content: "Hi Anna, can we spend 60 per person for the offsite dinner?"}
+
+  # Anna's mailbox (run as Anna).
+  - id: a01
+    owner: anna
+    thread: offsite_dinner
+    folder: inbox
+    from: mia
+    to: [anna]
+    subject: "Offsite: dinner reservation"
+    body: {type: text, content: "I reserved a table for twelve at the lake restaurant."}
+    received: "-2d 11:00"
+    read: true
+  - id: a02
+    owner: anna
+    thread: budget
+    folder: sentitems
+    from: anna
+    to: [mia]
+    subject: Q3 budget review
+    body: {type: text, content: "Mia, the Q3 review is due. Your project spent 18 percent more on external services than planned."}
+    received: "-6d 09:00"
+    read: true
+    categories: [Finance]
+
+  # Tom's mailbox (run as Tom).
+  - id: t01
+    owner: tom
+    thread: laptop_thanks
+    folder: inbox
+    from: mia
+    to: [tom]
+    subject: "Laptop rollout: thanks"
+    body: {type: text, content: "Thanks for the new laptop, everything works."}
+    received: "-1d 12:00"
+    read: false
+  - id: t02
+    owner: tom
+    folder: sentitems
+    from: tom
+    to: [mia, anna]
+    subject: Server maintenance on Saturday
+    body: {type: text, content: "The file server is offline on Saturday from 08:00 to 12:00."}
+    received: "-7d 11:00"
+    read: true

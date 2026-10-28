@@ -1,0 +1,17 @@
+# Mail folders the seed creates in Mia's mailbox. The seed adds the "seed-v1 " prefix to each name.
+# `key` is the reference that mail.yaml uses in `folder:`. Well-known folders (inbox, sentitems,
+# drafts) are not created; mail.yaml uses them by their Graph well-known name.
+folders:
+  - key: archive
+    owner: mia
+    name: Archive
+  - key: handled
+    owner: mia
+    name: Handled
+  - key: projects
+    owner: mia
+    name: Projects
+  - key: website
+    owner: mia
+    name: Website Relaunch
+    parent: projects

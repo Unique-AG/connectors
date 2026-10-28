@@ -1,0 +1,69 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Project Plan"
+          },
+          "size": 25
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-uc-01-06.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-uc-01-06.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?UniqueId=00000000-1f93-4ca2-8e58-4a8fddef4ca3&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "UniqueId": "00000000-1f93-4ca2-8e58-4a8fddef4ca3",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    "body": "rec-uc-01-06.04.docx"
+  }
+]

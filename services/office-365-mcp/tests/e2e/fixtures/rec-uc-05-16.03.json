@@ -1,0 +1,49 @@
+{
+  "@odata.etag": "W/\"FUZWBANIEZBotHgxExlsJFUsDiXt/NumMUWhugmp\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "Travel costs for the offsite go to cost center 4100.",
+    "contentType": "text"
+  },
+  "bodyPreview": "Travel costs for the offsite go to cost center 4100.",
+  "categories": ["seed-v1", "Finance", "Offsite"],
+  "ccRecipients": [],
+  "changeKey": "CVZLGHLCPTAymPvkUhhzIATbTcMf/QmxMBGuuucs",
+  "conversationId": "AAQkLXqdFEV4CJC5BTOhARjtKOX2QE57Ruk2OCT5NQXyMTAdK5QsQARBBIQPS9krsPOVorXi20rlHHo=",
+  "createdDateTime": "2026-10-26T14:17:24Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "from": {
+    "emailAddress": {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  },
+  "hasAttachments": false,
+  "id": "UOeWChMHFIPUQKUJZdplYx6poYIwHC-SGd2Rn6Dmxf28AbQQXl7E8firkqME8U09EiNZ",
+  "importance": "normal",
+  "isDraft": false,
+  "isRead": false,
+  "lastModifiedDateTime": "2026-10-26T15:01:57Z",
+  "parentFolderId": "AAMkTTozVMU4EDU4VAMsUTaoLFS4JI21Hof2PYA2EVBdJVYvE3JiWPRjTNUBYMUzanrHBAzhVHenQ1o7YGX0JWWudOtkNaavTIBvZsHu-MvtSTRCow7LIPL=",
+  "receivedDateTime": "2026-10-25T15:45:00Z",
+  "replyTo": [],
+  "sender": {
+    "emailAddress": {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  },
+  "sentDateTime": "2026-10-25T15:45:00Z",
+  "subject": "Q3 budget: travel costs",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=WOoKAfEZUTREOTSLKgmsQs7pjQOaAL%2FWXp2Wa2Qowu67SiVKLl4W7stxyrKU9J37PfLH&exvsurl=1&viewmodel=ReadMessageItem"
+}

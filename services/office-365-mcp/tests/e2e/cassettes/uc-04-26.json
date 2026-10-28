@@ -1,0 +1,50 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "request for the contract by Friday",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "Contract",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna.meier@example.com"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "body": "me.messages.draft.json",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "body": "me.mailFolders.drafts.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "25",
+      "$orderby": "receivedDateTime desc"
+    },
+    "status": 200,
+    "body": "value.empty.json"
+  }
+]

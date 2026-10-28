@@ -1,0 +1,11 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNREPORT",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "body": "drive.item.report.json"
+  }
+]

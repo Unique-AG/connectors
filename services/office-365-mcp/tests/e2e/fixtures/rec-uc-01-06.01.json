@@ -1,0 +1,49 @@
+{
+  "value": [
+    {
+      "hitsContainers": [
+        {
+          "hits": [
+            {
+              "hitId": "01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+              "rank": 1,
+              "resource": {
+                "@odata.type": "#microsoft.graph.driveItem",
+                "createdBy": {
+                  "user": {
+                    "displayName": "Mia Keller",
+                    "email": "mia@example.test"
+                  }
+                },
+                "createdDateTime": "2026-10-26T14:17:29Z",
+                "file": {
+                  "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                },
+                "id": "01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+                "lastModifiedBy": {
+                  "user": {
+                    "displayName": "Mia Keller",
+                    "email": "mia@example.test"
+                  }
+                },
+                "lastModifiedDateTime": "2026-01-05T09:00:00Z",
+                "name": "seed-v1 Project Plan.docx",
+                "parentReference": {
+                  "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+                  "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+                  "siteId": "kiaqdpzfkcrfinyqw-ic.squsbkdinx.ifd,00000000-84a1-4040-8976-7aac948926e9,00000000-a564-4d8d-89c6-a011992bbd1c"
+                },
+                "size": 1902,
+                "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Project%20Plan.docx"
+              },
+              "summary": "synthetic text 01"
+            }
+          ],
+          "moreResultsAvailable": false,
+          "total": 1
+        }
+      ],
+      "searchTerms": ["seed-v1", "project", "plan"]
+    }
+  ]
+}

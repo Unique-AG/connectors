@@ -1,0 +1,64 @@
+# OneDrive files and mail attachments. seed.py generates every byte from these values
+# (zipfile + minimal OOXML for docx and xlsx, a hand-written PDF), so the same corpus gives the
+# same bytes and the same SHA-256 on every run.
+# Document properties name personas by key; the generator writes their display names.
+drive_folder: Seed Files
+
+files:
+  - id: f01
+    name: Project Plan.docx
+    kind: docx
+    properties: {title: Website Relaunch Project Plan, creator: mia, last_modified_by: anna, company: Lakeside Demo AG}
+    paragraphs:
+      - Website Relaunch Project Plan
+      - Goal. Launch the new website before the end of the quarter.
+      - Milestones. Design freeze, content migration, redirect test, go-live.
+      - Owner. Mia Keller, with Tom Berger for hosting and Anna Meier for the budget.
+  - id: f02
+    name: Budget Overview.xlsx
+    kind: xlsx
+    properties: {title: Relaunch Budget Overview, creator: anna, last_modified_by: anna, company: Lakeside Demo AG}
+    rows:
+      - [Item, Planned, Actual]
+      - [Agency, "12000", "14160"]
+      - [Hosting, "3000", "3000"]
+      - [Photo shoot, "4500", "4200"]
+  - id: f03
+    name: Meeting Notes.txt
+    kind: txt
+    text: "Meeting notes, weekly project sync.\nRedirect test done. Two press pages missing.\nNext: cookie banner text.\n"
+  - id: f04
+    name: Brochure Proof.pdf
+    kind: pdf
+    properties: {title: Brochure Proof, creator: tom, company: Lakeside Demo AG}
+    lines:
+      - Brochure Proof
+      - Alpine Print, first proof for review.
+  - id: f05
+    owner: anna
+    name: Budget Draft.xlsx
+    kind: xlsx
+    properties: {title: Q4 Budget Draft, creator: anna, last_modified_by: anna, company: Lakeside Demo AG}
+    rows:
+      - [Cost center, Q4]
+      - ["4100", "8000"]
+
+attachments:
+  - id: q3-numbers
+    name: q3-numbers.csv
+    kind: txt
+    content_type: text/csv
+    text: "line,item,amount\n7,External services,14160\n8,Hosting,3000\n"
+  - id: offsite-agenda
+    name: offsite-agenda.txt
+    kind: txt
+    content_type: text/plain
+    text: "Day 1: arrival, workshop, dinner.\nDay 2: boat trip, review, return.\n"
+  - id: print-offer
+    name: alpine-print-offer.pdf
+    kind: pdf
+    content_type: application/pdf
+    properties: {title: Alpine Print Offer, creator: anna, company: Lakeside Demo AG}
+    lines:
+      - Alpine Print offer
+      - 2000 brochures, 32 pages, delivery in three weeks.

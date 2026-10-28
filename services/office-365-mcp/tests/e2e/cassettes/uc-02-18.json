@@ -1,0 +1,24 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"from:Anna\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "25"
+    },
+    "status": 200,
+    "body": "me.messages.anna.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": ["AAMkAGI2RUN-0102="],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "body": "me.translateExchangeIds.anna.json"
+  }
+]

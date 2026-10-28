@@ -1,0 +1,61 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "body": "me.calendar.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "attendees": [
+        {
+          "emailAddress": { "address": "anna@example.invalid" },
+          "@odata.type": "#microsoft.graph.attendee",
+          "type": "required"
+        },
+        {
+          "emailAddress": { "address": "tom@example.invalid" },
+          "@odata.type": "#microsoft.graph.attendee",
+          "type": "required"
+        }
+      ],
+      "end": { "dateTime": "2026-11-02T14:30", "timeZone": "UTC" },
+      "isAllDay": false,
+      "start": { "dateTime": "2026-11-02T14:00", "timeZone": "UTC" },
+      "subject": "Launch review",
+      "transactionId": "9ff95ffe-db03-5665-8c4a-a68744b42f72"
+    },
+    "status": 201
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "body": "me.calendar.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkAGI2RUN-calendar/calendarView",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "query": {
+      "endDateTime": "2026-11-04T00:00:00+00:00",
+      "startDateTime": "2026-11-02T00:00:00+00:00",
+      "$filter": "contains(subject,'Launch review')",
+      "$orderby": "start/dateTime",
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance",
+      "$top": "25"
+    },
+    "status": 200,
+    "body": "value.empty.json"
+  }
+]
