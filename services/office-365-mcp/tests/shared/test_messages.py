@@ -26,6 +26,7 @@ from office_365_mcp.shared.messages import (
     OutgoingMention,
     TeamsMessage,
     chat_in_question,
+    links_in_question,
     mention_fields,
     mentioned_members,
     message_in_question,
@@ -1066,3 +1067,23 @@ class TestUnknownEnumHeaders:
 
     def test_every_call_builds_its_own_collection(self) -> None:
         assert unknown_enum_headers() is not unknown_enum_headers()
+
+
+class TestLinksInQuestion:
+    def test_a_message_with_no_link_adds_nothing(self) -> None:
+        assert links_in_question("Ship it **Friday**.") == ""
+
+    def test_every_destination_is_listed_in_order_once(self) -> None:
+        message = "[a](https://one.example) <https://two.example> [b](https://one.example)"
+
+        assert links_in_question(message) == (
+            " It links to 'https://one.example', 'https://two.example'."
+        )
+
+    def test_a_link_after_the_preview_cut_is_still_listed(self) -> None:
+        message = "x" * 300 + " [pay](https://evil.example/pay)"
+
+        assert links_in_question(message) == " It links to 'https://evil.example/pay'."
+
+    def test_a_script_link_is_not_a_destination(self) -> None:
+        assert links_in_question("[y](javascript:alert(1))") == ""

@@ -156,6 +156,26 @@ class TestThePersonBeforeTheSend:
         assert _MESSAGE in asked[0]
         assert "cannot be recalled" in asked[0]
 
+    async def test_the_question_lists_a_link_that_starts_after_the_preview_cut(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        _ = await send_chat_message(
+            client,
+            chat_id=_CHAT_ID,
+            message="x" * 300 + " [pay](https://evil.example/pay)",
+            confirm=capturing,
+        )
+
+        assert "It links to 'https://evil.example/pay'." in asked[0]
+
     async def test_the_question_carries_the_destination(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

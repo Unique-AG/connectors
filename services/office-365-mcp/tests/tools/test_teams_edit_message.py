@@ -688,6 +688,21 @@ class TestThePersonBeforeTheChange:
         assert f"{'a' * PREVIEW_CHARACTERS}…" in asked[0]
         assert long_text not in asked[0]
 
+    async def test_the_question_lists_a_link_that_starts_after_the_preview_cut(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _edits(graph)
+        asked: list[str] = []
+
+        _ = await edit_message(
+            client,
+            handle=_CHAT_HANDLE,
+            message="x" * 300 + " [pay](https://evil.example/pay)",
+            confirm=_asking(asked),
+        )
+
+        assert "It links to 'https://evil.example/pay'." in asked[0]
+
     async def test_the_question_cuts_a_long_current_text(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

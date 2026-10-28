@@ -25,6 +25,7 @@ from office_365_mcp.shared.messages import (
     OutgoingMention,
     TeamsMessage,
     get_message,
+    links_in_question,
     mention_fields,
     mention_in_question,
     mentioned_members,
@@ -194,7 +195,7 @@ def _question(current: TeamsMessage, message: str, mentions: Sequence[OutgoingMe
     removed = f" The change can remove {attached} from the message." if attached else ""
     return (
         f"Replace the text of {message_in_question(current)} with {cut_for_a_question(message)!r}?"
-        + f"{mentioned}{removed} {EVERYONE_SEES_IT}"
+        + f"{mentioned}{removed}{links_in_question(message)} {EVERYONE_SEES_IT}"
     )
 
 
