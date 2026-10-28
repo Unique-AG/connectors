@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "Backstop CRM FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==4.1.3",
+    "fastmcp==4.1.4",
     "uvicorn[standard]==0.54.0",
     "pydantic[email]==2.14.1",
     "pydantic-settings==2.16.1",
@@ -16,13 +16,13 @@ dependencies = [
     "opentelemetry-instrumentation-asgi==0.66b1",
     "sqlalchemy[asyncio]==2.1.6",
     "asyncpg==0.32.0",
-    "alembic==1.20.0",
+    "alembic==1.20.1",
     "cryptography==50.0.2",
     "jinja2==3.1.6",
     "tenacity==9.2.1",
     "markdownify==1.2.3",
     "beautifulsoup4==4.15.0",
-    "starlette==1.9.0",
+    "starlette==1.10.0",
     "mcp==2.3.0",
     "mcp-configs==0.1.0",
     "mcp-credential-auth==0.1.0",
@@ -33,7 +33,7 @@ dependencies = [
 backstop-mcp = "backstop_mcp.main:main"
 
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -44,10 +44,10 @@ packages = ["src/backstop_mcp"]
 
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
-    "hatchling==1.32.4",
-    "ruff==0.17.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
+    "hatchling==1.33.0",
+    "ruff==0.17.3",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers[postgres]==4.15.0",
@@ -96,12 +96,6 @@ reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
 reportCallInDefaultInitializer = false
-
-[tool.uv]
-override-dependencies = [
-    "filelock>=4.2.1",
-    "pillow>=13.0.0",
-]
 
 [tool.uv.sources]
 mcp-configs = { path = "../../packages/mcp-configs" }

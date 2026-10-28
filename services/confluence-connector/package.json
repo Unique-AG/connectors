@@ -60,7 +60,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@golevelup/ts-vitest": "4.0.0",
+    "@golevelup/ts-vitest": "4.0.1",
     "@nestjs/cli": "catalog:",
     "@nestjs/schematics": "catalog:",
     "@nestjs/testing": "catalog:",

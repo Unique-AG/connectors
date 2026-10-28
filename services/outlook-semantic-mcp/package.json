@@ -74,7 +74,7 @@
     "remeda": "catalog:",
     "rxjs": "catalog:",
     "safe-regex2": "5.1.2",
-    "temporal-polyfill": "1.0.5",
+    "temporal-polyfill": "1.0.6",
     "typeid-js": "catalog:",
     "undici": "catalog:",
     "windows-iana": "5.1.0",

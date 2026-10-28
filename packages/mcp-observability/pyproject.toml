@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -27,11 +27,11 @@ packages = ["src/mcp_observability"]
 [dependency-groups]
 dev = [
     "basedpyright==1.40.2",
-    "httpx2==2.14.0",
+    "httpx2==2.16.0",
     "poethepoet==0.49.0",
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
-    "ruff==0.17.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
+    "ruff==0.17.3",
 ]
 
 [tool.uv.sources]
