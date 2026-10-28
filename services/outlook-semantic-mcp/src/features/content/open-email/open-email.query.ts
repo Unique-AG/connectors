@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
+import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
@@ -107,10 +108,11 @@ export class OpenEmailQuery {
     outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const encodedMessageId = encodeGraphItemIdForUrlPath(messageId);
     const messagePath =
       mailbox && folderId
-        ? `/users/${mailbox}/mailFolders/${folderId}/messages/${messageId}`
-        : `/me/messages/${messageId}`;
+        ? `/users/${mailbox}/mailFolders/${encodeGraphItemIdForUrlPath(folderId)}/messages/${encodedMessageId}`
+        : `/me/messages/${encodedMessageId}`;
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
       .api(messagePath)

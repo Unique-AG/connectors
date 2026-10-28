@@ -25,7 +25,7 @@ const OpenEmailByIdInputSchema = z
       ),
     parentFolderId: z
       .string()
-      .regex(/^[A-Za-z0-9_=-]+$/)
+      .regex(/^[A-Za-z0-9+/_=-]+$/)
       .optional()
       .describe(
         'The folder containing this email. Use `openEmailParams.parentFolderId` from a `search_emails` result.',

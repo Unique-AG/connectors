@@ -11,6 +11,7 @@ const graphMessage = {
 
 describe('OpenEmailQuery', () => {
   let graphRequest: { header: Mock; select: Mock; expand: Mock; get: Mock };
+  let api: Mock;
   let getContentById: Mock;
   let instance: OpenEmailQuery;
 
@@ -23,13 +24,10 @@ describe('OpenEmailQuery', () => {
       expand: vi.fn().mockReturnThis(),
       get: vi.fn().mockResolvedValue(graphMessage),
     };
+    api = vi.fn().mockReturnValue(graphRequest);
     getContentById = vi.fn();
     instance = new OpenEmailQuery(
-      {
-        createClientForUser: vi
-          .fn()
-          .mockReturnValue({ api: vi.fn().mockReturnValue(graphRequest) }),
-      } as never,
+      { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
       { content: { getContentById } } as never,
     );
   });
@@ -40,6 +38,20 @@ describe('OpenEmailQuery', () => {
     expect(graphRequest.select).toHaveBeenCalledWith(expect.stringContaining('isDraft'));
     expect(graphRequest.expand).toHaveBeenCalledWith('attachments($select=name,size,isInline)');
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'outlook.body-content-type="text"');
+  });
+
+  it('encodes immutable message and folder ids that contain a slash', async () => {
+    await instance.run({
+      userProfileId: 'user-1',
+      id: 'AAk/msg=',
+      mailbox: 'shared@example.com',
+      folderId: 'AQMk/folder+1=',
+      idIsImmutable: true,
+    });
+
+    expect(api).toHaveBeenCalledWith(
+      '/users/shared@example.com/mailFolders/AQMk-folder+1=/messages/AAk-msg=',
+    );
   });
 
   it('returns the matched chunks next to the Graph body', async () => {
