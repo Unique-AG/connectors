@@ -102,7 +102,7 @@ function makeSearchItem(id: string, chunkId = `chunk-${id}`) {
     chunkId,
     title: `Email ${id}`,
     url: null,
-    metadata: {},
+    metadata: { id: `graph-${id}` } as Record<string, string>,
     order: 0,
     text: `Content of ${id}`,
   };
@@ -321,6 +321,97 @@ describe('SemanticSearchEmailsQuery', () => {
       const { results } = await instance.run(testUserId, [baseInput]);
 
       expect(results[0]?.isDraft).toBe(expected);
+    });
+
+    it('opens a draft from Graph as HTML and keeps the matched chunk ids', async () => {
+      const folderIdPath =
+        'uniquepathid://scope:/__Outlook MCP/scope:Outlook_own-provider-id_uncategoried/drafts';
+      const { instance } = createMockQuery({
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              metadata: {
+                id: 'graph-1',
+                isDraft: 'true',
+                parentFolderId: 'drafts-folder',
+                folderIdPath,
+              },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.sourceMailbox).toBe(OWN_EMAIL);
+      expect(results[0]?.openEmailParams).toEqual({
+        id: 'graph-1',
+        idIsImmutable: true,
+        bodyContentType: 'html',
+        uniqueContentId: 'mail-1',
+        chunkIds: ['chunk-mail-1'],
+      });
+    });
+
+    it('points a delegated draft at that mailbox', async () => {
+      const folderIdPath =
+        'uniquepathid://scope:/__Outlook MCP/scope:Outlook_delegated-provider-id_uncategoried/drafts';
+      const { instance } = createMockQuery({
+        delegatedAccesses: [delegatedAccess],
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              metadata: {
+                id: 'graph-1',
+                isDraft: 'true',
+                parentFolderId: 'drafts-folder',
+                folderIdPath,
+              },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.openEmailParams).toEqual({
+        id: 'graph-1',
+        mailbox: DELEGATED_EMAIL,
+        parentFolderId: 'drafts-folder',
+        idIsImmutable: true,
+        bodyContentType: 'html',
+        uniqueContentId: 'mail-1',
+        chunkIds: ['chunk-mail-1'],
+      });
+    });
+
+    it('opens a non-draft from Graph as text and still names the matched chunks', async () => {
+      const { instance } = createMockQuery({
+        searchResults: [
+          [{ ...makeSearchItem('mail-1'), metadata: { id: 'graph-1', isDraft: 'false' } }],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.openEmailParams).toEqual({
+        id: 'graph-1',
+        idIsImmutable: true,
+        uniqueContentId: 'mail-1',
+        chunkIds: ['chunk-mail-1'],
+      });
+    });
+
+    it('rejects a match without a Graph id', async () => {
+      const { instance } = createMockQuery({
+        searchResults: [[{ ...makeSearchItem('mail-1'), metadata: {} }]],
+      });
+
+      await expect(instance.run(testUserId, [baseInput])).rejects.toThrow(
+        'Ingested email mail-1 has no Graph message id',
+      );
     });
 
     it('returns every email of every search without a count cap', async () => {

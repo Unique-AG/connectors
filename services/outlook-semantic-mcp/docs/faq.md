@@ -431,8 +431,6 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 - **Read state** works in both modes. In Mode A, the agent sets the `isRead` condition on semantic entries and `isRead:false` in the KQL query, so the merged results contain only unread mail. In Mode B, `isRead:false` in the KQL query is the only option.
 - **Flags** work in Mode A only, through the `flagStatus` condition on semantic entries (`flagged`, `complete`, `notFlagged`). Microsoft Graph has no KQL property for follow-up flags, so Mode B cannot filter by flag. To express "not flagged", use `notEquals: "flagged"`.
 
-**Attachment names (Mode A):** ingestion also stores the names of a message's attachments in the `attachmentNames` metadata (and which of them are inline in `inlineAttachmentNames`), so `open_email` can list them for semantic results. Messages ingested before this metadata existed have none until Live catch-up re-ingests them, which only happens when the message's `lastModifiedDateTime` changes — as it does whenever a draft is edited.
-
 **Freshness (Mode A):** the semantic `isRead` and `flagStatus` values are metadata written at ingestion. Live catch-up only re-fetches a message and rewrites that metadata when its Graph `lastModifiedDateTime` is newer than the sync watermark. Whether Exchange moves `lastModifiedDateTime` when a message is marked read or flagged is not guaranteed by this service, so semantic read and flag results can lag behind the mailbox or stay at their ingested values. KQL `isRead:` is evaluated live by Microsoft Graph and is always current, which is why read-state questions go to both backends.
 
 ```json
@@ -448,11 +446,11 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 ### Can I edit a draft that already exists?
 
-**Answer:** Yes, for drafts that were created with `create_draft_email` and for drafts the user wrote in Outlook. The agent finds the draft with `search_emails` restricted to the `Drafts` folder (results carry `isDraft: true`), reads it with `open_email`, and then calls:
+**Answer:** Yes, for drafts that were created with `create_draft_email` and for drafts the user wrote in Outlook. The agent finds the draft with `search_emails` restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with `open_email` by passing `openEmailParams`, and then calls:
 
-- `update_draft_email` to change the subject, body, To recipients, or CC recipients. The body and each recipient list replace the existing ones, so the agent rewrites from what it read.
+- `update_draft_email` to change the subject, body, To recipients, or CC recipients. The body is the HTML from that read, sent back unchanged (no Markdown conversion), and it replaces the whole body, so the agent keeps the formatting, signature, quoted thread, and inline images the user did not ask to change. Each recipient list also replaces the existing one.
 - `add_attachments_to_draft_email` to attach more files. Existing attachments stay.
-- `remove_attachments_from_draft_email` to remove attachments by file name. The user is asked to confirm in a prompt first; if the client cannot show the prompt, nothing is removed.
+- `remove_attachments_from_draft_email` to remove attachments by file name. Inline images are left in place unless the user explicitly asked to remove them. The user is asked to confirm in a prompt first; if the client cannot show the prompt, nothing is removed.
 
 All three check that the message is still a draft and fail without changing anything if it was already sent.
 

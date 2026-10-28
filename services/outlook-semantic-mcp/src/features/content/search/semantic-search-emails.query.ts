@@ -33,7 +33,12 @@ import {
 } from './cursors/search-cursor.payload';
 import { SEARCH_CONFIG } from './search.config';
 import { SearchEmailsInput } from './search-conditions.dto';
-import { SearchBackend, SearchEmailResult, SearchPageStatus } from './search-results.types';
+import {
+  OpenEmailParams,
+  SearchBackend,
+  SearchEmailResult,
+  SearchPageStatus,
+} from './search-results.types';
 
 @Injectable()
 export class SemanticSearchEmailsQuery {
@@ -236,37 +241,44 @@ export class SemanticSearchEmailsQuery {
         const metadata = item.content?.metadata as
           | (MessageMetadata & { folderIdPath?: string })
           | undefined;
+        const msGraphMessageId = metadata?.id;
+        assert.ok(msGraphMessageId, `Ingested email ${item.content.id} has no Graph message id`);
 
         const sourceMailbox =
           context.mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
-            return metadata?.folderIdPath?.startsWith(uniqueFolderIdPath);
+            return metadata.folderIdPath?.startsWith(uniqueFolderIdPath);
           })?.ownerEmail ?? null;
 
-        const msGraphMessageId = metadata?.id || undefined;
+        const isDraft = metadata.isDraft === 'true';
+        const folderId = metadata.parentFolderId ?? '';
 
         return {
           title: item.content.title ?? '',
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
-          outlookWebLink: metadata?.webLink ?? '',
+          outlookWebLink: metadata.webLink ?? '',
           sourceMailbox,
           msGraphMessageId,
-          folderId: metadata?.parentFolderId ?? '',
-          from: metadata?.fromEmailAddress ?? '',
+          folderId,
+          from: metadata.fromEmailAddress ?? '',
           receivedDateTime:
-            convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone) ?? '',
+            convertDateTimeToTimezone(metadata.receivedDateTime, outputTimeZone) ?? '',
           backend: SearchBackend.Unique,
-          isDraft: metadata?.isDraft === 'true',
+          isDraft,
           text: concatChunks(Array.from(item.chunks.values())),
-          openEmailParams: {
-            id: item.content.id,
-            idType: SearchBackend.Unique,
-          },
+          openEmailParams: this.openEmailParamsForMessage({
+            uniqueContentId: item.content.id,
+            chunkIds: Array.from(item.chunks.keys()),
+            isDraft,
+            msGraphMessageId,
+            folderId,
+            sourceMailbox,
+            userEmail: userProfile.email,
+          }),
           replyToParams: {
-            ...(msGraphMessageId
-              ? { inReplyToMessageId: msGraphMessageId, idIsImmutable: true }
-              : {}),
-            isReplyable: !!msGraphMessageId && metadata?.isDraft !== 'true',
+            inReplyToMessageId: msGraphMessageId,
+            idIsImmutable: true,
+            isReplyable: !isDraft,
           },
         };
       }),
@@ -276,7 +288,7 @@ export class SemanticSearchEmailsQuery {
     // use the new outlook.cloud.microsoft format (broken for some tenants) — translate the
     // immutable ID to a RestId and construct a working OWA URL.
     const buildWebLinksForIds = rawResults.flatMap((message) => {
-      if (!message.msGraphMessageId || !message.sourceMailbox) {
+      if (!message.sourceMailbox) {
         return [];
       }
 
@@ -302,6 +314,41 @@ export class SemanticSearchEmailsQuery {
     }));
 
     return results;
+  }
+
+  // Ingested ids are immutable. A delegated mailbox needs its folder or open_email cannot address
+  // /users/{mailbox}/mailFolders/{folder}/messages/{id}.
+  private openEmailParamsForMessage({
+    uniqueContentId,
+    chunkIds,
+    isDraft,
+    msGraphMessageId,
+    folderId,
+    sourceMailbox,
+    userEmail,
+  }: {
+    uniqueContentId: string;
+    chunkIds: string[];
+    isDraft: boolean;
+    msGraphMessageId: string;
+    folderId: string;
+    sourceMailbox: Nullish<string>;
+    userEmail: string;
+  }): OpenEmailParams {
+    const delegatedMailbox =
+      sourceMailbox && sourceMailbox.toLowerCase() !== userEmail.toLowerCase()
+        ? sourceMailbox
+        : undefined;
+    return {
+      id: msGraphMessageId,
+      ...(delegatedMailbox && folderId
+        ? { mailbox: delegatedMailbox, parentFolderId: folderId }
+        : {}),
+      idIsImmutable: true,
+      ...(isDraft ? { bodyContentType: 'html' as const } : {}),
+      uniqueContentId,
+      chunkIds,
+    };
   }
 
   private async loadAccessContext(

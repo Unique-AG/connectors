@@ -3,13 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
-import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { Nullish } from '~/utils/nullish';
-import { SearchBackend } from '../search/search-results.types';
 
 const recipientSchema = z.object({
   emailAddress: z.object({ address: z.string() }).optional(),
@@ -51,6 +49,8 @@ export interface OpenEmailResult {
     attachments?: { name: string; size?: number; isInline: boolean }[];
   };
   text: string;
+  bodyContentType: 'text' | 'html';
+  chunks?: string;
 }
 
 @Injectable()
@@ -64,31 +64,37 @@ export class OpenEmailQuery {
   public async run({
     userProfileId,
     id,
-    idType,
     mailbox,
     folderId,
     idIsImmutable,
+    bodyContentType,
+    uniqueContentId,
+    chunkIds,
     outputTimeZone,
   }: {
     userProfileId: string;
     id: string;
-    idType: SearchBackend;
     mailbox?: string;
     folderId?: string;
     idIsImmutable?: boolean;
+    bodyContentType?: 'text' | 'html';
+    uniqueContentId?: string;
+    chunkIds?: string[];
     outputTimeZone?: string;
   }): Promise<OpenEmailResult> {
-    if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(
-        userProfileId,
-        id,
-        mailbox,
-        folderId,
-        idIsImmutable,
-        outputTimeZone,
-      );
+    const message = await this.readMessageFromMsGraph(
+      userProfileId,
+      id,
+      mailbox,
+      folderId,
+      idIsImmutable,
+      bodyContentType === 'html' ? 'html' : 'text',
+      outputTimeZone,
+    );
+    if (!uniqueContentId) {
+      return message;
     }
-    return this.readMessageFromUnique(id, outputTimeZone);
+    return { ...message, chunks: await this.readRelevantChunks(uniqueContentId, chunkIds) };
   }
 
   private async readMessageFromMsGraph(
@@ -97,6 +103,7 @@ export class OpenEmailQuery {
     mailbox?: string,
     folderId?: string,
     idIsImmutable?: boolean,
+    bodyContentType: 'text' | 'html' = 'text',
     outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -107,7 +114,7 @@ export class OpenEmailQuery {
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
       .api(messagePath)
-      .header('Prefer', `outlook.body-content-type="text"${immutableIdHeader}`)
+      .header('Prefer', `outlook.body-content-type="${bodyContentType}"${immutableIdHeader}`)
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments,isDraft',
       )
@@ -142,33 +149,17 @@ export class OpenEmailQuery {
         })),
       },
       text: message.body?.content ?? '',
+      bodyContentType,
     };
   }
 
-  private async readMessageFromUnique(
-    id: string,
-    outputTimeZone?: string,
-  ): Promise<OpenEmailResult> {
-    const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
-    const metadata = emailData.metadata as MessageMetadata | undefined;
-
-    return {
-      id: emailData.id,
-      title: emailData.title ?? null,
-      metadata: {
-        from: metadata?.fromEmailAddress,
-        toRecipients: metadata?.toRecipientsEmailAddresses,
-        ccRecipients: metadata?.ccRecipientsEmailAddresses,
-        receivedDateTime: convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone),
-        webLink: metadata?.webLink,
-        hasAttachments: metadata?.hasAttachments === 'true',
-        isDraft: metadata?.isDraft === 'true',
-        attachments: (metadata?.attachmentNames ?? []).map((name) => ({
-          name,
-          isInline: metadata?.inlineAttachmentNames?.includes(name) ?? false,
-        })),
-      },
-      text: concatChunks(emailData.chunks ?? []),
-    };
+  private async readRelevantChunks(contentId: string, chunkIds?: string[]): Promise<string> {
+    const emailData = await this.uniqueApi.content.getContentById({ contentId });
+    const chunks = emailData.chunks ?? [];
+    if (!chunkIds?.length) {
+      return concatChunks(chunks);
+    }
+    const wanted = new Set(chunkIds);
+    return concatChunks(chunks.filter((chunk) => wanted.has(chunk.id)));
   }
 }

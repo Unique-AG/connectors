@@ -22,6 +22,7 @@ const DraftStateResponseSchema = z.object({
 export interface DraftAttachment {
   id: string;
   name: string;
+  isInline: boolean;
 }
 
 export type DraftState =
@@ -69,7 +70,11 @@ export class GetDraftStateQuery {
       return {
         status: 'draft',
         subject: message.subject ?? null,
-        attachments: message.attachments.map(({ id, name }) => ({ id, name })),
+        attachments: message.attachments.map(({ id, name, isInline }) => ({
+          id,
+          name,
+          isInline: isInline === true,
+        })),
       };
     } catch (err) {
       this.logger.error({

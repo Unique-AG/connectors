@@ -29,7 +29,7 @@ function makeGraphResult(
     text: 'Graph body',
     uniqueContentUrl: undefined,
     backend: SearchBackend.MsGraph,
-    openEmailParams: { id: emailId, idType: SearchBackend.MsGraph, idIsImmutable: false },
+    openEmailParams: { id: emailId, idIsImmutable: false },
     replyToParams: { inReplyToMessageId: emailId, idIsImmutable: false, isReplyable: true },
     ...overrides,
   };
@@ -52,7 +52,12 @@ function makeUniqueResult(
     text: 'Unique body',
     uniqueContentUrl: 'https://unique.example.com/doc/1',
     backend: SearchBackend.Unique,
-    openEmailParams: { id: `content-${emailId}`, idType: SearchBackend.Unique },
+    openEmailParams: {
+      id: emailId,
+      idIsImmutable: true,
+      uniqueContentId: `content-${emailId}`,
+      chunkIds: [`chunk-${emailId}`],
+    },
     replyToParams: { inReplyToMessageId: emailId, idIsImmutable: true, isReplyable: true },
     ...overrides,
   };
@@ -163,6 +168,70 @@ describe('SearchEmailsQuery', () => {
     expect(result.results[21]?.msGraphMessageId).toBe('email-20');
     // remainingGraph: graph-only
     expect(result.results[22]?.msGraphMessageId).toBe('email-graph-only');
+  });
+
+  it('opens a merged result from Graph and keeps the semantic chunk ids', async () => {
+    const semanticDraft = makeUniqueResult('email-draft', {
+      isDraft: true,
+      openEmailParams: {
+        id: 'email-draft',
+        idIsImmutable: true,
+        bodyContentType: 'html',
+        uniqueContentId: 'content-email-draft',
+        chunkIds: ['chunk-draft'],
+      },
+    });
+    const graphDraft = makeGraphResult('email-draft', {
+      isDraft: true,
+      openEmailParams: {
+        id: 'email-draft',
+        idIsImmutable: false,
+        bodyContentType: 'html',
+      },
+    });
+    const semanticStaleDraft = makeUniqueResult('email-sent', {
+      isDraft: true,
+      openEmailParams: {
+        id: 'email-sent',
+        idIsImmutable: true,
+        bodyContentType: 'html',
+        uniqueContentId: 'content-email-sent',
+        chunkIds: ['chunk-sent'],
+      },
+    });
+    const graphSent = makeGraphResult('email-sent', { isDraft: false });
+
+    semanticSearchQuery.run.mockResolvedValue({
+      results: [semanticDraft, semanticStaleDraft],
+      searchSummary: undefined,
+      pages: [],
+    });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [graphDraft, graphSent],
+      searchSummary: undefined,
+      pages: [],
+    });
+
+    const result = await instance.run(testUserId, {
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [] }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
+    });
+
+    const draft = result.results.find((item) => item.msGraphMessageId === 'email-draft');
+    const sent = result.results.find((item) => item.msGraphMessageId === 'email-sent');
+    expect(draft?.isDraft).toBe(true);
+    expect(draft?.openEmailParams).toEqual({
+      ...graphDraft.openEmailParams,
+      uniqueContentId: 'content-email-draft',
+      chunkIds: ['chunk-draft'],
+    });
+    expect(sent?.isDraft).toBe(false);
+    expect(sent?.openEmailParams).toEqual({
+      id: 'email-sent',
+      idIsImmutable: false,
+      uniqueContentId: 'content-email-sent',
+      chunkIds: ['chunk-sent'],
+    });
   });
 
   it('semantic-only results beyond top-20 appear before graph-only results', async () => {

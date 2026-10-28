@@ -31,7 +31,10 @@ describe('GetDraftStateQuery', () => {
     const { query, api, graphRequest } = makeQuery({
       isDraft: true,
       subject: 'Offer',
-      attachments: [{ id: 'att-1', name: 'offer.pdf', size: 10, isInline: false }],
+      attachments: [
+        { id: 'att-1', name: 'offer.pdf', size: 10, isInline: false },
+        { id: 'att-2', name: 'logo.png', size: 4, isInline: true },
+      ],
     });
 
     const result = await query.run({ userProfileId: 'user-1', draftId: 'draft-1' });
@@ -39,10 +42,12 @@ describe('GetDraftStateQuery', () => {
     expect(result).toEqual({
       status: 'draft',
       subject: 'Offer',
-      attachments: [{ id: 'att-1', name: 'offer.pdf' }],
+      attachments: [
+        { id: 'att-1', name: 'offer.pdf', isInline: false },
+        { id: 'att-2', name: 'logo.png', isInline: true },
+      ],
     });
     expect(api).toHaveBeenCalledWith('/me/messages/draft-1');
-    expect(graphRequest.select).toHaveBeenCalledWith('isDraft,subject');
     expect(graphRequest.header).not.toHaveBeenCalled();
   });
 

@@ -26,7 +26,8 @@ const PAGING_DESCRIPTION =
 
 const OPEN_EMAIL_DESCRIPTION =
   'Each result carries only partial content in `text`, never the full email. ' +
-  'To read an email, call `open_email` with the `openEmailParams` object from that result — do this whenever `text` does not clearly answer the question.';
+  'To read an email, call `open_email` with the `openEmailParams` object from that result — do this whenever `text` does not clearly answer the question. ' +
+  'Pass it through unchanged: a draft requests HTML, and `uniqueContentId` / `chunkIds` add the matched passages.';
 
 const SearchEmailsToolDescription = isMicrosoftGraphBackend()
   ? [

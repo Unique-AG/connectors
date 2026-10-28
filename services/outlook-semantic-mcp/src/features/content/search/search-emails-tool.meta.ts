@@ -12,7 +12,11 @@ const {
 } = SEARCH_CONFIG;
 
 const READING_EMAILS = `## Reading emails
-  Results carry only partial content in \`text\` — never the full email. Answer from \`text\` only when it clearly contains the answer. Otherwise call \`open_email\` with the result's \`openEmailParams\` object, passed directly as the tool input, for every email whose content you need. Also call it when the user asks to open, read, or see an email. Do NOT tell the user you cannot access the email or that you lack mailbox access.`;
+  Results carry only partial content in \`text\` — never the full email. Answer from \`text\` only when it clearly contains the answer. Otherwise call \`open_email\` with the result's \`openEmailParams\` object, passed directly as the tool input, for every email whose content you need. Also call it when the user asks to open, read, or see an email. Do NOT tell the user you cannot access the email or that you lack mailbox access.
+  \`openEmailParams\` addresses the live Microsoft Graph message. A draft sets \`bodyContentType\` to \`html\`; every other message is plain text. When the object includes \`uniqueContentId\` and \`chunkIds\`, pass those too: \`open_email\` then also returns the matched ingested passages in \`chunks\`.
+
+  ## Editing a draft
+  Call \`open_email\` with \`openEmailParams\` before any edit. \`text\` is the live HTML body. Edit that HTML and pass it to \`update_draft_email\` as \`content\`. Do not rewrite from \`chunks\`. The server stores the HTML unchanged and does not convert Markdown. Copy \`openEmailParams.id\` to \`draftId\`, and \`idIsImmutable\` and \`mailbox\` when they are set.`;
 
 const PAGING = `## Pages and cursors: how to get all results out
   One call runs several backend requests. Each semantic entry is one request. Each KQL query runs once per mailbox, and once per folder when \`directories\` is set. A response holds at most ${maxResultsPerResponse} results, so requests that do not fit run later: they come back with status \`deferred\` and a \`cursorId\`.

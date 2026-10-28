@@ -6,7 +6,6 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { markdownToHtml } from '~/utils/markdown-to-html';
 import { toGraphRecipients } from './draft-recipients';
 import { GetDraftStateQuery } from './get-draft-state.query';
 
@@ -65,7 +64,7 @@ export class UpdateDraftEmailCommand {
     const patchBody = {
       ...(input.subject !== undefined && { subject: input.subject }),
       ...(input.content !== undefined && {
-        body: { contentType: 'HTML', content: markdownToHtml(input.content) },
+        body: { contentType: 'HTML', content: input.content },
       }),
       ...(input.toRecipients && { toRecipients: toGraphRecipients(input.toRecipients) }),
       ...(input.ccRecipients && { ccRecipients: toGraphRecipients(input.ccRecipients) }),

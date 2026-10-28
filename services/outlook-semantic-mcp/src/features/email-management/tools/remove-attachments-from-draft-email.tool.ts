@@ -16,7 +16,13 @@ const RemoveAttachmentsInputSchema = z.object({
     .array(z.string())
     .min(1)
     .describe(
-      'File names of the attachments to remove, exactly as listed in `metadata.attachments` from `open_email` (matching ignores case). Every attachment with a given name is removed.',
+      'File names of the attachments to remove, exactly as listed in `metadata.attachments` from `open_email` (matching ignores case). Every non-inline attachment with a given name is removed. Inline images (`isInline: true`) are left in place unless `includeInline` is true.',
+    ),
+  includeInline: z
+    .boolean()
+    .optional()
+    .describe(
+      'Set true only when the user explicitly asked to remove an inline image (a signature image or a picture embedded in the body). Otherwise inline attachments are skipped, because the body still references them and removing them leaves a broken image.',
     ),
 });
 
@@ -50,7 +56,7 @@ export class RemoveAttachmentsFromDraftEmailTool {
     name: 'remove_attachments_from_draft_email',
     title: 'Remove Attachments from Draft Email',
     description:
-      'Removes attachments from an existing unsent draft, by file name. The user is asked to confirm the removal before anything is deleted, and a removed attachment cannot be restored. **Read the draft with `open_email` first** to get the exact file names in `metadata.attachments`. Fails when the message is no longer a draft.',
+      'Removes attachments from an existing unsent draft, by file name. The user is asked to confirm the removal before anything is deleted, and a removed attachment cannot be restored. Inline images are skipped unless `includeInline` is true and the user explicitly asked for them. **Read the draft with `open_email` first** (pass `openEmailParams`) to get the exact file names in `metadata.attachments`. Fails when the message is no longer a draft.',
     parameters: RemoveAttachmentsInputSchema,
     outputSchema: RemoveAttachmentsOutputSchema,
     annotations: {
@@ -80,18 +86,21 @@ export class RemoveAttachmentsFromDraftEmailTool {
       return { success: false, message: draftState.message };
     }
 
-    const wantedNames = new Set(input.fileNames.map((name) => name.toLowerCase()));
-    const toRemove = draftState.attachments.filter(({ name }) =>
-      wantedNames.has(name.toLowerCase()),
-    );
-    const missing = input.fileNames.filter(
-      (name) =>
-        !toRemove.some((attachment) => attachment.name.toLowerCase() === name.toLowerCase()),
+    const { toRemove, missing, skippedInline } = this.selectAttachments(
+      draftState.attachments,
+      input.fileNames,
+      input.includeInline === true,
     );
     if (missing.length) {
       return {
         success: false,
         message: `The draft has no attachment named ${missing.map((name) => `"${name}"`).join(', ')}. Nothing was removed. The draft's attachments are: ${this.listNames(draftState.attachments)}.`,
+      };
+    }
+    if (!toRemove.length) {
+      return {
+        success: false,
+        message: `${this.inlineSkippedMessage(skippedInline)} Nothing was removed.`,
       };
     }
 
@@ -119,24 +128,53 @@ export class RemoveAttachmentsFromDraftEmailTool {
         attachments: toRemove,
       },
     );
+    const skippedNote = skippedInline.length ? ` ${this.inlineSkippedMessage(skippedInline)}` : '';
     return {
-      success: failed.length === 0,
+      success: failed.length === 0 && skippedInline.length === 0,
       message: failed.length
-        ? 'Some attachments could not be removed from the draft.'
-        : 'Attachments removed from the draft.',
+        ? `Some attachments could not be removed from the draft.${skippedNote}`
+        : `Attachments removed from the draft.${skippedNote}`,
       removed,
       ...(failed.length && { failed }),
     };
   }
 
+  private selectAttachments(
+    attachments: DraftAttachment[],
+    fileNames: string[],
+    includeInline: boolean,
+  ): { toRemove: DraftAttachment[]; missing: string[]; skippedInline: DraftAttachment[] } {
+    const wantedNames = new Set(fileNames.map((name) => name.toLowerCase()));
+    const named = attachments.filter(({ name }) => wantedNames.has(name.toLowerCase()));
+    const missing = fileNames.filter(
+      (name) => !named.some((attachment) => attachment.name.toLowerCase() === name.toLowerCase()),
+    );
+    const skippedInline = includeInline ? [] : named.filter((attachment) => attachment.isInline);
+    const toRemove = includeInline ? named : named.filter((attachment) => !attachment.isInline);
+    return { toRemove, missing, skippedInline };
+  }
+
   private listNames(attachments: DraftAttachment[]): string {
-    return attachments.length ? attachments.map(({ name }) => `"${name}"`).join(', ') : 'none';
+    return attachments.length
+      ? attachments.map((attachment) => this.formatName(attachment)).join(', ')
+      : 'none';
+  }
+
+  private formatName(attachment: DraftAttachment): string {
+    return `"${attachment.name}"${attachment.isInline ? ' (inline image)' : ''}`;
+  }
+
+  private inlineSkippedMessage(skippedInline: DraftAttachment[]): string {
+    const names = skippedInline.map((attachment) => this.formatName(attachment)).join(', ');
+    return `Left inline images in place: ${names}. They are referenced from the body, so removing them leaves a broken image. Pass includeInline: true only when the user explicitly asked to remove them.`;
   }
 
   private elicitMessage(subject: string | null, toRemove: DraftAttachment[]): string {
     return [
       `Remove ${toRemove.length === 1 ? 'this attachment' : 'these attachments'} from the draft "${subject ?? '(no subject)'}"?`,
-      ...toRemove.map(({ name }) => `- ${name}`),
+      ...toRemove.map(
+        (attachment) => `- ${attachment.name}${attachment.isInline ? ' (inline image)' : ''}`,
+      ),
       'This cannot be undone. The draft is not sent.',
     ].join('\n');
   }
