@@ -18,7 +18,7 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
 | Merge | A person reviews the PR, then merges it. See [Review a dependency PR](#review-a-dependency-pr). |
 
-For a GitHub Action, the age of the release is not enough, because a publisher can move a tag to another commit. The job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
+Our policy pins every GitHub Action to a commit, so a moved tag cannot change a workflow. But the job reads the commit from a tag when it opens a PR. A publisher can move a tag after the release is old enough. So the job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
 
 A package build can run code. The `uv` tool builds a package that has no wheel. So a first job makes the update with no secret and saves a patch. A second job applies the patch to a fresh checkout and checks that the patch changes only the files of that ecosystem. Only then does it create the App token and push.
 

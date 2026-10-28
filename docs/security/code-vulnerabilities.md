@@ -9,7 +9,7 @@ For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md).
 
 ## What runs
 
-CodeQL scans our workflow files, our JavaScript and TypeScript, and our Python. It runs on every PR and on every push to `main`. A repository ruleset requires the CodeQL result. A PR that adds an alert cannot merge. As a result, unsafe code does not reach `main`.
+CodeQL scans our workflow files, our JavaScript and TypeScript, and our Python. It runs on every PR and on every push to `main`. A repository ruleset requires the CodeQL result. A PR that adds an alert cannot merge. As a result, unsafe (newly added) code does not reach `main`.
 
 ```mermaid
 flowchart LR
@@ -36,10 +36,6 @@ Do not dismiss an alert without a reason. The next scan of `main` closes a fixed
 
 ## The ruleset
 
-An admin sets one branch ruleset on the default branch. It makes the checks of this process required.
+The ruleset is created as code, here: https://github.com/unique-ag/infrastructure/blob/0a6f17440184c3238b67c2537591a0d043ca816d/providers/github/unique-ag/repos/connectors.yaml
 
-1. Open Settings, Rules, Rulesets, and add a branch ruleset for the default branch.
-2. Add the rule "Require status checks to pass". Add the checks `gatekeeper` and `release-gate`.
-3. Add the rule "Require code scanning results". Add the tool CodeQL. Set the security alerts to "High or higher" and the alerts to "Errors".
-
-The check `release-gate` is skipped on a PR that is not a release PR. A skipped check counts as passing. The check is required so that a release PR cannot merge before the gate has run.
+It requires the check `gatekeeper`. The gatekeeper waits for every other check, CodeQL included.

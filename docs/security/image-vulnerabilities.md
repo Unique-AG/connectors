@@ -3,7 +3,7 @@
 
 # Image vulnerabilities
 
-Trivy scans our images. It reports operating system packages and application packages inside the image. We scan published images every night, and we scan each release before it merges. For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md).
+Trivy scans our images. It reports operating system packages and application packages inside the image. We scan published images every night, and we scan each release before it ships. For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md).
 
 ```mermaid
 flowchart LR
