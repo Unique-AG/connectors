@@ -140,6 +140,22 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
     expect(elicit).not.toHaveBeenCalled();
   });
 
+  it('removes nothing when the draft was sent while the prompt was open', async () => {
+    getDraftStateQuery.run
+      .mockResolvedValueOnce(DRAFT_STATE)
+      .mockResolvedValueOnce({ status: 'failed', message: 'Already sent.' });
+
+    const result = await tool.removeAttachments(
+      { draftId: 'draft-1', fileNames: ['Offer.pdf'] },
+      context,
+      request,
+    );
+
+    expect(elicit).toHaveBeenCalled();
+    expect(result).toEqual({ success: false, message: 'Already sent.' });
+    expect(removeCommand.run).not.toHaveBeenCalled();
+  });
+
   it('leaves inline images in place unless includeInline is set', async () => {
     const result = await tool.removeAttachments(
       { draftId: 'draft-1', fileNames: ['logo.png'] },

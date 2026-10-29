@@ -370,7 +370,8 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 **Usage notes:**
 
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
-- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, the body is still returned and `chunks` is left out.
+- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
+- When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
 
@@ -527,7 +528,7 @@ Remove attachments from an existing draft, by file name.
 | `fileNames` | string[] | Yes | File names to remove, as listed in `metadata.attachments` from `open_email`. Matching ignores case. Inline attachments (`isInline: true`) are skipped. |
 | `includeInline` | boolean | No | Set true only when the user explicitly asked to remove an inline image. Otherwise those attachments stay, because the body still references them. |
 
-**Confirmation:** the user is asked to confirm the removal in an MCP elicitation prompt that names the draft and the files, because a removed attachment cannot be restored. If the user declines, or the client cannot show the prompt, nothing is removed. There is no parameter that skips the prompt.
+**Confirmation:** the user is asked to confirm the removal in an MCP elicitation prompt that names the draft and the files, because a removed attachment cannot be restored. If the user declines, or the client cannot show the prompt, nothing is removed. There is no parameter that skips the prompt. After the user accepts, the tool reads the draft again and removes nothing if it is no longer a draft, because the prompt can stay open long enough for the user to send it from Outlook.
 
 If a requested name is not on the draft, nothing is removed and the response lists the draft's actual attachment names. A name that matches only an inline image is left in place unless `includeInline` is true, and the response says so. `success` is true only when every requested attachment was removed.
 
