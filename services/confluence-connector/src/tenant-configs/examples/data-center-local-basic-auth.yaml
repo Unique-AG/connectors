@@ -1,0 +1,44 @@
+# Example: the local Confluence Data Center from local-confluence-v8.5-docker-compose.yaml,
+# ingesting into a Unique platform running on this machine.
+#
+# Copy it to src/tenant-configs/<name>-tenant-config.yaml and fill in:
+#   - scopeId: an empty folder in your local Unique.
+#   - zitadelProjectId: the id of the "Unique Apps" project in your local Zitadel.
+# In your local Zitadel, create a machine user "confluence-connector" with a client secret,
+# and give it chat.admin.all, chat.knowledge.read and chat.knowledge.write on that project.
+#
+# Secrets are resolved from environment variables at startup via "os.environ/VAR_NAME" references:
+#   - CONFLUENCE_PASSWORD_LOCAL_DC -> confluence.auth.password
+#   - ZITADEL_CLIENT_SECRET -> unique.zitadelClientSecret
+
+confluence:
+  instanceType: data-center
+  baseUrl: http://localhost:8090
+  auth:
+    mode: basic
+    username: admin
+    password: os.environ/CONFLUENCE_PASSWORD_LOCAL_DC
+  apiRateLimitPerMinute: 10000
+  ingestSingleLabel: ai-ingest
+  ingestAllLabel: ai-ingest-all
+
+unique:
+  serviceAuthMode: external
+  zitadelOauthTokenUrl: http://localhost:10116/oauth/v2/token
+  zitadelProjectId: "your-local-unique-project-id"
+  zitadelClientId: confluence-connector
+  zitadelClientSecret: os.environ/ZITADEL_CLIENT_SECRET
+  ingestionServiceBaseUrl: http://localhost:8091
+  scopeManagementServiceBaseUrl: http://localhost:8094
+  apiRateLimitPerMinute: 6000
+
+processing:
+  concurrency: 1
+  scanIntervalCron: "*/1 * * * *"
+
+ingestion:
+  ingestionMode: flat
+  scopeId: your-scope-id
+  storeInternally: enabled
+  attachments:
+    mode: enabled

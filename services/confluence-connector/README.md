@@ -16,11 +16,11 @@ pnpm dev
 docker compose -f local-confluence-v8.5-docker-compose.yaml run --rm seed
 ```
 
-- Starts Confluence 8.5 on http://localhost:8090, user `admin`, password `CONFLUENCE_PASSWORD_LOCAL_DC` from `.env`.
+- Starts Confluence 8.5 on http://localhost:8090, user `admin`, password `CONFLUENCE_PASSWORD_LOCAL_DC` from `.env` (default `admin`).
 - Asks for a license key and prints the link to get a free 30-day trial key. Press Enter instead to use Atlassian's 3-hour [timebomb license](https://developer.atlassian.com/platform/marketplace/timebomb-licenses-for-testing-server-apps/).
 - Creates the space `TEST`: labeled pages, child pages and attachments, plus one page that must not be ingested.
 - Run it again for a new license. Existing content is kept. `up -d` also works, and renews only the timebomb license.
-- Point a tenant config at it with `instanceType: data-center`, `baseUrl: http://localhost:8090` and `auth.mode: basic`.
+- For the tenant config, start from [`examples/data-center-local-basic-auth.yaml`](./src/tenant-configs/examples/data-center-local-basic-auth.yaml). It lists the one-time setup in your local Unique.
 
 ## Configuration
 

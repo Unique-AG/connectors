@@ -31,6 +31,9 @@ services:
       ATL_TOMCAT_PORT: 8090
       JVM_MINIMUM_MEMORY: 1g
       JVM_MAXIMUM_MEMORY: 2g
+      # Fixed, so a fresh volume keeps the instance id the connector checks on the
+      # root scope, and a 30-day trial key keeps working.
+      ATL_PRODUCT_SERVER_ID: BDQU-16UU-RFI3-CW5W
     ports:
       - "8090:8090"
     volumes:
@@ -51,7 +54,7 @@ services:
       confluence:
         condition: service_healthy
     environment:
-      CONFLUENCE_ADMIN_PASSWORD: ${CONFLUENCE_PASSWORD_LOCAL_DC:?set CONFLUENCE_PASSWORD_LOCAL_DC in .env}
+      CONFLUENCE_ADMIN_PASSWORD: ${CONFLUENCE_PASSWORD_LOCAL_DC:-admin}
     volumes:
       - ./local-confluence:/seed:ro
 
