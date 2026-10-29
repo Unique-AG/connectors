@@ -303,6 +303,7 @@ def main():
     for spec in PAGES:
         ensure_page(spec, ids)
     log(f"done: http://localhost:8090/display/{SPACE_KEY}")
+    log(f"log in as {ADMIN_USER} / {ADMIN_PASSWORD}")
 
 
 if __name__ == "__main__":
