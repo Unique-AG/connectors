@@ -197,7 +197,7 @@ The lock files hold hashes for `linux_amd64`, `linux_arm64`, and `darwin_arm64`.
 terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64
 ```
 
-An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too, for example the `uv` image in `COPY --from`. An npm version that its publisher deprecated goes there as well. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint.
+An action that is pinned to a branch goes to the list "Needs a person". An image that is not an official Docker Hub image goes there too, for example the `uv` image in `COPY --from`. An npm version that its publisher deprecated goes there as well. The Terraform version itself, `required_version`, goes there when its newest release is outside the constraint. A Python package goes there when its lookup at PyPI fails. If pnpm finds only versions younger than the 3-day cooldown for a version range, the job skips the transitive npm updates that night. It lists the package with a reason. The direct updates still run.
 
 ## Advisories in lock files
 
