@@ -42,6 +42,21 @@ services:
       retries: 20
       start_period: 120s
 
+  # Runs once per `up`: sets Confluence up on a fresh volume, renews the 3-hour
+  # timebomb license otherwise, and creates the test space and pages if missing.
+  seed:
+    image: atlassian/confluence:8.5.18
+    entrypoint: ["python3", "/seed/seed.py"]
+    restart: "no"
+    depends_on:
+      confluence:
+        condition: service_healthy
+    environment:
+      CONFLUENCE_URL: http://confluence:8090
+      CONFLUENCE_ADMIN_PASSWORD: ${CONFLUENCE_PASSWORD_LOCAL_DC:?set CONFLUENCE_PASSWORD_LOCAL_DC in .env}
+    volumes:
+      - ./local-confluence:/seed:ro
+
 volumes:
   confluence_pgdata:
   confluence_data:
