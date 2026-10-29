@@ -30,6 +30,7 @@ from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
 from office_365_mcp.tools import TOOL_NAMES
 from tests.conftest import RecordedSleeps
+from tests.graph_fixtures import response
 
 type Json = Mapping[str, object]
 
@@ -149,15 +150,6 @@ def same(expected: object, actual: object) -> bool:
     )
 
 
-def _response(spec: Json) -> httpx.Response:
-    named = HERE / "bodies" / str(spec.get("body", ""))
-    content = named.read_bytes() if named.is_file() else b""
-    headers = {"content-type": "application/json"} if named.suffix == ".json" else {}
-    answered = spec.get("response_headers", spec.get("headers", {}))
-    headers.update(cast("Mapping[str, str]", answered))
-    return httpx.Response(cast("int", spec["status"]), content=content, headers=headers)
-
-
 def _asked(request: httpx.Request) -> Json:
     try:
         body = cast("object", json.loads(request.content)) if request.content else None
@@ -214,9 +206,9 @@ class Replay:
             self.faults_left -= 1
             if "transport" in self.fault:
                 raise httpx.ReadTimeout("injected by the sidecar fault", request=request)
-            return _response(mapping(self.fault["graph"]))
+            return response(mapping(self.fault["graph"]), HERE / "bodies")
         self.served.add(index)
-        return _response(self.interactions[index])
+        return response(self.interactions[index], HERE / "bodies")
 
     def counted(self, step: int, expected: Json) -> dict[str, int]:
         made = [call for at, call in self.calls if at == step]
@@ -360,7 +352,7 @@ def test_a_redirect_answer_carries_its_own_headers() -> None:
     replay = Replay(
         [{"method": "GET", "host": "contoso.sharepoint.com", "path": "/f", "status": 200}]
     )
-    moved = _response(
+    moved = response(
         {
             "status": 302,
             "headers": {"authorization": "x"},

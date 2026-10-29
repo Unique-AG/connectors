@@ -10,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client import GraphForbidden
+from office_365_mcp.graph_client import GraphForbidden, GraphUnavailable
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.shared.mail import (
     SUMMARY_FIELDS,
@@ -20,6 +20,7 @@ from office_365_mcp.shared.mail import (
     WellKnownFolder,
 )
 from office_365_mcp.tools import outlook_list_mail as lister
+from tests.graph_fixtures import response, serve
 
 from .conftest import GRAPH_V1
 
@@ -1294,3 +1295,43 @@ class TestGraphFailures:
 
     def test_a_folder_that_will_not_resolve_is_answered_with_both_recoveries(self) -> None:
         assert "outlook_browse_folders" in lister.GRAPH_NOT_FOUND
+
+
+_RECORDED_MESSAGES = ("GET", "/me/mailFolders/inbox/messages")
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_reads_the_listing_microsoft_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-uc-02-01")
+
+        listing = await lister.list_mail(client, unread_only=True, limit=25)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+
+        assert listing.messages[0].subject == "Q3 budget: travel costs"
+        assert listing.messages[0].is_read is False
+        assert listing.unread_items is not None
+
+    async def test_a_500_from_microsoft_is_raised_as_unavailable_after_one_try(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-uc-02-01")
+        failing = routes[_RECORDED_MESSAGES].mock(
+            side_effect=[response({"status": 500, "body": "error.generalException.json"})]
+        )
+
+        with pytest.raises(GraphUnavailable):
+            _ = await lister.list_mail(client, unread_only=True, limit=25)
+
+        assert failing.call_count == 1
+
+    async def test_no_answer_in_time_is_raised_as_unavailable(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-uc-02-01")
+        _ = routes[_RECORDED_MESSAGES].mock(side_effect=httpx.ReadTimeout)
+
+        with pytest.raises(GraphUnavailable):
+            _ = await lister.list_mail(client, unread_only=True, limit=25)
