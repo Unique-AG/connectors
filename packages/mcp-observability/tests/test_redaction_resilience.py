@@ -336,7 +336,16 @@ def test_a_secret_with_unusual_characters_is_redacted(secret: str) -> None:
 
 @pytest.mark.parametrize(
     "message",
-    ["Refreshing token for user", "token value expired", "Basic auth failed", "a bearer of bad"],
+    [
+        "Refreshing token for user",
+        "token value expired",
+        "Basic auth failed",
+        "a bearer of bad",
+        "Basic authentication failed",
+        "Bearer authorization header missing",
+        "Basic configuration loaded.",
+        "Bearer Authentication expired",
+    ],
 )
 def test_ordinary_text_is_left_alone(message: str) -> None:
     line = json.dumps({"msg": message})

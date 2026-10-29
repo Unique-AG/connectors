@@ -1,7 +1,6 @@
 """Known secrets and secret-shaped text replaced with `[Redacted]` in every log line."""
 
 import json
-import logging
 import re
 import time
 import traceback
@@ -32,31 +31,52 @@ from mcp_observability.stacktrace import scrub_stacktrace
 MIN_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
 
-# When a pattern has a `secret` group, only that group is replaced, so the context around it
-# (`Bearer `, `password=`) stays readable. A pattern that can fail after a long run starts only
-# where that run starts: one that tried again inside the run would take seconds on a large value.
-# Kept in step with `packages/logger`.
-DEFAULT_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(?:Bearer|Basic)\s+(?P<secret>[A-Za-z0-9\-._~+/]{8,}=*)"),
-    re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"),
-    re.compile(r"\b(?:x-)?api[-_]?key\s*[=:]\s*(?P<secret>[^\s&,;\"']+)", re.IGNORECASE),
-    re.compile(
-        r"\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd"
-        r"|secret|token)=(?P<secret>[^\s&,;\"']+)",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^/\s:@]+:(?P<secret>[^/\s@]+)@", re.IGNORECASE
-    ),
-    re.compile(
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?"
-        r"-----END [A-Z ]*PRIVATE KEY-----"
-    ),
-    re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"),
-    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}"),
-    re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
-    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+# Applied to every log line unless `default_patterns` is false, and exported one by one so a
+# consumer that opts out can pick its own. When a pattern has a `secret` group, only that group is
+# replaced, so the context around it (`Bearer `, `password=`) stays readable. A pattern that can
+# fail after a long run starts only where that run starts: one that tried again inside the run
+# would take seconds on a large value. Kept in step with `packages/logger`.
+
+# A credential has a digit, an inner capital or a symbol, or is too long to be a word, so prose such
+# as "Basic authentication failed" keeps its words.
+AUTHORIZATION_SCHEME_PATTERN = re.compile(
+    r"\b(?:Bearer|Basic)\s+(?P<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})"
+    r"[A-Za-z0-9\-._~+/]{8,}=*)"
 )
+JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+API_KEY_PATTERN = re.compile(
+    r"\b(?:x-)?api[-_]?key\s*[=:]\s*(?P<secret>[^\s&,;\"']+)", re.IGNORECASE
+)
+CREDENTIAL_PARAMETER_PATTERN = re.compile(
+    r"\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd"
+    r"|secret|token)=(?P<secret>[^\s&,;\"']+)",
+    re.IGNORECASE,
+)
+URL_CREDENTIALS_PATTERN = re.compile(
+    r"(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^/\s:@]+:(?P<secret>[^/\s@]+)@", re.IGNORECASE
+)
+PRIVATE_KEY_PATTERN = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?"
+    r"-----END [A-Z ]*PRIVATE KEY-----"
+)
+SK_PREFIXED_KEY_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{20,}")
+GITHUB_TOKEN_PATTERN = re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}")
+SLACK_TOKEN_PATTERN = re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}")
+AWS_ACCESS_KEY_ID_PATTERN = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
+
+DEFAULT_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    AUTHORIZATION_SCHEME_PATTERN,
+    JWT_PATTERN,
+    API_KEY_PATTERN,
+    CREDENTIAL_PARAMETER_PATTERN,
+    URL_CREDENTIALS_PATTERN,
+    PRIVATE_KEY_PATTERN,
+    SK_PREFIXED_KEY_PATTERN,
+    GITHUB_TOKEN_PATTERN,
+    SLACK_TOKEN_PATTERN,
+    AWS_ACCESS_KEY_ID_PATTERN,
+)
+
 
 # A JSON string literal, and the colon after it when it is an object key.
 _JSON_STRING = re.compile(r'("(?:[^"\\]|\\.)*")(\s*:)?')
@@ -69,7 +89,8 @@ type Source = Callable[[], dict[str, object]]
 
 # The variants to replace, longest first, already expanded by `_secret_variants`.
 _context_secrets: ContextVar[tuple[str, ...]] = ContextVar("log_context_secrets", default=())
-_log = logging.getLogger("mcp_observability")
+# Why the secrets of this context could not be read, as JSON added to every line logged in it.
+_context_failure: ContextVar[str | None] = ContextVar("log_context_failure", default=None)
 
 
 class SecretRedactor:
@@ -84,7 +105,8 @@ class SecretRedactor:
         *,
         default_patterns: bool = True,
     ) -> None:
-        """`default_patterns=False` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`."""
+        """`default_patterns=False` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`, which
+        can pick from them."""
         self._secrets: tuple[str, ...] = _secret_variants(secrets)
         defaults = DEFAULT_SECRET_PATTERNS if default_patterns else ()
         self._patterns: tuple[re.Pattern[str], ...] = (*defaults, *patterns)
@@ -93,7 +115,8 @@ class SecretRedactor:
         """Never raises: `logging` would print the unredacted record to stderr. `source` describes
         the log call for the line that replaces one that cannot be redacted."""
         try:
-            return _JSON_STRING.sub(partial(self._redact_token, self._current_secrets()), line)
+            redacted = _JSON_STRING.sub(partial(self._redact_token, self._current_secrets()), line)
+            return _with_failure(redacted, _context_failure.get())
         except Exception as error:  # noqa: BLE001 - any failure must still produce a safe line
             return failed_line(
                 "secret redaction",
@@ -195,14 +218,24 @@ class RedactToolCallSecretsMiddleware(Middleware):
 @contextmanager
 def _secrets_read_safely(read: Callable[[], Iterable[str]]) -> Generator[None]:
     """Secrets that cannot be read must not fail the caller: its lines are still written, redacted
-    for every other secret, after one that names the error."""
+    for every other secret and naming the error in `log_secrets_failed`."""
     try:
-        secrets = tuple(read())
-    except Exception:
-        _log.error("Could not read the secrets to redact from this context's lines", exc_info=True)
-        secrets = ()
-    with log_secrets(*secrets):
-        yield
+        secrets, failure = tuple(read()), None
+    except Exception as error:  # noqa: BLE001 - the caller must run whatever the consumer raised
+        secrets, failure = (), json.dumps(_error_fields(error))
+    token = _context_failure.set(failure or _context_failure.get())
+    try:
+        with log_secrets(*secrets):
+            yield
+    finally:
+        _context_failure.reset(token)
+
+
+def _with_failure(line: str, failure: str | None) -> str:
+    """A `PinoJsonFormatter` line always opens with `{"level":`, so the field goes first."""
+    if failure is None or not line.startswith('{"'):
+        return line
+    return f'{{"log_secrets_failed": {failure}, {line[1:]}'
 
 
 def _decoded(literal: str) -> str | None:
@@ -274,16 +307,20 @@ def failed_line(
         message = None
     salvaged = {} if message is None else {"original_msg": message}
     try:
-        err = {
+        return json.dumps({**failed, **described, **salvaged, "err": _error_fields(error)})
+    except Exception:  # noqa: BLE001 - the replacement line must always be written
+        return json.dumps(failed)
+
+
+def _error_fields(error: Exception) -> dict[str, str]:
+    """The error's type and frames, never its message, which can quote the secret."""
+    try:
+        return {
             "name": type(error).__name__,
             "stack": scrub_stacktrace("".join(traceback.format_exception(error))),
         }
-    except Exception:  # noqa: BLE001 - the replacement line must always be written
-        err = {"name": "unknown"}
-    try:
-        return json.dumps({**failed, **described, **salvaged, "err": err})
-    except Exception:  # noqa: BLE001 - the replacement line must always be written
-        return json.dumps(failed)
+    except Exception:  # noqa: BLE001 - a line naming the failure must always be written
+        return {"name": "unknown"}
 
 
 def _replace_secrets(text: str, secrets: tuple[str, ...]) -> str:

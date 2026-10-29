@@ -15,6 +15,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
+from mcp_observability import JWT_PATTERN
 from mcp_observability import RedactRequestSecretsMiddleware
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
@@ -145,7 +146,8 @@ class TestDefaultPatterns:
     @pytest.mark.parametrize(
         ("message", "expected"),
         [
-            ("Authorization: Bearer abc.def-ghi", "Authorization: Bearer [Redacted]"),
+            ("Authorization: Bearer abc.def-ghi9", "Authorization: Bearer [Redacted]"),
+            ("Bearer abcdefghijklmnopqrstuvwxyz", "Bearer [Redacted]"),
             ("Basic dXNlcjpwYXNz", "Basic [Redacted]"),
             (
                 "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl",
@@ -187,6 +189,21 @@ class TestDefaultPatterns:
 
 
 class TestOptingOutOfTheDefaultPatterns:
+    def test_the_default_patterns_the_consumer_picks_apply(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        configure_logging(
+            LoggingSettings(),
+            own_loggers=("tests",),
+            secret_patterns=(JWT_PATTERN,),
+            default_secret_patterns=False,
+        )
+
+        _log.info("password=hunter2 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl")
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "password=hunter2 [Redacted]"
+
     def test_only_the_consumer_patterns_and_known_secrets_remain(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -308,13 +325,13 @@ class TestRequestSecrets:
             middleware=[Middleware(RedactRequestSecretsMiddleware, secrets_of=unreadable)],
         )
         response = TestClient(app).get("/echo")
+        _log.warning("after the request")
 
         assert response.text == "done"
-        failure, echoed = [
-            line for line in logged(capsys) if line["context"] in {"mcp_observability", _log.name}
-        ]
-        assert failure["msg"] == "Could not read the secrets to redact from this context's lines"
-        assert failure["log_level"] == "error"
-        assert cast("dict[str, str]", failure["err"])["name"] == "KeyError"
-        assert _API_KEY not in json.dumps(failure)
+        echoed, after = [line for line in logged(capsys) if line["context"] == _log.name]
         assert echoed["msg"] == "upstream rejected [Redacted]"
+        failure = cast("dict[str, str]", echoed["log_secrets_failed"])
+        assert failure["name"] == "KeyError"
+        assert "test_redaction.py" in failure["stack"]
+        assert _API_KEY not in json.dumps(echoed)
+        assert "log_secrets_failed" not in after

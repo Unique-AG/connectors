@@ -261,6 +261,17 @@ describe('createSecretRedactor resilience', () => {
       expect(line.req_id).toBe('trace_01h455vb4pex5vsknk084sn02q');
     });
 
+    it('keeps the logger context of the original line', () => {
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
+      });
+
+      logger.child({ context: 'UserSyncService' }).info('syncing');
+
+      expect(JSON.parse(lines[0] ?? '').context).toBe('UserSyncService');
+    });
+
     it('drops ids of the original line that are not in their expected format', () => {
       const { logger, lines } = createCapturingLogger({
         secrets: [mockSecret],
@@ -356,6 +367,10 @@ describe('createSecretRedactor resilience', () => {
       'token value expired',
       'Basic auth failed',
       'a bearer of bad news',
+      'Basic authentication failed',
+      'Bearer authorization header missing',
+      'Basic configuration loaded.',
+      'Bearer Authentication expired',
     ])('leaves ordinary text alone: %j', (message) => {
       const { logger, lines } = createCapturingLogger();
 

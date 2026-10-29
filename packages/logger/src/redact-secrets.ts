@@ -7,23 +7,43 @@ export const MIN_SECRET_LENGTH = 8;
 
 const REDACTED = '[Redacted]';
 
-/**
- * Patterns applied to every log line. When a pattern has a `secret` group, only that group is
- * replaced, so the context around it (`Bearer `, `password=`) stays readable. A pattern that can
- * fail after a long run starts only where that run starts: one that tried again inside the run
- * would take seconds on a large value.
+/*
+ * Applied to every log line unless `defaultPatterns` is false, and exported one by one so a consumer
+ * that opts out can pick its own. When a pattern has a `secret` group, only that group is replaced,
+ * so the context around it (`Bearer `, `password=`) stays readable. A pattern that can fail after a
+ * long run starts only where that run starts: one that tried again inside the run would take seconds
+ * on a large value.
  */
+
+// A credential has a digit, an inner capital or a symbol, or is too long to be a word, so prose such
+// as "Basic authentication failed" keeps its words.
+export const AUTHORIZATION_SCHEME_PATTERN =
+  /\b(?:Bearer|Basic)\s+(?<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})[A-Za-z0-9\-._~+/]{8,}=*)/dg;
+export const JWT_PATTERN =
+  /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg;
+export const API_KEY_PATTERN = /\b(?:x-)?api[-_]?key\s*[=:]\s*(?<secret>[^\s&,;"']+)/dgi;
+export const CREDENTIAL_PARAMETER_PATTERN =
+  /\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd|secret|token)=(?<secret>[^\s&,;"']+)/dgi;
+export const URL_CREDENTIALS_PATTERN =
+  /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:(?<secret>[^/\s@]+)@/dgi;
+export const PRIVATE_KEY_PATTERN =
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----/dg;
+export const SK_PREFIXED_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{20,}/dg;
+export const GITHUB_TOKEN_PATTERN = /\bgh[pousr]_[A-Za-z0-9]{36,}/dg;
+export const SLACK_TOKEN_PATTERN = /\bxox[abprs]-[A-Za-z0-9-]{10,}/dg;
+export const AWS_ACCESS_KEY_ID_PATTERN = /\bAKIA[0-9A-Z]{16}\b/dg;
+
 export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
-  /\b(?:Bearer|Basic)\s+(?<secret>[A-Za-z0-9\-._~+/]{8,}=*)/dg,
-  /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg,
-  /\b(?:x-)?api[-_]?key\s*[=:]\s*(?<secret>[^\s&,;"']+)/dgi,
-  /\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd|secret|token)=(?<secret>[^\s&,;"']+)/dgi,
-  /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:(?<secret>[^/\s@]+)@/dgi,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----/dg,
-  /\bsk-[A-Za-z0-9_-]{20,}/dg,
-  /\bgh[pousr]_[A-Za-z0-9]{36,}/dg,
-  /\bxox[abprs]-[A-Za-z0-9-]{10,}/dg,
-  /\bAKIA[0-9A-Z]{16}\b/dg,
+  AUTHORIZATION_SCHEME_PATTERN,
+  JWT_PATTERN,
+  API_KEY_PATTERN,
+  CREDENTIAL_PARAMETER_PATTERN,
+  URL_CREDENTIALS_PATTERN,
+  PRIVATE_KEY_PATTERN,
+  SK_PREFIXED_KEY_PATTERN,
+  GITHUB_TOKEN_PATTERN,
+  SLACK_TOKEN_PATTERN,
+  AWS_ACCESS_KEY_ID_PATTERN,
 ];
 
 // A JSON string literal, and the colon after it when it is an object key.
@@ -50,7 +70,7 @@ export interface SecretRedactionOptions {
    * narrows what is replaced.
    */
   patterns?: readonly RegExp[];
-  /** `false` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`. */
+  /** `false` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`, which can pick from them. */
   defaultPatterns?: boolean;
 }
 
@@ -204,6 +224,7 @@ const STACK_FRAME = /^\s+at (.+:\d+:\d+\)?)$/;
 const ORIGINAL_FIELDS: ReadonlyArray<readonly [string, RegExp]> = [
   ['original_level', /"level":(\d+)/],
   ['original_time', /"time":(\d+)/],
+  ['context', /"context":("[A-Za-z0-9_.$-]{1,100}")/],
   ['trace_id', /"trace_id":("[0-9a-f]{32}")/],
   ['span_id', /"span_id":("[0-9a-f]{16}")/],
   ['req_id', /"req":\{"id":(\d+|"[0-9a-f]{32}"|"[a-z_]+_[0-9a-z]{26}")/],
