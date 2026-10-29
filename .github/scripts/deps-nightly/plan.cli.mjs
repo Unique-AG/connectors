@@ -30,8 +30,17 @@ import {
   uvProjectFolders,
 } from './repo.mjs';
 import { run, runOrThrow, sandboxEnv } from './run.mjs';
-import { closedKeysOf } from './state.mjs';
+import { closedBodiesOf, closedKeysOf } from './state.mjs';
 import { createTerraformLookup, planTerraform } from './terraform.mjs';
+
+const CLOSED_PULLS_QUERY = `query($owner: String!, $name: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: CLOSED, labels: ["dependencies"], first: 100, after: $endCursor) {
+      nodes { body labels(first: 20) { nodes { name } } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
 
 function planNpm() {
   const outdatedRun = run('pnpm', [
@@ -166,22 +175,23 @@ const openPulls = openPullRequests
       gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
     ).some((login) => login !== 'github-actions[bot]'),
   }));
-const closedBodies = gh(
-  'api',
-  '--method',
-  'GET',
-  'search/issues',
-  '-f',
-  `q=repo:${repository} is:pr is:closed is:unmerged label:dependencies -label:superseded`,
-  '-f',
-  'per_page=100',
-  '--paginate',
-  '--jq',
-  '.items[].body | @json',
-)
-  .split('\n')
-  .filter(Boolean)
-  .map((line) => JSON.parse(line));
+const [owner, repositoryName] = repository.split('/');
+const closedBodies = closedBodiesOf(
+  JSON.parse(
+    gh(
+      'api',
+      'graphql',
+      '--paginate',
+      '--slurp',
+      '-f',
+      `query=${CLOSED_PULLS_QUERY}`,
+      '-f',
+      `owner=${owner}`,
+      '-f',
+      `name=${repositoryName}`,
+    ),
+  ),
+);
 const plan = buildPlan({
   candidates: [
     ...npm.candidates,
