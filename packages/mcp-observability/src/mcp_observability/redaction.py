@@ -2,6 +2,7 @@
 
 import json
 import re
+import threading
 import time
 import traceback
 from collections.abc import Callable
@@ -88,9 +89,41 @@ _MSG = re.compile(r'"msg":\s*("(?:[^"\\]|\\.)*")')
 type Source = Callable[[], dict[str, object]]
 
 # The variants to replace, longest first, already expanded by `_secret_variants`.
-_context_secrets: ContextVar[tuple[str, ...]] = ContextVar("log_context_secrets", default=())
-# Why the secrets of this context could not be read, as JSON added to every line logged in it.
-_context_failure: ContextVar[str | None] = ContextVar("log_context_failure", default=None)
+
+
+class _LogScope:
+    """The secrets of one `log_secrets` block or redaction middleware. Every task started in it
+    shares this object, so a secret `add_log_secrets` adds late reaches them all, and the lines
+    logged after the call that added it returns or raises."""
+
+    def __init__(
+        self, parent: _LogScope | None, secrets: tuple[str, ...], failure: str | None = None
+    ) -> None:
+        self._parent: _LogScope | None = parent
+        # The variants to replace, longest first, already expanded by `_secret_variants`.
+        self._secrets: tuple[str, ...] = secrets
+        # Why secrets of this scope could not be read, as JSON added to every line logged in it.
+        self._failure: str | None = failure
+        self._lock: threading.Lock = threading.Lock()
+
+    def add(self, secrets: tuple[str, ...]) -> None:
+        with self._lock:
+            self._secrets = _longest_first((*self._secrets, *secrets))
+
+    def fail(self, failure: str) -> None:
+        self._failure = failure
+
+    def secrets(self) -> tuple[str, ...]:
+        outer = self._parent.secrets() if self._parent is not None else ()
+        return (*outer, *self._secrets)
+
+    def failure(self) -> str | None:
+        if self._failure is not None or self._parent is None:
+            return self._failure
+        return self._parent.failure()
+
+
+_log_scope: ContextVar[_LogScope | None] = ContextVar("log_scope", default=None)
 
 
 class SecretRedactor:
@@ -116,7 +149,8 @@ class SecretRedactor:
         the log call for the line that replaces one that cannot be redacted."""
         try:
             redacted = _JSON_STRING.sub(partial(self._redact_token, self._current_secrets()), line)
-            return _with_failure(redacted, _context_failure.get())
+            scope = _log_scope.get()
+            return _with_failure(redacted, scope.failure() if scope is not None else None)
         except Exception as error:  # noqa: BLE001 - any failure must still produce a safe line
             return failed_line(
                 "secret redaction",
@@ -135,8 +169,8 @@ class SecretRedactor:
             return without_secrets
 
     def _current_secrets(self) -> tuple[str, ...]:
-        current = _context_secrets.get()
-        return _longest_first((*self._secrets, *current)) if current else self._secrets
+        scope = _log_scope.get()
+        return _longest_first((*self._secrets, *scope.secrets())) if scope else self._secrets
 
     def _redact_token(self, secrets: tuple[str, ...], token: re.Match[str]) -> str:
         literal, key_colon = token.group(1), token.group(2)
@@ -166,13 +200,32 @@ class SecretRedactor:
 @contextmanager
 def log_secrets(*secrets: str) -> Generator[None]:
     """Redact `secrets` from every line logged in this context, on top of the outer ones."""
-    token = _context_secrets.set(
-        _longest_first((*_context_secrets.get(), *_secret_variants(secrets)))
-    )
+    with _scope(_secret_variants(secrets)):
+        yield
+
+
+def add_log_secrets(*secrets: str) -> None:
+    """Redact `secrets` from every line logged until the innermost `log_secrets` block or
+    redaction middleware ends, also after the caller returns or raises, and in the tasks started
+    in it. For a secret read partway through, such as the caller's token loaded from a database
+    inside the tool. Outside such a scope it does nothing. It never raises: when it fails, the
+    lines of the scope name the error in `log_secrets_failed`."""
+    scope = _log_scope.get()
+    if scope is None:
+        return
+    try:
+        scope.add(_secret_variants(secrets))
+    except Exception as error:  # noqa: BLE001 - the caller must run whatever it passed
+        scope.fail(json.dumps(_error_fields(error)))
+
+
+@contextmanager
+def _scope(secrets: tuple[str, ...], failure: str | None = None) -> Generator[None]:
+    token = _log_scope.set(_LogScope(_log_scope.get(), secrets, failure))
     try:
         yield
     finally:
-        _context_secrets.reset(token)
+        _log_scope.reset(token)
 
 
 class RedactRequestSecretsMiddleware:
@@ -223,12 +276,8 @@ def _secrets_read_safely(read: Callable[[], Iterable[str]]) -> Generator[None]:
         secrets, failure = tuple(read()), None
     except Exception as error:  # noqa: BLE001 - the caller must run whatever the consumer raised
         secrets, failure = (), json.dumps(_error_fields(error))
-    token = _context_failure.set(failure or _context_failure.get())
-    try:
-        with log_secrets(*secrets):
-            yield
-    finally:
-        _context_failure.reset(token)
+    with _scope(_secret_variants(secrets), failure):
+        yield
 
 
 def _with_failure(line: str, failure: str | None) -> str:

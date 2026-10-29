@@ -25,6 +25,7 @@ from mcp_observability.redaction import SLACK_TOKEN_PATTERN
 from mcp_observability.redaction import URL_CREDENTIALS_PATTERN
 from mcp_observability.redaction import RedactRequestSecretsMiddleware
 from mcp_observability.redaction import RedactToolCallSecretsMiddleware
+from mcp_observability.redaction import add_log_secrets
 from mcp_observability.redaction import log_secrets
 from mcp_observability.tool_calls import ToolCallObservabilityMiddleware
 from mcp_observability.trace_declarations import trace_arguments
@@ -53,6 +54,7 @@ __all__ = [
     "RedactRequestSecretsMiddleware",
     "RedactToolCallSecretsMiddleware",
     "ToolCallObservabilityMiddleware",
+    "add_log_secrets",
     "configure_identifiable_values",
     "configure_logging",
     "configure_tracing",

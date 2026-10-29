@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -17,6 +18,7 @@ from starlette.testclient import TestClient
 
 from mcp_observability import JWT_PATTERN
 from mcp_observability import RedactRequestSecretsMiddleware
+from mcp_observability import add_log_secrets
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
 from mcp_observability.redaction import MIN_SECRET_LENGTH
@@ -335,3 +337,60 @@ class TestRequestSecrets:
         assert "test_redaction.py" in failure["stack"]
         assert _API_KEY not in json.dumps(echoed)
         assert "log_secrets_failed" not in after
+
+
+class TestSecretsAddedPartway:
+    def test_an_added_secret_is_redacted_after_the_call_that_added_it_raises(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure()
+
+        def load_credential() -> None:
+            add_log_secrets("stored-user-token-1234")
+            raise RuntimeError("upstream rejected stored-user-token-1234")
+
+        with log_secrets():
+            try:
+                load_credential()
+            except RuntimeError as error:
+                _log.warning("tool failed: %s", error)
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "tool failed: upstream rejected [Redacted]"
+
+    async def test_a_secret_added_in_a_child_task_reaches_the_scope_that_started_it(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure()
+
+        async def load_credential() -> None:
+            add_log_secrets("stored-user-token-1234")
+
+        with log_secrets():
+            await asyncio.gather(load_credential())
+            _log.info("loaded stored-user-token-1234")
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "loaded [Redacted]"
+
+    def test_an_added_secret_ends_with_its_scope(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _configure()
+
+        with log_secrets("outer-secret-1"):
+            with log_secrets():
+                add_log_secrets("inner-secret-2")
+            _log.info("outer-secret-1 inner-secret-2")
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "[Redacted] inner-secret-2"
+
+    def test_adding_outside_any_scope_does_nothing(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure()
+
+        add_log_secrets("stored-user-token-1234")
+        _log.info("stored-user-token-1234")
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "stored-user-token-1234"

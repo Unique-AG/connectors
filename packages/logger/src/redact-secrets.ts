@@ -52,15 +52,18 @@ const JSON_STRING = /("(?:[^"\\]|\\.)*")(\s*:)?/g;
 // pino writes the line's own `msg` last, after any nested in the logged object.
 const MSG = /"msg":("(?:[^"\\]|\\.)*")/g;
 
-interface LogContext {
+// The secrets of one `runWithLogSecrets` call or request. Everything that runs in it shares this
+// object, so a secret `addLogSecrets` adds late reaches all of it, including the lines logged after
+// the call that added it returns or throws.
+interface LogScope {
+  readonly parent: LogScope | undefined;
   // The variants to replace, longest first, already expanded by `secretVariants`.
-  readonly secrets: readonly string[];
-  // Why the secrets of this context could not be read, as JSON added to every line logged in it.
-  readonly failure?: string;
+  secrets: readonly string[];
+  // Why secrets of this scope could not be read, as JSON added to every line logged in it.
+  failure?: string;
 }
 
-const NO_CONTEXT: LogContext = { secrets: [] };
-const logContext = new AsyncLocalStorage<LogContext>();
+const logScope = new AsyncLocalStorage<LogScope>();
 
 export interface SecretRedactionOptions {
   /** Known secret values, such as API keys from env. Values under `MIN_SECRET_LENGTH` are skipped. */
@@ -98,10 +101,10 @@ export function createSecretRedactor({
     },
   );
 
-  const secretsIn = (context: LogContext | undefined): readonly string[] =>
-    context === undefined || context.secrets.length === 0
-      ? knownSecrets
-      : longestFirst([...knownSecrets, ...context.secrets]);
+  const secretsIn = (scope: LogScope | undefined): readonly string[] => {
+    const scoped = scopeSecrets(scope);
+    return scoped.length === 0 ? knownSecrets : longestFirst([...knownSecrets, ...scoped]);
+  };
   const replacePatterns = (text: string): string => allPatterns.reduce(redactPattern, text);
 
   const redactLine = (line: string, secrets: readonly string[]): string =>
@@ -120,8 +123,8 @@ export function createSecretRedactor({
 
   // What can still be shown of a message when redacting its line failed. Replacing the secrets
   // cannot fail, the patterns are what may have.
-  const salvage = (text: string, context: LogContext | undefined): string => {
-    const withoutSecrets = replaceSecrets(text, secretsIn(context));
+  const salvage = (text: string, scope: LogScope | undefined): string => {
+    const withoutSecrets = replaceSecrets(text, secretsIn(scope));
     try {
       return replacePatterns(withoutSecrets);
     } catch {
@@ -132,11 +135,11 @@ export function createSecretRedactor({
   // The hook runs inside the log call, so a throw would fail the caller's request, and writing
   // the line as it is could leak the secret.
   const hook = (line: string): string => {
-    const context = logContext.getStore();
+    const scope = logScope.getStore();
     try {
-      return withFailure(redactLine(line, secretsIn(context)), context?.failure);
+      return withFailure(redactLine(line, secretsIn(scope)), scopeFailure(scope));
     } catch (error) {
-      return redactionFailedLine(line, error, hook, (text) => salvage(text, context));
+      return redactionFailedLine(line, error, hook, (text) => salvage(text, scope));
     }
   };
   return hook;
@@ -144,10 +147,29 @@ export function createSecretRedactor({
 
 /** Runs `callback` with `secrets` redacted from every line it logs, on top of the outer ones. */
 export function runWithLogSecrets<T>(secrets: readonly string[], callback: () => T): T {
-  return logContext.run(
-    contextWith(() => secrets),
+  return logScope.run(
+    scopeWith(() => secrets),
     callback,
   );
+}
+
+/**
+ * Redacts `secrets` from every line logged until the innermost `runWithLogSecrets` call or
+ * `redactRequestSecrets` request ends, also after the caller returns or throws. For a secret read
+ * partway through, such as the caller's token loaded from a database while the request is
+ * handled. Outside such a scope it does nothing. It never throws: when it fails, the lines of the
+ * scope name the error in `log_secrets_failed`.
+ */
+export function addLogSecrets(secrets: readonly string[]): void {
+  const scope = logScope.getStore();
+  if (scope === undefined) {
+    return;
+  }
+  try {
+    scope.secrets = longestFirst([...scope.secrets, ...secretVariants(secrets)]);
+  } catch (error) {
+    scope.failure = failureJson(error);
+  }
 }
 
 /**
@@ -160,21 +182,29 @@ export function redactRequestSecrets<Request extends IncomingMessage>(
   secretsOf: (request: Request) => readonly string[],
 ): (request: Request, response: ServerResponse, next: () => void) => void {
   return (request, _response, next) =>
-    logContext.run(
-      contextWith(() => secretsOf(request)),
+    logScope.run(
+      scopeWith(() => secretsOf(request)),
       next,
     );
 }
 
 // Secrets that cannot be read must not fail the caller: its lines are still written, redacted for
 // every other secret and naming the failure.
-function contextWith(secretsOf: () => readonly string[]): LogContext {
-  const outer = logContext.getStore() ?? NO_CONTEXT;
+function scopeWith(secretsOf: () => readonly string[]): LogScope {
+  const parent = logScope.getStore();
   try {
-    return { ...outer, secrets: longestFirst([...outer.secrets, ...secretVariants(secretsOf())]) };
+    return { parent, secrets: secretVariants(secretsOf()) };
   } catch (error) {
-    return { ...outer, failure: failureJson(error) };
+    return { parent, secrets: [], failure: failureJson(error) };
   }
+}
+
+function scopeSecrets(scope: LogScope | undefined): readonly string[] {
+  return scope === undefined ? [] : [...scopeSecrets(scope.parent), ...scope.secrets];
+}
+
+function scopeFailure(scope: LogScope | undefined): string | undefined {
+  return scope === undefined ? undefined : (scope.failure ?? scopeFailure(scope.parent));
 }
 
 function failureJson(error: unknown): string {
