@@ -109,12 +109,21 @@ describe('createSecretRedactor', () => {
       expect(line?.upstream).toBe('reachable');
     });
 
-    it('leaves object keys untouched', () => {
+    it('redacts a secret in an object key', () => {
       const { logger, lines } = createCapturingLogger({ secrets: [mockApiKey] });
 
-      logger.info({ [mockApiKey]: 'value' });
+      logger.info({ cache: { [mockApiKey]: 'value' } });
 
-      expect(parsedLines(lines)[0]?.[mockApiKey]).toBe('value');
+      expect(lines[0]).not.toContain(mockApiKey);
+      expect(parsedLines(lines)[0]?.cache).toEqual({ '[Redacted]': 'value' });
+    });
+
+    it('does not match object keys against the patterns', () => {
+      const { logger, lines } = createCapturingLogger();
+
+      logger.info({ 'password=hunter2': 'value' });
+
+      expect(parsedLines(lines)[0]?.['password=hunter2']).toBe('value');
     });
   });
 
@@ -255,6 +264,43 @@ describe('createSecretRedactor', () => {
         'echoed [Redacted] and [Redacted]',
         'after the request opaque-token-1234',
       ]);
+    });
+
+    it('serves and logs a request whose secrets cannot be read, naming the error', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: [mockApiKey] });
+      const mockRequest = new IncomingMessage(new Socket());
+      const middleware = redactRequestSecrets(() => {
+        throw new TypeError(`no header for ${mockApiKey}`);
+      });
+      let served = false;
+
+      middleware(mockRequest, new ServerResponse(mockRequest), () => {
+        served = true;
+        logger.info(`upstream rejected ${mockApiKey}`);
+      });
+      logger.info('after the request');
+
+      expect(served).toBe(true);
+      expect(lines[0]).not.toContain(mockApiKey);
+      const [during, after] = parsedLines(lines);
+      expect(during?.msg).toBe('upstream rejected [Redacted]');
+      expect(during?.log_secrets_failed).toEqual({
+        name: 'TypeError',
+        stack: expect.arrayContaining([expect.stringMatching(/redact-secrets\.spec\.ts:\d+:\d+/)]),
+      });
+      expect(after).not.toHaveProperty('log_secrets_failed');
+    });
+
+    it('treats secrets that are not a list as unreadable', () => {
+      const { logger, lines } = createCapturingLogger();
+      const mockRequest = new IncomingMessage(new Socket());
+      const middleware = redactRequestSecrets(() => undefined as unknown as string[]);
+
+      middleware(mockRequest, new ServerResponse(mockRequest), () => logger.info('handled'));
+
+      const line = parsedLines(lines)[0];
+      expect(line?.msg).toBe('handled');
+      expect(line?.log_secrets_failed).toMatchObject({ name: 'TypeError' });
     });
   });
 });

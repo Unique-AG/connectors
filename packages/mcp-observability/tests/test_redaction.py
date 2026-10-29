@@ -128,10 +128,17 @@ class TestKnownSecrets:
 
         assert SecretRedactor().redact_line(line) == line
 
-    def test_object_keys_are_untouched(self) -> None:
+    def test_a_secret_in_an_object_key_is_redacted(self) -> None:
         redactor = SecretRedactor((_API_KEY,))
 
-        assert redactor.redact_line(f'{{"{_API_KEY}":"v"}}') == f'{{"{_API_KEY}":"v"}}'
+        line = redactor.redact_line(f'{{"cache":{{"{_API_KEY}":"v"}}}}')
+
+        assert json.loads(line) == {"cache": {"[Redacted]": "v"}}
+
+    def test_object_keys_are_not_matched_against_the_patterns(self) -> None:
+        line = '{"password=hunter2":"v"}'
+
+        assert SecretRedactor().redact_line(line) == line
 
 
 class TestDefaultPatterns:
@@ -283,3 +290,31 @@ class TestRequestSecrets:
             "upstream rejected [Redacted]",
             "after the request tenant-token-1234",
         ]
+
+    def test_a_request_is_served_and_logged_when_its_secrets_cannot_be_read(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure((_API_KEY,))
+
+        async def echo(_request: Request) -> PlainTextResponse:
+            _log.warning("upstream rejected %s", _API_KEY)
+            return PlainTextResponse("done")
+
+        def unreadable(request: Request) -> list[str]:
+            raise KeyError(f"no secret in {request.url.path} for {_API_KEY}")
+
+        app = Starlette(
+            routes=[Route("/echo", echo)],
+            middleware=[Middleware(RedactRequestSecretsMiddleware, secrets_of=unreadable)],
+        )
+        response = TestClient(app).get("/echo")
+
+        assert response.text == "done"
+        failure, echoed = [
+            line for line in logged(capsys) if line["context"] in {"mcp_observability", _log.name}
+        ]
+        assert failure["msg"] == "Could not read the secrets to redact from this context's lines"
+        assert failure["log_level"] == "error"
+        assert cast("dict[str, str]", failure["err"])["name"] == "KeyError"
+        assert _API_KEY not in json.dumps(failure)
+        assert echoed["msg"] == "upstream rejected [Redacted]"

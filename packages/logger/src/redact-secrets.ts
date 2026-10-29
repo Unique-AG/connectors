@@ -9,15 +9,17 @@ const REDACTED = '[Redacted]';
 
 /**
  * Patterns applied to every log line. When a pattern has a `secret` group, only that group is
- * replaced, so the context around it (`Bearer `, `password=`) stays readable.
+ * replaced, so the context around it (`Bearer `, `password=`) stays readable. A pattern that can
+ * fail after a long run starts only where that run starts: one that tried again inside the run
+ * would take seconds on a large value.
  */
 export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
   /\b(?:Bearer|Basic)\s+(?<secret>[A-Za-z0-9\-._~+/]{8,}=*)/dg,
-  /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg,
+  /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg,
   /\b(?:x-)?api[-_]?key\s*[=:]\s*(?<secret>[^\s&,;"']+)/dgi,
   /\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd|secret|token)=(?<secret>[^\s&,;"']+)/dgi,
-  /\b[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:(?<secret>[^/\s@]+)@/dgi,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/dg,
+  /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:(?<secret>[^/\s@]+)@/dgi,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----/dg,
   /\bsk-[A-Za-z0-9_-]{20,}/dg,
   /\bgh[pousr]_[A-Za-z0-9]{36,}/dg,
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/dg,
@@ -27,8 +29,18 @@ export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
 // A JSON string literal, and the colon after it when it is an object key.
 const JSON_STRING = /("(?:[^"\\]|\\.)*")(\s*:)?/g;
 
-// The variants to replace, longest first, already expanded by `secretVariants`.
-const contextSecrets = new AsyncLocalStorage<readonly string[]>();
+// pino writes the line's own `msg` last, after any nested in the logged object.
+const MSG = /"msg":("(?:[^"\\]|\\.)*")/g;
+
+interface LogContext {
+  // The variants to replace, longest first, already expanded by `secretVariants`.
+  readonly secrets: readonly string[];
+  // Why the secrets of this context could not be read, as JSON added to every line logged in it.
+  readonly failure?: string;
+}
+
+const NO_CONTEXT: LogContext = { secrets: [] };
+const logContext = new AsyncLocalStorage<LogContext>();
 
 export interface SecretRedactionOptions {
   /** Known secret values, such as API keys from env. Values under `MIN_SECRET_LENGTH` are skipped. */
@@ -44,9 +56,10 @@ export interface SecretRedactionOptions {
 
 /**
  * Builds the pino `hooks.streamWrite` hook. It replaces known secrets, the current context's
- * secrets and pattern matches inside every JSON string value of the serialized line. Structure and
- * keys are never touched and every changed value is re-encoded, so the line always stays valid
- * JSON. It never throws: a line it cannot redact is replaced by one that says so.
+ * secrets and pattern matches inside every JSON string value of the serialized line, and the
+ * secrets alone inside keys. Structure is never touched and every changed string is re-encoded, so
+ * the line always stays valid JSON. It never throws: a line it cannot redact is replaced by one that
+ * says so.
  */
 export function createSecretRedactor({
   secrets = [],
@@ -55,42 +68,55 @@ export function createSecretRedactor({
 }: SecretRedactionOptions = {}): (line: string) => string {
   const knownSecrets = secretVariants(secrets);
   patterns.forEach(assertPatternFlags);
-  // Copies, so a `lastIndex` left on the caller's regex never shifts where matching starts.
+  // Copies, so a `lastIndex` left on the caller's regex never shifts where matching starts. Each
+  // keeps the class of its original, and with it any matching that class overrides.
   const allPatterns = [...(defaultPatterns ? DEFAULT_SECRET_PATTERNS : []), ...patterns].map(
-    (pattern) => new RegExp(pattern),
+    (pattern) => {
+      const copy = new RegExp(pattern);
+      Object.setPrototypeOf(copy, Object.getPrototypeOf(pattern));
+      return copy;
+    },
   );
 
-  const redactText = (text: string): string => {
-    const current = contextSecrets.getStore() ?? [];
-    const variants =
-      current.length === 0 ? knownSecrets : longestFirst([...knownSecrets, ...current]);
-    const withoutSecrets = variants.reduce(
-      (redacted, secret) => redacted.replaceAll(secret, REDACTED),
-      text,
-    );
-    return allPatterns.reduce(redactPattern, withoutSecrets);
-  };
+  const secretsIn = (context: LogContext | undefined): readonly string[] =>
+    context === undefined || context.secrets.length === 0
+      ? knownSecrets
+      : longestFirst([...knownSecrets, ...context.secrets]);
+  const replacePatterns = (text: string): string => allPatterns.reduce(redactPattern, text);
 
-  const redactLine = (line: string): string =>
+  const redactLine = (line: string, secrets: readonly string[]): string =>
     line.replace(JSON_STRING, (token: string, literal: string, keyColon: string | undefined) => {
-      if (keyColon !== undefined) {
-        return token;
-      }
       const text = decodeJsonString(literal);
       if (text === undefined) {
-        return JSON.stringify(REDACTED);
+        return keyColon === undefined ? JSON.stringify(REDACTED) : token;
       }
-      const redacted = redactText(text);
+      if (keyColon !== undefined) {
+        const redactedKey = replaceSecrets(text, secrets);
+        return redactedKey === text ? token : `${JSON.stringify(redactedKey)}${keyColon}`;
+      }
+      const redacted = replacePatterns(replaceSecrets(text, secrets));
       return redacted === text ? token : JSON.stringify(redacted);
     });
+
+  // What can still be shown of a message when redacting its line failed. Replacing the secrets
+  // cannot fail, the patterns are what may have.
+  const salvage = (text: string, context: LogContext | undefined): string => {
+    const withoutSecrets = replaceSecrets(text, secretsIn(context));
+    try {
+      return replacePatterns(withoutSecrets);
+    } catch {
+      return withoutSecrets;
+    }
+  };
 
   // The hook runs inside the log call, so a throw would fail the caller's request, and writing
   // the line as it is could leak the secret.
   const hook = (line: string): string => {
+    const context = logContext.getStore();
     try {
-      return redactLine(line);
+      return withFailure(redactLine(line, secretsIn(context)), context?.failure);
     } catch (error) {
-      return redactionFailedLine(line, error, hook);
+      return redactionFailedLine(line, error, hook, (text) => salvage(text, context));
     }
   };
   return hook;
@@ -98,37 +124,74 @@ export function createSecretRedactor({
 
 /** Runs `callback` with `secrets` redacted from every line it logs, on top of the outer ones. */
 export function runWithLogSecrets<T>(secrets: readonly string[], callback: () => T): T {
-  const outer = contextSecrets.getStore() ?? [];
-  return contextSecrets.run(longestFirst([...outer, ...secretVariants(secrets)]), callback);
+  return logContext.run(
+    contextWith(() => secrets),
+    callback,
+  );
 }
 
 /**
  * Middleware that redacts what `secretsOf` returns for a request, such as its bearer token or API
  * key, from every line logged while the request is handled. An MCP tool call arrives as a request,
- * so this covers tool calls too.
+ * so this covers tool calls too. When `secretsOf` throws, the request still runs and every line it
+ * logs names the error in `log_secrets_failed`.
  */
 export function redactRequestSecrets<Request extends IncomingMessage>(
   secretsOf: (request: Request) => readonly string[],
 ): (request: Request, response: ServerResponse, next: () => void) => void {
-  return (request, _response, next) => runWithLogSecrets(secretsOf(request), next);
+  return (request, _response, next) =>
+    logContext.run(
+      contextWith(() => secretsOf(request)),
+      next,
+    );
+}
+
+// Secrets that cannot be read must not fail the caller: its lines are still written, redacted for
+// every other secret and naming the failure.
+function contextWith(secretsOf: () => readonly string[]): LogContext {
+  const outer = logContext.getStore() ?? NO_CONTEXT;
+  try {
+    return { ...outer, secrets: longestFirst([...outer.secrets, ...secretVariants(secretsOf())]) };
+  } catch (error) {
+    return { ...outer, failure: failureJson(error) };
+  }
+}
+
+function failureJson(error: unknown): string {
+  try {
+    return JSON.stringify(errorFields(error));
+  } catch {
+    return JSON.stringify({ name: 'unknown' });
+  }
+}
+
+// A pino line always opens with `{"level":`, so the field goes in front of it.
+function withFailure(line: string, failure: string | undefined): string {
+  return failure === undefined || !line.startsWith('{"')
+    ? line
+    : `{"log_secrets_failed":${failure},${line.slice(1)}`;
 }
 
 /**
  * The line written in place of one that could not be redacted. It points at the log call and at
  * what broke, from frames, numbers and fixed-format ids only: the error's message and the line's
- * strings can quote the secret. It does not log, so it cannot loop, and it cannot throw.
+ * strings can quote the secret. The message is kept as `salvage` returns it. It does not log, so it
+ * cannot loop, and it cannot throw.
  */
-function redactionFailedLine(line: string, error: unknown, hook: (line: string) => string): string {
+function redactionFailedLine(
+  line: string,
+  error: unknown,
+  hook: (line: string) => string,
+  salvage: (text: string) => string,
+): string {
   const failed = { level: 50, time: Date.now(), msg: 'Log line replaced: secret redaction failed' };
   try {
     return `${JSON.stringify({
       ...failed,
       ...originalFields(line),
+      ...originalMsg(line, salvage),
       logged_from: callerFrames(hook),
-      err: {
-        name: errorName(error),
-        stack: stackFrames(error instanceof Error ? error.stack : undefined),
-      },
+      err: errorFields(error),
     })}\n`;
   } catch {
     return `${JSON.stringify(failed)}\n`;
@@ -156,6 +219,16 @@ function originalFields(line: string): Record<string, unknown> {
   );
 }
 
+function originalMsg(line: string, salvage: (text: string) => string): { original_msg?: string } {
+  try {
+    const literal = [...line.matchAll(MSG)].at(-1)?.[1];
+    const text = literal === undefined ? undefined : decodeJsonString(literal);
+    return text === undefined ? {} : { original_msg: salvage(text) };
+  } catch {
+    return {};
+  }
+}
+
 // The frames of the log call, above pino and any other library between it and the caller.
 function callerFrames(hook: (line: string) => string): string[] {
   const limit = Error.stackTraceLimit;
@@ -178,6 +251,13 @@ function stackFrames(
     .flatMap((line) => STACK_FRAME.exec(line)?.slice(1, 2) ?? [])
     .filter(keep)
     .slice(0, MAX_FRAMES);
+}
+
+function errorFields(error: unknown): { name: string; stack: string[] } {
+  return {
+    name: errorName(error),
+    stack: stackFrames(error instanceof Error ? error.stack : undefined),
+  };
 }
 
 // The constructor's name, not `error.name`, which code can set to anything.
@@ -215,6 +295,10 @@ function urlEncoded(secret: string): string[] {
   } catch {
     return [];
   }
+}
+
+function replaceSecrets(text: string, secrets: readonly string[]): string {
+  return secrets.reduce((redacted, secret) => redacted.replaceAll(secret, REDACTED), text);
 }
 
 // Longest first, so a secret that contains another is replaced whole.

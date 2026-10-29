@@ -58,7 +58,8 @@ def configure_logging(
     default_secret_patterns: bool = True,
 ) -> None:
     """Send every log record to stderr as Pino JSON, with the trace and span of the call, and
-    without exception text unless `ERROR_DETAILS_POLICY=disclose`. Safe to call more than once.
+    without exception text unless `ERROR_DETAILS_POLICY=disclose`. Safe to call more than once: the
+    last call's secrets and patterns replace the earlier ones.
 
     `secrets`, such as API keys from the settings, and `secret_patterns` are replaced with
     `[Redacted]` in every line, on top of the default patterns unless `default_secret_patterns` is
@@ -112,7 +113,12 @@ class PinoJsonFormatter(logging.Formatter):
         try:
             line = json.dumps(self._payload(record), default=str, ensure_ascii=False)
         except Exception as error:  # noqa: BLE001 - any failure must still produce a safe line
-            return failed_line("formatting", error, source=source)
+            return failed_line(
+                "formatting",
+                error,
+                source=source,
+                original_msg=lambda: self._redactor.salvage(_record_msg(record)),
+            )
         return self._redactor.redact_line(line, source=source)
 
     def _payload(self, record: logging.LogRecord) -> dict[str, object]:
@@ -199,6 +205,14 @@ def add_filter_once(logger_name: str, filter_type: type[logging.Filter]) -> None
     target = logging.getLogger(logger_name)
     if not any(isinstance(existing, filter_type) for existing in target.filters):
         target.addFilter(filter_type())
+
+
+def _record_msg(record: logging.LogRecord) -> str:
+    """The message as logged, or its template when its arguments are what broke formatting."""
+    try:
+        return record.getMessage()
+    except Exception:  # noqa: BLE001 - the template is still worth showing
+        return str(record.msg)
 
 
 def _failure_source(record: logging.LogRecord) -> dict[str, object]:

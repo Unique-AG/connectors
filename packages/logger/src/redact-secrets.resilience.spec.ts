@@ -54,6 +54,24 @@ function createCapturingLogger(redaction: SecretRedactionOptions = {}) {
   return { logger, lines };
 }
 
+// A consumer pattern whose matching throws for its first `times` string values.
+function explodingPattern(message: string, times = Number.POSITIVE_INFINITY): RegExp {
+  let left = times;
+  return new (class extends RegExp {
+    public constructor() {
+      super('unused', 'dg');
+    }
+
+    public override [Symbol.matchAll](text: string): RegExpStringIterator<RegExpMatchArray> {
+      if (left > 0) {
+        left -= 1;
+        throw new Error(message);
+      }
+      return super[Symbol.matchAll](text);
+    }
+  })();
+}
+
 // mulberry32: a seeded generator, so a failing run can be replayed.
 function seededRandom(seed: number): () => number {
   let state = seed;
@@ -166,9 +184,9 @@ describe('createSecretRedactor resilience', () => {
     });
 
     it('writes a redaction failed line instead of throwing out of the log call', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementation(() => {
-        throw new Error('matching exploded');
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
       });
 
       expect(() => logger.info(`leaking ${mockSecret}`)).not.toThrow();
@@ -182,10 +200,23 @@ describe('createSecretRedactor resilience', () => {
       expect(typeof line.time).toBe('number');
     });
 
+    it('keeps the message with the known and context secrets replaced', () => {
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
+      });
+
+      runWithLogSecrets(['context-secret-0123'], () =>
+        logger.info(`leaking ${mockSecret} and context-secret-0123`),
+      );
+
+      expect(JSON.parse(lines[0] ?? '').original_msg).toBe('leaking [Redacted] and [Redacted]');
+    });
+
     it('points at the log call and what broke, without the message or the secret', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementation(() => {
-        throw new Error(`matching exploded on ${mockSecret}`);
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern(`matching exploded on ${mockSecret}`)],
       });
       class UserSyncService {
         public syncUser(): void {
@@ -210,9 +241,9 @@ describe('createSecretRedactor resilience', () => {
     });
 
     it('keeps the trace and request ids of the original line', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementation(() => {
-        throw new Error('matching exploded');
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
       });
       const traceId = '4bf92f3577b34da6a3ce929d0e0e4736';
 
@@ -231,9 +262,9 @@ describe('createSecretRedactor resilience', () => {
     });
 
     it('drops ids of the original line that are not in their expected format', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementation(() => {
-        throw new Error('matching exploded');
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
       });
 
       logger.child({ trace_id: mockSecret, req: { id: mockSecret } }).info('traced');
@@ -245,9 +276,9 @@ describe('createSecretRedactor resilience', () => {
     });
 
     it('falls back to a minimal line when describing the failure fails too', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementation(() => {
-        throw new Error('matching exploded');
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
       });
       vi.spyOn(Error, 'captureStackTrace').mockImplementation(() => {
         throw new Error('stack exploded');
@@ -262,9 +293,9 @@ describe('createSecretRedactor resilience', () => {
     });
 
     it('keeps logging normally after a failed line', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
-      vi.spyOn(String.prototype, 'matchAll').mockImplementationOnce(() => {
-        throw new Error('matching exploded');
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded', 1)],
       });
 
       logger.info('first');
@@ -331,6 +362,24 @@ describe('createSecretRedactor resilience', () => {
       logger.info(message);
 
       expect(JSON.parse(lines[0] ?? '').msg).toBe(message);
+    });
+  });
+
+  describe('values shaped to backtrack', () => {
+    it.each([
+      ['dotted', 'a.'.repeat(500_000)],
+      ['token-like', 'eyJa-'.repeat(200_000)],
+      ['key headers', '-----BEGIN RSA PRIVATE KEY-----\n'.repeat(30_000)],
+      ['userinfo', `x://${'y:'.repeat(500_000)}`],
+      ['schemes', 'a://b:'.repeat(170_000)],
+    ])('redacts a 1 MB %s value within a second', (_name, value) => {
+      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
+      const started = performance.now();
+
+      logger.info(`${value} ${mockSecret}`);
+
+      expect(performance.now() - started).toBeLessThan(1000);
+      expect(lines[0]).not.toContain(mockSecret);
     });
   });
 
