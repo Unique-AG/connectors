@@ -2,6 +2,7 @@
 
 import json
 import os
+import pathlib
 import pty
 import select
 import sys
@@ -13,7 +14,7 @@ def main() -> None:
     destination = sys.argv[2]
     width = 120
     height = 40
-    with open(destination, "w", encoding="utf-8") as cast:
+    with pathlib.Path(destination).open("w", encoding="utf-8") as cast:
         cast.write(
             json.dumps(
                 {

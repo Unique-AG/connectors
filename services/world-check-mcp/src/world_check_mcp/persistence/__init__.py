@@ -2,8 +2,16 @@
 
 """Storage the MCP owns. Redis holds Zitadel sign-in state. Screening records stay in LSEG."""
 
+from world_check_mcp.persistence.persistence import open_persistence
+from world_check_mcp.persistence.persistence import Persistence
+from world_check_mcp.persistence.persistence import PersistenceSettings
 from world_check_mcp.persistence.store import sign_in_store
-from world_check_mcp.persistence.store import Store
 from world_check_mcp.persistence.store import StoreSettings
 
-__all__ = ["Store", "StoreSettings", "sign_in_store"]
+__all__ = [
+    "Persistence",
+    "PersistenceSettings",
+    "StoreSettings",
+    "open_persistence",
+    "sign_in_store",
+]

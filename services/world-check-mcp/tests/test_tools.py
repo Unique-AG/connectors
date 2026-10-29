@@ -5,12 +5,14 @@ from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 import httpx2
+from key_value.aio.stores.memory import MemoryStore
 from mcp_types import ElicitResult
 from pydantic import TypeAdapter
 import pytest
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.persistence import Persistence
 
 
 def _token(request: httpx2.Request) -> httpx2.Response | None:
@@ -480,7 +482,11 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
 
 
 def _server() -> FastMCP:
-    return build_server(fake_upstream_settings(), httpx2.MockTransport(_world_check))
+    return build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore()),
+        httpx2.MockTransport(_world_check),
+    )
 
 
 async def test_list_groups_returns_descendant_groups() -> None:

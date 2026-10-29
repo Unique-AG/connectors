@@ -1,7 +1,7 @@
 # mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
 
 """The server with fakes in place of the upstream and the stores. The tests build it, and so
-does `uv run mcp-architecture-check`, which lists its tools.
+does `uv run poe architecture`, which lists its tools.
 """
 
 from collections.abc import AsyncGenerator
@@ -9,11 +9,13 @@ from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 import httpx2
+from key_value.aio.stores.memory import MemoryStore
 from mcp_configs import RetrySettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 
 from world_check_mcp.mcp import create_server
+from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import UpstreamSettings
 
 
@@ -35,12 +37,29 @@ def unanswered_upstream() -> httpx2.MockTransport:
     return httpx2.MockTransport(lambda _request: httpx2.Response(404))
 
 
+@asynccontextmanager
+async def open_fake_persistence() -> AsyncGenerator[Persistence]:
+    """An in-memory store in place of Redis, which CI does not run."""
+    yield Persistence(store=MemoryStore())
+
+
 def build_server(
-    upstream_settings: UpstreamSettings, upstream_transport: httpx2.MockTransport
+    upstream_settings: UpstreamSettings,
+    persistence: Persistence,
+    upstream_transport: httpx2.MockTransport,
 ) -> FastMCP:
-    return create_server(upstream_settings, upstream_transport)
+    """Every client of the server shares `persistence`, as the server's clients share the real
+    stores.
+    """
+
+    @asynccontextmanager
+    async def open_persistence() -> AsyncGenerator[Persistence]:
+        yield persistence
+
+    return create_server(upstream_settings, open_persistence, upstream_transport)
 
 
 @asynccontextmanager
 async def offline_server() -> AsyncGenerator[FastMCP]:
-    yield build_server(fake_upstream_settings(), unanswered_upstream())
+    async with open_fake_persistence() as persistence:
+        yield build_server(fake_upstream_settings(), persistence, unanswered_upstream())

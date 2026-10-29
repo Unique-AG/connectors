@@ -6,11 +6,13 @@ from typing import cast
 
 from fastmcp import Client
 import httpx2
+from key_value.aio.stores.memory import MemoryStore
 from mcp_configs import RetrySettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 
 from tests.offline_server import build_server
+from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import GET_API_INFO
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
@@ -166,7 +168,9 @@ async def test_get_api_info_does_not_ask_for_credentials() -> None:
             200, json={"version": "3.9.0", "systemDateTime": "2026-10-22T06:47:00Z"}
         )
 
-    server = build_server(_settings(), httpx2.MockTransport(respond))
+    server = build_server(
+        _settings(), Persistence(store=MemoryStore()), httpx2.MockTransport(respond)
+    )
     async with Client(server) as client:
         tools = await client.list_tools()
         await client.call_tool("get_api_info", {})
