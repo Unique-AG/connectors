@@ -14,7 +14,7 @@ import {
   pinEdit,
   restoreUvLockHeader,
 } from './locks.mjs';
-import { changedFiles, lockFiles, renderPr } from './pr.mjs';
+import { lockFiles, renderPr } from './pr.mjs';
 import {
   ACTION_FILES,
   config,
@@ -128,7 +128,7 @@ const bumpers = {
 assert.ok(entry.ecosystem in bumpers, `Unknown ecosystem ${entry.ecosystem}`);
 const lockBefore = lockFiles(entry.ecosystem);
 bumpers[entry.ecosystem]();
-const files = changedFiles();
+const files = runOrThrow('git', ['diff', '--name-only']).split('\n').filter(Boolean);
 const outputs = [`changed=${files.length > 0}`];
 
 if (files.length > 0) {
