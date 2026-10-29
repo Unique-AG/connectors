@@ -58,6 +58,21 @@
   border-radius: 999px;
 }
 
+.deck-footer {
+  position: absolute;
+  right: 3.5rem;
+  bottom: 0.9rem;
+  left: 3.5rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #525252; /* dimmedLight */
+}
+
+.deck-footer b {
+  color: var(--accent);
+}
+
 .pipeline {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -109,10 +124,6 @@
 /* purple slides use the soft purple border too, as on the pipeline slide */
 .tiingo .pipeline .step {
   --accent-line: #b48cec;
-}
-
-.tiingo .card {
-  border-color: #b48cec;
 }
 
 .pipeline.flow .col:not(:last-child)::after {
@@ -174,6 +185,10 @@
   color: var(--accent);
 }
 
+.tiingo .card {
+  border-color: #b48cec;
+}
+
 .slidev-layout.two-columns .col-left {
   padding-right: 1.5rem;
 }
@@ -185,21 +200,6 @@
 
 .slidev-layout td:first-child {
   white-space: nowrap;
-}
-
-.deck-footer {
-  position: absolute;
-  right: 3.5rem;
-  bottom: 0.9rem;
-  left: 3.5rem;
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  color: #525252; /* dimmedLight */
-}
-
-.deck-footer b {
-  color: var(--accent);
 }
 
 /* slides that carry a table or long code plus text */
@@ -219,6 +219,7 @@
 
 /* the theme's comment grey is too pale to project */
 .slidev-code span[style*="#A0ADA0"] {
+  /* biome-ignore lint/complexity/noImportantStyles: only !important beats the variable shiki sets inline */
   --shiki-light: #4a544a !important;
 }
 
