@@ -2,6 +2,7 @@ import ssl
 from datetime import timedelta
 
 import pytest
+from mcp_credential_auth import DEFAULT_ALLOWED_REDIRECT_HOSTS
 from pydantic import ValidationError
 
 from backstop_mcp.config import (
@@ -326,6 +327,28 @@ class TestAuthConfig:
         """A zero interval would spin the sweep loop without ever sleeping."""
         with pytest.raises(ValueError, match="cleanup_interval_hours"):
             AuthConfig(cleanup_interval_hours=0)
+
+    def test_redirect_allowlist_defaults_to_the_supported_clients(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_SCHEMES", raising=False)
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == DEFAULT_ALLOWED_REDIRECT_HOSTS
+        assert config.allowed_redirect_schemes == ("cursor",)
+
+    def test_redirect_allowlist_env_vars_replace_the_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "claude.ai, mcp.example.com")
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == ("claude.ai", "mcp.example.com")
+        assert config.allowed_redirect_schemes == ()
 
 
 class TestPublicBaseUrl:

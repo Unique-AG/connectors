@@ -88,6 +88,23 @@ you. Idle longer than the 30-day refresh lifetime and you log in again.
 
 Postgres is required: OAuth token validation reads it on every request.
 
+### Allowed redirect URIs
+
+Registration is open, so the redirect URI is what keeps an authorization code with the client the
+user meant. A client is refused with `invalid_redirect_uri` unless every redirect URI it registers
+is loopback `http`/`https` (`localhost`, `127.0.0.1`, `[::1]`, any port), `https` on a host in
+`AUTH_ALLOWED_REDIRECT_HOSTS`, or a scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES`. Fragments, userinfo,
+and `javascript:`, `data:`, `file:` and similar schemes are always refused. The login form names the
+host the user is sent to after signing in.
+
+| Variable | Default | Why |
+|---|---|---|
+| `AUTH_ALLOWED_REDIRECT_HOSTS` | `claude.ai,claude.com,chatgpt.com,cursor.com,www.cursor.com,vscode.dev,insiders.vscode.dev` | Callback hosts of Claude, ChatGPT, Cursor and VS Code. Sources in `mcp_credential_auth/redirect_policy.py` |
+| `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Cursor registers `cursor://anysphere.cursor-mcp/oauth/callback` |
+
+Both are comma-separated, replace their default when set, and are set under `env` in the Helm chart.
+A client registered before the check keeps only the redirect URIs the lists still accept.
+
 ## Migrations
 
 ```bash

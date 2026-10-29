@@ -6,8 +6,9 @@ from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import ClassVar, Literal, Self, TypedDict, cast
+from typing import Annotated, ClassVar, Literal, Self, TypedDict, cast
 
+from mcp_credential_auth import DEFAULT_ALLOWED_REDIRECT_HOSTS, DEFAULT_ALLOWED_REDIRECT_SCHEMES
 from pydantic import (
     Field,
     HttpUrl,
@@ -17,7 +18,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine.url import URL, make_url
 
 PKG_VERSION = pkg_version("with-intelligence-mcp")
@@ -260,6 +261,24 @@ class AuthConfig(BaseSettings):
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
     login_max_attempts: int = Field(default=10, ge=1)
     login_attempt_window_minutes: int = Field(default=15, ge=1)
+
+    # Where a dynamically registered client may send the browser after login. An https redirect
+    # URI must be on one of these hosts, and a non-web one must use one of these schemes; loopback
+    # http on any port is always accepted. Setting either *replaces* its default. Comma-separated;
+    # `NoDecode` keeps pydantic-settings from JSON-decoding the CSV before the validator runs.
+    allowed_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=DEFAULT_ALLOWED_REDIRECT_HOSTS
+    )
+    allowed_redirect_schemes: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=DEFAULT_ALLOWED_REDIRECT_SCHEMES
+    )
+
+    @field_validator("allowed_redirect_hosts", "allowed_redirect_schemes", mode="before")
+    @classmethod
+    def _split_csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return value
 
     @property
     def token_retention(self) -> timedelta:

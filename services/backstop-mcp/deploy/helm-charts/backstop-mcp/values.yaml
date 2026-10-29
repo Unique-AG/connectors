@@ -24,6 +24,22 @@ mcpConfig:
     relationshipTypeMarkers: null
     formerRelationshipTypeIds: null
     formerRelationshipTypeMarkers: null
+  # Where a dynamically registered OAuth client may send the browser after login: an https
+  # redirect URI must be on one of these hosts, any other scheme must be listed. Loopback http on
+  # any port is always accepted. A list replaces the app default; null keeps it.
+  auth:
+    # AUTH_ALLOWED_REDIRECT_HOSTS. Claude (web, desktop, mobile), ChatGPT, Cursor, VS Code.
+    allowedRedirectHosts:
+      - claude.ai
+      - claude.com
+      - chatgpt.com
+      - cursor.com
+      - www.cursor.com
+      - vscode.dev
+      - insiders.vscode.dev
+    # AUTH_ALLOWED_REDIRECT_SCHEMES. Cursor registers cursor://anysphere.cursor-mcp/oauth/callback.
+    allowedRedirectSchemes:
+      - cursor
   # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}
   logging:
@@ -49,7 +65,8 @@ env:
   APP_ENV: production
   PORT: "8000"
   # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL, the employment relationship
-  # types, BACKSTOP_MCP_TENANT_GUIDANCE and the logging settings (LOG_LEVEL, LIBRARY_LOG_LEVELS,
+  # types, the redirect allowlist (AUTH_ALLOWED_REDIRECT_HOSTS, AUTH_ALLOWED_REDIRECT_SCHEMES),
+  # BACKSTOP_MCP_TENANT_GUIDANCE and the logging settings (LOG_LEVEL, LIBRARY_LOG_LEVELS,
   # LOGS_DIAGNOSTICS_DATA_POLICY, ERROR_DETAILS_POLICY) are set through mcpConfig above.
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide

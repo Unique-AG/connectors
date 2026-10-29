@@ -11,6 +11,12 @@ from mcp_credential_auth.models import (
     PendingAuthorization,
 )
 from mcp_credential_auth.provider import CredentialOAuthProvider, SubjectFactory
+from mcp_credential_auth.redirect_policy import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
+    RedirectTarget,
+    describe_redirect_target,
+)
 from mcp_credential_auth.throttle import (
     MAX_USERNAME_LENGTH,
     LoginThrottleConfig,
@@ -22,6 +28,8 @@ from mcp_credential_auth.throttle import (
 )
 
 __all__ = [
+    "DEFAULT_ALLOWED_REDIRECT_HOSTS",
+    "DEFAULT_ALLOWED_REDIRECT_SCHEMES",
     "MAX_USERNAME_LENGTH",
     "AuthBase",
     "AuthorizationCode",
@@ -32,10 +40,12 @@ __all__ = [
     "OAuthClient",
     "OAuthToken",
     "PendingAuthorization",
+    "RedirectTarget",
     "SubjectFactory",
     "cleanup_lifespan",
     "record_login_success",
     "count_recent_login_failures",
+    "describe_redirect_target",
     "discard_login_attempt",
     "finalize_login_failure",
     "load_fernet_key",

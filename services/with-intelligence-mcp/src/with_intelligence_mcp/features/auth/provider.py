@@ -1,13 +1,18 @@
 import logging
 import uuid
+from collections.abc import Iterable
 from datetime import timedelta
 from typing import ClassVar, cast
 
 from mcp_credential_auth import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
     LoginCsrf,
     LoginThrottleConfig,
+    PendingAuthorization,
+    describe_redirect_target,
     discard_login_attempt,
     finalize_login_failure,
     record_login_success,
@@ -138,11 +143,15 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         wi_clients: WithIntelligenceClientFactory,
         throttle: LoginThrottleConfig,
         login_path: str = "/login",
+        allowed_redirect_hosts: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_HOSTS,
+        allowed_redirect_schemes: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     ) -> None:
         super().__init__(
             base_url=base_url,
             session_factory=session_factory,
             login_path=login_path,
+            allowed_redirect_hosts=allowed_redirect_hosts,
+            allowed_redirect_schemes=allowed_redirect_schemes,
         )
         self._encryption_key = encryption_key
         self._wi_clients = wi_clients
@@ -156,7 +165,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
 
     def _form_response(
         self,
-        request_id: str,
+        pending: PendingAuthorization,
         *,
         status_code: int = 200,
         client_name: str | None = None,
@@ -164,11 +173,13 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         error: str | None = None,
     ) -> Response:
         """Render the login form with fresh CSRF credentials."""
+        request_id = pending.request_id
         csrf_token = _LOGIN_CSRF.issue_token()
         response = HTMLResponse(
             render_login_form(
                 request_id,
                 csrf_token,
+                describe_redirect_target(pending.redirect_uri),
                 client_name=client_name,
                 username=username,
                 error=error,
@@ -195,7 +206,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         client = await self.get_client(pending.client_id)
         client_name = client.client_name if client is not None else None
 
-        return self._form_response(request_id, client_name=client_name)
+        return self._form_response(pending, client_name=client_name)
 
     async def handle_login_post(self, request: Request) -> Response:
         try:
@@ -214,7 +225,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
             if pending is None:
                 return self._expired_link_response()
             return self._form_response(
-                request_id_value,
+                pending,
                 status_code=400,
                 error="The login form contains invalid values. Please try again.",
             )
@@ -230,7 +241,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
             logger.warning("auth.login.csrf_mismatch")
             return self._form_response(
-                request_id,
+                pending,
                 status_code=400,
                 username=username,
                 error="This form expired before it was submitted. Please try again.",
@@ -238,13 +249,13 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
 
         if not username or not password:
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Username and password are both required.",
             )
 
         if len(username) > MAX_USERNAME_LENGTH:
-            return self._form_response(request_id, error="Invalid username or password.")
+            return self._form_response(pending, error="Invalid username or password.")
 
         attempt_id = await reserve_login_attempt(
             self._session_factory,
@@ -254,7 +265,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         )
         if attempt_id is None:
             return self._form_response(
-                request_id,
+                pending,
                 status_code=429,
                 username=username,
                 error=(
@@ -269,7 +280,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
         except AuthenticationRejected:
             await finalize_login_failure(self._session_factory, attempt_id)
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Invalid username or password.",
             )
@@ -277,7 +288,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
             await discard_login_attempt(self._session_factory, attempt_id)
             logger.warning("auth.login.wi_rate_limited", exc_info=exc)
             return self._form_response(
-                request_id,
+                pending,
                 status_code=429,
                 username=username,
                 error=(
@@ -289,7 +300,7 @@ class WithIntelligenceOAuthProvider(CredentialOAuthProvider):
             await discard_login_attempt(self._session_factory, attempt_id)
             logger.warning("auth.login.wi_unreachable", exc_info=exc)
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="With Intelligence is unreachable right now — please try again shortly.",
             )

@@ -15,7 +15,7 @@ import httpx
 import pytest
 import respx
 from cryptography.fernet import Fernet
-from mcp.server.auth.provider import AuthorizationParams, TokenError
+from mcp.server.auth.provider import AuthorizationParams, RegistrationError, TokenError
 from mcp.shared.auth import OAuthClientInformationFull
 from mcp_credential_auth import LoginCsrf
 from pydantic import AnyUrl
@@ -31,7 +31,7 @@ from with_intelligence_mcp.features.auth import LoginThrottleConfig
 from with_intelligence_mcp.features.auth.provider import WithIntelligenceOAuthProvider
 from with_intelligence_mcp.features.auth.session_store import get_stored_wi_session
 
-_REDIRECT_URI = "https://client.example/callback"
+_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 _SIGN_IN = f"{BASE_URL}/v3/auth/sign-in"
 _CSRF_TOKEN = "provider-test-csrf-token"
 _LOGIN_CSRF = LoginCsrf("wi_login_csrf_")
@@ -142,6 +142,25 @@ class TestAuthorize:
         assert response.status_code == 200
         assert b'name="password"' in response.body
         assert b'name="request_id"' in response.body
+        assert b"Test Client wants to connect" in response.body
+        assert b"you will be sent to <strong>claude.ai</strong>" in response.body
+
+    async def test_register_rejects_a_redirect_uri_off_the_allowlist(
+        self, db: DatabaseFixture
+    ) -> None:
+        provider = _make_provider(db)
+        client_id = _unique("attacker")
+        client_info = OAuthClientInformationFull(
+            client_id=client_id,
+            redirect_uris=[AnyUrl("https://attacker.example/callback")],
+            client_name="Claude",
+        )
+
+        with pytest.raises(RegistrationError) as raised:
+            await provider.register_client(client_info)
+
+        assert raised.value.error == "invalid_redirect_uri"
+        assert await provider.get_client(client_id) is None
 
     async def test_the_form_refuses_an_unknown_request_id(self, db: DatabaseFixture) -> None:
         provider = _make_provider(db)
