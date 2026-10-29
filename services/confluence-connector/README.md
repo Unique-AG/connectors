@@ -24,7 +24,7 @@ docker compose -f local-confluence-v8.5-docker-compose.yaml run --rm seed
 ```
 
 1. At the license prompt (about 3 minutes on the first start), paste a free 30-day trial key from the printed link and press Enter on an empty line. Or just press Enter for Atlassian's 3-hour [timebomb license](https://developer.atlassian.com/platform/marketplace/timebomb-licenses-for-testing-server-apps/).
-2. Wait for `[seed] done`. Confluence runs on http://localhost:8090 (`admin` / `admin`), with a `TEST` space: labeled pages, child pages, attachments, and one page that must not be ingested.
+2. Wait for `[seed] done`. Confluence runs on http://localhost:8090 (`admin` / `admin`), with a `TEST` space: labeled pages, child pages, attachments, and one page that must not be ingested. Each one holds a fact you can ask Unique about. The tree is at the top of [`local-confluence/seed.py`](./local-confluence/seed.py).
 
 Stop it with `docker compose -f local-confluence-v8.5-docker-compose.yaml down`.
 

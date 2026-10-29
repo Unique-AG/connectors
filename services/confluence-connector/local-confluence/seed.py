@@ -5,6 +5,21 @@ In a terminal (`docker compose run --rm seed`) it asks for a license key and
 prints where to get one. Without a key, or without a terminal (`up -d`), it uses
 Atlassian's 3-hour timebomb license, and never replaces a license you pasted.
 Content is only created when missing, so running it again is safe.
+
+What it creates, with the fact each item holds:
+
+    Space TEST "Connector Test"
+    ├── Single ingest page        [ai-ingest]      release checklist, sign-off by Priya Nandakumar
+    │   └── release-notes.txt                      code word AMBER-FALCON-42
+    ├── Ingest all root           [ai-ingest-all]  handbook, Monday 09:30 in the Lindt room
+    │   ├── team-budget.csv                        team leads and budgets
+    │   ├── Child page                             on-call rotation, weeks 44 and 45
+    │   │   └── Grandchild page                    incident runbook, review within 3 days
+    │   │       └── incident-flow.png              image text: pager code ORCHID-7
+    │   └── Second child page                      glossary: Heron, Nest
+    └── Not ingested page         no label         COPPER-LANTERN-99, must never be found
+
+Attachment files live in content/.
 """
 
 import base64
@@ -25,44 +40,73 @@ ADMIN_PASSWORD = os.environ["CONFLUENCE_ADMIN_PASSWORD"]
 SPACE_KEY = "TEST"
 
 TIMEBOMB_LICENSE_PATH = os.path.join(os.path.dirname(__file__), "timebomb-license.txt")
+CONTENT_DIR = os.path.join(os.path.dirname(__file__), "content")
 
-# 1x1 transparent PNG.
-PNG_BYTES = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-)
-
+# Each page and attachment holds a distinct fact, so you can ask Unique about it
+# and see where the answer came from.
 PAGES = [
     {
         "title": "Single ingest page",
         "labels": ["ai-ingest"],
-        "body": "<p>Has the <code>ai-ingest</code> label, so only this page is ingested.</p>",
-        "attachments": [("notes.txt", "text/plain", b"Plain text attachment.\n")],
+        "body": (
+            "<p>Release checklist for the Heron test project. This page has the "
+            "<code>ai-ingest</code> label, so only this page is ingested, not its children.</p>"
+            "<ol><li>Freeze the main branch on Wednesday.</li>"
+            "<li>Run the regression suite and attach the report.</li>"
+            "<li>Get sign-off from the release manager, Priya Nandakumar.</li></ol>"
+        ),
+        "attachments": [("release-notes.txt", "text/plain")],
     },
     {
         "title": "Ingest all root",
         "labels": ["ai-ingest-all"],
-        "body": "<p>Has the <code>ai-ingest-all</code> label, so this page and every page below it are ingested.</p>",
-        "attachments": [("report.csv", "text/csv", b"name,value\nalpha,1\nbeta,2\n")],
+        "body": (
+            "<p>Team handbook for the Heron test project. This page has the "
+            "<code>ai-ingest-all</code> label, so it and every page below it are ingested.</p>"
+            "<p>The Heron teams meet every Monday at 09:30 in the Lindt room. "
+            "The yearly offsite is in Lucerne in September.</p>"
+        ),
+        "attachments": [("team-budget.csv", "text/csv")],
     },
     {
         "title": "Child page",
         "parent": "Ingest all root",
-        "body": "<p>No label of its own. Ingested through its parent.</p>",
+        "body": (
+            "<p>On-call rotation. This page has no label and is ingested through its parent.</p>"
+            "<table><tbody>"
+            "<tr><th>Week</th><th>Primary</th><th>Secondary</th></tr>"
+            "<tr><td>44</td><td>Mara Jensen</td><td>Leo Brandt</td></tr>"
+            "<tr><td>45</td><td>Tomas Varga</td><td>Ines Okafor</td></tr>"
+            "</tbody></table>"
+        ),
     },
     {
         "title": "Grandchild page",
         "parent": "Child page",
-        "body": "<p>Two levels below the <code>ai-ingest-all</code> page.</p>",
-        "attachments": [("pixel.png", "image/png", PNG_BYTES)],
+        "body": (
+            "<p>Incident runbook, two levels below the <code>ai-ingest-all</code> page. "
+            "The attached diagram shows the incident flow.</p>"
+            "<p>Open an incident in the #heron-incidents channel, and write a review "
+            "within 3 working days.</p>"
+        ),
+        "attachments": [("incident-flow.png", "image/png")],
     },
     {
         "title": "Second child page",
         "parent": "Ingest all root",
-        "body": "<p>A second child, to check siblings.</p>",
+        "body": (
+            "<p>Glossary, a second child page.</p>"
+            "<ul><li><strong>Heron</strong>: the code name of the field app.</li>"
+            "<li><strong>Nest</strong>: the shared staging environment.</li></ul>"
+        ),
     },
     {
         "title": "Not ingested page",
-        "body": "<p>No label and no labeled parent. Must never be ingested.</p>",
+        "body": (
+            "<p>This page has no label and no labeled parent, so it must never be ingested. "
+            "If Unique can answer what the secret marker is, the label filter is broken. "
+            "Secret marker: COPPER-LANTERN-99.</p>"
+        ),
     },
 ]
 
@@ -267,10 +311,12 @@ def ensure_page(spec, ids):
             [{"prefix": "global", "name": label} for label in spec["labels"]],
         )
 
-    for filename, mime_type, content in spec.get("attachments", []):
+    for filename, mime_type in spec.get("attachments", []):
         query = urllib.parse.urlencode({"filename": filename})
         if api("GET", f"/content/{page_id}/child/attachment?{query}")["results"]:
             continue
+        with open(os.path.join(CONTENT_DIR, filename), "rb") as file:
+            content = file.read()
         boundary = uuid.uuid4().hex
         body = (
             (
