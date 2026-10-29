@@ -122,7 +122,7 @@ Rules for the report:
 
 ## Step 6: Stop
 
-Give the report in chat. Do not publish it as a file or comment unless the user asks.
+Give the report in chat. A calling skill can take the report and the verdict from you. Do not publish a file or comment yourself unless the user or the calling skill asks.
 Wait for the next PR link.
 
 ## Verdict guide
