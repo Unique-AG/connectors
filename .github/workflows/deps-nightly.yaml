@@ -161,8 +161,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ matrix.entry.number }}
         run: |
-          gh pr update-branch "$NUMBER" || echo "::warning::#$NUMBER does not update from main. A person must resolve the conflict."
-          echo "- #$NUMBER: main merged in, because a person pushed a commit to this pull request." >> "$GITHUB_STEP_SUMMARY"
+          if gh pr update-branch "$NUMBER"; then
+            echo "- #$NUMBER: main merged in. A person or the agent changed this pull request, so the job keeps its commits." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::#$NUMBER does not update from main. A person must resolve the conflict."
+            echo "- #$NUMBER: main did not merge in. A person must resolve the conflict." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   bump:
     name: Bump ${{ matrix.entry.slug }}
