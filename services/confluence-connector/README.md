@@ -22,6 +22,13 @@ docker compose -f local-confluence-v8.5-docker-compose.yaml run --rm seed
 - Run it again for a new license. Existing content is kept. `up -d` also works, and renews only the timebomb license.
 - For the tenant config, start from [`examples/data-center-local-basic-auth.yaml`](./src/tenant-configs/examples/data-center-local-basic-auth.yaml). It lists the one-time setup in your local Unique.
 
+> [!NOTE]
+> **About the license**
+>
+> - **Timebomb (press Enter):** the same public key works every time. Each time it is applied, it is valid for 3 hours. When it runs out, run the command again and press Enter.
+> - **30-day trial (paste a key):** better for longer sessions. The compose file pins the server ID (`ATL_PRODUCT_SERVER_ID`), so the key also works after `down -v`.
+> - **Pasted keys are kept.** Running the command again never replaces a pasted key with the timebomb key.
+
 ## Configuration
 
 The connector uses YAML-based tenant configuration files. See [`src/tenant-configs/`](./src/tenant-configs/) for the local dev config and [`src/tenant-configs/examples/`](./src/tenant-configs/examples/) for reference configurations.
