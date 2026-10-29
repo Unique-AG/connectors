@@ -153,9 +153,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -s scan-report/trivy-results.json ]; then
-            echo "No trivy results file — treating as clean."
-            echo "✅ ${IMAGE}:${VERSION} reports no CRITICAL,HIGH findings." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error::The Trivy results file is missing or empty for ${IMAGE}:${VERSION}."
+            exit 1
           fi
           if [ -f "$SUMMARY_TEMPLATE" ]; then
             trivy convert --format template --template @"$SUMMARY_TEMPLATE" scan-report/trivy-results.json > trivy-report.md || true
