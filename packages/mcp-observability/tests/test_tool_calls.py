@@ -17,6 +17,7 @@ from fastmcp.tools import ToolResult
 from mcp_configs import LoggingSettings
 
 from mcp_observability import PinoJsonFormatter
+from mcp_observability import RedactToolCallSecretsMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import configure_logging
 from mcp_observability import metrics_text
@@ -156,3 +157,30 @@ async def test_a_cancelled_call_is_logged_as_cancelled(
     _, ended = _tool_lines(pino)
     assert ended["msg"] == "Tool call cancelled"
     assert ended["log_level"] == "info"
+
+
+async def test_the_secrets_the_consumer_extracts_are_redacted_from_what_the_call_logs(
+    pino: io.StringIO,
+) -> None:
+    caller_token = "caller-bearer-token-123"
+    server = FastMCP(
+        "kiosk",
+        middleware=[
+            RedactToolCallSecretsMiddleware(lambda _context: [caller_token]),
+            ToolCallObservabilityMiddleware(),
+        ],
+    )
+
+    @server.tool
+    async def echo() -> str:
+        logging.getLogger("tests").warning("upstream rejected %s", caller_token)
+        return "done"
+
+    async with Client(server) as connected:
+        await connected.call_tool("echo", {})
+    logging.getLogger("tests").warning("after the call %s", caller_token)
+
+    messages = [line["msg"] for line in _lines(pino)]
+    assert "upstream rejected [Redacted]" in messages
+    assert messages[-1] == f"after the call {caller_token}"
+    assert caller_token not in json.dumps(messages[:-1])

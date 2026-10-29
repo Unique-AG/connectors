@@ -6,7 +6,9 @@ import logging
 import re
 import sys
 import traceback
+from collections.abc import Iterable
 from collections.abc import Sequence
+from functools import partial
 from types import TracebackType
 from typing import cast
 from typing import override
@@ -19,6 +21,8 @@ from opentelemetry import trace
 from mcp_observability.failed_fields import FAILED_FIELDS_SHOWN
 from mcp_observability.failed_fields import failed_fields
 from mcp_observability.ops import OPS_PATHS
+from mcp_observability.redaction import SecretRedactor
+from mcp_observability.redaction import failed_line
 from mcp_observability.stacktrace import scrub_stacktrace
 
 # httpx logs every request URL, query string included, at INFO. sse-starlette logs each outbound
@@ -45,9 +49,20 @@ _PINO_LEVEL = {
 _RECORD_FIELDS = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {"message"}
 
 
-def configure_logging(settings: LoggingSettings, *, own_loggers: Sequence[str]) -> None:
+def configure_logging(
+    settings: LoggingSettings,
+    *,
+    own_loggers: Sequence[str],
+    secrets: Iterable[str] = (),
+    secret_patterns: Iterable[re.Pattern[str]] = (),
+    default_secret_patterns: bool = True,
+) -> None:
     """Send every log record to stderr as Pino JSON, with the trace and span of the call, and
     without exception text unless `ERROR_DETAILS_POLICY=disclose`. Safe to call more than once.
+
+    `secrets`, such as API keys from the settings, and `secret_patterns` are replaced with
+    `[Redacted]` in every line, on top of the default patterns unless `default_secret_patterns` is
+    false.
 
     `own_loggers` (the MCP's package, such as `("backstop_mcp",)`) and this package log at
     `LOG_LEVEL`; a library at its `LIBRARY_LOG_LEVELS` entry, else its default, else INFO. The app
@@ -61,8 +76,12 @@ def configure_logging(settings: LoggingSettings, *, own_loggers: Sequence[str]) 
     )
     if output is None:
         output = logging.StreamHandler(sys.stderr)
-        output.setFormatter(PinoJsonFormatter())
         root.addHandler(output)
+    output.setFormatter(
+        PinoJsonFormatter(
+            SecretRedactor(secrets, secret_patterns, default_patterns=default_secret_patterns)
+        )
+    )
     output.setLevel(logging.NOTSET)
     for stale in [kept for kept in output.filters if isinstance(kept, _ErrorDetails)]:
         output.removeFilter(stale)
@@ -82,8 +101,21 @@ def configure_logging(settings: LoggingSettings, *, own_loggers: Sequence[str]) 
 
 
 class PinoJsonFormatter(logging.Formatter):
+    def __init__(self, redactor: SecretRedactor | None = None) -> None:
+        super().__init__()
+        self._redactor: SecretRedactor = redactor or SecretRedactor()
+
     @override
     def format(self, record: logging.LogRecord) -> str:
+        """Never raises: `logging` would print the record's message and arguments to stderr."""
+        source = partial(_failure_source, record)
+        try:
+            line = json.dumps(self._payload(record), default=str, ensure_ascii=False)
+        except Exception as error:  # noqa: BLE001 - any failure must still produce a safe line
+            return failed_line("formatting", error, source=source)
+        return self._redactor.redact_line(line, source=source)
+
+    def _payload(self, record: logging.LogRecord) -> dict[str, object]:
         level, log_level = _PINO_LEVEL.get(record.levelno, _PINO_LEVEL[logging.INFO])
         payload: dict[str, object] = {
             "level": level,
@@ -100,7 +132,7 @@ class PinoJsonFormatter(logging.Formatter):
         }
         if record.exc_info and record.exc_info[0] is not None and "err" not in payload:
             payload["err"] = _error(*record.exc_info)
-        return json.dumps(payload, default=str, ensure_ascii=False)
+        return payload
 
 
 class _ErrorDetails(logging.Filter):
@@ -167,6 +199,18 @@ def add_filter_once(logger_name: str, filter_type: type[logging.Filter]) -> None
     target = logging.getLogger(logger_name)
     if not any(isinstance(existing, filter_type) for existing in target.filters):
         target.addFilter(filter_type())
+
+
+def _failure_source(record: logging.LogRecord) -> dict[str, object]:
+    """Where a log call that failed was made, for the line that replaces it. Only the logger, level,
+    code location and trace ids: none of them holds a logged value."""
+    level, _ = _PINO_LEVEL.get(record.levelno, _PINO_LEVEL[logging.INFO])
+    return {
+        "context": record.name,
+        "original_level": level,
+        "logged_from": f"{record.funcName} ({record.pathname}:{record.lineno})",
+        **_trace_fields(),
+    }
 
 
 def _trace_fields() -> dict[str, str | int]:
