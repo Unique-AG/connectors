@@ -1,0 +1,8 @@
+Release notes for the Heron test project
+
+Version 2.4.0 adds offline mode for the field app and fixes the export to PDF.
+Version 2.3.1 fixes a crash when a report has more than 500 rows.
+
+The fallback deploy window is Thursday at 14:00 UTC.
+If a release is blocked, the release manager posts in the #heron-releases channel.
+The release code word for this test is AMBER-FALCON-42.
