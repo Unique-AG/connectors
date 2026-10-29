@@ -7,6 +7,7 @@ import { McpAuthJwtGuard, OAUTH_ENDPOINTS } from '../src';
 import { createMockModuleConfig, MockOAuthStore } from '../src/__mocks__';
 import { McpOAuthModule } from '../src/mcp-oauth.module';
 import { OpaqueTokenService } from '../src/services/opaque-token.service';
+import { followProviderRedirect, openConsentPage, submitConsent } from './consent.helpers';
 
 const CODE_VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 const CODE_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
@@ -74,25 +75,22 @@ describe('MCP token revocation (E2E)', () => {
     expect(registerResponse.status).toBe(201);
     clientId = registerResponse.body.client_id;
 
-    const authResponse = await request(app.getHttpServer()).get(OAUTH_ENDPOINTS.authorize).query({
-      response_type: 'code',
+    const consentPage = await openConsentPage(app, {
       client_id: clientId,
       redirect_uri: REDIRECT_URI,
       code_challenge: CODE_CHALLENGE,
-      code_challenge_method: 'S256',
       state: 'client-state-123',
       scope: 'offline_access mcp:read',
     });
+    const authResponse = await submitConsent(app, consentPage, 'approve');
     expect(authResponse.status).toBe(302);
 
-    // biome-ignore lint/style/noNonNullAssertion: asserted above via the 302
-    const providerRedirect = new URL(authResponse.headers.location!);
-    const callbackResponse = await request(app.getHttpServer())
-      .get(OAUTH_ENDPOINTS.callback)
-      .query({
-        state: providerRedirect.searchParams.get('state'),
-        code: providerRedirect.searchParams.get('code'),
-      });
+    const callbackResponse = await followProviderRedirect(
+      app,
+      // biome-ignore lint/style/noNonNullAssertion: asserted above via the 302
+      authResponse.headers.location!,
+      consentPage.cookie,
+    );
     expect(callbackResponse.status).toBe(302);
 
     // biome-ignore lint/style/noNonNullAssertion: asserted above via the 302

@@ -48,6 +48,104 @@ describe('McpOAuthService', () => {
       .digest('base64url');
   });
 
+  describe('consent', () => {
+    const pendingSession = {
+      sessionId: 'session-123',
+      state: 'unguessable-pending-state',
+      clientId: 'client-123',
+      redirectUri: 'http://localhost:4000/callback',
+      codeChallenge: 'challenge',
+      codeChallengeMethod: 'S256',
+      oauthState: 'client-state',
+      resource: 'http://localhost:3000/mcp',
+      scope: 'offline_access',
+      expiresAt: Date.now() + 600000,
+    };
+
+    describe('approveConsent', () => {
+      it('replaces the pending state with one the callback can verify', async () => {
+        const encoded = await service.approveConsent(pendingSession);
+
+        const providerState = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf-8'));
+        const expectedHmac = createHmac('sha256', options.hmacSecret)
+          .update(`session-123:${providerState.sessionNonce}`)
+          .digest('base64url');
+        expect(providerState).toEqual({
+          sessionId: 'session-123',
+          sessionNonce: expect.any(String),
+          sessionHmac: expectedHmac,
+        });
+        expect(store.removeOAuthSession).toHaveBeenCalledWith('session-123');
+        expect(store.storeOAuthSession).toHaveBeenCalledWith('session-123', {
+          ...pendingSession,
+          state: expectedHmac,
+        });
+      });
+
+      it('lets the callback issue a code once approved', async () => {
+        const encoded = await service.approveConsent(pendingSession);
+        const providerState = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf-8'));
+        const storedSession = store.storeOAuthSession.mock.calls[0]?.[1];
+        store.getOAuthSession.mockResolvedValue(storedSession);
+        store.upsertUserProfile.mockResolvedValue('profile-123');
+
+        const { redirectUrl } = await service.processAuthenticationSuccess({
+          user: {
+            profile: { id: 'user-123', username: 'testuser' },
+            accessToken: 'provider-access-token',
+            refreshToken: 'provider-refresh-token',
+            provider: 'test-provider',
+          },
+          ...providerState,
+        });
+
+        expect(new URL(redirectUrl).searchParams.get('code')).toEqual(expect.any(String));
+      });
+    });
+
+    describe('denyConsent', () => {
+      it('removes the session and redirects with access_denied and the client state', async () => {
+        const redirectUrl = new URL(await service.denyConsent(pendingSession));
+
+        expect(store.removeOAuthSession).toHaveBeenCalledWith('session-123');
+        expect(redirectUrl.origin + redirectUrl.pathname).toBe('http://localhost:4000/callback');
+        expect(redirectUrl.searchParams.get('error')).toBe('access_denied');
+        expect(redirectUrl.searchParams.get('state')).toBe('client-state');
+        expect(redirectUrl.searchParams.get('code')).toBeNull();
+      });
+
+      it('omits state when the client sent none', async () => {
+        const redirectUrl = new URL(
+          await service.denyConsent({ ...pendingSession, oauthState: undefined }),
+        );
+
+        expect(redirectUrl.searchParams.has('state')).toBe(false);
+      });
+    });
+
+    it('rejects a callback for a session that was never approved', async () => {
+      store.getOAuthSession.mockResolvedValue(pendingSession);
+      const forgedHmac = createHmac('sha256', 'attacker-secret')
+        .update('session-123:nonce')
+        .digest('base64url');
+
+      await expect(
+        service.processAuthenticationSuccess({
+          user: {
+            profile: { id: 'user-123', username: 'testuser' },
+            accessToken: 'a',
+            refreshToken: 'r',
+            provider: 'test-provider',
+          },
+          sessionId: 'session-123',
+          sessionNonce: 'nonce',
+          sessionHmac: forgedHmac,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(store.storeAuthCode).not.toHaveBeenCalled();
+    });
+  });
+
   describe('processAuthenticationSuccess', () => {
     const mockUser: PassportUser = {
       profile: {
