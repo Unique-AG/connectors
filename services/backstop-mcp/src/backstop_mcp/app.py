@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_access_token
 from mcp.server.transport_security import (
     DEFAULT_MAX_REQUEST_BODY_SIZE,
     RequestBodyLimitMiddleware,
@@ -11,6 +12,8 @@ from mcp.server.transport_security import (
 from mcp_configs import TracingSettings
 from mcp_observability import (
     OPS_PATHS,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
     ToolCallObservabilityMiddleware,
     configure_tracing,
     setup_ops,
@@ -32,6 +35,8 @@ from backstop_mcp.dependencies import (
     get_auth_config,
     get_auth_provider,
     get_backstop_client_factory,
+    get_database_config,
+    get_encryption_config,
     get_encryption_key,
     get_engine,
     get_logging_settings,
@@ -40,7 +45,7 @@ from backstop_mcp.dependencies import (
 )
 from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.system_users import find_system_user_by_user_name
-from backstop_mcp.logging import configure_logging
+from backstop_mcp.logging import configure_logging, deployment_secrets
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
@@ -66,7 +71,11 @@ def create_app() -> Starlette:
     auth_config = get_auth_config()
 
     logging_settings = get_logging_settings()
-    configure_logging(logging_settings, encryption_key=get_encryption_key())
+    configure_logging(
+        logging_settings,
+        encryption_key=get_encryption_key(),
+        secrets=deployment_secrets(get_encryption_config(), get_database_config()),
+    )
     configure_metrics(config)
     # Before FastMCP is built. Tracing is off unless an OTEL_* variable turns it on.
     configure_tracing(
@@ -99,8 +108,12 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
-        # Outermost MCP middleware. `setup_ops` appends metrics inside it.
-        middleware=[ToolCallObservabilityMiddleware()],
+        # Redaction first, so the tool-call lines are redacted too. `setup_ops` appends metrics
+        # inside them.
+        middleware=[
+            RedactToolCallSecretsMiddleware(_caller_access_token),
+            ToolCallObservabilityMiddleware(),
+        ],
     )
     registered = tuple(mcp.add_tool(fn) for fn in TOOLS)
     validate_trace_declarations()
@@ -137,6 +150,8 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
+            # Outermost, so every line logged while the request is handled is redacted.
+            Middleware(RedactRequestSecretsMiddleware, secrets_of=_bearer_token),
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
             Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),
@@ -155,6 +170,17 @@ def create_app() -> Starlette:
             Middleware(SessionRevokedToUnauthorizedMiddleware),
         ]
     )
+
+
+def _bearer_token(request: Request) -> tuple[str, ...]:
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    return (token,) if scheme.lower() == "bearer" and token else ()
+
+
+def _caller_access_token(_context: object) -> tuple[str, ...]:
+    """The MCP access token of the tool call, which may not run in its HTTP request's context."""
+    access_token = get_access_token()
+    return (access_token.token,) if access_token is not None else ()
 
 
 async def _resolve_system_user_for_login(
