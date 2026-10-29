@@ -219,7 +219,6 @@ source = { registry = "https://pypi.org/simple" }
 
 describe('buildPlan', () => {
   const config = {
-    maxNewPullRequests: 3,
     groups: [
       { name: 'opentelemetry', ecosystem: 'uv', patterns: ['opentelemetry-*'] },
       { name: 'fastmcp', ecosystem: 'uv', patterns: ['fastmcp', 'fastmcp-slim'] },
@@ -358,23 +357,13 @@ describe('buildPlan', () => {
       assert.strictEqual(entries[0].action, 'replace');
     });
 
-    it('skips a version that a person closed and counts open pull requests against the cap', () => {
+    it('skips a version that a person closed', () => {
       const closed = plan([], { closedKeys: new Set([zod.key]) });
       assert.deepStrictEqual(
         closed.entries.map(({ slug }) => slug),
         ['npm-pino'],
       );
       assert.strictEqual(closed.skipped[0].reason, 'a person closed this version');
-      const full = buildPlan({
-        candidates: [candidate('npm', 'pino')],
-        needsPerson: [],
-        config: { ...config, maxOpenPullRequests: 1 },
-        openPulls: [pull({ branch: 'deps/npm-other' })],
-      });
-      assert.deepStrictEqual(
-        full.deferred.map(({ slug }) => slug),
-        ['npm-pino'],
-      );
     });
   });
 
@@ -404,8 +393,8 @@ describe('buildPlan', () => {
     );
   });
 
-  it('caps new pull requests, mixes ecosystems and puts direct updates first', () => {
-    const { entries, deferred } = buildPlan({
+  it('opens a pull request for every new dependency with no limit', () => {
+    const { entries } = buildPlan({
       candidates: [
         candidate('npm', 'a'),
         candidate('npm', 'b', true),
@@ -416,14 +405,13 @@ describe('buildPlan', () => {
       needsPerson: [],
       config,
     });
-    assert.deepStrictEqual(
-      entries.map(({ slug }) => slug),
-      ['npm-b', 'uv-e', 'npm-c'],
-    );
-    assert.deepStrictEqual(
-      deferred.map(({ slug }) => slug),
-      ['uv-d', 'npm-a'],
-    );
+    assert.deepStrictEqual(entries.map(({ slug }) => slug).sort(), [
+      'npm-a',
+      'npm-b',
+      'npm-c',
+      'uv-d',
+      'uv-e',
+    ]);
   });
 });
 
@@ -435,7 +423,6 @@ describe('renderSummary', () => {
           { ecosystem: 'npm', name: 'zod', isGroup: false, members: [{ from: '1', to: '2' }] },
         ],
         skipped: [],
-        deferred: [],
         needsPerson: [{ ecosystem: 'uv', name: 'fastmcp', reason: 'A limit forbids it.' }],
       },
       'Plan only.',

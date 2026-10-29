@@ -177,14 +177,6 @@ function slugOf(ecosystem, name) {
     .replace(/^-+|-+$/g, '')}`;
 }
 
-function interleave(entries) {
-  const lanes = Object.values(Object.groupBy(entries, ({ ecosystem }) => ecosystem));
-  const longest = Math.max(0, ...lanes.map((lane) => lane.length));
-  return Array.from({ length: longest }, (_, index) => lanes.map((lane) => lane[index]))
-    .flat()
-    .filter(Boolean);
-}
-
 function isIgnored(rules, candidate) {
   return rules.some(
     ({ ecosystem, name, updateTypes }) =>
@@ -260,17 +252,11 @@ export function buildPlan({
   });
   const withAction = (action) =>
     decisions.flatMap(({ entry }) => (entry.action === action ? [entry] : []));
-  const fresh = interleave(withAction('new'));
-  const room = Math.min(
-    config.maxNewPullRequests,
-    Math.max(0, (config.maxOpenPullRequests ?? Number.POSITIVE_INFINITY) - openPulls.length),
-  );
   return {
-    entries: [...withAction('rebuild'), ...withAction('replace'), ...fresh.slice(0, room)],
+    entries: [...withAction('rebuild'), ...withAction('replace'), ...withAction('new')],
     updates: withAction('update'),
     skipped: decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
     ignored,
-    deferred: fresh.slice(room),
     needsPerson,
   };
 }
@@ -285,7 +271,7 @@ function describe({ name, isGroup, members }) {
 const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR' };
 
 export function renderSummary(
-  { entries, updates = [], skipped, ignored = [], deferred, needsPerson },
+  { entries, updates = [], skipped, ignored = [], needsPerson },
   modeNote,
 ) {
   const section = (title, items) =>
@@ -312,7 +298,6 @@ export function renderSummary(
       'Ignored by the configuration',
       ignored.map(({ ecosystem, name, from, to }) => `${ecosystem} ${name}: ${from} -> ${to}`),
     ),
-    ...section('Left for a later run', deferred.map(line)),
     ...section(
       'Needs a person',
       needsPerson.map(({ ecosystem, name, reason }) => `${ecosystem} ${name}: ${reason}`),
