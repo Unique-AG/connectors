@@ -1,10 +1,14 @@
 import { OAuthClient } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Cache } from 'cache-manager';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { DrizzleDatabase, sourceOnLoginConflict } from '~/db';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
+
+const toQueryParams = (condition: unknown) => new PgDialect().sqlToQuery(condition as SQL).params;
 
 describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
@@ -498,6 +502,52 @@ describe('McpOAuthStore', () => {
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:test-token');
+    });
+
+    it('looks up only access tokens so a refresh token never passes as one', async () => {
+      mockCache.get.mockResolvedValue(undefined);
+      mockDrizzle.__nextSelectRows = [];
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      const result = await unit.getAccessToken('refresh-token');
+
+      const where = mockDrizzle.select.mock.results[0]?.value.where;
+      expect(result).toBeUndefined();
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['refresh-token', 'ACCESS']);
+      expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
+    it('deletes only an access token row when removing an access token', async () => {
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.removeAccessToken('refresh-token');
+
+      const where = mockDrizzle.delete.mock.results[0]?.value.where;
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['refresh-token', 'ACCESS']);
+    });
+
+    it('deletes only a refresh token row when removing a refresh token', async () => {
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.removeRefreshToken('access-token');
+
+      const where = mockDrizzle.delete.mock.results[0]?.value.where;
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['access-token', 'REFRESH']);
     });
   });
 

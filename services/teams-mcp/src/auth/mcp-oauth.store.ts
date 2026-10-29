@@ -264,10 +264,9 @@ export class McpOAuthStore implements IOAuthStore {
       return cached;
     }
 
-    const metadata = await this.drizzle
+    // A refresh token shares this table but must never pass as a bearer access token.
+    const metadata: AccessTokenMetadata | undefined = await this.drizzle
       .select({
-        token: tokens.token,
-        type: tokens.type,
         expiresAt: tokens.expiresAt,
         userId: tokens.userId,
         clientId: tokens.clientId,
@@ -278,7 +277,7 @@ export class McpOAuthStore implements IOAuthStore {
       })
       .from(tokens)
       .leftJoin(userProfiles, eq(tokens.userProfileId, userProfiles.id))
-      .where(eq(tokens.token, token))
+      .where(and(eq(tokens.token, token), eq(tokens.type, 'ACCESS')))
       .then((rows) => rows[0]);
     if (!metadata) {
       return undefined;
@@ -288,12 +287,14 @@ export class McpOAuthStore implements IOAuthStore {
       return undefined;
     }
 
-    await this.cacheAccessTokenMetadata(token, metadata as unknown as AccessTokenMetadata);
-    return metadata as unknown as AccessTokenMetadata;
+    await this.cacheAccessTokenMetadata(token, metadata);
+    return metadata;
   }
 
   public async removeAccessToken(token: string): Promise<void> {
-    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
+    await this.drizzle
+      .delete(tokens)
+      .where(and(eq(tokens.token, token), eq(tokens.type, 'ACCESS')));
 
     await this.removeCachedAccessToken(token);
   }
@@ -339,7 +340,9 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
-    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
+    await this.drizzle
+      .delete(tokens)
+      .where(and(eq(tokens.token, token), eq(tokens.type, 'REFRESH')));
   }
 
   public async redeemRefreshToken(token: string): Promise<boolean> {
