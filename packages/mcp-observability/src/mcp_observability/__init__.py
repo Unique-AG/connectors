@@ -14,6 +14,9 @@ from mcp_observability.ops import OPS_PATHS
 from mcp_observability.ops import setup_ops
 from mcp_observability.rate_limit import RateLimitMiddleware
 from mcp_observability.rate_limit import access_token_subject
+from mcp_observability.redaction import RedactRequestSecretsMiddleware
+from mcp_observability.redaction import RedactToolCallSecretsMiddleware
+from mcp_observability.redaction import log_secrets
 from mcp_observability.tool_calls import ToolCallObservabilityMiddleware
 from mcp_observability.trace_declarations import trace_arguments
 from mcp_observability.trace_declarations import traced
@@ -28,6 +31,8 @@ __all__ = [
     "DeclaresFailureLevel",
     "MetricNamespace",
     "PinoJsonFormatter",
+    "RedactRequestSecretsMiddleware",
+    "RedactToolCallSecretsMiddleware",
     "ToolCallObservabilityMiddleware",
     "access_token_subject",
     "configure_identifiable_values",
@@ -36,6 +41,7 @@ __all__ = [
     "failed_fields",
     "failure_level",
     "identifiable_value",
+    "log_secrets",
     "metrics_text",
     "reset_identifiable_values",
     "setup_ops",
