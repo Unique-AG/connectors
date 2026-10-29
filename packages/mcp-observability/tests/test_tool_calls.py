@@ -205,10 +205,9 @@ async def test_a_call_runs_and_is_logged_when_its_secrets_cannot_be_read(
         result = await connected.call_tool("echo", {})
 
     assert not result.is_error
-    messages = [str(line["msg"]) for line in _lines(pino)]
-    failure = "Could not read the secrets to redact from this context's lines"
-    assert messages.index(failure) < messages.index("Tool call started")
-    assert [message for message in messages if message.startswith("Tool call")] == [
-        "Tool call started",
-        "Tool call completed",
-    ]
+    tool_call_lines = [line for line in _lines(pino) if str(line["msg"]).startswith("Tool call")]
+    assert [line["msg"] for line in tool_call_lines] == ["Tool call started", "Tool call completed"]
+    assert all(
+        cast("dict[str, str]", line["log_secrets_failed"])["name"] == "LookupError"
+        for line in tool_call_lines
+    )

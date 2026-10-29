@@ -4,6 +4,7 @@ import pinoHttp from 'pino-http';
 import { describe, expect, it } from 'vitest';
 import {
   createSecretRedactor,
+  JWT_PATTERN,
   MIN_SECRET_LENGTH,
   redactRequestSecrets,
   runWithLogSecrets,
@@ -129,7 +130,8 @@ describe('createSecretRedactor', () => {
 
   describe('default patterns', () => {
     it.each([
-      ['Authorization: Bearer abc.def-ghi', 'Authorization: Bearer [Redacted]'],
+      ['Authorization: Bearer abc.def-ghi9', 'Authorization: Bearer [Redacted]'],
+      ['Bearer abcdefghijklmnopqrstuvwxyz', 'Bearer [Redacted]'],
       ['Basic dXNlcjpwYXNz', 'Basic [Redacted]'],
       ['token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl', 'token [Redacted]'],
       ['x-api-key: 0123456789abcdef', 'x-api-key: [Redacted]'],
@@ -183,6 +185,17 @@ describe('createSecretRedactor', () => {
       logger.info(`password=hunter2 tenant-key:abc123 ${mockApiKey}`);
 
       expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 tenant-key:[Redacted] [Redacted]');
+    });
+
+    it('applies the default patterns the consumer picks', () => {
+      const { logger, lines } = createCapturingLogger({
+        patterns: [JWT_PATTERN],
+        defaultPatterns: false,
+      });
+
+      logger.info('password=hunter2 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 [Redacted]');
     });
   });
 
