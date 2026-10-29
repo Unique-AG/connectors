@@ -102,6 +102,23 @@ describe('OpenEmailQuery', () => {
     expect(result.chunks).toBeUndefined();
   });
 
+  it('returns the Graph body without chunks when none of the matched chunks remain', async () => {
+    getContentById.mockResolvedValue({
+      id: 'cont-1',
+      chunks: [{ id: 'chunk-new', order: 0, text: 'Re-ingested passage' }],
+    });
+
+    const result = await instance.run({
+      userProfileId: 'user-1',
+      id: 'msg-1',
+      uniqueContentId: 'cont-1',
+      chunkIds: ['chunk-old'],
+    });
+
+    expect(result.text).toBe('Hello');
+    expect(result).not.toHaveProperty('chunks');
+  });
+
   it('does not load ingested chunks when the params have none', async () => {
     const result = await run();
 

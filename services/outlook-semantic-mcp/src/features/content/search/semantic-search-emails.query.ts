@@ -256,6 +256,13 @@ export class SemanticSearchEmailsQuery {
           context.mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
             return metadata.folderIdPath?.startsWith(uniqueFolderIdPath);
           })?.ownerEmail ?? null;
+        if (!sourceMailbox) {
+          // Without a mailbox the params address /me, which cannot open a shared-mailbox message.
+          this.logger.warn({
+            msg: 'Ingested email matched no known mailbox; open_email reads it from the signed-in mailbox',
+            contentId: item.content.id,
+          });
+        }
 
         const isDraft = metadata.isDraft === 'true';
         const folderId = metadata.parentFolderId ?? '';

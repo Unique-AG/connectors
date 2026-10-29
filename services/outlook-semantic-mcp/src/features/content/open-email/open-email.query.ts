@@ -98,7 +98,8 @@ export class OpenEmailQuery {
       return message;
     }
     try {
-      return { ...message, chunks: await this.readRelevantChunks(uniqueContentId, chunkIds) };
+      const chunks = await this.readRelevantChunks(uniqueContentId, chunkIds);
+      return chunks === undefined ? message : { ...message, chunks };
     } catch (err) {
       this.logger.warn({
         msg: 'Failed to read matched chunks from Unique; returning the Graph body without them',
@@ -165,13 +166,25 @@ export class OpenEmailQuery {
     };
   }
 
-  private async readRelevantChunks(contentId: string, chunkIds?: string[]): Promise<string> {
+  private async readRelevantChunks(
+    contentId: string,
+    chunkIds?: string[],
+  ): Promise<string | undefined> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId });
     const chunks = emailData.chunks ?? [];
     if (!chunkIds?.length) {
       return concatChunks(chunks);
     }
     const wanted = new Set(chunkIds);
-    return concatChunks(chunks.filter((chunk) => wanted.has(chunk.id)));
+    const matched = chunks.filter((chunk) => wanted.has(chunk.id));
+    if (!matched.length) {
+      // The email was ingested again after the search, so its chunks have new ids.
+      this.logger.warn({
+        msg: 'None of the matched chunks are on the ingested email anymore; returning the Graph body without them',
+        uniqueContentId: contentId,
+      });
+      return undefined;
+    }
+    return concatChunks(matched);
   }
 }

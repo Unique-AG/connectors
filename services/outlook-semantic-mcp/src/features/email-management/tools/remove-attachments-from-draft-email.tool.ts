@@ -77,12 +77,13 @@ export class RemoveAttachmentsFromDraftEmailTool {
   ): Promise<z.infer<typeof RemoveAttachmentsOutputSchema>> {
     const userProfileId = extractUserProfileId(request);
 
-    const draftState = await this.getDraftStateQuery.run({
+    const draftTarget = {
       userProfileId: userProfileId.toString(),
       draftId: input.draftId,
       idIsImmutable: input.idIsImmutable,
       mailbox: input.mailbox,
-    });
+    };
+    const draftState = await this.getDraftStateQuery.run(draftTarget);
     if (draftState.status === 'failed') {
       return { success: false, message: draftState.message };
     }
@@ -118,6 +119,12 @@ export class RemoveAttachmentsFromDraftEmailTool {
     }
     if (confirmation.status !== 'accepted') {
       return { success: false, message: 'Attachment removal was cancelled. Nothing was removed.' };
+    }
+
+    // The prompt can stay open for a long time, and the user may send the draft from Outlook meanwhile.
+    const confirmedDraftState = await this.getDraftStateQuery.run(draftTarget);
+    if (confirmedDraftState.status === 'failed') {
+      return { success: false, message: confirmedDraftState.message };
     }
 
     const { removed, failed } = await this.removeAttachmentsFromDraftEmailCommand.run(

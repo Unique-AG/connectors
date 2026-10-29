@@ -1,5 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -71,7 +72,7 @@ export const EmailDataSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Semantically matched passages from the ingested email, including attachment text. Present when `uniqueContentId` was passed and the ingested email could be read. The live message body is `text`. When editing a draft, change `text`, not `chunks`.',
+      'Semantically matched passages from the ingested email, including attachment text. Present when `uniqueContentId` was passed and the matched passages could still be read from the ingested email. The live message body is `text`. When editing a draft, change `text`, not `chunks`.',
     ),
 });
 
@@ -122,17 +123,30 @@ export class OpenEmailTool {
     }
 
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
-    const emailData = await this.openEmailQuery.run({
-      userProfileId: userProfileTypeId.toString(),
-      id: input.id,
-      mailbox: input.mailbox,
-      folderId: input.parentFolderId,
-      idIsImmutable: input.idIsImmutable,
-      bodyContentType: input.bodyContentType,
-      uniqueContentId: input.uniqueContentId,
-      chunkIds: input.chunkIds,
-      outputTimeZone: outputTimeZone,
-    });
-    return { success: true, emailData };
+    try {
+      const emailData = await this.openEmailQuery.run({
+        userProfileId: userProfileTypeId.toString(),
+        id: input.id,
+        mailbox: input.mailbox,
+        folderId: input.parentFolderId,
+        idIsImmutable: input.idIsImmutable,
+        bodyContentType: input.bodyContentType,
+        uniqueContentId: input.uniqueContentId,
+        chunkIds: input.chunkIds,
+        outputTimeZone: outputTimeZone,
+      });
+      return { success: true, emailData };
+    } catch (err) {
+      // 404: deleted or moved in Outlook since it was indexed. 400: an id Graph does not accept,
+      // such as a Unique content id from `openEmailParams` of an older search.
+      if (err instanceof GraphError && (err.statusCode === 404 || err.statusCode === 400)) {
+        return {
+          success: false,
+          message:
+            'This email could not be found in Outlook. It may have been deleted or moved, or the parameters come from an older search. Run `search_emails` again and pass the new `openEmailParams`.',
+        };
+      }
+      throw err;
+    }
   }
 }
