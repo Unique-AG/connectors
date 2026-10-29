@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const PNPM_PACKAGE_KEY = /^ {2}'?((?:@[^/@']+\/)?[^@'/]+)@(\d[^'(]*)'?:$/;
@@ -120,4 +121,33 @@ export function hasUvCooldown(pyproject) {
 
 export function findMissing(lock, names) {
   return names.filter((name) => !lock.has(name));
+}
+
+const YOUNG_VERSION =
+  /ERR_PNPM_NO_MATURE_MATCHING_VERSION\s+Version \S+ \(released [^)]+\) of (\S+) does not meet the minimumReleaseAge constraint/;
+
+export function youngVersionOf(output) {
+  return YOUNG_VERSION.exec(output)?.[1] ?? null;
+}
+
+export function transitiveUpdates({ result, before, after, cooldownDays }) {
+  if (result.status === 0) {
+    return {
+      lockChanges: changedPackages(parsePnpmPackages(before), parsePnpmPackages(after)),
+      needsPerson: [],
+    };
+  }
+  const output = `${result.stdout}${result.stderr}`;
+  const name = youngVersionOf(output);
+  assert.ok(name, `pnpm update failed:\n${output}`);
+  return {
+    lockChanges: [],
+    needsPerson: [
+      {
+        ecosystem: 'npm',
+        name,
+        reason: `Only versions younger than ${cooldownDays} days match this range. The job skips the transitive npm updates until one is old enough.`,
+      },
+    ],
+  };
 }

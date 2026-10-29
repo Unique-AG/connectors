@@ -14,6 +14,8 @@ import {
   pinEdit,
   pinnedVersion,
   restoreUvLockHeader,
+  transitiveUpdates,
+  youngVersionOf,
 } from './locks.mjs';
 
 const pnpmLock = (zod, nypm) => `lockfileVersion: '9.0'
@@ -241,5 +243,63 @@ describe('findMissing', () => {
   it('lists the names that a lock lost', () => {
     const lock = new Map([['ruff', ['0.17.2']]]);
     assert.deepStrictEqual(findMissing(lock, ['ruff', 'httpx']), ['httpx']);
+  });
+});
+
+const YOUNG_OUTPUT =
+  'ERR_PNPM_NO_MATURE_MATCHING_VERSION  Version 7.1.2 (released 44 hours ago) of @azure/msal-node does not meet the minimumReleaseAge constraint\n';
+
+describe('youngVersionOf', () => {
+  it('returns the package name of a minimumReleaseAge failure', () => {
+    assert.strictEqual(youngVersionOf(YOUNG_OUTPUT), '@azure/msal-node');
+  });
+
+  it('returns null for another pnpm error', () => {
+    assert.strictEqual(
+      youngVersionOf('ERR_PNPM_FETCH_404  GET https://registry/zod: Not Found'),
+      null,
+    );
+  });
+});
+
+describe('transitiveUpdates', () => {
+  const lockOf = (version) => pnpmLock(version, '0.2.1');
+
+  it('lists the lock changes when the update succeeded', () => {
+    const { lockChanges, needsPerson } = transitiveUpdates({
+      result: { status: 0, stdout: '', stderr: '' },
+      before: lockOf('4.6.5'),
+      after: lockOf('4.6.7'),
+      cooldownDays: 3,
+    });
+    assert.deepStrictEqual(lockChanges, [{ name: 'zod', from: ['4.6.5'], to: ['4.6.7'] }]);
+    assert.deepStrictEqual(needsPerson, []);
+  });
+
+  it('drops the lock changes and asks for a person when only young versions match', () => {
+    const { lockChanges, needsPerson } = transitiveUpdates({
+      result: { status: 1, stdout: '', stderr: YOUNG_OUTPUT },
+      before: lockOf('4.6.5'),
+      after: lockOf('4.6.5'),
+      cooldownDays: 3,
+    });
+    assert.deepStrictEqual(lockChanges, []);
+    assert.strictEqual(needsPerson.length, 1);
+    assert.strictEqual(needsPerson[0].ecosystem, 'npm');
+    assert.strictEqual(needsPerson[0].name, '@azure/msal-node');
+    assert.match(needsPerson[0].reason, /younger than 3 days/);
+  });
+
+  it('throws with the output on any other failure', () => {
+    assert.throws(
+      () =>
+        transitiveUpdates({
+          result: { status: 1, stdout: '', stderr: 'ERR_PNPM_OTHER boom' },
+          before: '',
+          after: '',
+          cooldownDays: 3,
+        }),
+      /ERR_PNPM_OTHER boom/,
+    );
   });
 });

@@ -13,6 +13,7 @@ import {
   parseUvPackages,
   pinEdit,
   restoreUvLockHeader,
+  youngVersionOf,
 } from './locks.mjs';
 import { lockFiles, renderPr } from './pr.mjs';
 import {
@@ -36,7 +37,9 @@ function bumpNpm() {
   for (const [command, ...args] of pnpmCommands(entry, releaseAge)) {
     runOrThrow(command, args);
   }
-  runOrThrow('pnpm', ['dedupe', '--ignore-scripts', '--loglevel', 'error', releaseAge]);
+  const dedupe = run('pnpm', ['dedupe', '--ignore-scripts', '--loglevel', 'error', releaseAge]);
+  const output = `${dedupe.stdout}${dedupe.stderr}`;
+  assert.ok(dedupe.status === 0 || youngVersionOf(output), `pnpm dedupe failed:\n${output}`);
 }
 
 function bumpUv() {

@@ -2,15 +2,14 @@ import assert from 'node:assert';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createActionsLookup, planActions } from './actions.mjs';
 import { createDockerLookup, planDocker } from './docker.mjs';
-import { createNpmDeprecationLookup, dropDeprecated } from './npm-deprecated.mjs';
 import {
-  changedPackages,
   hasUvCooldown,
-  parsePnpmPackages,
   parseRequirements,
   parseUvUpdates,
   pinnedVersion,
+  transitiveUpdates,
 } from './locks.mjs';
+import { createNpmDeprecationLookup, dropDeprecated } from './npm-deprecated.mjs';
 import {
   buildPlan,
   latestEligibleVersions,
@@ -57,14 +56,31 @@ function planNpm() {
     `pnpm outdated failed:\n${outdatedRun.stdout}${outdatedRun.stderr}`,
   );
   const before = readFileSync('pnpm-lock.yaml', 'utf8');
-  runOrThrow('pnpm', ['update', '-r', '--lockfile-only', '--loglevel', 'error', releaseAge]);
-  const after = readFileSync('pnpm-lock.yaml', 'utf8');
-  writeFileSync('pnpm-lock.yaml', before);
-  return npmCandidates({
+  let updates;
+  try {
+    const updateRun = run('pnpm', [
+      'update',
+      '-r',
+      '--lockfile-only',
+      '--loglevel',
+      'error',
+      releaseAge,
+    ]);
+    updates = transitiveUpdates({
+      result: updateRun,
+      before,
+      after: readFileSync('pnpm-lock.yaml', 'utf8'),
+      cooldownDays: config.cooldownDays,
+    });
+  } finally {
+    writeFileSync('pnpm-lock.yaml', before);
+  }
+  const { candidates, needsPerson } = npmCandidates({
     outdated: JSON.parse(outdatedRun.stdout.trim() || '{}'),
-    lockChanges: changedPackages(parsePnpmPackages(before), parsePnpmPackages(after)),
+    lockChanges: updates.lockChanges,
     overrides: JSON.parse(readFileSync('package.json', 'utf8')).pnpm?.overrides ?? {},
   });
+  return { candidates, needsPerson: [...updates.needsPerson, ...needsPerson] };
 }
 
 async function planUv() {
