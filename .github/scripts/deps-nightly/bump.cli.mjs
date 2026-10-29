@@ -3,20 +3,18 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { applyActions } from './actions.mjs';
-import { pnpmCommands, renderBody, renderTitle, uvLockArgs } from './bump.mjs';
+import { pnpmCommands, uvLockArgs } from './bump.mjs';
 import { applyDocker } from './docker.mjs';
 import {
-  changedPackages,
   findDowngrades,
   findMissing,
   hasUvCooldown,
-  movedPnpmImporters,
   normalizeName,
-  parsePnpmPackages,
   parseUvPackages,
   pinEdit,
   restoreUvLockHeader,
 } from './locks.mjs';
+import { changedFiles, lockFiles, renderPr } from './pr.mjs';
 import {
   ACTION_FILES,
   config,
@@ -28,24 +26,17 @@ import {
   uvProjectFolders,
 } from './repo.mjs';
 import { run, runOrThrow, sandboxEnv } from './run.mjs';
-import { commitScope } from './scope.mjs';
-import { generateLock, LOCK_FILE, mergeLockBlock } from './terraform-lock.mjs';
 import { applyTerraform, parseProviders } from './terraform.mjs';
+import { generateLock, LOCK_FILE, mergeLockBlock } from './terraform-lock.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const entry = JSON.parse(process.env.ENTRY);
 
 function bumpNpm() {
-  const before = readFileSync('pnpm-lock.yaml', 'utf8');
   for (const [command, ...args] of pnpmCommands(entry, releaseAge)) {
     runOrThrow(command, args);
   }
   runOrThrow('pnpm', ['dedupe', '--ignore-scripts', '--loglevel', 'error', releaseAge]);
-  const after = readFileSync('pnpm-lock.yaml', 'utf8');
-  return {
-    changes: changedPackages(parsePnpmPackages(before), parsePnpmPackages(after)),
-    projects: movedPnpmImporters(before, after),
-  };
 }
 
 function bumpUv() {
@@ -64,8 +55,6 @@ function bumpUv() {
       writeFileSync(`${folder}/pyproject.toml`, edited);
     }
   }
-  const changes = [];
-  const projects = [];
   for (const folder of folders) {
     const before = readFileSync(`${folder}/uv.lock`, 'utf8');
     const held = parseUvPackages(before);
@@ -89,13 +78,10 @@ function bumpUv() {
       [],
       `The lock in ${folder} lowered: ${downgrades.join(', ')}`,
     );
-    changes.push(...changedPackages(held, parseUvPackages(after)));
-    projects.push(folder);
   }
   runOrThrow('bash', ['scripts/each-python-project.sh', 'uv', 'lock', '--check'], {
     env: sandboxEnv(),
   });
-  return { changes, projects };
 }
 
 function bumpTextFiles(pattern, apply) {
@@ -104,19 +90,13 @@ function bumpTextFiles(pattern, apply) {
   for (const { name, to, data } of entry.members) {
     after = { ...after, ...apply(after, { name, to, data }) };
   }
-  const projects = Object.keys(after).filter((path) => after[path] !== before[path]);
-  for (const path of projects) {
+  for (const path of Object.keys(after).filter((path) => after[path] !== before[path])) {
     writeFileSync(path, after[path]);
   }
-  return {
-    changes: entry.members.map(({ name, from, to }) => ({ name, from: [from], to: [to] })),
-    projects,
-  };
 }
 
 function bumpTerraform() {
-  const edited = bumpTextFiles(TERRAFORM_FILES, applyTerraform);
-  const locks = [];
+  bumpTextFiles(TERRAFORM_FILES, applyTerraform);
   for (const { to, data } of entry.members) {
     const generated = generateLock({
       source: data.source,
@@ -133,11 +113,9 @@ function bumpTerraform() {
       if (provider && merged !== before) {
         writeFileSync(lockPath, merged);
         runOrThrow('git', ['add', '--intent-to-add', lockPath]);
-        locks.push(lockPath);
       }
     }
   }
-  return { changes: edited.changes, projects: [...edited.projects, ...locks] };
 }
 
 const bumpers = {
@@ -148,12 +126,20 @@ const bumpers = {
   terraform: bumpTerraform,
 };
 assert.ok(entry.ecosystem in bumpers, `Unknown ecosystem ${entry.ecosystem}`);
-const { changes, projects } = bumpers[entry.ecosystem]();
-const files = runOrThrow('git', ['diff', '--name-only']).split('\n').filter(Boolean);
+const lockBefore = lockFiles(entry.ecosystem);
+bumpers[entry.ecosystem]();
+const files = changedFiles();
 const outputs = [`changed=${files.length > 0}`];
 
 if (files.length > 0) {
-  const title = renderTitle(entry, commitScope(files, readFileSync('.gitcommitizen', 'utf8')));
+  const { title } = renderPr({
+    entry,
+    files,
+    before: lockBefore,
+    after: lockFiles(entry.ecosystem),
+    gitcommitizen: readFileSync('.gitcommitizen', 'utf8'),
+    cooldownDays: config.cooldownDays,
+  });
   if (run('cz', ['--version']).status === 0) {
     const lint = run('cz', ['--no-breaking-footer', 'lint', '--paths', files.join('\n')], {
       input: title,
@@ -167,11 +153,6 @@ if (files.length > 0) {
   const outDirectory = join(process.env.RUNNER_TEMP ?? tmpdir(), 'patch');
   mkdirSync(outDirectory, { recursive: true });
   writeFileSync(join(outDirectory, 'changes.patch'), runOrThrow('git', ['diff', '--binary']));
-  writeFileSync(join(outDirectory, 'pr-title.txt'), title);
-  writeFileSync(
-    join(outDirectory, 'pr-body.md'),
-    renderBody({ entry, changes, projects, cooldownDays: config.cooldownDays }),
-  );
   console.log(title);
 }
 
