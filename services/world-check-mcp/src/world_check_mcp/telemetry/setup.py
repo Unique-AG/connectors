@@ -1,21 +1,27 @@
-# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
+# mcp-scaffold-commit: 36a912c54836, timestamp: 2026-10-29T08:37:43+00:00
 
 from importlib.metadata import version
 
 from fastmcp import FastMCP
 from mcp_configs import LoggingSettings
+from mcp_configs import TracingSettings
+from mcp_observability import configure_logging
+from mcp_observability import configure_tracing
+from mcp_observability import setup_ops
 from starlette.middleware import Middleware
-from unique_mcp.logging import configure_logging
-from unique_mcp.monitoring import setup_ops
-from unique_toolkit.monitoring import configure_tracing
 
 SERVICE_NAME = "world-check-mcp"
 
 
 def init_telemetry(settings: LoggingSettings) -> None:
     """Runs before anything logs. Tracing reads its settings (OTEL_*) from the environment."""
-    configure_tracing(service_name=SERVICE_NAME, service_version=version(SERVICE_NAME))
-    configure_logging(level=settings.log_level)
+    configure_tracing(
+        TracingSettings(),
+        service_name=SERVICE_NAME,
+        service_version=version(SERVICE_NAME),
+        error_details_policy=settings.error_details_policy,
+    )
+    configure_logging(settings, own_loggers=("world_check_mcp",))
 
 
 def instrument(mcp: FastMCP) -> Middleware:

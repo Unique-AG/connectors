@@ -1,6 +1,7 @@
 # mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
+from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastmcp.server.providers import FileSystemProvider
 import httpx2
 
 from world_check_mcp.mcp.approval import ApprovalGate
+from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
 from world_check_mcp.upstream import upstream_tools
@@ -24,17 +26,25 @@ INSTRUCTIONS = (
 
 def create_server(
     upstream: UpstreamSettings,
+    open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
     transport: httpx2.AsyncBaseTransport | None = None,
+    *,
     auth: AuthProvider | None = None,
 ) -> FastMCP:
+    """Build the server. `open_persistence` opens every store, so the tests can open their own."""
     http = upstream_http(upstream, transport)
 
     @asynccontextmanager
     async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
         async with (
             open_upstream(http, upstream) as upstream_resource,
+            open_persistence() as persistence_resource,
         ):
-            yield {"upstream": upstream_resource, "approvals": ApprovalGate()}
+            yield {
+                "upstream": upstream_resource,
+                "persistence": persistence_resource,
+                "approvals": ApprovalGate(),
+            }
 
     mcp = FastMCP(
         name="World Check MCP",
