@@ -92,6 +92,12 @@ describe('parseAttachmentUri', () => {
       );
     });
 
+    it('rejects base64 that contains a character outside the alphabet', () => {
+      expect(() => parseAttachmentUri('data:text/plain;base64,QQ=@')).toThrow(
+        'Attachment data is truncated and cannot be opened',
+      );
+    });
+
     it('parses a complete Word file', () => {
       const zip = buildStoredZip('word/document.xml', Buffer.from('<document/>'));
       const result = parseAttachmentUri(

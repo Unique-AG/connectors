@@ -66,12 +66,18 @@ function shouldCheckZipStructure(mimeType: string, data: Buffer): boolean {
   return data.length >= 4 && data.readUInt32LE(0) === ZIP_LOCAL_HEADER_SIGNATURE;
 }
 
+// TypeScript 5.9 does not declare Uint8Array.fromBase64, which Node 26 provides.
+interface Uint8ArrayFromBase64 extends Uint8ArrayConstructor {
+  fromBase64(input: string): Uint8Array;
+}
+
 function decodeBase64Attachment(rawData: string): Buffer {
-  const compact = rawData.replace(/\s/g, '');
-  if (compact.length % 4 === 1) {
+  try {
+    const bytes = (Uint8Array as Uint8ArrayFromBase64).fromBase64(rawData);
+    return Buffer.from(bytes);
+  } catch {
     throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
   }
-  return Buffer.from(rawData, 'base64');
 }
 
 function assertOfficeZipIsComplete(data: Buffer): void {
@@ -82,6 +88,7 @@ function assertOfficeZipIsComplete(data: Buffer): void {
 
   const centralDirectorySize = data.readUInt32LE(eocdOffset + 12);
   const centralDirectoryOffset = data.readUInt32LE(eocdOffset + 16);
+  // ZIP64 archives are not checked: the real offset lives in a locator this parser does not read.
   if (centralDirectoryOffset === ZIP64_MARKER || centralDirectorySize === ZIP64_MARKER) {
     return;
   }
