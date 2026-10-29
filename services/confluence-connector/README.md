@@ -14,6 +14,16 @@ pnpm dev
 
 Run these from `services/confluence-connector`.
 
+Before you start, create `.env` (`cp .env.example .env`) and check these variables:
+
+| Variable | Where | Value |
+|---|---|---|
+| `TENANT_CONFIG_PATH_PATTERN` | `.env` | `src/tenant-configs/*-tenant-config.yaml` (the default `/app/...` path is for the container) |
+| `CONFLUENCE_PASSWORD_LOCAL_DC` | `.env` | `admin`. Used by the Confluence setup and by the tenant config |
+| `ZITADEL_CLIENT_SECRET` | `.env` | the client secret of the `confluence-connector` service user, from step 4.2 |
+| `FEATURE_FLAG_ENABLE_SERVICE_USER_API_KEY_UN_22696` | monorepo, `next/services/node-scope-management/app.env` | `true`, see step 4.1 |
+| `CONFLUENCE_LICENSE_KEY` | optional, `-e` on the seed command | a license key, to skip the prompt (step 6) |
+
 0. Optional: delete an old local Confluence and all its data, to start clean. Your Unique data is not touched, and the connector keeps its root scope because the server ID is pinned.
 
    ```bash
