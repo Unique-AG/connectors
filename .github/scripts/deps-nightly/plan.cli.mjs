@@ -5,9 +5,9 @@ import { createDockerLookup, planDocker } from './docker.mjs';
 import {
   hasUvCooldown,
   parseRequirements,
-  parseUvUpdates,
   pinnedVersion,
   transitiveUpdates,
+  uvFolderUpdates,
 } from './locks.mjs';
 import { createNpmDeprecationLookup, dropDeprecated } from './npm-deprecated.mjs';
 import {
@@ -88,23 +88,18 @@ async function planUv() {
   const pyprojects = Object.fromEntries(
     folders.map((folder) => [folder, readFileSync(`${folder}/pyproject.toml`, 'utf8')]),
   );
-  const updates = new Map(
-    folders.map((folder) => {
-      const flag = hasUvCooldown(pyprojects[folder])
-        ? []
-        : ['--exclude-newer', `${config.cooldownDays} days`];
-      const dryRun = run('uv', ['lock', '--upgrade', '--dry-run', ...flag], {
-        cwd: folder,
-        env: sandboxEnv(),
-      });
-      assert.strictEqual(
-        dryRun.status,
-        0,
-        `uv lock --dry-run failed in ${folder}:\n${dryRun.stdout}${dryRun.stderr}`,
-      );
-      return [folder, parseUvUpdates(`${dryRun.stdout}\n${dryRun.stderr}`)];
-    }),
-  );
+  const folderUpdates = folders.map((folder) => {
+    const flag = hasUvCooldown(pyprojects[folder])
+      ? []
+      : ['--exclude-newer', `${config.cooldownDays} days`];
+    const result = run('uv', ['lock', '--upgrade', '--dry-run', ...flag], {
+      cwd: folder,
+      env: sandboxEnv(),
+    });
+    return { folder, ...uvFolderUpdates({ result, folder, cooldownDays: config.cooldownDays }) };
+  });
+  const updates = new Map(folderUpdates.map(({ folder, updates }) => [folder, updates]));
+  const blocked = folderUpdates.flatMap(({ needsPerson }) => needsPerson);
   const pinnedNames = [
     ...new Set(
       Object.values(pyprojects).flatMap((text) =>
@@ -132,7 +127,7 @@ async function planUv() {
     })),
     latest,
   });
-  return { candidates, needsPerson: [...unanswered, ...needsPerson] };
+  return { candidates, needsPerson: [...blocked, ...unanswered, ...needsPerson] };
 }
 
 function planFiles(pattern) {

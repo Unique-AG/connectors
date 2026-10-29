@@ -115,6 +115,28 @@ export function parseUvDryRun(output) {
   return updates;
 }
 
+export function cooldownBlocksUv(output) {
+  return /No solution found[\s\S]*exclude[- ]newer/.test(output);
+}
+
+export function uvFolderUpdates({ result, folder, cooldownDays }) {
+  const output = `${result.stdout}\n${result.stderr}`;
+  if (result.status === 0) {
+    return { updates: parseUvUpdates(output), needsPerson: [] };
+  }
+  assert.ok(cooldownBlocksUv(output), `uv lock --dry-run failed in ${folder}:\n${output}`);
+  return {
+    updates: [],
+    needsPerson: [
+      {
+        ecosystem: 'uv',
+        name: folder,
+        reason: `uv finds no solution with the cooldown of ${cooldownDays} days. The job skips the updates of this project until the pins are old enough.`,
+      },
+    ],
+  };
+}
+
 export function hasUvCooldown(pyproject) {
   return /^exclude-newer\b/m.test(pyproject);
 }

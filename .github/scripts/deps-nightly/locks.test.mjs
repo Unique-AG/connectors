@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
   changedPackages,
+  cooldownBlocksUv,
   findDowngrades,
   findMissing,
   hasUvCooldown,
@@ -15,6 +16,7 @@ import {
   pinnedVersion,
   restoreUvLockHeader,
   transitiveUpdates,
+  uvFolderUpdates,
   youngVersionOf,
 } from './locks.mjs';
 
@@ -300,6 +302,74 @@ describe('transitiveUpdates', () => {
           cooldownDays: 3,
         }),
       /ERR_PNPM_OTHER boom/,
+    );
+  });
+});
+
+const UV_COOLDOWN_OUTPUT = `Using CPython 3.14.6
+Resolving despite existing lockfile due to addition of global exclude newer 2026-10-26T15:08:36.036331Z
+  × No solution found when resolving dependencies for split (markers:
+  │ python_full_version >= '3.15'):
+  ╰─▶ Because there is no version of ruff==0.17.3 and mcp-architecture:dev
+      depends on ruff==0.17.3, we can conclude that mcp-architecture:dev's
+      requirements are unsatisfiable.
+
+hint: \`ruff\` was filtered by \`exclude-newer\` to only include packages uploaded before 2026-10-26T15:08:36.262887Z.
+`;
+
+describe('cooldownBlocksUv', () => {
+  it('matches a failed resolution that the cooldown causes', () => {
+    assert.strictEqual(cooldownBlocksUv(UV_COOLDOWN_OUTPUT), true);
+  });
+
+  it('does not match another uv error', () => {
+    assert.strictEqual(cooldownBlocksUv('error: Failed to parse pyproject.toml'), false);
+    assert.strictEqual(
+      cooldownBlocksUv('× No solution found when resolving dependencies: conflict'),
+      false,
+    );
+  });
+});
+
+describe('uvFolderUpdates', () => {
+  const folder = 'packages/mcp-architecture';
+
+  it('lists the updates of a successful dry run', () => {
+    const { updates, needsPerson } = uvFolderUpdates({
+      result: { status: 0, stdout: '', stderr: 'Update ruff v0.17.2 -> v0.17.3\n' },
+      folder,
+      cooldownDays: 3,
+    });
+    assert.deepStrictEqual(updates, [{ name: 'ruff', from: '0.17.2', to: '0.17.3' }]);
+    assert.deepStrictEqual(needsPerson, []);
+  });
+
+  it('drops the updates and asks for a person when the cooldown blocks the lock', () => {
+    const { updates, needsPerson } = uvFolderUpdates({
+      result: { status: 1, stdout: '', stderr: UV_COOLDOWN_OUTPUT },
+      folder,
+      cooldownDays: 3,
+    });
+    assert.deepStrictEqual(updates, []);
+    assert.deepStrictEqual(needsPerson, [
+      {
+        ecosystem: 'uv',
+        name: folder,
+        reason:
+          'uv finds no solution with the cooldown of 3 days. The job skips the updates of this project until the pins are old enough.',
+      },
+    ]);
+  });
+
+  it('throws with the output on any other failure', () => {
+    assert.throws(
+      () =>
+        uvFolderUpdates({
+          result: { status: 2, stdout: '', stderr: 'error: boom' },
+          folder,
+          cooldownDays: 3,
+        }),
+      /packages\/mcp-architecture:\n.*error: boom/s,
     );
   });
 });
