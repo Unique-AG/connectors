@@ -184,3 +184,31 @@ async def test_the_secrets_the_consumer_extracts_are_redacted_from_what_the_call
     assert "upstream rejected [Redacted]" in messages
     assert messages[-1] == f"after the call {caller_token}"
     assert caller_token not in json.dumps(messages[:-1])
+
+
+async def test_a_call_runs_and_is_logged_when_its_secrets_cannot_be_read(
+    pino: io.StringIO,
+) -> None:
+    def unreadable(_context: object) -> list[str]:
+        raise LookupError("no access token")
+
+    server = FastMCP(
+        "kiosk",
+        middleware=[RedactToolCallSecretsMiddleware(unreadable), ToolCallObservabilityMiddleware()],
+    )
+
+    @server.tool
+    async def echo() -> str:
+        return "done"
+
+    async with Client(server) as connected:
+        result = await connected.call_tool("echo", {})
+
+    assert not result.is_error
+    messages = [str(line["msg"]) for line in _lines(pino)]
+    failure = "Could not read the secrets to redact from this context's lines"
+    assert messages.index(failure) < messages.index("Tool call started")
+    assert [message for message in messages if message.startswith("Tool call")] == [
+        "Tool call started",
+        "Tool call completed",
+    ]

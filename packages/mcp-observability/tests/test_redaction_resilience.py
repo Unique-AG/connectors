@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import re
+import time
 from collections.abc import Callable
 from collections.abc import Iterator
 from typing import cast
@@ -118,17 +119,36 @@ def _written(capsys: pytest.CaptureFixture[str]) -> list[dict[str, object]]:
     return [cast("dict[str, object]", json.loads(line)) for line in output.splitlines()]
 
 
+class _ExplodingPattern:
+    """A consumer pattern whose matching raises its first `times` calls."""
+
+    def __init__(self, message: str, *, times: int = 1_000) -> None:
+        self._message: str = message
+        self._left: int = times
+
+    def sub(self, _replacement: object, text: str) -> str:
+        if self._left == 0:
+            return text
+        self._left -= 1
+        raise RuntimeError(self._message)
+
+
+def _configure_exploding(message: str, *, times: int = 1_000) -> None:
+    exploding = cast(object, _ExplodingPattern(message, times=times))
+    configure_logging(
+        LoggingSettings(),
+        own_loggers=("tests",),
+        secrets=(_SECRET,),
+        secret_patterns=(cast("re.Pattern[str]", exploding),),
+    )
+
+
 def test_a_redaction_failure_writes_a_line_naming_the_error_without_its_message(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    configure_logging(LoggingSettings(), own_loggers=("tests",), secrets=(_SECRET,))
+    _configure_exploding(f"matching exploded on {_SECRET}", times=1)
 
-    def explode(_self: SecretRedactor, text: str) -> str:
-        raise RuntimeError(f"matching exploded on {text}")
-
-    monkeypatch.setattr(SecretRedactor, "_redact_text", explode)
     _log.info("leaking %s", _SECRET)
-    monkeypatch.undo()
     _log.info("second %s", _SECRET)
 
     failed, second = _written(capsys)
@@ -138,20 +158,27 @@ def test_a_redaction_failure_writes_a_line_naming_the_error_without_its_message(
     assert isinstance(failed["time"], int)
     err = cast("dict[str, str]", failed["err"])
     assert err["name"] == "RuntimeError"
-    assert "in explode" in err["stack"]
+    assert "in sub" in err["stack"]
     assert err["stack"].endswith("\nRuntimeError")
     assert second["msg"] == "second [Redacted]"
 
 
-def test_a_redaction_failure_points_at_the_log_call_and_its_trace(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+def test_a_redaction_failure_keeps_the_message_with_its_secrets_replaced(
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    configure_logging(LoggingSettings(), own_loggers=("tests",), secrets=(_SECRET,))
+    _configure_exploding("matching exploded")
 
-    def explode(_self: SecretRedactor, _text: str) -> str:
-        raise RuntimeError("matching exploded")
+    with log_secrets("context-secret-0123"):
+        _log.info("leaking %s and %s", _SECRET, "context-secret-0123")
 
-    monkeypatch.setattr(SecretRedactor, "_redact_text", explode)
+    (failed,) = _written(capsys)
+    assert failed["original_msg"] == "leaking [Redacted] and [Redacted]"
+
+
+def test_a_redaction_failure_points_at_the_log_call_and_its_trace(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _configure_exploding("matching exploded")
     span_context = SpanContext(
         trace_id=0x4BF92F3577B34DA6A3CE929D0E0E4736, span_id=0x00F067AA0BA902B7, is_remote=False
     )
@@ -210,13 +237,18 @@ def _log_an_unprintable_exception() -> None:
 
 
 @pytest.mark.parametrize(
-    "log_call",
-    [_log_with_mismatched_arguments, _log_an_unprintable_extra, _log_an_unprintable_exception],
+    ("log_call", "original_msg"),
+    [
+        (_log_with_mismatched_arguments, "value %d"),
+        (_log_an_unprintable_extra, "value"),
+        (_log_an_unprintable_exception, "failed"),
+    ],
 )
 def test_a_formatting_failure_writes_a_line_instead_of_printing_the_record(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     log_call: Callable[[], None],
+    original_msg: str,
 ) -> None:
     configure_logging(
         LoggingSettings(error_details_policy=ErrorDetailsPolicy.DISCLOSE),
@@ -235,6 +267,7 @@ def test_a_formatting_failure_writes_a_line_instead_of_printing_the_record(
 
     failed, following = _written(capsys)
     assert failed["msg"] == "Log line replaced: formatting failed"
+    assert failed["original_msg"] == original_msg
     assert failed["context"] == _log.name
     assert str(failed["logged_from"]).startswith(f"{log_call.__name__} (")
     assert "name" in cast("dict[str, str]", failed["err"])
@@ -253,6 +286,27 @@ def test_the_replacement_line_survives_its_own_error_description_failing(
 
     assert line["msg"] == "Log line replaced: formatting failed"
     assert line["err"] == {"name": "unknown"}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "a." * 500_000,
+        "eyJa-" * 200_000,
+        "-----BEGIN RSA PRIVATE KEY-----\n" * 30_000,
+        "x://" + "y:" * 500_000,
+        "a://b:" * 170_000,
+    ],
+    ids=["dotted", "token-like", "key-headers", "userinfo", "schemes"],
+)
+def test_a_megabyte_value_shaped_to_backtrack_is_redacted_within_a_second(value: str) -> None:
+    line = json.dumps({"msg": f"{value} {_SECRET}"})
+    started = time.perf_counter()
+
+    redacted = SecretRedactor((_SECRET,)).redact_line(line)
+
+    assert time.perf_counter() - started < 1
+    assert _SECRET not in redacted
 
 
 def test_secrets_that_are_not_strings_at_runtime_are_ignored() -> None:
