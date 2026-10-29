@@ -120,7 +120,7 @@ def atl_token(page):
 def ask_for_license(page, has_license):
     """Returns the key to apply, or "" to keep the current license."""
     if os.environ.get("CONFLUENCE_LICENSE_KEY"):
-        return os.environ["CONFLUENCE_LICENSE_KEY"].strip()
+        return "".join(os.environ["CONFLUENCE_LICENSE_KEY"].split())
 
     replaceable = not has_license or "Test license" in page
     fallback = (
