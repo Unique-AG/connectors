@@ -30,30 +30,38 @@ The skill `vulna-squash` does the whole job for a dependency PR in one run. The 
 
 ```mermaid
 flowchart TD
-  opened[Event: Pull request opened] --> labels{"Label dependencies, and no label ai-assisted or human-required?"}
+  opened[Event: Pull request opened] --> labels{"Label dependencies, and no agent label?"}
   labels -->|no| stop[Stop with no change]
   labels -->|yes| assess[Assess the bump with the skill dependency-pr-review]
-  assess --> ci{Are the checks green?}
-  ci -->|red| cause{Did the bump cause it, and can the agent fix it?}
+  assess --> ci{State of the checks}
+  ci -->|green| verdict{Verdict}
+  ci -->|red| cause{"Did the bump cause it, is the fix in scope, and is it attempt 1 or 2?"}
   cause -->|yes| fix[Push a fix to the PR branch]
   fix --> ci
-  cause -->|no| handoff[Add human-required and the section Hand-off to the report]
-  ci -->|green| verdict{Verdict}
-  verdict -->|safe to merge| report[Post one report comment, add ai-assisted, and send the Slack message]
-  verdict -->|gap or do not merge| handoff
+  cause -->|no| handoff["Remove ai-assisted, add human-required, then file the Jira ticket or write the Hand-off section"]
+  ci -->|timed out or held| handoff
+  verdict -->|safe to merge, or safe with a gap| report[Post one report comment and add ai-assisted]
+  verdict -->|do not merge, break caused by the bump| handoff
   report --> merge[A person reads the report and merges]
-  handoff --> ticket[A person logs the Jira ticket and finishes the PR]
+  handoff --> finish[A person finishes the PR]
 ```
 
-The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, never edits a lockfile by hand, and never files a Jira ticket. To run the agent again, remove the labels `ai-assisted` and `human-required`. Then convert the PR to a draft. Then mark it ready for review.
+The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, and never edits a lockfile by hand. The PR run posts no Slack message. To run the agent again, remove the agent label. Then convert the PR to a draft. Then mark it ready for review.
 
 ## The daily findings run
 
-The cron automation `connectors-vulna-patchy` runs the same skill in mode `findings` at 05:00 UTC. It reads the Trivy findings, opens fix PRs, and then does the same assess, fix, report, and hand-off steps for each PR. See [Patch a finding](./image-vulnerabilities.md#patch-a-finding).
+The cron automation `connectors-vulna-patchy` runs the same skill in mode `findings` at 05:00 UTC. It reads the Trivy findings and skips a package that an open PR with the label `dependencies` already changes. It opens each fix PR with the labels `dependencies` and `ai-assisted`, so the PR automation stops at its entry check. Then it does the same assess, fix, report, and hand-off steps for each PR. It posts one Slack message with the PR URLs and the status, or with the reason to stop. See [Patch a finding](./image-vulnerabilities.md#patch-a-finding).
 
 ## Hand-off
 
-The agent hands off when the verdict is "do not merge" or "safe with a gap". It also hands off when it cannot fix a red CI. The report comment gets the section "Hand-off: log a Jira ticket". The section lists the next steps. The agent has no Jira access, so a person logs the ticket and finishes the work.
+The agent hands off when it cannot finish the PR. These causes give the label `human-required`:
+
+- The bump caused a breaking change that we use.
+- The CI is red after 2 fix attempts.
+- The CI timed out, or a run waits for approval.
+- The cause is unclear, or the fix is outside the PR scope.
+
+The agent removes `ai-assisted` first, so a PR never has both labels. With a Jira tool, the agent files one ticket and writes the key in the report. The project is `UN` and the component is `mcp-servers`. Without the tool, the report gets the section "Hand-off: log a Jira ticket", and a person logs the ticket. The verdicts "safe to merge" and "safe with a gap" give `ai-assisted`.
 
 ## Review a dependency PR
 
@@ -137,14 +145,14 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 | Update the branch by a rebase | Run `gh pr update-branch <number> --rebase`. This rewrites the branch. |
 | Fix a conflict in a lock file | Check out the PR and merge or rebase `main`. Regenerate the lock file with `pnpm install --lockfile-only` or `uv lock`. Never edit it by hand. After a rebase, push with `git push --force-with-lease`. |
 | Rebuild a PR that has no agent label and no commit from a person | Wait for the next nightly run. It rebuilds the branch when the branch is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open new PRs. |
-| Rebuild a PR and drop every commit on it | Remove the labels `ai-assisted` and `human-required`. Check out the PR. Reset the branch to the first commit, the one by `github-actions[bot]`. Push with `git push --force-with-lease`. Then rebuild as in the row above. |
+| Rebuild a PR and drop every commit on it | Remove the agent label. Check out the PR. Reset the branch to the first commit, the one by `github-actions[bot]`. Push with `git push --force-with-lease`. Then rebuild as in the row above. |
 | Keep your own commits on a PR | Push the commit. The job sees a commit from a person and only merges `main` into the branch. |
 
 ## Each day
 
 1. Read the issue with the label `dependency-dashboard`. The nightly job updates it. It lists the plan and the open dependency PRs. You can also run `gh pr list --label dependencies --state open`.
-2. If a PR has the label `ai-assisted` and not `human-required`, read the report in its comment. Then merge the PR.
-3. If a PR has the label `human-required`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
+2. If a PR has the label `ai-assisted`, read the report in its comment. Then merge the PR.
+3. If a PR has the label `human-required`, read the report. If it has the section "Hand-off: log a Jira ticket", log the Jira ticket. Then finish the work.
 4. If a PR has no agent label and a green CI, run the review by hand. See [Review a dependency PR](#review-a-dependency-pr).
 5. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
 6. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
@@ -156,7 +164,7 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 
 | Problem | What you see | What to do |
 |---|---|---|
-| The agent run crashes. | The PR has no label `ai-assisted`. | Run the agent again. |
+| The agent run crashes. | The PR has no agent label. | Run the agent again. |
 | A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 | The report says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |
 

@@ -66,8 +66,8 @@ flowchart LR
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
 | `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
 | `dependency-dashboard` | Nightly job | Person | The one issue that lists the plan and the open dependency PRs. |
-| `ai-assisted` | Agent | Agent, nightly job | The agent handled the PR and posted its report. |
-| `human-required` | Agent | Agent, nightly job, person | The agent cannot finish the PR. A person logs the Jira ticket and finishes the PR. |
+| `ai-assisted` | Agent | Agent, nightly job | An agent run owns the PR and posted its report. |
+| `human-required` | Agent | Agent, nightly job, person | The agent cannot finish the PR. It removes `ai-assisted` first, so a PR never has both labels. A person finishes the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
 | `title-exception` | Person | Gatekeeper title check | Skip the PR title check. |
 
@@ -88,11 +88,12 @@ flowchart LR
 | The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The check `release-gate` in the list `required_status_checks` of the ruleset code. See [The ruleset](./docs/security/code-vulnerabilities.md#the-ruleset). | A release PR cannot merge before the gate has run. Today the ruleset requires only `gatekeeper`. |
-| The two Cursor automation files in the monorepo. Apply them with the Cursor Terraform. See [Cursor automations](#cursor-automations). | Cursor needs access to this repository and to the Slack channel `C0C1PR9CNMP`. Without the automations, no agent run starts. |
+| The two Cursor automation files in the monorepo. Apply them with the Cursor Terraform. See [Cursor automations](#cursor-automations). | Cursor needs access to this repository. `connectors-vulna-patchy` also needs access to the Slack channel `C0C1PR9CNMP`. Without the automations, no agent run starts. |
+| A Jira tool for the Cursor automations. The site is `unique-ch.atlassian.net` and the project is `UN`. | With the tool, the agent files one ticket for a PR with the label `human-required`. Without it, a person logs the ticket. |
 
 ## Cursor automations
 
-The monorepo defines the two automations in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. Both use the repository `Unique-AG/connectors`, the branch `main`, and the Slack channel `C0C1PR9CNMP`. Memory is off.
+The monorepo defines the two automations in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. Both use the repository `Unique-AG/connectors` and the branch `main`. Memory is off. Only `connectors-vulna-patchy` has a Slack action, on the channel `C0C1PR9CNMP`. The PR automation has no Slack action.
 
 | Name | Trigger | Prompt |
 |---|---|---|
