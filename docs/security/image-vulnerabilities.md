@@ -29,7 +29,7 @@ These rules follow the policy page "Vulnerability Patch Management Process".
 - A release needs no fixable critical or high finding.
 - A finding with no fix is visible. It does not block.
 - A fix younger than 3 days does not count.
-- The age of a fix is its registry date. If that date is not available, it is the date of the advisory. If both are not available, the finding blocks.
+- The age of a fix comes from the package registry. If the registry does not answer after one retry, the age is unknown and the finding blocks the release. For operating system packages, the date of the advisory is the age, because they have no registry lookup.
 
 ## The release gate
 
@@ -73,7 +73,7 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
 

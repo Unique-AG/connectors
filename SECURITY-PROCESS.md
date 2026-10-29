@@ -62,7 +62,7 @@ flowchart LR
 
 | Label | Set by | Read by | Meaning |
 |---|---|---|---|
-| `dependencies` | Nightly job | PR automation, gatekeeper title check, person | The PR comes from the nightly job. |
+| `dependencies` | Nightly job | PR automation, person | The PR comes from the nightly job. |
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
 | `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
 | `dependency-dashboard` | Nightly job | Person | The one issue that lists the plan and the open dependency PRs. |

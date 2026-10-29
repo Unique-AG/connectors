@@ -14,13 +14,13 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
-| Limit | None. The job opens a PR for every update it finds. |
+| Limit | 250 PRs in one night, because GitHub allows only 256 jobs in a matrix. The job opens a PR for every update it finds, up to this number. The other updates wait for the next night. The job summary lists them under "Left for the next night". |
 | Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
 | Merge | A person merges. The agent never merges. See [One agent run for every PR](#one-agent-run-for-every-pr). |
 
 Our policy pins every GitHub Action to a commit, so a moved tag cannot change a workflow. But the job reads the commit from a tag when it opens a PR. A publisher can move a tag after the release is old enough. So the job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
 
-A package build can run code. The `uv` tool builds a package that has no wheel. So a first job makes the update with no secret and saves a patch. A second job applies the patch to a fresh checkout and checks that the patch changes only the files of that ecosystem. Only then does it create the App token and push.
+A package build can run code. The `uv` tool builds a package that has no wheel. So a first job makes the update with no secret and saves a patch. A second job applies the patch to a fresh checkout and checks that the patch changes only the files of that ecosystem. Only then does it create the App token and push. The second job builds the PR title and body itself, from the plan and the patched files. The patch is the only thing that it takes from the first job.
 
 A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. The job also opens no PR until the GitHub App exists. See [Setup that needs an admin](../../SECURITY-PROCESS.md#setup-that-needs-an-admin).
 
