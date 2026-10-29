@@ -1,7 +1,9 @@
 """Sets up the local Confluence Data Center and fills it with test content.
 
-Runs on every `docker compose up`. A fresh volume gets the setup wizard; a set-up
-instance gets its timebomb license applied again, which restarts the 3 hours.
+A fresh volume gets the setup wizard; a set-up instance can get a new license.
+In a terminal (`docker compose run --rm seed`) it asks for a license key and
+prints where to get one. Without a key, or without a terminal (`up -d`), it uses
+Atlassian's 3-hour timebomb license, and never replaces a license you pasted.
 Content is only created when missing, so running it again is safe.
 """
 
@@ -22,10 +24,7 @@ ADMIN_USER = "admin"
 ADMIN_PASSWORD = os.environ["CONFLUENCE_ADMIN_PASSWORD"]
 SPACE_KEY = "TEST"
 
-LICENSE_KEY = os.environ.get("CONFLUENCE_LICENSE_KEY")
-if not LICENSE_KEY:
-    with open(os.path.join(os.path.dirname(__file__), "timebomb-license.txt")) as file:
-        LICENSE_KEY = file.read().strip()
+TIMEBOMB_LICENSE_PATH = os.path.join(os.path.dirname(__file__), "timebomb-license.txt")
 
 # 1x1 transparent PNG.
 PNG_BYTES = base64.b64decode(
@@ -69,10 +68,7 @@ PAGES = [
 
 # Setup wizard: page path -> (form action, fields).
 SETUP_STEPS = {
-    "/setup/setuplicense.action": (
-        "/setup/dosetuplicense.action",
-        {"confLicenseString": LICENSE_KEY},
-    ),
+    "/setup/setuplicense.action": ("/setup/dosetuplicense.action", {}),
     "/setup/setupcluster-start.action": (
         "/setup/setupcluster.action",
         {"newCluster": "skipCluster"},
@@ -121,6 +117,40 @@ def atl_token(page):
     return match.group(1) if match else ""
 
 
+def ask_for_license(page, has_license):
+    """Returns the key to apply, or "" to keep the current license."""
+    if os.environ.get("CONFLUENCE_LICENSE_KEY"):
+        return os.environ["CONFLUENCE_LICENSE_KEY"].strip()
+
+    replaceable = not has_license or "Test license" in page
+    fallback = (
+        "use the 3-hour timebomb license" if replaceable else "keep the current license"
+    )
+    key = ""
+    if sys.stdin.isatty():
+        server_id = re.search(r"\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}\b", page)
+        url = "https://my.atlassian.com/license/evaluation?product=Confluence"
+        if server_id:
+            url += f"&sid={server_id.group(0)}"
+        print(
+            f"\nGet a free 30-day Data Center trial license here:\n  {url}\n"
+            "Paste the key, then press Enter on an empty line.\n"
+            f"Or press Enter right away to {fallback}.",
+            flush=True,
+        )
+        lines = []
+        for line in sys.stdin:
+            if not line.strip():
+                break
+            lines.append(line.strip())
+        key = "".join(lines)
+
+    if key or not replaceable:
+        return key
+    with open(TIMEBOMB_LICENSE_PATH) as file:
+        return file.read().strip()
+
+
 def wait_for_confluence():
     for _ in range(120):
         try:
@@ -145,6 +175,8 @@ def run_setup_wizard():
             return
         log(f"setup step {step}")
         action, fields = SETUP_STEPS[step]
+        if step == "/setup/setuplicense.action":
+            fields = {"confLicenseString": ask_for_license(page, has_license=False)}
         next_step, page = browse(action, {**fields, "atl_token": atl_token(page)})
         if next_step == step:
             log("waiting for Confluence to finish the last step")
@@ -154,7 +186,7 @@ def run_setup_wizard():
     sys.exit("[seed] setup did not finish")
 
 
-def renew_license():
+def update_license():
     _, page = browse("/login.action")
     browse(
         "/dologin.action",
@@ -168,15 +200,19 @@ def renew_license():
         "/doauthenticate.action",
         {"password": ADMIN_PASSWORD, "destination": "/admin/license.action"},
     )
+    key = ask_for_license(page, has_license=True)
+    if not key:
+        log("kept the current license")
+        return
     _, page = browse(
         "/admin/doupdatelicense.action",
-        {"licenseString": LICENSE_KEY, "atl_token": atl_token(page)},
+        {"licenseString": key, "atl_token": atl_token(page)},
     )
     if "aui-message-error" in page:
         sys.exit(
             "[seed] license update failed, check http://localhost:8090/admin/license.action"
         )
-    log("license applied again, valid for the next 3 hours")
+    log("license applied")
 
 
 def api(method, path, payload=None, headers=None):
@@ -260,7 +296,7 @@ def main():
     if wait_for_confluence() == "FIRST_RUN":
         run_setup_wizard()
     else:
-        renew_license()
+        update_license()
 
     ensure_space()
     ids = {}

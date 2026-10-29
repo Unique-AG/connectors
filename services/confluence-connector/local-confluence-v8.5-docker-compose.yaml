@@ -42,8 +42,7 @@ services:
       retries: 20
       start_period: 120s
 
-  # Runs once per `up`: sets Confluence up on a fresh volume, renews the 3-hour
-  # timebomb license otherwise, and creates the test space and pages if missing.
+  # Sets Confluence up and creates the test content. See local-confluence/seed.py.
   seed:
     image: atlassian/confluence:8.5.18
     entrypoint: ["python3", "/seed/seed.py"]
