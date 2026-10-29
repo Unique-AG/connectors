@@ -4,15 +4,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict
 
-# Callback hosts of the hosted MCP clients we support. Sources:
-# - claude.ai, claude.com: https://claude.com/docs/connectors/building/authentication#callback-urls
-#   (`https://claude.ai/api/mcp/auth_callback`, announced to move to claude.com)
-# - chatgpt.com: https://developers.openai.com/apps-sdk/build/auth
-#   (`/connector_platform_oauth_redirect` and `/connector/oauth/{callback_id}`)
-# - cursor.com, www.cursor.com: Cursor registers its cloud callback
-#   `https://www.cursor.com/agents/mcp/oauth/callback` alongside its loopback and `cursor://` ones
-# - vscode.dev, insiders.vscode.dev: VS Code registers `https://vscode.dev/redirect` and
-#   `https://insiders.vscode.dev/redirect` alongside its loopback one
+# Callback hosts of the hosted MCP clients we support; sources are in
+# services/backstop-mcp/docs/operator/authentication.md ("Which Clients Can Connect").
 DEFAULT_ALLOWED_REDIRECT_HOSTS: tuple[str, ...] = (
     "claude.ai",
     "claude.com",
@@ -23,9 +16,8 @@ DEFAULT_ALLOWED_REDIRECT_HOSTS: tuple[str, ...] = (
     "insiders.vscode.dev",
 )
 
-# Private-use URI schemes (RFC 8252 §7.1) that open a desktop app. Cursor registers
-# `cursor://anysphere.cursor-mcp/oauth/callback` in the same request as its loopback URI, so the
-# whole registration fails without it.
+# Cursor registers its `cursor://` callback together with its loopback one, so the whole
+# registration fails without this private-use scheme (RFC 8252 §7.1).
 DEFAULT_ALLOWED_REDIRECT_SCHEMES: tuple[str, ...] = ("cursor",)
 
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
