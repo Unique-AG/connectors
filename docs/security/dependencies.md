@@ -46,7 +46,7 @@ flowchart TD
   handoff --> finish[A person finishes the PR]
 ```
 
-The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, and never edits a lockfile by hand. The PR run posts no Slack message. To run the agent again, remove the agent label. Then convert the PR to a draft. Then mark it ready for review.
+The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, and never edits a lockfile by hand. The PR run posts no Slack message. To run the agent again, remove the agent label. Then start an agent session in this repository and say: "Run the skill `vulna-squash` in mode `pr` for PR <number>". Do not close the PR, because a closed PR skips that version.
 
 ## The daily findings run
 
@@ -164,7 +164,8 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 
 | Problem | What you see | What to do |
 |---|---|---|
-| The agent run crashes. | The PR has no agent label. | Run the agent again. |
+| The agent run crashes. | The PR has no agent label. | Run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
+| A fix PR from the agent and a nightly PR change the same package. | Both PRs conflict, or one has a conflict after the other merges. | Merge the PR that has the fix. Then close the other PR. A closed PR skips only its own target versions. |
 | A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 | The report says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |
 
