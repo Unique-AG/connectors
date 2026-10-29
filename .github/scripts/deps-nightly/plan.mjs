@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
 import { classifyOpenPull, entryKey } from './state.mjs';
 import {
@@ -10,6 +11,7 @@ import {
 } from './versions.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MATRIX_LIMIT = 250;
 
 function matchesPattern(pattern, name) {
   return new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`).test(
@@ -87,14 +89,32 @@ function eligibleLatest(pypi, now, cooldownDays) {
   return versions.length > 0 ? newestVersion(versions) : undefined;
 }
 
+async function pypiOrUndefined(fetchPypi, name) {
+  try {
+    return await fetchPypi(name);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function latestEligibleVersions(names, fetchPypi, now, cooldownDays) {
-  const pairs = await Promise.all(
-    names.map(async (name) => [
-      name,
-      eligibleLatest((await fetchPypi(name)) ?? {}, now, cooldownDays),
-    ]),
+  const answers = await Promise.all(
+    names.map(async (name) => ({ name, pypi: await pypiOrUndefined(fetchPypi, name) })),
   );
-  return new Map(pairs.filter(([, version]) => version !== undefined));
+  const pairs = answers.map(({ name, pypi }) => [
+    name,
+    eligibleLatest(pypi ?? {}, now, cooldownDays),
+  ]);
+  return {
+    latest: new Map(pairs.filter(([, version]) => version !== undefined)),
+    needsPerson: answers
+      .filter(({ pypi }) => !pypi)
+      .map(({ name }) => ({
+        ecosystem: 'uv',
+        name,
+        reason: `PyPI did not answer for ${name}.`,
+      })),
+  };
 }
 
 export function uvCandidates({ projects, latest }) {
@@ -177,6 +197,17 @@ function slugOf(ecosystem, name) {
     .replace(/^-+|-+$/g, '')}`;
 }
 
+const shortHash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 6);
+
+function separateSlugs(seeds) {
+  const sharing = Map.groupBy(seeds, ({ entry }) => entry.slug);
+  return seeds.map(({ base, entry }) =>
+    sharing.get(entry.slug).length > 1
+      ? { ...entry, slug: `${entry.slug}-${shortHash(base)}` }
+      : entry,
+  );
+}
+
 function isIgnored(rules, candidate) {
   return rules.some(
     ({ ecosystem, name, updateTypes }) =>
@@ -209,16 +240,14 @@ export function buildPlan({
       );
     },
   );
-  const entries = [...buckets].map(([bucket, members]) => {
+  const seeds = [...buckets].map(([bucket, members]) => {
     const [, kind, groupName, major] = JSON.parse(bucket);
     const isGroup = kind === 'group' && members.length > 1;
     const name = isGroup ? groupName : members[0].name;
+    const base = kind === 'group' ? `${groupName}${major ? '-major' : ''}` : name;
     const entry = {
       ecosystem: members[0].ecosystem,
-      slug: slugOf(
-        members[0].ecosystem,
-        kind === 'group' ? `${groupName}${major ? '-major' : ''}` : name,
-      ),
+      slug: slugOf(members[0].ecosystem, base),
       name,
       isGroup,
       members: members.map(({ name: memberName, from, to, direct, data }) => ({
@@ -229,8 +258,9 @@ export function buildPlan({
         ...(data ? { data } : {}),
       })),
     };
-    return { ...entry, key: entryKey(entry) };
+    return { base, entry };
   });
+  const entries = separateSlugs(seeds).map((entry) => ({ ...entry, key: entryKey(entry) }));
   const ordered = entries.sort(
     (a, b) =>
       Number(b.members.some(({ direct }) => direct)) -
@@ -252,9 +282,12 @@ export function buildPlan({
   });
   const withAction = (action) =>
     decisions.flatMap(({ entry }) => (entry.action === action ? [entry] : []));
+  const allEntries = [...withAction('rebuild'), ...withAction('replace'), ...withAction('new')];
+  const allUpdates = withAction('update');
   return {
-    entries: [...withAction('rebuild'), ...withAction('replace'), ...withAction('new')],
-    updates: withAction('update'),
+    entries: allEntries.slice(0, MATRIX_LIMIT),
+    updates: allUpdates.slice(0, MATRIX_LIMIT),
+    deferred: [...allEntries.slice(MATRIX_LIMIT), ...allUpdates.slice(MATRIX_LIMIT)],
     skipped: decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
     ignored,
     needsPerson,
@@ -268,10 +301,10 @@ function describe({ name, isGroup, members }) {
   return `${name}: ${members[0].from} -> ${members[0].to}`;
 }
 
-const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR' };
+const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR', update: 'merge main' };
 
 export function renderSummary(
-  { entries, updates = [], skipped, ignored = [], needsPerson },
+  { entries, updates = [], deferred = [], skipped, ignored = [], needsPerson },
   modeNote,
 ) {
   const section = (title, items) =>
@@ -290,6 +323,7 @@ export function renderSummary(
       'Branches that get main merged in',
       updates.map((entry) => `${entry.ecosystem} ${entry.name} (#${entry.number})`),
     ),
+    ...section('Left for the next night (GitHub allows 256 jobs in a matrix)', deferred.map(line)),
     ...section(
       'Skipped',
       skipped.map((entry) => `${entry.ecosystem} ${entry.name}: ${entry.reason}`),

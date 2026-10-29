@@ -28,3 +28,9 @@ export function classifyOpenPull({ key, pull }) {
   const touched = pull.humanCommits || pull.labels.some((label) => AGENT_LABELS.includes(label));
   return touched ? 'update' : 'rebuild';
 }
+
+export const closedBodiesOf = (pages) =>
+  pages
+    .flatMap((page) => page.data.repository.pullRequests.nodes)
+    .filter(({ labels }) => !labels.nodes.some(({ name }) => name === 'superseded'))
+    .map(({ body }) => body);

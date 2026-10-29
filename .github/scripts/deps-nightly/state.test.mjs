@@ -1,6 +1,13 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { classifyOpenPull, closedKeysOf, entryKey, markerKeyOf, markerOf } from './state.mjs';
+import {
+  classifyOpenPull,
+  closedBodiesOf,
+  closedKeysOf,
+  entryKey,
+  markerKeyOf,
+  markerOf,
+} from './state.mjs';
 
 const entry = (to) => ({
   slug: 'npm-nestjs',
@@ -57,5 +64,22 @@ describe('classifyOpenPull', () => {
   it('replaces a pull request for other versions, and one with no marker', () => {
     assert.strictEqual(classifyOpenPull({ key: entryKey(entry('11.3.0')), pull }), 'replace');
     assert.strictEqual(classifyOpenPull({ key, pull: { ...pull, body: '' } }), 'replace');
+  });
+});
+
+describe('closedBodiesOf', () => {
+  const node = (body, ...labels) => ({ body, labels: { nodes: labels.map((name) => ({ name })) } });
+  const page = (...nodes) => ({ data: { repository: { pullRequests: { nodes } } } });
+
+  it('joins the bodies of every page and drops the superseded ones', () => {
+    const pages = [
+      page(node('a', 'dependencies'), node('b', 'dependencies', 'superseded')),
+      page(node('c', 'dependencies'), node(null, 'dependencies')),
+    ];
+    assert.deepStrictEqual(closedBodiesOf(pages), ['a', 'c', null]);
+  });
+
+  it('returns nothing for no pages', () => {
+    assert.deepStrictEqual(closedBodiesOf([]), []);
   });
 });
