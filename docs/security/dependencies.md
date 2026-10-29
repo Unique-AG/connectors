@@ -14,7 +14,7 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
-| Cap | At most 5 new PRs each night, and at most 15 open PRs |
+| Limit | None. The job opens a PR for every update it finds. |
 | Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
 | Merge | A person reviews the PR, then merges it. See [Review a dependency PR](#review-a-dependency-pr). |
 
@@ -105,7 +105,7 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 | Update the branch from `main` and keep the commits | Click "Update branch" in the PR, or run `gh pr update-branch <number>`. This merges `main` into the branch. |
 | Update the branch by a rebase | Run `gh pr update-branch <number> --rebase`. This rewrites the branch. |
 | Fix a conflict in a lock file | Check out the PR and merge or rebase `main`. Regenerate the lock file with `pnpm install --lockfile-only` or `uv lock`. Never edit it by hand. After a rebase, push with `git push --force-with-lease`. |
-| Rebuild a PR that has no commit from a person | Wait for the next nightly run. It rebuilds the branch when the branch is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open up to 5 new PRs. |
+| Rebuild a PR that has no commit from a person | Wait for the next nightly run. It rebuilds the branch when the branch is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open new PRs. |
 | Rebuild a PR and drop your own commits | Check out the PR. Reset the branch to the first commit, the one by `github-actions[bot]`. Push with `git push --force-with-lease`. Then rebuild as in the row above. |
 | Keep your own commits on a PR | Push the commit. The job sees a commit from a person and only merges `main` into the branch. |
 
