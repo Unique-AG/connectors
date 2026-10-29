@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
+import { addLogSecrets } from '@unique-ag/logger';
 import {
   isPermanentUpstreamOAuthError,
   isUpstreamCredentialRevokedError,
@@ -86,12 +87,15 @@ export class TokenProvider implements AuthenticationProvider {
     assert.ok(userProfile, `User profile not found: ${this.userProfileId}`);
     assert.ok(userProfile.accessToken, `Access token not found for user: ${this.userProfileId}`);
 
-    const decrypedAccessToken = this.encryptionService.decryptFromString(userProfile.accessToken);
+    const accessToken = this.encryptionService
+      .decryptFromString(userProfile.accessToken)
+      .toString('utf-8');
+    addLogSecrets([accessToken]);
 
     // Return the access token directly
     // If the token is expired, the Microsoft Graph SDK will handle the error
     // when making actual API calls, and you can implement retry logic there
-    return decrypedAccessToken.toString('utf-8');
+    return accessToken;
   }
 
   public async refreshAccessToken(userProfileId: string): Promise<string> {
@@ -101,7 +105,10 @@ export class TokenProvider implements AuthenticationProvider {
 
     assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
 
-    const decrypedRefreshToken = this.encryptionService.decryptFromString(userProfile.refreshToken);
+    const refreshToken = this.encryptionService
+      .decryptFromString(userProfile.refreshToken)
+      .toString('utf-8');
+    addLogSecrets([refreshToken]);
 
     try {
       // Microsoft OAuth2 token refresh endpoint
@@ -112,7 +119,7 @@ export class TokenProvider implements AuthenticationProvider {
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: decrypedRefreshToken.toString('utf-8'),
+          refresh_token: refreshToken,
           client_id: this.clientId,
           client_secret: this.clientSecret,
           scope: this.scopes.join(' '),
@@ -156,6 +163,10 @@ export class TokenProvider implements AuthenticationProvider {
       }
 
       const tokenData = TokenRefreshResponseSchema.parse(await response.json());
+      addLogSecrets([
+        tokenData.access_token,
+        ...(tokenData.refresh_token ? [tokenData.refresh_token] : []),
+      ]);
 
       const tenant = authorizeTenant(tokenData.access_token, this.allowedTenantIds);
       if (!tenant.allowed) {
