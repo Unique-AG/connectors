@@ -16,7 +16,7 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Limit | None. The job opens a PR for every update it finds. |
 | Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
-| Merge | A person reviews the PR, then merges it. See [Review a dependency PR](#review-a-dependency-pr). |
+| Merge | A person merges. The agent never merges. See [One agent run for every PR](#one-agent-run-for-every-pr). |
 
 Our policy pins every GitHub Action to a commit, so a moved tag cannot change a workflow. But the job reads the commit from a tag when it opens a PR. A publisher can move a tag after the release is old enough. So the job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
 
@@ -24,9 +24,40 @@ A package build can run code. The `uv` tool builds a package that has no wheel. 
 
 A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. The job also opens no PR until the GitHub App exists. See [Setup that needs an admin](../../SECURITY-PROCESS.md#setup-that-needs-an-admin).
 
+## One agent run for every PR
+
+The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `connectors-dependency-pr-assess` starts it in mode `pr`. Its trigger is "Pull request opened". See [Cursor automations](../../SECURITY-PROCESS.md#cursor-automations).
+
+```mermaid
+flowchart TD
+  opened[Event: Pull request opened] --> labels{"Label dependencies, and no label ai-assisted or human-required?"}
+  labels -->|no| stop[Stop with no change]
+  labels -->|yes| assess[Assess the bump with the skill dependency-pr-review]
+  assess --> ci{Are the checks green?}
+  ci -->|red| cause{Did the bump cause it, and can the agent fix it?}
+  cause -->|yes| fix[Push a fix to the PR branch]
+  fix --> ci
+  cause -->|no| handoff[Add human-required and the section Hand-off to the report]
+  ci -->|green| verdict{Verdict}
+  verdict -->|safe to merge| report[Post one report comment, add ai-assisted, and send the Slack message]
+  verdict -->|gap or do not merge| handoff
+  report --> merge[A person reads the report and merges]
+  handoff --> ticket[A person logs the Jira ticket and finishes the PR]
+```
+
+The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, never edits a lockfile by hand, and never files a Jira ticket. To run the agent again, remove the labels `ai-assisted` and `human-required`. Then convert the PR to a draft. Then mark it ready for review.
+
+## The daily findings run
+
+The cron automation `connectors-vulna-patchy` runs the same skill in mode `findings` at 05:00 UTC. It reads the Trivy findings, opens fix PRs, and then does the same assess, fix, report, and hand-off steps for each PR. See [Patch a finding](./image-vulnerabilities.md#patch-a-finding).
+
+## Hand-off
+
+The agent hands off when the verdict is "do not merge" or "safe with a gap". It also hands off when it cannot fix a red CI. The report comment gets the section "Hand-off: log a Jira ticket". The section lists the next steps. The agent has no Jira access, so a person logs the ticket and finishes the work.
+
 ## Review a dependency PR
 
-A person reviews each dependency PR before the merge. The skill `dependency-pr-review` helps with this. It answers one question: does this version bump break our code? It starts from how we use the dependency, not from the changelog.
+The agent runs the skill `dependency-pr-review` first. A person can also run it by hand on a dependency PR. It answers one question: does this version bump break our code? It starts from how we use the dependency, not from the changelog.
 
 ```mermaid
 flowchart TD
@@ -62,7 +93,7 @@ flowchart TD
   same -->|no| replace[Label the old PR superseded, close it, and open a new PR]
   same -->|yes| behind{Is the branch behind main?}
   behind -->|no| keep[Do nothing]
-  behind -->|yes| touched{"A commit from a person on the branch?"}
+  behind -->|yes| touched{"Agent label, or a commit from a person?"}
   touched -->|yes| merge[Merge main into the branch and keep the commits]
   touched -->|no| rebuild[Rebuild the branch from main and update the PR body]
 ```
@@ -71,12 +102,12 @@ flowchart TD
 |---|---|
 | The target versions are the same, and the branch has all of `main` | Nothing. |
 | The target versions are the same and the branch is behind `main`. Nobody touched the PR. | It rebuilds the branch from `main` and updates the PR body. |
-| The target versions are the same, and a person pushed a commit to the PR | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
-| A target version changed | It labels the old PR `superseded`, closes it with a comment, and opens a new PR. |
+| The target versions are the same, and the PR has an agent label or a commit from a person | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
+| A target version changed | It labels the old PR `superseded`, closes it with a comment, and opens a new PR. The new PR starts a new agent run. |
 | A person closed the PR without a merge | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
 | A person merged the PR | Nothing. The plan finds no update. |
 
-A PR with a commit from a person keeps that commit, because a rebuild from `main` deletes it.
+Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A touched PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
 
 ## Ignore a dependency
 
@@ -105,16 +136,18 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 | Update the branch from `main` and keep the commits | Click "Update branch" in the PR, or run `gh pr update-branch <number>`. This merges `main` into the branch. |
 | Update the branch by a rebase | Run `gh pr update-branch <number> --rebase`. This rewrites the branch. |
 | Fix a conflict in a lock file | Check out the PR and merge or rebase `main`. Regenerate the lock file with `pnpm install --lockfile-only` or `uv lock`. Never edit it by hand. After a rebase, push with `git push --force-with-lease`. |
-| Rebuild a PR that has no commit from a person | Wait for the next nightly run. It rebuilds the branch when the branch is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open new PRs. |
-| Rebuild a PR and drop your own commits | Check out the PR. Reset the branch to the first commit, the one by `github-actions[bot]`. Push with `git push --force-with-lease`. Then rebuild as in the row above. |
+| Rebuild a PR that has no agent label and no commit from a person | Wait for the next nightly run. It rebuilds the branch when the branch is behind `main`. To run it now, run `gh workflow run deps-nightly.yaml -f dry-run=false`. This run can also open new PRs. |
+| Rebuild a PR and drop every commit on it | Remove the labels `ai-assisted` and `human-required`. Check out the PR. Reset the branch to the first commit, the one by `github-actions[bot]`. Push with `git push --force-with-lease`. Then rebuild as in the row above. |
 | Keep your own commits on a PR | Push the commit. The job sees a commit from a person and only merges `main` into the branch. |
 
 ## Each day
 
 1. Read the issue with the label `dependency-dashboard`. The nightly job updates it. It lists the plan and the open dependency PRs. You can also run `gh pr list --label dependencies --state open`.
-2. For each PR with a green CI, run the review, as in [Review a dependency PR](#review-a-dependency-pr). Merge the PR when the verdict is "safe to merge".
-3. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
-4. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
+2. If a PR has the label `ai-assisted` and not `human-required`, read the report in its comment. Then merge the PR.
+3. If a PR has the label `human-required`, read the section "Hand-off: log a Jira ticket" in its report comment. Log the Jira ticket, then finish the work.
+4. If a PR has no agent label and a green CI, run the review by hand. See [Review a dependency PR](#review-a-dependency-pr).
+5. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
+6. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
 
 
 Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the root `package.json`. A pin holds a dependency at one version, so the nightly job cannot move it.
@@ -123,8 +156,9 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 
 | Problem | What you see | What to do |
 |---|---|---|
-| A PR with a commit from a person has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
-| The review says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |
+| The agent run crashes. | The PR has no label `ai-assisted`. | Run the agent again. |
+| A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
+| The report says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |
 
 ## Dependency review
 
@@ -165,7 +199,8 @@ A lock file alert closes when the fixed lock file reaches `main`. It does not ne
 | File | What it holds |
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
-| `agentic/skills/dependency-pr-review/SKILL.md` | The skill for the manual review of a dependency PR |
+| `agentic/skills/vulna-squash/SKILL.md` | The skill that handles every dependency PR in one run |
+| `agentic/skills/dependency-pr-review/SKILL.md` | The skill for the review of a dependency PR |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan, including the lock files of `main` |
 | `.github/workflows/security-pinned-actions.yaml` | The check that an action is pinned to a commit |

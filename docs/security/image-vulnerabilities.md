@@ -12,8 +12,8 @@ flowchart LR
   gate -->|clean or skip label| publish[Image published]
   publish --> scan[Nightly scan of published images]
   scan --> slack[Slack report with image tag and CVE]
-  slack --> person[A person opens fix PRs]
-  person --> releasePr
+  slack --> patch[Daily patch run opens fix PRs]
+  patch --> releasePr
 ```
 
 ## Rules
@@ -108,13 +108,13 @@ The nightly Slack report is the list of images that still need a release.
 
 ## Patch a finding
 
-A person reads the Slack report each day and opens the fix PRs. A critical or high finding must ship within 1 month.
+The cron automation `connectors-vulna-patchy` starts the skill `vulna-squash` in mode `findings` at 05:00 UTC. It runs after the 03:00 scan. The skill opens fix PRs for the findings. A person merges them, and a critical or high finding must ship within 1 month. For each PR, see [One agent run for every PR](./dependencies.md#one-agent-run-for-every-pr).
 
 ```mermaid
 flowchart LR
   scan[Nightly scan] --> slack[Slack report with image tag and CVE]
-  slack --> person[A person reads the report]
-  person --> fix[A fix PR, or the Rebuild Service workflow]
+  scan --> agent[Agent reads the findings at 05:00]
+  agent --> fix[Fix PR with an agent run]
   fix --> release[Release PR and release gate]
 ```
 
@@ -122,7 +122,7 @@ Use this table to find the fix for each cause.
 
 | Cause | Fix |
 |---|---|
-| A Python or Node dependency | The nightly dependency PR, or a PR that a person opens |
+| A Python or Node dependency | The nightly dependency PR, or a fix PR from the patch run |
 | An operating system package | Run the Rebuild Service workflow. The new build takes the patch. |
 | The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
@@ -142,4 +142,5 @@ Use this table to find the fix for each cause.
 | `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
+| `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date |
