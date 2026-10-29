@@ -89,7 +89,7 @@ async function planUv() {
       ),
     ),
   ];
-  const latest = await latestEligibleVersions(
+  const { latest, needsPerson: unanswered } = await latestEligibleVersions(
     pinnedNames,
     async (name) => {
       const response = await fetch(`https://pypi.org/pypi/${name}/json`);
@@ -98,7 +98,7 @@ async function planUv() {
     Date.now(),
     config.cooldownDays,
   );
-  return uvCandidates({
+  const { candidates, needsPerson } = uvCandidates({
     projects: folders.map((folder) => ({
       project: folder,
       pyproject: pyprojects[folder],
@@ -107,6 +107,7 @@ async function planUv() {
     })),
     latest,
   });
+  return { candidates, needsPerson: [...unanswered, ...needsPerson] };
 }
 
 function planFiles(pattern) {

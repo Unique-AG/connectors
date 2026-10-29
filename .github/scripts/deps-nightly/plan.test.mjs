@@ -80,7 +80,7 @@ describe('latestEligibleVersions', () => {
     },
   };
   const latestAt = async (now) => [
-    ...(await latestEligibleVersions(['a'], async () => pypi, now, 3)),
+    ...(await latestEligibleVersions(['a'], async () => pypi, now, 3)).latest,
   ];
 
   it('picks the newest stable release that is old enough and not yanked', async () => {
@@ -97,9 +97,29 @@ describe('latestEligibleVersions', () => {
       asked.push(name);
       return name === 'a' ? { releases: { '1.0.0': [file('2026-09-01T00:00:00Z')] } } : undefined;
     };
-    const latest = await latestEligibleVersions(['a', 'b'], fetchPypi, NOW, 3);
+    const { latest } = await latestEligibleVersions(['a', 'b'], fetchPypi, NOW, 3);
     assert.deepStrictEqual([...latest], [['a', '1.0.0']]);
     assert.deepStrictEqual(asked, ['a', 'b']);
+  });
+
+  it('puts a name that PyPI did not answer into needsPerson', async () => {
+    const fetchPypi = async (name) => {
+      if (name === 'down') {
+        throw new Error('network');
+      }
+      return name === 'missing' ? undefined : pypi;
+    };
+    const { latest, needsPerson } = await latestEligibleVersions(
+      ['a', 'missing', 'down'],
+      fetchPypi,
+      NOW,
+      3,
+    );
+    assert.deepStrictEqual([...latest], [['a', '1.1.0']]);
+    assert.deepStrictEqual(needsPerson, [
+      { ecosystem: 'uv', name: 'missing', reason: 'PyPI did not answer for missing.' },
+      { ecosystem: 'uv', name: 'down', reason: 'PyPI did not answer for down.' },
+    ]);
   });
 });
 
@@ -294,6 +314,77 @@ describe('buildPlan', () => {
     ]);
   });
 
+  it('gives colliding slugs a stable suffix and keeps the unique ones', () => {
+    const plan = () =>
+      buildPlan({
+        candidates: [
+          candidate('npm', '@babel/core'),
+          candidate('npm', 'babel-core'),
+          candidate('npm', 'zod'),
+        ],
+        needsPerson: [],
+        config,
+      });
+    const slugs = () => Object.fromEntries(plan().entries.map(({ name, slug }) => [name, slug]));
+    const bySlug = slugs();
+    assert.strictEqual(bySlug.zod, 'npm-zod');
+    assert.match(bySlug['@babel/core'], /^npm-babel-core-[0-9a-f]{6}$/);
+    assert.match(bySlug['babel-core'], /^npm-babel-core-[0-9a-f]{6}$/);
+    assert.notStrictEqual(bySlug['@babel/core'], bySlug['babel-core']);
+    assert.deepStrictEqual(slugs(), bySlug);
+  });
+
+  describe('with a matrix over the limit', () => {
+    const many = (count) =>
+      Array.from({ length: count }, (_, index) => candidate('npm', `pkg-${index}`));
+    const pull = (index, labels = []) => ({
+      number: index,
+      branch: `deps/npm-pkg-${index}`,
+      body: '',
+      labels,
+      behindBy: 1,
+      humanCommits: false,
+    });
+
+    it('keeps at most 250 entries and returns the rest as deferred', () => {
+      const { entries, updates, deferred } = buildPlan({
+        candidates: many(260),
+        needsPerson: [],
+        config,
+      });
+      assert.strictEqual(entries.length, 250);
+      assert.strictEqual(updates.length, 0);
+      assert.strictEqual(deferred.length, 10);
+    });
+
+    it('puts the existing pull requests first and defers the new ones', () => {
+      const { entries, deferred } = buildPlan({
+        candidates: many(260),
+        needsPerson: [],
+        config,
+        openPulls: Array.from({ length: 5 }, (_, index) => pull(255 + index)),
+      });
+      assert.deepStrictEqual(
+        entries.slice(0, 5).map(({ action }) => action),
+        Array(5).fill('replace'),
+      );
+      assert.ok(deferred.every(({ action }) => action === 'new'));
+    });
+
+    it('caps the updates too', () => {
+      const candidates = many(255);
+      const first = buildPlan({ candidates, needsPerson: [], config });
+      const openPulls = [...first.entries, ...first.deferred].map(({ key, name }, index) => ({
+        ...pull(index, ['ai-assisted']),
+        branch: `deps/npm-${name}`,
+        body: markerOf(key),
+      }));
+      const { updates, deferred } = buildPlan({ candidates, needsPerson: [], config, openPulls });
+      assert.strictEqual(updates.length, 250);
+      assert.strictEqual(deferred.length, 5);
+    });
+  });
+
   describe('with open pull requests', () => {
     const [zod] = buildPlan({
       candidates: [candidate('npm', 'zod')],
@@ -451,5 +542,24 @@ describe('renderSummary', () => {
     assert.match(summary, /### Pull requests for this run \(1\)\n\n- npm zod: 1 -> 2/);
     assert.match(summary, /### Needs a person \(1\)\n\n- uv fastmcp: A limit forbids it\./);
     assert.doesNotMatch(summary, /Skipped/);
+  });
+
+  it('lists what is left for the next night', () => {
+    const deferred = [
+      {
+        ecosystem: 'npm',
+        name: 'zod',
+        isGroup: false,
+        action: 'new',
+        members: [{ from: '1', to: '2' }],
+      },
+    ];
+    const summary = renderSummary({ entries: [], skipped: [], needsPerson: [], deferred }, '');
+    assert.match(
+      summary,
+      /### Left for the next night \(GitHub allows 256 jobs in a matrix\) \(1\)\n\n- npm zod: 1 -> 2/,
+    );
+    const none = renderSummary({ entries: [], skipped: [], needsPerson: [] }, '');
+    assert.doesNotMatch(none, /next night/);
   });
 });
