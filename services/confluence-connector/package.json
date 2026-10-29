@@ -20,7 +20,7 @@
     "codegen": "echo \"No codegen needed for this server\"",
     "style": "biome check .",
     "style:fix": "biome check . --write",
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc --noEmit && tsc --noEmit -p test",
     "check-all": "pnpm style:fix && pnpm check-types",
     "test": "vitest run",
     "test:watch": "vitest watch",
