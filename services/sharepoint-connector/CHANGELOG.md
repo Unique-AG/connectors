@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.4...sharepoint-connector@3.2.0) (2026-10-28)
+
+
+### Features
+
+* **sharepoint-connector,deps:** sync attachments of SharePoint list items ([#1288](https://github.com/Unique-AG/connectors/issues/1288)) ([e5ff6e5](https://github.com/Unique-AG/connectors/commit/e5ff6e5e23809070a2225fcdef7581ec8a6a4376))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** bump base chart for network policy sync-wave ordering ([#1307](https://github.com/Unique-AG/connectors/issues/1307)) ([8e9eba5](https://github.com/Unique-AG/connectors/commit/8e9eba588c9052ef87a356a0bd9c575170848ca2))
+* **main:** vulna squash MAJOR VERSION BUMP pillow 12.3.0 to 13.0.0 ([#1296](https://github.com/Unique-AG/connectors/issues/1296)) ([1704f7c](https://github.com/Unique-AG/connectors/commit/1704f7c9a36082c6deff1615b1dfbf3a55b48ac0))
+* **sharepoint-connector:** move edited-and-moved files and leftover files out of stale scopes ([#1185](https://github.com/Unique-AG/connectors/issues/1185)) ([a504a13](https://github.com/Unique-AG/connectors/commit/a504a13d5a716e0228e5f0946feb69d6c314d255))
+
+
+### Dependencies
+
+* **main:** refresh dependencies and drop unneeded overrides ([#1322](https://github.com/Unique-AG/connectors/issues/1322)) ([a4f2390](https://github.com/Unique-AG/connectors/commit/a4f239000fc35b5809f6c7b50c920ac3c8419ef9))
+
 ## [3.1.4](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.3...sharepoint-connector@3.1.4) (2026-10-23)
 
 

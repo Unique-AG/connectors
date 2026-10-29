@@ -102,10 +102,10 @@ Do this one time for each service.
 The pin in the app spec then looks like this:
 
 ```yaml
-targetRevision: dev/teams-mcp/main # x-teams-mcp-version: teams-mcp@0.4.12
+targetRevision: dev/teams-mcp/main # x-teams-mcp-version: rolling dev of main
 ```
 
-The comment keeps the release to return to.
+The comment shows that the pin has no fixed version.
 
 ## Run a dev build
 
