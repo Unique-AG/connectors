@@ -13,12 +13,8 @@ export interface FlowCookie {
 }
 
 /**
- * Binds an authorization flow to the browser that started it.
- *
- * `/auth/authorize` sets a signed cookie per OAuth session. The consent form and the provider
- * callback are only honoured when the same browser presents that cookie, so a link to a flow
- * that someone else started cannot be completed in a victim's browser. The CSRF token on the
- * consent form is derived from the cookie, so it is useless without it.
+ * Binds an authorization flow to the browser that started it with a signed cookie, from which
+ * the consent form's CSRF token is derived.
  */
 @Injectable()
 export class FlowBindingService {

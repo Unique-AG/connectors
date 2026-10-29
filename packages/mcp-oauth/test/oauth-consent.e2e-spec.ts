@@ -201,6 +201,48 @@ describe('OAuth consent (E2E)', () => {
       expect(location.searchParams.get('state')).toBe(CLIENT_STATE);
     });
 
+    it('signs in when the user submits the approval twice', async () => {
+      const page = await openPage();
+      const first = await submitConsent(app, page, 'approve');
+      const second = await submitConsent(app, page, 'approve');
+
+      expect(second.status).toBe(302);
+      // biome-ignore lint/style/noNonNullAssertion: asserted by the 302
+      const secondState = new URL(second.headers.location!).searchParams.get('state');
+      // biome-ignore lint/style/noNonNullAssertion: approval redirects
+      expect(new URL(first.headers.location!).searchParams.get('state')).toBe(secondState);
+
+      // biome-ignore lint/style/noNonNullAssertion: asserted by the 302
+      const response = await followProviderRedirect(app, second.headers.location!, page.cookie);
+
+      expect(response.status).toBe(302);
+      // biome-ignore lint/style/noNonNullAssertion: asserted by the 302
+      expect(new URL(response.headers.location!).searchParams.get('code')).toEqual(
+        expect.any(String),
+      );
+    });
+
+    it('signs in when two approvals arrive at the same time', async () => {
+      const page = await openPage();
+      const approvals = await Promise.all([
+        submitConsent(app, page, 'approve'),
+        submitConsent(app, page, 'approve'),
+      ]);
+
+      expect(approvals.map(({ status }) => status)).toEqual([302, 302]);
+      // biome-ignore lint/style/noNonNullAssertion: asserted by the 302
+      const [first, last] = approvals.map(({ headers }) => new URL(headers.location!));
+      expect(last?.searchParams.get('state')).toBe(first?.searchParams.get('state'));
+
+      const response = await followProviderRedirect(app, String(last), page.cookie);
+
+      expect(response.status).toBe(302);
+      // biome-ignore lint/style/noNonNullAssertion: asserted by the 302
+      expect(new URL(response.headers.location!).searchParams.get('code')).toEqual(
+        expect.any(String),
+      );
+    });
+
     it('rejects a provider redirect followed in a browser without the flow cookie', async () => {
       const attackerPage = await openPage();
       const approval = await submitConsent(app, attackerPage, 'approve');

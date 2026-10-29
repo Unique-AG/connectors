@@ -38,18 +38,14 @@ export class McpOAuthService {
   ) {}
 
   /**
-   * Signs the state sent to the identity provider. Until the user approves, the session holds a
-   * random state that no provider state can match, so the callback cannot skip the consent.
+   * Signs the provider state, derived from the session so a repeated approval yields the same one.
+   * Until approval the session holds a random state that no provider state can match.
    */
   public async approveConsent(session: OAuthSession): Promise<string> {
-    const sessionNonce = randomBytes(32).toString('base64url');
-    const sessionHmac = createHmac('sha256', this.options.hmacSecret)
-      .update(`${session.sessionId}:${sessionNonce}`)
-      .digest('base64url');
+    const sessionNonce = this.sign(`${session.sessionId}:consent-nonce`);
+    const sessionHmac = this.sign(`${session.sessionId}:${sessionNonce}`);
 
-    // The stores insert sessions without upserting, so replace the row.
-    await this.store.removeOAuthSession(session.sessionId);
-    await this.store.storeOAuthSession(session.sessionId, { ...session, state: sessionHmac });
+    await this.store.updateOAuthSessionState(session.sessionId, sessionHmac);
 
     return encodeProviderState({ sessionId: session.sessionId, sessionNonce, sessionHmac });
   }
@@ -107,10 +103,7 @@ export class McpOAuthService {
       throw new UnauthorizedException('Invalid state.');
     }
 
-    const expectedHmac = createHmac('sha256', this.options.hmacSecret)
-      .update(`${session.sessionId}:${sessionNonce}`)
-      .digest('base64url');
-    if (sessionHmac !== expectedHmac) {
+    if (sessionHmac !== this.sign(`${session.sessionId}:${sessionNonce}`)) {
       throw new UnauthorizedException('Invalid state validation.');
     }
 
@@ -539,6 +532,10 @@ export class McpOAuthService {
       msg: 'Token revocation attempted for non-existent or already revoked token',
       clientId: client_id,
     });
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.options.hmacSecret).update(payload).digest('base64url');
   }
 
   private validatePKCE(codeVerifier: string, codeChallenge: string, codeChallengeMethod: string) {
