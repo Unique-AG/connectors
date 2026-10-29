@@ -3,6 +3,7 @@ import { Socket } from 'node:net';
 import pinoHttp from 'pino-http';
 import { describe, expect, it } from 'vitest';
 import {
+  addLogSecrets,
   createSecretRedactor,
   JWT_PATTERN,
   MIN_SECRET_LENGTH,
@@ -313,6 +314,79 @@ describe('createSecretRedactor', () => {
 
       const line = parsedLines(lines)[0];
       expect(line?.msg).toBe('handled');
+      expect(line?.log_secrets_failed).toMatchObject({ name: 'TypeError' });
+    });
+  });
+
+  describe('secrets added partway', () => {
+    const mockUserToken = 'stored-user-token-1234';
+
+    it('redacts an added secret after the call that added it throws', () => {
+      const { logger, lines } = createCapturingLogger();
+      const loadCredential = () => {
+        addLogSecrets([mockUserToken]);
+        throw new Error(`upstream rejected ${mockUserToken}`);
+      };
+
+      runWithLogSecrets([], () => {
+        try {
+          loadCredential();
+        } catch (error) {
+          logger.warn({ err: error }, 'tool failed');
+        }
+      });
+
+      expect(lines[0]).not.toContain(mockUserToken);
+      expect(parsedLines(lines)[0]?.err).toMatchObject({
+        message: 'upstream rejected [Redacted]',
+      });
+    });
+
+    it('redacts a secret added in an awaited function from the lines its caller logs', async () => {
+      const { logger, lines } = createCapturingLogger();
+      const loadCredential = async () => {
+        await Promise.resolve();
+        addLogSecrets([mockUserToken]);
+      };
+
+      await runWithLogSecrets([], async () => {
+        await loadCredential();
+        logger.info(`loaded ${mockUserToken}`);
+      });
+
+      expect(parsedLines(lines)[0]?.msg).toBe('loaded [Redacted]');
+    });
+
+    it('ends with its scope', () => {
+      const { logger, lines } = createCapturingLogger();
+
+      runWithLogSecrets(['outer-secret-1'], () => {
+        runWithLogSecrets([], () => addLogSecrets(['inner-secret-2']));
+        logger.info('outer-secret-1 inner-secret-2');
+      });
+
+      expect(parsedLines(lines)[0]?.msg).toBe('[Redacted] inner-secret-2');
+    });
+
+    it('does nothing outside any scope', () => {
+      const { logger, lines } = createCapturingLogger();
+
+      addLogSecrets([mockUserToken]);
+      logger.info(mockUserToken);
+
+      expect(parsedLines(lines)[0]?.msg).toBe(mockUserToken);
+    });
+
+    it('names the error on the lines of its scope when the secrets cannot be added', () => {
+      const { logger, lines } = createCapturingLogger();
+
+      runWithLogSecrets([], () => {
+        addLogSecrets(undefined as unknown as string[]);
+        logger.info('loaded');
+      });
+
+      const line = parsedLines(lines)[0];
+      expect(line?.msg).toBe('loaded');
       expect(line?.log_secrets_failed).toMatchObject({ name: 'TypeError' });
     });
   });

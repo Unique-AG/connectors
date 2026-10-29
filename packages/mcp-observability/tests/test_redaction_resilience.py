@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from collections.abc import Iterator
 from typing import cast
+from typing import final
 from typing import override
 
 import pytest
@@ -17,6 +18,7 @@ from opentelemetry.trace import NonRecordingSpan
 from opentelemetry.trace import SpanContext
 
 from mcp_observability import PinoJsonFormatter
+from mcp_observability import add_log_secrets
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
 from mcp_observability.redaction import SecretRedactor
@@ -368,3 +370,24 @@ async def test_concurrent_contexts_stay_apart() -> None:
 
     assert json.loads(first)["msg"] == "[Redacted] second-context-secret"
     assert json.loads(second)["msg"] == "first-context-secret [Redacted]"
+
+
+@final
+class _UnmeasurableSecret(str):
+    __slots__ = ()
+
+    @override
+    def __len__(self) -> int:
+        raise TypeError(f"cannot measure {str.__str__(self)}")
+
+
+def test_a_secret_that_cannot_be_added_names_the_error_on_the_lines_of_its_scope() -> None:
+    line = '{"level": 30, "msg": "loaded"}'
+
+    with log_secrets():
+        add_log_secrets(_UnmeasurableSecret("secret-value-1234"))
+        redacted = cast("dict[str, object]", json.loads(SecretRedactor().redact_line(line)))
+
+    assert redacted["msg"] == "loaded"
+    assert cast("dict[str, str]", redacted["log_secrets_failed"])["name"] == "TypeError"
+    assert "secret-value-1234" not in json.dumps(redacted)
