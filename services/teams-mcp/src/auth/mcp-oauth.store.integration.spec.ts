@@ -1,5 +1,10 @@
+import { createHmac } from 'node:crypto';
 import path from 'node:path';
-import { type McpOAuthModuleOptions, OpaqueTokenService } from '@unique-ag/mcp-oauth';
+import {
+  type McpOAuthModuleOptions,
+  OpaqueTokenService,
+  type TokenPair,
+} from '@unique-ag/mcp-oauth';
 import type { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { Cache } from 'cache-manager';
@@ -7,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockCacheManager, MockEncryptionService } from '../__mocks__';
 import type { DrizzleDatabase } from '../drizzle/drizzle.module';
 import * as schema from '../drizzle/schema';
@@ -15,6 +20,7 @@ import { McpOAuthStore } from './mcp-oauth.store';
 
 const CONTAINER_STARTUP_TIMEOUT_MS = 120_000;
 const CLIENT_ID = 'client-a';
+const HMAC_SECRET = 'integration-hmac-secret';
 
 const tokenServiceOptions = {
   accessTokenExpiresIn: 3600,
@@ -28,9 +34,15 @@ function createPod(db: DrizzleDatabase) {
     new MockEncryptionService(),
     new MockCacheManager() as unknown as Cache,
     {} as AmqpConnection,
+    HMAC_SECRET,
   );
   return { store, tokenService: new OpaqueTokenService(tokenServiceOptions, store) };
 }
+
+type Pod = ReturnType<typeof createPod>;
+
+const hashToken = (token: string) =>
+  createHmac('sha256', HMAC_SECRET).update(`mcp-token:${token}`).digest('hex');
 
 describe('McpOAuthStore against Postgres: refresh token reuse', () => {
   let container: StartedPostgreSqlContainer;
@@ -121,11 +133,104 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     expect(results.filter(Boolean)).toHaveLength(1);
   });
 
+  async function expectNoUsableTokens(pod: Pod, tokenPairs: (TokenPair | null)[]) {
+    for (const tokenPair of tokenPairs) {
+      expect(await pod.tokenService.validateAccessToken(tokenPair?.access_token ?? '')).toBeNull();
+      expect(
+        await pod.tokenService.validateRefreshToken(tokenPair?.refresh_token ?? ''),
+      ).toBeNull();
+    }
+    expect(await db.select().from(schema.tokens)).toEqual([]);
+  }
+
+  it('leaves neither caller with usable tokens after two concurrent refreshes', async () => {
+    const podA = createPod(db);
+    const podB = createPod(db);
+    const initial = await issueInitialTokens(podA.tokenService);
+
+    const results = await Promise.all([
+      podA.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID),
+      podB.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID),
+    ]);
+
+    await expectNoUsableTokens(createPod(db), results);
+  });
+
+  it('revokes the winner of a concurrent refresh when the loser revoked the family before the winner stored its tokens', async () => {
+    const podA = createPod(db);
+    const podB = createPod(db);
+    const initial = await issueInitialTokens(podA.tokenService);
+    let loserResult: TokenPair | null = null;
+    const redeem = podA.store.redeemRefreshToken.bind(podA.store);
+    vi.spyOn(podA.store, 'redeemRefreshToken').mockImplementation(async (token) => {
+      const redeemed = await redeem(token);
+      loserResult = await podB.tokenService.refreshAccessToken(token, CLIENT_ID);
+      return redeemed;
+    });
+
+    const winnerResult = await podA.tokenService.refreshAccessToken(
+      initial.refresh_token,
+      CLIENT_ID,
+    );
+
+    expect(winnerResult).toBeNull();
+    expect(loserResult).toBeNull();
+    await expectNoUsableTokens(createPod(db), [winnerResult, loserResult]);
+  });
+
+  it('revokes the winner of a concurrent refresh when the loser revoked the family after the winner stored its tokens', async () => {
+    const podA = createPod(db);
+    const podB = createPod(db);
+    const initial = await issueInitialTokens(podA.tokenService);
+    let winnerResult: TokenPair | null = null;
+    const redeem = podB.store.redeemRefreshToken.bind(podB.store);
+    vi.spyOn(podB.store, 'redeemRefreshToken').mockImplementation(async (token) => {
+      winnerResult = await podA.tokenService.refreshAccessToken(token, CLIENT_ID);
+      return redeem(token);
+    });
+
+    const loserResult = await podB.tokenService.refreshAccessToken(
+      initial.refresh_token,
+      CLIENT_ID,
+    );
+
+    expect(winnerResult).not.toBeNull();
+    expect(loserResult).toBeNull();
+    // The winner's pod still has the new access token in its per-pod cache until that expires.
+    await expectNoUsableTokens(createPod(db), [winnerResult, loserResult]);
+  });
+
+  it('does not accept an unused refresh token as an access token', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+
+    expect(await pod.store.getAccessToken(initial.refresh_token)).toBeUndefined();
+    expect(await pod.tokenService.validateAccessToken(initial.refresh_token)).toBeNull();
+  });
+
+  it('does not accept a used refresh token as an access token', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    expect(await pod.store.getAccessToken(initial.refresh_token)).toBeUndefined();
+    expect(await pod.tokenService.validateAccessToken(initial.refresh_token)).toBeNull();
+  });
+
+  it('keeps a refresh token when it is removed as an access token', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+
+    await pod.store.removeAccessToken(initial.refresh_token);
+
+    expect(await pod.store.getRefreshToken(initial.refresh_token)).toBeDefined();
+  });
+
   it('keeps a used refresh token until the cleanup job removes it after expiry', async () => {
     const pod = createPod(db);
     const initial = await issueInitialTokens(pod.tokenService);
     await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
-    const usedTokenRow = eq(schema.tokens.token, initial.refresh_token);
+    const usedTokenRow = eq(schema.tokens.token, hashToken(initial.refresh_token));
 
     const [kept] = await db.select().from(schema.tokens).where(usedTokenRow);
     expect(kept?.usedAt).toBeInstanceOf(Date);

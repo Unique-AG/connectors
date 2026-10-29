@@ -278,10 +278,9 @@ export class McpOAuthStore implements IOAuthStore {
       return cached;
     }
 
-    const metadata = await this.drizzle
+    // A refresh token shares this table but must never pass as a bearer access token.
+    const metadata: AccessTokenMetadata | undefined = await this.drizzle
       .select({
-        token: tokens.token,
-        type: tokens.type,
         expiresAt: tokens.expiresAt,
         userId: tokens.userId,
         clientId: tokens.clientId,
@@ -292,7 +291,7 @@ export class McpOAuthStore implements IOAuthStore {
       })
       .from(tokens)
       .leftJoin(userProfiles, eq(tokens.userProfileId, userProfiles.id))
-      .where(eq(tokens.token, hash))
+      .where(and(eq(tokens.token, hash), eq(tokens.type, 'ACCESS')))
       .then((rows) => rows[0]);
     if (!metadata) {
       return undefined;
@@ -302,13 +301,14 @@ export class McpOAuthStore implements IOAuthStore {
       return undefined;
     }
 
-    await this.cacheAccessTokenMetadata(hash, metadata as unknown as AccessTokenMetadata);
-    return metadata as unknown as AccessTokenMetadata;
+    await this.cacheAccessTokenMetadata(hash, metadata);
+    return metadata;
   }
 
   public async removeAccessToken(token: string): Promise<void> {
     const hash = this.hashToken(token);
-    await this.drizzle.delete(tokens).where(eq(tokens.token, hash));
+    await this.drizzle.delete(tokens).where(and(eq(tokens.token, hash), eq(tokens.type, 'ACCESS')));
+
     await this.removeCachedAccessToken(hash);
   }
 
@@ -354,14 +354,22 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
-    await this.drizzle.delete(tokens).where(eq(tokens.token, this.hashToken(token)));
+    await this.drizzle
+      .delete(tokens)
+      .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH')));
   }
 
   public async redeemRefreshToken(token: string): Promise<boolean> {
     const redeemed = await this.drizzle
       .update(tokens)
       .set({ usedAt: new Date() })
-      .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH'), isNull(tokens.usedAt)))
+      .where(
+        and(
+          eq(tokens.token, this.hashToken(token)),
+          eq(tokens.type, 'REFRESH'),
+          isNull(tokens.usedAt),
+        ),
+      )
       .returning({ id: tokens.id });
 
     return redeemed.length > 0;

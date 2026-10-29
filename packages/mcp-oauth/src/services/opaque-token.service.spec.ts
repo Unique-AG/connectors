@@ -209,6 +209,38 @@ describe('OpaqueTokenService', () => {
       expect(store.storeRefreshToken).not.toHaveBeenCalled();
     });
 
+    it('revokes the new tokens when a concurrent request revoked the family before they were stored', async () => {
+      store.getRefreshToken
+        .mockResolvedValueOnce(mockRefreshMetadata)
+        .mockResolvedValueOnce(undefined);
+      store.redeemRefreshToken.mockResolvedValue(true);
+      store.revokeTokenFamily?.mockResolvedValue(undefined);
+
+      const result = await service.refreshAccessToken('refresh-token', 'client-123');
+
+      expect(result).toBeNull();
+      expect(store.storeRefreshToken).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ familyId: 'tkfam_123' }),
+      );
+      expect(store.revokeTokenFamily).toHaveBeenCalledWith('tkfam_123');
+    });
+
+    it('revokes the new tokens of a token without a family when its row disappeared during refresh', async () => {
+      store.getRefreshToken
+        .mockResolvedValueOnce({ ...mockRefreshMetadata, familyId: null })
+        .mockResolvedValueOnce(undefined);
+      store.redeemRefreshToken.mockResolvedValue(true);
+      store.revokeTokenFamily?.mockResolvedValue(undefined);
+
+      const result = await service.refreshAccessToken('refresh-token', 'client-123');
+
+      expect(result).toBeNull();
+      const issuedFamilyId = store.storeRefreshToken.mock.calls[0]?.[1].familyId;
+      expect(issuedFamilyId).toEqual(expect.stringContaining('tkfam'));
+      expect(store.revokeTokenFamily).toHaveBeenCalledWith(issuedFamilyId);
+    });
+
     it('removes a replayed refresh token without a family', async () => {
       store.getRefreshToken.mockResolvedValue({
         ...mockRefreshMetadata,
