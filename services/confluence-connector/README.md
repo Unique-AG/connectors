@@ -14,6 +14,12 @@ pnpm dev
 
 Run these from `services/confluence-connector`.
 
+0. Optional: delete an old local Confluence and all its data, to start clean. Your Unique data is not touched, and the connector keeps its root scope because the server ID is pinned.
+
+   ```bash
+   docker compose -f local-confluence-v8.5-docker-compose.yaml down -v
+   ```
+
 1. Start Confluence and set it up:
 
    ```bash
@@ -38,14 +44,12 @@ Run these from `services/confluence-connector`.
      -e CONFLUENCE_LICENSE_KEY="<key>" seed
    ```
 
-   Content is kept. Stop Confluence with `docker compose -f local-confluence-v8.5-docker-compose.yaml down`. Add `-v` to delete all its data.
+   Content is kept. Stop Confluence with `docker compose -f local-confluence-v8.5-docker-compose.yaml down`.
 
 > [!NOTE]
 > **About the license**
 >
-> - **Timebomb (press Enter):** the same public key works every time. Each time it is applied, it is valid for 3 hours. When it runs out, repeat step 1 and press Enter.
-> - **New Confluence, same scope:** after `down -v`, the connector keeps working with the same root scope, because the server ID is pinned.
-> - **30-day trial (paste a key):** better for longer sessions. The compose file pins the server ID (`ATL_PRODUCT_SERVER_ID`), so the key also works after `down -v`.
+> - **Timebomb (press Enter):** the same public key works every time. Each time it is applied, it is valid for 3 hours. When it runs out, repeat step 1 and press Enter.> - **30-day trial (paste a key):** better for longer sessions. The compose file pins the server ID (`ATL_PRODUCT_SERVER_ID`), so the key also works after `down -v`.
 > - **Pasted keys are kept.** Pressing Enter never replaces a pasted key with the timebomb key.
 
 ## Configuration
