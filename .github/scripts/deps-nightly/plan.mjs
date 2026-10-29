@@ -108,7 +108,7 @@ export async function latestEligibleVersions(names, fetchPypi, now, cooldownDays
   return {
     latest: new Map(pairs.filter(([, version]) => version !== undefined)),
     needsPerson: answers
-      .filter(({ pypi }) => !pypi)
+      .filter(({ pypi }) => pypi === undefined)
       .map(({ name }) => ({
         ecosystem: 'uv',
         name,

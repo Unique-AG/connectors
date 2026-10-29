@@ -121,6 +121,18 @@ describe('latestEligibleVersions', () => {
       { ecosystem: 'uv', name: 'down', reason: 'PyPI did not answer for down.' },
     ]);
   });
+
+  it('drops a name that PyPI does not know without a needsPerson entry', async () => {
+    const fetchPypi = async (name) => (name === 'workspace-only' ? null : pypi);
+    const { latest, needsPerson } = await latestEligibleVersions(
+      ['a', 'workspace-only'],
+      fetchPypi,
+      NOW,
+      3,
+    );
+    assert.deepStrictEqual([...latest], [['a', '1.1.0']]);
+    assert.deepStrictEqual(needsPerson, []);
+  });
 });
 
 describe('uvCandidates', () => {

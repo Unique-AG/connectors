@@ -112,7 +112,12 @@ async function planUv() {
   const { latest, needsPerson: unanswered } = await latestEligibleVersions(
     pinnedNames,
     async (name) => {
-      const response = await fetch(`https://pypi.org/pypi/${name}/json`);
+      const response = await fetch(`https://pypi.org/pypi/${name}/json`, {
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.status === 404) {
+        return null;
+      }
       return response.ok ? response.json() : undefined;
     },
     Date.now(),
