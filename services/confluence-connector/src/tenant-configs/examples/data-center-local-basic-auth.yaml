@@ -1,11 +1,9 @@
 # Example: the local Confluence Data Center from local-confluence-v8.5-docker-compose.yaml,
 # ingesting into a Unique platform running on this machine.
 #
-# Copy it to src/tenant-configs/<name>-tenant-config.yaml and fill in:
-#   - scopeId: an empty folder in your local Unique.
-#   - zitadelProjectId: the id of the "Unique Apps" project in your local Zitadel.
-# In your local Zitadel, create a machine user "confluence-connector" with a client secret,
-# and give it chat.admin.all, chat.knowledge.read and chat.knowledge.write on that project.
+# Setup steps: README.md, "Local Confluence Data Center", step 4.
+# Fill in zitadelProjectId (the "Unique Apps" project in your local Zitadel) and scopeId
+# (an empty folder in your local Unique).
 #
 # Secrets are resolved from environment variables at startup via "os.environ/VAR_NAME" references:
 #   - CONFLUENCE_PASSWORD_LOCAL_DC -> confluence.auth.password
