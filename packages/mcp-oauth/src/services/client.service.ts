@@ -5,6 +5,7 @@ import { RegisterClientDto } from '../dtos/register-client.dto';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
 import { ClientRegistrationResponse, OAuthClient } from '../interfaces/oauth-client.interface';
 import { OAUTH_STORE_TOKEN } from '../mcp-oauth.module-definition';
+import { isLoopbackHostname } from '../utils/redirect-uri';
 
 @Injectable()
 export class ClientService {
@@ -117,10 +118,11 @@ export class ClientService {
         const registered = new URL(registeredUri);
         const requested = new URL(redirectUri);
 
-        // Only for localhost/127.0.0.1 - allow port variations
+        // Only for loopback hosts - allow port variations, scheme and path must match
         if (
-          (registered.hostname === 'localhost' || registered.hostname === '127.0.0.1') &&
-          (requested.hostname === 'localhost' || requested.hostname === '127.0.0.1') &&
+          isLoopbackHostname(registered.hostname) &&
+          isLoopbackHostname(requested.hostname) &&
+          registered.protocol === requested.protocol &&
           registered.pathname === requested.pathname &&
           registered.search === requested.search
         ) {

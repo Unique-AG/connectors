@@ -160,6 +160,33 @@ describe('ClientService', () => {
       expect(result).toBe(true);
     });
 
+    it('returns true for IPv6 loopback with different port', async () => {
+      store.getClient.mockResolvedValue({ ...mockClient, redirect_uris: ['http://[::1]:3000/cb'] });
+
+      const result = await clientService.validateRedirectUri('test-id', 'http://[::1]:9999/cb');
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false for loopback with a different scheme', async () => {
+      store.getClient.mockResolvedValue({ ...mockClient, redirect_uris: ['http://localhost/cb'] });
+
+      const result = await clientService.validateRedirectUri('test-id', 'ftp://localhost/cb');
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false for loopback with a different path', async () => {
+      store.getClient.mockResolvedValue({ ...mockClient, redirect_uris: ['http://localhost/cb'] });
+
+      const result = await clientService.validateRedirectUri(
+        'test-id',
+        'http://localhost:81/other',
+      );
+
+      expect(result).toBe(false);
+    });
+
     it('returns false for non-matching redirect URI', async () => {
       store.getClient.mockResolvedValue(mockClient);
 
