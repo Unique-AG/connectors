@@ -11,11 +11,10 @@ concurrency:
 jobs:
   conventional-pr-title:
     name: Validate PR title and scope
-    # These labels skip the job: the two release-please labels, the dependencies label, and the title exception.
+    # These labels skip the job: the two release-please labels and the title exception.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
-      !contains(github.event.pull_request.labels.*.name, 'dependencies') &&
       !contains(github.event.pull_request.labels.*.name, 'title-exception')
     permissions:
       pull-requests: read # to list the files of the pull request

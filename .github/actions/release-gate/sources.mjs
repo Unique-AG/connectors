@@ -1,19 +1,37 @@
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_COMMENT_PAGES = 10;
 
+const isRetryable = (status) => status === 429 || status >= 500;
+
 async function getJson(url, fetchImpl, headers = {}) {
-  try {
-    const response = await fetchImpl(url, {
-      headers,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    return response.ok ? await response.json() : null;
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetchImpl(url, {
+        headers,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      if (!isRetryable(response.status)) {
+        return null;
+      }
+    } catch {}
   }
+  return null;
 }
 
 export function createRegistryLookups(fetchImpl = fetch) {
+  const npmDocuments = new Map();
+  const npmDocument = (name) => {
+    if (!npmDocuments.has(name)) {
+      npmDocuments.set(
+        name,
+        getJson(`https://registry.npmjs.org/${encodeURIComponent(name)}`, fetchImpl),
+      );
+    }
+    return npmDocuments.get(name);
+  };
   return {
     'python-pkg': async (name, version) => {
       const payload = await getJson(
@@ -28,10 +46,7 @@ export function createRegistryLookups(fetchImpl = fetch) {
       return uploads.sort()[0] ?? null;
     },
     'node-pkg': async (name, version) => {
-      const payload = await getJson(
-        `https://registry.npmjs.org/${encodeURIComponent(name)}`,
-        fetchImpl,
-      );
+      const payload = await npmDocument(name);
       const published = payload?.time?.[version];
       return typeof published === 'string' ? published : null;
     },

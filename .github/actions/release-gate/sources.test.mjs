@@ -37,6 +37,51 @@ test('returns null when the registry fails', async () => {
   assert.equal(await broken['node-pkg']('tar', '1.0.0'), null);
 });
 
+test('retries once after a 429 or a thrown error', async () => {
+  let calls = 0;
+  const flaky = createRegistryLookups(async () => {
+    calls++;
+    return calls === 1
+      ? jsonResponse({}, 429)
+      : jsonResponse({ time: { '1.0.0': '2026-10-01T00:00:00.000Z' } });
+  });
+  assert.equal(await flaky['node-pkg']('tar', '1.0.0'), '2026-10-01T00:00:00.000Z');
+  assert.equal(calls, 2);
+  let thrown = 0;
+  const failing = createRegistryLookups(async () => {
+    thrown++;
+    throw new Error('timeout');
+  });
+  assert.equal(await failing['python-pkg']('urllib3', '1.0'), null);
+  assert.equal(thrown, 2);
+});
+
+test('does not retry a 404', async () => {
+  let calls = 0;
+  const lookups = createRegistryLookups(async () => {
+    calls++;
+    return jsonResponse({}, 404);
+  });
+  assert.equal(await lookups['node-pkg']('tar', '1.0.0'), null);
+  assert.equal(calls, 1);
+});
+
+test('fetches the npm document once for several versions of one package', async () => {
+  let calls = 0;
+  const lookups = createRegistryLookups(async () => {
+    calls++;
+    return jsonResponse({
+      time: { '1.0.0': '2026-10-01T00:00:00.000Z', '1.1.0': '2026-10-02T00:00:00.000Z' },
+    });
+  });
+  const dates = await Promise.all([
+    lookups['node-pkg']('tar', '1.0.0'),
+    lookups['node-pkg']('tar', '1.1.0'),
+  ]);
+  assert.deepEqual(dates, ['2026-10-01T00:00:00.000Z', '2026-10-02T00:00:00.000Z']);
+  assert.equal(calls, 1);
+});
+
 test('collects comments across pages', async () => {
   const pages = [
     Array.from({ length: 100 }, (_, index) => ({ id: index, body: 'a' })),

@@ -44,18 +44,12 @@ function oldestFirst(fixes) {
 }
 
 async function resolveFix(finding, version, lookup, now) {
-  const registryDate = lookup ? await lookup(finding.PkgName, version) : null;
-  const sources = [
-    [registryDate, 'registry'],
-    [finding.PublishedDate, 'advisory'],
-  ];
-  for (const [date, source] of sources) {
-    const ageDays = toAgeDays(date, now);
-    if (ageDays !== null) {
-      return { version, source, ageDays };
-    }
+  const date = lookup ? await lookup(finding.PkgName, version) : finding.PublishedDate;
+  const ageDays = toAgeDays(date, now);
+  if (ageDays === null) {
+    return { version, source: 'unknown', ageDays: null };
   }
-  return { version, source: 'unknown', ageDays: null };
+  return { version, source: lookup ? 'registry' : 'advisory', ageDays };
 }
 
 async function evaluateFinding(finding, lookups, now) {

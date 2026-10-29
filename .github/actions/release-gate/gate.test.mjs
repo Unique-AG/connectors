@@ -52,10 +52,10 @@ test('takes the fix age from the npm registry for node packages', async () => {
   );
 });
 
-test('falls back to the advisory date when the registry has no date', async () => {
+test('treats the age as unknown when the registry lookup returns no date', async () => {
   const result = await gate({});
   assert.equal(result.passed, false);
-  assert.match(result.summary, /30\.0 days \| advisory \| BLOCKS/);
+  assert.match(result.summary, /unknown \| unknown \| BLOCKS/);
 });
 
 test('uses the advisory date for results without a registry lookup', async () => {
@@ -126,7 +126,7 @@ test('passes with the label and lists the skipped findings', async () => {
   const result = await gate({ hasLabel: true });
   assert.equal(result.passed, true);
   assert.match(result.message, /label security-exception is set\. 1 finding\(s\) are skipped/);
-  assert.match(result.summary, /CVE-2026-0001 \| 30\.0 days \| advisory \| skipped by exception/);
+  assert.match(result.summary, /CVE-2026-0001 \| unknown \| unknown \| skipped by exception/);
   assert.match(result.annotations[0], /^::warning::/);
 });
 
