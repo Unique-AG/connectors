@@ -10,7 +10,7 @@ uc-06-01:
       expect:
         result: {"chats[*].topic": [Brightway pricing, null]}
         graph_calls: {GET /v1.0/me/chats: 1}
-  cassette: uc-06-01
+  fixture: uc-06-01
 
 uc-06-02:
   status: untested
@@ -238,7 +238,7 @@ uc-06-18:
   note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
   variants:
     limited:
-      cassette: uc-06-01
+      fixture: uc-06-01
       1:
         fault: {graph: {status: 429, headers: {Retry-After: "30"}, body: error.TooManyRequests.json}, times: 4}
         expect:
@@ -253,7 +253,7 @@ uc-06-18:
           graph_calls: {GET /v1.0/me/chats: 4}
           retry_sleeps: [30.0, 30.0, 30.0]
     too-busy:
-      cassette: uc-06-01
+      fixture: uc-06-01
       1:
         fault: {graph: {status: 503, headers: {Retry-After: "120"}}, times: 4}
         expect:

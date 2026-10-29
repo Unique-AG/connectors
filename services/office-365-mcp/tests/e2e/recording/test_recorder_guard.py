@@ -368,7 +368,7 @@ def test_an_address_check_is_quiet_on_text_without_an_at() -> None:
 def test_the_dry_run_plans_the_calls_and_shows_the_refusals() -> None:
     lines = describe(resolve("uc-05-16"), guard(allow_writes=False))
     assert lines == [
-        "uc-05-16 -> cassette rec-uc-05-16 (dry run, nothing is sent):",
+        "uc-05-16 -> fixture rec-uc-05-16 (dry run, nothing is sent):",
         '  step 1: outlook_list_mail({"category": "seed-v1", "limit": 3}) -> allowed',
         '  step 2: outlook_move_mail({"destination": "archive", "message_refs": '
         + '"$prev.messages[*].uri"}) -> REFUSED: outlook_move_mail is a write and needs '

@@ -1,5 +1,5 @@
 scenario: uc-02-01
-cassette: rec-uc-02-01
+fixture: rec-uc-02-01
 source: recorded
 target: graph
 recorded_at: '2026-10-26T14:17:33+00:00'

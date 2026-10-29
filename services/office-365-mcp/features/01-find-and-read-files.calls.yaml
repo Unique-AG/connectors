@@ -67,7 +67,7 @@ uc-01-06:
   note: the tool converts nothing itself, so the call sets convert_to for the Word, Excel, and PowerPoint rows
   variants:
     recorded:
-      cassette: rec-uc-01-06
+      fixture: rec-uc-01-06
       1:
         bind: {query: seed-v1 Project Plan}
         expect:
@@ -117,7 +117,7 @@ uc-01-10:
           tools.sharepoint_read_file._too_large: {size: 11010048, web_url: "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf"}
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNREPORT: 1}
   note: the tool refuses above 10 MB and sends no part of the file
-  cassette: uc-01-10
+  fixture: uc-01-10
 
 uc-01-11:
   status: partly
@@ -146,7 +146,7 @@ uc-01-11:
           "content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE: 1, GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content: 1}
   note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format; no run shows that the assistant reads it
-  cassette: uc-01-11
+  fixture: uc-01-11
 
 uc-01-16:
   status: untested
@@ -225,7 +225,7 @@ uc-01-17:
   note: "expected behaviour per row. Sign-in expired, from shared/seam.py:520-525: ask the user to sign in to this connector again, because retrying unchanged fails the same way. No access, from shared/seam.py:528-537 (sharepoint_read_file has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Files.Read.All, and retrying will not help. File gone, from tools/sharepoint_read_file.py:110-117 (GRAPH_NOT_FOUND): most probably deleted or moved, search again with sharepoint_search_files and take the uri from the new result, and do not retry the same handle."
   variants:
     sign-in-expired:
-      cassette: uc-01-17
+      fixture: uc-01-17
       2:
         fault: {graph: {status: 401, body: error.InvalidAuthenticationToken.json}}
         expect:
@@ -239,7 +239,7 @@ uc-01-17:
               forbidden: null
           graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNPLAN: 1}
     no-access:
-      cassette: uc-01-17
+      fixture: uc-01-17
       2:
         fault: {graph: {status: 403, body: error.accessDenied.json}}
         expect:
@@ -253,7 +253,7 @@ uc-01-17:
               forbidden: null
           graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNPLAN: 1}
     gone:
-      cassette: uc-01-17
+      fixture: uc-01-17
       2:
         fault: {graph: {status: 404, body: error.itemNotFound.json}}
         expect:
@@ -290,7 +290,7 @@ uc-01-19:
   note: "expected behaviour for every row from shared/seam.py:546-553 (sharepoint_read_file is read only): retry once. Internal error and no answer in time come from graph_client/errors.py:218-227 and 238-247 and map to the same advice. An incomplete file comes from graph_client/download.py:121-131 (GraphUnavailable) and maps to the same advice."
   variants:
     fails-with-an-internal-error:
-      cassette: uc-01-19
+      fixture: uc-01-19
       1:
         bind: {query: Brightway Launch Plan}
       2:
@@ -313,7 +313,7 @@ uc-01-19:
           result: {"content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document}
           graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
     no-answer-in-time:
-      cassette: uc-01-19
+      fixture: uc-01-19
       1:
         bind: {query: Brightway Launch Plan}
       2:
@@ -337,7 +337,7 @@ uc-01-19:
           graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
 
     stops-before-the-end:
-      cassette: uc-01-19-short
+      fixture: uc-01-19-short
       1:
         bind: {query: Brightway Launch Plan}
       2:

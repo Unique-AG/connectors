@@ -2,7 +2,7 @@
 the seeded test tenant: Mia's seed mail and files come from the seed corpus and the seed's own
 document generator. Next to them it serves foreign data that is not synthetic: real-looking
 senders, subjects and phone numbers, a tenant GUID and a UPN in a safelink, another user's file,
-and noisy headers. The tests prove that none of it reaches a cassette."""
+and noisy headers. The tests prove that none of it reaches a fixture."""
 
 import importlib.util
 import json

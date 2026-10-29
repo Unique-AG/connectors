@@ -10,7 +10,7 @@ uc-02-01:
       expect:
         result: {"messages[*].subject": [Invoice 4471, "Lunch on Friday?"], "messages[*].is_read": [false, false]}
         graph_calls: {GET /v1.0/me/mailFolders/inbox: 1, GET /v1.0/me/mailFolders/inbox/messages: 1}
-  cassette: uc-02-01
+  fixture: uc-02-01
   variants:
     busy:
       1:
@@ -20,7 +20,7 @@ uc-02-01:
           graph_calls: {GET /v1.0/me/mailFolders/inbox: 2, GET /v1.0/me/mailFolders/inbox/messages: 1}
           retry_sleeps: [2.0]
     recorded:
-      cassette: rec-uc-02-01
+      fixture: rec-uc-02-01
       1:
         expect:
           result:
@@ -221,7 +221,7 @@ uc-02-17:
     tool limit of node-chat. A failed search is never an empty result, so no row says that no message matches.
   variants:
     busy:
-      cassette: uc-02-17
+      fixture: uc-02-17
       1:
         fault: {graph: {status: 429, headers: {Retry-After: "30"}, body: error.TooManyRequests.json}, times: 4}
         expect:
@@ -236,7 +236,7 @@ uc-02-17:
           graph_calls: {GET /v1.0/me/messages: 4}
           retry_sleeps: [30.0, 30.0, 30.0]
     busy-without-a-wait-time:
-      cassette: uc-02-17
+      fixture: uc-02-17
       1:
         fault: {graph: {status: 429, body: error.TooManyRequests.json}, times: 4}
         expect:
@@ -267,7 +267,7 @@ uc-02-18:
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
   variants:
     fails-on-its-side:
-      cassette: uc-02-18
+      fixture: uc-02-18
       1:
         fault: {graph: {status: 500, body: error.generalException.json}}
         expect:
@@ -285,7 +285,7 @@ uc-02-18:
           result: {"messages[0].subject": "Lunch on Friday?"}
           graph_calls: {GET /v1.0/me/messages: 1, POST /v1.0/me/translateExchangeIds: 1}
     no-answer-in-time:
-      cassette: uc-02-18
+      fixture: uc-02-18
       1:
         fault: {transport: timeout}
         expect:
@@ -303,7 +303,7 @@ uc-02-18:
           result: {"messages[0].subject": "Lunch on Friday?"}
           graph_calls: {GET /v1.0/me/messages: 1, POST /v1.0/me/translateExchangeIds: 1}
     unreadable:
-      cassette: uc-02-18
+      fixture: uc-02-18
       1:
         fault: {graph: {status: 502, headers: {Content-Type: text/html}, body: page.badGateway.html}}
         expect:
@@ -336,7 +336,7 @@ uc-02-19:
     report it. The assistant calls the search twice and no third time.
   variants:
     fails-twice:
-      cassette: uc-02-17
+      fixture: uc-02-17
       1:
         fault: {graph: {status: 500, body: error.generalException.json}}
         expect:

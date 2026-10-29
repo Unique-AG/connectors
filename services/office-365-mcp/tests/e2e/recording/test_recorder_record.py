@@ -34,7 +34,7 @@ def server() -> FastMCP[None]:
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS)
-async def test_a_recorded_cassette_replays_through_the_repo_runner(
+async def test_a_recorded_fixture_replays_through_the_repo_runner(
     recorded: Recorded,
     scenario: str,
     server: FastMCP[None],
@@ -52,16 +52,16 @@ async def test_a_recorded_cassette_replays_through_the_repo_runner(
 @pytest.mark.parametrize("scenario", SCENARIOS)
 def test_a_second_record_gives_the_same_files(recorded: Recorded, scenario: str) -> None:
     again = record_on(scenario)
-    cassette = recorded.outcomes[scenario].cassette.name
-    assert differences(stored(cassette, recorded.out), files_of(again.cassette)) == []
+    fixture = recorded.outcomes[scenario].fixture.name
+    assert differences(stored(fixture, recorded.out), files_of(again.fixture)) == []
 
 
 def test_the_recorder_reports_its_replacements(recorded: Recorded) -> None:
     report = recorded.outcomes["uc-02-01"].report
     assert report[0] == (
-        "uc-02-01: 4 requests -> 4 interactions, 4 fixtures, lint clean, replay clean"
+        "uc-02-01: 4 requests -> 4 interactions, 4 bodies, lint clean, replay clean"
     )
-    counts = recorded.outcomes["uc-02-01"].cassette.counts
+    counts = recorded.outcomes["uc-02-01"].fixture.counts
     assert counts["text replaced"] >= 6
     assert counts["other addresses replaced"] >= 3
     assert "tool output changed by the scrub: replaced" in report[2]
@@ -140,7 +140,7 @@ def test_a_token_echoed_by_graph_is_never_printed_or_written(
     assert stand_in.TOKEN not in str(refused.value)
     assert stand_in.UPN not in str(refused.value)
     leaked = record_on("uc-02-01", StandIn(frozenset({"token-leak"})))
-    written = b"".join(files_of(leaked.cassette).values())
+    written = b"".join(files_of(leaked.fixture).values())
     assert stand_in.TOKEN.encode() not in written
     assert main(["uc-02-01", "--target", "stand-in", "--out", str(tmp_path)]) == 0
     shown = capsys.readouterr()
@@ -197,7 +197,7 @@ def test_the_cli_records_and_refuses_under_python_o(tmp_path: Path) -> None:
 
 _RECORDED_BLOCK = """\
 uc-01-01:
-  cassette: rec-uc-01-01
+  fixture: rec-uc-01-01
   1:
     expect:
       result: {capped: false}
@@ -207,7 +207,7 @@ _SIDECARS = {
     "no variants": "uc-01-01:\n  chain:\n    - tool: t\n" + _NEXT,
     "other variants": "uc-01-01:\n  variants:\n    busy:\n      1: {fault: {transport: timeout}}\n"
     + _NEXT,
-    "old recorded variant": "uc-01-01:\n  variants:\n    recorded:\n      cassette: old\n" + _NEXT,
+    "old recorded variant": "uc-01-01:\n  variants:\n    recorded:\n      fixture: old\n" + _NEXT,
 }
 
 

@@ -45,7 +45,7 @@ _ENTRY_KEYS = {
     "chain",
     "must_not",
     "note",
-    "cassette",
+    "fixture",
     "variants",
 }
 _RUNNER_STEP_KEYS = {"args", "pick", "fault", "expect", "approval", "bind"}
@@ -176,9 +176,9 @@ def _step_tools(step: Mapping[str, object]) -> list[str]:
     return [str(step["tool"])]
 
 
-def _cassettes(entry: Mapping[str, object]) -> list[str]:
+def _fixtures(entry: Mapping[str, object]) -> list[str]:
     variants = map(_object, _object(entry.get("variants", {})).values())
-    named = [entry.get("cassette"), *(variant.get("cassette") for variant in variants)]
+    named = [entry.get("fixture"), *(variant.get("fixture") for variant in variants)]
     return [str(name) for name in named if name is not None]
 
 
@@ -186,9 +186,9 @@ def _run_steps(entry: Mapping[str, object]) -> Iterator[Mapping[str, object]]:
     chain = [_object(step) for step in _list(entry["chain"])]
     yield from chain
     for variant in map(_object, _object(entry.get("variants", {})).values()):
-        assert "cassette" in entry or "cassette" in variant, "a run names a cassette"
+        assert "fixture" in entry or "fixture" in variant, "a run names a fixture"
         for key, override in cast("Mapping[object, object]", variant).items():
-            if key != "cassette":
+            if key != "fixture":
                 assert key in range(1, len(chain) + 1), f"a variant names step {key!r}"
                 assert set(_object(override)) <= _RUNNER_STEP_KEYS, set(_object(override))
                 yield {**chain[cast("int", key) - 1], **_object(override)}
@@ -330,8 +330,8 @@ class TestSidecars:
             assert not ("any_of" in step and {"args", "uses"} & set(step)), (
                 "`args` and `uses` belong to a step with one tool"
             )
-        for name in _cassettes(entry):
-            assert (_E2E / "cassettes" / f"{name}.json").is_file(), f"no cassette {name}"
+        for name in _fixtures(entry):
+            assert (_E2E / "fixtures" / f"{name}.json").is_file(), f"no fixture {name}"
         assert [problem for step in _run_steps(entry) for problem in _runner_problems(step)] == []
 
     @pytest.mark.parametrize(("stem", "scenario_id"), _entries())
@@ -387,17 +387,15 @@ class TestSidecars:
 
 
 class TestTheScenarioRuns:
-    def test_every_cassette_and_fixture_is_used(self) -> None:
+    def test_every_fixture_and_body_is_used(self) -> None:
         sidecars = [_sidecar(feature_file) for feature_file in _FEATURE_FILES]
-        named = {name for s in sidecars for e in s.values() for name in _cassettes(_object(e))}
-        cassettes = sorted((_E2E / "cassettes").glob("*.json"))
-        text = "".join(path.read_text() for path in [*cassettes, *_FEATURES.glob("*.calls.yaml")])
-        fixtures = sorted((_E2E / "fixtures").iterdir())
+        named = {name for s in sidecars for e in s.values() for name in _fixtures(_object(e))}
+        fixtures = sorted((_E2E / "fixtures").glob("*.json"))
+        text = "".join(path.read_text() for path in [*fixtures, *_FEATURES.glob("*.calls.yaml")])
+        bodies = sorted((_E2E / "bodies").iterdir())
 
-        problems = [
-            f"no sidecar names cassettes/{p.name}" for p in cassettes if p.stem not in named
-        ]
-        problems += [f"nothing uses fixtures/{p.name}" for p in fixtures if p.name not in text]
+        problems = [f"no sidecar names fixtures/{p.name}" for p in fixtures if p.stem not in named]
+        problems += [f"nothing uses bodies/{p.name}" for p in bodies if p.name not in text]
         assert problems == []
 
 

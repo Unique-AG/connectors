@@ -122,8 +122,8 @@ uv run pytest tests/test_use_cases.py
 
 ## Running the scenarios
 
-`../tests/e2e/test_scenarios.py` runs each scenario that has a cassette. The run uses the real app,
-the real middleware, and the real tools. Microsoft Graph does not answer. A cassette answers. The
+`../tests/e2e/test_scenarios.py` runs each scenario that has a fixture. The run uses the real app,
+the real middleware, and the real tools. Microsoft Graph does not answer. A fixture answers. The
 run uses no network. It uses the legacy MCP handshake, so a tool asks for approval with an
 elicitation request.
 
@@ -132,12 +132,12 @@ cd services/office-365-mcp
 uv run pytest tests/e2e
 ```
 
-A cassette is a file `../tests/e2e/cassettes/<name>.json`. It is a list of interactions. An
+A fixture is a file `../tests/e2e/fixtures/<name>.json`. It is a list of interactions. An
 interaction has a request part and an answer part:
 
 - The request part: `method`, `path`, and optionally `host`, `query`, `json` (the body), and
   `headers`. The headers are only `prefer` and `consistencylevel`, and they must be equal.
-- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/fixtures/`,
+- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/bodies/`,
   and `response_headers`, the headers of the answer (for example `location` of a redirect).
 
 The run is strict. A request that matches no unused interaction fails the step, and the message
@@ -145,7 +145,7 @@ shows the request and the interactions that no request reached yet. An interacti
 reaches fails the run. A request to Graph without the token of the user fails the step. A request
 to another host, such as a download redirect, fails the step when it carries the token.
 
-A date or a time in a request matches only the same text in the cassette, or a symbol.
+A date or a time in a request matches only the same text in the fixture, or a symbol.
 `~yesterday`, `~today`, and `~tomorrow` match a date whose UTC day is that day, plus or minus one
 day. No other value is a wildcard.
 
@@ -153,8 +153,8 @@ The keys of an entry:
 
 | Key | Meaning |
 | --- | --- |
-| `cassette` | The cassette of the run of the entry. |
-| `variants` | More runs. Each variant has a name, an optional `cassette`, and a step number for each step that it changes. |
+| `fixture` | The fixture of the run of the entry. |
+| `variants` | More runs. Each variant has a name, an optional `fixture`, and a step number for each step that it changes. |
 
 The keys of a step:
 
@@ -183,27 +183,27 @@ no `$` and reads the result of the same step.
 To add a run:
 
 1. Find the scenario that states the behaviour.
-2. Write the cassette. Put each answer body in `fixtures/`, or use a fixture that is there.
-3. Add `cassette` or a variant to the entry, and add `bind`, `fault`, `approval`, and `expect` to the
+2. Write the fixture. Put each answer body in `bodies/`, or use a body that is there.
+3. Add `fixture` or a variant to the entry, and add `bind`, `fault`, `approval`, and `expect` to the
    steps.
 4. Run `uv run pytest tests/e2e`. A request that does not match shows the request. Copy its values
-   into the cassette.
+   into the fixture.
 5. Increase `_MINIMUM_EXECUTABLE` in `test_scenarios.py` to the new number of runs.
 
 `_MINIMUM_EXECUTABLE` is a ratchet. The number of runs must not go below it. Increase it when you
 add a run. Decrease it only in a change that says why.
 
 A scenario outline gets a variant for each row. `uc-05-26` has a variant for the subject line. Add
-the other rows in the same way, with a different `fault` `input` and the same cassette.
+the other rows in the same way, with a different `fault` `input` and the same fixture.
 
 `../tests/test_use_cases.py` checks the shape of the keys, that each argument exists, that each
-cassette exists, that a sidecar names each cassette, and that a cassette or a sidecar names each
-fixture.
+fixture exists, that a sidecar names each fixture, and that a fixture or a sidecar names each
+body.
 
-A recorder writes a cassette from a run against a test tenant. It scrubs the answers, so that
+A recorder writes a fixture from a run against a test tenant. It scrubs the answers, so that
 only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has the commands, and
-`../scripts/dogfood/seed/README.md` has the seed. A recorded cassette is a variant named
-`recorded` in the sidecar, and its cassette name starts with `rec-`. The option `--link` of the
+`../scripts/dogfood/seed/README.md` has the seed. A recorded fixture is a variant named
+`recorded` in the sidecar, and its fixture name starts with `rec-`. The option `--link` of the
 recorder writes that variant into the sidecar.
 
 ## Evidence for the order

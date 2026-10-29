@@ -1,11 +1,11 @@
 # The recording variant of each scenario that the recorder records. The chain comes from the
 # scenario's entry in features/*.calls.yaml; a step number here replaces those keys of that step,
-# exactly as a `variants` entry of a sidecar does. To land a recorded cassette, copy the block
+# exactly as a `variants` entry of a sidecar does. To land a recorded fixture, copy the block
 # under `variants: recorded:` of the sidecar entry.
 # The expectations hold for the seed corpus (scripts/dogfood/seed/corpus). They must not read a
 # field that the scrub replaces (foreign text, foreign addresses): the recorder refuses that.
 uc-02-01:
-  cassette: rec-uc-02-01
+  fixture: rec-uc-02-01
   1:
     expect:
       result:
@@ -14,7 +14,7 @@ uc-02-01:
         capped: false
 
 uc-05-16:
-  cassette: rec-uc-05-16
+  fixture: rec-uc-05-16
   1:
     args: {category: seed-v1, limit: 3}
   2:
@@ -23,7 +23,7 @@ uc-05-16:
       graph_calls: {POST /v1.0/me/messages/*/move: 3}
 
 uc-01-06:
-  cassette: rec-uc-01-06
+  fixture: rec-uc-01-06
   1:
     bind: {query: seed-v1 Project Plan}
     expect:

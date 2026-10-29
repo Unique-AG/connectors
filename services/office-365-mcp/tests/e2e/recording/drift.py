@@ -26,9 +26,9 @@ _VOLATILE = re.compile(r"^recorded_at: .*\n|^sdk_versions:\n(?:  .*\n)*", re.M)
 _SHOWN = 40
 
 
-def stored(cassette: str, out: Path) -> dict[str, bytes]:
-    names = [out / "cassettes" / f"{cassette}.json", out / "cassettes" / f"{cassette}.meta.yaml"]
-    names += sorted((out / "fixtures").glob(f"{cassette}.[0-9][0-9].*"))
+def stored(fixture: str, out: Path) -> dict[str, bytes]:
+    names = [out / "fixtures" / f"{fixture}.json", out / "fixtures" / f"{fixture}.meta.yaml"]
+    names += sorted((out / "bodies").glob(f"{fixture}.[0-9][0-9].*"))
     return {str(p.relative_to(out)): p.read_bytes() for p in names if p.is_file()}
 
 
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
                     stand_in=graph,
                 )
             )
-            found = differences(stored(plan.cassette, out), files_of(outcome.cassette))
+            found = differences(stored(plan.fixture, out), files_of(outcome.fixture))
             drifted += bool(found)
             print(f"{scenario}: " + ("DRIFT\n" + "\n".join(found) if found else "no drift"))
     except Refused as refused:

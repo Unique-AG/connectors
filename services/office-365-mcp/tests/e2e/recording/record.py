@@ -1,6 +1,6 @@
 # pyright: reportPrivateUsage=false
 """Records a scenario's chain through the real app and tools against Microsoft Graph or the
-stand-in, scrubs it, lints it, replays it through the runner, and writes the cassette.
+stand-in, scrubs it, lints it, replays it through the runner, and writes the fixture.
 
   GRAPH_TOKEN=... SEED_UPNS=... python -m tests.e2e.recording.record uc-02-01 --target graph
   python -m tests.e2e.recording.record uc-02-01 --target stand-in [--dry-run] [--allow-writes]
@@ -47,7 +47,7 @@ from tests.e2e.recording.guard import (
 )
 from tests.e2e.recording.lint import lint_files
 from tests.e2e.recording.scrub import (
-    Cassette,
+    Fixture,
     Hop,
     Identities,
     Recording,
@@ -89,7 +89,7 @@ type Send = Callable[[httpx.AsyncBaseTransport, httpx.Request], Awaitable[httpx.
 @dataclass(frozen=True)
 class Plan:
     scenario: str
-    cassette: str
+    fixture: str
     steps: tuple[Json, ...]
 
     @property
@@ -101,7 +101,7 @@ class Plan:
 @dataclass(frozen=True, repr=False)
 class Outcome:
     recording: Recording
-    cassette: Cassette
+    fixture: Fixture
     report: list[str]
     unmet: list[str]
 
@@ -121,7 +121,7 @@ def resolve(scenario: str, recorded: Path = RECORDED) -> Plan:
     steps = tuple(
         {**mapping(step), **mapping(overrides.get(n, {}))} for n, step in enumerate(chain, 1)
     )
-    return Plan(scenario, str(variant.get("cassette", f"rec-{scenario}")), steps)
+    return Plan(scenario, str(variant.get("fixture", f"rec-{scenario}")), steps)
 
 
 def _tool(step: Json) -> str:
@@ -144,7 +144,7 @@ def check(plan: Plan, guard: Guard) -> list[str]:
 
 
 def describe(plan: Plan, guard: Guard) -> list[str]:
-    lines = [f"{plan.scenario} -> cassette {plan.cassette} (dry run, nothing is sent):"]
+    lines = [f"{plan.scenario} -> fixture {plan.fixture} (dry run, nothing is sent):"]
     for number, step in enumerate(plan.steps, 1):
         given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
         refusal = guard.refuses_call(_tool(step), _literal_args(step))
@@ -379,7 +379,7 @@ async def capture(
     }
     recording = Recording(
         plan.scenario,
-        plan.cassette,
+        plan.fixture,
         target,
         recorded_at,
         tuple(recorder.hops),
@@ -459,14 +459,14 @@ def _unmet(number: int, expect: Json, outcome: object, replay: Replay) -> list[s
 
 
 async def replay_check(
-    plan: Plan, cassette: Cassette, server: FastMCP[None]
+    plan: Plan, fixture: Fixture, server: FastMCP[None]
 ) -> tuple[list[object], list[str], list[str]]:
-    replay = Replay([mapping(one) for one in cassette.interactions])
+    replay = Replay([mapping(one) for one in fixture.interactions])
     outcomes: list[object] = []
     broken: list[str] = []
     unmet: list[str] = []
     with tempfile.TemporaryDirectory() as folder, pytest.MonkeyPatch.context() as patch:
-        for name, body in files_of(cassette).items():
+        for name, body in files_of(fixture).items():
             (Path(folder) / name).parent.mkdir(parents=True, exist_ok=True)
             _ = (Path(folder) / name).write_bytes(body)
         patch.setattr(runner, "HERE", Path(folder))
@@ -495,7 +495,7 @@ async def replay_check(
                         break
                     outcomes.append(outcome)
                     unmet += _unmet(number, mapping(step.get("expect", {})), outcome, replay)
-    unused = [n for n in range(len(cassette.interactions)) if n not in replay.seen]
+    unused = [n for n in range(len(fixture.interactions)) if n not in replay.seen]
     broken += [f"interaction {n + 1} is never reached on replay" for n in unused]
     return outcomes, broken, unmet
 
@@ -519,18 +519,18 @@ async def record(
         plan, target, token=token, upns=upns, guard=guard, server=server, stand_in=stand_in
     )
     secrets = sorted(recording.identities.everything())
-    cassette = scrub(recording)
-    findings = lint_files(files_of(cassette), recording.identities.everything())
+    fixture = scrub(recording)
+    findings = lint_files(files_of(fixture), recording.identities.everything())
     if findings:
         raise Refused(
             f"{plan.scenario}: the lint found {len(findings)} leak(s), nothing was written:\n  "
             + "\n  ".join(findings)
         )
-    replayed, broken, unmet = await replay_check(plan, cassette, server)
+    replayed, broken, unmet = await replay_check(plan, fixture, server)
     if broken:
         raise Refused(
             _redacted(
-                f"{plan.scenario}: the scrubbed cassette does not replay, nothing was written:\n  "
+                f"{plan.scenario}: the scrubbed fixture does not replay, nothing was written:\n  "
                 + "\n  ".join(broken),
                 secrets,
             )
@@ -558,22 +558,22 @@ async def record(
         for kind in ("replaced", "dropped", "mapped")
     }
     report = [
-        f"{plan.scenario}: {len(recording.hops)} requests -> {len(cassette.interactions)} "
-        + f"interactions, {len(cassette.fixtures)} fixtures, lint clean, replay clean",
-        "  scrub: " + ", ".join(f"{k} {v}" for k, v in cassette.counts.items()),
+        f"{plan.scenario}: {len(recording.hops)} requests -> {len(fixture.interactions)} "
+        + f"interactions, {len(fixture.bodies)} bodies, lint clean, replay clean",
+        "  scrub: " + ", ".join(f"{k} {v}" for k, v in fixture.counts.items()),
         "  tool output changed by the scrub: " + ", ".join(f"{k} {v}" for k, v in tally.items()),
     ]
-    return Outcome(recording, cassette, report, unmet)
+    return Outcome(recording, fixture, report, unmet)
 
 
-def write(cassette: Cassette, out: Path) -> list[Path]:
-    stale = re.compile(re.escape(cassette.name) + r"\.\d{2}\.")
+def write(fixture: Fixture, out: Path) -> list[Path]:
+    stale = re.compile(re.escape(fixture.name) + r"\.\d{2}\.")
     old: Path
-    for old in (out / "fixtures").glob(f"{cassette.name}.*"):
+    for old in (out / "bodies").glob(f"{fixture.name}.*"):
         if stale.match(old.name):
             old.unlink()
     written: list[Path] = []
-    for name, body in files_of(cassette).items():
+    for name, body in files_of(fixture).items():
         (out / name).parent.mkdir(parents=True, exist_ok=True)
         _ = (out / name).write_bytes(body)
         written.append(out / name)
@@ -695,7 +695,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             secrets += sorted(outcome.recording.identities.values)
-            written = write(outcome.cassette, out)
+            written = write(outcome.fixture, out)
             print(
                 _redacted(
                     "\n".join([*outcome.report, f"  wrote {len(written)} files under {out}"]),

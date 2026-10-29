@@ -346,7 +346,7 @@ def render_status() -> str:
         if found:
             happy = found.count("happy")
             paths.append(f"| {surface} | {happy} | {len(found) - happy} | {len(found)} |")
-    runs = sum(1 for entry in _entries().values() if {"cassette", "variants"} & set(entry))
+    runs = sum(1 for entry in _entries().values() if {"fixture", "variants"} & set(entry))
     lines = [
         "# office-365-mcp use case status",
         "",

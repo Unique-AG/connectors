@@ -1,5 +1,5 @@
 # pyright: reportPrivateUsage=false
-"""Turns a recording into the runner's cassette, its fixtures and a metadata file (plan v3 R2,
+"""Turns a recording into the runner's fixture, its bodies and a metadata file (plan v3 R2,
 allowlist by construction). A response key that `SCHEMA` does not name is dropped. Free text that
 is not seed corpus text becomes `synthetic text NN`. An address that is not a persona becomes
 `user-NN@example.test`. An id keeps its length, punctuation and known prefix, and its letters and
@@ -159,7 +159,7 @@ type Target = Literal["stand-in", "graph"]
 @dataclass(frozen=True, repr=False)
 class Recording:
     scenario: str
-    cassette: str
+    fixture: str
     target: Target
     recorded_at: datetime
     hops: tuple[Hop, ...]
@@ -475,10 +475,10 @@ class Mapper:
 
 
 @dataclass(frozen=True)
-class Cassette:
+class Fixture:
     name: str
     interactions: list[dict[str, object]]
-    fixtures: dict[str, bytes]
+    bodies: dict[str, bytes]
     metadata: dict[str, object]
     counts: dict[str, int]
 
@@ -526,7 +526,7 @@ def _symbols(day: date, where: str) -> Callable[[str], str]:
     return lambda text: re.sub(_DATETIME, symbol, text)
 
 
-def scrub(recording: Recording, corpus: Corpus | None = None) -> Cassette:
+def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
     corpus = corpus or load_corpus()
     parsed = [_parsed(hop) for hop in recording.hops]
     extra = "\x00".join(normalized(one) for one in sorted(recording.literals))
@@ -534,7 +534,7 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Cassette:
     mapper = Mapper(corpus, recording.personas, ids, extra)
     day = recording.recorded_at.date()
     interactions: list[dict[str, object]] = []
-    fixtures: dict[str, bytes] = {}
+    bodies: dict[str, bytes] = {}
     followed: list[tuple[str, list[tuple[str, str]]]] = []
     for n, (hop, body) in enumerate(zip(recording.hops, parsed, strict=True), 1):
         where = f"{recording.scenario} hop {n}"
@@ -562,10 +562,10 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Cassette:
         if body is not None:
             if isinstance(body, Mapping) and "@odata.nextLink" in body:
                 followed.append(_target(str(cast("Json", body)["@odata.nextLink"])))
-            name = f"{recording.cassette}.{n:02d}.json"
+            name = f"{recording.fixture}.{n:02d}.json"
             scrubbed = mapper.response(cast("object", body))
             text = json.dumps(scrubbed, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-            fixtures[name] = text.encode()
+            bodies[name] = text.encode()
             interaction["body"] = name
         elif hop.body:
             if hashlib.sha256(hop.body).hexdigest() not in corpus.binaries:
@@ -576,14 +576,14 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Cassette:
             mapper.counts["binaries kept by hash"] += 1
             media = headers.get("content-type", "")
             suffix = next((s for k, s in _SUFFIXES.items() if k in media), ".bin")
-            name = f"{recording.cassette}.{n:02d}{suffix}"
-            fixtures[name] = hop.body
+            name = f"{recording.fixture}.{n:02d}{suffix}"
+            bodies[name] = hop.body
             interaction["body"] = name
         interactions.append(interaction)
     counts = dict(sorted(mapper.counts.items()))
     metadata: dict[str, object] = {
         "scenario": recording.scenario,
-        "cassette": recording.cassette,
+        "fixture": recording.fixture,
         "source": "recorded",
         "target": recording.target,
         "recorded_at": recording.recorded_at.isoformat(timespec="seconds"),
@@ -592,14 +592,14 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Cassette:
         "literals": sorted(recording.literals),
         "sdk_versions": {name: version(name) for name in SDKS},
     }
-    return Cassette(recording.cassette, interactions, fixtures, metadata, counts)
+    return Fixture(recording.fixture, interactions, bodies, metadata, counts)
 
 
-def files_of(cassette: Cassette) -> dict[str, bytes]:
-    text = json.dumps(cassette.interactions, indent=2, ensure_ascii=False) + "\n"
-    meta = yaml.safe_dump(cassette.metadata, sort_keys=False)
+def files_of(fixture: Fixture) -> dict[str, bytes]:
+    text = json.dumps(fixture.interactions, indent=2, ensure_ascii=False) + "\n"
+    meta = yaml.safe_dump(fixture.metadata, sort_keys=False)
     return {
-        f"cassettes/{cassette.name}.json": text.encode(),
-        f"cassettes/{cassette.name}.meta.yaml": meta.encode(),
-        **{f"fixtures/{name}": body for name, body in sorted(cassette.fixtures.items())},
+        f"fixtures/{fixture.name}.json": text.encode(),
+        f"fixtures/{fixture.name}.meta.yaml": meta.encode(),
+        **{f"bodies/{name}": body for name, body in sorted(fixture.bodies.items())},
     }

@@ -1,5 +1,5 @@
-"""Runs the sidecar entries that name a cassette through the real app, middleware and tools, with
-Graph answered from `cassettes/`. `features/README.md`, "Running the scenarios", has the keys."""
+"""Runs the sidecar entries that name a fixture through the real app, middleware and tools, with
+Graph answered from `fixtures/`. `features/README.md`, "Running the scenarios", has the keys."""
 
 import importlib
 import json
@@ -69,7 +69,7 @@ def entries() -> Iterator[tuple[str, Json]]:
 def runs() -> list[tuple[str, Json, Json]]:
     found: list[tuple[str, Json, Json]] = []
     for scenario_id, entry in entries():
-        found += [(scenario_id, entry, {})] if "cassette" in entry else []
+        found += [(scenario_id, entry, {})] if "fixture" in entry else []
         variants = mapping(entry.get("variants", {})).items()
         found += [(f"{scenario_id}/{name}", entry, mapping(one)) for name, one in variants]
     return found
@@ -150,7 +150,7 @@ def same(expected: object, actual: object) -> bool:
 
 
 def _response(spec: Json) -> httpx.Response:
-    named = HERE / "fixtures" / str(spec.get("body", ""))
+    named = HERE / "bodies" / str(spec.get("body", ""))
     content = named.read_bytes() if named.is_file() else b""
     headers = {"content-type": "application/json"} if named.suffix == ".json" else {}
     answered = spec.get("response_headers", spec.get("headers", {}))
@@ -284,8 +284,8 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_the_scenario_runs_as_its_sidecar_says(
     entry: Json, variant: Json, server: FastMCP[None], retry_sleeps: RecordedSleeps
 ) -> None:
-    cassette = str(variant.get("cassette", entry.get("cassette")))
-    recorded = cast("object", json.loads((HERE / "cassettes" / f"{cassette}.json").read_text()))
+    fixture = str(variant.get("fixture", entry.get("fixture")))
+    recorded = cast("object", json.loads((HERE / "fixtures" / f"{fixture}.json").read_text()))
     replay, person = Replay([mapping(one) for one in items(recorded)]), Person()
     results: list[object] = []
     overrides = cast("Mapping[object, object]", variant)
@@ -297,7 +297,7 @@ async def test_the_scenario_runs_as_its_sidecar_says(
             for number, step in enumerate(steps, 1):
                 results.append(await _step(c, replay, person, retry_sleeps, number, step, results))
     unused = [json.dumps(one) for n, one in enumerate(replay.interactions) if n not in replay.seen]
-    assert unused == [], f"cassette {cassette}: no request reached\n" + "\n".join(unused)
+    assert unused == [], f"fixture {fixture}: no request reached\n" + "\n".join(unused)
     assert bool(person.asked) == entry["asks_user"], f"asks_user, but asked {person.asked}"
 
 
@@ -327,7 +327,7 @@ async def _step(
         }
     except ToolError as refused:
         error = str(refused)
-    assert not replay.unmatched, f"{where}: no cassette interaction matches\n" + "\n".join(
+    assert not replay.unmatched, f"{where}: no fixture interaction matches\n" + "\n".join(
         replay.unmatched
     )
     assert replay.faults_left == 0, f"{where}: {replay.faults_left} faults reached no request"

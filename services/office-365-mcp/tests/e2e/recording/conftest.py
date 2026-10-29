@@ -43,5 +43,5 @@ def recorded(tmp_path_factory: pytest.TempPathFactory) -> Recorded:
     out = tmp_path_factory.mktemp("recorded")
     outcomes = {scenario: record_on(scenario) for scenario in SCENARIOS}
     for outcome in outcomes.values():
-        _ = write(outcome.cassette, out)
+        _ = write(outcome.fixture, out)
     return Recorded(out, outcomes)

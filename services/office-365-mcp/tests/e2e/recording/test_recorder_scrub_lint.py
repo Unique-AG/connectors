@@ -41,11 +41,11 @@ IDENTITIES = frozenset(
         stand_in.DRIVE_ID,
     }
 )
-MAIL = "fixtures/rec-uc-02-01.03.json"
-MOVED = "fixtures/rec-uc-05-16.03.json"
-ITEM = "fixtures/rec-uc-01-06.02.json"
-DOCX = "fixtures/rec-uc-01-06.04.docx"
-CASSETTE = "cassettes/rec-uc-01-06.json"
+MAIL = "bodies/rec-uc-02-01.03.json"
+MOVED = "bodies/rec-uc-05-16.03.json"
+ITEM = "bodies/rec-uc-01-06.02.json"
+DOCX = "bodies/rec-uc-01-06.04.docx"
+FIXTURE = "fixtures/rec-uc-01-06.json"
 PREVIEW = "Your new laptop is ready."
 
 
@@ -110,16 +110,16 @@ PLANTED: dict[str, tuple[Plant, str]] = {
         "a GUID without dashes",
     ),
     "OneDrive path": (
-        swap(CASSETTE, "/personal/mia_example_test", stand_in.ONEDRIVE_PATH),
+        swap(FIXTURE, "/personal/mia_example_test", stand_in.ONEDRIVE_PATH),
         "a OneDrive path",
     ),
     "docx part": (in_docx, "a binary that the seed generator did not make"),
     "token": (swap(MAIL, PREVIEW, stand_in.TEMPAUTH), "a token-like string"),
-    "tempauth": (swap(CASSETTE, "Translate=false", "tempauth=x"), "a credential parameter"),
-    "sig": (swap(CASSETTE, "Translate=false", "sig=x"), "a credential parameter"),
-    "SAS parameter": (swap(CASSETTE, "Translate=false", "skoid=x"), "a credential parameter"),
+    "tempauth": (swap(FIXTURE, "Translate=false", "tempauth=x"), "a credential parameter"),
+    "sig": (swap(FIXTURE, "Translate=false", "sig=x"), "a credential parameter"),
+    "SAS parameter": (swap(FIXTURE, "Translate=false", "skoid=x"), "a credential parameter"),
     "response header": (
-        swap(CASSETTE, '"location":', '"x-ms-ags-diagnostic": "{}", "location":'),
+        swap(FIXTURE, '"location":', '"x-ms-ags-diagnostic": "{}", "location":'),
         "keeps the response header x-ms-ags-diagnostic",
     ),
     "foreign subject": (
@@ -155,12 +155,12 @@ ENCODED: dict[str, tuple[str, str]] = {
 }
 
 
-def test_the_recorded_cassettes_are_clean(recorded: Recorded) -> None:
+def test_the_recorded_fixtures_are_clean(recorded: Recorded) -> None:
     assert lint_dir(recorded.out) == []
     assert lint_dir(recorded.out, IDENTITIES) == []
 
 
-def test_the_hand_written_cassettes_pass_the_lint() -> None:
+def test_the_hand_written_fixtures_pass_the_lint() -> None:
     assert lint_dir(runner.HERE) == []
 
 
@@ -223,7 +223,7 @@ def test_the_scrub_drops_headers_and_keys_outside_the_allowlists(recorded: Recor
     raw = {name.lower() for hop in recording.hops for name, _ in hop.headers}
     kept = {
         name
-        for path in (recorded.out / "cassettes").glob("rec-*.json")
+        for path in (recorded.out / "fixtures").glob("rec-*.json")
         for one in items(loaded(path))
         for name in mapping(mapping(one).get("response_headers", {}))
     }
@@ -235,7 +235,7 @@ def test_the_scrub_drops_headers_and_keys_outside_the_allowlists(recorded: Recor
 
 
 def test_foreign_text_and_addresses_become_placeholders(recorded: Recorded) -> None:
-    pages = ("fixtures/rec-uc-02-01.03.json", "fixtures/rec-uc-02-01.04.json")
+    pages = ("bodies/rec-uc-02-01.03.json", "bodies/rec-uc-02-01.04.json")
     rows = [row for page in pages for row in items(select(loaded(recorded.out / page), "value"))]
     assert [select(row, "subject") for row in rows][-2:] == [
         "synthetic text 03",
@@ -260,7 +260,7 @@ def test_a_persona_keeps_the_persona_name_that_the_corpus_gives_it() -> None:
 
 
 def test_the_download_location_loses_its_credentials(recorded: Recorded) -> None:
-    location = select(loaded(recorded.out / CASSETTE), "[2].response_headers.location")
+    location = select(loaded(recorded.out / FIXTURE), "[2].response_headers.location")
     assert location == (
         "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx"
         + f"?UniqueId={mapped_guid(stand_in.FILE_UNIQUE_ID)}&Translate=false&ApiVersion=2.0"

@@ -72,7 +72,7 @@ uc-04-06:
         result: {subject: Contract for Brightway, "to[*].address": [anna@example.invalid]}
         graph_calls: {GET /v1.0/me/messages/*: 2, POST /v1.0/me/messages/*/send: 1}
   note: Anna receives the message once because of the read before the send (tools/outlook_send_draft.py:172-182). A draft that already went out gives not found or not-a-draft, so a second call sends nothing. The advice text of a failed send gives no such guarantee (uc-04-25, uc-04-36). Keep the read.
-  cassette: uc-04-06
+  fixture: uc-04-06
 
 uc-04-07:
   status: untested
@@ -88,7 +88,7 @@ uc-04-07:
         tool_error: {shared.seam._not_agreed: [tools.outlook_send_draft._NOTHING_SENT]}
         graph_calls: {GET /v1.0/me/messages/*: 1}
   note: Mia declines, so the tool sends nothing
-  cassette: uc-04-07
+  fixture: uc-04-07
 
 uc-04-08:
   status: untested
@@ -309,10 +309,10 @@ uc-04-25:
   note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail. The send runs with no_retry (graph_client/client.py:220-232), so one failure makes exactly one send call (tests/test_error_mapping.py:654-698 states the same for other writes). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text and not this text (uc-04-36). An unreadable answer is not a row: a send has no answer body, and a 2xx is a success without parsing (kiota send_no_response_content_async). The assistant calls outlook_send_draft again only when the sent items do not show the message, and the read before each send gives not found or not-a-draft for a draft that went out (tools/outlook_send_draft.py:172-182)."
   variants:
     fails:
-      cassette: uc-04-25
+      fixture: uc-04-25
       1: {fault: {graph: {status: 503}, at: POST */send}}
     no-answer-in-time:
-      cassette: uc-04-25
+      fixture: uc-04-25
       1: {fault: {transport: timeout, at: POST */send}}
 
 uc-04-26:
@@ -334,13 +334,13 @@ uc-04-26:
   note: "expected behaviour from shared/seam.py:451-470: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:207), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
   variants:
     fails:
-      cassette: uc-04-26
+      fixture: uc-04-26
       1: {fault: {graph: {status: 500, body: error.generalException.json}}}
     no-answer-in-time:
-      cassette: uc-04-26
+      fixture: uc-04-26
       1: {fault: {transport: timeout}}
     unreadable:
-      cassette: uc-04-26
+      fixture: uc-04-26
       1: {fault: {graph: {status: 201, headers: {Content-Type: text/html}, body: page.notData.html}}}
 
 uc-04-27:
@@ -433,7 +433,7 @@ uc-04-33:
         tool_error: {shared.seam._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}
         graph_calls: {GET /v1.0/me/messages/*: 1}
   note: "expected behaviour from shared/seam.py:227-233 (_no_answer): the client sent no answer that the connector can use, tell the user that the connector received no answer and that they can make the same request again. The same text covers an error or a timeout of the question."
-  cassette: uc-04-07
+  fixture: uc-04-07
 
 uc-04-34:
   status: untested

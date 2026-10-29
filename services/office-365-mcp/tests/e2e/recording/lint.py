@@ -1,6 +1,6 @@
 """The scrub lint (plan v3 R3), the second line behind the scrub. It looks for what must never reach
-a cassette or a fixture: plain, URL-, HTML-, JSON- and MIME-encoded, base64 and base32 at every
-alignment, gzip, and inside zip members, also nested. A recorded cassette also gets the corpus
+a fixture or a body: plain, URL-, HTML-, JSON- and MIME-encoded, base64 and base32 at every
+alignment, gzip, and inside zip members, also nested. A recorded fixture also gets the corpus
 check: every kept key is in the projection, every text is corpus text, every address is
 synthetic, every id was made by the mapper, every binary is a seed file. It never prints a value.
 
@@ -236,11 +236,11 @@ def _keys(value: object) -> Iterator[str]:
 def _recorded(files: Mapping[str, bytes]) -> dict[str, frozenset[str]]:
     recorded: dict[str, frozenset[str]] = {}
     for name, body in files.items():
-        if name.startswith("cassettes/") and name.endswith(".meta.yaml"):
+        if name.startswith("fixtures/") and name.endswith(".meta.yaml"):
             meta = cast("Json", yaml.safe_load(body))
             if meta.get("source") == "recorded":
-                cassette = name.removesuffix(".meta.yaml") + ".json"
-                recorded[cassette] = frozenset(cast("list[str]", meta.get("literals", [])))
+                fixture = name.removesuffix(".meta.yaml") + ".json"
+                recorded[fixture] = frozenset(cast("list[str]", meta.get("literals", [])))
     return recorded
 
 
@@ -300,7 +300,7 @@ def lint_files(
     findings: list[str] = []
     recorded = _recorded(files)
     strict = set(recorded) | {
-        f"fixtures/{interaction['body']}"
+        f"bodies/{interaction['body']}"
         for name in recorded
         if name in files
         for interaction in cast("list[Json]", json.loads(files[name]))
@@ -309,16 +309,16 @@ def lint_files(
     for name, body in files.items():
         for where, text in _texts(name, body):
             findings += _scan(where, text, identities, name in strict)
-        if not (name.startswith("cassettes/") and name.endswith(".json")):
+        if not (name.startswith("fixtures/") and name.endswith(".json")):
             continue
         interactions = cast("list[Json]", json.loads(body))
         findings += _headers(name, interactions)
         if name in recorded:
             findings += _ids(name, interactions)
-            for fixture in (str(i["body"]) for i in interactions if "body" in i):
-                key = f"fixtures/{fixture}"
+            for body_name in (str(i["body"]) for i in interactions if "body" in i):
+                key = f"bodies/{body_name}"
                 if key not in files:
-                    findings.append(f"{name}: the fixture {fixture} is missing")
+                    findings.append(f"{name}: the body {body_name} is missing")
                     continue
                 findings += _corpus(key, files[key], corpus or load_corpus(), recorded[name])
     first: dict[str, str] = {}
@@ -330,7 +330,7 @@ def lint_files(
 def lint_dir(
     root: Path, identities: Collection[str] = (), corpus: Corpus | None = None
 ) -> list[str]:
-    paths = sorted(p for folder in ("cassettes", "fixtures") for p in (root / folder).iterdir())
+    paths = sorted(p for folder in ("fixtures", "bodies") for p in (root / folder).iterdir())
     return lint_files({str(p.relative_to(root)): p.read_bytes() for p in paths}, identities, corpus)
 
 

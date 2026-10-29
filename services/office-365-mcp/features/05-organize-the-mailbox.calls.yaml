@@ -61,10 +61,10 @@ uc-05-16:
           "messages[1].uri": outlook:///messages/AAMkAGI2RUN-0002%3D
         graph_calls: {POST /v1.0/me/messages/*/move: 3}
   note: the tool moves each message on its own, and it reports an error only when no message moved
-  cassette: uc-05-16
+  fixture: uc-05-16
   variants:
     recorded:
-      cassette: rec-uc-05-16
+      fixture: rec-uc-05-16
       1:
         args: {category: seed-v1, limit: 3}
       2:
@@ -367,7 +367,7 @@ uc-05-26:
   note: "expected behaviour from tools/outlook_move_mail.py:112 (_NOT_A_MESSAGE_HANDLE): a subject line, an email address, an Outlook web link, a bare message id and a folder or rule handle are not handles. The tool checks every handle before any message moves, so nothing moved, and the assistant fixes the value and calls again with the whole batch. The first call makes no Microsoft call. The second listing is optional, because the first listing already holds the right uri values. The logs show the failing move and no arguments (features/README.md, What the usage shows), so the batch of 2 plus 1 and the 5 wrong values are drafted. uc-05-03 states the success side."
   variants:
     subject-line:
-      cassette: uc-05-26
+      fixture: uc-05-26
       2:
         fault: {input: {message_refs: ["$prev.messages[0].uri", "$prev.messages[1].uri", "$prev.messages[2].subject"]}}
         expect: {tool_error: tools.outlook_move_mail._NOT_A_MESSAGE_HANDLE, graph_calls: {}}

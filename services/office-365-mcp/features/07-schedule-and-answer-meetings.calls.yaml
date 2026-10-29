@@ -288,10 +288,10 @@ uc-07-22:
   note: "expected behaviour from shared/seam.py:451-470 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (tools/outlook_create_event.py:94). The same advice is chosen at shared/seam.py:546-548 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Launch review. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:418), but the advice does not rely on it. The write is not repeated by the SDK (graph_client/client.py:220-232)."
   variants:
     fails:
-      cassette: uc-07-22
+      fixture: uc-07-22
       1: {fault: {graph: {status: 503}, at: POST */events}}
     no-answer-in-time:
-      cassette: uc-07-22
+      fixture: uc-07-22
       1: {fault: {transport: timeout, at: POST */events}}
 
 uc-07-23:

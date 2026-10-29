@@ -1,8 +1,8 @@
-# Cassette recorder
+# Fixture recorder
 
 The recorder runs a scenario's chain through the real app and the real tools against Microsoft
 Graph. It then scrubs the answers, lints them, replays them through the runner, and writes a
-cassette in the runner's format. Raw answers stay in memory. Only the scrubbed files are written.
+fixture in the runner's format. Raw answers stay in memory. Only the scrubbed files are written.
 
 | File | Job |
 | --- | --- |
@@ -89,14 +89,14 @@ export RECORD_LINT_IDENTITIES="<tenant id>,<tenant name>,<tenant domain>,$SEED_U
 Exit codes of `record`: 0 written; 1 written, but the variant's `expect` does not hold (the
 recorder shows the values; update `recorded.calls.yaml` and replay); 2 refused, nothing written.
 
-The files go to `tests/e2e/cassettes/rec-<id>.json`, `rec-<id>.meta.yaml` and
-`tests/e2e/fixtures/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
+The files go to `tests/e2e/fixtures/rec-<id>.json`, `rec-<id>.meta.yaml` and
+`tests/e2e/bodies/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
 scenario's block from `recorded.calls.yaml` into its sidecar entry as `variants: recorded:`, and
 only after a recording whose `expect` holds. It prints the number of runs. Set `_MINIMUM_EXECUTABLE`
 to that number, run `pnpm exec biome check --write services/office-365-mcp/tests/e2e` from the
 repository root (CI fails on the unformatted files that the recorder writes), and run
 `uv run pytest tests/e2e tests/test_use_cases.py`. The tenant owner
-reads the first cassette diff before any push.
+reads the first fixture diff before any push.
 
 To record uc-05-16 again, run the seed `cleanup` and `apply` as Mia first. The first run moved
 the three newest seed mails.
