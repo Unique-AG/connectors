@@ -293,6 +293,8 @@ jobs:
           if [ "$ecosystem_label" = actions ]; then ecosystem_label=github-actions; fi
           gh label create dependencies --color 0366d6 --description "Updates to dependencies" || true
           gh label create "$ecosystem_label" --color 6f42c1 --description "Updates to $ecosystem_label packages" || true
+          gh label create ai-assisted --color 5319e7 --description "The AI agent handled this pull request" || true
+          gh label create human-required --color d93f0b --description "A person must finish this pull request" || true
 
           if [ "$ACTION" = rebuild ]; then
             gh pr edit "$NUMBER" --title "$title" --body-file "$RUNNER_TEMP/patch/pr-body.md"

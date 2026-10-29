@@ -306,6 +306,7 @@ describe('buildPlan', () => {
       body: markerOf(zod.key),
       behindBy: 2,
       humanCommits: false,
+      labels: [],
       ...overrides,
     });
     const plan = (openPulls, extra = {}) =>
@@ -352,8 +353,27 @@ describe('buildPlan', () => {
       );
     });
 
+    it('only merges main into a pull request that the agent handled', () => {
+      const { entries, updates } = plan([pull({ labels: ['ai-assisted'] })]);
+      assert.deepStrictEqual(
+        updates.map(({ slug, number }) => [slug, number]),
+        [['npm-zod', 7]],
+      );
+      assert.deepStrictEqual(
+        entries.map(({ slug }) => slug),
+        ['npm-pino'],
+      );
+    });
+
     it('replaces a pull request for another version', () => {
       const { entries } = plan([pull({ body: markerOf('npm-zod:0123456789ab') })]);
+      assert.strictEqual(entries[0].action, 'replace');
+    });
+
+    it('replaces an agent-handled pull request for another version', () => {
+      const { entries } = plan([
+        pull({ labels: ['human-required'], body: markerOf('npm-zod:0123456789ab') }),
+      ]);
       assert.strictEqual(entries[0].action, 'replace');
     });
 

@@ -31,7 +31,7 @@ describe('markers', () => {
 
 describe('classifyOpenPull', () => {
   const key = entryKey(entry('11.2.4'));
-  const pull = { body: markerOf(key), behindBy: 3, humanCommits: false };
+  const pull = { body: markerOf(key), behindBy: 3, humanCommits: false, labels: [] };
 
   it('keeps a pull request that is up to date', () => {
     assert.strictEqual(classifyOpenPull({ key, pull: { ...pull, behindBy: 0 } }), 'keep');
@@ -44,6 +44,15 @@ describe('classifyOpenPull', () => {
   it('only merges main into a pull request that has a commit from a person', () => {
     assert.strictEqual(classifyOpenPull({ key, pull: { ...pull, humanCommits: true } }), 'update');
   });
+
+  for (const label of ['ai-assisted', 'human-required']) {
+    it(`only merges main into a pull request that carries the label ${label}`, () => {
+      assert.strictEqual(
+        classifyOpenPull({ key, pull: { ...pull, labels: ['dependencies', label] } }),
+        'update',
+      );
+    });
+  }
 
   it('replaces a pull request for other versions, and one with no marker', () => {
     assert.strictEqual(classifyOpenPull({ key: entryKey(entry('11.3.0')), pull }), 'replace');

@@ -149,14 +149,15 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseBranch = process.env.BASE_BRANCH ?? 'main';
 const gh = (...args) => runOrThrow('gh', args);
 const openPullRequests = JSON.parse(
-  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,body'),
+  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,body,labels'),
 );
 const openPulls = openPullRequests
   .filter(({ headRefName }) => headRefName.startsWith('deps/'))
-  .map(({ number, headRefName, body }) => ({
+  .map(({ number, headRefName, body, labels }) => ({
     number,
     branch: headRefName,
     body,
+    labels: labels.map(({ name }) => name),
     behindBy: Number(
       gh('api', `repos/${repository}/compare/${baseBranch}...${headRefName}`, '--jq', '.behind_by'),
     ),
