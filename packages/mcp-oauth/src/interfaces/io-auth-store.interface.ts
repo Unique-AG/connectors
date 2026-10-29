@@ -10,6 +10,7 @@ export interface AccessTokenMetadata {
   expiresAt: Date;
   userProfileId: string;
   userData?: unknown;
+  familyId?: string | null;
 }
 
 export interface RefreshTokenMetadata {
@@ -21,6 +22,8 @@ export interface RefreshTokenMetadata {
   userProfileId: string;
   familyId?: string | null;
   generation?: number | null;
+  /** Set once the token has been exchanged; a used token presented again is a replay. */
+  usedAt?: Date | null;
 }
 
 /** What a profile-wide revocation swept away, so callers can log the blast radius. */
@@ -52,13 +55,21 @@ export interface IOAuthStore {
   removeAccessToken(token: string): Promise<void>;
 
   storeRefreshToken(token: string, metadata: RefreshTokenMetadata): Promise<void>;
+  /**
+   * Returns used tokens too, so a replay can be told apart from an unknown token. Read it from
+   * the shared database rather than a per-instance cache, or a token redeemed or revoked on
+   * another instance is still accepted here.
+   */
   getRefreshToken(token: string): Promise<RefreshTokenMetadata | undefined>;
   removeRefreshToken(token: string): Promise<void>;
+  /**
+   * Atomically marks an unused refresh token as used. Returns false when it was already used or
+   * no longer exists, so of several concurrent redemptions exactly one succeeds.
+   */
+  redeemRefreshToken(token: string): Promise<boolean>;
 
   // Refresh token family management for reuse detection
   revokeTokenFamily?(familyId: string): Promise<void>;
-  markRefreshTokenAsUsed?(token: string): Promise<void>;
-  isRefreshTokenUsed?(token: string): Promise<boolean>;
 
   /**
    * Delete every MCP access/refresh token for a user profile.

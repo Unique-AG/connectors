@@ -18,7 +18,6 @@ export class MockOAuthStore implements IOAuthStore {
     string,
     OAuthUserProfile & { profile_id: string; provider: string }
   >();
-  private usedRefreshTokens = new Set<string>();
 
   public generateClientId(_client: OAuthClient): string {
     return `client-${Math.random().toString(36).substr(2, 9)}`;
@@ -95,10 +94,21 @@ export class MockOAuthStore implements IOAuthStore {
     this.refreshTokens.delete(token);
   }
 
+  public async redeemRefreshToken(token: string): Promise<boolean> {
+    const metadata = this.refreshTokens.get(token);
+    if (!metadata || metadata.usedAt) {
+      return false;
+    }
+    this.refreshTokens.set(token, { ...metadata, usedAt: new Date() });
+    return true;
+  }
+
   public async revokeTokenFamily(familyId: string): Promise<void> {
-    for (const [token, metadata] of this.refreshTokens.entries()) {
-      if (metadata.familyId === familyId) {
-        this.refreshTokens.delete(token);
+    for (const tokenStore of [this.accessTokens, this.refreshTokens]) {
+      for (const [token, metadata] of [...tokenStore.entries()]) {
+        if (metadata.familyId === familyId) {
+          tokenStore.delete(token);
+        }
       }
     }
   }
@@ -118,14 +128,6 @@ export class MockOAuthStore implements IOAuthStore {
     }
 
     return { tokenCount, clientIds: [...clientIds] };
-  }
-
-  public async markRefreshTokenAsUsed(token: string): Promise<void> {
-    this.usedRefreshTokens.add(token);
-  }
-
-  public async isRefreshTokenUsed(token: string): Promise<boolean> {
-    return this.usedRefreshTokens.has(token);
   }
 
   public async upsertUserProfile(user: PassportUser): Promise<string> {
@@ -180,7 +182,6 @@ export class MockOAuthStore implements IOAuthStore {
     this.accessTokens.clear();
     this.refreshTokens.clear();
     this.userProfiles.clear();
-    this.usedRefreshTokens.clear();
   }
 
   public clearDynamicData(): void {
@@ -190,7 +191,6 @@ export class MockOAuthStore implements IOAuthStore {
     this.accessTokens.clear();
     this.refreshTokens.clear();
     this.userProfiles.clear();
-    this.usedRefreshTokens.clear();
   }
 
   public getStoredData() {

@@ -14,7 +14,7 @@ import {
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { eq, lt } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { typeid } from 'typeid-js';
 import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
@@ -45,7 +45,6 @@ export class McpOAuthStore implements IOAuthStore {
 
   // Cache key prefixes
   private readonly ACCESS_TOKEN_CACHE_PREFIX = 'access_token:';
-  private readonly REFRESH_TOKEN_CACHE_PREFIX = 'refresh_token:';
 
   public constructor(
     private readonly drizzle: DrizzleDatabase,
@@ -247,6 +246,7 @@ export class McpOAuthStore implements IOAuthStore {
       scope: metadata.scope,
       resource: metadata.resource,
       userProfileId: metadata.userProfileId,
+      familyId: metadata.familyId ?? undefined,
     });
 
     await this.cacheAccessTokenMetadata(token, metadata);
@@ -316,26 +316,12 @@ export class McpOAuthStore implements IOAuthStore {
       familyId: metadata.familyId ?? undefined,
       generation: metadata.generation ?? undefined,
     });
-
-    await this.cacheRefreshTokenMetadata(token, metadata);
   }
 
+  // Never cached: a token redeemed or revoked on another pod must be rejected here at once.
   public async getRefreshToken(token: string): Promise<RefreshTokenMetadata | undefined> {
-    const cacheKey = this.getRefreshTokenCacheKey(token);
-    const cached = await this.cacheManager.get<RefreshTokenMetadata>(cacheKey);
-
-    if (cached) {
-      if (cached.expiresAt < new Date()) {
-        await this.removeRefreshToken(token);
-        return undefined;
-      }
-      return cached;
-    }
-
-    const metadata = await this.drizzle
+    const [metadata] = await this.drizzle
       .select({
-        token: tokens.token,
-        type: tokens.type,
         expiresAt: tokens.expiresAt,
         userId: tokens.userId,
         clientId: tokens.clientId,
@@ -344,28 +330,26 @@ export class McpOAuthStore implements IOAuthStore {
         userProfileId: tokens.userProfileId,
         familyId: tokens.familyId,
         generation: tokens.generation,
+        usedAt: tokens.usedAt,
       })
       .from(tokens)
-      .where(eq(tokens.token, token))
-      .then((rows) => rows[0]);
-
-    if (!metadata) {
-      return undefined;
-    }
-    if (metadata.expiresAt < new Date()) {
-      await this.removeRefreshToken(token);
-      return undefined;
-    }
-
-    await this.cacheRefreshTokenMetadata(token, metadata);
+      .where(and(eq(tokens.token, token), eq(tokens.type, 'REFRESH')));
 
     return metadata;
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
     await this.drizzle.delete(tokens).where(eq(tokens.token, token));
+  }
 
-    await this.removeCachedRefreshToken(token);
+  public async redeemRefreshToken(token: string): Promise<boolean> {
+    const redeemed = await this.drizzle
+      .update(tokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(tokens.token, token), eq(tokens.type, 'REFRESH'), isNull(tokens.usedAt)))
+      .returning({ id: tokens.id });
+
+    return redeemed.length > 0;
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {
@@ -377,11 +361,9 @@ export class McpOAuthStore implements IOAuthStore {
     await this.drizzle.delete(tokens).where(eq(tokens.userProfileId, userProfileId));
 
     await Promise.all(
-      tokensForUser.map((tokenData) =>
-        tokenData.type === 'ACCESS'
-          ? this.removeCachedAccessToken(tokenData.token)
-          : this.removeCachedRefreshToken(tokenData.token),
-      ),
+      tokensForUser
+        .filter((tokenData) => tokenData.type === 'ACCESS')
+        .map((tokenData) => this.removeCachedAccessToken(tokenData.token)),
     );
 
     return {
@@ -391,47 +373,20 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async revokeTokenFamily(familyId: string): Promise<void> {
-    // First, get all tokens in the family from database to remove from cache
-    const tokensInFamily = await this.drizzle
-      .select({ token: tokens.token, type: tokens.type })
-      .from(tokens)
-      .where(eq(tokens.familyId, familyId));
+    const revokedAccessTokens = await this.drizzle
+      .delete(tokens)
+      .where(eq(tokens.familyId, familyId))
+      .returning({ token: tokens.token, type: tokens.type })
+      .then((rows) => rows.filter((row) => row.type === 'ACCESS'));
 
-    await this.drizzle.delete(tokens).where(eq(tokens.familyId, familyId));
-
-    // Remove each token from cache
-    for (const tokenData of tokensInFamily) {
-      if (tokenData.type === 'ACCESS') {
-        await this.removeCachedAccessToken(tokenData.token);
-      } else if (tokenData.type === 'REFRESH') {
-        await this.removeCachedRefreshToken(tokenData.token);
-      }
-    }
-  }
-
-  public async markRefreshTokenAsUsed(token: string): Promise<void> {
-    await this.drizzle.update(tokens).set({ usedAt: new Date() }).where(eq(tokens.token, token));
-
-    await this.removeCachedRefreshToken(token);
-  }
-
-  public async isRefreshTokenUsed(token: string): Promise<boolean> {
-    // Always check DB, not cache.
-    const [metadata] = await this.drizzle
-      .select({ usedAt: tokens.usedAt })
-      .from(tokens)
-      .where(eq(tokens.token, token));
-
-    return !!metadata?.usedAt;
+    await Promise.all(
+      revokedAccessTokens.map((tokenData) => this.removeCachedAccessToken(tokenData.token)),
+    );
   }
 
   // Cache helper methods
   private getAccessTokenCacheKey(token: string): string {
     return `${this.ACCESS_TOKEN_CACHE_PREFIX}${token}`;
-  }
-
-  private getRefreshTokenCacheKey(token: string): string {
-    return `${this.REFRESH_TOKEN_CACHE_PREFIX}${token}`;
   }
 
   private async cacheAccessTokenMetadata(
@@ -447,26 +402,8 @@ export class McpOAuthStore implements IOAuthStore {
     }
   }
 
-  private async cacheRefreshTokenMetadata(
-    token: string,
-    metadata: RefreshTokenMetadata,
-  ): Promise<void> {
-    const cacheKey = this.getRefreshTokenCacheKey(token);
-    // cache-manager TTLs are in milliseconds
-    const ttl = Math.min(metadata.expiresAt.getTime() - Date.now(), MAX_TOKEN_CACHE_TTL_MS);
-
-    if (ttl > 0) {
-      await this.cacheManager.set(cacheKey, metadata, ttl);
-    }
-  }
-
   private async removeCachedAccessToken(token: string): Promise<void> {
     const cacheKey = this.getAccessTokenCacheKey(token);
-    await this.cacheManager.del(cacheKey);
-  }
-
-  private async removeCachedRefreshToken(token: string): Promise<void> {
-    const cacheKey = this.getRefreshTokenCacheKey(token);
     await this.cacheManager.del(cacheKey);
   }
 
