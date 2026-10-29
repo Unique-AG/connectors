@@ -6,7 +6,6 @@ Content is only created when missing, so running it again is safe.
 """
 
 import base64
-import html
 import http.cookiejar
 import json
 import os
@@ -18,16 +17,15 @@ import urllib.parse
 import urllib.request
 import uuid
 
-BASE_URL = os.environ.get("CONFLUENCE_URL", "http://confluence:8090").rstrip("/")
+BASE_URL = "http://confluence:8090"
 ADMIN_USER = "admin"
 ADMIN_PASSWORD = os.environ["CONFLUENCE_ADMIN_PASSWORD"]
-with open(
-    os.path.join(os.path.dirname(__file__), "timebomb-license.txt")
-) as license_file:
-    LICENSE_KEY = (
-        os.environ.get("CONFLUENCE_LICENSE_KEY") or license_file.read()
-    ).strip()
 SPACE_KEY = "TEST"
+
+LICENSE_KEY = os.environ.get("CONFLUENCE_LICENSE_KEY")
+if not LICENSE_KEY:
+    with open(os.path.join(os.path.dirname(__file__), "timebomb-license.txt")) as file:
+        LICENSE_KEY = file.read().strip()
 
 # 1x1 transparent PNG.
 PNG_BYTES = base64.b64decode(
@@ -69,8 +67,39 @@ PAGES = [
     },
 ]
 
-jar = http.cookiejar.CookieJar()
-browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+# Setup wizard: page path -> (form action, fields).
+SETUP_STEPS = {
+    "/setup/setuplicense.action": (
+        "/setup/dosetuplicense.action",
+        {"confLicenseString": LICENSE_KEY},
+    ),
+    "/setup/setupcluster-start.action": (
+        "/setup/setupcluster.action",
+        {"newCluster": "skipCluster"},
+    ),
+    "/setup/setupdata-start.action": (
+        "/setup/setupdata.action",
+        {"contentChoice": "blank"},
+    ),
+    "/setup/setupusermanagementchoice-start.action": (
+        "/setup/setupusermanagementchoice.action",
+        {"userManagementChoice": "internal"},
+    ),
+    "/setup/setupadministrator-start.action": (
+        "/setup/setupadministrator.action",
+        {
+            "username": ADMIN_USER,
+            "fullName": "Local Admin",
+            "email": "admin@example.com",
+            "password": ADMIN_PASSWORD,
+            "confirm": ADMIN_PASSWORD,
+        },
+    ),
+}
+
+browser = urllib.request.build_opener(
+    urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
+)
 auth_header = (
     "Basic " + base64.b64encode(f"{ADMIN_USER}:{ADMIN_PASSWORD}".encode()).decode()
 )
@@ -80,15 +109,11 @@ def log(message):
     print(f"[seed] {message}", flush=True)
 
 
-def form_post(path, fields):
-    body = urllib.parse.urlencode(fields).encode()
+def browse(path, fields=None):
+    """GET, or POST a form when fields are given. Returns the final URL path and the page."""
+    body = urllib.parse.urlencode(fields).encode() if fields is not None else None
     with browser.open(BASE_URL + path, body, timeout=900) as response:
-        return response.geturl(), response.read().decode("utf-8", "replace")
-
-
-def page_get(path):
-    with browser.open(BASE_URL + path, timeout=120) as response:
-        return response.geturl(), response.read().decode("utf-8", "replace")
+        return urllib.parse.urlparse(response.geturl()).path, response.read().decode()
 
 
 def atl_token(page):
@@ -96,17 +121,13 @@ def atl_token(page):
     return match.group(1) if match else ""
 
 
-def status():
-    try:
-        with urllib.request.urlopen(BASE_URL + "/status", timeout=10) as response:
-            return json.load(response).get("state")
-    except (urllib.error.URLError, ValueError, TimeoutError):
-        return None
-
-
 def wait_for_confluence():
     for _ in range(120):
-        state = status()
+        try:
+            with urllib.request.urlopen(BASE_URL + "/status", timeout=10) as response:
+                state = json.load(response).get("state")
+        except (OSError, ValueError):
+            state = None
         if state in ("FIRST_RUN", "RUNNING"):
             return state
         log(f"waiting for Confluence (state: {state})")
@@ -117,122 +138,60 @@ def wait_for_confluence():
 def run_setup_wizard():
     # The user management choice is only kept in the session, so each step
     # continues from the page the previous one returned, not from "/".
-    url, page = page_get("/")
-    previous_step = None
+    step, page = browse("/")
     for _ in range(60):
-        step = urllib.parse.urlparse(url).path
-        if step == previous_step:
-            log(f"still at {step}, waiting for Confluence to finish the last step")
-            time.sleep(10)
-            url, page = page_get("/")
-            step = urllib.parse.urlparse(url).path
-        previous_step = step
-        log(f"setup step {step}")
-        token = atl_token(page)
-        if "setuplicense" in step:
-            field = re.search(r'<textarea[^>]*name="([^"]+)"', page)
-            url, page = form_post(
-                "/setup/dosetuplicense.action",
-                {
-                    "atl_token": token,
-                    (field.group(1) if field else "confLicenseString"): LICENSE_KEY,
-                },
-            )
-        elif "setupcluster" in step:
-            url, page = form_post(
-                "/setup/setupcluster.action",
-                {
-                    "atl_token": token,
-                    "newCluster": "skipCluster",
-                    "isClusteringEnabled": "true",
-                },
-            )
-        elif "setupdata" in step:
-            log("creating the empty site, this takes a minute")
-            url, page = form_post(
-                "/setup/setupdata.action",
-                {
-                    "atl_token": token,
-                    "contentChoice": "blank",
-                    "dbchoiceSelect": "Empty Site",
-                },
-            )
-        elif "setupusermanagementchoice" in step:
-            url, page = form_post(
-                "/setup/setupusermanagementchoice.action",
-                {
-                    "atl_token": token,
-                    "userManagementChoice": "internal",
-                    "internal": "Manage users and groups within Confluence",
-                },
-            )
-        elif "setupadministrator" in step:
-            url, page = form_post(
-                "/setup/setupadministrator.action",
-                {
-                    "atl_token": token,
-                    "username": ADMIN_USER,
-                    "fullName": "Local Admin",
-                    "email": "admin@example.com",
-                    "password": ADMIN_PASSWORD,
-                    "confirm": ADMIN_PASSWORD,
-                    "setup-next-button": "Next",
-                },
-            )
-        elif "finishsetup" in step or not step.startswith("/setup"):
+        if step not in SETUP_STEPS:
             log("setup finished")
             return
-        else:
-            sys.exit(f"[seed] unexpected setup step {step}")
+        log(f"setup step {step}")
+        action, fields = SETUP_STEPS[step]
+        next_step, page = browse(action, {**fields, "atl_token": atl_token(page)})
+        if next_step == step:
+            log("waiting for Confluence to finish the last step")
+            time.sleep(10)
+            next_step, page = browse("/")
+        step = next_step
     sys.exit("[seed] setup did not finish")
 
 
 def renew_license():
-    _, login_page = page_get("/login.action")
-    form_post(
+    _, page = browse("/login.action")
+    browse(
         "/dologin.action",
         {
             "os_username": ADMIN_USER,
             "os_password": ADMIN_PASSWORD,
-            "login": "Log in",
-            "atl_token": atl_token(login_page),
+            "atl_token": atl_token(page),
         },
     )
-    form_post(
+    _, page = browse(
         "/doauthenticate.action",
-        {
-            "password": ADMIN_PASSWORD,
-            "authenticate": "Confirm",
-            "destination": "/admin/license.action",
-        },
+        {"password": ADMIN_PASSWORD, "destination": "/admin/license.action"},
     )
-    _, license_page = page_get("/admin/license.action")
-    _, result = form_post(
+    _, page = browse(
         "/admin/doupdatelicense.action",
-        {
-            "atl_token": atl_token(license_page),
-            "licenseString": LICENSE_KEY,
-            "update": "Save",
-        },
+        {"licenseString": LICENSE_KEY, "atl_token": atl_token(page)},
     )
-    if "aui-message-error" in result:
-        sys.exit(f"[seed] license update failed, check {BASE_URL}/admin/license.action")
+    if "aui-message-error" in page:
+        sys.exit(
+            "[seed] license update failed, check http://localhost:8090/admin/license.action"
+        )
     log("license applied again, valid for the next 3 hours")
 
 
 def api(method, path, payload=None, headers=None):
-    request = urllib.request.Request(BASE_URL + "/rest/api" + path, method=method)
-    request.add_header("Authorization", auth_header)
-    request.add_header("Accept", "application/json")
-    for name, value in (headers or {}).items():
-        request.add_header(name, value)
-    data = None
     if isinstance(payload, bytes):
         data = payload
-    elif payload is not None:
-        data = json.dumps(payload).encode()
-        request.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(request, data, timeout=60) as response:
+    else:
+        data = json.dumps(payload).encode() if payload is not None else None
+        headers = {"Content-Type": "application/json", **(headers or {})}
+    request = urllib.request.Request(
+        f"{BASE_URL}/rest/api{path}",
+        data,
+        {"Authorization": auth_header, "Accept": "application/json", **(headers or {})},
+        method=method,
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
         raw = response.read()
         return json.loads(raw) if raw else None
 
@@ -240,38 +199,32 @@ def api(method, path, payload=None, headers=None):
 def ensure_space():
     try:
         api("GET", f"/space/{SPACE_KEY}")
-        return
     except urllib.error.HTTPError as error:
         if error.code != 404:
             raise
-    api("POST", "/space", {"key": SPACE_KEY, "name": "Connector Test"})
-    log(f"created space {SPACE_KEY}")
-
-
-def find_page(title):
-    query = urllib.parse.urlencode(
-        {"spaceKey": SPACE_KEY, "title": title, "type": "page"}
-    )
-    results = api("GET", f"/content?{query}")["results"]
-    return results[0]["id"] if results else None
+        api("POST", "/space", {"key": SPACE_KEY, "name": "Connector Test"})
+        log(f"created space {SPACE_KEY}")
 
 
 def ensure_page(spec, ids):
-    page_id = find_page(spec["title"])
-    if not page_id:
+    query = urllib.parse.urlencode({"spaceKey": SPACE_KEY, "title": spec["title"]})
+    found = api("GET", f"/content?{query}")["results"]
+    if found:
+        page_id = found[0]["id"]
+    else:
         payload = {
             "type": "page",
             "title": spec["title"],
             "space": {"key": SPACE_KEY},
             "body": {"storage": {"value": spec["body"], "representation": "storage"}},
         }
-        if spec.get("parent"):
+        if "parent" in spec:
             payload["ancestors"] = [{"id": ids[spec["parent"]]}]
         page_id = api("POST", "/content", payload)["id"]
         log(f"created page {spec['title']}")
     ids[spec["title"]] = page_id
 
-    if spec.get("labels"):
+    if "labels" in spec:
         api(
             "POST",
             f"/content/{page_id}/label",
@@ -285,8 +238,7 @@ def ensure_page(spec, ids):
         boundary = uuid.uuid4().hex
         body = (
             (
-                f"--{boundary}\r\n"
-                f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+                f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
                 f"Content-Type: {mime_type}\r\n\r\n"
             ).encode()
             + content
@@ -310,22 +262,15 @@ def main():
     else:
         renew_license()
 
-    for _ in range(30):
-        if status() == "RUNNING":
-            break
-        time.sleep(10)
-
     ensure_space()
     ids = {}
     for spec in PAGES:
         ensure_page(spec, ids)
-    log(f"done: {BASE_URL.replace('confluence:', 'localhost:')}/display/{SPACE_KEY}")
+    log(f"done: http://localhost:8090/display/{SPACE_KEY}")
 
 
 if __name__ == "__main__":
     try:
         main()
     except urllib.error.HTTPError as error:
-        sys.exit(
-            f"[seed] {error.code} {error.reason} on {error.url}: {html.unescape(error.read().decode('utf-8', 'replace'))[:300]}"
-        )
+        sys.exit(f"[seed] {error.code} {error.reason} on {error.url}")

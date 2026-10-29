@@ -52,7 +52,6 @@ services:
       confluence:
         condition: service_healthy
     environment:
-      CONFLUENCE_URL: http://confluence:8090
       CONFLUENCE_ADMIN_PASSWORD: ${CONFLUENCE_PASSWORD_LOCAL_DC:?set CONFLUENCE_PASSWORD_LOCAL_DC in .env}
     volumes:
       - ./local-confluence:/seed:ro
