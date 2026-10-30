@@ -13,6 +13,7 @@ from fastmcp.server.providers import FileSystemProvider
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
+from mcp_observability import ToolCallObservabilityMiddleware
 from starlette.middleware import Middleware
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
@@ -132,6 +133,7 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
+        middleware=[ToolCallObservabilityMiddleware()],
     )
     apply_enabled_tools(mcp, settings)
     add_favicon_route(mcp)

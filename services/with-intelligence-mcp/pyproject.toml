@@ -26,6 +26,7 @@ dependencies = [
     "starlette==1.10.0",
     "mcp==2.3.0",
     "mcp-credential-auth==0.1.0",
+    "mcp-observability==0.1.0",
 ]
 
 [project.scripts]
@@ -97,3 +98,4 @@ reportCallInDefaultInitializer = false
 
 [tool.uv.sources]
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
+mcp-observability = { path = "../../packages/mcp-observability" }
