@@ -223,6 +223,14 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+    egress:
+      backstop:
+        toFQDNs:
+          - matchName: api.backstopsolutions.com
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
 
 # Alert when Backstop ignores a filter we sent (search_activities row check).
 prometheus:
