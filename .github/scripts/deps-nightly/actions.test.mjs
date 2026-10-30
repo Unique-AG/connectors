@@ -541,6 +541,35 @@ describe('createActionsLookup', () => {
       assert.match(needsPerson[0].reason, /^The lookup failed\. GitHub answered 429 for /);
     });
 
+    it('reports a deleted git tag as a missing commit, not a failed lookup', async () => {
+      const releases = [
+        {
+          tag_name: 'v7.0.2',
+          published_at: '2026-10-01T00:00:00Z',
+          draft: false,
+          prerelease: false,
+        },
+      ];
+      const lookup = createActionsLookup('secret', async (url) =>
+        url.includes('/commits/') ? respond(422, {}) : respond(200, releases),
+      );
+      assert.equal(await lookup.commitSha('actions/checkout', 'v7.0.2'), null);
+      const { needsPerson } = await planWithLedger({
+        files,
+        ledger: {},
+        now: NOW,
+        cooldownDays: 3,
+        lookup,
+      });
+      assert.deepEqual(needsPerson, [
+        {
+          ecosystem: 'actions',
+          name: 'actions/checkout',
+          reason: 'The lookup found no commit for v7.0.2.',
+        },
+      ]);
+    });
+
     it('keeps the cooldown text for a repo that GitHub does not know', async () => {
       const { needsPerson } = await planWith(404);
       assert.deepEqual(needsPerson, [

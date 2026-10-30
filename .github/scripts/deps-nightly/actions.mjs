@@ -180,7 +180,7 @@ export function createActionsLookup(token, fetchImpl = fetch) {
       headers,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 422) {
       return null;
     }
     if (response.status !== 200) {
