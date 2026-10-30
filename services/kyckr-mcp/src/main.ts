@@ -44,5 +44,6 @@ async function bootstrap() {
 initOpenTelemetry({
   defaultServiceName: 'kyckr-mcp',
   defaultServiceVersion: packageJson.version,
+  sensitivePathSegments: process.env.MCP_API_KEY ? [process.env.MCP_API_KEY] : [],
 });
 void runWithInstrumentation(bootstrap, 'kyckr-mcp');
