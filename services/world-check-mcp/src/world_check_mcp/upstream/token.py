@@ -54,19 +54,21 @@ class ServiceAccountAuth(httpx2.Auth):
     async def async_auth_flow(
         self, request: httpx2.Request
     ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
-        request.headers["Authorization"] = f"Bearer {await self._access_token()}"
+        token = await self._access_token()
+        request.headers["Authorization"] = f"Bearer {token}"
         response = yield request
         if response.status_code != 401:
             return
-        request.headers["Authorization"] = f"Bearer {await self._access_token(refresh=True)}"
+        request.headers["Authorization"] = f"Bearer {await self._access_token(rejected=token)}"
         yield request
 
-    async def _access_token(self, *, refresh: bool = False) -> str:
+    async def _access_token(self, *, rejected: str | None = None) -> str:
+        """Only the token a 401 rejected is replaced, so concurrent 401s fetch one new token."""
         async with self._lock:
             now = self._now()
             if (
-                not refresh
-                and self._token is not None
+                self._token is not None
+                and self._token != rejected
                 and self._expires_at is not None
                 and now < self._expires_at
             ):
