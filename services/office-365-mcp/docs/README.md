@@ -36,7 +36,7 @@ Rules for the selection:
   neither. The Helm chart schema, the Terraform module, and the startup check of the server enforce
   this rule.
 - A deployment can name several presets in a comma-separated list, for example
-  `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
+  `teams-write,outlook-read`, or in a YAML list. It gets the union of their tools and of their permissions. The union
   needs admin consent when at least one of the presets needs it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
@@ -1203,9 +1203,11 @@ mcpConfig:
 ```
 
 The `preset` key names one of the 36 presets in the [preset index](#preset-index), or several of
-them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
-exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
-The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment
+them. Write several presets as a YAML list or as one comma-separated string, for example
+`teams-write,outlook-read`. The chart gives the pod one comma-separated `TOOLS_PRESET`
+in each case. The `enabled` key names an exact list of tool names instead. Write that list in the
+same two ways. The `tools_preset` input of the Terraform module takes the same two forms: a list of
+strings or one comma-separated string. Both forms resolve to the same tools. A deployment
 that needs a mix that no presets cover uses `enabled`, and names every wanted tool. Granting admin
 consent is a separate step, covered in [Admin consent](#admin-consent).
 

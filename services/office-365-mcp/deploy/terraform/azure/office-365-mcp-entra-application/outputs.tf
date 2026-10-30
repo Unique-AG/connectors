@@ -41,7 +41,7 @@ output "tool_surface" {
     GET /manifest on the running pod.
   EOT
   value = {
-    preset        = var.tools_preset
+    preset        = local.preset_names == null ? null : join(",", local.preset_names)
     tools         = local.tools
     permissions   = local.permissions
     graph_scopes  = local.graph_scopes
