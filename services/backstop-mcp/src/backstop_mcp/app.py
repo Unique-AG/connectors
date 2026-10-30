@@ -11,6 +11,7 @@ from mcp.server.transport_security import (
 from mcp_configs import TracingSettings
 from mcp_observability import (
     OPS_PATHS,
+    RateLimitMiddleware,
     ToolCallObservabilityMiddleware,
     configure_tracing,
     setup_ops,
@@ -103,7 +104,7 @@ def create_app() -> Starlette:
         instructions=compose_instructions(INSTRUCTIONS, guidance),
         mask_error_details=True,
         # Outermost MCP middleware. `setup_ops` appends metrics inside it.
-        middleware=[ToolCallObservabilityMiddleware()],
+        middleware=[ToolCallObservabilityMiddleware(), RateLimitMiddleware()],
     )
     registered = tuple(mcp.add_tool(fn) for fn in TOOLS)
     validate_trace_declarations()
