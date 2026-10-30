@@ -26,6 +26,15 @@ export const mcpOAuthModuleOptionsSchema = z.object({
         output: oauthUserProfileSchema,
       })
       .describe('A function that maps the profile from the strategy to the user profile.'),
+    validateCallback: z
+      .function({
+        input: [z.string(), z.string(), z.unknown()],
+        output: z.any(),
+      })
+      .optional()
+      .describe(
+        'Called with (accessToken, refreshToken, profile) after passport authenticates. Throw to reject the sign-in.',
+      ),
   }),
 
   // Required OAuth Provider Credentials
