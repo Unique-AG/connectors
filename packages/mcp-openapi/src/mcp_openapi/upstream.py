@@ -80,13 +80,20 @@ class OperationClient:
         if missing:
             raise ValueError(f"{operation.operation_id} needs {sorted(missing)}")
         built = self._director.build(route, arguments, str(self._http.base_url))
+        content = built.read()
+        headers = built.headers
+        # The director leaves out a body no argument fills, even one the spec requires.
+        body = route.request_body
+        if not content and body and body.required and "application/json" in body.content_schema:
+            content = b"{}"
+            headers = httpx2.Headers({**headers, "Content-Type": "application/json"})
         # Built again through the client so its default headers are merged in.
         request = self._http.build_request(
             built.method,
             built.url.copy_with(query=None),
             params=built.url.params,
-            headers=built.headers,
-            content=built.read(),
+            headers=headers,
+            content=content,
         )
         return self._parse(operation.adapter, await self._send(request))
 
@@ -152,6 +159,11 @@ class OperationClient:
             raise LockTimeoutError(message) from None
 
     def _parse[T](self, adapter: TypeAdapter[T], content: bytes) -> T:
+        if not content.strip():
+            try:
+                return adapter.validate_python(None)
+            except ValidationError as exc:
+                raise UpstreamError("Unexpected response: empty body") from exc
         try:
             return adapter.validate_json(content)
         except ValidationError as exc:
