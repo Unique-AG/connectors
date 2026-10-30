@@ -203,6 +203,37 @@ class TestWhatBindsATokenToItsTenant:
         assert home_tenant(claims) is None
 
 
+def _entra_config_with_allowlist(
+    tenant_id: str = ORGANIZATIONS, allowed: str = ""
+) -> EntraConfig:
+    return EntraConfig.model_validate(
+        {
+            "tenant_id": tenant_id,
+            "client_id": _CLIENT_ID,
+            "client_secret": "s3cr3t",
+            "allowed_tenant_ids": allowed,
+        }
+    )
+
+
+class TestAllowedTenantIds:
+    def test_empty_string_yields_empty_allowlist(self) -> None:
+        entra = _entra_config_with_allowlist(allowed="")
+        assert entra.allowed_tenant_ids == frozenset()
+
+    def test_single_tenant_is_parsed(self) -> None:
+        entra = _entra_config_with_allowlist(allowed=_TENANT_ID)
+        assert entra.allowed_tenant_ids == frozenset({_TENANT_ID})
+
+    def test_comma_separated_tenants_are_parsed(self) -> None:
+        entra = _entra_config_with_allowlist(allowed=f"{_TENANT_ID},{_ANOTHER_TENANT_ID}")
+        assert entra.allowed_tenant_ids == frozenset({_TENANT_ID, _ANOTHER_TENANT_ID})
+
+    def test_whitespace_around_guids_is_stripped(self) -> None:
+        entra = _entra_config_with_allowlist(allowed=f"  {_TENANT_ID} , {_ANOTHER_TENANT_ID}  ")
+        assert entra.allowed_tenant_ids == frozenset({_TENANT_ID, _ANOTHER_TENANT_ID})
+
+
 @pytest.fixture(scope="module")
 def signing_key() -> tuple[str, str]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -316,6 +347,68 @@ class TestTenantBoundTokens:
         ).decode()
 
         assert await verifier.verify_token(_entra_token(other_pem)) is None
+
+
+@pytest.fixture
+def allowlisted_verifier(signing_key: tuple[str, str]) -> TenantBoundJWTVerifier:
+    _, public_pem = signing_key
+    stock = JWTVerifier(
+        public_key=public_pem,
+        audience=[_CLIENT_ID, f"api://{_CLIENT_ID}"],
+        algorithm="RS256",
+        required_scopes=["access_as_user"],
+    )
+    return TenantBoundJWTVerifier(stock, allowed_tenant_ids=frozenset({_TENANT_ID}))
+
+
+class TestTenantAllowlist:
+    async def test_a_token_from_a_listed_tenant_is_accepted(
+        self, allowlisted_verifier: TenantBoundJWTVerifier, signing_key: tuple[str, str]
+    ) -> None:
+        private_pem, _ = signing_key
+        token = _entra_token(private_pem, tid=_TENANT_ID, iss=_issuer(_TENANT_ID))
+
+        accepted = await allowlisted_verifier.verify_token(token)
+
+        assert accepted is not None
+        assert accepted.claims["tid"] == _TENANT_ID
+
+    async def test_a_token_from_an_unlisted_tenant_is_rejected(
+        self, allowlisted_verifier: TenantBoundJWTVerifier, signing_key: tuple[str, str]
+    ) -> None:
+        private_pem, _ = signing_key
+        token = _entra_token(
+            private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID)
+        )
+
+        assert await allowlisted_verifier.verify_token(token) is None
+
+    async def test_an_empty_allowlist_accepts_any_tenant(
+        self, signing_key: tuple[str, str]
+    ) -> None:
+        _, public_pem = signing_key
+        stock = JWTVerifier(
+            public_key=public_pem,
+            audience=[_CLIENT_ID, f"api://{_CLIENT_ID}"],
+            algorithm="RS256",
+            required_scopes=["access_as_user"],
+        )
+        open_verifier = TenantBoundJWTVerifier(stock, allowed_tenant_ids=frozenset())
+        private_pem, _ = signing_key
+        token = _entra_token(private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID))
+
+        accepted = await open_verifier.verify_token(token)
+
+        assert accepted is not None
+
+    async def test_build_auth_passes_allowlist_to_the_verifier(self) -> None:
+        entra = _entra_config_with_allowlist(tenant_id=ORGANIZATIONS, allowed=_TENANT_ID)
+        provider = _build_auth(entra)
+
+        assert isinstance(provider, OrganizationsAzureProvider)
+        validator = provider._token_validator  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(validator, TenantBoundJWTVerifier)
+        assert validator._allowed_tenant_ids == frozenset({_TENANT_ID})  # pyright: ignore[reportPrivateUsage]
 
 
 def _unsigned_jwt(claims: Mapping[str, object]) -> str:

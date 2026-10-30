@@ -240,12 +240,20 @@ class EntraConfig(BaseSettings):
     tenant_id: str = Field(min_length=1)
     client_id: str = Field(min_length=1)
     client_secret: SecretStr = Field(min_length=1)
+    allowed_tenant_ids: frozenset[str] = Field(default_factory=frozenset)
 
     @field_validator("tenant_id", mode="before")
     @classmethod
     def _lowercase_a_named_authority(cls, value: object) -> object:
         if isinstance(value, str) and value.lower() in _NAMED_AUTHORITIES:
             return value.lower()
+        return value
+
+    @field_validator("allowed_tenant_ids", mode="before")
+    @classmethod
+    def _parse_allowed_tenant_ids(cls, value: object) -> object:
+        if isinstance(value, str):
+            return frozenset(t.strip() for t in value.split(",") if t.strip())
         return value
 
     @model_validator(mode="after")
