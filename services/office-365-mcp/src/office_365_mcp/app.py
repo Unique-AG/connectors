@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp_observability import ToolCallObservabilityMiddleware
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
@@ -127,6 +128,8 @@ def create_app(
         # Then the advice one, outside the operations layer, so a client reads the polished refusal
         # while that layer still logs the untranslated failure.
         middleware=[
+            # Outermost FastMCP middleware: logs one line per tool call (start, complete/fail).
+            ToolCallObservabilityMiddleware(),
             BoundedNameMiddleware(),
             GraphAdviceMiddleware(graph_advice(selection)),
             TraceContextRestoreMiddleware(),
