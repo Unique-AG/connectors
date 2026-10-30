@@ -29,8 +29,9 @@ export function microsoftOAuthTokenUrl(signInTenantId: string): string {
 
 function extractTid(accessToken: string): string {
   const parts = accessToken.split('.');
-  assert.strictEqual(parts.length, 3, 'Access token is not a JWT');
-  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8')) as Record<
+  const rawPayload = parts[1];
+  assert.ok(rawPayload !== undefined && parts.length === 3, 'Access token is not a JWT');
+  const payload = JSON.parse(Buffer.from(rawPayload, 'base64url').toString('utf-8')) as Record<
     string,
     unknown
   >;
