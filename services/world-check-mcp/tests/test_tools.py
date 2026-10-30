@@ -4,8 +4,10 @@ from typing import cast
 from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp.shared.exceptions import MCPError
 from mcp_types import ElicitResult
 from pydantic import TypeAdapter
 import pytest
@@ -926,6 +928,56 @@ async def test_resolve_result_refuses_a_passport_match() -> None:
                 "resolve_result",
                 {"case": "sys-pass", "result_id": "p1", "status": "POSITIVE", "risk": "High"},
             )
+
+    assert _writes == []
+
+
+_WRITE_CALLS = [
+    pytest.param(
+        "resolve_result",
+        {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"},
+        id="resolve_result",
+    ),
+    pytest.param(
+        "verify_passport_check", {"case": "sys-pass", "mrz_matched": True}, id="verify_passport"
+    ),
+]
+
+
+@pytest.mark.parametrize(("tool", "arguments"), _WRITE_CALLS)
+async def test_a_write_tool_refuses_a_client_without_form_elicitation(
+    tool: str, arguments: dict[str, object]
+) -> None:
+    _writes.clear()
+    async with Client(_server(), mode="legacy") as client:
+        with pytest.raises(ToolError, match="form elicitation. No write was performed"):
+            await client.call_tool(tool, arguments)
+
+    assert _writes == []
+
+
+@pytest.mark.parametrize(("tool", "arguments"), _WRITE_CALLS)
+async def test_a_write_tool_does_not_write_when_the_client_cannot_answer_the_approval(
+    tool: str, arguments: dict[str, object]
+) -> None:
+    _writes.clear()
+    async with Client(_server()) as client:
+        with pytest.raises(MCPError, match="Elicitation not supported"):
+            await client.call_tool(tool, arguments)
+
+    assert _writes == []
+
+
+@pytest.mark.parametrize(("tool", "arguments"), _WRITE_CALLS)
+async def test_a_write_tool_refuses_a_caller_without_a_token_when_auth_is_on(
+    tool: str, arguments: dict[str, object]
+) -> None:
+    _writes.clear()
+    server = _server()
+    server.auth = StaticTokenVerifier(tokens={})
+    async with Client(server, elicitation_handler=_approve) as client:
+        with pytest.raises(ToolError, match="Authentication is required"):
+            await client.call_tool(tool, arguments)
 
     assert _writes == []
 
