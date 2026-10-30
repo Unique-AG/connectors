@@ -1,3 +1,5 @@
+import type { IncomingMessage } from 'node:http';
+import type { Span } from '@opentelemetry/api';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import {
@@ -23,6 +25,18 @@ export interface InstrumentationOptions {
   additionalInstrumentations?: Instrumentation[];
   configOverrides?: Partial<OtelConfig>;
   views?: ViewOptions[];
+  /**
+   * URL path segments that must not appear in HTTP span attributes.
+   * Each entry is matched verbatim against every `/`-delimited segment and
+   * replaced with `/[REDACTED]`. Pass the raw secret value, not a pattern.
+   */
+  sensitivePathSegments?: string[];
+}
+
+function redactPathSegments(path: string, segments: string[]): string {
+  return path.replace(/\/([^/?#]*)/g, (_, segment) =>
+    segments.includes(segment) ? '/[REDACTED]' : `/${segment}`,
+  );
 }
 
 /**
@@ -36,6 +50,7 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
     additionalInstrumentations = [],
     configOverrides = {},
     views = [],
+    sensitivePathSegments = [],
   } = options;
 
   const config = { ...parseOtelConfig(), ...configOverrides };
@@ -51,9 +66,28 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   const metricReader = createMetricReader(config);
   const spanProcessor = createSpanProcessor(config);
 
+  const httpInstrumentationConfig =
+    sensitivePathSegments.length > 0
+      ? {
+          requestHook: (span: Span, request: IncomingMessage | unknown) => {
+            const req = request as Partial<IncomingMessage>;
+            if (typeof req.url !== 'string') {
+              return;
+            }
+            const redacted = redactPathSegments(req.url, sensitivePathSegments);
+            if (redacted === req.url) {
+              return;
+            }
+            span.setAttribute('http.target', redacted);
+            span.setAttribute('url.path', redacted.split('?')[0]);
+          },
+        }
+      : {};
+
   // Build instrumentations array
   const instrumentations = [
     getNodeAutoInstrumentations({
+      '@opentelemetry/instrumentation-http': httpInstrumentationConfig,
       '@opentelemetry/instrumentation-pino': {
         disableLogSending: process.env.NODE_ENV !== 'development', // Let infra pull from STDOUT in prod
       },
