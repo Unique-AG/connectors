@@ -1095,16 +1095,20 @@
           "description": "The standard deviation of daily returns, scaled to 252 trading days."
         },
         "first_close": {
+          "description": "The adjusted close on `first_date`.",
           "type": "number"
         },
         "first_date": {
+          "description": "The first trading day in the period.",
           "format": "date",
           "type": "string"
         },
         "last_close": {
+          "description": "The adjusted close on `last_date`.",
           "type": "number"
         },
         "last_date": {
+          "description": "The last trading day in the period.",
           "format": "date",
           "type": "string"
         },
@@ -1113,12 +1117,15 @@
           "type": "number"
         },
         "period_high": {
+          "description": "The highest adjusted close in the period.",
           "type": "number"
         },
         "period_low": {
+          "description": "The lowest adjusted close in the period.",
           "type": "number"
         },
         "ticker": {
+          "description": "The ticker as Tiingo lists it.",
           "type": "string"
         },
         "total_return": {
@@ -1126,6 +1133,7 @@
           "type": "number"
         },
         "trading_days": {
+          "description": "The closes the performance is computed from.",
           "type": "integer"
         }
       },
@@ -1496,12 +1504,15 @@
           "type": "number"
         },
         "portfolio": {
+          "description": "The name the user gave the portfolio.",
           "type": "string"
         },
         "positions": {
+          "description": "One per ticker the portfolio holds.",
           "items": {
             "properties": {
               "cost_basis": {
+                "description": "What one share or unit cost.",
                 "type": "number"
               },
               "last_close": {
@@ -1524,7 +1535,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "The day of `last_close`."
               },
               "market_value": {
                 "anyOf": [
@@ -1534,12 +1546,15 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Quantity times the last close."
               },
               "quantity": {
+                "description": "How many shares or units the user holds.",
                 "type": "number"
               },
               "ticker": {
+                "description": "The ticker as Tiingo lists it.",
                 "type": "string"
               },
               "unrealized_pnl": {
@@ -1550,7 +1565,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Market value less quantity times cost basis."
               },
               "weight": {
                 "anyOf": [
