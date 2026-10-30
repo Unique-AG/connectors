@@ -99,6 +99,7 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
+        mask_error_details=True,
         # Outermost MCP middleware. `setup_ops` appends metrics inside it.
         middleware=[ToolCallObservabilityMiddleware()],
     )
