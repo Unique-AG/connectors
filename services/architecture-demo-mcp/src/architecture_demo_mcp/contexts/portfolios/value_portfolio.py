@@ -63,7 +63,9 @@ async def _latest_close_or_none(
             return await get_latest_close(upstream=upstream, persistence=persistence, ticker=ticker)
         except UpstreamError:
             _logger.warning(
-                "Left %s unpriced: Tiingo did not answer its latest close", ticker, exc_info=True
+                "Left a position unpriced: Tiingo did not answer its latest close",
+                extra={"ticker": ticker},
+                exc_info=True,
             )
             return None
 
