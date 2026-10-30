@@ -145,6 +145,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         provider: createMicrosoftOAuthProvider(
           proxyService.getHttpAgent({ mode: 'always' }),
           configService.get('microsoft.signInTenantId', { infer: true }),
+          configService.get('microsoft.allowedTenantIds', { infer: true }),
         ),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),

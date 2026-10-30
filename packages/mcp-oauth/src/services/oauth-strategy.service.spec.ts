@@ -83,7 +83,7 @@ describe('OAuthStrategyService', () => {
       expect(passport.use).toHaveBeenCalledWith(STRATEGY_NAME, expect.any(Object));
     });
 
-    it('configures strategy with profile mapping callback', () => {
+    it('configures strategy with profile mapping callback', async () => {
       service.onModuleInit();
 
       const strategyCallback = mockStrategy.mock.calls[0][1];
@@ -95,7 +95,7 @@ describe('OAuthStrategyService', () => {
       };
 
       const done = vi.fn();
-      strategyCallback('access-token', 'refresh-token', mockProfile, done);
+      await strategyCallback('access-token', 'refresh-token', mockProfile, done);
 
       expect(options.provider.profileMapper).toHaveBeenCalledWith(mockProfile);
       expect(done).toHaveBeenCalledWith(null, {
@@ -111,7 +111,7 @@ describe('OAuthStrategyService', () => {
       });
     });
 
-    it('handles profile mapping errors gracefully', () => {
+    it('handles profile mapping errors gracefully', async () => {
       service.onModuleInit();
 
       const strategyCallback = mockStrategy.mock.calls[0][1];
@@ -121,7 +121,7 @@ describe('OAuthStrategyService', () => {
       });
 
       const done = vi.fn();
-      strategyCallback('access-token', 'refresh-token', {}, done);
+      await strategyCallback('access-token', 'refresh-token', {}, done);
 
       expect(done).toHaveBeenCalledWith(error, null);
     });

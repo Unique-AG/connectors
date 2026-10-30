@@ -10,6 +10,11 @@ import {
   SCOPES,
 } from './microsoft.provider';
 
+function makeJwt(claims: Record<string, unknown>): string {
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `eyJhbGciOiJSUzI1NiJ9.${payload}.fake-sig`;
+}
+
 describe(resolveMicrosoftScopes.name, () => {
   it('full mode (chat + ingestion) requests identity, messaging and KB scopes', () => {
     const scopes = resolveMicrosoftScopes({ chat: 'enabled', ingestion: 'enabled' });
@@ -95,5 +100,61 @@ describe(microsoftOAuthTokenUrl.name, () => {
     expect(microsoftOAuthTokenUrl('f66cc3e7-9a7f-42ae-a0fa-adb72979b371')).toBe(
       'https://login.microsoftonline.com/f66cc3e7-9a7f-42ae-a0fa-adb72979b371/oauth2/v2.0/token',
     );
+  });
+});
+
+describe('tenant allowlist via validateCallback', () => {
+  const LISTED_TENANT = 'aaaaaaaa-0000-0000-0000-000000000001';
+  const OTHER_TENANT = 'bbbbbbbb-0000-0000-0000-000000000002';
+
+  const baseToggles = {
+    chat: 'enabled' as const,
+    ingestion: 'disabled' as const,
+    signInTenantId: 'common',
+  };
+
+  it('sets no validateCallback when allowedTenantIds is empty', () => {
+    const provider = createMicrosoftOAuthProvider({ ...baseToggles, allowedTenantIds: [] });
+
+    expect(provider.validateCallback).toBeUndefined();
+  });
+
+  it('sets validateCallback when allowedTenantIds is non-empty', () => {
+    const provider = createMicrosoftOAuthProvider({
+      ...baseToggles,
+      allowedTenantIds: [LISTED_TENANT],
+    });
+
+    expect(provider.validateCallback).toBeDefined();
+  });
+
+  it('validateCallback passes for a listed tenant', () => {
+    const provider = createMicrosoftOAuthProvider({
+      ...baseToggles,
+      allowedTenantIds: [LISTED_TENANT],
+    });
+    const token = makeJwt({ tid: LISTED_TENANT });
+
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).not.toThrow();
+  });
+
+  it('validateCallback rejects a token from an unlisted tenant', () => {
+    const provider = createMicrosoftOAuthProvider({
+      ...baseToggles,
+      allowedTenantIds: [LISTED_TENANT],
+    });
+    const token = makeJwt({ tid: OTHER_TENANT });
+
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow(OTHER_TENANT);
+  });
+
+  it('validateCallback rejects a token with no tid claim', () => {
+    const provider = createMicrosoftOAuthProvider({
+      ...baseToggles,
+      allowedTenantIds: [LISTED_TENANT],
+    });
+    const token = makeJwt({ sub: 'no-tid-here' });
+
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow();
   });
 });
