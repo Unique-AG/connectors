@@ -10,6 +10,7 @@ from typing import override
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from mcp_observability import ToolCallObservabilityMiddleware
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
@@ -132,6 +133,7 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
+        middleware=[ToolCallObservabilityMiddleware()],
     )
     apply_enabled_tools(mcp, settings)
     add_favicon_route(mcp)
