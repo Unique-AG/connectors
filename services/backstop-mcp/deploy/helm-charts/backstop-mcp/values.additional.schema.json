@@ -123,6 +123,31 @@
             }
           }
         },
+        "auth": {
+          "type": "object",
+          "description": "Which redirect URIs a dynamically registered OAuth client may use. An https redirect URI must be on an allowed host, and a non-web one must use an allowed scheme. Loopback http (localhost, 127.0.0.1, [::1]) on any port is always accepted. Each list is rendered comma-separated and replaces the app default. null keeps the app default.",
+          "properties": {
+            "allowedRedirectHosts": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              },
+              "description": "AUTH_ALLOWED_REDIRECT_HOSTS. Exact hosts an https redirect URI may point at. Chart and app default: claude.ai, claude.com, chatgpt.com, cursor.com, www.cursor.com, vscode.dev, insiders.vscode.dev."
+            },
+            "allowedRedirectSchemes": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+              },
+              "description": "AUTH_ALLOWED_REDIRECT_SCHEMES. Private-use schemes that open a desktop app, such as cursor. http, https and browser schemes such as javascript are refused at startup. Chart and app default: [cursor]."
+            }
+          },
+          "additionalProperties": false
+        },
         "logging": {
           "type": "object",
           "description": "Logging and error-detail settings. An empty value leaves its variable unset, which keeps the app default.",

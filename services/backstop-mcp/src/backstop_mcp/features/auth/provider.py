@@ -1,12 +1,16 @@
 import logging
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 
 from mcp_credential_auth import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
     LoginCsrf,
     LoginThrottleConfig,
+    PendingAuthorization,
+    describe_redirect_target,
     discard_login_attempt,
     finalize_login_failure,
     record_login_success,
@@ -91,11 +95,15 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         throttle: LoginThrottleConfig,
         resolve_system_user: ResolveSystemUser | None = None,
         login_path: str = "/backstop/login",
+        allowed_redirect_hosts: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_HOSTS,
+        allowed_redirect_schemes: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     ) -> None:
         super().__init__(
             base_url=base_url,
             session_factory=session_factory,
             login_path=login_path,
+            allowed_redirect_hosts=allowed_redirect_hosts,
+            allowed_redirect_schemes=allowed_redirect_schemes,
         )
         self._encryption_key = encryption_key
         # Credential verification goes through the shared factory so the login form reuses the
@@ -121,7 +129,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
 
     def _form_response(
         self,
-        request_id: str,
+        pending: PendingAuthorization,
         *,
         status_code: int = 200,
         client_name: str | None = None,
@@ -135,11 +143,13 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         echoing the one just submitted) means an error page never reflects an attacker-supplied
         value back into the form.
         """
+        request_id = pending.request_id
         csrf_token = _LOGIN_CSRF.issue_token()
         response = HTMLResponse(
             render_login_form(
                 request_id,
                 csrf_token,
+                describe_redirect_target(pending.redirect_uri),
                 client_name=client_name,
                 username=username,
                 error=error,
@@ -166,7 +176,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         client = await self.get_client(pending.client_id)
         client_name = client.client_name if client is not None else None
 
-        return self._form_response(request_id, client_name=client_name)
+        return self._form_response(pending, client_name=client_name)
 
     async def handle_login_post(self, request: Request) -> Response:
         form = await request.form()
@@ -187,7 +197,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
             logger.warning("Login form failed the CSRF check")
             return self._form_response(
-                request_id,
+                pending,
                 status_code=400,
                 username=username,
                 error="This form expired before it was submitted. Please try again.",
@@ -195,7 +205,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
 
         if not username or not api_token:
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Username and API token are both required.",
             )
@@ -209,7 +219,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 "Login rejected",
                 extra={"reason": "username_too_long", "username": identifiable_value(username)},
             )
-            return self._form_response(request_id, error="Invalid username or API token.")
+            return self._form_response(pending, error="Invalid username or API token.")
 
         attempt_id = await reserve_login_attempt(
             self._session_factory,
@@ -220,7 +230,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         if attempt_id is None:
             logger.warning("Login throttled", extra={"username": identifiable_value(username)})
             return self._form_response(
-                request_id,
+                pending,
                 status_code=429,
                 username=username,
                 error=(
@@ -239,7 +249,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 exc_info=exc,
             )
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Backstop is unreachable right now — please try again shortly.",
             )
@@ -251,7 +261,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 extra={"reason": "invalid_credential", "username": identifiable_value(username)},
             )
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Invalid username or API token.",
             )
@@ -270,14 +280,14 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
                 exc_info=exc,
             )
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error="Backstop is unreachable right now — please try again shortly.",
             )
 
         if system_user is None:
             return self._form_response(
-                request_id,
+                pending,
                 username=username,
                 error=(
                     "This Backstop login has no matching system user, so it cannot be "

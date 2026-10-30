@@ -84,8 +84,47 @@ On success the credential is saved, keyed by Backstop username. A user who logs 
 same internal user id while their `backstop_credentials` row exists; their stored token is replaced
 with the new one.
 
+The login page names the host the browser is sent to after a successful login, under the client's
+name: *"After you sign in, you will be sent to claude.ai."* For a loopback or app-scheme redirect it
+adds *"an app on this computer"*. The client name is whatever the client registered with, so the
+host is what tells the user where the code goes. The page also tells the user to close it if that
+is not the app they started from.
+
 The login page is sent with `Referrer-Policy: no-referrer`, `Cache-Control: no-store`,
 `X-Content-Type-Options: nosniff`, and `X-Frame-Options: DENY`.
+
+## Which Clients Can Connect
+
+Any client may register itself (dynamic client registration, RFC 7591), but only with redirect URIs
+the server accepts. Without that, anyone could register a client named "Claude" with a redirect URI
+they own, send a user the authorize link, and receive the authorization code once the user signs in
+on this server's genuine login page. The registration is refused with `400` and
+`{"error": "invalid_redirect_uri"}` unless every redirect URI is one of these:
+
+| Redirect URI | Accepted | Used by |
+|---|---|---|
+| `http` or `https` on `localhost`, `127.0.0.1` or `[::1]`, any port | Always | Claude Code, VS Code, Cursor, MCP Inspector |
+| `https` on a host in `AUTH_ALLOWED_REDIRECT_HOSTS` | Default list below | Hosted clients |
+| A scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES` | Default `cursor` | Cursor (`cursor://anysphere.cursor-mcp/oauth/callback`) |
+
+The default hosts, and where each comes from:
+
+| Host | Client | Source |
+|---|---|---|
+| `claude.ai`, `claude.com` | Claude on the web, Desktop, mobile and Cowork (`/api/mcp/auth_callback`) | [Claude: Callback URLs](https://claude.com/docs/connectors/building/authentication#callback-urls), which announces the move to `claude.com` |
+| `chatgpt.com` | ChatGPT connectors (`/connector_platform_oauth_redirect`, `/connector/oauth/{callback_id}`) | [OpenAI Apps SDK: Authentication](https://developers.openai.com/apps-sdk/build/auth) |
+| `cursor.com`, `www.cursor.com` | Cursor's cloud callback (`/agents/mcp/oauth/callback`) | Cursor registers it in the same request as its loopback and `cursor://` URIs ([Cursor forum](https://forum.cursor.com/t/oauth-redirect-uri-changed-from-cursor-to-http-localhost-for-streamable-http-mcp/165019)) |
+| `vscode.dev`, `insiders.vscode.dev` | VS Code (`/redirect`) | VS Code registers both with its loopback URI ([microsoft/vscode#278512](https://github.com/microsoft/vscode/issues/278512)) |
+
+- A redirect URI with a fragment, with userinfo (`https://user@host`), with `http` on any other
+  host, or with `javascript:`, `data:`, `file:` or a similar scheme is always refused.
+- One refused URI refuses the whole registration, so a client that registers several (Cursor
+  registers three) needs all of them allowed.
+- Add a host when a customer uses another hosted MCP client. A host is matched exactly, so list
+  each subdomain.
+- A client registered before this check keeps working only through redirect URIs the current list
+  still accepts. `/authorize` answers any other with a `400` error page and never redirects there.
+  Tokens already issued stay valid until they expire or are revoked.
 
 ## Token Lifetimes
 

@@ -3,12 +3,14 @@
 import ssl
 
 import pytest
+from mcp_credential_auth import DEFAULT_ALLOWED_REDIRECT_HOSTS
 from pydantic import ValidationError
 
 from with_intelligence_mcp.config import (
     AppConfig,
     AppEnv,
     AssetClassGroup,
+    AuthConfig,
     DatabaseConfig,
     WithIntelligenceConfig,
     normalize_asyncpg_url,
@@ -163,3 +165,27 @@ class TestNormalizeAsyncpgUrl:
     def test_rejects_an_unknown_sslmode(self) -> None:
         with pytest.raises(ValueError, match="Unsupported sslmode"):
             normalize_asyncpg_url("postgresql://u:p@db/wi?sslmode=sideways")
+
+
+class TestAuthConfig:
+    def test_redirect_allowlist_defaults_to_the_supported_clients(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_SCHEMES", raising=False)
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == DEFAULT_ALLOWED_REDIRECT_HOSTS
+        assert config.allowed_redirect_schemes == ("cursor",)
+
+    def test_redirect_allowlist_env_vars_replace_the_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "claude.ai, mcp.example.com")
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == ("claude.ai", "mcp.example.com")
+        assert config.allowed_redirect_schemes == ()

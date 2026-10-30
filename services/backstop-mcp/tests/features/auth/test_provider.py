@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 from cryptography.fernet import Fernet
-from mcp.server.auth.provider import AuthorizationParams, TokenError
+from mcp.server.auth.provider import AuthorizationParams, RegistrationError, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from mcp_credential_auth import (
     MAX_USERNAME_LENGTH,
@@ -30,7 +30,7 @@ from tests.helpers import client_factory
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
-_REDIRECT_URI = "https://client.example/callback"
+_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 
 
 def _pseudonym(username: str) -> str:
@@ -181,7 +181,25 @@ class TestAuthorizeAndLoginForm:
         response = await provider.handle_login_get(request)
 
         assert response.status_code == 200
-        assert b"Test Client" in response.body
+        assert b"Test Client wants to connect" in response.body
+        assert b"you will be sent to <strong>claude.ai</strong>" in response.body
+
+    @pytest.mark.asyncio
+    async def test_register_rejects_a_redirect_uri_off_the_allowlist(
+        self, db: DatabaseFixture
+    ) -> None:
+        provider = _make_provider(db)
+        client_info = OAuthClientInformationFull(
+            client_id="provider-client-attacker",
+            redirect_uris=[AnyUrl("https://attacker.example/callback")],
+            client_name="Claude",
+        )
+
+        with pytest.raises(RegistrationError) as raised:
+            await provider.register_client(client_info)
+
+        assert raised.value.error == "invalid_redirect_uri"
+        assert await provider.get_client("provider-client-attacker") is None
 
     @pytest.mark.asyncio
     async def test_login_get_rejects_unknown_request_id(self, db: DatabaseFixture) -> None:
@@ -212,7 +230,7 @@ class TestLoginFormSubmission:
         location = response.headers["location"]
         parsed = urlparse(location)
         assert parsed.scheme == "https"
-        assert parsed.netloc == "client.example"
+        assert parsed.netloc == "claude.ai"
         query = parse_qs(parsed.query)
         assert "code" in query
         assert query["state"] == ["state-1"]
@@ -567,6 +585,7 @@ class TestLoginCsrf:
         )
 
         assert b'name="csrf_token"' in response.body
+        assert b"you will be sent to <strong>claude.ai</strong>" in response.body
         assert _LOGIN_CSRF.cookie_name(request_id) in response.headers["set-cookie"]
 
     @pytest.mark.asyncio

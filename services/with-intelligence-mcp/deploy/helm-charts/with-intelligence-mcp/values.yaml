@@ -10,6 +10,12 @@ env:
   LOG_LEVEL: info
   PORT: "8000"
   WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
+  # Where a dynamically registered OAuth client may send the browser after login, comma-separated.
+  # An https redirect URI must be on one of these hosts: Claude (web, desktop, mobile), ChatGPT,
+  # Cursor, VS Code. Any other scheme must be listed; Cursor registers
+  # cursor://anysphere.cursor-mcp/oauth/callback. Loopback http on any port is always accepted.
+  AUTH_ALLOWED_REDIRECT_HOSTS: claude.ai,claude.com,chatgpt.com,cursor.com,www.cursor.com,vscode.dev,insiders.vscode.dev
+  AUTH_ALLOWED_REDIRECT_SCHEMES: cursor
   # CA the database certificate is verified against, mounted from pg-cluster-ca below. When the
   # file is absent (no CloudNativePG cluster), the system trust store is used instead.
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt

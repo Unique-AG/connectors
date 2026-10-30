@@ -167,3 +167,48 @@ class TestAuthIsRequired:
         response = _get(client, "/login?request_id=nope")
         assert response.status_code == 400
         assert "expired" in response.text
+
+
+_CLAUDE_CALLBACK = "https://claude.ai/api/mcp/auth_callback"
+
+
+class TestClientRegistration:
+    def _register(self, client: TestClient, redirect_uri: str) -> _HttpResponse:
+        response = client.post(
+            "/register",
+            json={
+                "redirect_uris": [redirect_uri],
+                "client_name": "Claude",
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code", "refresh_token"],
+                "response_types": ["code"],
+            },
+        )
+        return cast(_HttpResponse, cast(object, response))
+
+    def test_accepts_an_allowlisted_callback(self, client: TestClient) -> None:
+        assert self._register(client, _CLAUDE_CALLBACK).status_code == 201
+
+    def test_refuses_a_callback_off_the_allowlist(self, client: TestClient) -> None:
+        response = self._register(client, "https://attacker.example/callback")
+
+        assert response.status_code == 400
+        assert _json_object(response) == {
+            "error": "invalid_redirect_uri",
+            "error_description": "Redirect URI https://attacker.example/callback has host "
+            + "attacker.example, which is not on the allowlist",
+        }
+
+    def test_follows_the_configured_allowlist(
+        self, database_url: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "mcp.example.com")
+        monkeypatch.setenv("APP_ENV", "development")
+        monkeypatch.setenv("DB_URL", database_url)
+        monkeypatch.setenv("WITH_INTELLIGENCE_MCP_ENCRYPTION_KEY", Fernet.generate_key().decode())
+        with TestClient(create_app()) as running:
+            allowed = self._register(running, "https://mcp.example.com/callback")
+            refused = self._register(running, _CLAUDE_CALLBACK)
+
+        assert allowed.status_code == 201
+        assert refused.status_code == 400
