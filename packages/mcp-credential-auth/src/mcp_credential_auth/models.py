@@ -16,6 +16,10 @@ class OAuthClient(AuthBase):
     client_id: Mapped[str] = mapped_column(String, primary_key=True)
     client_metadata: Mapped[dict[str, object]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Set when the client first exchanges an authorization code. A client that signed in once
+    # keeps its registration: MCP clients cache their `client_id`, and one the server forgot
+    # strands them on a "Client ID not found" page they cannot see.
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PendingAuthorization(AuthBase):

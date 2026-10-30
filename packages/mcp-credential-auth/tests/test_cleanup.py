@@ -23,10 +23,13 @@ LONG_AGO = NOW - TOKEN_RETENTION - timedelta(days=1)
 
 
 async def _register_client(
-    session_factory: async_sessionmaker[AsyncSession], client_id: str
+    session_factory: async_sessionmaker[AsyncSession],
+    client_id: str,
+    *,
+    activated_at: datetime | None = None,
 ) -> None:
     async with transaction(session_factory) as session:
-        session.add(OAuthClient(client_id=client_id, client_metadata={}))
+        session.add(OAuthClient(client_id=client_id, client_metadata={}, activated_at=activated_at))
 
 
 def _token(
@@ -336,11 +339,11 @@ async def test_keeps_an_old_client_that_still_holds_a_live_token(
     assert client_id in await _client_ids(session_factory)
 
 
-async def test_reclaims_a_client_in_the_same_sweep_that_purges_its_last_token(
+async def test_keeps_a_signed_in_client_after_its_last_token_is_purged(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     client_id = "cleanup-client-last-token"
-    await _register_client(session_factory, client_id)
+    await _register_client(session_factory, client_id, activated_at=LONG_AGO)
     await _backdate_client(
         session_factory, client_id, age=UNUSED_CLIENT_RETENTION + timedelta(days=1)
     )
@@ -356,7 +359,8 @@ async def test_reclaims_a_client_in_the_same_sweep_that_purges_its_last_token(
 
     await _sweep(session_factory)
 
-    assert client_id not in await _client_ids(session_factory)
+    assert await _token_ids(session_factory) == set()
+    assert client_id in await _client_ids(session_factory)
 
 
 async def test_keeps_a_client_with_an_authorization_still_in_flight(

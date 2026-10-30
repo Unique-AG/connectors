@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from mcp_credential_auth import CredentialOAuthProvider, transaction
 from mcp_credential_auth.models import AuthorizationCode as AuthorizationCodeRow
+from mcp_credential_auth.models import OAuthClient as OAuthClientRow
 from mcp_credential_auth.models import PendingAuthorization
 
 _REDIRECT_URI = "https://client.example/callback"
@@ -142,6 +143,32 @@ async def test_authorization_code_exchange_is_single_use(
 
     assert len([result for result in results if isinstance(result, OAuthToken)]) == 1
     assert len([result for result in results if isinstance(result, TokenError)]) == 1
+
+
+async def _activated_at(
+    session_factory: async_sessionmaker[AsyncSession], client_id: str
+) -> datetime | None:
+    async with transaction(session_factory) as session:
+        row = await session.get(OAuthClientRow, client_id)
+        assert row is not None
+        return row.activated_at
+
+
+async def test_authorization_code_exchange_activates_the_client_once(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-activation")
+    client_id = client.client_id or ""
+    await provider.register_client(client)
+    assert await _activated_at(session_factory, client_id) is None
+
+    await provider.exchange_authorization_code(client, await _authorization_code(provider, client))
+    first_activation = await _activated_at(session_factory, client_id)
+    await provider.exchange_authorization_code(client, await _authorization_code(provider, client))
+
+    assert first_activation is not None
+    assert await _activated_at(session_factory, client_id) == first_activation
 
 
 async def test_authorization_code_exchange_rechecks_expiry(
