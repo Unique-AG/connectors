@@ -10,10 +10,10 @@ from typing import override
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
-from mcp_observability import ToolCallObservabilityMiddleware
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
+from mcp_observability import ToolCallObservabilityMiddleware
 from starlette.middleware import Middleware
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
