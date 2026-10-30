@@ -107,7 +107,11 @@ describe('tenant allowlist via validateCallback', () => {
   const LISTED_TENANT = 'aaaaaaaa-0000-0000-0000-000000000001';
   const OTHER_TENANT = 'bbbbbbbb-0000-0000-0000-000000000002';
 
-  const baseToggles = { chat: 'enabled' as const, ingestion: 'disabled' as const, signInTenantId: 'common' };
+  const baseToggles = {
+    chat: 'enabled' as const,
+    ingestion: 'disabled' as const,
+    signInTenantId: 'common',
+  };
 
   it('sets no validateCallback when allowedTenantIds is empty', () => {
     const provider = createMicrosoftOAuthProvider({ ...baseToggles, allowedTenantIds: [] });
