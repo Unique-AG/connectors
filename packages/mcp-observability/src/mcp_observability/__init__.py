@@ -1,6 +1,5 @@
 from mcp_observability.failed_fields import FAILED_FIELDS_SHOWN
 from mcp_observability.failed_fields import failed_fields
-from mcp_observability.rate_limit import RateLimitMiddleware
 from mcp_observability.failures import DeclaresFailureLevel
 from mcp_observability.failures import failure_level
 from mcp_observability.identifiable_value import configure_identifiable_values
@@ -13,6 +12,7 @@ from mcp_observability.metrics import MetricNamespace
 from mcp_observability.metrics import metrics_text
 from mcp_observability.ops import OPS_PATHS
 from mcp_observability.ops import setup_ops
+from mcp_observability.rate_limit import RateLimitMiddleware
 from mcp_observability.tool_calls import ToolCallObservabilityMiddleware
 from mcp_observability.trace_declarations import trace_arguments
 from mcp_observability.trace_declarations import traced

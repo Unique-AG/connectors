@@ -9,7 +9,9 @@ import { McpModule, Tool } from '../src';
 @Injectable()
 class UserIdGuard implements CanActivate {
   public canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<{ headers: Record<string, string>; user?: { userProfileId: string } }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<{ headers: Record<string, string>; user?: { userProfileId: string } }>();
     const userId = req.headers['x-test-user-id'];
     if (userId) {
       req.user = { userProfileId: userId };
@@ -20,7 +22,11 @@ class UserIdGuard implements CanActivate {
 
 @Injectable()
 class EchoTool {
-  @Tool({ name: 'echo', description: 'Echo back the message', parameters: z.object({ msg: z.string() }) })
+  @Tool({
+    name: 'echo',
+    description: 'Echo back the message',
+    parameters: z.object({ msg: z.string() }),
+  })
   public echo({ msg }: { msg: string }): string {
     return msg;
   }
@@ -43,7 +49,12 @@ async function postMcp(
   });
   const text = await res.text();
   const body = text.startsWith('data:')
-    ? (JSON.parse(text.slice(text.indexOf('\n') + 1).split('data:')[1].trim()) as Record<string, unknown>)
+    ? (JSON.parse(
+        text
+          .slice(text.indexOf('\n') + 1)
+          .split('data:')[1]
+          .trim(),
+      ) as Record<string, unknown>)
     : (JSON.parse(text) as Record<string, unknown>);
   return { status: res.status, body };
 }
