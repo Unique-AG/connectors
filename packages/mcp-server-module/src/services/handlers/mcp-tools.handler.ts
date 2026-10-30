@@ -14,6 +14,7 @@ import { ToolError } from '../../errors/tool.error';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
 import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
+import { RateLimiterService } from '../rate-limiter.service';
 import { McpHandlerBase } from './mcp-handler.base';
 
 @Injectable({ scope: Scope.REQUEST })
@@ -22,6 +23,7 @@ export class McpToolsHandler extends McpHandlerBase {
     moduleRef: ModuleRef,
     registry: McpRegistryService,
     @Inject('MCP_MODULE_ID') private readonly mcpModuleId: string,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     super(moduleRef, registry, McpToolsHandler.name);
   }
@@ -115,6 +117,10 @@ export class McpToolsHandler extends McpHandlerBase {
       const toolName = request.params.name;
       const callerId: string | undefined = (httpRequest.raw as any)?.user?.userProfileId;
       const startedAt = Date.now();
+
+      if (callerId !== undefined) {
+        this.rateLimiter.check(callerId);
+      }
 
       try {
         // Validate input parameters against the tool's schema

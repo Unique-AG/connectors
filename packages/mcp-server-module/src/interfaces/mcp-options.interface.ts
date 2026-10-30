@@ -8,6 +8,13 @@ export enum McpTransportType {
   STDIO = 'stdio',
 }
 
+export interface McpRateLimitOptions {
+  /** Maximum number of tool calls per window per user. Set to 0 to disable. Default: 60 */
+  toolCallsPerWindow?: number;
+  /** Window duration in milliseconds. Default: 60000 */
+  windowMs?: number;
+}
+
 export interface McpOptions {
   // When and if, additional properties are introduced in ServerOptions or ServerInfo,
   // consider deprecating these fields in favor of using ServerOptions and ServerInfo directly.
@@ -28,6 +35,7 @@ export interface McpOptions {
   apiPrefix?: string;
   guards?: Type<CanActivate>[];
   decorators?: ClassDecorator[];
+  rateLimit?: McpRateLimitOptions;
   sse?: {
     pingEnabled?: boolean;
     pingIntervalMs?: number;

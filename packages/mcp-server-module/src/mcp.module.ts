@@ -15,6 +15,7 @@ import { McpExecutorService } from './services/mcp-executor.service';
 import { McpRegistryService } from './services/mcp-registry.service';
 import { McpSseService } from './services/mcp-sse.service';
 import { McpStreamableHttpService } from './services/mcp-streamable-http.service';
+import { RateLimiterService } from './services/rate-limiter.service';
 import { SsePingService } from './services/sse-ping.service';
 import { createSseController } from './transport/sse.controller.factory';
 import { StdioService } from './transport/stdio.service';
@@ -89,6 +90,7 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      RateLimiterService,
       SsePingService,
       McpSseService,
       McpStreamableHttpService,
@@ -226,6 +228,7 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      RateLimiterService,
       SsePingService,
       McpSseService,
       McpStreamableHttpService,
