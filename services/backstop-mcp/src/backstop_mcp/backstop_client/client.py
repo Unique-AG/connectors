@@ -7,7 +7,7 @@ from typing import NoReturn, cast, overload
 
 import httpx
 from fastmcp.exceptions import ToolError
-from mcp_observability import failure_level, identifiable_value
+from mcp_observability import add_log_secrets, failure_level, identifiable_value
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
@@ -281,9 +281,12 @@ class BackstopClient:
         json: dict[str, object] | None = None,
         params: dict[str, object] | None = None,
     ) -> httpx.Response:
-        """The whole transport stack for one request, authenticated as `session`."""
+        """The whole transport stack for one request, authenticated as `session`. Its API token
+        stays redacted until the enclosing tool call or HTTP request ends."""
         credential = session.credential
-        auth = httpx.BasicAuth(credential.username, credential.api_token.get_secret_value())
+        api_token = credential.api_token.get_secret_value()
+        add_log_secrets(api_token)
+        auth = httpx.BasicAuth(credential.username, api_token)
         timeout = (
             self._settings.reports_timeout_seconds
             if any(marker in path for marker in _SLOW_ENDPOINT_MARKERS)
