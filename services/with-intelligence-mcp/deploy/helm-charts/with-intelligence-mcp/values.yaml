@@ -123,3 +123,11 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+    egress:
+      withIntelligence:
+        toFQDNs:
+          - matchName: api.withintelligence.com
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
