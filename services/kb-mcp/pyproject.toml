@@ -20,6 +20,7 @@ dependencies = [
     "pydantic-settings==2.16.1",
     "python-dotenv==1.2.4",
     "mcp==2.3.0",
+    "mcp-observability==0.1.0",
 ]
 
 [project.scripts]
@@ -80,6 +81,9 @@ exclude = [".venv"]
 extend-select = ["I"]
 # FastMCP tool DI uses Depends(...) in parameter defaults (same pattern as FastAPI).
 ignore = ["B008"]
+
+[tool.uv.sources]
+mcp-observability = { path = "../../packages/mcp-observability" }
 
 [tool.basedpyright]
 venvPath = "."

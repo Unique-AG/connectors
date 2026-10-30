@@ -13,6 +13,7 @@ import * as z from 'zod';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
 import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
+import { RateLimiterService } from '../rate-limiter.service';
 import { McpHandlerBase } from './mcp-handler.base';
 
 @Injectable({ scope: Scope.REQUEST })
@@ -21,6 +22,7 @@ export class McpToolsHandler extends McpHandlerBase {
     moduleRef: ModuleRef,
     registry: McpRegistryService,
     @Inject('MCP_MODULE_ID') private readonly mcpModuleId: string,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     super(moduleRef, registry, McpToolsHandler.name);
   }
@@ -109,6 +111,12 @@ export class McpToolsHandler extends McpHandlerBase {
 
       if (!toolInfo) {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+      }
+
+      const userId = (httpRequest as { raw?: { user?: { userProfileId?: string } } }).raw?.user
+        ?.userProfileId;
+      if (userId !== undefined) {
+        this.rateLimiter.check(userId);
       }
 
       try {
