@@ -5,6 +5,20 @@ import type { Params } from 'nestjs-pino';
 import { isPlainObject } from 'remeda';
 import { sanitizeError } from './sanitize-error';
 
+function serializeReq(req: IncomingMessage) {
+  const rawUrl = req.url ?? '';
+  const qIndex = rawUrl.indexOf('?');
+  const urlPath = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
+  const url = urlPath.startsWith('/auth/') ? urlPath : rawUrl;
+  return {
+    method: req.method,
+    url,
+    headers: req.headers,
+    remoteAddress: req.socket?.remoteAddress,
+    remotePort: req.socket?.remotePort,
+  };
+}
+
 export const productionTarget = {
   target: 'pino/file',
 };
@@ -22,6 +36,7 @@ export const defaultLoggerOptions: Params = {
     redact: {
       paths: [
         'req.headers.authorization',
+        'req.headers.cookie',
         'req.headers.x_api_key',
         'req.headers["x-api-key"]',
         'config.headers.Authorization',
@@ -31,6 +46,7 @@ export const defaultLoggerOptions: Params = {
     },
     serializers: {
       err: sanitizePinoError,
+      req: serializeReq,
     },
     customProps: (req: IncomingMessage) => {
       const operationName = getOperationName(req);

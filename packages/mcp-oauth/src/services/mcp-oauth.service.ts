@@ -204,7 +204,6 @@ export class McpOAuthService {
     if (!authCode) {
       this.logger.error({
         msg: 'Invalid or expired authorization code',
-        code,
       });
       throw new BadRequestException('Invalid or expired authorization code');
     }
@@ -212,7 +211,6 @@ export class McpOAuthService {
     if (authCode.expires_at < Date.now()) {
       this.logger.error({
         msg: 'Authorization code expired',
-        code,
       });
       throw new BadRequestException('Invalid or expired authorization code');
     }
@@ -220,7 +218,6 @@ export class McpOAuthService {
     if (authCode.client_id !== client_id) {
       this.logger.error({
         msg: 'Authorization code does not belong to the client',
-        code,
         client_id,
       });
       throw new BadRequestException('Client ID mismatch');
@@ -229,7 +226,6 @@ export class McpOAuthService {
     if (!authCode.resource) {
       this.logger.error({
         msg: 'Authorization code is not associated with a resource',
-        code,
         client_id,
       });
       throw new BadRequestException('Authorization code is not associated with a resource');
