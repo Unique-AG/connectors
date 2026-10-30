@@ -1,5 +1,4 @@
 from world_check_mcp.contexts.attribution import AttributionError
-from world_check_mcp.contexts.attribution import decision_lock
 from world_check_mcp.contexts.attribution import reviewer_note
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.pages import all_case_results
@@ -86,23 +85,21 @@ async def apply_resolution(
     actor: str,
 ) -> ResolutionOutcome:
     """Save an already approved match decision, after reading the case once more."""
-    async with decision_lock:
-        current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
-        if current != plan:
-            raise ResolutionError(
-                "Case, match, or toolkit changed during approval. "
-                "Review and request fresh approval."
-            )
-        arguments: dict[str, object] = {
-            "caseSystemId": request.case_system_id,
-            "resultIds": [request.result_id],
-            "statusId": plan.status.id,
-            "riskId": plan.risk.id,
-            "resolutionRemark": plan.note,
-        }
-        if plan.reason is not None:
-            arguments["reasonId"] = plan.reason.id
-        await upstream.call(RESOLVE_RESULTS, **arguments)
+    current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
+    if current != plan:
+        raise ResolutionError(
+            "Case, match, or toolkit changed during approval. Review and request fresh approval."
+        )
+    arguments: dict[str, object] = {
+        "caseSystemId": request.case_system_id,
+        "resultIds": [request.result_id],
+        "statusId": plan.status.id,
+        "riskId": plan.risk.id,
+        "resolutionRemark": plan.note,
+    }
+    if plan.reason is not None:
+        arguments["reasonId"] = plan.reason.id
+    await upstream.call(RESOLVE_RESULTS, **arguments)
     return ResolutionOutcome(
         resolved=True,
         case_system_id=request.case_system_id,

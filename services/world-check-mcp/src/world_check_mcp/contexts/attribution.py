@@ -1,11 +1,5 @@
-import asyncio
-
-
 class AttributionError(Exception):
     """The note does not leave room for the reviewer identity."""
-
-
-decision_lock = asyncio.Lock()
 
 
 def reviewer_note(*, note: str, actor: str) -> str:
