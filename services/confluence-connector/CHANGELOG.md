@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.5](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.4...confluence-connector@3.0.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+
 ## [3.0.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.3...confluence-connector@3.0.4) (2026-10-28)
 
 
