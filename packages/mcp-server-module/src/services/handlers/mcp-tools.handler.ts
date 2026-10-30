@@ -111,6 +111,10 @@ export class McpToolsHandler extends McpHandlerBase {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
       }
 
+      const toolName = request.params.name;
+      const callerId: string | undefined = (httpRequest.raw as any)?.user?.userProfileId;
+      const startedAt = Date.now();
+
       try {
         // Validate input parameters against the tool's schema
         if (toolInfo.metadata.parameters) {
@@ -151,10 +155,22 @@ export class McpToolsHandler extends McpHandlerBase {
         const transformedResult = this.formatToolResult(result, toolInfo.metadata.outputSchema);
 
         this.logger.debug('CallToolRequestSchema result');
+        this.logger.log('Tool call completed', {
+          tool: toolName,
+          callerId,
+          outcome: 'success',
+          durationMs: Date.now() - startedAt,
+        });
 
         return transformedResult;
       } catch (error) {
         this.logger.error(error);
+        this.logger.log('Tool call completed', {
+          tool: toolName,
+          callerId,
+          outcome: 'error',
+          durationMs: Date.now() - startedAt,
+        });
         // Re-throw McpErrors (like validation errors) so they are handled by the MCP protocol layer
         if (error instanceof McpError) {
           throw error;
