@@ -2,8 +2,8 @@ apiVersion: v2
 name: backstop-mcp
 description: Backstop CRM FastMCP server with OAuth credential bridging.
 type: application
-version: 3.0.0
-appVersion: 3.0.0
+version: 3.0.1
+appVersion: 3.0.1
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
