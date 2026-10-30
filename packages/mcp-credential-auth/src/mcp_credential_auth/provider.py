@@ -264,6 +264,14 @@ class CredentialOAuthProvider(OAuthProvider):
                         refresh_token_expires_at=now + self.refresh_token_ttl,
                     )
                 )
+                await session.execute(
+                    update(OAuthClientRow)
+                    .where(
+                        OAuthClientRow.client_id == client.client_id,
+                        OAuthClientRow.activated_at.is_(None),
+                    )
+                    .values(activated_at=now)
+                )
 
         if already_consumed:
             raise TokenError(

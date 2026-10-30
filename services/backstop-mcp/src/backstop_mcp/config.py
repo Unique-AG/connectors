@@ -557,13 +557,12 @@ class AuthConfig(BaseSettings):
     # trail of one grant's rotations, so they outlive their usefulness as credentials.
     token_retention_days: int = Field(default=30, ge=1)
 
-    # How long a registered OAuth client with nothing left referencing it is kept. Dynamic client
-    # registration is open (RFC 7591), so every client that ever connected — and anyone who
-    # merely called /register — leaves an `oauth_clients` row behind. A client in use always has a
-    # live token family and so is never reachable by the sweep; this bounds registration spam and
-    # clients that registered but never finished a login. Comfortably longer than
-    # `BackstopOAuthProvider.PENDING_AUTHORIZATION_TTL`, so a client waiting on its user to fill
-    # in the login form can't be swept mid-handshake.
+    # How long a registered OAuth client that never finished a login is kept. Dynamic client
+    # registration is open (RFC 7591), so anyone who merely calls /register leaves an
+    # `oauth_clients` row behind; this bounds that spam. A client that signed in once is never
+    # swept: it caches its `client_id`, and one the server forgot strands it. Comfortably longer
+    # than `BackstopOAuthProvider.PENDING_AUTHORIZATION_TTL`, so a client waiting on its user to
+    # fill in the login form can't be swept mid-handshake.
     unused_client_retention_hours: float = Field(default=24.0, gt=0)
 
     # How often the sweep runs. Rows are unusable the moment they expire, so this bounds only
