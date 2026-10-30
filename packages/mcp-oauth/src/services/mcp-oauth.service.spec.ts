@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { createHmac } from 'node:crypto';
 import { UnauthorizedException } from '@nestjs/common';
 import { type Mocked, TestBed } from '@suites/unit';
@@ -8,6 +9,7 @@ import {
   type McpOAuthModuleOptions,
   OAUTH_STORE_TOKEN,
 } from '../mcp-oauth.module-definition';
+import { decodeProviderState } from '../utils/provider-state';
 import { ClientService } from './client.service';
 import { McpOAuthService } from './mcp-oauth.service';
 import { PassportUser } from './oauth-strategy.service';
@@ -46,6 +48,127 @@ describe('McpOAuthService', () => {
     validHmac = createHmac('sha256', options.hmacSecret)
       .update('session-123:nonce-123')
       .digest('base64url');
+  });
+
+  describe('consent', () => {
+    const pendingSession = {
+      sessionId: 'session-123',
+      state: 'unguessable-pending-state',
+      clientId: 'client-123',
+      redirectUri: 'http://localhost:4000/callback',
+      codeChallenge: 'challenge',
+      codeChallengeMethod: 'S256',
+      oauthState: 'client-state',
+      resource: 'http://localhost:3000/mcp',
+      scope: 'offline_access',
+      expiresAt: Date.now() + 600000,
+    };
+
+    describe('approveConsent', () => {
+      const decodeState = (encoded: string) => {
+        const providerState = decodeProviderState(encoded);
+        assert.ok(providerState, 'approveConsent returns a decodable provider state');
+        return providerState;
+      };
+
+      it('replaces the pending state with one the callback can verify', async () => {
+        const providerState = decodeState(await service.approveConsent(pendingSession));
+
+        const expectedHmac = createHmac('sha256', options.hmacSecret)
+          .update(`session-123:${providerState.sessionNonce}`)
+          .digest('base64url');
+        expect(providerState).toEqual({
+          sessionId: 'session-123',
+          sessionNonce: expect.any(String),
+          sessionHmac: expectedHmac,
+        });
+        expect(store.updateOAuthSessionState).toHaveBeenCalledWith('session-123', expectedHmac);
+        expect(store.removeOAuthSession).not.toHaveBeenCalled();
+        expect(store.storeOAuthSession).not.toHaveBeenCalled();
+      });
+
+      it('returns the same provider state when the user approves twice', async () => {
+        const first = await service.approveConsent(pendingSession);
+        const second = await service.approveConsent(pendingSession);
+
+        expect(second).toBe(first);
+        expect(store.updateOAuthSessionState.mock.calls).toEqual([
+          ['session-123', decodeState(first).sessionHmac],
+          ['session-123', decodeState(first).sessionHmac],
+        ]);
+      });
+
+      it('derives a different provider state for another session', async () => {
+        const first = await service.approveConsent(pendingSession);
+        const other = await service.approveConsent({ ...pendingSession, sessionId: 'session-456' });
+
+        expect(decodeState(other).sessionNonce).not.toBe(decodeState(first).sessionNonce);
+        expect(decodeState(other).sessionHmac).not.toBe(decodeState(first).sessionHmac);
+      });
+
+      it('lets the callback issue a code once approved', async () => {
+        const providerState = decodeState(await service.approveConsent(pendingSession));
+        store.getOAuthSession.mockResolvedValue({
+          ...pendingSession,
+          state: store.updateOAuthSessionState.mock.calls[0]?.[1] ?? '',
+        });
+        store.upsertUserProfile.mockResolvedValue('profile-123');
+
+        const { redirectUrl } = await service.processAuthenticationSuccess({
+          user: {
+            profile: { id: 'user-123', username: 'testuser' },
+            accessToken: 'provider-access-token',
+            refreshToken: 'provider-refresh-token',
+            provider: 'test-provider',
+          },
+          ...providerState,
+        });
+
+        expect(new URL(redirectUrl).searchParams.get('code')).toEqual(expect.any(String));
+      });
+    });
+
+    describe('denyConsent', () => {
+      it('removes the session and redirects with access_denied and the client state', async () => {
+        const redirectUrl = new URL(await service.denyConsent(pendingSession));
+
+        expect(store.removeOAuthSession).toHaveBeenCalledWith('session-123');
+        expect(redirectUrl.origin + redirectUrl.pathname).toBe('http://localhost:4000/callback');
+        expect(redirectUrl.searchParams.get('error')).toBe('access_denied');
+        expect(redirectUrl.searchParams.get('state')).toBe('client-state');
+        expect(redirectUrl.searchParams.get('code')).toBeNull();
+      });
+
+      it('omits state when the client sent none', async () => {
+        const redirectUrl = new URL(
+          await service.denyConsent({ ...pendingSession, oauthState: undefined }),
+        );
+
+        expect(redirectUrl.searchParams.has('state')).toBe(false);
+      });
+    });
+
+    it('rejects a callback for a session that was never approved', async () => {
+      store.getOAuthSession.mockResolvedValue(pendingSession);
+      const forgedHmac = createHmac('sha256', 'attacker-secret')
+        .update('session-123:nonce')
+        .digest('base64url');
+
+      await expect(
+        service.processAuthenticationSuccess({
+          user: {
+            profile: { id: 'user-123', username: 'testuser' },
+            accessToken: 'a',
+            refreshToken: 'r',
+            provider: 'test-provider',
+          },
+          sessionId: 'session-123',
+          sessionNonce: 'nonce',
+          sessionHmac: forgedHmac,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(store.storeAuthCode).not.toHaveBeenCalled();
+    });
   });
 
   describe('processAuthenticationSuccess', () => {

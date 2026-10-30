@@ -144,6 +144,13 @@ export class McpOAuthStore implements IOAuthStore {
     return fromDrizzleSessionRow(session);
   }
 
+  public async updateOAuthSessionState(sessionId: string, state: string): Promise<void> {
+    await this.drizzle
+      .update(oauthSessions)
+      .set({ state })
+      .where(eq(oauthSessions.sessionId, sessionId));
+  }
+
   public async removeOAuthSession(sessionId: string): Promise<void> {
     try {
       await this.drizzle.delete(oauthSessions).where(eq(oauthSessions.sessionId, sessionId));

@@ -67,6 +67,13 @@ export class MockOAuthStore implements IOAuthStore {
     return this.sessions.get(sessionId);
   }
 
+  public async updateOAuthSessionState(sessionId: string, state: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      this.sessions.set(sessionId, { ...session, state });
+    }
+  }
+
   public async removeOAuthSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
   }
