@@ -132,6 +132,7 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
+        mask_error_details=True,
     )
     apply_enabled_tools(mcp, settings)
     add_favicon_route(mcp)

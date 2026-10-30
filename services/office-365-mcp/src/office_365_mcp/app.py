@@ -119,6 +119,7 @@ def create_app(
         "Office 365 MCP",
         version=config.version,
         auth=auth,
+        mask_error_details=True,
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #

@@ -57,6 +57,7 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
+        mask_error_details=True,
     )
     for fn in TOOLS:
         mcp.add_tool(fn)
