@@ -22,6 +22,11 @@ class RateLimitMiddleware(Middleware):
     unthrottled so local development is not affected.
     """
 
+    _calls_per_window: int
+    _window_seconds: float
+    _buckets: dict[str, list[float]]
+    _lock: asyncio.Lock
+
     def __init__(
         self,
         *,
@@ -31,7 +36,7 @@ class RateLimitMiddleware(Middleware):
         super().__init__()
         self._calls_per_window = calls_per_window
         self._window_seconds = window_seconds
-        self._buckets: dict[str, list[float]] = defaultdict(list)
+        self._buckets = defaultdict(list)
         self._lock = asyncio.Lock()
 
     @override
