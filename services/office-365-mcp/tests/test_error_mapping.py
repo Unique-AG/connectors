@@ -149,6 +149,7 @@ _NOTEBOOK = {"id": "NB1", "displayName": "Work", "isShared": False, "userRole": 
 # before `_McpMetrics` reads it. `tests/test_app.py` holds the rule that pins the two relative to
 # each other.
 _CHAIN = (
+    "ToolCallObservabilityMiddleware",
     "BoundedNameMiddleware",
     "GraphAdviceMiddleware",
     "TraceContextRestoreMiddleware",
