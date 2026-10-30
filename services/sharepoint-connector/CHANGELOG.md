@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.2.0...sharepoint-connector@3.2.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+
 ## [3.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.4...sharepoint-connector@3.2.0) (2026-10-28)
 
 
