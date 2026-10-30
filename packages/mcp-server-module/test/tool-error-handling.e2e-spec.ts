@@ -48,11 +48,7 @@ async function postMcp(
   };
 }
 
-async function callTool(
-  url: URL,
-  sessionId: string,
-  toolName: string,
-): Promise<string> {
+async function callTool(url: URL, sessionId: string, toolName: string): Promise<string> {
   const { body } = await postMcp(
     url,
     {
