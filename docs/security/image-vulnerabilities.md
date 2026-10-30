@@ -143,4 +143,4 @@ Use this table to find the fix for each cause.
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
-| `.github/trivyignore.yaml` | Accepted findings, each with an expiry date |
+| `.github/trivyignore.yaml` | Accepted findings, each with an expiry date. The nightly scan and the release gate skip them. |
