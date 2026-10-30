@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.2...outlook-semantic-mcp@4.1.3) (2026-10-30)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+
 ## [4.1.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.1...outlook-semantic-mcp@4.1.2) (2026-10-29)
 
 
