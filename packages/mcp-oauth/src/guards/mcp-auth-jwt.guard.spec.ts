@@ -114,6 +114,30 @@ describe('McpAuthJwtGuard', () => {
       expect(tokenService.validateAccessToken).not.toHaveBeenCalled();
     });
 
+    it.each(['/mcp?x=1', '/MCP', '/Mcp/', '/mcp/abc?y=2', '/mcp#frag'])(
+      'requires a token for MCP url variant %s',
+      async (url) => {
+        mockRequest.url = url;
+        mockRequest.headers = {};
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          new UnauthorizedException('Access token required'),
+        );
+      },
+    );
+
+    it.each(['/auth/authorize', '/mcpx', '/mcpx?a=/mcp', '/health?next=/mcp'])(
+      'allows non-MCP url %s without authentication',
+      async (url) => {
+        mockRequest.url = url;
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+        expect(tokenService.validateAccessToken).not.toHaveBeenCalled();
+      },
+    );
+
     it('throws UnauthorizedException when no authorization header is present for MCP requests', async () => {
       mockRequest.url = '/mcp/tools';
       mockRequest.headers = {};
