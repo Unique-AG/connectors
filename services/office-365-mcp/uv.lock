@@ -1573,7 +1573,7 @@ wheels = [
 
 [[package]]
 name = "msgraph-sdk"
-version = "1.62.0"
+version = "1.65.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -1583,9 +1583,9 @@ dependencies = [
     { name = "microsoft-kiota-serialization-text" },
     { name = "msgraph-core" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/7a/ff7274935ec862c5a1f399e6d5b54c657540d779c9033c8da6a6614ffe80/msgraph_sdk-1.62.0.tar.gz", hash = "sha256:2392b656f9132e7f7aa7b6be5e733b2f34cbdfd279725b71fa13f8757d37c1d3", size = 7043706, upload-time = "2026-09-02T18:52:57.911Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/fc/d2370f160e2453d2fc4e329a7a41f711407b0d098968a1417ce16095ff1a/msgraph_sdk-1.65.0.tar.gz", hash = "sha256:4725563a199234ff360089ed632e71dfb0d718107ed08ac1e16e29d2214503f3", size = 7118894, upload-time = "2026-10-22T22:23:00.645Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/f0/ba735427419645582313c0ec3dd87d240815750b55698291be55829caa86/msgraph_sdk-1.62.0-py3-none-any.whl", hash = "sha256:de6dfd78a33cc8f7cc398497937af8b7746f3f36304977d786713d5ce603c461", size = 28933842, upload-time = "2026-09-02T18:53:01.992Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/41/24b7fc81f0a359870e98e0c16fe516044ef0723d41c774390eb993787fc7/msgraph_sdk-1.65.0-py3-none-any.whl", hash = "sha256:543975b8ea5c6c94ac443be03a6f2429a6a6d7c1c4b90f08c382f211937f3dc1", size = 29209169, upload-time = "2026-10-22T22:23:05.802Z" },
 ]
 
 [[package]]
@@ -1798,7 +1798,7 @@ requires-dist = [
     { name = "httpx", extras = ["http2"], specifier = "==0.28.1" },
     { name = "markdown-it-py", specifier = "==4.2.0" },
     { name = "mcp", specifier = "==2.3.0" },
-    { name = "msgraph-sdk", specifier = "==1.62.0" },
+    { name = "msgraph-sdk", specifier = "==1.65.0" },
     { name = "opentelemetry-api", specifier = "==1.45.1" },
     { name = "opentelemetry-exporter-prometheus", specifier = "==0.66b1" },
     { name = "opentelemetry-instrumentation-asgi", specifier = "==0.66b1" },
