@@ -7,7 +7,8 @@ import { sanitizeError } from './sanitize-error';
 
 function serializeReq(req: IncomingMessage) {
   const rawUrl = req.url ?? '';
-  const [urlPath] = rawUrl.split('?');
+  const qIndex = rawUrl.indexOf('?');
+  const urlPath = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
   const url = urlPath.startsWith('/auth/') ? urlPath : rawUrl;
   return {
     method: req.method,
