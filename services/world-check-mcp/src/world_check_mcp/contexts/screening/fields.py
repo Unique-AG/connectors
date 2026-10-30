@@ -92,7 +92,7 @@ def screening_arguments(
         ),
         "customFields": validate_fields(
             fields=custom_fields,
-            definitions=template.customFields or [],
+            definitions=template.custom_fields or [],
             countries=countries,
             nationalities=nationalities,
         ),
@@ -104,9 +104,9 @@ def screening_arguments(
 
 
 def _require_watchlist_group(*, template: CaseTemplateResponse, group_id: str) -> None:
-    if template.groupId != group_id or template.groupScreeningType != "CASE_MANAGEMENT_AUDIT":
+    if template.group_id != group_id or template.group_screening_type != "CASE_MANAGEMENT_AUDIT":
         raise ScreeningError("Choose a case-management group. screen_entity persists a case.")
-    mandatory = template.mandatoryProviderTypes or []
+    mandatory = template.mandatory_provider_types or []
     if any(_normalized(value=provider) != "WATCHLIST" for provider in mandatory):
         raise ScreeningError(
             "This group requires other providers. Choose a WATCHLIST-only group, "
@@ -115,7 +115,7 @@ def _require_watchlist_group(*, template: CaseTemplateResponse, group_id: str) -
 
 
 def _definitions(*, template: CaseTemplateResponse, entity_type: str) -> list[FieldDefinition]:
-    by_provider = template.secondaryFieldsByProvider or {}
+    by_provider = template.secondary_fields_by_provider or {}
     watchlist = [
         fields for name, fields in by_provider.items() if _normalized(value=name) == "WATCHLIST"
     ]
@@ -123,7 +123,7 @@ def _definitions(*, template: CaseTemplateResponse, entity_type: str) -> list[Fi
         raise ScreeningError("This group does not uniquely define WATCHLIST secondary fields.")
     matches = [
         fields
-        for name, fields in watchlist[0].secondaryFieldsByEntity.items()
+        for name, fields in watchlist[0].secondary_fields_by_entity.items()
         if _normalized(value=name) == entity_type
     ]
     if len(matches) != 1:
@@ -159,9 +159,9 @@ def _with_named_fields(
         if len(matches) != 1:
             raise ScreeningError(f"Cannot uniquely map {label}. See get_group_settings.")
         if label == "DATE_OF_BIRTH":
-            added.append(FieldValue(type_id=matches[0].typeId, date_time_value=dob))
+            added.append(FieldValue(type_id=matches[0].type_id, date_time_value=dob))
         else:
-            added.append(FieldValue(type_id=matches[0].typeId, value=str(value)))
+            added.append(FieldValue(type_id=matches[0].type_id, value=str(value)))
     return [*secondary_fields, *added]
 
 
@@ -172,7 +172,7 @@ def validate_fields(
     countries: dict[str, str],
     nationalities: dict[str, str],
 ) -> list[dict[str, str]]:
-    available = {field.typeId: field for field in definitions}
+    available = {field.type_id: field for field in definitions}
     supplied: set[str] = set()
     for field in fields:
         definition = available.get(field.type_id)
@@ -183,7 +183,9 @@ def validate_fields(
             field=field, definition=definition, countries=countries, nationalities=nationalities
         )
     missing = [
-        field.label for field in definitions if field.fieldRequired and field.typeId not in supplied
+        field.label
+        for field in definitions
+        if field.field_required and field.type_id not in supplied
     ]
     if missing:
         required = ", ".join(missing)
@@ -200,17 +202,17 @@ def _check_value(
 ) -> None:
     if (field.value is None) == (field.date_time_value is None):
         raise ScreeningError(f"Supply exactly one value for {definition.label}.")
-    if (definition.fieldValueType == "DATE") != (field.date_time_value is not None):
+    if (definition.field_value_type == "DATE") != (field.date_time_value is not None):
         raise ScreeningError(f"Use the template's value type for {definition.label}.")
     if field.value is None:
         return
-    if definition.fieldValueType == "COUNTRY" and field.value not in countries:
+    if definition.field_value_type == "COUNTRY" and field.value not in countries:
         raise ScreeningError(f"Use an ISO alpha-3 country code for {definition.label}.")
-    if definition.fieldValueType == "STATE" and field.value not in nationalities:
+    if definition.field_value_type == "STATE" and field.value not in nationalities:
         raise ScreeningError(f"Use a passport nationality code for {definition.label}.")
-    if definition.fieldValueType == "PASSPORT_DOCUMENT_TYPE" and field.value not in _DOCUMENTS:
+    if definition.field_value_type == "PASSPORT_DOCUMENT_TYPE" and field.value not in _DOCUMENTS:
         raise ScreeningError(f"Invalid document type for {definition.label}.")
-    if definition.fieldValueType == "GENDER" and field.value not in _GENDERS:
+    if definition.field_value_type == "GENDER" and field.value not in _GENDERS:
         raise ScreeningError(f"Invalid gender for {definition.label}.")
 
 

@@ -20,34 +20,34 @@ async def get_group_settings(*, upstream: Upstream, group_id: str) -> GroupSetti
     toolkits = await upstream.call(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=group_id)
     return GroupSettings(
         group=group_from_summary(summary=group),
-        screening_type=template.groupScreeningType,
-        mandatory_provider_types=template.mandatoryProviderTypes or [],
+        screening_type=template.group_screening_type,
+        mandatory_provider_types=template.mandatory_provider_types or [],
         secondary_fields=_secondary_fields(template=template),
         toolkits=[_toolkit(toolkit=toolkit) for toolkit in toolkits.root.values()],
     )
 
 
 def _secondary_fields(*, template: CaseTemplateResponse) -> list[SecondaryField]:
-    by_provider = template.secondaryFieldsByProvider or {}
+    by_provider = template.secondary_fields_by_provider or {}
     return [
         SecondaryField(
             provider=provider,
             entity_type=entity_type,
-            type_id=field.typeId,
+            type_id=field.type_id,
             label=field.label,
-            value_type=field.fieldValueType,
-            required=bool(field.fieldRequired),
+            value_type=field.field_value_type,
+            required=bool(field.field_required),
         )
         for provider, by_entity in by_provider.items()
-        for entity_type, fields in by_entity.secondaryFieldsByEntity.items()
+        for entity_type, fields in by_entity.secondary_fields_by_entity.items()
         for field in fields
     ]
 
 
 def _toolkit(*, toolkit: ResolutionToolkitResponse) -> ResolutionToolkit:
-    fields = toolkit.resolutionFields
+    fields = toolkit.resolution_fields
     return ResolutionToolkit(
-        provider_type=toolkit.providerType or "",
+        provider_type=toolkit.provider_type or "",
         statuses=_statuses(fields=fields.statuses) if fields else [],
         risks=_options(fields=fields.risks) if fields else [],
         reasons=_options(fields=fields.reasons) if fields else [],

@@ -41,20 +41,22 @@ async def get_reference_data(*, upstream: Upstream, kind: ReferenceKind) -> Refe
         filters = await upstream.call(GET_SEARCH_FILTERS)
         return ReferenceData(kind=kind, search_filters=_filters(collection=filters))
     info = await upstream.call(GET_API_INFO)
-    return ReferenceData(kind=kind, api_version=info.version, system_date_time=info.systemDateTime)
+    return ReferenceData(
+        kind=kind, api_version=info.version, system_date_time=info.system_date_time
+    )
 
 
 def _profile(*, record: Entity) -> Profile:
     names = [
         part.value
-        for detail in record.names.nameDetails or []
+        for detail in record.names.name_details or []
         for part in detail.details or []
         if part.value
     ]
     categories = [category.value for category in record.categories or [] if category.value]
     return Profile(
-        reference_id=record.referenceId,
-        entity_type=record.entityType,
+        reference_id=record.reference_id,
+        entity_type=record.entity_type,
         names=names,
         categories=categories,
     )
@@ -65,9 +67,9 @@ def _provider(*, provider: ProviderDetail) -> ProviderSummary:
 
 
 def _filters(*, collection: SearchParameterCollection) -> list[SearchFilter]:
-    queries = collection.freeTextParameters or []
-    custom = collection.customFieldParameters or []
-    predefined = collection.predefinedParameters or []
+    queries = collection.free_text_parameters or []
+    custom = collection.custom_field_parameters or []
+    predefined = collection.predefined_parameters or []
     return [
         *[SearchFilter(kind="query", fields=parameter.fields) for parameter in queries],
         *[SearchFilter(kind="custom", fields=parameter.fields) for parameter in custom],
