@@ -123,6 +123,12 @@ export class McpOAuthModule extends ConfigurableModuleClass {
         ThrottlerModule.forRoot({
           throttlers: [
             {
+              name: 'default',
+              ttl: seconds(60),
+              limit: 10,
+            },
+            {
+              name: 'auth',
               ttl: seconds(60),
               limit: 10,
             },

@@ -12,6 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
   app.enableShutdownHooks();
+  app.set('trust proxy', 1);
 
   const logger = app.get(Logger);
   app.useLogger(logger);
