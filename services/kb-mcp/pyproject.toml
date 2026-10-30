@@ -6,6 +6,8 @@ requires-python = ">=3.14"
 dependencies = [
     "cryptography==50.0.2",
     "fastmcp==4.1.4",
+    "mcp-configs==0.1.0",
+    "mcp-observability==0.1.0",
     "pydantic==2.14.1",
     # fastmcp already depends on py-key-value-aio[filetree,memory];
     # this adds the postgresql extra (asyncpg) for durable OAuth storage.
@@ -99,3 +101,7 @@ reportUnusedFunction = "none"
 reportImplicitStringConcatenation = "none"
 reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
+
+[tool.uv.sources]
+mcp-configs = { path = "../../packages/mcp-configs" }
+mcp-observability = { path = "../../packages/mcp-observability" }

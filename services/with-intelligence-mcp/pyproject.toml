@@ -22,6 +22,8 @@ dependencies = [
     "markdownify==1.2.3",
     "tenacity==9.2.1",
     "typing-extensions==4.16.0",
+    "mcp-configs==0.1.0",
+    "mcp-observability==0.1.0",
     "unique-mcp==2026.44.2",
     "starlette==1.10.0",
     "mcp==2.3.0",
@@ -96,4 +98,6 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv.sources]
+mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
+mcp-observability = { path = "../../packages/mcp-observability" }

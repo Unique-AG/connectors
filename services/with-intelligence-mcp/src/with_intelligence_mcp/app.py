@@ -34,7 +34,7 @@ def create_app() -> Starlette:
     config = get_app_config()
     auth_config = get_auth_config()
 
-    configure_logging(config)
+    configure_logging()
     configure_metrics(config)
 
     engine = get_engine()
