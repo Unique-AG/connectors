@@ -15,7 +15,6 @@ on:
 permissions:
   contents: read # to read the repository
   packages: read # to read the cache image from GHCR
-  pull-requests: read # to read the live security-exception label
 
 jobs:
   containerize:
@@ -23,7 +22,6 @@ jobs:
     timeout-minutes: 30
     env:
       SERVICE_PATH: ${{ inputs.service-path }}
-      SERVICE_NAME: ${{ inputs.service-name }}
       GHCR_REPO: ghcr.io/unique-ag/connectors/services/${{ inputs.service-name }}
       GHA_CACHE_SCOPE: ${{ inputs.service-name }}
     steps:
@@ -39,11 +37,6 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Resolve image tar path
-        id: image-tar
-        if: steps.check-dockerfile.outputs.exists == 'true'
-        run: echo "path=${RUNNER_TEMP}/${SERVICE_NAME}.tar" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
         if: steps.check-dockerfile.outputs.exists == 'true'
@@ -71,11 +64,3 @@ jobs:
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
             type=registry,ref=${{ env.GHCR_REPO }}:cache
           cache-to: type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
-          outputs: type=docker,dest=${{ steps.image-tar.outputs.path }}
-
-      - name: Vulnerability gate
-        if: steps.check-dockerfile.outputs.exists == 'true'
-        uses: ./.github/actions/container-image-vuln-gate
-        with:
-          image_tar: ${{ steps.image-tar.outputs.path }}
-          docker_dockerfile_path: ${{ env.SERVICE_PATH }}/deploy/Dockerfile

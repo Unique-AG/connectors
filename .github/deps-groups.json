@@ -1,0 +1,19 @@
+{
+  "cooldownDays": 3,
+  "ignore": [],
+  "terraformPlatforms": ["linux_amd64", "linux_arm64", "darwin_arm64"],
+  "groups": [
+    { "name": "nestjs", "ecosystem": "npm", "patterns": ["@nestjs/*", "nestjs-*"] },
+    { "name": "opentelemetry", "ecosystem": "npm", "patterns": ["@opentelemetry/*"] },
+    { "name": "vitest", "ecosystem": "npm", "patterns": ["vitest", "@vitest/*"] },
+    { "name": "suites", "ecosystem": "npm", "patterns": ["@suites/*"] },
+    { "name": "swc", "ecosystem": "npm", "patterns": ["@swc/*"] },
+    { "name": "rollup", "ecosystem": "npm", "patterns": ["rollup", "@rollup/*"] },
+    { "name": "esbuild", "ecosystem": "npm", "patterns": ["esbuild", "@esbuild/*"] },
+    { "name": "babel", "ecosystem": "npm", "patterns": ["@babel/*"] },
+    { "name": "biome", "ecosystem": "npm", "patterns": ["@biomejs/*"] },
+    { "name": "opentelemetry", "ecosystem": "uv", "patterns": ["opentelemetry-*"] },
+    { "name": "unique", "ecosystem": "uv", "patterns": ["unique-*"] },
+    { "name": "fastmcp", "ecosystem": "uv", "patterns": ["fastmcp", "fastmcp-slim"] }
+  ]
+}

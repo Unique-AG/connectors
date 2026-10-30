@@ -1,0 +1,71 @@
+name: Trivy report to Slack
+description: Build a Slack report from the Trivy results of published images and post it to an incoming webhook
+
+inputs:
+  webhook:
+    description: Slack incoming webhook URL
+    required: true
+  title:
+    description: Title shown in the Slack header
+    required: true
+  version_label:
+    description: Label shown after the title in the Slack header
+    required: true
+  reports_path:
+    description: Directory that holds one trivy-registry-<service> folder per service
+    required: true
+  services:
+    description: JSON array of the services to report, each with service and version
+    required: true
+  trigger_label:
+    description: Trigger shown in the context line, for example scheduled or manual
+    required: true
+  repository:
+    description: GitHub repository (owner/repo)
+    required: true
+  actor:
+    description: GitHub actor that started the workflow
+    required: true
+  workflow_name:
+    description: Workflow display name
+    required: true
+  run_url:
+    description: URL of the workflow run
+    required: true
+  other_alerts:
+    description: Optional text for a section about the other open alerts, for example the lock files
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Build Slack payload
+      id: build-payload
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+        VERSION_LABEL: ${{ inputs.version_label }}
+        REPORTS_PATH: ${{ inputs.reports_path }}
+        SERVICES: ${{ inputs.services }}
+        TRIGGER_LABEL: ${{ inputs.trigger_label }}
+        REPOSITORY: ${{ inputs.repository }}
+        ACTOR: ${{ inputs.actor }}
+        WORKFLOW_NAME: ${{ inputs.workflow_name }}
+        RUN_URL: ${{ inputs.run_url }}
+        OTHER_ALERTS: ${{ inputs.other_alerts }}
+      run: |
+        set -euo pipefail
+        PAYLOAD=$(node "${{ github.action_path }}/build-payload.mjs")
+        {
+          echo 'payload<<EOF'
+          echo "$PAYLOAD"
+          echo 'EOF'
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Send Slack notification
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+      with:
+        webhook: ${{ inputs.webhook }}
+        webhook-type: incoming-webhook
+        payload: ${{ steps.build-payload.outputs.payload }}
