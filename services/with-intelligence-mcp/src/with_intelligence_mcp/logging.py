@@ -1,7 +1,6 @@
-from unique_mcp.logging import configure_logging as configure_pino_logging
+from mcp_configs import LoggingSettings
+from mcp_observability import configure_logging as _configure_pino_logging
 
-from with_intelligence_mcp.config import AppConfig
 
-
-def configure_logging(config: AppConfig) -> None:
-    configure_pino_logging(level=config.log_level.value.upper())
+def configure_logging() -> None:
+    _configure_pino_logging(LoggingSettings(), own_loggers=("with_intelligence_mcp",))
