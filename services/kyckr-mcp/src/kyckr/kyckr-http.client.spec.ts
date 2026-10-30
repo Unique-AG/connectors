@@ -5,10 +5,12 @@ import type { Metrics } from './metrics';
 
 vi.mock('undici', () => ({
   request: vi.fn(),
+  // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
+  Agent: class MockAgent { constructor(_opts: any) {} },
 }));
 
 import { request } from 'undici';
-import { KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
+import { KyckrApiError, KyckrHttpClient, KyckrRateLimitError } from './kyckr-http.client';
 
 const mockRecorder: Pick<Metrics, 'recordApiRequest'> = {
   recordApiRequest: vi.fn(),
@@ -21,12 +23,21 @@ interface KyckrHttpClientInternals {
   normalizePath(path: string): string;
 }
 
-function mockResponse(statusCode: number, body: string): Dispatcher.ResponseData {
+function mockResponse(
+  statusCode: number,
+  body: string,
+  headers: Record<string, string> = {},
+): Dispatcher.ResponseData {
   return {
     statusCode,
-    headers: {},
+    headers,
     body: {
-      text: vi.fn().mockResolvedValue(body),
+      async *[Symbol.asyncIterator]() {
+        if (body.length > 0) {
+          yield Buffer.from(body, 'utf-8');
+        }
+      },
+      destroy: vi.fn(),
     },
   } as unknown as Dispatcher.ResponseData;
 }
@@ -62,6 +73,7 @@ describe('KyckrHttpClient', () => {
             Accept: 'application/json',
           },
           body: undefined,
+          dispatcher: expect.any(Object),
         },
       );
       expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
@@ -106,6 +118,42 @@ describe('KyckrHttpClient', () => {
       });
     });
 
+    it('throws KyckrRateLimitError with retryAfterSeconds from the Retry-After header', async () => {
+      mockedRequest.mockResolvedValueOnce(mockResponse(429, '', { 'retry-after': '60' }));
+
+      await expect(unit.get('/companies')).rejects.toMatchObject({
+        name: 'KyckrRateLimitError',
+        status: 429,
+        path: '/companies',
+        retryAfterSeconds: 60,
+        message: 'Rate limit exceeded. Retry after 60s.',
+      } satisfies Partial<KyckrRateLimitError>);
+      expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
+        method: 'GET',
+        path: '/companies',
+        status: 429,
+        durationMs: expect.any(Number),
+      });
+    });
+
+    it('throws KyckrRateLimitError with undefined retryAfterSeconds when Retry-After is absent', async () => {
+      mockedRequest.mockResolvedValueOnce(mockResponse(429, ''));
+
+      await expect(unit.get('/orders')).rejects.toMatchObject({
+        name: 'KyckrRateLimitError',
+        status: 429,
+        retryAfterSeconds: undefined,
+        message: 'Rate limit exceeded.',
+      } satisfies Partial<KyckrRateLimitError>);
+    });
+
+    it('throws when the response body exceeds the 10 MiB size cap', async () => {
+      const oversized = 'x'.repeat(11 * 1024 * 1024);
+      mockedRequest.mockResolvedValueOnce(mockResponse(200, oversized));
+
+      await expect(unit.get('/companies')).rejects.toThrow(/exceeded/);
+    });
+
     it('rethrows transport errors after logging and still records metrics', async () => {
       const error = new Error('ECONNRESET');
       mockedRequest.mockRejectedValueOnce(error);
@@ -140,6 +188,7 @@ describe('KyckrHttpClient', () => {
             kyckrId: 'GB|123',
             productId: 'DOC-1',
           }),
+          dispatcher: expect.any(Object),
         }),
       );
     });

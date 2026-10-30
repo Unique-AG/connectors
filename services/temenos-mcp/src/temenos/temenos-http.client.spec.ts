@@ -5,10 +5,12 @@ import type { Metrics } from './metrics';
 
 vi.mock('undici', () => ({
   request: vi.fn(),
+  // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
+  Agent: class MockAgent { constructor(_opts: any) {} },
 }));
 
 import { request } from 'undici';
-import { TemenosApiError, TemenosHttpClient } from './temenos-http.client';
+import { TemenosApiError, TemenosHttpClient, TemenosRateLimitError } from './temenos-http.client';
 
 const mockRecorder: Pick<Metrics, 'recordApiRequest'> = {
   recordApiRequest: vi.fn(),
@@ -17,18 +19,23 @@ const mockRecorder: Pick<Metrics, 'recordApiRequest'> = {
 const stubConfig = { apiBaseUrl: 'https://api.example.com', apiKey: { value: 'key' } };
 const mockedRequest = vi.mocked(request);
 
-function mockResponse(statusCode: number, body: string): Dispatcher.ResponseData {
+function mockResponse(
+  statusCode: number,
+  body: string,
+  headers: Record<string, string> = {},
+): Dispatcher.ResponseData {
   // The client reads via `for await (const chunk of response.body)` so the
   // mock must expose an async iterator over Buffer chunks.
   return {
     statusCode,
-    headers: {},
+    headers,
     body: {
       async *[Symbol.asyncIterator]() {
         if (body.length > 0) {
           yield Buffer.from(body, 'utf-8');
         }
       },
+      destroy: vi.fn(),
     },
   } as unknown as Dispatcher.ResponseData;
 }
@@ -59,6 +66,7 @@ describe('TemenosHttpClient', () => {
             apikey: 'key',
             Accept: 'application/json',
           },
+          dispatcher: expect.any(Object),
         },
       );
       expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
@@ -107,6 +115,36 @@ describe('TemenosHttpClient', () => {
         status: 500,
         message: 'HTTP 500',
       } satisfies Partial<TemenosApiError>);
+    });
+
+    it('throws TemenosRateLimitError with retryAfterSeconds from the Retry-After header', async () => {
+      mockedRequest.mockResolvedValueOnce(
+        mockResponse(429, '', { 'retry-after': '120' }),
+      );
+
+      await expect(unit.get('/party/v1.0.0/parties')).rejects.toMatchObject({
+        name: 'TemenosRateLimitError',
+        status: 429,
+        path: '/party/v1.0.0/parties',
+        retryAfterSeconds: 120,
+        message: 'Rate limit exceeded. Retry after 120s.',
+      } satisfies Partial<TemenosRateLimitError>);
+      expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
+        path: '/party/v1.0.0/parties',
+        status: 429,
+        durationMs: expect.any(Number),
+      });
+    });
+
+    it('throws TemenosRateLimitError with undefined retryAfterSeconds when Retry-After is absent', async () => {
+      mockedRequest.mockResolvedValueOnce(mockResponse(429, ''));
+
+      await expect(unit.get('/reference/v1.0.0/countries')).rejects.toMatchObject({
+        name: 'TemenosRateLimitError',
+        status: 429,
+        retryAfterSeconds: undefined,
+        message: 'Rate limit exceeded.',
+      } satisfies Partial<TemenosRateLimitError>);
     });
 
     it('throws when the response body exceeds the size cap', async () => {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isPlainObject, isString } from 'remeda';
-import { type Dispatcher, request } from 'undici';
+import { Agent, type Dispatcher, request } from 'undici';
 import { TemenosConfig } from '~/config';
 import { Metrics } from './metrics';
 
@@ -15,12 +15,28 @@ export class TemenosApiError extends Error {
   }
 }
 
+export class TemenosRateLimitError extends TemenosApiError {
+  public constructor(
+    path: string,
+    public readonly retryAfterSeconds: number | undefined,
+  ) {
+    const hint = retryAfterSeconds !== undefined ? ` Retry after ${retryAfterSeconds}s.` : '';
+    super(429, path, `Rate limit exceeded.${hint}`);
+    this.name = 'TemenosRateLimitError';
+  }
+}
+
 @Injectable()
 export class TemenosHttpClient {
   // Hard cap on upstream response size. Temenos paginates (default 99 records),
   // so legitimate bodies stay well under this. The cap stops attacker-controlled
   // paging from forcing unbounded heap allocation.
   private static readonly MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+  private static readonly dispatcher = new Agent({
+    headersTimeout: 30_000,
+    bodyTimeout: 60_000,
+  });
 
   private readonly logger = new Logger(TemenosHttpClient.name);
 
@@ -43,9 +59,19 @@ export class TemenosHttpClient {
           apikey: this.config.apiKey.value,
           Accept: 'application/json',
         },
+        dispatcher: TemenosHttpClient.dispatcher,
       });
 
       status = response.statusCode;
+
+      if (status === 429) {
+        response.body.destroy();
+        throw new TemenosRateLimitError(
+          path,
+          this.parseRetryAfter(response.headers['retry-after']),
+        );
+      }
+
       const rawBody = await this.readBodyWithLimit(
         response.body,
         TemenosHttpClient.MAX_RESPONSE_BYTES,
@@ -70,6 +96,15 @@ export class TemenosHttpClient {
     } finally {
       this.metrics.recordApiRequest({ path, status, durationMs: Date.now() - start });
     }
+  }
+
+  private parseRetryAfter(header: string | string[] | undefined): number | undefined {
+    const raw = Array.isArray(header) ? header[0] : header;
+    if (!raw) {
+      return undefined;
+    }
+    const seconds = Number.parseInt(raw, 10);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
   }
 
   private async readBodyWithLimit(
