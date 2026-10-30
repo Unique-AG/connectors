@@ -42,6 +42,8 @@ _ENCRYPTION_SALT = "office-365-mcp-oauth-storage"
 # Python name for the registry to read.
 _CALLBACK_PATH = "/auth/callback"
 
+_NO_TENANT_RESTRICTION: frozenset[str] = frozenset()
+
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
     """Trap: FastMCP's default store encrypts. Handing it a bare table silently disables at-rest
@@ -74,7 +76,11 @@ def home_tenant(claims: Mapping[str, object]) -> str | None:
 
 
 class TenantBoundJWTVerifier(JWTVerifier):
-    def __init__(self, stock: JWTVerifier, allowed_tenant_ids: frozenset[str] = frozenset()) -> None:
+    _allowed_tenant_ids: frozenset[str]
+
+    def __init__(
+        self, stock: JWTVerifier, allowed_tenant_ids: frozenset[str] = _NO_TENANT_RESTRICTION
+    ) -> None:
         super().__init__(
             public_key=stock.public_key,
             jwks_uri=stock.jwks_uri,
@@ -125,7 +131,10 @@ class _Registration(TypedDict):
 @final
 class OrganizationsAzureProvider(AzureProvider):
     def __init__(
-        self, *, allowed_tenant_ids: frozenset[str] = frozenset(), **registration: Unpack[_Registration]
+        self,
+        *,
+        allowed_tenant_ids: frozenset[str] = _NO_TENANT_RESTRICTION,
+        **registration: Unpack[_Registration],
     ) -> None:
         super().__init__(tenant_id=ORGANIZATIONS, **registration)
         assert self._base_authority == AzureAuthorityHosts.AZURE_PUBLIC_CLOUD, (
@@ -179,5 +188,7 @@ def build_auth(
         client_storage=client_storage,
     )
     if entra.multi_tenant:
-        return OrganizationsAzureProvider(allowed_tenant_ids=entra.allowed_tenant_ids, **registration)
+        return OrganizationsAzureProvider(
+            allowed_tenant_ids=entra.allowed_tenant_ids, **registration
+        )
     return AzureProvider(tenant_id=entra.tenant_id, **registration)

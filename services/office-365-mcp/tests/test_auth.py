@@ -203,9 +203,7 @@ class TestWhatBindsATokenToItsTenant:
         assert home_tenant(claims) is None
 
 
-def _entra_config_with_allowlist(
-    tenant_id: str = ORGANIZATIONS, allowed: str = ""
-) -> EntraConfig:
+def _entra_config_with_allowlist(tenant_id: str = ORGANIZATIONS, allowed: str = "") -> EntraConfig:
     return EntraConfig.model_validate(
         {
             "tenant_id": tenant_id,
@@ -377,9 +375,7 @@ class TestTenantAllowlist:
         self, allowlisted_verifier: TenantBoundJWTVerifier, signing_key: tuple[str, str]
     ) -> None:
         private_pem, _ = signing_key
-        token = _entra_token(
-            private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID)
-        )
+        token = _entra_token(private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID))
 
         assert await allowlisted_verifier.verify_token(token) is None
 
