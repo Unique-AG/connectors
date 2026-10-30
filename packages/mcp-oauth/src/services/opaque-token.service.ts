@@ -100,6 +100,7 @@ export class OpaqueTokenService {
       resource,
       expiresAt: accessExpiresAt,
       userProfileId,
+      familyId: tokenFamilyId,
     });
 
     await this.store.storeRefreshToken(refreshToken, {
@@ -157,23 +158,10 @@ export class OpaqueTokenService {
   }
 
   public async validateRefreshToken(token: string): Promise<RefreshTokenMetadata | null> {
-    const metadata = await this.store.getRefreshToken(token);
-
-    if (!metadata) {
-      this.logger.debug({ msg: 'Refresh token not found', tokenPrefix: token.substring(0, 8) });
+    const metadata = await this.findUnexpiredRefreshToken(token);
+    if (!metadata || metadata.usedAt) {
       return null;
     }
-
-    if (metadata.expiresAt < new Date()) {
-      this.logger.debug({
-        msg: 'Refresh token expired',
-        tokenPrefix: token.substring(0, 8),
-        expiredAt: metadata.expiresAt,
-      });
-      await this.store.removeRefreshToken(token);
-      return null;
-    }
-
     return metadata;
   }
 
@@ -182,26 +170,13 @@ export class OpaqueTokenService {
     clientId: string,
     requestedScope?: string,
   ): Promise<TokenPair | null> {
-    if (this.store.isRefreshTokenUsed) {
-      const wasUsed = await this.store.isRefreshTokenUsed(refreshToken);
-      if (wasUsed) {
-        this.logger.error({
-          msg: 'SECURITY: Refresh token reuse detected! Revoking entire token family.',
-          tokenPrefix: refreshToken.substring(0, 8),
-        });
-
-        // Get the token metadata to find the family
-        const metadata = await this.store.getRefreshToken(refreshToken);
-        if (metadata?.familyId && this.store.revokeTokenFamily) {
-          await this.store.revokeTokenFamily(metadata.familyId);
-        }
-
-        return null;
-      }
+    const metadata = await this.findUnexpiredRefreshToken(refreshToken);
+    if (!metadata) {
+      return null;
     }
 
-    const metadata = await this.validateRefreshToken(refreshToken);
-    if (!metadata) {
+    if (metadata.usedAt) {
+      await this.revokeReplayedRefreshToken(refreshToken, metadata);
       return null;
     }
 
@@ -225,21 +200,90 @@ export class OpaqueTokenService {
       return null;
     }
 
-    if (this.store.markRefreshTokenAsUsed) {
-      await this.store.markRefreshTokenAsUsed(refreshToken);
+    // The used row is kept until it expires, so a later replay is still recognised as one.
+    const redeemed = await this.store.redeemRefreshToken(refreshToken);
+    if (!redeemed) {
+      await this.revokeReplayedRefreshToken(refreshToken, metadata);
+      return null;
     }
 
-    // Rotate refresh token with same family but incremented generation
-    await this.store.removeRefreshToken(refreshToken);
-    return this.generateTokenPair(
+    const familyId = metadata.familyId || typeid('tkfam').toString();
+    const tokenPair = await this.generateTokenPair(
       metadata.userId,
       metadata.clientId,
       finalScope,
       metadata.resource,
       metadata.userProfileId,
-      metadata.familyId,
+      familyId,
       (metadata.generation || 0) + 1,
     );
+
+    // A concurrent request that lost the redemption revokes the family, deleting the used row.
+    // If that happened before the new pair was stored, the pair escaped the revocation, so revoke
+    // again now. A revocation that runs after this check deletes the new pair along with the rest.
+    const redeemedTokenSurvived = await this.store.getRefreshToken(refreshToken);
+    if (!redeemedTokenSurvived) {
+      this.logger.error({
+        msg: 'SECURITY: Token family revoked during refresh; revoking the newly issued tokens.',
+        tokenPrefix: refreshToken.substring(0, 8),
+        familyId,
+        clientId: metadata.clientId,
+      });
+      await this.revokeIssuedTokenPair(familyId, tokenPair);
+      return null;
+    }
+
+    return tokenPair;
+  }
+
+  private async revokeIssuedTokenPair(familyId: string, tokenPair: TokenPair): Promise<void> {
+    if (this.store.revokeTokenFamily) {
+      await this.store.revokeTokenFamily(familyId);
+      return;
+    }
+    await this.store.removeAccessToken(tokenPair.access_token);
+    await this.store.removeRefreshToken(tokenPair.refresh_token);
+  }
+
+  private async findUnexpiredRefreshToken(
+    token: string,
+  ): Promise<RefreshTokenMetadata | undefined> {
+    const metadata = await this.store.getRefreshToken(token);
+
+    if (!metadata) {
+      this.logger.debug({ msg: 'Refresh token not found', tokenPrefix: token.substring(0, 8) });
+      return undefined;
+    }
+
+    if (metadata.expiresAt < new Date()) {
+      this.logger.debug({
+        msg: 'Refresh token expired',
+        tokenPrefix: token.substring(0, 8),
+        expiredAt: metadata.expiresAt,
+      });
+      await this.store.removeRefreshToken(token);
+      return undefined;
+    }
+
+    return metadata;
+  }
+
+  private async revokeReplayedRefreshToken(
+    token: string,
+    metadata: RefreshTokenMetadata,
+  ): Promise<void> {
+    this.logger.error({
+      msg: 'SECURITY: Refresh token reuse detected! Revoking entire token family.',
+      tokenPrefix: token.substring(0, 8),
+      familyId: metadata.familyId,
+      clientId: metadata.clientId,
+    });
+
+    if (metadata.familyId && this.store.revokeTokenFamily) {
+      await this.store.revokeTokenFamily(metadata.familyId);
+    } else {
+      await this.store.removeRefreshToken(token);
+    }
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<void> {

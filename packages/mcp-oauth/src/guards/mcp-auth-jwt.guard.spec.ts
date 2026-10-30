@@ -1,6 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MockOAuthStore } from '../__mocks__/oauth-store.mock';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
   type McpOAuthModuleOptions,
@@ -271,6 +272,49 @@ describe('McpAuthJwtGuard', () => {
       const token = (guard as any).extractTokenFromHeader(request);
 
       expect(token).toBeUndefined();
+    });
+  });
+
+  describe('with a real token service', () => {
+    function createRequestWithBearer(token: string) {
+      const request = {
+        url: '/mcp',
+        headers: { authorization: `Bearer ${token}` },
+      } as McpAuthenticatedRequest;
+      const context = {
+        switchToHttp: vi.fn().mockReturnValue({ getRequest: vi.fn().mockReturnValue(request) }),
+        getType: vi.fn().mockReturnValue('http'),
+      } as unknown as ExecutionContext;
+      return { request, context };
+    }
+
+    async function issueTokens() {
+      const tokenService = new OpaqueTokenService(options, new MockOAuthStore());
+      const tokenPair = await tokenService.generateTokenPair(
+        'user-123',
+        'test-client',
+        'offline_access',
+        options.resource,
+        'profile-123',
+      );
+      return { tokenPair, guard: new McpAuthJwtGuard(tokenService, options) };
+    }
+
+    it('accepts an access token as a bearer token', async () => {
+      const { tokenPair, guard } = await issueTokens();
+      const { request, context } = createRequestWithBearer(tokenPair.access_token);
+
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.user?.userProfileId).toBe('profile-123');
+    });
+
+    it('rejects a refresh token presented as a bearer token', async () => {
+      const { tokenPair, guard } = await issueTokens();
+      const { context } = createRequestWithBearer(tokenPair.refresh_token);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new UnauthorizedException('Invalid or expired access token'),
+      );
     });
   });
 });

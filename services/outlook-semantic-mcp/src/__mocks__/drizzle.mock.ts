@@ -27,16 +27,20 @@ class DeleteBuilder<T = unknown> {
   }
 }
 
-class UpdateBuilder {
+class UpdateBuilder<T = unknown> {
+  public constructor(private readonly db: MockDrizzleDatabase) {}
   public set = vi.fn((_values: unknown) => this);
-  public where = vi.fn(async (_cond: unknown): Promise<void> => {});
+  public where = vi.fn((_cond: unknown) => this);
+  public async returning(_projection?: unknown): Promise<T[]> {
+    return (this.db.__nextUpdateReturningRows as T[]) ?? ([] as T[]);
+  }
 }
 
 export class MockDrizzleDatabase {
   public insert = vi.fn((_table: unknown) => new InsertBuilder(this));
   public select = vi.fn((_projection?: unknown) => new SelectBuilder(this));
   public delete = vi.fn((_table: unknown) => new DeleteBuilder(this));
-  public update = vi.fn((_table: unknown) => new UpdateBuilder());
+  public update = vi.fn((_table: unknown) => new UpdateBuilder(this));
 
   // Simple query helpers used by TokenProvider
   public query = {
@@ -49,6 +53,7 @@ export class MockDrizzleDatabase {
   public __nextInsertReturningRows: unknown[] | undefined;
   public __nextSelectRows: unknown[] | undefined;
   public __nextDeleteReturningRows: unknown[] | undefined;
+  public __nextUpdateReturningRows: unknown[] | undefined;
   public __nextQueryUserProfile: unknown | undefined;
 }
 

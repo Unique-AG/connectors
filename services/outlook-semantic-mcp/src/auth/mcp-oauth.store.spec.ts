@@ -1,10 +1,14 @@
 import { OAuthClient } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Cache } from 'cache-manager';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { DrizzleDatabase, sourceOnLoginConflict } from '~/db';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
+
+const toQueryParams = (condition: unknown) => new PgDialect().sqlToQuery(condition as SQL).params;
 
 describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
@@ -499,6 +503,52 @@ describe('McpOAuthStore', () => {
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:test-token');
     });
+
+    it('looks up only access tokens so a refresh token never passes as one', async () => {
+      mockCache.get.mockResolvedValue(undefined);
+      mockDrizzle.__nextSelectRows = [];
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      const result = await unit.getAccessToken('refresh-token');
+
+      const where = mockDrizzle.select.mock.results[0]?.value.where;
+      expect(result).toBeUndefined();
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['refresh-token', 'ACCESS']);
+      expect(mockCache.set).not.toHaveBeenCalled();
+    });
+
+    it('deletes only an access token row when removing an access token', async () => {
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.removeAccessToken('refresh-token');
+
+      const where = mockDrizzle.delete.mock.results[0]?.value.where;
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['refresh-token', 'ACCESS']);
+    });
+
+    it('deletes only a refresh token row when removing a refresh token', async () => {
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      await unit.removeRefreshToken('access-token');
+
+      const where = mockDrizzle.delete.mock.results[0]?.value.where;
+      expect(toQueryParams(where.mock.calls[0]?.[0])).toEqual(['access-token', 'REFRESH']);
+    });
   });
 
   describe('Refresh Token Family management', () => {
@@ -520,7 +570,7 @@ describe('McpOAuthStore', () => {
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
-      expect(mockCache.del).toHaveBeenCalledWith('refresh_token:refresh-1');
+      expect(mockCache.del).not.toHaveBeenCalledWith('refresh_token:refresh-1');
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-2');
     });
 
@@ -543,7 +593,11 @@ describe('McpOAuthStore', () => {
       expect(revoked).toEqual({ tokenCount: 3, clientIds: ['client-a', 'client-b'] });
     });
 
-    it('revokes token family', async () => {
+    it('revokes token family and clears its cached access tokens', async () => {
+      mockDrizzle.__nextDeleteReturningRows = [
+        { token: 'access-1', type: 'ACCESS' },
+        { token: 'refresh-1', type: 'REFRESH' },
+      ];
       const unit = new McpOAuthStore(
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
@@ -554,9 +608,12 @@ describe('McpOAuthStore', () => {
       await unit.revokeTokenFamily('family-123');
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
+      expect(mockCache.del).toHaveBeenCalledTimes(1);
+      expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
     });
 
-    it('marks refresh token as used', async () => {
+    it('redeems an unused refresh token', async () => {
+      mockDrizzle.__nextUpdateReturningRows = [{ id: 'token-1' }];
       const unit = new McpOAuthStore(
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
@@ -564,14 +621,14 @@ describe('McpOAuthStore', () => {
         mockAmqpConnection as unknown as AmqpConnection,
       );
 
-      await unit.markRefreshTokenAsUsed('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token');
 
+      expect(result).toBe(true);
       expect(mockDrizzle.update).toHaveBeenCalled();
     });
 
-    it('checks if refresh token is used', async () => {
-      mockDrizzle.__nextSelectRows = [{ usedAt: new Date() }];
-
+    it('does not redeem a refresh token that is already used', async () => {
+      mockDrizzle.__nextUpdateReturningRows = [];
       const unit = new McpOAuthStore(
         mockDrizzle as unknown as DrizzleDatabase,
         mockEncryption,
@@ -579,10 +636,26 @@ describe('McpOAuthStore', () => {
         mockAmqpConnection as unknown as AmqpConnection,
       );
 
-      const result = await unit.isRefreshTokenUsed('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token');
 
-      expect(result).toBe(true);
-      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(result).toBe(false);
+    });
+
+    it('reads refresh tokens from the database, never from the cache', async () => {
+      const usedAt = new Date();
+      mockDrizzle.__nextSelectRows = [{ clientId: 'client-a', usedAt }];
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+      );
+
+      const result = await unit.getRefreshToken('refresh-token');
+
+      expect(result).toEqual({ clientId: 'client-a', usedAt });
+      expect(mockCache.get).not.toHaveBeenCalled();
+      expect(mockCache.set).not.toHaveBeenCalled();
     });
   });
 
