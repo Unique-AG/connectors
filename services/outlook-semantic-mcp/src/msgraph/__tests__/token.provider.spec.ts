@@ -1,4 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import assert from 'node:assert';
+import { createLoggerOptions, runWithLogSecrets } from '@unique-ag/logger';
+import pino from 'pino';
 import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
@@ -303,6 +306,60 @@ describe('TokenProvider', () => {
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
         'Token refresh failed: Network error',
       );
+    });
+  });
+
+  describe('log redaction', () => {
+    function createCapturingLogger() {
+      const pinoHttpOptions = createLoggerOptions().pinoHttp;
+      assert.ok(
+        typeof pinoHttpOptions === 'object' &&
+          pinoHttpOptions !== null &&
+          'hooks' in pinoHttpOptions,
+        'Expected pinoHttp options with hooks',
+      );
+      const lines: string[] = [];
+      const logger = pino({ hooks: pinoHttpOptions.hooks }, { write: (line) => lines.push(line) });
+      return { logger, lines };
+    }
+
+    it('redacts the access token from what the request logs after reading it', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        accessToken: 'ZW5jcnlwdGVkLWFjY2Vzcy10b2tlbg==',
+      };
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+      const { logger, lines } = createCapturingLogger();
+
+      await runWithLogSecrets([], async () => {
+        const accessToken = await unit.getAccessToken();
+        logger.error(`Graph rejected ${accessToken}`);
+      });
+
+      expect(JSON.parse(lines[0] ?? '{}').msg).toBe('Graph rejected [Redacted]');
+    });
+
+    it('redacts the old and new tokens from what the request logs after a refresh', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+        }),
+      } as any);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+      const { logger, lines } = createCapturingLogger();
+
+      await runWithLogSecrets([], async () => {
+        await unit.refreshAccessToken('user-profile-123');
+        logger.error('tokens encrypted-refresh-token new-access-token new-refresh-token');
+      });
+
+      expect(JSON.parse(lines[0] ?? '{}').msg).toBe('tokens [Redacted] [Redacted] [Redacted]');
     });
   });
 });

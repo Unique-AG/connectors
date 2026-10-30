@@ -1,5 +1,5 @@
 import { AesGcmEncryptionModule, AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
-import { defaultLoggerOptions } from '@unique-ag/logger';
+import { createLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
@@ -22,17 +22,22 @@ import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import {
+  type AMQPConfig,
   type AppConfig,
   type AppConfigNamespaced,
+  type AuthConfig,
   type AuthConfigNamespaced,
   amqpConfig,
   appConfig,
   authConfig,
+  type DatabaseConfig,
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
+  type MicrosoftConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  type UniqueConfig,
   type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
@@ -45,6 +50,7 @@ import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { buildServerInstructions } from './server.instructions';
 import { GraphErrorFilter } from './utils/graph-error.filter';
+import { deploymentSecrets } from './utils/log-secrets';
 
 @Module({
   imports: [
@@ -72,12 +78,31 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
-      inject: [appConfig.KEY],
-      useFactory: (config: AppConfig) => {
+      inject: [
+        appConfig.KEY,
+        amqpConfig.KEY,
+        authConfig.KEY,
+        databaseConfig.KEY,
+        encryptionConfig.KEY,
+        microsoftConfig.KEY,
+        uniqueConfig.KEY,
+      ],
+      useFactory: (
+        config: AppConfig,
+        amqp: AMQPConfig,
+        auth: AuthConfig,
+        database: DatabaseConfig,
+        encryption: EncryptionConfig,
+        microsoft: MicrosoftConfig,
+        unique: UniqueConfig,
+      ) => {
+        const loggerOptions = createLoggerOptions({
+          secrets: deploymentSecrets({ amqp, auth, database, encryption, microsoft, unique }),
+        });
         return {
-          ...defaultLoggerOptions,
+          ...loggerOptions,
           pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
+            ...loggerOptions.pinoHttp,
             level: config.logLevel,
             mixin: () => {
               // For some reason open telemetry pino integration which we are using is not adding
