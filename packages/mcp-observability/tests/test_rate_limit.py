@@ -1,10 +1,12 @@
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
 import mcp_types as mt
 import pytest
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
 
-import mcp_observability.rate_limit as rl
 from mcp_observability import RateLimitMiddleware
 
 
@@ -12,18 +14,21 @@ def _make_context() -> MiddlewareContext[mt.CallToolRequestParams]:
     return MiddlewareContext(message=mt.CallToolRequestParams(name="greet", arguments={}))
 
 
-async def _noop_next(_ctx: MiddlewareContext[mt.CallToolRequestParams]) -> ToolResult:
+async def _noop_next(context: MiddlewareContext[mt.CallToolRequestParams]) -> ToolResult:
+    del context
     return ToolResult(content=[])
 
 
+def _token(subject: str) -> MagicMock:
+    token = MagicMock()
+    token.subject = subject
+    return token
+
+
 async def _invoke(middleware: RateLimitMiddleware, subject: str | None) -> None:
-    """Call on_call_tool with a fixed subject, bypassing the real token context."""
-    original = rl._subject
-    rl._subject = lambda: subject  # type: ignore[assignment]
-    try:
+    return_value = _token(subject) if subject is not None else None
+    with patch("mcp_observability.rate_limit.get_access_token", return_value=return_value):
         await middleware.on_call_tool(_make_context(), _noop_next)
-    finally:
-        rl._subject = original  # type: ignore[assignment]
 
 
 async def test_calls_within_limit_succeed() -> None:
