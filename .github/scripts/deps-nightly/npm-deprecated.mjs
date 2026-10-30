@@ -1,26 +1,30 @@
 const REGISTRY_URL = 'https://registry.npmjs.org';
 const TIMEOUT_MS = 20_000;
+const ATTEMPTS = 2;
 const CONCURRENCY = 8;
 const MAX_MESSAGE_LENGTH = 120;
 
 export function createNpmDeprecationLookup(fetchImpl = fetch) {
   return {
     async deprecated(name, version) {
-      try {
-        const response = await fetchImpl(
-          `${REGISTRY_URL}/${name.replaceAll('/', '%2F')}/${version}`,
-          {
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-          },
-        );
-        if (response.status !== 200) {
-          return null;
-        }
-        const { deprecated } = await response.json();
-        return typeof deprecated === 'string' && deprecated ? deprecated : null;
-      } catch {
-        return null;
+      for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+        try {
+          const response = await fetchImpl(
+            `${REGISTRY_URL}/${name.replaceAll('/', '%2F')}/${version}`,
+            {
+              signal: AbortSignal.timeout(TIMEOUT_MS),
+            },
+          );
+          if (response.status === 404) {
+            return null;
+          }
+          if (response.status === 200) {
+            const { deprecated } = await response.json();
+            return typeof deprecated === 'string' && deprecated ? deprecated : null;
+          }
+        } catch {}
       }
+      return undefined;
     },
   };
 }
@@ -42,13 +46,20 @@ async function deprecationReason({ ecosystem, name, to }, lookup) {
   if (ecosystem !== 'npm') {
     return null;
   }
-  for (const version of to.split(',').map((part) => part.trim())) {
-    const message = version && (await lookup.deprecated(name, version));
+  let unanswered = null;
+  for (const version of to
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    const message = await lookup.deprecated(name, version);
     if (message) {
       return `The version ${version} is deprecated: ${message.slice(0, MAX_MESSAGE_LENGTH)}`;
     }
+    if (message === undefined && unanswered === null) {
+      unanswered = `The npm registry did not answer for ${version}. The job cannot check whether it is deprecated.`;
+    }
   }
-  return null;
+  return unanswered;
 }
 
 export async function dropDeprecated({ candidates, lookup }) {

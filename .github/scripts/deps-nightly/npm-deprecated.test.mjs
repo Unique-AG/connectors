@@ -27,21 +27,48 @@ describe('createNpmDeprecationLookup', () => {
     );
   });
 
-  it('returns null on a non-200 answer', async () => {
-    const fetchImpl = async () => answer({ deprecated: 'Use 3.x.' }, 404);
+  it('returns null on a 404 answer without a retry', async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      return answer({ deprecated: 'Use 3.x.' }, 404);
+    };
     assert.strictEqual(
       await createNpmDeprecationLookup(fetchImpl).deprecated('zod', '2.0.0'),
       null,
     );
+    assert.strictEqual(calls, 1);
   });
 
-  it('returns null on a network error', async () => {
+  it('retries once after a 429 answer', async () => {
+    const answers = [answer({}, 429), answer({ deprecated: 'Use 3.x.' })];
+    const fetchImpl = async () => answers.shift();
+    assert.strictEqual(
+      await createNpmDeprecationLookup(fetchImpl).deprecated('zod', '2.0.0'),
+      'Use 3.x.',
+    );
+  });
+
+  it('returns undefined after two 429 answers', async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      return answer({}, 429);
+    };
+    assert.strictEqual(
+      await createNpmDeprecationLookup(fetchImpl).deprecated('zod', '2.0.0'),
+      undefined,
+    );
+    assert.strictEqual(calls, 2);
+  });
+
+  it('returns undefined after two network errors', async () => {
     const fetchImpl = async () => {
       throw new Error('offline');
     };
     assert.strictEqual(
       await createNpmDeprecationLookup(fetchImpl).deprecated('zod', '2.0.0'),
-      null,
+      undefined,
     );
   });
 });
@@ -114,10 +141,40 @@ describe('dropDeprecated', () => {
     assert.deepStrictEqual(lookup.calls, []);
   });
 
-  it('keeps a candidate when the lookup returns null', async () => {
+  it('keeps a candidate when the registry says it is not deprecated', async () => {
     const candidate = npm('zod', '4.1.0');
     const result = await dropDeprecated({ candidates: [candidate], lookup: lookupOf({}) });
     assert.deepStrictEqual(result, { candidates: [candidate], needsPerson: [] });
+  });
+
+  it('moves a candidate to needsPerson when the registry gives no answer', async () => {
+    const lookup = { deprecated: async (name) => (name === 'down' ? undefined : null) };
+    const result = await dropDeprecated({
+      candidates: [npm('down', '1.1.0'), npm('zod', '4.1.0')],
+      lookup,
+    });
+    assert.deepStrictEqual(result, {
+      candidates: [npm('zod', '4.1.0')],
+      needsPerson: [
+        {
+          ecosystem: 'npm',
+          name: 'down',
+          reason:
+            'The npm registry did not answer for 1.1.0. The job cannot check whether it is deprecated.',
+        },
+      ],
+    });
+  });
+
+  it('keeps the deprecation reason when another version of the candidate gets no answer', async () => {
+    const lookup = {
+      deprecated: async (_, version) => (version === '1.2.3' ? undefined : 'Broken.'),
+    };
+    const { needsPerson } = await dropDeprecated({
+      candidates: [npm('lib', '1.2.3, 1.2.4')],
+      lookup,
+    });
+    assert.strictEqual(needsPerson[0].reason, 'The version 1.2.4 is deprecated: Broken.');
   });
 
   it('runs at most 8 lookups at once', async () => {
