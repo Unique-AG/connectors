@@ -120,6 +120,14 @@ class TestKnownSecrets:
             redactor.redact_line('{"msg":"v shared-prefix-and-more"}') == '{"msg":"v [Redacted]"}'
         )
 
+    def test_a_lone_string_is_one_secret(self, capsys: pytest.CaptureFixture[str]) -> None:
+        configure_logging(LoggingSettings(), own_loggers=("tests",), secrets=_API_KEY)
+
+        _log.info("calling upstream with %s", _API_KEY)
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "calling upstream with [Redacted]"
+
     def test_secrets_under_the_minimum_length_are_skipped(self) -> None:
         short = "s" * (MIN_SECRET_LENGTH - 1)
         redactor = SecretRedactor(("", short))
@@ -150,6 +158,8 @@ class TestDefaultPatterns:
         [
             ("Authorization: Bearer abc.def-ghi9", "Authorization: Bearer [Redacted]"),
             ("Bearer abcdefghijklmnopqrstuvwxyz", "Bearer [Redacted]"),
+            ("authorization: bearer abc.def-ghi9", "authorization: bearer [Redacted]"),
+            ("BASIC dXNlcjpwYXNz", "BASIC [Redacted]"),
             ("Basic dXNlcjpwYXNz", "Basic [Redacted]"),
             (
                 "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl",

@@ -396,6 +396,19 @@ describe('createSecretRedactor resilience', () => {
       expect(performance.now() - started).toBeLessThan(1000);
       expect(lines[0]).not.toContain(mockSecret);
     });
+
+    it.each([
+      ['escaped quotes', `"${'\\"'.repeat(500_000)}`],
+      ['escaped quotes and a dangling backslash', `"${'\\"'.repeat(500_000)}\\`],
+    ])('redacts an unterminated 1 MB line of %s within a second', (_name, value) => {
+      const redact = createSecretRedactor({ secrets: [mockSecret] });
+      const started = performance.now();
+
+      const line = redact(`{"msg":${value} ${mockSecret}`);
+
+      expect(performance.now() - started).toBeLessThan(1000);
+      expect(line).not.toContain(mockSecret);
+    });
   });
 
   describe('secret contents', () => {
