@@ -104,7 +104,6 @@ operation-ids = [
     "getResolutionToolkitsForGroup",
     "getSearchFilters",
 ]
-snake-case-fields = false
 operation-module = "mcp_openapi.upstream"
 models-module = "world_check_mcp.upstream.generated.vendor_responses"
 models-output = "src/world_check_mcp/upstream/generated/vendor_responses.py"

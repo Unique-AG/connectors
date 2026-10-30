@@ -33,12 +33,12 @@ async def prepare_resolution(
     toolkit = toolkits.root.get("WATCHLIST")
     if (
         toolkit is None
-        or toolkit.groupId != case.group_id
-        or toolkit.providerType != "WATCHLIST"
-        or toolkit.resolutionFields is None
+        or toolkit.group_id != case.group_id
+        or toolkit.provider_type != "WATCHLIST"
+        or toolkit.resolution_fields is None
     ):
         raise ResolutionError("The case, result, and resolution toolkit do not match.")
-    fields = toolkit.resolutionFields
+    fields = toolkit.resolution_fields
     status = _one(value=request.status, choices=_statuses(fields=fields.statuses), kind="status")
     risk = _one(value=request.risk, choices=_options(fields=fields.risks), kind="risk")
     reason = (
@@ -46,14 +46,14 @@ async def prepare_resolution(
         if request.reason
         else None
     )
-    rule = (toolkit.resolutionRules or {}).get(status.id)
+    rule = (toolkit.resolution_rules or {}).get(status.id)
     if rule is None or risk.id not in rule.risks:
         raise ResolutionError("This status/risk combination is not allowed by the group toolkit.")
-    if (rule.reasonRequired and reason is None) or (
+    if (rule.reason_required and reason is None) or (
         reason is not None and reason.id not in rule.reasons
     ):
         raise ResolutionError("Supply a reason allowed for this status by the group toolkit.")
-    if rule.remarkRequired and not request.note.strip():
+    if rule.remark_required and not request.note.strip():
         raise ResolutionError("This resolution status requires a non-empty note.")
     try:
         note = reviewer_note(note=request.note, actor=actor)
@@ -72,8 +72,8 @@ async def prepare_resolution(
         note=note,
         rule_risks=tuple(rule.risks),
         rule_reasons=tuple(rule.reasons),
-        reason_required=rule.reasonRequired,
-        remark_required=rule.remarkRequired,
+        reason_required=rule.reason_required,
+        remark_required=rule.remark_required,
     )
 
 

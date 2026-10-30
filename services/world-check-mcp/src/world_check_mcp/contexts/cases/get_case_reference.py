@@ -13,4 +13,4 @@ async def get_case_reference(*, upstream: Upstream, case_id: str) -> CaseReferen
         if error.status_code == 404:
             raise CaseNotFoundError(case=case_id) from error
         raise
-    return CaseReferenceDetails(case_id=reference.caseId, case_system_id=reference.caseSystemId)
+    return CaseReferenceDetails(case_id=reference.case_id, case_system_id=reference.case_system_id)

@@ -39,7 +39,9 @@ def passport_arguments(
     """Passport Check save-and-screen body. Media Check is never requested."""
     _require_case_group(template=template, group_id=group_id)
     providers = ["WATCHLIST", "PASSPORT_CHECK"] if include_watchlist else ["PASSPORT_CHECK"]
-    mandatory = {_normalized(value=provider) for provider in template.mandatoryProviderTypes or []}
+    mandatory = {
+        _normalized(value=provider) for provider in template.mandatory_provider_types or []
+    }
     if not mandatory.issubset(providers):
         raise ScreeningError(
             "The group requires additional providers. Enable include_watchlist or choose another "
@@ -65,7 +67,7 @@ def passport_arguments(
         ),
         "customFields": validate_fields(
             fields=custom_fields,
-            definitions=template.customFields or [],
+            definitions=template.custom_fields or [],
             countries=countries,
             nationalities=nationalities,
         ),
@@ -79,7 +81,7 @@ def passport_arguments(
 
 
 def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) -> list[FieldValue]:
-    available = {field.typeId: field for field in definitions}
+    available = {field.type_id: field for field in definitions}
     values: dict[str, date | str] = {
         "given_name": passport.given_name,
         "last_name": passport.last_name,
@@ -94,7 +96,7 @@ def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) 
     fields: list[FieldValue] = []
     for attribute, type_id, value_type in _PASSPORT_FIELDS:
         definition = available.get(type_id)
-        if definition is None or definition.fieldValueType != value_type:
+        if definition is None or definition.field_value_type != value_type:
             raise PassportError(
                 f"The group does not expose passport field {type_id} ({value_type}). "
                 "See get_group_settings."
@@ -109,7 +111,7 @@ def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) 
 
 
 def _entity_fields(*, template: CaseTemplateResponse, provider: str) -> list[FieldDefinition]:
-    by_provider = template.secondaryFieldsByProvider or {}
+    by_provider = template.secondary_fields_by_provider or {}
     matched = [
         fields for name, fields in by_provider.items() if _normalized(value=name) == provider
     ]
@@ -117,7 +119,7 @@ def _entity_fields(*, template: CaseTemplateResponse, provider: str) -> list[Fie
         raise PassportError(f"This group does not uniquely define {provider} secondary fields.")
     individuals = [
         fields
-        for name, fields in matched[0].secondaryFieldsByEntity.items()
+        for name, fields in matched[0].secondary_fields_by_entity.items()
         if _normalized(value=name) == "INDIVIDUAL"
     ]
     if len(individuals) != 1:
@@ -126,7 +128,7 @@ def _entity_fields(*, template: CaseTemplateResponse, provider: str) -> list[Fie
 
 
 def _require_case_group(*, template: CaseTemplateResponse, group_id: str) -> None:
-    if template.groupId != group_id or template.groupScreeningType != "CASE_MANAGEMENT_AUDIT":
+    if template.group_id != group_id or template.group_screening_type != "CASE_MANAGEMENT_AUDIT":
         raise ScreeningError("Passport Check requires a persistent case-management group.")
 
 
