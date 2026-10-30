@@ -133,6 +133,8 @@ describe('createSecretRedactor', () => {
     it.each([
       ['Authorization: Bearer abc.def-ghi9', 'Authorization: Bearer [Redacted]'],
       ['Bearer abcdefghijklmnopqrstuvwxyz', 'Bearer [Redacted]'],
+      ['authorization: bearer abc.def-ghi9', 'authorization: bearer [Redacted]'],
+      ['BASIC dXNlcjpwYXNz', 'BASIC [Redacted]'],
       ['Basic dXNlcjpwYXNz', 'Basic [Redacted]'],
       ['token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl', 'token [Redacted]'],
       ['x-api-key: 0123456789abcdef', 'x-api-key: [Redacted]'],

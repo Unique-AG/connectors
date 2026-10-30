@@ -7,18 +7,13 @@ export const MIN_SECRET_LENGTH = 8;
 
 const REDACTED = '[Redacted]';
 
-/*
- * Applied to every log line unless `defaultPatterns` is false, and exported one by one so a consumer
- * that opts out can pick its own. When a pattern has a `secret` group, only that group is replaced,
- * so the context around it (`Bearer `, `password=`) stays readable. A pattern that can fail after a
- * long run starts only where that run starts: one that tried again inside the run would take seconds
- * on a large value.
- */
+// Exported one by one so a consumer that opts out of the defaults can pick its own. A `secret`
+// group narrows what is replaced, so `Bearer ` or `password=` stays readable.
 
-// A credential has a digit, an inner capital or a symbol, or is too long to be a word, so prose such
-// as "Basic authentication failed" keeps its words.
+// The scheme in any case. The credential needs a digit, an inner capital or a symbol, or 20
+// characters, so prose such as "Basic authentication failed" keeps its words.
 export const AUTHORIZATION_SCHEME_PATTERN =
-  /\b(?:Bearer|Basic)\s+(?<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})[A-Za-z0-9\-._~+/]{8,}=*)/dg;
+  /\b(?:[Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])\s+(?<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})[A-Za-z0-9\-._~+/]{8,}=*)/dg;
 export const JWT_PATTERN =
   /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg;
 export const API_KEY_PATTERN = /\b(?:x-)?api[-_]?key\s*[=:]\s*(?<secret>[^\s&,;"']+)/dgi;
@@ -46,11 +41,12 @@ export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
   AWS_ACCESS_KEY_ID_PATTERN,
 ];
 
-// A JSON string literal, and the colon after it when it is an object key.
-const JSON_STRING = /("(?:[^"\\]|\\.)*")(\s*:)?/g;
+// A JSON string literal, and the colon after it when it is an object key. An unterminated literal
+// runs to the end of the line, so a match never fails partway and retries inside it.
+const JSON_STRING = /("(?:[^"\\]|\\[\s\S])*(?:"|\\?$))(\s*:)?/g;
 
 // pino writes the line's own `msg` last, after any nested in the logged object.
-const MSG = /"msg":("(?:[^"\\]|\\.)*")/g;
+const MSG = /"msg":("(?:[^"\\]|\\[\s\S])*(?:"|\\?$))/g;
 
 // The secrets of one `runWithLogSecrets` call or request. Everything that runs in it shares this
 // object, so a secret `addLogSecrets` adds late reaches all of it, including the lines logged after
@@ -223,10 +219,8 @@ function withFailure(line: string, failure: string | undefined): string {
 }
 
 /**
- * The line written in place of one that could not be redacted. It points at the log call and at
- * what broke, from frames, numbers and fixed-format ids only: the error's message and the line's
- * strings can quote the secret. The message is kept as `salvage` returns it. It does not log, so it
- * cannot loop, and it cannot throw.
+ * Replaces a line that could not be redacted, with frames, numbers and fixed-format ids only, never
+ * the error's message or the line's strings. It does not log and cannot throw.
  */
 function redactionFailedLine(
   line: string,
@@ -319,6 +313,9 @@ function errorName(error: unknown): string {
 // Undefined for a literal that is not valid JSON, which the caller redacts whole rather than
 // throwing out of the log call or writing it as it is.
 function decodeJsonString(literal: string): string | undefined {
+  if (literal.length < 2 || !literal.endsWith('"')) {
+    return undefined;
+  }
   if (!literal.includes('\\')) {
     return literal.slice(1, -1);
   }

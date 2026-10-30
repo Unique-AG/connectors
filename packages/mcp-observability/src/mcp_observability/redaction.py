@@ -32,16 +32,14 @@ from mcp_observability.stacktrace import scrub_stacktrace
 MIN_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
 
-# Applied to every log line unless `default_patterns` is false, and exported one by one so a
-# consumer that opts out can pick its own. When a pattern has a `secret` group, only that group is
-# replaced, so the context around it (`Bearer `, `password=`) stays readable. A pattern that can
-# fail after a long run starts only where that run starts: one that tried again inside the run
-# would take seconds on a large value. Kept in step with `packages/logger`.
+# Exported one by one so a consumer that opts out of the defaults can pick its own. A `secret`
+# group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in step with
+# `packages/logger`.
 
-# A credential has a digit, an inner capital or a symbol, or is too long to be a word, so prose such
-# as "Basic authentication failed" keeps its words.
+# The scheme in any case. The credential needs a digit, an inner capital or a symbol, or 20
+# characters, so prose such as "Basic authentication failed" keeps its words.
 AUTHORIZATION_SCHEME_PATTERN = re.compile(
-    r"\b(?:Bearer|Basic)\s+(?P<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})"
+    r"\b(?i:Bearer|Basic)\s+(?P<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})"
     r"[A-Za-z0-9\-._~+/]{8,}=*)"
 )
 JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
@@ -79,10 +77,11 @@ DEFAULT_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-# A JSON string literal, and the colon after it when it is an object key.
-_JSON_STRING = re.compile(r'("(?:[^"\\]|\\.)*")(\s*:)?')
+# A JSON string literal, and the colon after it when it is an object key. An unterminated literal
+# runs to the end of the line, so a match never fails partway and retries inside it.
+_JSON_STRING = re.compile(r'("(?:[^"\\]|\\[\s\S])*(?:"|\\?\Z))(\s*:)?')
 # `PinoJsonFormatter` writes `msg` before any logged value that could nest one.
-_MSG = re.compile(r'"msg":\s*("(?:[^"\\]|\\.)*")')
+_MSG = re.compile(r'"msg":\s*("(?:[^"\\]|\\[\s\S])*(?:"|\\?\Z))')
 
 # Describes a log call from fields that hold no logged value: its logger, level, code location and
 # trace ids.
@@ -290,6 +289,8 @@ def _with_failure(line: str, failure: str | None) -> str:
 def _decoded(literal: str) -> str | None:
     """None for a literal that is not valid JSON, which the caller redacts whole: an exception
     here would reach `Handler.handleError`, which prints the record's message to stderr."""
+    if len(literal) < 2 or not literal.endswith('"'):
+        return None
     if "\\" not in literal:
         return literal[1:-1]
     try:
@@ -310,10 +311,11 @@ def _redact_match(match: re.Match[str]) -> str:
 
 
 def _secret_variants(secrets: Iterable[str]) -> tuple[str, ...]:
-    """Each secret as written and URL-encoded, as a query string carries it."""
+    """Each secret as written and URL-encoded, as a query string carries it. A lone `str` is one
+    secret, not the characters it is made of."""
     return _longest_first(
         variant
-        for secret in secrets
+        for secret in ((secrets,) if isinstance(secrets, str) else secrets)
         # A consumer reading an absent header passes `None` whatever the types say.
         if isinstance(secret, str) and len(secret) >= MIN_SECRET_LENGTH  # pyright: ignore[reportUnnecessaryIsInstance]
         for variant in (secret, *_url_encoded(secret))

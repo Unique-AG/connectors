@@ -311,6 +311,20 @@ def test_a_megabyte_value_shaped_to_backtrack_is_redacted_within_a_second(value:
     assert _SECRET not in redacted
 
 
+@pytest.mark.parametrize(
+    "value",
+    ['"' + '\\"' * 500_000, '"' + '\\"' * 500_000 + "\\"],
+    ids=["escaped-quotes", "escaped-quotes-and-a-dangling-backslash"],
+)
+def test_an_unterminated_megabyte_line_is_redacted_within_a_second(value: str) -> None:
+    started = time.perf_counter()
+
+    redacted = SecretRedactor((_SECRET,)).redact_line(f'{{"msg": {value} {_SECRET}')
+
+    assert time.perf_counter() - started < 1
+    assert _SECRET not in redacted
+
+
 def test_secrets_that_are_not_strings_at_runtime_are_ignored() -> None:
     not_strings: list[str] = [None, 12345678, {"value": _SECRET}]  # pyright: ignore[reportAssignmentType]
     redactor = SecretRedactor([*not_strings, _SECRET])
