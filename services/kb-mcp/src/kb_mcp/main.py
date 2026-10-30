@@ -14,7 +14,8 @@ from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp.types import Icon
 from starlette.middleware import Middleware
-from unique_mcp.logging import configure_logging
+from mcp_configs import LoggingSettings
+from mcp_observability import configure_logging
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 from unique_toolkit.monitoring.memory import start_memory_trimmer
@@ -109,7 +110,7 @@ def main() -> None:
     settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
-    configure_logging()
+    configure_logging(LoggingSettings(), own_loggers=("kb_mcp",))
     logging.getLogger("unique_toolkit.monitoring.memory").addFilter(
         _DowngradeMemoryTrimNoise()
     )
