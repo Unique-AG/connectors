@@ -1,5 +1,4 @@
 from world_check_mcp.contexts.attribution import AttributionError
-from world_check_mcp.contexts.attribution import decision_lock
 from world_check_mcp.contexts.attribution import reviewer_note
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.pages import all_case_results
@@ -69,21 +68,17 @@ async def apply_passport_verification(
     actor: str,
 ) -> PassportVerification:
     """Save an already approved comparison, after reading the case once more."""
-    async with decision_lock:
-        current = await prepare_passport_verification(
-            upstream=upstream, request=request, actor=actor
+    current = await prepare_passport_verification(upstream=upstream, request=request, actor=actor)
+    if current != plan:
+        raise PassportError(
+            "Case or passport results changed during approval. Review and request fresh approval."
         )
-        if current != plan:
-            raise PassportError(
-                "Case or passport results changed during approval. "
-                "Review and request fresh approval."
-            )
-        await upstream.call(
-            VERIFY_PASSPORT,
-            caseSystemId=request.case_system_id,
-            mrzMatched=plan.mrz_matched,
-            note=plan.note,
-        )
+    await upstream.call(
+        VERIFY_PASSPORT,
+        caseSystemId=request.case_system_id,
+        mrzMatched=plan.mrz_matched,
+        note=plan.note,
+    )
     return PassportVerification(
         recorded=True,
         case_system_id=request.case_system_id,
