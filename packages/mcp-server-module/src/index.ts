@@ -1,4 +1,5 @@
 export * from './decorators';
+export * from './errors/tool.error';
 export * from './interfaces';
 export * from './mcp.module';
 export * from './services/mcp-executor.service';
