@@ -120,10 +120,15 @@ function applyToText(text, name, version) {
   return text.slice(0, start) + updated + text.slice(start + body.length);
 }
 
-export function applyTerraform(files, { name, to }) {
+export function applyTerraform(files, { to, data }) {
   return Object.fromEntries(
     Object.entries(files)
-      .map(([path, text]) => [path, applyToText(text, name, to)])
+      .map(([path, text]) => [
+        path,
+        parseProviders(text)
+          .providers.filter(({ source }) => source === data.source)
+          .reduce((current, { name }) => applyToText(current, name, to), text),
+      ])
       .filter(([path, text]) => text !== files[path]),
   );
 }

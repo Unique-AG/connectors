@@ -339,7 +339,7 @@ describe('applyTerraform', () => {
   };
 
   it('changes only the named provider, in the files that need it', () => {
-    const changed = applyTerraform(files, { name: 'azurerm', to: '4.9.0' });
+    const changed = applyTerraform(files, { to: '4.9.0', data: { source: 'hashicorp/azurerm' } });
     assert.deepStrictEqual(Object.keys(changed), ['services/a/deploy/terraform/x/versions.tf']);
     const text = changed['services/a/deploy/terraform/x/versions.tf'];
     assert.match(text, /azurerm = \{\n\s+source\s+= "hashicorp\/azurerm"\n\s+version = "~> 4"/);
@@ -348,7 +348,7 @@ describe('applyTerraform', () => {
   });
 
   it('widens a range in every folder when the release is outside it', () => {
-    const changed = applyTerraform(files, { name: 'azurerm', to: '7.0.0' });
+    const changed = applyTerraform(files, { to: '7.0.0', data: { source: 'hashicorp/azurerm' } });
     assert.deepStrictEqual(Object.keys(changed).sort(), [
       'services/a/deploy/terraform/x/versions.tf',
       'services/b/deploy/terraform/y/versions.tf',
@@ -356,8 +356,29 @@ describe('applyTerraform', () => {
     assert.match(changed['services/b/deploy/terraform/y/versions.tf'], /version = ">= 4, < 8"/);
   });
 
+  it('retargets every local name that binds the same source', () => {
+    const module = (localName) => `terraform {
+  required_providers {
+    ${localName} = {
+      source  = "hashicorp/google"
+      version = "~> 5"
+    }
+  }
+}
+`;
+    const changed = applyTerraform(
+      { 'a/versions.tf': module('google'), 'b/versions.tf': module('gcp') },
+      { to: '6.1.0', data: { source: 'hashicorp/google' } },
+    );
+    assert.match(changed['a/versions.tf'], /google = \{[^}]*version = "~> 6"/);
+    assert.match(changed['b/versions.tf'], /gcp = \{[^}]*version = "~> 6"/);
+  });
+
   it('returns nothing when no file names the provider', () => {
-    assert.deepStrictEqual(applyTerraform(files, { name: 'google', to: '9.0.0' }), {});
+    assert.deepStrictEqual(
+      applyTerraform(files, { to: '9.0.0', data: { source: 'hashicorp/google' } }),
+      {},
+    );
   });
 });
 
