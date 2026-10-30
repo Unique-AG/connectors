@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.1.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.1...outlook-semantic-mcp@4.1.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** bump base chart for network policy sync-wave ordering ([#1307](https://github.com/Unique-AG/connectors/issues/1307)) ([8e9eba5](https://github.com/Unique-AG/connectors/commit/8e9eba588c9052ef87a356a0bd9c575170848ca2))
+
+
+### Dependencies
+
+* bump markdown-it from 15.0.2 to 15.0.3 ([#1254](https://github.com/Unique-AG/connectors/issues/1254)) ([60781e8](https://github.com/Unique-AG/connectors/commit/60781e847d8da7ee3ea9b519f6a066601f25c9a1))
+* **main:** refresh dependencies and drop unneeded overrides ([#1322](https://github.com/Unique-AG/connectors/issues/1322)) ([a4f2390](https://github.com/Unique-AG/connectors/commit/a4f239000fc35b5809f6c7b50c920ac3c8419ef9))
+
 ## [4.1.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.0...outlook-semantic-mcp@4.1.1) (2026-10-22)
 
 
