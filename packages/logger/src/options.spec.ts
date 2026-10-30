@@ -1,6 +1,7 @@
+import assert from 'node:assert';
 import pinoHttp from 'pino-http';
 import { describe, expect, it } from 'vitest';
-import { defaultLoggerOptions } from './options';
+import { createLoggerOptions, defaultLoggerOptions } from './options';
 
 describe('defaultLoggerOptions', () => {
   it('sanitizes pino-http wrapped GraphQL client errors', () => {
@@ -107,5 +108,26 @@ describe('defaultLoggerOptions', () => {
     ]);
     expect(log.err?.statusCode).toBe(200);
     expect(JSON.stringify(log.err)).not.toContain('Secret Report.docx');
+  });
+
+  it('redacts the secrets passed to createLoggerOptions from every line', () => {
+    const pinoHttpOptions = createLoggerOptions({ secrets: ['env-client-secret'] }).pinoHttp;
+    assert.ok(
+      typeof pinoHttpOptions === 'object' && pinoHttpOptions !== null && 'hooks' in pinoHttpOptions,
+      'Expected pinoHttp options with hooks',
+    );
+    const logLines: string[] = [];
+    const httpLogger = pinoHttp({
+      hooks: pinoHttpOptions.hooks,
+      stream: { write: (line) => logLines.push(line) },
+    });
+
+    httpLogger.logger.error(
+      { err: new Error('rejected env-client-secret') },
+      'token exchange failed',
+    );
+
+    expect(logLines[0]).not.toContain('env-client-secret');
+    expect(JSON.parse(logLines[0] ?? '{}').err.message).toBe('rejected [Redacted]');
   });
 });

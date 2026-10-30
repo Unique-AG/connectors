@@ -1,1 +1,18 @@
 export * from './options';
+export {
+  API_KEY_PATTERN,
+  AUTHORIZATION_SCHEME_PATTERN,
+  AWS_ACCESS_KEY_ID_PATTERN,
+  addLogSecrets,
+  CREDENTIAL_PARAMETER_PATTERN,
+  DEFAULT_SECRET_PATTERNS,
+  GITHUB_TOKEN_PATTERN,
+  JWT_PATTERN,
+  PRIVATE_KEY_PATTERN,
+  redactRequestSecrets,
+  runWithLogSecrets,
+  type SecretRedactionOptions,
+  SK_PREFIXED_KEY_PATTERN,
+  SLACK_TOKEN_PATTERN,
+  URL_CREDENTIALS_PATTERN,
+} from './redact-secrets';
