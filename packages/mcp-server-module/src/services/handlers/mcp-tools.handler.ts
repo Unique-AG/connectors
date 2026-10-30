@@ -10,6 +10,7 @@ import {
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import * as z from 'zod';
+import { ToolError } from '../../errors/tool.error';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
 import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
@@ -154,14 +155,20 @@ export class McpToolsHandler extends McpHandlerBase {
 
         return transformedResult;
       } catch (error) {
-        this.logger.error(error);
         // Re-throw McpErrors (like validation errors) so they are handled by the MCP protocol layer
         if (error instanceof McpError) {
           throw error;
         }
-        // For other errors, return formatted error response
+        // ToolError carries a message that is safe to surface to the client
+        if (error instanceof ToolError) {
+          return {
+            content: [{ type: 'text', text: error.message }],
+            isError: true,
+          };
+        }
+        this.logger.error(error);
         return {
-          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+          content: [{ type: 'text', text: 'An unexpected error occurred. Please try again.' }],
           isError: true,
         };
       }
