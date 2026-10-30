@@ -154,6 +154,7 @@ _CHAIN = (
     "GraphAdviceMiddleware",
     "TraceContextRestoreMiddleware",
     "MessageLogMiddleware",
+    "RateLimitMiddleware",
     "DereferenceRefsMiddleware",
     "_McpMetrics",
 )
