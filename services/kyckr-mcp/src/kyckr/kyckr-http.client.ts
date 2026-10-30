@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isPlainObject, isString } from 'remeda';
-import { request } from 'undici';
+import { Agent, type Dispatcher, request } from 'undici';
 import { KyckrConfig } from '~/config';
 import { Metrics } from './metrics';
 
@@ -16,8 +16,26 @@ export class KyckrApiError extends Error {
   }
 }
 
+export class KyckrRateLimitError extends KyckrApiError {
+  public constructor(
+    path: string,
+    public readonly retryAfterSeconds: number | undefined,
+  ) {
+    const hint = retryAfterSeconds !== undefined ? ` Retry after ${retryAfterSeconds}s.` : '';
+    super(429, path, `Rate limit exceeded.${hint}`);
+    this.name = 'KyckrRateLimitError';
+  }
+}
+
 @Injectable()
 export class KyckrHttpClient {
+  private static readonly MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+  private static readonly dispatcher = new Agent({
+    headersTimeout: 30_000,
+    bodyTimeout: 60_000,
+  });
+
   private readonly logger = new Logger(KyckrHttpClient.name);
 
   public constructor(
@@ -54,10 +72,20 @@ export class KyckrHttpClient {
           Accept: 'application/json',
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        dispatcher: KyckrHttpClient.dispatcher,
       });
 
       status = response.statusCode;
-      const rawBody = await response.body.text();
+
+      if (status === 429) {
+        response.body.destroy();
+        throw new KyckrRateLimitError(path, this.parseRetryAfter(response.headers['retry-after']));
+      }
+
+      const rawBody = await this.readBodyWithLimit(
+        response.body,
+        KyckrHttpClient.MAX_RESPONSE_BYTES,
+      );
       const responseBody = this.tryParseJson(rawBody);
 
       if (status >= 400) {
@@ -79,6 +107,32 @@ export class KyckrHttpClient {
         durationMs,
       });
     }
+  }
+
+  private async readBodyWithLimit(
+    body: Dispatcher.ResponseData['body'],
+    maxBytes: number,
+  ): Promise<string> {
+    let total = 0;
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > maxBytes) {
+        throw new Error(`Kyckr response exceeded ${maxBytes} bytes`);
+      }
+      chunks.push(buf);
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+  }
+
+  private parseRetryAfter(header: string | string[] | undefined): number | undefined {
+    const raw = Array.isArray(header) ? header[0] : header;
+    if (!raw) {
+      return undefined;
+    }
+    const seconds = Number.parseInt(raw, 10);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
   }
 
   private buildUrl(path: string, params?: Record<string, string | undefined>): string {
