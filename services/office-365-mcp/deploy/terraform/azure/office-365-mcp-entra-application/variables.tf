@@ -1,17 +1,17 @@
 variable "tools_preset" {
   description = <<-EOT
     Which tools this deployment runs, as a named surface — the pod's TOOLS_PRESET, spelled the same
-    way (lowercase only). Name several presets in a comma-separated string to turn on the union of
-    their tools. Set this or tools_enabled, never both, never neither; there is no default.
-    Widening a live registration makes every signed-in user meet AADSTS65001 until they sign in
-    again, so apply HERE BEFORE the overlay when widening, and AFTER it when narrowing.
+    way (lowercase only). Name several presets in a list of strings, or in a comma-separated string,
+    to turn on the union of their tools. Set this or tools_enabled, never both, never neither; there
+    is no default. Widening a live registration makes every signed-in user meet AADSTS65001 until
+    they sign in again, so apply HERE BEFORE the overlay when widening, and AFTER it when narrowing.
   EOT
-  type        = string
+  type        = any
   default     = null
 
   validation {
-    condition     = var.tools_preset == null ? true : alltrue([for name in split(",", var.tools_preset) : contains(keys(local.presets), trimspace(name))])
-    error_message = "tools_preset names no surface this connector has. It takes one preset or a comma-separated list of presets. Valid presets: ${join(", ", sort(keys(local.presets)))}."
+    condition     = var.tools_preset == null ? true : alltrue([for names in [[for name in try(tolist(var.tools_preset), split(",", var.tools_preset)) : trimspace(name)]] : length(names) > 0 && alltrue([for name in names : contains(keys(local.presets), name)])])
+    error_message = "tools_preset names no preset, or a surface this connector has not. It takes one preset, a list of presets, or a comma-separated string of presets. Valid presets: ${join(", ", sort(keys(local.presets)))}."
   }
 }
 
