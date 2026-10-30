@@ -59,6 +59,14 @@ When the vendor changes the spec:
 CI runs `uv run poe codegen --check`, which fails when the generated code is not what
 the spec and the table generate.
 
+When the upstream limits how many requests run at once, for the whole account or per user, write
+the lock in `upstream/` and pass it to `Upstream` in `open_upstream` as
+`lock_config=LockConfig(lock=..., acquire_timeout_seconds=...)`. The lock is any `RequestLock`
+from mcp-openapi: an `asyncio.Semaphore` for one replica, a Redis or Postgres lock for a limit the
+replicas share, keyed on the request's `Authorization` header for a limit per user. The client
+holds it around each attempt and releases it while a retry waits. Without one, nothing caps the
+requests in flight.
+
 ## Custom
 
 `upstream/client.py` starts as a small HTTP client, ours to change: `Upstream` has one

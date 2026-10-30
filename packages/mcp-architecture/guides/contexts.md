@@ -84,6 +84,12 @@ A context:
 - Returns its own pydantic models, never the upstream's. Map the vendor's model to the
   context's own here, keeping only what the tool needs, so a vendor change stops at this layer.
   The codegen already names generated fields in snake_case, with the vendor's names as aliases.
+- Sends upstream calls that do not depend on each other at once, in an `asyncio.TaskGroup`,
+  rather than one after another. It does not throttle them itself: the retry policy waits out a
+  429, and a limit on requests in flight is the lock `upstream` holds (see
+  [upstream](upstream.md#openapi)). A fan-out over a list the user controls, such as every
+  position of a portfolio, still bounds how many calls it starts at once, as `value_portfolio`
+  does.
 - Knows nothing about MCP. It raises its own errors for its own rules
   (`PositionRejectedError`), never a `ToolError`. An `UpstreamError` passes through it as it is:
   `upstream` made it a `ToolError` already.
