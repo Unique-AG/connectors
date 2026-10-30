@@ -83,6 +83,7 @@ jobs:
           severity: CRITICAL,HIGH
           scanners: vuln
           ignore-unfixed: true
+          trivyignores: .github/trivyignore.yaml
           exit-code: "0"
           timeout: 15m
           cache: true
