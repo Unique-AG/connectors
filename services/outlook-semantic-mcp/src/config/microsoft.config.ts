@@ -40,7 +40,12 @@ const ConfigSchema = z.object({
   allowedTenantIds: z
     .string()
     .optional()
-    .transform((val) => (val ?? '').split(',').map((s) => s.trim()).filter(Boolean))
+    .transform((val) =>
+      (val ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
     .describe(
       'Comma-separated list of Entra tenant GUIDs allowed to sign in (MICROSOFT_ALLOWED_TENANT_IDS). When set and non-empty, tokens from unlisted tenants are rejected. Leave unset to allow any tenant.',
     ),

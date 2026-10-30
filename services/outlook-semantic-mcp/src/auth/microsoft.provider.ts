@@ -34,7 +34,7 @@ function extractTid(accessToken: string): string {
     string,
     unknown
   >;
-  const tid = payload['tid'];
+  const tid = payload.tid;
   assert.ok(typeof tid === 'string' && tid.length > 0, 'Access token has no tid claim');
   return tid;
 }
