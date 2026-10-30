@@ -1,3 +1,4 @@
+import asyncio
 from base64 import b64encode
 from datetime import datetime
 from datetime import timedelta
@@ -127,6 +128,32 @@ async def test_a_rejected_token_is_refreshed_once() -> None:
     assert info.version == "3.9.0"
     assert tokens == ["access-1", "access-2"]
     assert bearers == ["Bearer access-1", "Bearer access-2"]
+
+
+async def test_concurrent_rejections_of_one_token_fetch_one_new_token() -> None:
+    tokens: list[str] = []
+    rejected = 0
+    both_rejected = asyncio.Event()
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        nonlocal rejected
+        if request.url.path == "/auth/oauth2/v1/token":
+            access_token = f"access-{len(tokens) + 1}"
+            tokens.append(access_token)
+            return _token(access_token)
+        if request.headers["Authorization"] == "Bearer access-1":
+            rejected += 1
+            if rejected == 2:
+                both_rejected.set()
+            await both_rejected.wait()
+            return httpx2.Response(401)
+        return httpx2.Response(204)
+
+    async with upstream_http(_settings(), httpx2.MockTransport(respond), now=lambda: _WHEN) as http:
+        first, second = await asyncio.gather(http.get("/apiInfo"), http.get("/apiInfo"))
+
+    assert (first.status_code, second.status_code) == (204, 204)
+    assert tokens == ["access-1", "access-2"]
 
 
 async def test_a_retry_reuses_the_token() -> None:
