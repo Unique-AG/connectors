@@ -41,12 +41,10 @@ export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
   AWS_ACCESS_KEY_ID_PATTERN,
 ];
 
-// A JSON string literal, and the colon after it when it is an object key. An unterminated literal
-// runs to the end of the line, so a match never fails partway and retries inside it.
-const JSON_STRING = /("(?:[^"\\]|\\[\s\S])*(?:"|\\?$))(\s*:)?/g;
-
 // pino writes the line's own `msg` last, after any nested in the logged object.
-const MSG = /"msg":("(?:[^"\\]|\\[\s\S])*(?:"|\\?$))/g;
+const MSG_KEY = '"msg":';
+
+const JSON_WHITESPACE = new Set([' ', '\t', '\n', '\r']);
 
 // The secrets of one `runWithLogSecrets` call or request. Everything that runs in it shares this
 // object, so a secret `addLogSecrets` adds late reaches all of it, including the lines logged after
@@ -104,7 +102,7 @@ export function createSecretRedactor({
   const replacePatterns = (text: string): string => allPatterns.reduce(redactPattern, text);
 
   const redactLine = (line: string, secrets: readonly string[]): string =>
-    line.replace(JSON_STRING, (token: string, literal: string, keyColon: string | undefined) => {
+    replaceJsonStrings(line, (token, literal, keyColon) => {
       const text = decodeJsonString(literal);
       if (text === undefined) {
         return keyColon === undefined ? JSON.stringify(REDACTED) : token;
@@ -266,7 +264,9 @@ function originalFields(line: string): Record<string, unknown> {
 
 function originalMsg(line: string, salvage: (text: string) => string): { original_msg?: string } {
   try {
-    const literal = [...line.matchAll(MSG)].at(-1)?.[1];
+    const start = line.lastIndexOf(`${MSG_KEY}"`) + MSG_KEY.length;
+    const literal =
+      start < MSG_KEY.length ? undefined : line.slice(start, jsonStringEnd(line, start));
     const text = literal === undefined ? undefined : decodeJsonString(literal);
     return text === undefined ? {} : { original_msg: salvage(text) };
   } catch {
@@ -308,6 +308,52 @@ function errorFields(error: unknown): { name: string; stack: string[] } {
 // The constructor's name, not `error.name`, which code can set to anything.
 function errorName(error: unknown): string {
   return error instanceof Error ? error.constructor.name : typeof error;
+}
+
+/**
+ * Replaces each JSON string literal of `line`, passing the colon after it when it is an object key.
+ * A single pass, so the cost stays linear whatever the line holds. An unterminated literal runs to
+ * the end of the line.
+ */
+function replaceJsonStrings(
+  line: string,
+  replace: (token: string, literal: string, keyColon: string | undefined) => string,
+): string {
+  const parts: string[] = [];
+  let copiedUpTo = 0;
+  for (let start = line.indexOf('"'); start !== -1; start = line.indexOf('"', copiedUpTo)) {
+    const literalEnd = jsonStringEnd(line, start);
+    const colonEnd = keyColonEnd(line, literalEnd);
+    const tokenEnd = colonEnd ?? literalEnd;
+    const keyColon = colonEnd === undefined ? undefined : line.slice(literalEnd, colonEnd);
+    parts.push(
+      line.slice(copiedUpTo, start),
+      replace(line.slice(start, tokenEnd), line.slice(start, literalEnd), keyColon),
+    );
+    copiedUpTo = tokenEnd;
+  }
+  parts.push(line.slice(copiedUpTo));
+  return parts.join('');
+}
+
+// Past the closing quote of the literal opening at `start`, or the end of the line.
+function jsonStringEnd(line: string, start: number): number {
+  let index = start + 1;
+  while (index < line.length) {
+    if (line[index] === '"') {
+      return index + 1;
+    }
+    index += line[index] === '\\' ? 2 : 1;
+  }
+  return line.length;
+}
+
+function keyColonEnd(line: string, from: number): number | undefined {
+  let index = from;
+  while (index < line.length && JSON_WHITESPACE.has(line[index] ?? '')) {
+    index += 1;
+  }
+  return line[index] === ':' ? index + 1 : undefined;
 }
 
 // Undefined for a literal that is not valid JSON, which the caller redacts whole rather than
