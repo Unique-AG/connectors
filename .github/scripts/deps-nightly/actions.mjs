@@ -180,7 +180,13 @@ export function createActionsLookup(token, fetchImpl = fetch) {
       headers,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    return response.status === 200 ? response.json() : null;
+    if (response.status === 404) {
+      return null;
+    }
+    if (response.status !== 200) {
+      throw new Error(`GitHub answered ${response.status} for ${path}.`);
+    }
+    return response.json();
   };
   const tagReleases = async (repo) => {
     const names = ((await get(`${repo}/tags?per_page=30`)) ?? [])

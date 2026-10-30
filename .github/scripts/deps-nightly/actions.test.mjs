@@ -507,11 +507,49 @@ describe('createActionsLookup', () => {
     assert.equal('Authorization' in calls[0].init.headers, false);
   });
 
-  it('returns an empty list and null for a non-200 answer', async () => {
+  it('returns an empty list and null for a 404 answer', async () => {
     const lookup = createActionsLookup('secret', async () =>
       respond(404, { message: 'Not Found' }),
     );
     assert.deepEqual(await lookup.releases('actions/missing'), []);
     assert.equal(await lookup.commitSha('actions/missing', 'v1.0.0'), null);
+  });
+
+  it('throws for any other non-200 answer', async () => {
+    const lookup = createActionsLookup('secret', async () => respond(429, {}));
+    await assert.rejects(
+      lookup.releases('actions/checkout'),
+      /^Error: GitHub answered 429 for actions\/checkout\/releases\?per_page=30\.$/,
+    );
+    await assert.rejects(lookup.commitSha('actions/checkout', 'v1.0.0'), /GitHub answered 429/);
+  });
+
+  describe('in a plan', () => {
+    const files = { 'a.yaml': `      - uses: actions/checkout@${OLD_SHA} # v7.0.1` };
+    const planWith = (status) =>
+      planWithLedger({
+        files,
+        ledger: {},
+        now: NOW,
+        cooldownDays: 3,
+        lookup: createActionsLookup('secret', async () => respond(status, {})),
+      });
+
+    it('reports a rate limit as a failed lookup', async () => {
+      const { needsPerson } = await planWith(429);
+      assert.equal(needsPerson.length, 1);
+      assert.match(needsPerson[0].reason, /^The lookup failed\. GitHub answered 429 for /);
+    });
+
+    it('keeps the cooldown text for a repo that GitHub does not know', async () => {
+      const { needsPerson } = await planWith(404);
+      assert.deepEqual(needsPerson, [
+        {
+          ecosystem: 'actions',
+          name: 'actions/checkout',
+          reason: 'No stable release is old enough.',
+        },
+      ]);
+    });
   });
 });
