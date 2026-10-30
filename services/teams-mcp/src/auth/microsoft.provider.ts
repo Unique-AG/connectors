@@ -107,9 +107,7 @@ export function createMicrosoftOAuthProvider(toggles: {
         ? (accessToken: string) => {
             const tid = extractTid(accessToken);
             if (!allowedTenantIds.includes(tid)) {
-              throw new Error(
-                `Sign-in rejected: Entra tenant ${tid} is not on the allowlist`,
-              );
+              throw new Error(`Sign-in rejected: Entra tenant ${tid} is not on the allowlist`);
             }
           }
         : undefined,

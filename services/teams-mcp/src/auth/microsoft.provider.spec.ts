@@ -131,7 +131,7 @@ describe('tenant allowlist via validateCallback', () => {
     });
     const token = makeJwt({ tid: LISTED_TENANT });
 
-    expect(() => provider.validateCallback!(token, 'refresh', {})).not.toThrow();
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).not.toThrow();
   });
 
   it('validateCallback rejects a token from an unlisted tenant', () => {
@@ -141,7 +141,7 @@ describe('tenant allowlist via validateCallback', () => {
     });
     const token = makeJwt({ tid: OTHER_TENANT });
 
-    expect(() => provider.validateCallback!(token, 'refresh', {})).toThrow(OTHER_TENANT);
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow(OTHER_TENANT);
   });
 
   it('validateCallback rejects a token with no tid claim', () => {
@@ -151,6 +151,6 @@ describe('tenant allowlist via validateCallback', () => {
     });
     const token = makeJwt({ sub: 'no-tid-here' });
 
-    expect(() => provider.validateCallback!(token, 'refresh', {})).toThrow();
+    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow();
   });
 });
