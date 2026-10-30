@@ -409,6 +409,8 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             ),
         )
     if request.method == "PATCH" and path.endswith("/cases/sys-1"):
+        if request.headers.get("content-type") != "application/json" or not request.content:
+            return _json(404, [])
         _screen_modes.append(request.url.params["screen"])
         return _json(
             200,
