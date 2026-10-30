@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp_observability import RateLimitMiddleware
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
@@ -132,6 +133,7 @@ def create_app(
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),
+            RateLimitMiddleware(),
         ],
         lifespan=lifespan,
     )
