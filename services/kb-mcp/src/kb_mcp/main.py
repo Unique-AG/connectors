@@ -7,6 +7,7 @@ from typing import override
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from mcp_observability import RateLimitMiddleware
 from fastmcp.server.providers import FileSystemProvider
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
@@ -121,7 +122,7 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
-        middleware=[ToolCallObservabilityMiddleware()],
+        middleware=[ToolCallObservabilityMiddleware(), RateLimitMiddleware()],
         mask_error_details=True,
     )
     apply_enabled_tools(mcp, settings)
