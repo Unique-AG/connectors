@@ -7,12 +7,15 @@ from typing import override
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from mcp_observability import RateLimitMiddleware
 from fastmcp.server.providers import FileSystemProvider
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp_configs import LoggingSettings
-from mcp_observability import ToolCallObservabilityMiddleware, configure_logging
+from mcp_observability import (
+    RateLimitMiddleware,
+    ToolCallObservabilityMiddleware,
+    configure_logging,
+)
 from starlette.middleware import Middleware
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
