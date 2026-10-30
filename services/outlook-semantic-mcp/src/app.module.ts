@@ -44,6 +44,7 @@ import { HealthModule } from './health/health.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { buildServerInstructions } from './server.instructions';
+import { serverIcons } from './server-icons';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -172,6 +173,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       name: 'outlook-semantic-mcp',
       version: packageJson.version,
       instructions: buildServerInstructions(),
+      icons: serverIcons,
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
