@@ -37,6 +37,13 @@ const ConfigSchema = z.object({
     .describe(
       'The hour of the day in UTC when scheduled subscription expirations should occur. This should be done during off-peak hours to avoid disruptions of incoming notifications.',
     ),
+  allowedTenantIds: z
+    .string()
+    .optional()
+    .transform((val) => (val ?? '').split(',').map((s) => s.trim()).filter(Boolean))
+    .describe(
+      'Comma-separated list of Entra tenant GUIDs allowed to sign in (MICROSOFT_ALLOWED_TENANT_IDS). When set and non-empty, tokens from unlisted tenants are rejected. Leave unset to allow any tenant.',
+    ),
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { type OAuthProviderConfig } from '@unique-ag/mcp-oauth';
 import { Strategy as Microsoft } from 'passport-microsoft';
 
@@ -63,13 +64,26 @@ export function microsoftOAuthTokenUrl(signInTenantId: string): string {
   return `https://login.microsoftonline.com/${signInTenantId}/oauth2/v2.0/token`;
 }
 
+function extractTid(accessToken: string): string {
+  const parts = accessToken.split('.');
+  assert.strictEqual(parts.length, 3, 'Access token is not a JWT');
+  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8')) as Record<
+    string,
+    unknown
+  >;
+  const tid = payload['tid'];
+  assert.ok(typeof tid === 'string' && tid.length > 0, 'Access token has no tid claim');
+  return tid;
+}
+
 export function createMicrosoftOAuthProvider(toggles: {
   chat: 'enabled' | 'disabled';
   ingestion: 'enabled' | 'disabled';
   signInTenantId: string;
+  allowedTenantIds?: string[];
 }): OAuthProviderConfig {
   const scopes = resolveMicrosoftScopes(toggles);
-  const { signInTenantId } = toggles;
+  const { signInTenantId, allowedTenantIds = [] } = toggles;
 
   return {
     name: 'microsoft',
@@ -88,5 +102,16 @@ export function createMicrosoftOAuthProvider(toggles: {
       displayName: profile.displayName,
       raw: profile,
     }),
+    validateCallback:
+      allowedTenantIds.length > 0
+        ? (accessToken: string) => {
+            const tid = extractTid(accessToken);
+            if (!allowedTenantIds.includes(tid)) {
+              throw new Error(
+                `Sign-in rejected: Entra tenant ${tid} is not on the allowlist`,
+              );
+            }
+          }
+        : undefined,
   };
 }

@@ -128,6 +128,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           chat: configService.get('chat.integration', { infer: true }),
           ingestion: configService.get('unique.integration', { infer: true }),
           signInTenantId: configService.get('microsoft.signInTenantId', { infer: true }),
+          allowedTenantIds: configService.get('microsoft.allowedTenantIds', { infer: true }),
         }),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
