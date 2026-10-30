@@ -8,8 +8,8 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | Admin Consent | Required | Purpose |
 |------------|------|---------------|----------|---------|
 | `User.Read` | Delegated | No | Yes | Resolve user identity and profile |
-| `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create draft emails in the user's mailbox |
-| `Mail.ReadWrite.Shared` | Delegated | No | Yes (requested unconditionally; only used when `DELEGATED_ACCESS_SCAN` is enabled) | Read emails and create drafts in mailboxes the user has been granted delegated access to via Exchange admin |
+| `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create and edit draft emails in the user's mailbox |
+| `Mail.ReadWrite.Shared` | Delegated | No | Yes (requested unconditionally; only used when `DELEGATED_ACCESS_SCAN` is enabled) | Read emails and create or edit drafts in mailboxes the user has been granted delegated access to via Exchange admin |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
 | `Calendars.ReadWrite.Shared` | Delegated | No | Only when `CALENDAR_INTEGRATION=enabled` | List calendars and read/write events, including calendars shared with the user |
@@ -43,7 +43,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read and create email messages in the user's mailbox |
-| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `create_draft_email` tool (POST `/me/messages`) |
+| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `create_draft_email` tool (POST `/me/messages`); editing drafts via `update_draft_email` (PATCH `/me/messages/{id}`) and adding or removing their attachments (POST and DELETE `/me/messages/{id}/attachments`) |
 | **Why Not `Mail.Read` + `Mail.ReadWrite`** | `Mail.ReadWrite` already includes full read access, making `Mail.Read` and `Mail.ReadBasic` redundant |
 | **Why Not `Mail.Send`** | The server only creates drafts — sending is a deliberate user action in Outlook. `Mail.Send` is not requested. |
 

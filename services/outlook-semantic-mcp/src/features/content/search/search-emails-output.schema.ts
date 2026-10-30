@@ -7,13 +7,12 @@ const SearchEmailResultSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Semantic-backend content ID. Pass as `id` with `idType: "Unique"` to `open_email`. Present only for semantic-backend results. Use it to recognise the same email returned again on a later semantic page with further passages.',
+      'Semantic-backend content ID. Present only for semantic-backend results. Use it to recognise the same email returned again on a later semantic page with further passages.',
     ),
   msGraphMessageId: z
     .string()
-    .optional()
     .describe(
-      'Microsoft Graph message ID. Pass as `id` with `idType: "MsGraph"` to `open_email`. Present for Graph-backend results; also present for semantic results when both backends matched the same email. Use it to recognise the same email returned on different pages.',
+      'Microsoft Graph message ID, the same as `openEmailParams.id`. Present for results of both backends. Use it to recognise the same email returned on different pages.',
     ),
   folderId: z
     .string()
@@ -27,6 +26,11 @@ const SearchEmailResultSchema = z.object({
     .optional()
     .nullable()
     .describe('Date and time the email was received, in ISO 8601 format.'),
+  isDraft: z
+    .boolean()
+    .describe(
+      'True when this message is an unsent draft. `openEmailParams.bodyContentType` is then `html`. A draft cannot be replied to.',
+    ),
   text: z
     .string()
     .describe(
@@ -55,18 +59,35 @@ const SearchEmailResultSchema = z.object({
   backend: z
     .nativeEnum(SearchBackend)
     .describe(
-      'Search backend that returned this result: "Unique" (semantic) or "MsGraph" (keyword). Determines which `idType` to use when calling `open_email`.',
+      'Search backend that returned this result: "Unique" (semantic) or "MsGraph" (keyword). Call `open_email` with `openEmailParams`, not with this field.',
     ),
   openEmailParams: z
     .object({
-      id: z.string(),
-      idType: z.nativeEnum(SearchBackend),
+      id: z.string().describe('Microsoft Graph message ID.'),
       mailbox: z.string().optional(),
       parentFolderId: z.string().optional(),
       idIsImmutable: z.boolean().optional(),
+      bodyContentType: z
+        .literal('html')
+        .optional()
+        .describe(
+          'Present only when `isDraft` is true. `open_email` then returns the live HTML body. Absent for every other message, which is read as plain text.',
+        ),
+      uniqueContentId: z
+        .string()
+        .optional()
+        .describe(
+          'Ingested content id, present when semantic search matched this email. Pass it through. `open_email` then also returns the matched chunks.',
+        ),
+      chunkIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Ids of the semantically matched chunks. Pass them through with `uniqueContentId`. `open_email` returns those chunks, not the whole ingested email.',
+        ),
     })
     .describe(
-      'Pre-constructed input for `open_email`. Pass this object directly as the tool input without modification to read the full email.',
+      'Pre-constructed input for `open_email`. Pass this object directly, including `uniqueContentId` and `chunkIds` when they are set. It addresses the live Microsoft Graph message. A draft includes `bodyContentType: "html"`; any other message is plain text. Copy `id` to `draftId` on the edit tools, and copy `idIsImmutable` and `mailbox` when they are set.',
     ),
   replyToParams: z
     .object({

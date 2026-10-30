@@ -26,6 +26,7 @@
   - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder?)
   - [Can I search for unread or flagged emails?](#Can-I-search-for-unread-or-flagged-emails?)
   - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email?)
+  - [Can I edit a draft that already exists?](#Can-I-edit-a-draft-that-already-exists?)
   - [Can I create drafts in a shared mailbox?](#Can-I-create-drafts-in-a-shared-mailbox?)
   - [Why does a reply draft in a shared mailbox appear in Drafts instead of in the thread in Outlook Web?](#Why-does-a-reply-draft-in-a-shared-mailbox-appear-in-Drafts-instead-of-in-the-thread-in-Outlook-Web?)
   - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do?)
@@ -72,22 +73,22 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 6 mail tools in `microsoft_graph` mode, and 8 more calendar tools when `CALENDAR_INTEGRATION` is enabled. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 13 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 9 mail tools in `microsoft_graph` mode, and 8 more calendar tools when `CALENDAR_INTEGRATION` is enabled. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
 - Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters
-- Exposes 10 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when the calendar flag is on
+- Exposes 13 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when the calendar flag is on
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Outlook account
-- 10 mail MCP tools available in their AI client immediately after connection (14 with debug mode enabled; 8 more when calendar is enabled)
+- 13 mail MCP tools available in their AI client immediately after connection (17 with debug mode enabled; 8 more when calendar is enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 10 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 mail tools. Calendar tools are additive behind `CALENDAR_INTEGRATION`. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 13 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 9 mail tools. Calendar tools are additive behind `CALENDAR_INTEGRATION`. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
@@ -98,7 +99,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 | Category | Tools |
 |----------|-------|
 | Email Search | `search_emails`, `fetch_next_search_pages`, `open_email` |
-| Draft Creation | `create_draft_email` |
+| Draft Creation and Editing | `create_draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
@@ -442,6 +443,16 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 ```
 
 **See also:** [Tools — search_emails](./technical/tools.md#search_emails)
+
+### Can I edit a draft that already exists?
+
+**Answer:** Yes, for drafts that were created with `create_draft_email` and for drafts the user wrote in Outlook. The agent finds the draft with `search_emails` restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with `open_email` by passing `openEmailParams`, and then calls:
+
+- `update_draft_email` to change the subject, body, To recipients, or CC recipients. The body is the HTML from that read, sent back unchanged (no Markdown conversion), and it replaces the whole body, so the agent keeps the formatting, signature, quoted thread, and inline images the user did not ask to change. Each recipient list also replaces the existing one.
+- `add_attachments_to_draft_email` to attach more files. Existing attachments stay.
+- `remove_attachments_from_draft_email` to remove attachments by file name. Inline images are left in place unless the user explicitly asked to remove them. The user is asked to confirm in a prompt first; if the client cannot show the prompt, nothing is removed.
+
+All three check that the message is still a draft and fail without changing anything if it was already sent.
 
 ### Can I attach files when creating a draft email?
 

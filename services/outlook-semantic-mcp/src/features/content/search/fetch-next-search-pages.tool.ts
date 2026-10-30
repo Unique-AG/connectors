@@ -35,7 +35,7 @@ export class FetchNextSearchPagesTool {
       'Fetch the next page of results, or retry a throttled or failed page, for searches started with `search_emails`. ' +
       'Pass the `cursorId`s from `pages`. Returns the same shape as `search_emails`: the new `results`, and a `pages` list with fresh `cursorId`s for whatever can still be continued. ' +
       'Following the same `cursorId` again returns the same page, so a retry never skips results. ' +
-      'Results carry only partial content in `text` — call `open_email` with `openEmailParams` to read an email in full.',
+      'Results carry only partial content in `text` — call `open_email` with `openEmailParams` to read an email in full. Pass the object through, including `uniqueContentId` and `chunkIds` when set. A draft requests the HTML body.',
     parameters: FetchNextSearchPagesInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {
