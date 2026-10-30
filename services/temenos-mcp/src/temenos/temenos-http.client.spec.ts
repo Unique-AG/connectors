@@ -5,8 +5,10 @@ import type { Metrics } from './metrics';
 
 vi.mock('undici', () => ({
   request: vi.fn(),
-  // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
-  Agent: class MockAgent { constructor(_opts: any) {} },
+  Agent: class MockAgent {
+    // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
+    public constructor(_opts: any) {}
+  },
 }));
 
 import { request } from 'undici';
@@ -118,9 +120,7 @@ describe('TemenosHttpClient', () => {
     });
 
     it('throws TemenosRateLimitError with retryAfterSeconds from the Retry-After header', async () => {
-      mockedRequest.mockResolvedValueOnce(
-        mockResponse(429, '', { 'retry-after': '120' }),
-      );
+      mockedRequest.mockResolvedValueOnce(mockResponse(429, '', { 'retry-after': '120' }));
 
       await expect(unit.get('/party/v1.0.0/parties')).rejects.toMatchObject({
         name: 'TemenosRateLimitError',

@@ -5,8 +5,10 @@ import type { Metrics } from './metrics';
 
 vi.mock('undici', () => ({
   request: vi.fn(),
-  // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
-  Agent: class MockAgent { constructor(_opts: any) {} },
+  Agent: class MockAgent {
+    // biome-ignore lint/suspicious/noExplicitAny: mock class for constructor
+    public constructor(_opts: any) {}
+  },
 }));
 
 import { request } from 'undici';
