@@ -35,6 +35,7 @@ import httpx2
 {% endif %}
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
+from mcp_observability import ToolCallObservabilityMiddleware, validate_trace_declarations
 
 {% if options.auth %}
 from mcp_skeleton.mcp.auth import AuthSettings, CredentialsAuthProvider, caller_credentials
@@ -113,6 +114,8 @@ def create_server({{ parameters }}) -> FastMCP:
         # An unexpected error, such as a database error with its SQL, reaches the client as the
         # tool's name alone. A ToolError still reaches it as raised.
         mask_error_details=True,
+        # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
+        middleware=[ToolCallObservabilityMiddleware()],
 {% if resources %}
         lifespan=lifespan,
 {% endif %}
@@ -131,4 +134,5 @@ def create_server({{ parameters }}) -> FastMCP:
     tools = FileSystemProvider(Path(__file__).parent / "tools")
     assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
     mcp.add_provider(tools)
+    validate_trace_declarations()
     return mcp

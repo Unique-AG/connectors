@@ -22,7 +22,7 @@ Before you change a layer, read its guide in `packages/mcp-architecture/guides/`
 | Postgres, Redis or a migration | [`persistence.md`](guides/persistence.md) |
 | sign-in | [`auth.md`](guides/auth.md) |
 | `shared/`, a contract between layers or a helper | [`shared.md`](guides/shared.md) |
-| settings, elicitation, logging or metrics | [`settings-and-telemetry.md`](guides/settings-and-telemetry.md) |
+| settings, elicitation, logging or metrics, or what a tool or context traces and logs | [`settings-and-telemetry.md`](guides/settings-and-telemetry.md) |
 | the Dockerfile, the chart or an env variable | [`deploy.md`](guides/deploy.md) |
 | tests or `tests/tool_surface.generated.json` | [`tests.md`](guides/tests.md) |
 | `[tool.ruff]`, `[tool.basedpyright]` or `[tool.importlinter]` | [`configuration.md`](guides/configuration.md) |

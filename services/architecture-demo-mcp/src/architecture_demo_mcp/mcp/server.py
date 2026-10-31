@@ -10,6 +10,8 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
+from mcp_observability import ToolCallObservabilityMiddleware
+from mcp_observability import validate_trace_declarations
 
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import open_upstream
@@ -56,9 +58,12 @@ def create_server(
         mask_error_details=True,
         lifespan=lifespan,
         auth=auth,
+        # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
+        middleware=[ToolCallObservabilityMiddleware()],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
     assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
     mcp.add_provider(tools)
+    validate_trace_declarations()
     return mcp
