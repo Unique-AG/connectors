@@ -13,7 +13,11 @@ import yaml
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from mcp_openapi.cli import CodegenConfig
-from mcp_openapi.codegen import generate_operations, generate_request_models
+from mcp_openapi.codegen import (
+    generate_operations,
+    generate_request_models,
+    generate_response_models,
+)
 from mcp_openapi.upstream import Operation, OperationClient
 
 SPEC = """
@@ -78,6 +82,22 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Case"}
+  /cases/{caseId}/name:
+    post:
+      operationId: renameCase
+      parameters:
+        - {name: caseId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RenameCaseRequest"}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Case"}
   /lookup:
     get:
       operationId: lookupCases
@@ -117,7 +137,10 @@ components:
   schemas:
     Case:
       type: object
-      properties: {caseId: {type: string}, caseName: {type: string}}
+      properties:
+        caseId: {type: string}
+        caseName: {type: string}
+        owner: {$ref: "#/components/schemas/Owner"}
     CaseUpdate:
       type: object
       required: [version]
@@ -128,7 +151,12 @@ components:
         owner: {$ref: "#/components/schemas/Owner"}
     Owner:
       type: object
+      additionalProperties: true
       properties: {name: {type: string}}
+    RenameCaseRequest:
+      type: object
+      required: [caseName]
+      properties: {caseName: {type: string}}
     Where:
       type: object
       properties: {caseName: {type: string}}
@@ -242,6 +270,21 @@ def test_a_component_the_request_sends_is_named_as_an_input(requests_for: Reques
     assert json.loads(sent.content) == {"owner": {"name": "o"}}
     assert not hasattr(generated, "CaseUpdate")
     assert not hasattr(generated, "Owner")
+
+
+def test_a_component_named_like_a_request_model_is_sent_as_its_input(
+    requests_for: RequestsFor,
+) -> None:
+    generated = requests_for(["renameCase"])
+    request = model(generated, "RenameCaseRequest")(
+        path=model(generated, "RenameCasePath")(case_id="c"),
+        body=model(generated, "RenameCaseRequestInput")(case_name="n"),
+    )
+
+    sent = sent_by("renameCase", request)
+
+    assert (sent.method, sent.url.raw_path) == ("POST", b"/v3/cases/c/name")
+    assert json.loads(sent.content) == {"caseName": "n"}
 
 
 def test_a_request_model_rejects_a_field_it_does_not_have(requests_for: RequestsFor) -> None:
@@ -393,6 +436,30 @@ def test_the_type_check_rejects_a_wrong_field_a_missing_body_and_another_request
         "usage.py:12:" in line and 'cannot be assigned to parameter "operation"' in line
         for line in errors
     ), checked.stdout
+
+
+def test_models_with_additional_properties_pass_the_strictest_type_check(
+    tmp_path: Path, requests_for: RequestsFor
+) -> None:
+    requests_for(["updateCase"])
+    generate_response_models(
+        spec_path=tmp_path / "spec.yml",
+        operation_ids=["updateCase"],
+        output=tmp_path / "responses.py",
+    )
+    (tmp_path / "pyrightconfig.json").write_text(
+        json.dumps({"typeCheckingMode": "all", "include": ["requests.py", "responses.py"]})
+    )
+
+    checked = subprocess.run(
+        [str(Path(sys.executable).parent / "basedpyright"), "--pythonpath", sys.executable],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert "0 errors" in checked.stdout, checked.stdout
 
 
 def test_the_requests_module_and_its_output_are_configured_together() -> None:
