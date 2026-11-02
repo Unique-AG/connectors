@@ -24,6 +24,7 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
+space-config-mcp = services/space-config-mcp/**
 architecture-demo-mcp = services/architecture-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**

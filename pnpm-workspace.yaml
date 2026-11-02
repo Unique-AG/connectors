@@ -6,6 +6,7 @@ packages:
   - "!services/office-365-mcp"
   - "!services/with-intelligence-mcp"
   - "!services/architecture-demo-mcp"
+  - "!services/space-config-mcp"
   - packages/*
 
 injectWorkspacePackages: true
