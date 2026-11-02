@@ -288,6 +288,7 @@ export function buildContextFooterText({
 
 export function buildPayload(env) {
   const {
+    CHANNEL,
     TITLE,
     VERSION_LABEL,
     REPORTS_PATH,
@@ -302,6 +303,7 @@ export function buildPayload(env) {
   const expected = JSON.parse(SERVICES);
   assert.ok(Array.isArray(expected), 'SERVICES must be a JSON array');
   assert.ok(RUN_URL, 'RUN_URL is required');
+  assert.ok(CHANNEL, 'CHANNEL is required');
 
   const summary = summarize(expected.map((entry) => readImage(REPORTS_PATH, entry)));
   const headerTitle = truncate(formatHeaderTitle(TITLE, VERSION_LABEL), HEADER_TEXT_LIMIT);
@@ -315,6 +317,7 @@ export function buildPayload(env) {
   });
 
   return {
+    channel: CHANNEL,
     text: headerTitle,
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },

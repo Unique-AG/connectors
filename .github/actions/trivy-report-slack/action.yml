@@ -5,6 +5,9 @@ inputs:
   webhook:
     description: Slack incoming webhook URL
     required: true
+  channel:
+    description: ID of the Slack channel. A legacy incoming webhook posts to the channel in the payload.
+    required: true
   title:
     description: Title shown in the Slack header
     required: true
@@ -45,6 +48,7 @@ runs:
       shell: bash
       env:
         TITLE: ${{ inputs.title }}
+        CHANNEL: ${{ inputs.channel }}
         VERSION_LABEL: ${{ inputs.version_label }}
         REPORTS_PATH: ${{ inputs.reports_path }}
         SERVICES: ${{ inputs.services }}

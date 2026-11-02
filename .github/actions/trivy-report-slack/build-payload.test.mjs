@@ -68,6 +68,7 @@ function withReports(setup, run) {
 }
 
 const baseEnv = {
+  CHANNEL: 'C0C1PR9CNMP',
   TITLE: 'Security Trivy Scan (Registry)',
   VERSION_LABEL: 'published-images',
   TRIGGER_LABEL: 'scheduled',
@@ -380,6 +381,7 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
 
 test('buildPayload adds a section for the other alerts only when it has text', () => {
   const base = {
+    CHANNEL: 'C0C1PR9CNMP',
     TITLE: 'Security Trivy Scan',
     VERSION_LABEL: 'published-images',
     REPORTS_PATH: '/nonexistent',
@@ -397,4 +399,16 @@ test('buildPayload adds a section for the other alerts only when it has text', (
   });
   assert.equal(withOther.blocks.length, without.blocks.length + 1);
   assert.equal(withOther.blocks[2].text.text, ':package: Lock files of main: 0 critical, 2 high');
+});
+
+test('buildPayload sets the channel for a legacy webhook', () => {
+  const { channel } = buildPayload({ ...baseEnv, REPORTS_PATH: '.', SERVICES: '[]' });
+  assert.equal(channel, 'C0C1PR9CNMP');
+});
+
+test('buildPayload rejects a missing CHANNEL', () => {
+  assert.throws(
+    () => buildPayload({ ...baseEnv, CHANNEL: '', REPORTS_PATH: '.', SERVICES: '[]' }),
+    /CHANNEL is required/,
+  );
 });
