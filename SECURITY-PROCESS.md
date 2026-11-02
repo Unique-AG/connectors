@@ -85,7 +85,7 @@ flowchart LR
 
 | What | Why |
 |---|---|
-| The secret `SLACK_SECURITY_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
+| The secret `SLACK_VULN_SCAN_WEBHOOK_URL` | The nightly scan posts the Slack report. Without it, the scan posts nothing. |
 | The variable `DEPS_APP_CLIENT_ID` and the secret `DEPS_APP_PRIVATE_KEY` of a GitHub App with `contents`, `pull-requests`, and `workflows` write access | The nightly dependency update opens PRs with it. Without it, the job writes only its plan. |
 | The check `release-gate` in the list `required_status_checks` of the ruleset code. See [The ruleset](./docs/security/code-vulnerabilities.md#the-ruleset). | A release PR cannot merge before the gate has run. Today the ruleset requires only `gatekeeper`. |
 | The two Cursor automation files in the monorepo. Apply them with the Cursor Terraform. See [Cursor automations](#cursor-automations). | Cursor needs access to this repository. `connectors-vulna-patchy` also needs access to the Slack channel `C0C1PR9CNMP`. Without the automations, no agent run starts. |
