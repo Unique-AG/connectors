@@ -1,6 +1,8 @@
 import logging
 from datetime import timedelta
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue, CacheFreshness
 from backstop_mcp.features.contact_sources.api_responses import ContactSourceAttributes
@@ -9,6 +11,7 @@ from backstop_mcp.features.contact_sources.responses import (
     ContactSourceResponse,
     ListContactSourcesResponse,
 )
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,6 @@ class ListContactSourcesQuery:
             ttl=ttl,
             snapshot=dict,
             name="contact-source",
-            log_prefix="contact_sources",
             caching_enabled=caching_enabled,
         )
 
@@ -38,6 +40,13 @@ class ListContactSourcesQuery:
     ) -> tuple[dict[str, ContactSourceDto], CacheFreshness]:
         return await self._cache.get(self._fetch, refresh=refresh)
 
+    @traced(
+        arguments=lambda args: {
+            "has_search": args["search"] is not None,
+            "refresh": args["refresh"],
+        },
+        result=lambda response: {"returned": len(response.sources)},
+    )
     async def run(
         self, *, search: str | None = None, refresh: bool = False
     ) -> ListContactSourcesResponse:
@@ -63,6 +72,7 @@ class ListContactSourcesQuery:
         )
 
         sources_by_id: dict[str, ContactSourceDto] = {}
+        conflicting_ids: list[str] = []
         for resource in page.items:
             source = ContactSourceDto.from_resource(resource)
             if source is None:
@@ -71,8 +81,10 @@ class ListContactSourcesQuery:
             if existing is None:
                 sources_by_id[source.id] = source
             elif existing != source:
-                logger.warning(
-                    "Conflicting contact sources for duplicate id %r; retaining first source",
-                    source.id,
-                )
+                conflicting_ids.append(source.id)
+        if conflicting_ids:
+            logger.warning(
+                "Ignored duplicate contact source ids",
+                extra={"count": len(conflicting_ids), "sample_ids": sample_ids(conflicting_ids)},
+            )
         return sources_by_id

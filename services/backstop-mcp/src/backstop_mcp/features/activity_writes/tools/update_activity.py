@@ -1,11 +1,11 @@
 """`update_activity`: PATCH a note, meeting, call, task, email, or document."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.activity_writes import (
@@ -16,8 +16,6 @@ from backstop_mcp.features.activity_writes import (
     get_update_activity_command_factory,
 )
 from backstop_mcp.models import published_output_schema
-
-logger = logging.getLogger(__name__)
 
 
 @tool(
@@ -31,6 +29,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(UpdatedActivityResponse),
 )
+@trace_arguments("activity.kind", "activity.activity_id")
 async def update_activity(
     activity: Annotated[UpdateActivityInput, Field(description=UPDATE_ACTIVITY_INPUT_DESCRIPTION)],
     update_activity_command: UpdateActivityCommand = Depends(get_update_activity_command_factory),
@@ -48,8 +47,4 @@ async def update_activity(
     Call like: {"activity": {"kind": "note", "activity_id": "<id from a create echo>",
     "title": "Corrected title"}}
     """
-    logger.info(
-        "activity_writes.update.start",
-        extra={"kind": activity.kind, "activity_id": activity.activity_id},
-    )
     return await update_activity_command.run(activity=activity)

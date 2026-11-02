@@ -286,11 +286,46 @@ class TestListCustomFieldsTool:
         definitions = refreshed.definitions_by_entity[CustomFieldEntityType.ORGANIZATIONS]
         assert len(definitions) == 1
         assert definitions[0].group_id == 321
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            "Conflicting custom-field definitions for duplicate id '99'; retaining first definition"
-        ]
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.getMessage() == "Ignored duplicate custom field definition ids"
+        assert warning.__dict__["count"] == 1
+        assert warning.__dict__["sample_ids"] == ["99"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_warns_once_per_load_with_a_capped_sample_of_conflicting_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("cf-list-many-conflicts")
+        ids = [str(4000 + index) for index in range(7)]
+
+        def definition(definition_id: str, group_id: int) -> dict[str, object]:
+            return resource(
+                definition_id,
+                "custom-field-definitions",
+                name=f"field {definition_id}",
+                entityType="OrganizationBean",
+                fieldType="text",
+                groupId=group_id,
+            )
+
+        _definitions_route(
+            base_url,
+            *(definition(definition_id, 1) for definition_id in ids),
+            *(definition(definition_id, 2) for definition_id in ids),
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_custom_fields(
+                    entity_types=[CustomFieldEntityType.ORGANIZATIONS],
+                    refresh=True,
+                    custom_fields=custom_fields_service(client),
+                )
+
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @pytest.mark.asyncio
     @respx.mock

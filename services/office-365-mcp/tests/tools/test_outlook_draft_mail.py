@@ -390,7 +390,7 @@ class TestTheSchemaItPublishes:
         assert set(properties) == {
             "to",
             "subject",
-            "body_html",
+            "body",
             "cc",
             "importance",
             "categories",
@@ -469,7 +469,7 @@ class TestTheSchemaItPublishes:
         to = cast("Mapping[str, object]", properties["to"])
         assert to["minItems"] == 1
         assert "maxItems" not in to
-        assert cast("Sequence[str]", parameters["required"]) == ["to", "subject", "body_html"]
+        assert cast("Sequence[str]", parameters["required"]) == ["to", "subject", "body"]
 
     async def test_cc_is_optional_and_has_no_ceiling(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)

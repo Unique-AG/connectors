@@ -1,11 +1,11 @@
 """`update_opportunity`: PATCH one deal. The only write that moves a deal's stage."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.opportunity_writes import (
@@ -17,8 +17,6 @@ from backstop_mcp.features.opportunity_writes import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -29,6 +27,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(UpdatedOpportunityResponse),
 )
+@trace_arguments("opportunity.opportunity_id")
 async def update_opportunity(
     opportunity: Annotated[
         UpdateOpportunityInput, Field(description=UPDATE_OPPORTUNITY_INPUT_DESCRIPTION)
@@ -51,8 +50,4 @@ async def update_opportunity(
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>",
     "stage": "<stage name from get_opportunities>", "probability": 0.3}}
     """
-    logger.info(
-        "opportunity_writes.update.start",
-        extra={"opportunity_id": opportunity.opportunity_id},
-    )
     return await update_opportunity_command.run(new_opportunity=opportunity)

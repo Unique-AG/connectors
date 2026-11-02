@@ -9,7 +9,6 @@ stage-change window is too. Rows
 mode returns one page per call and a cursor; aggregate mode reads every match.
 """
 
-import logging
 from collections.abc import Sequence
 from datetime import date
 from typing import Annotated, Literal
@@ -17,6 +16,7 @@ from typing import Annotated, Literal
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import BaseModel, Field
 
 from backstop_mcp.config import SearchConfig
@@ -34,9 +34,6 @@ from backstop_mcp.features.opportunities.dependencies import (
     get_search_opportunities_query_factory,
 )
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
-
-logger = logging.getLogger(__name__)
-
 
 SearchRowField = Literal[
     "id",
@@ -107,6 +104,16 @@ def _predicates(
         open_world_hint=False,
     ),
     output_schema=published_output_schema(SearchOpportunitiesResolvedResponse),
+)
+@trace_arguments(
+    "representative_scope",
+    "is_open",
+    "entered_stage_from",
+    "entered_stage_to",
+    "exclude_custom_fields",
+    "mode",
+    "group_by",
+    identifying=("representative", "stage"),
 )
 async def search_opportunities(
     representative: Annotated[
@@ -356,21 +363,6 @@ async def search_opportunities(
     )
     products = tuple(product or ())
     predicates = _predicates(custom_fields)
-    logger.info(
-        "opportunities.search.start",
-        extra={
-            "representative": representative,
-            "representative_scope": representative_scope,
-            "mode": mode,
-            "stage": stage,
-            "product": products,
-            "entered_stage_from": entered_stage_from,
-            "entered_stage_to": entered_stage_to,
-            "custom_fields": len(predicates),
-            "exclude_custom_fields": skip_custom_fields,
-            "start_offset": start_offset,
-        },
-    )
     return await search_opportunities_query.run(
         representative=representative,
         representative_scope=representative_scope,

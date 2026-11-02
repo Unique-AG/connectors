@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Self
 
 from fastmcp.exceptions import ToolError
+from mcp_observability import failure_level
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.caching import CachedValue
@@ -45,7 +46,6 @@ class OpportunityStagesService:
             ttl=ttl,
             snapshot=dict,
             name="opportunity-stage",
-            log_prefix="opportunities.stages",
             serve_stale=False,
         )
         self._cooldown: TimedGate = TimedGate(duration=_FAILURE_COOLDOWN)
@@ -116,7 +116,7 @@ class OpportunityStagesService:
         except Exception as error:
             self._failure = error
             self._cooldown.mark()
-            logger.warning("opportunities.stages.fetch_failed", exc_info=True)
+            logger.log(failure_level(error), "Failed to fetch opportunity stages", exc_info=error)
             raise
 
         self._failure = None

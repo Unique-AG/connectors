@@ -4,6 +4,7 @@ from typing import Annotated, cast
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import (
@@ -63,6 +64,13 @@ def _definitions_for(
         idempotent_hint=True,
         open_world_hint=False,
     ),
+)
+@trace_arguments(
+    lambda args: {
+        "entity_types": args["entity_types"],
+        "has_search": args["search"] is not None,
+        "refresh": args["refresh"],
+    }
 )
 async def list_custom_fields(
     entity_types: Annotated[

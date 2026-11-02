@@ -12,6 +12,8 @@ import logging
 from typing import Literal, assert_never
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -57,6 +59,10 @@ class UpdateMeetingOrCallCommand:
         self._time_zones_service: TimeZonesService = time_zones_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "activity.activity_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(self, *, activity: _MeetingOrCallUpdate) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
         collection, resource_id = extract_collection(handle, kind=activity.kind)
@@ -79,7 +85,7 @@ class UpdateMeetingOrCallCommand:
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
         logger.info(
-            "activity_writes.meeting_or_call.updated",
+            "Updated meeting or call",
             extra={"id": document.data.id, "kind": activity.kind},
         )
         target = (

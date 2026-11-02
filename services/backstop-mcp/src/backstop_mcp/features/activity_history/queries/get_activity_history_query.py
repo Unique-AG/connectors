@@ -22,6 +22,8 @@ from collections.abc import Coroutine, Mapping, Sequence
 from datetime import UTC, date, datetime
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BATCH_ABORTING_ERRORS,
     BackstopApiError,
@@ -64,6 +66,7 @@ from backstop_mcp.features.includes import (
 )
 from backstop_mcp.features.party_resolver import ResolvedPartyDto
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, activity_link_target
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,19 @@ _ACTIVITY_TYPE_FILTER: dict[BackstopActivityType, str] = {
     "document": "documents",
 }
 _ACTIVITY_SIDE_LOADS = include_plan(ActivityIncludesResponse, requested=("activity_tags",))
+
+
+def _history_result(history: ActivityHistoryResolvedResponse) -> dict[str, object]:
+    return {
+        "streams": list(history.groups),
+        "open_streams": [
+            activity_type
+            for activity_type, group in history.groups.items()
+            if group.next is not None
+        ],
+        "returned": sum(len(group.items) for group in history.groups.values()),
+    }
+
 
 _ActivityResource = BackstopApiResource[ActivityAttributes]
 _EmailResource = BackstopApiResource[EmailAttributes]
@@ -94,6 +110,15 @@ class GetActivityHistoryQuery:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
         self._get_meeting_attendees_query: GetMeetingAttendeesQuery = get_meeting_attendees_query
 
+    @traced(
+        arguments=lambda args: {
+            "segment": args["segment"],
+            "entity_id": args["entity_id"],
+            "stream_count": len(args["continuations"]),
+            "gist_max_chars": args["gist_max_chars"],
+        },
+        result=_history_result,
+    )
     async def run(
         self,
         *,
@@ -130,12 +155,13 @@ class GetActivityHistoryQuery:
         ):
             if isinstance(result, BackstopApiError) and result.status_code == 403:
                 logger.warning(
-                    "activity_history.stream.forbidden",
+                    "Activity stream forbidden",
                     extra={
                         "segment": segment,
                         "entity_id": entity_id,
                         "stream": activity_type,
-                        "detail": result.detail,
+                        "status_code": result.status_code,
+                        "code": result.code,
                     },
                 )
                 groups[activity_type] = ActivityGroupResponse(
@@ -213,7 +239,7 @@ class GetActivityHistoryQuery:
     ) -> tuple[tuple[ActivityRecordResponse, ...], bool]:
         """Fetch one page of one activity type. Future-dated items are kept."""
         logger.debug(
-            "activity_history.activity_page.fetch",
+            "Fetching activity page",
             extra={
                 "segment": segment,
                 "entity_id": entity_id,
@@ -262,7 +288,7 @@ class GetActivityHistoryQuery:
             for resource, row_attendees in zip(resources, attendees, strict=True)
         )
         logger.info(
-            "activity_history.activity_page.fetched",
+            "Fetched activity page",
             extra={
                 "segment": segment,
                 "entity_id": entity_id,
@@ -287,7 +313,7 @@ class GetActivityHistoryQuery:
     ) -> tuple[tuple[EmailRecordResponse, ...], bool]:
         """Fetch one page of emails. `since`/`until` map to startDate/endDate independently."""
         logger.debug(
-            "activity_history.email_page.fetch",
+            "Fetching email page",
             extra={
                 "segment": segment,
                 "entity_id": entity_id,
@@ -316,7 +342,7 @@ class GetActivityHistoryQuery:
         )
         end_of_stream = len(page.items) < limit
         logger.info(
-            "activity_history.email_page.fetched",
+            "Fetched email page",
             extra={
                 "segment": segment,
                 "entity_id": entity_id,
@@ -365,7 +391,7 @@ class GetActivityHistoryQuery:
             effective_date = resource.attributes.effective_date
             if effective_date is None:
                 logger.debug(
-                    "activity_history.since_truncate.null_date",
+                    "Activity row without effective date",
                     extra={
                         "activity_id": resource.id,
                         "stream": stream,
@@ -375,7 +401,7 @@ class GetActivityHistoryQuery:
                 continue
             if effective_date < since:
                 logger.info(
-                    "activity_history.since_truncate.cutoff",
+                    "Truncated activity page at since cutoff",
                     extra={
                         "activity_id": resource.id,
                         "stream": stream,
@@ -417,10 +443,22 @@ class GetActivityHistoryQuery:
             return_exceptions=True,
         )
         results = iter(fetched)
-        return tuple(
-            None if resource_id is None else self._attendee_responses(resource_id, next(results))
-            for resource_id in resource_ids
-        )
+        attendees: list[tuple[AttendeeResponse, ...] | None] = []
+        failed_ids: list[str] = []
+        for resource_id in resource_ids:
+            if resource_id is None:
+                attendees.append(None)
+                continue
+            responses = self._attendee_responses(resource_id, next(results))
+            if responses is None:
+                failed_ids.append(resource_id)
+            attendees.append(responses)
+        if failed_ids:
+            logger.warning(
+                "Attendee lookups failed",
+                extra={"count": len(failed_ids), "sample_ids": sample_ids(failed_ids)},
+            )
+        return tuple(attendees)
 
     def _record_from_resource(
         self,
@@ -491,8 +529,8 @@ class GetActivityHistoryQuery:
         if isinstance(fetched, BaseException):
             if not isinstance(fetched, Exception) or isinstance(fetched, BATCH_ABORTING_ERRORS):
                 raise fetched
-            logger.warning(
-                "activity_history.attendees.join_failed",
+            logger.debug(
+                "Attendee lookup failed",
                 extra={"resource_id": resource_id},
                 exc_info=fetched,
             )

@@ -3,6 +3,8 @@
 import asyncio
 from collections.abc import Mapping, Sequence
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.party_resolver._party_search_types import (
@@ -45,6 +47,11 @@ class ResolvePartyQuery:
         self._client: BackstopClient = client
         self._get_party_name_query: GetPartyNameQuery = get_party_name_query
 
+    @traced(
+        arguments=("search_type", "party_id", "confirm_name"),
+        identifying=("search", "name"),
+        result=lambda resolution: {"status": resolution.status},
+    )
     async def run(
         self,
         *,
@@ -69,6 +76,13 @@ class ResolvePartyQuery:
             quick_search_options=quick_search_options,
         )
 
+    @traced(
+        arguments=lambda args: {
+            "search_type": args["search_type"],
+            "item_count": len(args["items"]),
+            "confirm_name": args["confirm_name"],
+        }
+    )
     async def run_batch(
         self,
         *,

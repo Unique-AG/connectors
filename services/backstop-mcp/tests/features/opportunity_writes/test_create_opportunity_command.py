@@ -1,5 +1,6 @@
 """`CreateOpportunityCommand`: POST payload shape, stage resolve, re-read stage."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -202,6 +203,22 @@ class TestCreateOpportunityCommand:
 
         stage = object_dict(_relationships(recorded_json_bodies(route)[0])["stage"])
         assert object_dict(stage["data"]) == {"type": "opportunity-stages", "id": "42482"}
+
+    @respx.mock
+    async def test_logs_the_stage_id_and_not_the_stage_name(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_write(stage_id="42482")
+
+        with caplog.at_level(logging.INFO):
+            await make_command(client).run(
+                opportunity=_create(stage="Stage B"), investor_id=_INVESTOR_ID
+            )
+
+        [created] = [r for r in caplog.records if r.getMessage() == "Created opportunity"]
+        assert created.__dict__["stage_id"] == "42482"
+        assert "stage" not in created.__dict__
+        assert "Stage B" not in repr(created.__dict__)
 
     @respx.mock
     async def test_unknown_stage_does_not_post(self, client: BackstopClient) -> None:

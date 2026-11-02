@@ -98,10 +98,10 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   };
 
   if (metricReader) {
-    sdkConfig.metricReader = metricReader;
+    sdkConfig.metricReaders = [metricReader];
   }
   if (spanProcessor) {
-    sdkConfig.spanProcessor = spanProcessor;
+    sdkConfig.spanProcessors = [spanProcessor];
   }
   if (views.length) {
     sdkConfig.views = views;

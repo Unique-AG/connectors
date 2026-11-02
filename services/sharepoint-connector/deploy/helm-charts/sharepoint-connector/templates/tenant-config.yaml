@@ -71,6 +71,12 @@ data:
           {{- if .subsitesScan }}
           subsitesScan: {{ .subsitesScan | quote }}
           {{- end }}
+          {{- if .listAttachmentsScan }}
+          listAttachmentsScan: {{ .listAttachmentsScan | quote }}
+          {{- end }}
+          {{- if .itemNameColumnName }}
+          itemNameColumnName: {{ .itemNameColumnName | quote }}
+          {{- end }}
         {{- end }}
       {{- end }}
     # Unique API Configuration

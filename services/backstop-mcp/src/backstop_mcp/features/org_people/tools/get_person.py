@@ -5,6 +5,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import CustomFieldFilters
@@ -46,6 +47,7 @@ type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResol
     ),
     output_schema=published_output_schema(GetPersonResponse),
 )
+@trace_arguments("search_type", "party_id", "include", identifying=("search",))
 async def get_person(
     ctx: Context,
     party_id: Annotated[

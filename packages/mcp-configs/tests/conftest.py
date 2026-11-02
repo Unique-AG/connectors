@@ -12,6 +12,8 @@ _READ_PREFIXES = (
     "UPSTREAM_",
     "MCP_",
     "LOG",
+    "LIBRARY_LOG_LEVELS",
+    "ERROR_DETAILS_POLICY",
     "HOST",
     "PORT",
     "OTEL_",

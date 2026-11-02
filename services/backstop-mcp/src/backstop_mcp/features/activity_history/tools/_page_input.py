@@ -253,7 +253,7 @@ async def extract_fetch_activity_history_args(
                 continuations=dict(continuations),
             )
             logger.info(
-                "activity_history.args.next",
+                "Prepared next activity page request",
                 extra={
                     "segment": args.segment,
                     "entity_id": args.entity_id,
@@ -281,7 +281,7 @@ async def extract_fetch_activity_history_args(
                 return result
             if not isinstance(result, Resolved):
                 logger.info(
-                    "activity_history.args.unresolved",
+                    "Party unresolved for activity history",
                     extra={
                         "search_type": search_type,
                         "has_party_id": party_id is not None,
@@ -314,7 +314,7 @@ async def extract_fetch_activity_history_args(
                 },
             )
             logger.info(
-                "activity_history.args.first",
+                "Prepared first activity page request",
                 extra={
                     "segment": args.segment,
                     "entity_id": args.entity_id,

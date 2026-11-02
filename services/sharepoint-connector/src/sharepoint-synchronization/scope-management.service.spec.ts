@@ -5,10 +5,13 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
+import type { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
+import { FindScopeSuccessorQuery } from './find-scope-successor.query';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -82,6 +85,14 @@ const createDriveContentItem = (path: string): SharepointContentItem => {
     fileName: 'Page 1.aspx',
   };
 };
+
+const createUniqueFile = (id: string, ownerId: string): UniqueFile => ({
+  id,
+  key: `site-123/${id}`,
+  fileAccess: [],
+  ownerType: 'scope',
+  ownerId,
+});
 
 describe('ScopeManagementService', () => {
   const mockScopes: ScopeWithPath[] = [
@@ -508,6 +519,73 @@ describe('ScopeManagementService', () => {
           expect.any(String),
           expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
+      });
+
+      describe('list item attachments', () => {
+        const createAttachment = (
+          overrides: Partial<{ siteId: string; subsiteRelativePath: string }> = {},
+        ): SharepointContentItem =>
+          ({
+            itemType: 'listItemAttachment',
+            siteId: new Smeared(overrides.siteId ?? 'site-123', false),
+            ...(overrides.subsiteRelativePath && {
+              syncSiteId: new Smeared('site-123', false),
+              subsiteRelativePath: overrides.subsiteRelativePath,
+            }),
+            driveId: 'list-1',
+            driveName: 'Procedures',
+            folderPath: '/Policy',
+            fileName: 'policy.pdf',
+            attachment: {
+              absoluteUrl:
+                'https://example.sharepoint.com/sites/test-site/Lists/Procedures/Attachments/4/policy.pdf',
+              size: 2048,
+            },
+            item: { id: '4' },
+          }) as SharepointContentItem;
+
+        it('keys the list and item folders by ids', async () => {
+          await service.batchCreateScopes([createAttachment()], [], mockContext);
+
+          // Paths are created in order: /test1, /test1/Procedures, /test1/Procedures/Policy.
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-1',
+            expect.objectContaining({ value: 'spc:site-123/list:site-123/list-1' }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-2',
+            expect.objectContaining({ value: 'spc:site-123/listItem:site-123/list-1/4' }),
+          );
+        });
+
+        it('places subsite list folders under the subsite and keys them by the subsite id', async () => {
+          const subASiteId = 'host.com,col-a,web-a';
+          const context: SharepointSyncContext = {
+            ...mockContext,
+            discoveredSubsites: [makeSubsite('SubA', 'SubA', subASiteId)],
+          };
+
+          await service.batchCreateScopes(
+            [createAttachment({ siteId: subASiteId, subsiteRelativePath: 'SubA' })],
+            [],
+            context,
+          );
+
+          // Paths are created in order: /test1, /test1/SubA, /test1/SubA/Procedures,
+          // /test1/SubA/Procedures/Policy.
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-1',
+            expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-2',
+            expect.objectContaining({ value: `spc:site-123/list:${subASiteId}/list-1` }),
+          );
+          expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+            'scope-3',
+            expect.objectContaining({ value: `spc:site-123/listItem:${subASiteId}/list-1/4` }),
+          );
+        });
       });
     });
   });
@@ -1004,16 +1082,33 @@ describe('ScopeManagementService', () => {
   describe('deleteStaleScopes', () => {
     let listScopesByExternalIdPrefixMock: Mock;
     let deleteScopeMock: Mock;
+    let getFilesByOwnerIdMock: Mock;
+    let moveFileMock: Mock;
+    let findSuccessorMock: Mock;
+
+    const emptyDeletion = { successFolders: [], failedFolders: [] };
 
     beforeEach(async () => {
       listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
       deleteScopeMock = vi.fn().mockResolvedValue(undefined);
+      getFilesByOwnerIdMock = vi.fn().mockResolvedValue([]);
+      moveFileMock = vi.fn().mockResolvedValue(undefined);
+      findSuccessorMock = vi.fn().mockReturnValue(null);
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
         .impl(() => ({
           listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
           deleteScope: deleteScopeMock,
+        }))
+        .mock<UniqueFilesService>(UniqueFilesService)
+        .impl(() => ({
+          getFilesByOwnerId: getFilesByOwnerIdMock,
+          moveFile: moveFileMock,
+        }))
+        .mock<FindScopeSuccessorQuery>(FindScopeSuccessorQuery)
+        .impl(() => ({
+          execute: findSuccessorMock,
         }))
         .compile();
 
@@ -1106,6 +1201,154 @@ describe('ScopeManagementService', () => {
       expect(service['logger'].warn).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: expect.stringContaining('Failed to query stale scopes'),
+        }),
+      );
+    });
+
+    it('deletes a stale scope without moving files when it has no successor', async () => {
+      const staleScope: Scope = {
+        id: 'stale-scope',
+        name: 'Folder',
+        parentId: null,
+        externalId: 'spc:pending-delete:site-123/unknown:folder-uuid',
+      };
+      listScopesByExternalIdPrefixMock.mockImplementation(async (prefix: Smeared) =>
+        prefix.value.startsWith('spc:pending-delete:') ? [staleScope] : [],
+      );
+      deleteScopeMock.mockResolvedValue(emptyDeletion);
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 'spc:site-123/' }),
+      );
+      expect(findSuccessorMock).toHaveBeenCalledWith(staleScope, {});
+      expect(getFilesByOwnerIdMock).not.toHaveBeenCalled();
+      expect(moveFileMock).not.toHaveBeenCalled();
+      expect(deleteScopeMock).toHaveBeenCalledWith('stale-scope');
+    });
+
+    it('moves leftover files to each scope successor before deleting, deepest first', async () => {
+      const parentScope: Scope = {
+        id: 'parent-scope',
+        name: 'Parent',
+        parentId: null,
+        externalId: 'spc:pending-delete:site-123/folder:site-123/parent',
+      };
+      const childScope: Scope = {
+        id: 'child-scope',
+        name: 'Child',
+        parentId: 'parent-scope',
+        externalId: 'spc:pending-delete:site-123/folder:site-123/child',
+      };
+      const parentSuccessor: Scope = {
+        id: 'parent-successor',
+        name: 'Parent',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/parent',
+      };
+      const childSuccessor: Scope = {
+        id: 'child-successor',
+        name: 'Child',
+        parentId: 'parent-successor',
+        externalId: 'spc:site-123/folder:site-123/child',
+      };
+      const childFile = createUniqueFile('child-file', 'child-scope');
+      const parentFile = createUniqueFile('parent-file', 'parent-scope');
+
+      listScopesByExternalIdPrefixMock.mockImplementation(async (prefix: Smeared) => {
+        if (prefix.value.startsWith('spc:pending-delete:')) {
+          return [parentScope, childScope];
+        }
+        return [parentSuccessor, childSuccessor];
+      });
+      findSuccessorMock.mockImplementation((scope: Scope) =>
+        scope.id === 'child-scope' ? childSuccessor : parentSuccessor,
+      );
+      getFilesByOwnerIdMock.mockImplementation(async (ownerId: string) => {
+        if (ownerId === 'child-scope') {
+          return [childFile];
+        }
+        if (ownerId === 'parent-scope') {
+          return [parentFile];
+        }
+        return [];
+      });
+      deleteScopeMock.mockResolvedValue(emptyDeletion);
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      const activeScopes = findSuccessorMock.mock.calls[0]?.[1] as Record<string, Scope>;
+      expect(activeScopes[parentSuccessor.externalId ?? '']).toBe(parentSuccessor);
+      expect(activeScopes[childSuccessor.externalId ?? '']).toBe(childSuccessor);
+      expect(moveFileMock).toHaveBeenNthCalledWith(1, 'child-file', 'child-successor');
+      expect(moveFileMock).toHaveBeenNthCalledWith(2, 'parent-file', 'parent-successor');
+      expect(deleteScopeMock).toHaveBeenNthCalledWith(1, 'child-scope');
+      expect(deleteScopeMock).toHaveBeenNthCalledWith(2, 'parent-scope');
+      expect(moveFileMock.mock.invocationCallOrder[0]).toBeLessThan(
+        deleteScopeMock.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('keeps the stale scope when listing its files fails', async () => {
+      const staleScope: Scope = {
+        id: 'stale-scope',
+        name: 'Folder',
+        parentId: null,
+        externalId: 'spc:pending-delete:site-123/folder:site-123/item',
+      };
+      const successor: Scope = {
+        id: 'successor-scope',
+        name: 'Folder',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/item',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([staleScope]);
+      findSuccessorMock.mockReturnValue(successor);
+      getFilesByOwnerIdMock.mockRejectedValue(new Error('list failed'));
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(moveFileMock).not.toHaveBeenCalled();
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to list files in stale scope stale-scope'),
+        }),
+      );
+    });
+
+    it('moves the remaining leftover files when one move fails and keeps the stale scope', async () => {
+      const staleScope: Scope = {
+        id: 'stale-scope',
+        name: 'Folder',
+        parentId: null,
+        externalId: 'spc:pending-delete:site-123/folder:site-123/item',
+      };
+      const successor: Scope = {
+        id: 'successor-scope',
+        name: 'Folder',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/item',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([staleScope]);
+      findSuccessorMock.mockReturnValue(successor);
+      getFilesByOwnerIdMock.mockResolvedValue([
+        createUniqueFile('file-1', 'stale-scope'),
+        createUniqueFile('file-2', 'stale-scope'),
+      ]);
+      moveFileMock.mockRejectedValueOnce(new Error('move failed')).mockResolvedValue(undefined);
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(moveFileMock).toHaveBeenNthCalledWith(1, 'file-1', 'successor-scope');
+      expect(moveFileMock).toHaveBeenNthCalledWith(2, 'file-2', 'successor-scope');
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to move file file-1'),
         }),
       );
     });

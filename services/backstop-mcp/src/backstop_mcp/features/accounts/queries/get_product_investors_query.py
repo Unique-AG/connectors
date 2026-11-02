@@ -10,6 +10,8 @@ import asyncio
 from collections.abc import Callable, Sequence
 from datetime import date
 
+from mcp_observability import traced
+
 from backstop_mcp.features.accounts.internal_dto import ResolvedProductDto, TenureDto
 from backstop_mcp.features.accounts.queries.get_accounts_for_product_query import (
     GetAccountsForProductQuery,
@@ -50,6 +52,19 @@ class GetProductInvestorsQuery:
         self._max_valued_accounts: int = max_valued_accounts
         self._clock: Callable[[], date] = clock
 
+    @traced(
+        arguments=lambda args: {
+            "product_count": len(args["products"]),
+            "include_closed": args["include_closed"],
+            "include_latest_value": args["include_latest_value"],
+            "exclude_custom_fields": args["exclude_custom_fields"],
+            "investor_id_count": len(args["investor_ids"]),
+        },
+        result=lambda investors: {
+            "product_count": len(investors.products),
+            "investor_count": len(investors.investors),
+        },
+    )
     async def run(
         self,
         *,

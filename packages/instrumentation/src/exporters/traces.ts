@@ -1,9 +1,5 @@
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import {
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-  SpanProcessor,
-} from '@opentelemetry/sdk-trace-base';
+import { BatchSpanProcessor, ConsoleSpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace';
 import type { OtelConfig, TracesExporter } from '../config.js';
 
 export function createSpanProcessor(config: OtelConfig): SpanProcessor | undefined {
@@ -23,21 +19,19 @@ export function createSpanProcessor(config: OtelConfig): SpanProcessor | undefin
       }
 
       console.log(`  Traces Endpoint: ${tracesEndpoint}`);
-      return new BatchSpanProcessor(
-        new OTLPTraceExporter({
+      return new BatchSpanProcessor({
+        exporter: new OTLPTraceExporter({
           url: tracesEndpoint,
         }),
-        {
-          exportTimeoutMillis: config.OTEL_BSP_EXPORT_TIMEOUT,
-          scheduledDelayMillis: config.OTEL_BSP_SCHEDULE_DELAY,
-          maxExportBatchSize: config.OTEL_BSP_MAX_EXPORT_BATCH_SIZE,
-          maxQueueSize: config.OTEL_BSP_MAX_QUEUE_SIZE,
-        },
-      );
+        exportTimeoutMillis: config.OTEL_BSP_EXPORT_TIMEOUT,
+        scheduledDelayMillis: config.OTEL_BSP_SCHEDULE_DELAY,
+        maxExportBatchSize: config.OTEL_BSP_MAX_EXPORT_BATCH_SIZE,
+        maxQueueSize: config.OTEL_BSP_MAX_QUEUE_SIZE,
+      });
     }
     case 'console':
       console.log('  Using console traces exporter');
-      return new BatchSpanProcessor(new ConsoleSpanExporter());
+      return new BatchSpanProcessor({ exporter: new ConsoleSpanExporter() });
 
     case 'none':
       console.log('  Traces export disabled');

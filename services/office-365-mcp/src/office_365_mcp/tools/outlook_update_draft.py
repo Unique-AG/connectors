@@ -31,6 +31,7 @@ from office_365_mcp.shared.mail import (
     one_address_each,
     repeated_address,
 )
+from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -110,7 +111,7 @@ _NOT_A_DRAFT_NOW = (
 )
 
 _NOTHING_TO_CHANGE = (
-    "outlook_update_draft needs at least one of `subject`, `body_html`, `to`, `cc`, "
+    "outlook_update_draft needs at least one of `subject`, `body`, `to`, `cc`, "
     + "`importance` and `categories`. With none of them, there is nothing to change, and "
     + "nothing was changed. Find out which part of the draft the user wants to change. Then "
     + "call again."
@@ -455,13 +456,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
-        body_html: Annotated[
+        body: Annotated[
             str | None,
             Field(
                 min_length=1,
                 description=(
-                    "The new text of the draft as HTML. It replaces the whole body. Escape `&`, "
-                    + "`<` and `>`, and use `<p>` or `<br>` for structure."
+                    "The new text of the draft, as Markdown. This tool turns it into HTML. It "
+                    + "replaces the whole body."
                 ),
             ),
         ] = None,
@@ -514,7 +515,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message_ref=message_ref,
             change=DraftChange(
                 subject=subject,
-                body_html=body_html,
+                body_html=None if body is None else markdown_to_html(body),
                 to=to,
                 cc=cc,
                 importance=importance,

@@ -6,6 +6,7 @@ from http import HTTPStatus
 from urllib.parse import quote
 
 import httpx
+from mcp_observability import traced
 from pydantic import ValidationError
 
 from backstop_mcp.backstop_client import (
@@ -23,6 +24,7 @@ from backstop_mcp.features.opportunities.responses import (
     OpportunityResponse,
 )
 from backstop_mcp.features.ui_links import BuildEntityLinkUtil, OpportunityLinkTarget
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ class _FetchedOne:
     included: tuple[dict[str, object], ...] = ()
     error: str | None = None
     not_found: bool = False
+    failed: bool = False
 
 
 class GetOpportunitiesByIdsQuery:
@@ -56,6 +59,14 @@ class GetOpportunitiesByIdsQuery:
         self._custom_fields_service: CustomFieldsService = custom_fields_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("opportunity_ids", "include_stage_history"),
+        result=lambda response: {
+            "returned": len(response.opportunities),
+            "not_found": len(response.not_found),
+            "errors": len(response.errors),
+        },
+    )
     async def run(
         self,
         *,
@@ -117,6 +128,12 @@ class GetOpportunitiesByIdsQuery:
                 continue
             assert item.opportunity_response is not None
             opportunities.append(item.opportunity_response)
+        failed_ids = [item.opportunity_id for item in fetched if item.failed]
+        if failed_ids:
+            logger.warning(
+                "Failed to read opportunities by id",
+                extra={"count": len(failed_ids), "sample_ids": sample_ids(failed_ids)},
+            )
         return GetOpportunitiesByIdsResponse(
             opportunities=tuple(opportunities),
             not_found=tuple(not_found),
@@ -162,21 +179,25 @@ class GetOpportunitiesByIdsQuery:
             return _FetchedOne(
                 opportunity_id=opportunity_id, error="unreadable opportunity document"
             )
-        except ValidationError:
-            logger.warning(
-                "opportunities.by_ids.record.unreadable",
+        except ValidationError as exc:
+            logger.debug(
+                "Unreadable opportunity record",
                 extra={"opportunity_id": opportunity_id},
-                exc_info=True,
-            )
-            return _FetchedOne(opportunity_id=opportunity_id, error="unreadable opportunity record")
-        except httpx.RequestError:
-            # Only a 429 classified as `concurrency` is retried, so a timeout on one of 50 ids
-            # arrives here. Failing the batch over it would cost the caller the other 49.
-            logger.warning(
-                "opportunities.by_ids.request_failed",
-                extra={"opportunity_id": opportunity_id},
-                exc_info=True,
+                exc_info=exc,
             )
             return _FetchedOne(
-                opportunity_id=opportunity_id, error="Backstop did not answer for this id"
+                opportunity_id=opportunity_id, error="unreadable opportunity record", failed=True
+            )
+        except httpx.RequestError as exc:
+            # Only a 429 classified as `concurrency` is retried, so a timeout on one of 50 ids
+            # arrives here. Failing the batch over it would cost the caller the other 49.
+            logger.debug(
+                "Backstop did not answer for opportunity",
+                extra={"opportunity_id": opportunity_id},
+                exc_info=exc,
+            )
+            return _FetchedOne(
+                opportunity_id=opportunity_id,
+                error="Backstop did not answer for this id",
+                failed=True,
             )

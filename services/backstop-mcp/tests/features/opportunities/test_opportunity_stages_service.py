@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 
@@ -426,6 +427,35 @@ class TestFailureIsNotAnEmptyVocabulary:
 
         with pytest.raises(httpx.ConnectError):
             await _service(clients(base_url)).get_catalog()
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("failure", "level"),
+        [
+            (httpx.ConnectError("backstop down"), logging.WARNING),
+            (RuntimeError("bug"), logging.ERROR),
+        ],
+    )
+    async def test_a_failed_fetch_is_logged_at_the_level_of_its_cause(
+        self,
+        clients: ClientBuilder,
+        caplog: pytest.LogCaptureFixture,
+        failure: Exception,
+        level: int,
+    ) -> None:
+        base_url = f"{BASE_URL}/stages-failure-level"
+        respx.get(f"{base_url}/opportunity-stages").mock(side_effect=failure)
+
+        with caplog.at_level(logging.WARNING), pytest.raises(type(failure)):
+            await _service(clients(base_url)).get_catalog()
+
+        [logged] = [
+            r for r in caplog.records if r.getMessage() == "Failed to fetch opportunity stages"
+        ]
+        assert logged.levelno == level
+        assert logged.exc_info is not None
+        assert logged.exc_info[1] is failure
 
     @pytest.mark.asyncio
     @respx.mock

@@ -2,6 +2,7 @@
 was declined.
 """
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -190,6 +191,48 @@ class TestDeleteOrganization:
 
         assert location.call_count == 0
         assert party.call_count == 0
+
+    @respx.mock
+    async def test_a_successful_delete_logs_a_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_cascade()
+
+        with caplog.at_level(logging.INFO):
+            await delete_organization(
+                ctx_no_elicitation_capability(),
+                organization=_ORGANIZATION.validate_python(
+                    {"search_type": "organizations", "party_id": _ID}
+                ),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            )
+
+        [record] = [r for r in caplog.records if r.getMessage() == "Deleted party"]
+        assert record.levelno == logging.WARNING
+
+    @respx.mock
+    async def test_a_declined_delete_logs_one_info_sentence(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_cascade()
+
+        with caplog.at_level(logging.INFO), pytest.raises(ToolError):
+            await delete_organization(
+                ctx_decline(),
+                organization=_ORGANIZATION.validate_python(
+                    {"search_type": "organizations", "party_id": _ID}
+                ),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            )
+
+        [record] = [
+            r for r in caplog.records if r.getMessage() == "Organization deletion not confirmed"
+        ]
+        assert record.levelno == logging.INFO
+        assert record.__dict__["party_id"] == _ID
+        assert [r for r in caplog.records if r.getMessage() == "Deleted party"] == []
 
     @respx.mock
     async def test_confirmed_elicitation_deletes(self, client: BackstopClient) -> None:

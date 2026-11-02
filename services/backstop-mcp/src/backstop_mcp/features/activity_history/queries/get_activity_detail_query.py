@@ -21,6 +21,8 @@ import logging
 from http import HTTPStatus
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiSingleResourceDocument,
@@ -66,6 +68,17 @@ class GetActivityDetailQuery:
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
         self._get_meeting_attendees_query: GetMeetingAttendeesQuery = get_meeting_attendees_query
 
+    @traced(
+        arguments=lambda args: {
+            "activity_id": args["activity_id"],
+            "meeting_or_call": args["handle"].resource_type == "meeting-or-calls",
+        },
+        result=lambda detail: {
+            "attendee_count": len(detail.attendees),
+            "attachment_count": len(detail.attachments),
+            "has_body": bool(detail.body),
+        },
+    )
     async def run(
         self, *, activity_id: str, handle: ParsedActivityHandle
     ) -> ActivityDetailResponse:
@@ -79,7 +92,7 @@ class GetActivityDetailQuery:
             )
         elif handle.resource_type is not None:
             logger.debug(
-                "activity_history.detail.skip_meeting_fetches",
+                "Skipping meeting fetches for non-meeting handle",
                 extra={"activity_id": activity_id, "resource_type": handle.resource_type},
             )
             detail = await self._fetch_activity_detail(resource_id)
@@ -114,7 +127,7 @@ class GetActivityDetailQuery:
         )
 
     async def _fetch_activity_detail(self, resource_id: str) -> ActivityDetailDto:
-        logger.debug("activity_history.detail.fetch", extra={"resource_id": resource_id})
+        logger.debug("Fetching activity detail", extra={"resource_id": resource_id})
         path = f"/entity-activity-details/{quote(resource_id, safe='')}"
         document = await self._client.get(path, schema=_ActivityDetailDocument)
         # Null primary data here means "no such activity" — this endpoint answers 200 rather than
@@ -131,7 +144,7 @@ class GetActivityDetailQuery:
             attachments=attachments_from_stored(attributes.attachments),
         )
         logger.info(
-            "activity_history.detail.fetched",
+            "Fetched activity detail",
             extra={
                 "resource_id": resource_id,
                 "type": detail.type,
@@ -141,7 +154,7 @@ class GetActivityDetailQuery:
         return detail
 
     async def _fetch_meeting_specifics(self, resource_id: str) -> MeetingSpecificsDto:
-        logger.debug("activity_history.meeting_specifics.fetch", extra={"resource_id": resource_id})
+        logger.debug("Fetching meeting specifics", extra={"resource_id": resource_id})
         path = f"/meeting-or-calls/{quote(resource_id, safe='')}"
         document = await self._client.get(
             path,
@@ -156,7 +169,7 @@ class GetActivityDetailQuery:
             time_zone=attributes.time_zone,
         )
         logger.info(
-            "activity_history.meeting_specifics.fetched",
+            "Fetched meeting specifics",
             extra={
                 "resource_id": resource_id,
                 "has_start": specifics.start is not None,

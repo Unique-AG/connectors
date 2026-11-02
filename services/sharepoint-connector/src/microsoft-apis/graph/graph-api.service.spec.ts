@@ -6,7 +6,6 @@ import { FileFilterService } from './file-filter.service';
 import { GraphApiService } from './graph-api.service';
 import { GraphClientFactory } from './graph-client.factory';
 import type { DriveItem, ListColumn, ListItem } from './types/sharepoint.types';
-import type { SharepointContentItem } from './types/sharepoint-content-item.interface';
 
 describe('GraphApiService', () => {
   let service: GraphApiService;
@@ -351,12 +350,14 @@ describe('GraphApiService', () => {
 
   describe('getAspxPagesForSite', () => {
     it('skips SitePages when sync column is not present', async () => {
-      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
-        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
-      ]);
-      vi.spyOn(service, 'getListColumns').mockResolvedValue([
-        { id: '1', name: 'Title', displayName: 'Title' },
-      ]);
+      const lists = [
+        {
+          id: 'sitepages-list',
+          name: 'SitePages',
+          displayName: 'Site Pages',
+          columns: [{ id: '1', name: 'Title', displayName: 'Title' }],
+        },
+      ];
       const getAspxListItemsSpy = vi.spyOn(service, 'getAspxListItems');
       const logSpy = vi.spyOn(getLogger(), 'log');
       const warnSpy = vi.spyOn(getLogger(), 'warn');
@@ -364,6 +365,7 @@ describe('GraphApiService', () => {
       const result = await service.getAspxPagesForSite(
         new Smeared('site-1', false),
         'FinanceGPTKnowledge',
+        lists,
       );
 
       expect(result).toHaveLength(0);
@@ -377,16 +379,20 @@ describe('GraphApiService', () => {
     });
 
     it('scans SitePages when sync column is present', async () => {
-      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
-        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
-      ]);
-      vi.spyOn(service, 'getListColumns').mockResolvedValue([
-        { id: '1', name: 'Title', displayName: 'Title' },
-        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
-      ]);
+      const lists = [
+        {
+          id: 'sitepages-list',
+          name: 'SitePages',
+          displayName: 'Site Pages',
+          columns: [
+            { id: '1', name: 'Title', displayName: 'Title' },
+            { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+          ],
+        },
+      ];
       vi.spyOn(service, 'getAspxListItems').mockResolvedValue([]);
 
-      await service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge');
+      await service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge', lists);
 
       expect(service.getAspxListItems).toHaveBeenCalledWith(
         new Smeared('site-1', false),
@@ -396,28 +402,21 @@ describe('GraphApiService', () => {
       );
     });
 
-    it('propagates error when getListColumns throws', async () => {
-      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
-        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
-      ]);
-      vi.spyOn(service, 'getListColumns').mockRejectedValue(new Error('API Error'));
-
-      await expect(
-        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
-      ).rejects.toThrow('API Error');
-    });
-
     it('resolves display name to internal API name for SitePages', async () => {
-      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
-        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
-      ]);
-      vi.spyOn(service, 'getListColumns').mockResolvedValue([
-        { id: '1', name: 'Title', displayName: 'Title' },
-        { id: '2', name: 'InternalSyncName', displayName: 'My Sync Column' },
-      ]);
+      const lists = [
+        {
+          id: 'sitepages-list',
+          name: 'SitePages',
+          displayName: 'Site Pages',
+          columns: [
+            { id: '1', name: 'Title', displayName: 'Title' },
+            { id: '2', name: 'InternalSyncName', displayName: 'My Sync Column' },
+          ],
+        },
+      ];
       vi.spyOn(service, 'getAspxListItems').mockResolvedValue([]);
 
-      await service.getAspxPagesForSite(new Smeared('site-1', false), 'My Sync Column');
+      await service.getAspxPagesForSite(new Smeared('site-1', false), 'My Sync Column', lists);
 
       expect(service.getAspxListItems).toHaveBeenCalledWith(
         new Smeared('site-1', false),
@@ -428,257 +427,26 @@ describe('GraphApiService', () => {
     });
 
     it('propagates error when getAspxListItems throws', async () => {
-      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
-        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
-      ]);
-      vi.spyOn(service, 'getListColumns').mockResolvedValue([
-        { id: '1', name: 'Title', displayName: 'Title' },
-        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
-      ]);
+      const lists = [
+        {
+          id: 'sitepages-list',
+          name: 'SitePages',
+          displayName: 'Site Pages',
+          columns: [
+            { id: '1', name: 'Title', displayName: 'Title' },
+            { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+          ],
+        },
+      ];
       vi.spyOn(service, 'getAspxListItems').mockRejectedValue(new Error('ASPX fetch failed'));
 
       await expect(
-        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge', lists),
       ).rejects.toThrow('ASPX fetch failed');
     });
   });
 
-  describe('getAllFilesAndPagesForSite', () => {
-    const mockSharepointContentItem: SharepointContentItem = {
-      itemType: 'driveItem',
-      item: {
-        '@odata.etag': 'etag1',
-        id: 'file-1',
-        name: 'test.pdf',
-        size: 1024,
-        webUrl: 'https://sharepoint.example.com/test.pdf',
-        createdDateTime: '2024-01-01T00:00:00Z',
-        lastModifiedDateTime: '2024-01-01T00:00:00Z',
-        createdBy: {
-          user: {
-            email: 'test@example.com',
-            id: 'user-1',
-            displayName: 'Test User',
-          },
-        },
-        parentReference: {
-          driveType: 'documentLibrary',
-          driveId: 'drive-1',
-          id: 'parent-1',
-          name: 'Documents',
-          path: '/drive/root:/',
-          siteId: 'site-1',
-        },
-        file: { mimeType: 'application/pdf', hashes: { quickXorHash: 'hash1' } },
-        listItem: {
-          '@odata.etag': 'etag1',
-          id: 'item-1',
-          eTag: 'etag1',
-          createdDateTime: '2024-01-01T00:00:00Z',
-          lastModifiedDateTime: '2024-01-01T00:00:00Z',
-          webUrl: 'https://sharepoint.example.com/test.pdf',
-          createdBy: {
-            user: {
-              email: 'test@example.com',
-              id: 'user-1',
-              displayName: 'Test User',
-            },
-          },
-          fields: {
-            '@odata.etag': 'etag1',
-            FinanceGPTKnowledge: true,
-            FileLeafRef: 'test.pdf',
-            Modified: '2024-01-01T00:00:00Z',
-            Created: '2024-01-01T00:00:00Z',
-            ContentType: 'Document',
-            AuthorLookupId: '1704',
-            EditorLookupId: '1704',
-            FileSizeDisplay: '12345',
-            ItemChildCount: '0',
-            FolderChildCount: '0',
-          },
-        },
-      },
-      siteId: new Smeared('site-1', false),
-      driveId: 'drive-1',
-      driveName: 'Documents',
-      folderPath: '/',
-      fileName: 'test.pdf',
-    };
-
-    // biome-ignore lint/suspicious/noExplicitAny: Mock data for testing site pages which have different structure
-    const mockEnrichedSitePage: any = {
-      itemType: 'sitePage' as const,
-      id: 'page-1',
-      name: 'test.aspx',
-      size: 512,
-      webUrl: 'https://sharepoint.example.com/test.aspx',
-      lastModifiedDateTime: '2024-01-01T00:00:00Z',
-      siteId: 'site-1',
-      driveId: 'sitepages-list',
-      driveName: 'SitePages',
-      folderPath: '/',
-      listItem: {
-        fields: {
-          FileLeafRef: 'test.aspx',
-          Title: 'Test Page',
-        },
-      },
-    };
-
-    it('finds syncable files across multiple drives', async () => {
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [mockSharepointContentItem],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(1);
-      expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-    });
-
-    it('skips drives without IDs', async () => {
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [mockSharepointContentItem],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(1);
-      expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-    });
-
-    it('handles pagination correctly', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: File variant for pagination test
-      const file2: any = {
-        ...mockSharepointContentItem,
-        id: 'file-2',
-        name: 'test2.pdf',
-      };
-
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([mockEnrichedSitePage]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [file2],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(2);
-      expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-    });
-
-    it('filters out non-syncable files', async () => {
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockReturnValue(false) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(0);
-      expect(result.directories).toHaveLength(0);
-    });
-
-    it('recursively scans folders', async () => {
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [mockSharepointContentItem],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(1);
-      expect(result.directories).toHaveLength(0);
-      expect(service.getAspxPagesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-      expect(service.getAllFilesForSite).toHaveBeenCalledWith(
-        new Smeared('site-1', false),
-        'TestColumn',
-      );
-    });
-
-    it('counts total files vs syncable files', async () => {
-      mockFileFilterService.isFileValidForIngestion = vi
-        .fn()
-        .mockImplementation(
-          (file) => file.name !== 'invalid.exe',
-        ) as unknown as FileFilterService['isFileValidForIngestion'];
-
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [mockSharepointContentItem],
-        directories: [],
-      });
-
-      const result = await service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn');
-
-      expect(result.items).toHaveLength(1);
-      expect(result.directories).toHaveLength(0);
-      expect(result.items[0]).toBeDefined();
-      if (result.items[0]) {
-        expect(result.items[0].itemType === 'driveItem').toBe(true);
-        expect((result.items[0].item as DriveItem).name).toBe('test.pdf');
-      }
-    });
-
-    it('throws when getAllFilesForSite rejects', async () => {
-      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
-      vi.spyOn(service, 'getAllFilesForSite').mockRejectedValue(new Error('Drive scan failed'));
-
-      await expect(
-        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
-      ).rejects.toThrow('Drive scan failed');
-    });
-
-    it('throws when getAspxPagesForSite rejects', async () => {
-      vi.spyOn(service, 'getAspxPagesForSite').mockRejectedValue(new Error('Pages scan failed'));
-      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
-        items: [mockSharepointContentItem],
-        directories: [],
-      });
-
-      await expect(
-        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
-      ).rejects.toThrow('Pages scan failed');
-    });
-
+  describe('getAspxListItems', () => {
     it('limits site pages by maxFilesToScan', async () => {
       const firstItem = {
         id: 'item-1',

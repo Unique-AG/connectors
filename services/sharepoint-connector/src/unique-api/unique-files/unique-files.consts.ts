@@ -6,7 +6,7 @@ export interface ContentUpdateMutationInput {
   contentId: string;
   ownerId: string;
   input: {
-    url: string;
+    url?: string;
   };
 }
 
@@ -73,6 +73,9 @@ export interface PaginatedContentQueryInput {
     key?: {
       startsWith?: string;
       in?: string[];
+    };
+    ownerId?: {
+      equals: string;
     };
   };
 }

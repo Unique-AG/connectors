@@ -13,6 +13,8 @@ model requires the caller-supplied ones so the rejection is a schema error, not 
 import logging
 from typing import Literal, assert_never
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -63,6 +65,10 @@ class LogMeetingOrCallCommand:
         self._time_zones_service: TimeZonesService = time_zones_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(
         self,
         *,
@@ -98,7 +104,7 @@ class LogMeetingOrCallCommand:
         document = await self._client.post("/meeting-or-calls", schema=_Document, json=payload)
         resource = document.data
         logger.info(
-            "activity_writes.meeting_or_call.created",
+            "Created meeting or call",
             extra={
                 "id": resource.id,
                 "kind": activity.kind,

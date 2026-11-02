@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 import httpx
@@ -63,3 +64,41 @@ class TestCapitalFlowsAttribution:
         assert result.flows[0].account is not None
         assert result.flows[0].account.id == "a1"
         assert result.flows[0].account.name == "Litware acct"
+
+
+class TestScanCeiling:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_truncated_walk_logs_its_route_template(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "backstop_mcp.features.accounts.queries.get_capital_flows_query.MAX_CAPITAL_FLOW_SCAN_RECORDS",
+            1,
+        )
+        respx.get(_SUBS_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [_subscription(), {**_subscription(), "id": "s2"}],
+                    "meta": {"totalResourceCount": 2},
+                    "links": {"next": f"{_SUBS_URL}?page[offset]=1"},
+                },
+            )
+        )
+        respx.get(_REDS_URL).mock(return_value=_page())
+
+        with caplog.at_level(logging.WARNING):
+            result = await make_get_capital_flows_query(client).run(
+                start_date=date(2026, 1, 1), end_date=date(2026, 12, 31)
+            )
+
+        assert result.scan_truncated is True
+        [record] = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert record.message == "Capital flows scan ceiling reached"
+        assert record.__dict__["route"] == "/hedge-fund-account-subscriptions"
+        assert record.__dict__["ceiling"] == 1
+        assert not hasattr(record, "path")

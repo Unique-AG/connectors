@@ -12,6 +12,8 @@ Sparse fieldsets match the extras Backstop actually sends: `valueStatus` on acco
 from datetime import date
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.accounts.api_responses import SeriesPointAttributes
 from backstop_mcp.features.accounts.internal_dto import SeriesPointDto
@@ -28,6 +30,10 @@ class GetTimeSeriesQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("entity_type", "entity_id", "series", "start_date", "end_date"),
+        result=lambda series: {"points": len(series.points)},
+    )
     async def run(
         self,
         *,

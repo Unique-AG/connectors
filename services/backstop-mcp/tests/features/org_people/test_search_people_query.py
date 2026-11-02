@@ -1,11 +1,16 @@
+import logging
+from typing import NoReturn, Protocol
+
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from backstop_mcp.features.custom_fields import CustomFieldMatch
 from backstop_mcp.features.org_people import (
     LocationFilter,
+    SearchPeopleQuery,
     SearchPeopleResolvedResponse,
 )
 from tests.features.data_hygiene.helpers import (
@@ -27,6 +32,7 @@ from tests.helpers import (
 
 _FIELDS = frozenset({"id", "name", "email", "job_title", "company_name", "city", "country"})
 _RESULT_SIZE = 100
+_QUERY_LOGGER = "backstop_mcp.features.org_people.queries.search_people_query"
 
 
 def _page(
@@ -83,6 +89,11 @@ _EMPLOYMENT_INCLUDED = (
     person_org("er4", source_id="2", dest_id="o3", type_id=FORMER_TYPE),
     *relationship_types(EMPLOYEE_TYPE, FORMER_TYPE),
 )
+
+
+class _Identified(Protocol):
+    @property
+    def id(self) -> str: ...
 
 
 class TestSearchPeopleEmployments:
@@ -712,3 +723,54 @@ class TestSearchPeopleQuery:
         assert [row.id for row in exact.rows] == ["1"]
         assert lowercase.rows == ()
         assert partial.rows == ()
+
+
+class TestUnreadablePeople:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unreadable_rows_are_one_warning_with_capped_sample_ids(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def unreadable(
+            self: object, resource: _Identified, *args: object, **kwargs: object
+        ) -> NoReturn:
+            _ = self, args, kwargs
+            raise ValidationError.from_exception_data(resource.id, [])
+
+        monkeypatch.setattr(SearchPeopleQuery, "_row", unreadable)
+        base_url = f"{BASE_URL}/people-search-unreadable"
+        respx.get(f"{base_url}/people").mock(
+            return_value=_page(
+                *(_person(str(index), name=f"Person {index}") for index in range(1, 8))
+            )
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            async with tool_client(base_url) as client:
+                result = await make_search_people_query(client).run(
+                    result_size=_RESULT_SIZE, fields=_FIELDS
+                )
+
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert [record.getMessage() for record in warnings] == ["Skipped unreadable people"]
+        assert warnings[0].__dict__["count"] == 7
+        assert warnings[0].__dict__["sample_ids"] == ["1", "2", "3", "4", "5"]
+        debug_ids = [
+            record.__dict__["person_id"]
+            for record in caplog.records
+            if record.getMessage() == "Person record unreadable"
+        ]
+        assert debug_ids == ["1", "2", "3", "4", "5", "6", "7"]
+        assert result.coverage.rows_dropped == 7
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_readable_page_logs_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        base_url = f"{BASE_URL}/people-search-readable"
+        respx.get(f"{base_url}/people").mock(return_value=_page(_person("1", name="West, Ann")))
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            async with tool_client(base_url) as client:
+                await make_search_people_query(client).run(result_size=_RESULT_SIZE, fields=_FIELDS)
+
+        assert [record.getMessage() for record in caplog.records] == ["Fetched people"]

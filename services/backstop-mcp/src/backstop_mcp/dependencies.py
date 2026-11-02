@@ -7,6 +7,7 @@ the feature-owned providers without this one importing `features/` back.
 from functools import lru_cache
 
 from fastmcp.dependencies import Depends
+from mcp_configs import LoggingSettings
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import (
@@ -39,6 +40,11 @@ from backstop_mcp.features.auth import (
 @lru_cache(maxsize=1)
 def get_app_config() -> AppConfig:
     return AppConfig()
+
+
+@lru_cache(maxsize=1)
+def get_logging_settings() -> LoggingSettings:
+    return LoggingSettings()
 
 
 @lru_cache(maxsize=1)

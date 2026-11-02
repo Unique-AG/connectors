@@ -454,13 +454,13 @@ class TestTheSchemaItPublishes:
 
         assert set(_properties(parameters)) == {
             "message_ref",
-            "body_html",
+            "body",
             "cc",
             "importance",
             "categories",
             "mailbox",
         }
-        assert cast("Sequence[str]", parameters["required"]) == ["message_ref", "body_html"]
+        assert cast("Sequence[str]", parameters["required"]) == ["message_ref", "body"]
 
     @pytest.mark.parametrize("word", ["bcc", "blind", "attach", "file", "mode"])
     async def test_no_argument_offers_a_blind_copy_a_file_or_a_mode(

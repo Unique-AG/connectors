@@ -176,7 +176,7 @@ class TestTheRequest:
         with caplog.at_level(logging.WARNING):
             await resolve_product(ctx_never_elicit(), client, product="F1")
 
-        assert [record.message for record in caplog.records] == ["accounts.products.index_large"]
+        assert [record.message for record in caplog.records] == ["Product catalog is large"]
 
     @pytest.mark.asyncio
     @respx.mock

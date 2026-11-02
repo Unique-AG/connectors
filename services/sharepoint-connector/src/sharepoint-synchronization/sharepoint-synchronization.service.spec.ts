@@ -13,6 +13,7 @@ import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { FetchSiteItemsQuery } from './fetch-site-items.query';
 import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
 import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
@@ -42,6 +43,9 @@ describe('SharepointSynchronizationService', () => {
     execute: Mock;
   };
   let mockDeduplicateSitesQuery: {
+    execute: Mock;
+  };
+  let mockFetchSiteItemsQuery: {
     execute: Mock;
   };
   let mockFindRootScopeQuery: {
@@ -121,8 +125,11 @@ describe('SharepointSynchronizationService', () => {
   };
 
   beforeEach(async () => {
+    mockFetchSiteItemsQuery = {
+      execute: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
+    };
+
     mockGraphApiService = {
-      getAllSiteItems: vi.fn().mockResolvedValue({ items: [mockFile], directories: [] }),
       getSiteInfo: vi.fn().mockResolvedValue({
         siteName: new Smeared('test-site-name', false),
         managedPath: 'sites',
@@ -211,6 +218,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
+      .mock(FetchSiteItemsQuery)
+      .impl(() => mockFetchSiteItemsQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
       .mock(UniqueFilesService)
@@ -225,10 +234,11 @@ describe('SharepointSynchronizationService', () => {
   it('synchronizes files from all configured sites', async () => {
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(1);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       expect.any(Object),
       'TestColumn',
+      expect.objectContaining({ itemNameColumnName: 'Title', scanListAttachments: false }),
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       [mockFile],
@@ -247,6 +257,20 @@ describe('SharepointSynchronizationService', () => {
     const context = vi.mocked(mockContentSyncService.syncContentForSite).mock.calls[0]?.[2];
     expect(context?.siteName.value).toBe('test-site-name');
     expect(context?.rootPath.value).toBe('/test-root');
+  });
+
+  it('scans list attachments of a site that enables them', async () => {
+    mockSitesConfigurationService.loadSitesConfiguration = vi
+      .fn()
+      .mockResolvedValue([createMockSiteConfig({ listAttachmentsScan: 'enabled' })]);
+
+    await service.synchronize();
+
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
+      expect.any(Object),
+      'TestColumn',
+      expect.objectContaining({ scanListAttachments: true }),
+    );
   });
 
   it('delegates content synchronization to ContentSyncService', async () => {
@@ -272,7 +296,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('skips site when no items found', async () => {
-    mockGraphApiService.getAllSiteItems = vi.fn().mockResolvedValue({ items: [], directories: [] });
+    mockFetchSiteItemsQuery.execute = vi.fn().mockResolvedValue({ items: [], directories: [] });
 
     await service.synchronize();
 
@@ -280,7 +304,7 @@ describe('SharepointSynchronizationService', () => {
   });
 
   it('prevents overlapping scans', async () => {
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockImplementation(
         () =>
@@ -294,7 +318,7 @@ describe('SharepointSynchronizationService', () => {
 
     const [firstResult, secondResult] = await Promise.all([firstScan, secondScan]);
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(1);
     expect(firstResult.fullResult.status).toBe('success');
     expect(secondResult.fullResult.status).toBe('skipped');
     if (secondResult.fullResult.status === 'skipped') {
@@ -306,11 +330,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(2);
   });
 
   it('releases scan lock after site-level failure', async () => {
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
       .mockResolvedValue({ items: [mockFile], directories: [] });
@@ -318,7 +342,7 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(2);
   });
 
   it('continues content sync on error and attempts permissions sync', async () => {
@@ -366,6 +390,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
+      .mock(FetchSiteItemsQuery)
+      .impl(() => mockFetchSiteItemsQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
       .mock(UniqueFilesService)
@@ -459,6 +485,8 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
+      .mock(FetchSiteItemsQuery)
+      .impl(() => mockFetchSiteItemsQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
       .mock(UniqueFilesService)
@@ -538,7 +566,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '2019-BMW-Maintenance.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValue({ items: [fileWithAllFields], directories: [] });
 
@@ -621,7 +649,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValue({ items: [fileWithoutTimestamp], directories: [] });
 
@@ -834,7 +862,7 @@ describe('SharepointSynchronizationService', () => {
       fileName: '6034030.pdf',
     };
 
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValue({ items: [file1, file2, file3], directories: [] });
 
@@ -876,7 +904,7 @@ describe('SharepointSynchronizationService', () => {
       ...mockFile,
       siteId: new Smeared('subsite-1', false),
     };
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [mockFile], directories: [] })
       .mockResolvedValueOnce({ items: [subsiteFile], directories: [] });
@@ -888,19 +916,104 @@ describe('SharepointSynchronizationService', () => {
       new Smeared('test-site-name', false),
       expect.any(Set),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
-    const getAllSiteItemsMock = mockGraphApiService.getAllSiteItems as Mock;
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(2);
+    const fetchSiteItemsMock = mockFetchSiteItemsQuery.execute;
     expect(
       mockSubsiteDiscoveryService.discoverAllSubsites.mock.invocationCallOrder[0],
-    ).toBeLessThan(getAllSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER);
-    expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(1, siteConfig.siteId, expect.any(String));
-    expect(getAllSiteItemsMock).toHaveBeenNthCalledWith(
+    ).toBeLessThan(fetchSiteItemsMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER);
+    expect(fetchSiteItemsMock).toHaveBeenNthCalledWith(
+      1,
+      siteConfig.siteId,
+      expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
+    );
+    expect(fetchSiteItemsMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ value: 'subsite-1' }),
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
       [mockFile, { ...subsiteFile, syncSiteId: siteConfig.siteId }],
+      null,
+      expect.anything(),
+    );
+  });
+
+  it('passes each web the folder names of the synced subsites directly below it', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+    const subsite = (id: string, relativePath: string) => ({
+      siteId: new Smeared(id, false),
+      name: new Smeared(relativePath, false),
+      relativePath: new Smeared(relativePath, false),
+    });
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      subsite('sub-a', 'SubA'),
+      subsite('sub-a-team', 'SubA/Team'),
+      subsite('sub-b-deep', 'SubB/Deep'),
+    ]);
+    mockFetchSiteItemsQuery.execute = vi
+      .fn()
+      .mockResolvedValue({ items: [mockFile], directories: [] });
+
+    await service.synchronize();
+
+    const expectScannedWith = (siteId: string, subsiteFolderNames: string[]) =>
+      expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ value: siteId }),
+        expect.any(String),
+        expect.objectContaining({ subsiteFolderNames }),
+      );
+    expectScannedWith(siteConfig.siteId.value, ['SubA', 'SubB']);
+    expectScannedWith('sub-a', ['Team']);
+    expectScannedWith('sub-a-team', []);
+    expectScannedWith('sub-b-deep', []);
+  });
+
+  it('records the subsite path on subsite list attachments', async () => {
+    const siteConfig = createMockSiteConfig({
+      siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
+      subsitesScan: 'enabled',
+    });
+    mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([siteConfig]);
+    mockSubsiteDiscoveryService.discoverAllSubsites.mockResolvedValue([
+      {
+        siteId: new Smeared('subsite-1', false),
+        name: new Smeared('SubA', false),
+        relativePath: new Smeared('SubA/Team', false),
+      },
+    ]);
+
+    const subsiteAttachment = {
+      itemType: 'listItemAttachment',
+      siteId: new Smeared('subsite-1', false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'policy.pdf',
+      attachment: {
+        absoluteUrl:
+          'https://contoso.sharepoint.com/sites/test-site-name/SubA/Team/Lists/Procedures/Attachments/4/policy.pdf',
+        size: 2048,
+      },
+      item: { id: '4' },
+    } as SharepointContentItem;
+    mockFetchSiteItemsQuery.execute = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [mockFile], directories: [] })
+      .mockResolvedValueOnce({ items: [subsiteAttachment], directories: [] });
+
+    await service.synchronize();
+
+    expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledWith(
+      [
+        mockFile,
+        { ...subsiteAttachment, syncSiteId: siteConfig.siteId, subsiteRelativePath: 'SubA/Team' },
+      ],
       null,
       expect.anything(),
     );
@@ -938,7 +1051,7 @@ describe('SharepointSynchronizationService', () => {
       },
     ]);
 
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [mockFile], directories: [] })
       .mockRejectedValueOnce(new Error('Subsite fetch failed'));
@@ -946,7 +1059,7 @@ describe('SharepointSynchronizationService', () => {
     const result = await service.synchronize();
 
     expect(result.fullResult.status).toBe('success');
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(2);
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
@@ -979,7 +1092,7 @@ describe('SharepointSynchronizationService', () => {
       ...mockFile,
       siteId: new Smeared('host,col,other-subsite', false),
     };
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [parentFile], directories: [] })
       .mockResolvedValueOnce({ items: [otherSubsiteFile], directories: [] })
@@ -994,18 +1107,21 @@ describe('SharepointSynchronizationService', () => {
     );
     // 3 calls: parent site, non-configured subsite (SubB) via discovery, standalone site via its
     // own sync. Without the guard, there would be 4 calls (SubA also fetched via discovery)
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(3);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(3);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       parentSiteConfig.siteId,
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       expect.objectContaining({ value: 'host,col,other-subsite' }),
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       standaloneSiteConfig.siteId,
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
   });
 
@@ -1044,7 +1160,7 @@ describe('SharepointSynchronizationService', () => {
       siteId: new Smeared('host,col,other-subsite', false),
     };
 
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [mockFile], directories: [] })
       .mockResolvedValueOnce({ items: [otherSubsiteFile], directories: [] });
@@ -1056,14 +1172,16 @@ describe('SharepointSynchronizationService', () => {
       expect.any(Smeared),
       new Set(['host,col,inactive-subsite', 'host,col,deleted-subsite']),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(2);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       parentSiteConfig.siteId,
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       expect.objectContaining({ value: 'host,col,other-subsite' }),
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
   });
 
@@ -1095,7 +1213,7 @@ describe('SharepointSynchronizationService', () => {
       ...mockFile,
       siteId: new Smeared('host,col,discovered-subsite', false),
     };
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [mockFile], directories: [] })
       .mockResolvedValueOnce({ items: [subsiteFile], directories: [] })
@@ -1103,9 +1221,10 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       expect.objectContaining({ value: 'host,col,discovered-subsite' }),
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
   });
 
@@ -1128,7 +1247,7 @@ describe('SharepointSynchronizationService', () => {
       ...mockFile,
       siteId: new Smeared('subsite-b', false),
     };
-    mockGraphApiService.getAllSiteItems = vi
+    mockFetchSiteItemsQuery.execute = vi
       .fn()
       .mockResolvedValueOnce({ items: [mockFile], directories: [] })
       .mockResolvedValueOnce({ items: [subsiteFile], directories: [] });
@@ -1188,10 +1307,11 @@ describe('SharepointSynchronizationService', () => {
     await service.synchronize();
 
     expect(mockDeduplicateSitesQuery.execute).toHaveBeenCalledWith([site1, site2]);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledTimes(1);
+    expect(mockFetchSiteItemsQuery.execute).toHaveBeenCalledWith(
       expect.objectContaining({ value: site1.siteId.value }),
       expect.any(String),
+      expect.objectContaining({ itemNameColumnName: 'Title' }),
     );
   });
 

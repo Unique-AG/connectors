@@ -9,6 +9,7 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiSingleResourceDocument, BackstopClient
@@ -44,6 +45,7 @@ _RESOURCE_TYPE = "opportunities"
     ),
     output_schema=published_output_schema(DeleteOpportunityResponse),
 )
+@trace_arguments("opportunity.opportunity_id")
 async def delete_opportunity(
     ctx: Context,
     opportunity: Annotated[
@@ -67,10 +69,6 @@ async def delete_opportunity(
 
     Call like: {"opportunity": {"opportunity_id": "<id from get_opportunities>"}}
     """
-    logger.info(
-        "opportunity_writes.delete.start",
-        extra={"opportunity_id": opportunity.opportunity_id},
-    )
 
     async def prompt() -> str:
         return await _deletion_prompt(client=client, opportunity_id=opportunity.opportunity_id)
@@ -80,13 +78,13 @@ async def delete_opportunity(
         return outcome
     if outcome is EntityDeletion.DECLINED:
         logger.info(
-            "opportunity_writes.delete.not_confirmed",
+            "Opportunity deletion not confirmed",
             extra={"opportunity_id": opportunity.opportunity_id},
         )
         raise ToolError(DELETION_NOT_CONFIRMED)
     if outcome is EntityDeletion.NOT_AVAILABLE:
         logger.info(
-            "opportunity_writes.delete.elicit.not_available",
+            "Deleting opportunity without confirmation, client cannot elicit",
             extra={"opportunity_id": opportunity.opportunity_id},
         )
     return await delete_opportunity_command.run(opportunity=opportunity)

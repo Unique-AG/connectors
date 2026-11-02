@@ -401,4 +401,52 @@ describe('FetchGraphPermissionsMapQuery', () => {
       expect(progressLogs).toHaveLength(0);
     });
   });
+
+  it('fetches list item permissions once and assigns them to every attachment', async () => {
+    const permission: SimplePermission = {
+      id: 'perm-1',
+      grantedToV2: { siteGroup: { id: '12', displayName: 'Readers' } },
+    };
+    vi.mocked(graphApiService.getListItemPermissions).mockResolvedValue([permission]);
+    const attachments = [createAttachment('a.pdf'), createAttachment('b.pdf')];
+
+    const result = await query.run(
+      attachments,
+      new Smeared(mockSiteName, false),
+      mockSmearedSiteId,
+    );
+
+    expect(graphApiService.getListItemPermissions).toHaveBeenCalledOnce();
+    expect(graphApiService.getListItemPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ value: mockSiteId }),
+      'list-1',
+      '4',
+    );
+    const expected = [{ type: 'siteGroup', id: `${mockSiteName}|12`, name: 'Readers' }];
+    expect(result[buildIngestionItemKey(attachments[0] as AnySharepointItem)]).toEqual(expected);
+    expect(result[buildIngestionItemKey(attachments[1] as AnySharepointItem)]).toEqual(expected);
+  });
 });
+
+function createAttachment(fileName: string): AnySharepointItem {
+  return {
+    itemType: 'listItemAttachment',
+    siteId: new Smeared('site-123', false),
+    driveId: 'list-1',
+    driveName: 'Procedures',
+    folderPath: '/Policy',
+    fileName,
+    attachment: {
+      absoluteUrl: `https://contoso.sharepoint.com/sites/TestSite/Attachments/4/${fileName}`,
+      size: 2048,
+    },
+    item: {
+      id: '4',
+      webUrl: 'https://contoso.sharepoint.com/item',
+      lastModifiedDateTime: '2024-01-01T00:00:00Z',
+      createdDateTime: '2024-01-01T00:00:00Z',
+      createdBy: { user: { email: 'a@b.c', id: 'u', displayName: 'A' } },
+      fields: {},
+    },
+  } as AnySharepointItem;
+}

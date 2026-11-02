@@ -12,12 +12,11 @@ A 403 on one stream (Backstop refusing a linked entity) is reported on that grou
 other streams are kept — otherwise a forbidden document/email wipes a successful calls page.
 """
 
-import logging
-
 from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 
 from backstop_mcp.features.activity_history import (
     ActivityHistorySettings,
@@ -37,8 +36,6 @@ from ._page_input import (
     extract_fetch_activity_history_args,
 )
 
-logger = logging.getLogger(__name__)
-
 __all__ = [
     "ActivityHistoryFirstPageInput",
     "ActivityHistoryNextPageInput",
@@ -56,6 +53,7 @@ __all__ = [
     ),
     output_schema=published_output_schema(GetActivityHistoryResponse),
 )
+@trace_arguments("request.type", "request.search_type")
 async def get_activity_history(
     ctx: Context,
     request: ActivityHistoryPageInput,
@@ -121,31 +119,10 @@ async def get_activity_history(
     if not isinstance(args, FetchArgs):
         return args
 
-    logger.info(
-        "activity_history.get.start",
-        extra={
-            "segment": args.segment,
-            "entity_id": args.entity_id,
-            "streams": list(args.continuations),
-        },
-    )
-    result = await get_activity_history_query.run(
+    return await get_activity_history_query.run(
         segment=args.segment,
         entity_id=args.entity_id,
         party=args.party,
         continuations=args.continuations,
         gist_max_chars=activity_history.gist_max_chars,
     )
-    open_streams = [
-        activity_type for activity_type, group in result.groups.items() if group.next is not None
-    ]
-    logger.info(
-        "activity_history.get.completed",
-        extra={
-            "segment": args.segment,
-            "entity_id": args.entity_id,
-            "streams": list(result.groups),
-            "open_streams": open_streams,
-        },
-    )
-    return result

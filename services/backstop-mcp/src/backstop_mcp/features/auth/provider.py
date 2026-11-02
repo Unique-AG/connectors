@@ -12,6 +12,7 @@ from mcp_credential_auth import (
     record_login_success,
     reserve_login_attempt,
 )
+from mcp_observability import identifiable_value
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
@@ -184,7 +185,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         # token, so the legitimate case — a user whose cookie expired while the form sat open —
         # recovers by simply submitting again.
         if not _LOGIN_CSRF.token_is_valid(request, request_id, csrf_token):
-            logger.warning("auth.login.csrf_mismatch")
+            logger.warning("Login form failed the CSRF check")
             return self._form_response(
                 request_id,
                 status_code=400,
@@ -204,6 +205,10 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         # Treated as an ordinary invalid credential — no Backstop username is this long — so the
         # response is indistinguishable from any other bad submission.
         if len(username) > MAX_USERNAME_LENGTH:
+            logger.info(
+                "Login rejected",
+                extra={"reason": "username_too_long", "username": identifiable_value(username)},
+            )
             return self._form_response(request_id, error="Invalid username or API token.")
 
         attempt_id = await reserve_login_attempt(
@@ -213,6 +218,7 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             config=self._throttle,
         )
         if attempt_id is None:
+            logger.warning("Login throttled", extra={"username": identifiable_value(username)})
             return self._form_response(
                 request_id,
                 status_code=429,
@@ -227,7 +233,11 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             valid = await self._backstop_clients.verify_credential(username, api_token)
         except BackstopUnreachableError as exc:
             await discard_login_attempt(self._session_factory, attempt_id)
-            logger.warning("auth.login.backstop_unreachable", extra={"error": str(exc)})
+            logger.warning(
+                "Backstop unreachable during login",
+                extra={"username": identifiable_value(username)},
+                exc_info=exc,
+            )
             return self._form_response(
                 request_id,
                 username=username,
@@ -236,6 +246,10 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
 
         if not valid:
             await finalize_login_failure(self._session_factory, attempt_id)
+            logger.info(
+                "Login rejected",
+                extra={"reason": "invalid_credential", "username": identifiable_value(username)},
+            )
             return self._form_response(
                 request_id,
                 username=username,
@@ -250,7 +264,11 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         try:
             system_user = await self._resolve_system_user(username, api_token)
         except BackstopUnreachableError as exc:
-            logger.warning("auth.login.backstop_unreachable", extra={"error": str(exc)})
+            logger.warning(
+                "Backstop unreachable during login",
+                extra={"username": identifiable_value(username)},
+                exc_info=exc,
+            )
             return self._form_response(
                 request_id,
                 username=username,
@@ -284,8 +302,9 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
             else previous.api_token.get_secret_value() != api_token
         )
         logger.info(
-            "auth.login.succeeded",
+            "Login succeeded",
             extra={
+                "username": identifiable_value(username),
                 "had_previous_credential": had_previous_credential,
                 "credential_changed": credential_changed,
             },

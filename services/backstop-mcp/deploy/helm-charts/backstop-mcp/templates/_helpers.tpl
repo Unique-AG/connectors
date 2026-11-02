@@ -37,4 +37,21 @@ replaces the app default; null leaves it unset.
 - name: BACKSTOP_MCP_TENANT_GUIDANCE
   value: {{ toJson .Values.mcpConfig.tenantGuidance | quote }}
 {{- end }}
+{{- $logging := .Values.mcpConfig.logging | default dict }}
+{{- if $logging.level }}
+- name: LOG_LEVEL
+  value: {{ $logging.level | quote }}
+{{- end }}
+{{- if $logging.libraryLevels }}
+- name: LIBRARY_LOG_LEVELS
+  value: {{ toJson $logging.libraryLevels | quote }}
+{{- end }}
+{{- if $logging.diagnosticsDataPolicy }}
+- name: LOGS_DIAGNOSTICS_DATA_POLICY
+  value: {{ $logging.diagnosticsDataPolicy | quote }}
+{{- end }}
+{{- if $logging.errorDetailsPolicy }}
+- name: ERROR_DETAILS_POLICY
+  value: {{ $logging.errorDetailsPolicy | quote }}
+{{- end }}
 {{- end -}}

@@ -6,6 +6,7 @@ import { createSmeared } from '../smeared';
 export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfig => ({
   siteId: createSmeared('site-id'),
   syncColumnName: 'TestColumn',
+  itemNameColumnName: 'Title',
   ingestionMode: IngestionMode.Flat,
   scopeId: { type: 'fixed', scopeId: 'scope_test' },
   maxFilesToIngest: 1000,
@@ -14,5 +15,6 @@ export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfi
   syncMode: 'content_only',
   permissionsInheritanceMode: 'inherit_scopes_and_files',
   subsitesScan: EnabledDisabledMode.Disabled,
+  listAttachmentsScan: EnabledDisabledMode.Disabled,
   ...overrides,
 });

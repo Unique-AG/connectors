@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.0.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.3...confluence-connector@3.0.4) (2026-10-28)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** bump base chart for network policy sync-wave ordering ([#1307](https://github.com/Unique-AG/connectors/issues/1307)) ([8e9eba5](https://github.com/Unique-AG/connectors/commit/8e9eba588c9052ef87a356a0bd9c575170848ca2))
+
+
+### Dependencies
+
+* **main:** refresh dependencies and drop unneeded overrides ([#1322](https://github.com/Unique-AG/connectors/issues/1322)) ([a4f2390](https://github.com/Unique-AG/connectors/commit/a4f239000fc35b5809f6c7b50c920ac3c8419ef9))
+
 ## [3.0.3](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.2...confluence-connector@3.0.3) (2026-10-23)
 
 

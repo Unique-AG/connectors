@@ -122,6 +122,63 @@
               }
             }
           }
+        },
+        "logging": {
+          "type": "object",
+          "description": "Logging and error-detail settings. An empty value leaves its variable unset, which keeps the app default.",
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL",
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "critical",
+                ""
+              ],
+              "description": "LOG_LEVEL. The level of backstop-mcp's own loggers. Chart default: info.",
+              "default": "info"
+            },
+            "libraryLevels": {
+              "type": "object",
+              "description": "LIBRARY_LOG_LEVELS, rendered as JSON. Logger name to level, merged over the app's defaults (httpx and httpcore WARNING, sse_starlette INFO). A library not named logs at INFO. Empty keeps the defaults.",
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "DEBUG",
+                  "INFO",
+                  "WARNING",
+                  "ERROR",
+                  "CRITICAL",
+                  "debug",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ]
+              },
+              "default": {}
+            },
+            "diagnosticsDataPolicy": {
+              "type": "string",
+              "enum": ["conceal", "disclose", ""],
+              "description": "LOGS_DIAGNOSTICS_DATA_POLICY. conceal writes identifying values such as Backstop logins as hmac-sha256:<hex>; disclose writes the original, for debugging. Chart default: conceal.",
+              "default": "conceal"
+            },
+            "errorDetailsPolicy": {
+              "type": "string",
+              "enum": ["redact", "disclose", ""],
+              "description": "ERROR_DETAILS_POLICY. redact keeps exception messages and stack text out of logs and spans; disclose keeps them at ERROR, for debugging. Chart default: redact.",
+              "default": "redact"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

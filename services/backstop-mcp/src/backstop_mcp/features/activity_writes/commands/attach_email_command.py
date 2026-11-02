@@ -8,6 +8,8 @@ metadata-only email create. Plain base64 is rejected with
 
 import logging
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -36,6 +38,10 @@ class AttachEmailCommand:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("activity.kind", "party_id"),
+        result=lambda response: {"id": response.id},
+    )
     async def run(
         self,
         *,
@@ -63,7 +69,5 @@ class AttachEmailCommand:
             ),
         )
         document = await self._client.post("/emails", schema=_EmailDocument, json=payload)
-        logger.info(
-            "activity_writes.email.imported", extra={"id": document.data.id, "party_id": party_id}
-        )
+        logger.info("Imported email", extra={"id": document.data.id, "party_id": party_id})
         return AttachedFileResponse(id=document.data.id, kind="email")

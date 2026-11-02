@@ -1,11 +1,11 @@
 """`create_person`: POST one person."""
 
-import logging
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.org_people_writes import (
@@ -17,8 +17,6 @@ from backstop_mcp.features.org_people_writes import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -29,6 +27,7 @@ logger = logging.getLogger(__name__)
     ),
     output_schema=published_output_schema(CreatedPersonResponse),
 )
+@trace_arguments("person.category_ids", identifying=("person.owner_login",))
 async def create_person(
     person: Annotated[CreatePersonInput, Field(description=CREATE_PERSON_INPUT_DESCRIPTION)],
     create_person_command: CreatePersonCommand = Depends(get_create_person_command_factory),
@@ -43,5 +42,4 @@ async def create_person(
     Call like: {"person": {"last_name": "Smith", "gender": "Female",
     "category_ids": ["<id from list_contact_categories>"]}}
     """
-    logger.info("org_people_writes.create_person.start")
     return await create_person_command.run(person=person)

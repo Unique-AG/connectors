@@ -295,9 +295,31 @@ class TestListActivityTagsTool:
         assert refreshed.cache == "ok"
         assert len(refreshed.tags) == 1
         assert refreshed.tags[0].quantity_tagged == 12
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [f"Conflicting activity tags for duplicate id {_LIVE_TAG_ID!r}; retaining first tag"]
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.getMessage() == "Ignored duplicate activity tag ids"
+        assert warning.__dict__["count"] == 1
+        assert warning.__dict__["sample_ids"] == [_LIVE_TAG_ID]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_warns_once_per_load_with_a_capped_sample_of_conflicting_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("at-list-many-conflicts")
+        ids = [str(1000 + index) for index in range(7)]
+        originals = [_tag(tag_id, name=f"Tag {tag_id}", quantityTagged=1) for tag_id in ids]
+        conflicting = [_tag(tag_id, name=f"Tag {tag_id}", quantityTagged=2) for tag_id in ids]
+        respx.get(f"{base_url}/activity-tags").mock(
+            return_value=_collection_page(*originals, *conflicting)
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_activity_tags(refresh=True, activity_tags=activity_tags_service(client))
+
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
     @pytest.mark.asyncio
     @respx.mock

@@ -542,7 +542,7 @@ class TestTheEraWithNoBackChannel:
         sent = post.calls.last.request.content.decode()
         body = cast("Mapping[str, object]", json.loads(sent))
         content = cast("str", cast("Mapping[str, object]", body["body"])["content"])
-        assert content.startswith('<at id="0">Jane Smith</at> ')
+        assert content.startswith('<p><at id="0">Jane Smith</at> ')
         assert _ADA.name not in sent, "the label of the request reached the chat"
 
 
@@ -610,7 +610,7 @@ class TestWhatItAsksGraphFor:
         sent = post.calls.last.request.content.decode()
         body = cast("Mapping[str, object]", json.loads(sent))
         content = cast("Mapping[str, object]", body["body"])["content"]
-        assert cast("str", content).startswith('<at id="0">Jane Smith</at> Here is the plan.')
+        assert cast("str", content).startswith('<p><at id="0">Jane Smith</at> Here is the plan.')
         mentions = cast("Sequence[Mapping[str, object]]", body["mentions"])
         assert mentions[0]["mentionText"] == "Jane Smith"
         mentioned = cast("Mapping[str, object]", mentions[0]["mentioned"])
@@ -639,7 +639,7 @@ class TestWhatItAsksGraphFor:
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         assert body["body"] == {
-            "content": '<at id="0">Jane Smith</at> Q3 &lt; Q4 &amp; more '
+            "content": '<p><at id="0">Jane Smith</at> Q3 &lt; Q4 &amp; more</p> '
             + f'<attachment id="{_BUDGET_ID}"></attachment> '
             + f'<attachment id="{_PLAN_ID}"></attachment>',
             "contentType": "html",

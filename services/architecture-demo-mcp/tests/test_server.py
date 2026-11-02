@@ -94,3 +94,18 @@ def test_a_server_with_auth_serves_beyond_loopback(served: list[str]) -> None:
     run_server(FastMCP(name="Probe", auth=StaticTokenVerifier(tokens={})), DEPLOYED)
 
     assert served == ["0.0.0.0"]
+
+
+def test_uvicorn_logs_through_the_pino_handler(
+    server: FastMCP, server_settings: ServerSettings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    uvicorn_configs: list[object] = []
+
+    def run(_: FastMCP, **options: object) -> None:
+        uvicorn_configs.append(options["uvicorn_config"])
+
+    monkeypatch.setattr(FastMCP, "run", run)
+
+    run_server(server, server_settings)
+
+    assert uvicorn_configs == [{"access_log": False, "log_config": None}]

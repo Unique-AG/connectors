@@ -784,7 +784,7 @@ class TestTheSchemaItPublishes:
         assert set(_properties(parameters)) == {
             "message_ref",
             "mode",
-            "body_html",
+            "body",
             "to",
             "cc",
             "importance",
@@ -829,7 +829,7 @@ class TestTheSchemaItPublishes:
         assert cast("Sequence[str]", parameters["required"]) == [
             "message_ref",
             "mode",
-            "body_html",
+            "body",
         ]
 
     async def test_to_defaults_to_nobody_and_has_no_ceiling(

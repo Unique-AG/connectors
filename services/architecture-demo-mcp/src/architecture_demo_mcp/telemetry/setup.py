@@ -16,9 +16,12 @@ SERVICE_NAME = "architecture-demo-mcp"
 def init_telemetry(settings: LoggingSettings) -> None:
     """Runs before anything logs. Tracing reads its settings (OTEL_*) from the environment."""
     configure_tracing(
-        TracingSettings(), service_name=SERVICE_NAME, service_version=version(SERVICE_NAME)
+        TracingSettings(),
+        service_name=SERVICE_NAME,
+        service_version=version(SERVICE_NAME),
+        error_details_policy=settings.error_details_policy,
     )
-    configure_logging(level=settings.log_level)
+    configure_logging(settings, own_loggers=("architecture_demo_mcp",))
 
 
 def instrument(mcp: FastMCP) -> Middleware:

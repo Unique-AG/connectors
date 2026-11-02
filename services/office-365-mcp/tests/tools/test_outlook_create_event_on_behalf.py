@@ -1966,7 +1966,7 @@ class TestTheSchemaItPublishes:
             "time_zone",
             "attendees",
             "optional_attendees",
-            "body_html",
+            "body",
             "location",
             "all_day",
             "online_meeting",
@@ -2225,7 +2225,7 @@ class TestHowItDeclaresItself:
         parameters, tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        body_html = cast("Mapping[str, object]", properties["body_html"])
+        body_html = cast("Mapping[str, object]", properties["body"])
         starts_at = cast("Mapping[str, object]", properties["starts_at"])
         surfaces = [
             tool.description or "",

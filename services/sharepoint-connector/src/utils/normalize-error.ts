@@ -58,5 +58,14 @@ export function sanitizeError(error: unknown): object {
     };
   }
 
-  return serializeError(normalizeError(error));
+  const normalized = normalizeError(error);
+  // serializeError reads `name` from the prototype, so it reports `Error` for subclasses that set
+  // `this.name` in their constructor.
+  const serialized = { ...serializeError(normalized), name: normalized.name };
+  if (normalized.cause === undefined) {
+    return serialized;
+  }
+  // serializeError turns `cause` into `{}`, which hides why a wrapping error such as
+  // PermissionsSyncError was thrown.
+  return { ...serialized, cause: sanitizeError(normalized.cause) };
 }

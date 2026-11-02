@@ -1,12 +1,12 @@
 """`get_opportunities_by_ids`: full records with resolved custom fields for up to 50 ids."""
 
-import logging
 from collections.abc import Sequence
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.custom_fields import (
@@ -20,8 +20,6 @@ from backstop_mcp.features.opportunities import (
 from backstop_mcp.features.opportunities.dependencies import get_opportunities_by_ids_query_factory
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
 
-logger = logging.getLogger(__name__)
-
 
 @tool(
     annotations=ToolAnnotations(
@@ -31,6 +29,12 @@ logger = logging.getLogger(__name__)
         open_world_hint=False,
     ),
     output_schema=published_output_schema(GetOpportunitiesByIdsResponse),
+)
+@trace_arguments(
+    lambda args: {
+        "id_count": len(args["ids"]),
+        "include_stage_history": args["include_stage_history"],
+    }
 )
 async def get_opportunities_by_ids(
     ids: Annotated[
@@ -93,25 +97,11 @@ async def get_opportunities_by_ids(
     Call like: {"ids": ["<id from a search_opportunities row>"],
     "custom_field_names": ["<name from list_custom_fields>"]}
     """
-    opportunity_ids = coerce_ids(ids)
-    logger.info(
-        "opportunities.by_ids.start",
-        extra={"count": len(opportunity_ids), "include_stage_history": include_stage_history},
-    )
-    result = await get_opportunities_by_ids_query.run(
-        opportunity_ids=opportunity_ids,
+    return await get_opportunities_by_ids_query.run(
+        opportunity_ids=coerce_ids(ids),
         include_stage_history=include_stage_history,
         custom_fields_filters=CustomFieldFilters(
             definition_ids=coerce_ids(custom_field_definition_ids),
             names=tuple(custom_field_names),
         ),
     )
-    logger.info(
-        "opportunities.by_ids.completed",
-        extra={
-            "returned": len(result.opportunities),
-            "not_found": len(result.not_found),
-            "errors": len(result.errors),
-        },
-    )
-    return result

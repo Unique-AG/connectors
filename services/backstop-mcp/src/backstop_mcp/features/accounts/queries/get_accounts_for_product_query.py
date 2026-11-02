@@ -15,6 +15,8 @@ closed accounts, and owners with only closed accounts stay known, whatever `incl
 
 from collections.abc import Sequence
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopClient, Included
 from backstop_mcp.features.accounts.api_responses import (
     ACCOUNT_LISTING_FIELDS,
@@ -37,6 +39,13 @@ class GetAccountsForProductQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("product.id", "include_closed", "exclude_custom_fields", "owner_ids"),
+        result=lambda accounts: {
+            "returned": len(accounts.listing.accounts),
+            "closed_omitted": accounts.listing.closed_omitted,
+        },
+    )
     async def run(
         self,
         *,

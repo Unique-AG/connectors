@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.includes import InternalOwnerResponse
@@ -45,6 +46,7 @@ def _user_matches(user: SystemUserDto, search: str) -> bool:
     ),
     output_schema=published_output_schema(ListSystemUsersResponse),
 )
+@trace_arguments("refresh", identifying=("search",))
 async def list_system_users(
     search: Annotated[
         str | None,

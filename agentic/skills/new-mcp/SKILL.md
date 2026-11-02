@@ -242,6 +242,8 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - Each tool you added or served changes the tool surface. Read the diff
   `uv run poe architecture` prints, then accept it with `uv run poe surface`.
 - Run `uv run poe ci` in `services/<name>`: every check CI runs, in its order.
+- Add `services/<name>` to the `folders` of `connectors.code-workspace`, so VS Code and Cursor
+  type-check it with its own config and `.venv`.
 - Tell the user what is registered and what is still theirs to do:
   - Registered: the `<name>` commit scope, and release-please and release-rerun unless it ran
     with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.

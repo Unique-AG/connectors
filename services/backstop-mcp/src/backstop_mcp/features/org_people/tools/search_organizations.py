@@ -8,14 +8,13 @@ on that walk, so `location_filter` can match any office or the primary one. One 
 one page of matches; `cursor` resumes at the next unread record.
 """
 
-import logging
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
-from opentelemetry import trace
+from mcp_observability import trace_arguments
 from pydantic import BaseModel, Field
 
 from backstop_mcp.config import SearchConfig
@@ -28,9 +27,7 @@ from backstop_mcp.features.org_people import (
 from backstop_mcp.features.org_people.dependencies import get_search_organizations_query_factory
 from backstop_mcp.features.org_people.inputs import LocationFilter
 from backstop_mcp.models import CoercedId, NonEmptyStr, published_output_schema
-
-logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
+from backstop_mcp.utils import presence_flags
 
 SearchOrganizationField = Literal[
     "id",
@@ -96,6 +93,25 @@ def _predicates(
         open_world_hint=False,
     ),
     output_schema=published_output_schema(SearchOrganizationsResolvedResponse),
+)
+@trace_arguments(
+    lambda args: {
+        **presence_flags(
+            args,
+            "name",
+            "email",
+            "other_id",
+            "matching_domain",
+            "legal_name",
+            "location_filter",
+            "website",
+            "ria",
+            "internal_organization",
+            "cursor",
+        ),
+        "custom_field_count": len(args["custom_fields"] or []),
+        "exclude_custom_fields": args["exclude_custom_fields"],
+    }
 )
 async def search_organizations(
     name: Annotated[
@@ -240,38 +256,19 @@ async def search_organizations(
     skip_custom_fields = exclude_custom_fields and not custom_fields
     predicates = _predicates(custom_fields)
     chosen = frozenset(fields) if fields is not None else _DEFAULT_FIELDS
-    with _tracer.start_as_current_span("org_people.search") as span:
-        span.set_attribute("memory_custom_fields", len(predicates))
-        logger.info(
-            "org_people.search.start",
-            extra={
-                "has_name": name is not None,
-                "email": email is not None,
-                "other_id": other_id is not None,
-                "matching_domain": matching_domain is not None,
-                "legal_name": legal_name is not None,
-                "location_filter": location_filter is not None,
-                "website": website is not None,
-                "ria": ria is not None,
-                "internal_organization": internal_organization is not None,
-                "custom_fields": len(predicates),
-                "exclude_custom_fields": skip_custom_fields,
-                "cursor": cursor is not None,
-            },
-        )
-        return await search_organizations_query.run(
-            name=name,
-            email=email,
-            other_id=other_id,
-            matching_domain=matching_domain,
-            legal_name=legal_name,
-            location_filter=location_filter,
-            website=website,
-            ria=ria,
-            internal_organization=internal_organization,
-            custom_fields=predicates,
-            exclude_custom_fields=skip_custom_fields,
-            fields=chosen,
-            result_size=search_config.result_size,
-            cursor=cursor,
-        )
+    return await search_organizations_query.run(
+        name=name,
+        email=email,
+        other_id=other_id,
+        matching_domain=matching_domain,
+        legal_name=legal_name,
+        location_filter=location_filter,
+        website=website,
+        ria=ria,
+        internal_organization=internal_organization,
+        custom_fields=predicates,
+        exclude_custom_fields=skip_custom_fields,
+        fields=chosen,
+        result_size=search_config.result_size,
+        cursor=cursor,
+    )

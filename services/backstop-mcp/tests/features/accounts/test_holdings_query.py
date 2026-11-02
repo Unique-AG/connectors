@@ -10,6 +10,7 @@ rows under `data[0].attributes.accounts`, a `null` element id, `meta.totalResour
 and `included` empty.
 """
 
+import logging
 from collections.abc import Sequence
 from datetime import date
 
@@ -1168,3 +1169,122 @@ class TestDocumentedWalk:
 
         assert [row.account_id for row in listing.rows] == ["1"]
         assert listing.rows[0].investor_id is None
+
+
+_QUERY_LOGGER = "backstop_mcp.features.accounts.queries.get_holdings_query"
+
+
+def _query_records(
+    caplog: pytest.LogCaptureFixture, *, level: int = logging.DEBUG
+) -> list[logging.LogRecord]:
+    return [
+        record
+        for record in caplog.records
+        if record.name == _QUERY_LOGGER and record.levelno >= level
+    ]
+
+
+class TestFallbackLogging:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_failed_figures_log_one_warning_per_call_with_sample_ids(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        account_ids = [str(1000 + index) for index in range(7)]
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                *(_account(account_id, owner_id=_OWNER_ID) for account_id in account_ids),
+                included=[_owner(_OWNER_ID, name="Tailspin Investments")],
+            )
+        )
+        for account_id in account_ids:
+            respx.get(f"{BASE_URL}/accounts/{account_id}/values").mock(
+                return_value=httpx.Response(500, json={"errors": []})
+            )
+            respx.get(f"{BASE_URL}/accounts/{account_id}/percentageOfFundHistory").mock(
+                return_value=_series(0.25)
+            )
+        _table_unavailable()
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await make_get_holdings_query(client).run(owner_id=_OWNER_ID)
+
+        [warning] = [
+            record
+            for record in _query_records(caplog, level=logging.WARNING)
+            if record.message == "Holdings figures failed"
+        ]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == account_ids[:5]
+        details = [r for r in _query_records(caplog) if r.message == "Holdings figure failed"]
+        assert len(details) == 7
+        assert {record.levelno for record in details} == {logging.DEBUG}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_no_failed_figure_logs_no_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_page(
+                _account("1", owner_id=_OWNER_ID),
+                included=[_owner(_OWNER_ID, name="Tailspin Investments")],
+            )
+        )
+        _empty_series("1")
+        _table_unavailable()
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await make_get_holdings_query(client).run(owner_id=_OWNER_ID)
+
+        assert [r.message for r in _query_records(caplog, level=logging.WARNING)] == [
+            "Holdings table unavailable, using documented walk"
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_an_unavailable_table_from_backstop_is_a_warning_without_the_error_text(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_ACCOUNTS_URL).mock(return_value=_page())
+        _table_unavailable()
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await make_get_holdings_query(client).run(owner_id=_OWNER_ID)
+
+        [record] = _query_records(caplog, level=logging.WARNING)
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["owner_id"] == _OWNER_ID
+        assert "error" not in record.__dict__
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_table_that_contradicts_itself_is_an_error(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_TABLE_URL).mock(return_value=_table(_row("1"), allCount=5))
+        respx.get(_ACCOUNTS_URL).mock(return_value=_page())
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await make_get_holdings_query(client).run(owner_id=_OWNER_ID)
+
+        [record] = _query_records(caplog, level=logging.WARNING)
+        assert record.levelno == logging.ERROR
+        assert record.message == "Holdings table unavailable, using documented walk"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_rows_without_an_account_id_log_a_sentence_with_counts(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(_TABLE_URL).mock(
+            return_value=_table(_row("28435967"), _row("ignored", account=None))
+        )
+
+        with caplog.at_level(logging.DEBUG, logger=_QUERY_LOGGER):
+            await make_get_holdings_query(client).run(owner_id=_OWNER_ID)
+
+        [record] = _query_records(caplog, level=logging.WARNING)
+        assert record.message == "Holdings table rows without account id"
+        assert record.__dict__["dropped"] == 1
+        assert record.__dict__["returned"] == 2

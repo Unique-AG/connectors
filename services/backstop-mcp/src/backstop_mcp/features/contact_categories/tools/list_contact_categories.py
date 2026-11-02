@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.features.contact_categories import (
@@ -21,6 +22,9 @@ from backstop_mcp.models import published_output_schema
         open_world_hint=False,
     ),
     output_schema=published_output_schema(ListContactCategoriesResponse),
+)
+@trace_arguments(
+    lambda args: {"has_search": args["search"] is not None, "refresh": args["refresh"]}
 )
 async def list_contact_categories(
     search: Annotated[

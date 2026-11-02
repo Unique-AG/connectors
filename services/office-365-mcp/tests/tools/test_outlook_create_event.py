@@ -2278,7 +2278,7 @@ class TestTheSchemaItPublishes:
             "time_zone",
             "attendees",
             "optional_attendees",
-            "body_html",
+            "body",
             "location",
             "all_day",
             "online_meeting",
@@ -2539,9 +2539,7 @@ class TestHowItDeclaresItself:
             in lowered
         )
 
-        body_html = cast(
-            "str", _object(_object(parameters["properties"])["body_html"])["description"]
-        )
+        body_html = cast("str", _object(_object(parameters["properties"])["body"])["description"])
         assert "attach anything to this event" in body_html.casefold()
         assert "attached file" in body_html.casefold()
 

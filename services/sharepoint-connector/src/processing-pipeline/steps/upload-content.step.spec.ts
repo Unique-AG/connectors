@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
 import type { DriveItem, ListItem } from '../../microsoft-apis/graph/types/sharepoint.types';
+import { SharepointRestClientService } from '../../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import { Smeared } from '../../utils/smeared';
@@ -18,6 +19,7 @@ describe('UploadContentStep', () => {
   let mockHttpClientService: HttpClientService;
   let mockUniqueFilesService: UniqueFilesService;
   let mockApiService: GraphApiService;
+  let mockRestClientService: SharepointRestClientService;
 
   const mockDriveItem: DriveItem = {
     '@odata.etag': '"82009a9a-6cb2-4fe2-88fa-37d935120df6,7"',
@@ -164,6 +166,29 @@ describe('UploadContentStep', () => {
     },
   };
 
+  const baseAttachmentContext: ProcessingContext = {
+    ...baseListItemContext,
+    correlationId: 'c3',
+    mimeType: 'text/csv',
+    htmlContent: undefined,
+    fileSize: 2048,
+    pipelineItem: {
+      itemType: 'listItemAttachment' as const,
+      item: { ...mockListItem, id: '4' },
+      siteId: new Smeared('site-1', false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'report.csv',
+      subsiteRelativePath: 'Sub',
+      attachment: {
+        absoluteUrl:
+          'https://contoso.sharepoint.com/sites/test-site/Sub/Lists/Procedures/Attachments/4/report.csv',
+        size: 2048,
+      },
+    },
+  };
+
   const createMockResponseBody = () =>
     ({
       text: vi.fn().mockResolvedValue(''),
@@ -200,12 +225,21 @@ describe('UploadContentStep', () => {
       .impl(() => ({
         getFileContentStream: vi.fn().mockResolvedValue(Readable.from(Buffer.from('test content'))),
       }))
+      .mock(SharepointRestClientService)
+      .impl(() => ({
+        downloadListItemAttachment: vi
+          .fn()
+          .mockResolvedValue(Readable.from(Buffer.from('a,b\n1,2'))),
+      }))
       .compile();
 
     step = unit;
     mockHttpClientService = unitRef.get(HttpClientService) as unknown as HttpClientService;
     mockUniqueFilesService = unitRef.get(UniqueFilesService) as unknown as UniqueFilesService;
     mockApiService = unitRef.get(GraphApiService) as unknown as GraphApiService;
+    mockRestClientService = unitRef.get(
+      SharepointRestClientService,
+    ) as unknown as SharepointRestClientService;
   });
 
   describe('execute', () => {
@@ -365,6 +399,60 @@ describe('UploadContentStep', () => {
         await expect(step.execute(contextWithoutUrl)).rejects.toThrow(
           'Upload URL not found - content registration may have failed',
         );
+      });
+    });
+
+    describe('listItemAttachment uploads', () => {
+      it('downloads a subsite attachment from the subsite web and streams it', async () => {
+        const result = await step.execute({ ...baseAttachmentContext });
+
+        expect(mockRestClientService.downloadListItemAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 'test-site/Sub' }),
+          'sites',
+          'list-1',
+          '4',
+          'report.csv',
+        );
+        expect(mockHttpClientService.request).toHaveBeenCalledWith(
+          'https://storage.example.com/upload?key=encrypted-key',
+          expect.objectContaining({
+            method: 'PUT',
+            body: expect.any(Readable),
+            headers: {
+              'Content-Type': 'text/csv',
+              'Content-Length': '2048',
+              'x-ms-blob-type': 'BlockBlob',
+            },
+          }),
+        );
+        expect(result.uploadSucceeded).toBe(true);
+      });
+
+      it('downloads a root site attachment from the synced site web', async () => {
+        await step.execute({
+          ...baseAttachmentContext,
+          pipelineItem: { ...baseAttachmentContext.pipelineItem, subsiteRelativePath: undefined },
+        } as ProcessingContext);
+
+        expect(mockRestClientService.downloadListItemAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 'test-site' }),
+          'sites',
+          'list-1',
+          '4',
+          'report.csv',
+        );
+      });
+
+      it('does not download an attachment whose MIME type is not allowed', async () => {
+        const contextWithBadMimeType = {
+          ...baseAttachmentContext,
+          mimeType: 'application/x-executable',
+        } as ProcessingContext;
+
+        await expect(step.execute(contextWithBadMimeType)).rejects.toThrow(
+          'MIME type application/x-executable is not allowed',
+        );
+        expect(mockRestClientService.downloadListItemAttachment).not.toHaveBeenCalled();
       });
     });
   });

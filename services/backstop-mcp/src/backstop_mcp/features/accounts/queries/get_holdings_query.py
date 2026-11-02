@@ -19,6 +19,8 @@ import logging
 from collections.abc import Callable, Sequence
 from datetime import date
 
+from mcp_observability import failure_level, traced
+
 from backstop_mcp.backstop_client import (
     BackstopAuthError,
     BackstopClient,
@@ -47,6 +49,7 @@ from backstop_mcp.features.accounts.internal_dto import (
     ShareDto,
 )
 from backstop_mcp.features.accounts.utils import fetch_series, tenure_runs
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +88,15 @@ class GetHoldingsQuery:
         self._client: BackstopClient = client
         self._clock: Callable[[], date] = clock
 
+    @traced(
+        arguments=("owner_id", "include_closed"),
+        result=lambda listing: {
+            "source": listing.source,
+            "returned": len(listing.rows),
+            "closed_omitted": listing.closed_omitted,
+            "rows_dropped": listing.rows_dropped,
+        },
+    )
     async def run(self, *, owner_id: str, include_closed: bool = False) -> HoldingListingDto:
         """`owner_id` should be a resolved party id; an unresolved one returns "owns nothing"."""
         try:
@@ -100,8 +112,9 @@ class GetHoldingsQuery:
             # counts-versus-rows contradiction, and a 401 that re-verified
             # (`BackstopTransientAuthError`) all mean the same thing here — the unsupported
             # endpoint did not answer usably, so use the documented one.
-            logger.warning(
-                "accounts.holdings.table_unavailable_using_documented_walk",
+            logger.log(
+                failure_level(exc),
+                "Holdings table unavailable, using documented walk",
                 extra={"owner_id": owner_id},
                 exc_info=exc,
             )
@@ -121,7 +134,7 @@ class GetHoldingsQuery:
         rows_dropped = len(table.accounts) - len(all_rows)
         if rows_dropped:
             logger.warning(
-                "accounts.holdings_table.rows_without_account_id",
+                "Holdings table rows without account id",
                 extra={
                     "entity_id": owner_id,
                     "dropped": rows_dropped,
@@ -130,7 +143,7 @@ class GetHoldingsQuery:
             )
         rows = all_rows if include_closed else tuple(row for row in all_rows if not row.closed)
         logger.info(
-            "accounts.holdings_table.fetched",
+            "Fetched holdings table",
             extra={
                 "entity_id": owner_id,
                 "rows": len(rows),
@@ -173,6 +186,7 @@ class GetHoldingsQuery:
             if isinstance(result, BaseException):
                 raise result
             rows.append(result)
+        self._warn_about_failed_figures(rows)
         return HoldingListingDto(
             rows=tuple(rows),
             closed_omitted=listing.closed_omitted,
@@ -269,13 +283,21 @@ class GetHoldingsQuery:
             # no share-of-fund is still the answer to "what do they hold". The reason is
             # carried so the omission does not read as "Backstop publishes no number".
             message = f"{type(settled).__name__}: {settled}"
-            logger.warning(
-                "accounts.holdings.fallback_series_failed",
+            logger.debug(
+                "Holdings figure failed",
                 extra={"account_id": account_id, "figure": field},
                 exc_info=settled,
             )
             return None, HoldingFigureErrorDto(figure=field, message=message)
         return settled, None
+
+    def _warn_about_failed_figures(self, rows: Sequence[HoldingRowDto]) -> None:
+        account_ids = [row.account_id for row in rows if row.figure_errors]
+        if account_ids:
+            logger.warning(
+                "Holdings figures failed",
+                extra={"count": len(account_ids), "sample_ids": sample_ids(account_ids)},
+            )
 
     def _reject_contradictory_counts(
         self, table: AccountTableDataAttributes, *, entity_id: str

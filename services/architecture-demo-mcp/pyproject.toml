@@ -6,10 +6,10 @@ description = "Reference MCP showing every scaffold layer against Tiingo market 
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
 dependencies = [
-    "alembic==1.20.0",
+    "alembic==1.20.1",
     "asyncpg==0.32.0",
-    "fastmcp==4.1.3",
-    "httpx2==2.14.0",
+    "fastmcp==4.1.4",
+    "httpx2==2.16.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
@@ -18,12 +18,12 @@ dependencies = [
     "pydantic-settings==2.16.1",
     "pydantic==2.14.1",
     "pyyaml==6.0.3",
-    "sqlalchemy[asyncio]==2.1.4",
-    "starlette==1.9.0",
+    "sqlalchemy[asyncio]==2.1.6",
+    "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.44.1",
-    "unique-sdk==2026.44.1",
-    "unique-toolkit[monitoring,otel]==2026.44.1",
+    "unique-mcp==2026.44.2",
+    "unique-sdk==2026.44.2",
+    "unique-toolkit[monitoring,otel]==2026.44.2",
     "uvicorn[standard]==0.54.0",
 ]
 
@@ -41,9 +41,9 @@ dev = [
     "mcp-architecture==0.1.0",
     "mcp-openapi[codegen]==0.1.0",
     "poethepoet==0.49.0",
-    "pytest-asyncio==1.4.0",
-    "pytest==9.1.1",
-    "ruff==0.17.0",
+    "pytest-asyncio==1.4.1",
+    "pytest==9.2.0",
+    "ruff==0.17.3",
 ]
 
 [tool.pytest.ini_options]

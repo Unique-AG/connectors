@@ -4,7 +4,7 @@ import time
 from datetime import date
 from typing import cast
 
-from opentelemetry import trace
+from mcp_observability import identifiable_value, traced
 
 from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.reports.api_responses import ReportHeaderAttributes, ReportResource
@@ -16,7 +16,6 @@ from backstop_mcp.features.reports.queries.report_run_cache import (
 from backstop_mcp.features.reports.responses import RunReportPendingResponse, RunReportResponse
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 DEFAULT_REPORT_PAGE_SIZE = 100
 MAX_REPORT_PAGE_SIZE = 500
@@ -54,6 +53,11 @@ class RunReportQuery:
         self._runs: ReportRunCache = run_cache
         self._wait_seconds: float = wait_seconds
 
+    @traced(
+        arguments=("as_of_date", "limit", "offset"),
+        identifying=("report_name",),
+        result=lambda report: {"pending": type(report) is RunReportPendingResponse},
+    )
     async def run(
         self,
         *,
@@ -64,50 +68,43 @@ class RunReportQuery:
     ) -> RunReportResponse | RunReportPendingResponse:
         assert 1 <= limit <= MAX_REPORT_PAGE_SIZE
         assert offset >= 0
-        with _tracer.start_as_current_span("reports.query.run") as span:
-            span.set_attribute("report_name", report_name)
-            span.set_attribute("as_of_date", as_of_date.isoformat())
-            span.set_attribute("limit", limit)
-            span.set_attribute("offset", offset)
-            key = ReportRunKey(
-                caller=await self._client.caller_username(),
+        key = ReportRunKey(
+            caller=await self._client.caller_username(),
+            report_name=report_name,
+            as_of_date=as_of_date,
+            limit=limit,
+            offset=offset,
+        )
+        deadline = time.monotonic() + self._wait_seconds
+        run = self._join_or_start(key)
+        while True:
+            # `asyncio.wait` never cancels the run, on timeout or when this call is cancelled.
+            await asyncio.wait({run.task}, timeout=max(0.0, deadline - time.monotonic()))
+            if not run.task.cancelled():
+                break
+            # Evicted: join or start the replacement, so the next call has one to collect.
+            run = self._join_or_start(key)
+            if time.monotonic() >= deadline:
+                break
+        if not run.task.done():
+            running_seconds = round(time.monotonic() - run.started_at)
+            logger.info(
+                "Report run pending",
+                extra={
+                    "report_name": identifiable_value(report_name),
+                    "as_of_date": as_of_date.isoformat(),
+                    "running_seconds": running_seconds,
+                },
+            )
+            return RunReportPendingResponse(
                 report_name=report_name,
                 as_of_date=as_of_date,
                 limit=limit,
                 offset=offset,
+                running_seconds=running_seconds,
             )
-            span.set_attribute("joined", self._runs.get(key) is not None)
-            deadline = time.monotonic() + self._wait_seconds
-            run = self._join_or_start(key)
-            while True:
-                # `asyncio.wait` never cancels the run, on timeout or when this call is cancelled.
-                await asyncio.wait({run.task}, timeout=max(0.0, deadline - time.monotonic()))
-                if not run.task.cancelled():
-                    break
-                # Evicted: join or start the replacement, so the next call has one to collect.
-                run = self._join_or_start(key)
-                if time.monotonic() >= deadline:
-                    break
-            if not run.task.done():
-                running_seconds = round(time.monotonic() - run.started_at)
-                span.set_attribute("pending", True)
-                logger.info(
-                    "reports.run.pending",
-                    extra={
-                        "report_name": report_name,
-                        "as_of_date": as_of_date.isoformat(),
-                        "running_seconds": running_seconds,
-                    },
-                )
-                return RunReportPendingResponse(
-                    report_name=report_name,
-                    as_of_date=as_of_date,
-                    limit=limit,
-                    offset=offset,
-                    running_seconds=running_seconds,
-                )
-            self._runs.discard(key, run)
-            return run.task.result()
+        self._runs.discard(key, run)
+        return run.task.result()
 
     def _join_or_start(self, key: ReportRunKey) -> ReportRun:
         run = self._runs.get(key)
@@ -134,6 +131,12 @@ class RunReportQuery:
         if not run.task.cancelled() and run.task.exception() is not None:
             self._runs.discard(key, run)
 
+    @traced(
+        name="RunReportQuery.fetch",
+        arguments=("as_of_date", "limit", "offset"),
+        identifying=("report_name",),
+        result=lambda report: {"row_count": report.row_count},
+    )
     async def _fetch(
         self,
         *,
@@ -142,64 +145,72 @@ class RunReportQuery:
         limit: int,
         offset: int,
     ) -> RunReportResponse:
-        with _tracer.start_as_current_span("reports.query.fetch"):
-            page = await self._client.fetch_page(
-                "/reports",
-                schema=ReportResource,
-                params={
-                    "filter[reportName][eq]": report_name,
-                    "filter[asOfDate][eq]": as_of_date.isoformat(),
-                },
-                page_size=limit,
-                offset=offset,
-            )
-            header: list[ReportHeaderAttributes] = []
-            records: list[dict[str, object]] = []
-            # Backstop's offset counts values it sent, not rows we could read; advancing by
-            # len(records) would re-request each dropped slot and duplicate the rest.
-            consumed = 0
-            for report in page.items:
-                result = report.attributes.result
-                if result is None:
+        page = await self._client.fetch_page(
+            "/reports",
+            schema=ReportResource,
+            params={
+                "filter[reportName][eq]": report_name,
+                "filter[asOfDate][eq]": as_of_date.isoformat(),
+            },
+            page_size=limit,
+            offset=offset,
+        )
+        header: list[ReportHeaderAttributes] = []
+        records: list[dict[str, object]] = []
+        # Backstop's offset counts values it sent, not rows we could read; advancing by
+        # len(records) would re-request each dropped slot and duplicate the rest.
+        consumed = 0
+        unreadable = 0
+        for report in page.items:
+            result = report.attributes.result
+            if result is None:
+                continue
+            if not header:
+                header = result.header
+            for value in result.values:
+                consumed += 1
+                if not isinstance(value, dict):
+                    unreadable += 1
+                    logger.debug(
+                        "Report row unreadable", extra={"row_offset": offset + consumed - 1}
+                    )
                     continue
-                if not header:
-                    header = result.header
-                for value in result.values:
-                    consumed += 1
-                    if not isinstance(value, dict):
-                        logger.warning("reports.row.unreadable", extra={"report_name": report_name})
-                        continue
-                    records.append(cast("dict[str, object]", value))
-            columns = self._columns(header, records)
-            rows = tuple(tuple(record.get(key) for key in columns) for record in records)
-            total = page.total_count
-            next_offset = (
-                offset + consumed
-                if total is not None and consumed > 0 and offset + consumed < total
-                else None
+                records.append(cast("dict[str, object]", value))
+        if unreadable:
+            logger.warning(
+                "Skipped unreadable report rows",
+                extra={"report_name": identifiable_value(report_name), "count": unreadable},
             )
-            fetched = RunReportResponse(
-                report_name=report_name,
-                as_of_date=as_of_date,
-                columns=tuple(columns.values()),
-                rows=rows,
-                row_count=len(rows),
-                total=total,
-                offset=offset,
-                next_offset=next_offset,
-            )
-            logger.info(
-                "reports.fetched",
-                extra={
-                    "report_name": report_name,
-                    "as_of_date": as_of_date.isoformat(),
-                    "offset": offset,
-                    "limit": limit,
-                    "row_count": fetched.row_count,
-                    "total": fetched.total,
-                },
-            )
-            return fetched
+        columns = self._columns(header, records)
+        rows = tuple(tuple(record.get(key) for key in columns) for record in records)
+        total = page.total_count
+        next_offset = (
+            offset + consumed
+            if total is not None and consumed > 0 and offset + consumed < total
+            else None
+        )
+        fetched = RunReportResponse(
+            report_name=report_name,
+            as_of_date=as_of_date,
+            columns=tuple(columns.values()),
+            rows=rows,
+            row_count=len(rows),
+            total=total,
+            offset=offset,
+            next_offset=next_offset,
+        )
+        logger.info(
+            "Fetched report",
+            extra={
+                "report_name": identifiable_value(report_name),
+                "as_of_date": as_of_date.isoformat(),
+                "offset": offset,
+                "limit": limit,
+                "row_count": fetched.row_count,
+                "total": fetched.total,
+            },
+        )
+        return fetched
 
     def _columns(
         self, header: list[ReportHeaderAttributes], records: list[dict[str, object]]

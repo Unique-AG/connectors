@@ -4,6 +4,8 @@ from datetime import date
 import httpx
 import pytest
 import respx
+from mcp_observability import identifiable_value
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from backstop_mcp.backstop_client import BackstopApiError, BackstopClient
 from backstop_mcp.features.accounts import ProductFetchDto
@@ -390,3 +392,25 @@ class TestSearchProductsByIds:
         assert _ids(by_short_name.products) == ["2"]
         assert _ids(modified_after.products) == ["1"]
         assert same_day.products == ()
+
+
+class TestSpan:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_the_name_filter_is_pseudonymised_on_the_span(
+        self, client: BackstopClient, exporter: InMemorySpanExporter
+    ) -> None:
+        respx.get(_PRODUCTS_URL).mock(return_value=_page(_GLOBAL_US))
+
+        await make_search_products_query(client).run(name="Global", product_ids=())
+
+        [span] = [
+            span
+            for span in exporter.get_finished_spans()
+            if span.name.endswith("SearchProductsQuery.run")
+        ]
+        attributes = dict(span.attributes or {})
+        assert attributes["input.name"] == str(identifiable_value("Global"))
+        assert "Global" not in str(attributes)
+        assert attributes["input.has_modified_since"] is False
+        assert attributes["result.returned"] == 1

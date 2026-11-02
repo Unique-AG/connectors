@@ -208,7 +208,7 @@ helpers package.
 `IncludedResource` is what every feature uses to read `?include=` chips. Do not grow a
 second follow/index helper in a feature. Call-site updates in leave-alone packages are
 part of keeping that one API, not a drive-by rewrite. Warn when a chip is dropped
-(`includes.side_load.unreadable` from `include_plan`; `org_people.side_load.unreadable`
+(`Included resource unreadable` from `include_plan`; `Dropped unreadable side-loaded resources`
 when `Included.by_type` drops an employment chip).
 
 ---
@@ -607,32 +607,43 @@ that is not enough to see *which query ran* or *why a walk was empty*. Put spans
 structured logs on the feature path so a trace reads tool → resolve → query/command →
 Backstop.
 
-**Spans.** Open a span around each tool entry and each query/command `run` (and around a
-util only when it is a real unit of work, not a one-line map). Name them after the
-operation (`opportunities.get`, `opportunities.query.get`, `opportunities.command.close`),
-and set attributes the reader will filter on (`segment`, `entity_id`, `status`, counts).
-Use `opentelemetry.trace`. Do not invent a wrapper.
+**Spans.** FastMCP spans each tool call (`tools/call <tool>`). Declare on the tool, under
+`@tool`, the arguments the reader will filter on with `@trace_arguments("search_type",
+"party_id")`, and give each query/command `run` its own span with `@traced(arguments=...,
+result=lambda r: {...})`, both from `mcp_observability`. Declare names or dotted paths into an
+input model (`"person.owner_login"`); a login, email or name goes in `identifying=` and is
+hashed. Nothing is traced unless declared, and a free-text value (a search term, a note) never
+is. `create_app` checks every name and path at startup and crashes on a bad one. A lambda is the
+escape hatch for a computed value; it is not checked. Do not log to put something on a span,
+and do not open spans by hand.
 
-**Logs.** Dotted event names, structured `extra`, no interpolated messages:
+**Logs.** A fixed sentence, structured `extra`, no interpolated values: past tense for an
+outcome (`Fetched opportunities`), present for a state, no trailing period, no ids in the text.
 
 ```python
 logger.info(
-    "opportunities.fetched",
+    "Fetched opportunities",
     extra={"segment": segment, "entity_id": entity_id, "total": result.total},
 )
 logger.warning(
-    "opportunities.record.unreadable",
-    extra={"opportunity_id": opportunity.id},
-    exc_info=exc,
+    "Skipped unreadable opportunities",
+    extra={"count": len(unreadable), "sample_ids": unreadable[:5]},
 )
 ```
 
-Log at the start of a tool call and when a query finishes (what was asked, what came
-back). Warn when a record is dropped, a catalog miss is flagged, or a per-id GET fails.
-Do not log every mapped row. Do not put secrets, tokens, or raw Backstop bodies in
-`extra`. A username or login is `IdentifiableValue(login)` from `utils/` — it prints
-`sha256:<hex>` unless `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Never interpolate the raw
-login into the line.
+The tool-call middleware logs the start and the end of each tool call with its declared
+arguments, so a tool writes no `started` or `completed` line. Log when a query or command
+finishes something a reader would look for (what was asked, what came back) and when a record
+is dropped, a catalog miss is flagged or a per-id GET fails. One line per call, not per row:
+collect unreadable rows into a WARNING with `count` and `sample_ids` (at most five ids) and put
+the per-row detail at DEBUG. Do not put secrets, tokens, URLs, Backstop error text or raw
+Backstop bodies in `extra`; log the `route` (`metric_route(path)`), never the path. A username,
+login, search term or report name is `identifiable_value(value)` from `mcp_observability` —
+it prints `hmac-sha256:<hex>` (plain `sha256:<hex>` at debug) unless
+`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Log a search filter as a presence flag (`has_name`).
+A coped-with exception is `exc_info=exc`, never `str(exc)`; a broad `except Exception`
+fallback logs at `failure_level(exc)` so a bug stays an ERROR. A Backstop 4xx or 5xx is a
+WARNING.
 
 **Metrics.** Add an instrument in `metrics.py` only when a number will change a decision
 you can name: catalog TTL vs walk cost (`CUSTOM_FIELD_SCHEMA_LOADS`, the catalog

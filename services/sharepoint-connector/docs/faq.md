@@ -57,7 +57,7 @@ Without `GroupMember.Read.All`, group-based permissions cannot be synchronized.
 
 **Answer:** SharePoint site groups have a visibility setting: "Who can view the membership of the group?"
 
-If this is **not** set to "Everyone", the connector cannot read group members.
+If this is **not** set to "Everyone", the connector cannot read group members. It syncs such a group without members, so its members lose access in Unique to content shared through it, and logs a warning that names the site and the group ids.
 
 **Solutions:**
 
@@ -116,6 +116,7 @@ sharepoint:
 | ---------------------------- | ---------------- | -------- | --------------------------------------------- |
 | `siteId`                     | Single line text | Yes      | SharePoint site ID (UUID)                     |
 | `syncColumnName`             | Single line text | Yes\*    | Column marking files for sync                 |
+| `itemNameColumnName`         | Single line text | No       | List-item folder name column. Default `Title` |
 | `ingestionMode`              | Choice           | Yes\*    | `flat` or `recursive`                         |
 | `uniqueScopeId`              | Single line text | Yes\*    | Unique scope ID                               |
 | `syncStatus`                 | Choice           | Yes\*    | `active`, `inactive`, or `deleted`            |
@@ -124,6 +125,7 @@ sharepoint:
 | `storeInternally`            | Choice           | No       | `enabled` or `disabled`                       |
 | `permissionsInheritanceMode` | Choice           | No       | Inheritance settings                          |
 | `subsitesScan`               | Choice           | No       | `enabled` or `disabled` (default: `disabled`) |
+| `listAttachmentsScan`        | Choice           | No       | `enabled` or `disabled` (default: `disabled`) |
 
 ### Are subsites automatically included?
 

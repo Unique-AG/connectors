@@ -11,10 +11,12 @@ A local `MeterProvider` is used rather than `configure_metrics`, which installs 
 provider that cannot be set twice or torn down.
 """
 
+from mcp_observability import metrics_text
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import Histogram, InMemoryMetricReader
 
-from backstop_mcp.metrics import CATALOG_DURATION_VIEW
+from backstop_mcp.config import AppConfig, AppEnv
+from backstop_mcp.metrics import BACKSTOP_REQUESTS, CATALOG_DURATION_VIEW, configure_metrics
 
 _CATALOG_HISTOGRAMS = ("catalog_get_duration_seconds", "catalog_fetch_duration_seconds")
 
@@ -71,3 +73,14 @@ class TestCatalogDurationView:
         catalog_bounds = bounds["catalog_get_duration_seconds"]
         assert bounds["backstop_request_duration_seconds"] != catalog_bounds
         assert bounds["backstop_concurrency_wait_seconds"] != catalog_bounds
+
+
+class TestServedRegistry:
+    def test_a_backstop_metric_is_in_what_metrics_serves(self) -> None:
+        """`/metrics` is `metrics_text()`. `create_app` calls `configure_metrics` once per process
+        too, so calling it here installs nothing new."""
+        configure_metrics(AppConfig(app_env=AppEnv.DEVELOPMENT))
+
+        BACKSTOP_REQUESTS.add(1, {"method": "GET", "route": "/people", "status": 200})
+
+        assert "backstop_requests_total" in metrics_text().decode()

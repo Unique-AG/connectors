@@ -32,7 +32,7 @@ print(heading + ":\n" + "\n".join(f"  {line}" for line in lines))
 
 if os.environ.get("GITHUB_ACTIONS") == "true":
     print(
-        f"::warning title=Python version drift::{heading}. Run `uv run poe upgrade` to align them."
+        f"::warning title=Python version drift::{heading}. Run `uvx --from poethepoet==0.49.0 poe upgrade` to align them."
     )
     with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as summary:
         summary.write(f"### {heading}\n\n" + "\n".join(f"- {line}" for line in lines) + "\n")

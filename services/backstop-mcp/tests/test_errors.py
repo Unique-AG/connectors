@@ -1,37 +1,53 @@
+import logging
 from datetime import UTC, datetime
 from typing import override
 
 import httpx
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
 )
-
-
-class _Schema(BaseModel):
-    name: str
+from backstop_mcp.features.tasks import TaskAttributes
 
 
 class TestBackstopResponseSchemaError:
-    def test_message_includes_path_and_schema_name(self) -> None:
+    def test_message_names_the_schema_and_failed_fields_only(self) -> None:
         try:
-            _Schema.model_validate({})
+            TaskAttributes.model_validate({"title": 42, "status": "Open"})
         except ValidationError as exc:
             cause = exc
         else:
             raise AssertionError("expected ValidationError")
 
-        error = BackstopResponseSchemaError("/parties/123", _Schema.__name__, cause)
+        error = BackstopResponseSchemaError(
+            "/tasks?filter[entityId][eq]=org-1", "TaskAttributes", cause
+        )
 
-        assert error.path == "/parties/123"
-        assert error.schema_name == "_Schema"
+        assert error.path == "/tasks?filter[entityId][eq]=org-1"
+        assert error.schema_name == "TaskAttributes"
         assert error.cause is cause
-        assert "/parties/123" in str(error)
-        assert "_Schema" in str(error)
+        assert str(error) == (
+            "Backstop response failed schema validation against 'TaskAttributes' "
+            + "at title (string_type, got int)"
+        )
+
+    def test_message_lists_ten_failed_fields_and_counts_the_rest(self) -> None:
+        try:
+            TypeAdapter(list[TaskAttributes]).validate_python([{"title": 1}] * 12)
+        except ValidationError as exc:
+            cause = exc
+        else:
+            raise AssertionError("expected ValidationError")
+
+        error = BackstopResponseSchemaError("/tasks", "list[TaskAttributes]", cause)
+
+        assert "9.title (string_type, got int)" in str(error)
+        assert "10.title" not in str(error)
+        assert str(error).endswith(" and 2 more")
 
 
 class TestParseJsonApiErrorWellFormed:
@@ -147,6 +163,23 @@ class TestParseJsonApiErrorMalformedBody:
         assert len(error.errors) == 1
         assert error.errors[0].message is None
 
+    def test_a_body_that_fails_the_error_schema_logs_the_status_but_not_the_body(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        response = httpx.Response(500, json={"errors": "canary-leak-detail"})
+
+        with caplog.at_level(logging.WARNING):
+            BackstopApiError.from_response(response)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Backstop error body failed schema validation"
+        )
+        assert record.__dict__["status_code"] == 500
+        assert record.exc_info is not None
+        assert "error" not in record.__dict__
+
 
 class TestParseJsonApiErrorRateLimit:
     def test_recognizes_concurrency_limit_kind(self) -> None:
@@ -230,6 +263,25 @@ class TestParseJsonApiErrorRateLimit:
 
         assert isinstance(error, BackstopRateLimitError)
         assert error.retry_after_seconds is None
+
+    def test_unparseable_retry_after_logs_without_the_header_value(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        response = httpx.Response(
+            429,
+            headers={"Retry-After": "not-a-number"},
+            json={"errors": [{"detail": "Too many requests"}]},
+        )
+
+        with caplog.at_level(logging.WARNING):
+            BackstopApiError.from_response(response)
+
+        record = next(
+            item
+            for item in caplog.records
+            if item.message == "Ignored unparseable Retry-After header"
+        )
+        assert "not-a-number" not in str(record.__dict__)
 
     def test_retry_after_http_date(self, monkeypatch: pytest.MonkeyPatch) -> None:
         now = datetime(2026, 8, 7, 12, 0, 0, tzinfo=UTC)

@@ -225,4 +225,64 @@ describe('ContentRegistrationStep', () => {
       }),
     );
   });
+
+  it('writes parent list fields as metadata for an attachment', async () => {
+    const { unit } = await TestBed.solitary(ContentRegistrationStep)
+      .mock(ConfigService)
+      .impl(() => ({
+        get: vi.fn((k: string) => {
+          if (k === 'sharepoint.baseUrl') {
+            return 'https://contoso.sharepoint.com';
+          }
+          if (k === 'unique.serviceAuthMode') {
+            return 'external';
+          }
+          return undefined;
+        }),
+      }))
+      .mock(UniqueFileIngestionService)
+      .impl(() => uniqueFileIngestionServiceMock)
+      .compile();
+
+    const context = createMockContext();
+    context.pipelineItem = {
+      itemType: 'listItemAttachment',
+      item: {
+        ...createMockListItem(),
+        fields: {
+          ...createMockListItem().fields,
+          DocStatus: 'Published',
+          Expiry: '2027-01-01',
+        },
+      },
+      siteId: new Smeared('site', false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'policy.pdf',
+      attachment: {
+        absoluteUrl: 'https://contoso.sharepoint.com/sites/Contoso/Attachments/f1/policy.pdf',
+        size: 20,
+      },
+    };
+
+    await unit.execute(context);
+
+    expect(uniqueFileIngestionServiceMock.registerContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          DocStatus: 'Published',
+          Expiry: '2027-01-01',
+          Title: 'Test Title',
+          Filename: 'policy.pdf',
+          DriveId: 'list-1',
+          ItemInternalId: 'f1',
+          Path: '/Policy',
+          Url: 'https://contoso.sharepoint.com/sites/Contoso/Attachments/f1/policy.pdf',
+          Link: 'https://contoso.sharepoint.com/sites/Contoso/Attachments/f1/policy.pdf',
+          ModerationStatus: ModerationStatus.Approved,
+        }),
+      }),
+    );
+  });
 });

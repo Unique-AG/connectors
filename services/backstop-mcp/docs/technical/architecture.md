@@ -101,7 +101,7 @@ then adds four, outermost first:
 1. **Request body limit**, 4 MiB, the same cap as the MCP SDK's streamable HTTP transport. It also
    bounds the unauthenticated login POST.
 2. **OpenTelemetry ASGI** instrumentation.
-3. **HTTP request metrics** from `unique_mcp.monitoring.setup_ops`.
+3. **HTTP request metrics** from `mcp_observability.setup_ops`.
 4. **Session-revoked rewrite.** When a tool call confirms the user's Backstop credential is dead,
    this turns the in-flight `200` into `401` so the client reconnects at once. See
    [Authentication: When Backstop rejects the credential](../operator/authentication.md#When-Backstop-rejects-the-credential).
@@ -245,14 +245,68 @@ See [Authentication: Data stored](../operator/authentication.md#Data-Stored).
 
 ### Logs
 
-Structured JSON on stderr, through `unique_mcp.logging` (the chart labels pods so Loki parses it).
-Events use dotted names with fields in `extra`, for example `auth.login.succeeded`,
-`backstop.request.failed`, `backstop.auth_recheck.decision`, `resolution.elicit.timed_out`,
-`tenant_guidance.applied`. Tool-level events conceal Backstop logins as `sha256:<hex>` unless
-`LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Backstop client events (`backstop.request.*`,
-`backstop.auth_recheck.*`) currently carry the username in clear. API tokens are never logged.
+Structured JSON on stderr, through `mcp_observability.configure_logging` (the chart labels pods so
+Loki parses it). FastMCP, uvicorn and Python warnings join the same stream.
 
-Each tool call also logs one completion line with its name, status, and duration.
+A message is a fixed sentence and values stay in `extra`, never interpolated, so every occurrence of
+a line has the same `msg` and groups in Loki: `Fetched tasks for party`, `Backstop request failed`,
+`Login rejected`, `Applied tenant guidance`. Outcomes are past tense, state is present tense, with
+no trailing period and no ids in the text.
+
+`LOG_LEVEL` is the level of the `backstop_mcp` loggers. `LIBRARY_LOG_LEVELS` sets libraries over
+defaults that keep `httpx` and `httpcore` at WARNING, because their INFO lines are request URLs
+with query strings, and `sse_starlette` at INFO, because its DEBUG lines are tool results.
+FastMCP's DEBUG line that prints a tool call's arguments is dropped.
+
+Identifying values go through `identifiable_value`: Backstop logins are `hmac-sha256:<hex>`, keyed
+with a secret derived from `BACKSTOP_MCP_ENCRYPTION_KEY`, plain `sha256:<hex>` at `LOG_LEVEL=debug`,
+and the value itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. That covers the Backstop
+client's request and re-check lines and the login lines (`Login succeeded`, `Login rejected`,
+`Login throttled`), which carry the keyed username only, and every search term, `representative`,
+report name and stored login a tool logs. API tokens are never logged.
+
+What a line may carry:
+
+- Safe raw fields are Backstop record ids, our `subject`, enums defined in our code (`kind`,
+  `segment`, `mode`, `source`, `series`, `stream`, resource types), counts and lengths, presence
+  flags, the HTTP status and JSON:API `code`, route templates, durations, argument and field
+  names, figure names, the date windows the caller asked for, and an IANA `time_zone`. Search
+  filters are logged as presence flags (`has_name`) and counts, and a stage as `stage_id`.
+- No URL. The client logs the `route` template, never the path: from page 2 the path is the
+  `links.next` URL with the search filters in its query string. `path`, `url` and `next_path` reach
+  no log or span except as the argument of `metric_route()`.
+- No Backstop error text. `Backstop request failed` and `Backstop rejected the credential` keep
+  `status_code`, the JSON:API `code` and `error_count`, and drop `detail`, `title`, `errors` and the
+  body, which can echo what the caller submitted.
+
+Levels: a Backstop 4xx or 5xx or a timeout is WARNING without a stack, because it is not a bug. A
+broad `except Exception` fallback logs at `failure_level(exc)`, so a bug there is still ERROR with
+its scrubbed stack. A successful delete is WARNING on purpose, so a destructive write stands out.
+
+One line per call, not per row: unreadable rows, failed fan-out items and duplicate catalog ids
+become one WARNING per call with `count` and `sample_ids` (at most five), and the per-row detail is
+DEBUG. Tools write no `started` or `completed` line of their own; the tool-call middleware's lines
+carry the declared arguments.
+
+Exception text is kept out of logs, because a pydantic error quotes its input and a Backstop error
+can quote a record. A line logged with an exception names it in `error_type`; below ERROR it has
+no stack, and at ERROR its `err` keeps the frames and exception types but no message. A pydantic
+validation error, or one it was raised from (even `from None`), adds `failed_fields`: the path,
+the error type and the type of the input of each error, never the input, such as
+`data.3.attributes.title (string_type, got int)`. Ten are listed and `failed_field_count` gives
+the total: one broken field fails once per record, and a page holds thousands. The path is
+pydantic's own, so a model must never be keyed by a name or another value.
+`ERROR_DETAILS_POLICY=disclose` keeps the message and full stack at ERROR. It is separate from
+`LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login.
+
+`ToolCallObservabilityMiddleware`, the outermost FastMCP middleware, logs `Tool call started`
+and exactly one of `Tool call completed`, `Tool call failed` or `Tool call cancelled` per call,
+with `tool`, `argument_names`, `subject` (our internal user id), `duration_ms` and the values the
+tool's `@trace_arguments` declared. A failure is logged at its level: WARNING when the caller or
+Backstop caused it, ERROR when a developer has to act; an exception class declares its own level
+with `DeclaresFailureLevel`. An invalid argument is named in `failed_fields` without its value.
+FastMCP's own per-call failure lines and `setup_ops`'s per-call line for a tool are dropped,
+because they repeat these and can quote the caller's input.
 
 ### Metrics
 
@@ -278,10 +332,59 @@ in `server_filter_ignored`.
 
 ### Traces
 
-Several tools, queries, and commands open OpenTelemetry spans (for example `reports.run`,
-`accounts.product_investors`, `opportunity_writes.command.update`), and the ASGI middleware spans each
-HTTP request. The server does not install a trace exporter, so with the shipped
-image these spans are not exported anywhere.
+`mcp_observability.configure_tracing` installs a trace provider when an `OTEL_*` variable turns
+tracing on (see [Configuration: Tracing](../operator/configuration.md#Tracing)), before FastMCP is
+built. The ASGI middleware spans each HTTP request except `/health`, `/probe`, `/ready` and
+`/metrics`, without `send`/`receive` child spans and without a second HTTP duration histogram on
+`/metrics`. FastMCP opens a `tools/call <tool>` span inside the request, in the trace of the
+request that carried the call, and the `run` method of every query and command opens a span inside
+that, named after its class (`GetTasksForPartyQuery.run`). The Backstop client opens the only
+hand-written span.
+
+Each logical Backstop request, retries included, is one CLIENT span named
+`backstop <METHOD> <route>`, with `http.request.method`, the route template as `url.template` and
+`http.response.status_code` (a 401 included). It never carries the path, the URL or the query
+string: from page 2 the path is the `links.next` URL with the search filters. Only a 5xx or a
+transport error marks it as an error, with `error.type` and no message. Each Backstop error type
+declares how loud its tool call's failure line is with `DeclaresFailureLevel`: a schema mismatch is
+ERROR, a revoked session INFO, the others WARNING. A schema mismatch names the schema and its
+up to ten `failed_fields`, never pydantic's text, which quotes the record; the pydantic error stays on
+`.cause` and is not chained.
+
+FastMCP records every exception a tool raises on its span, with the message, the stack and the
+message again as the status description, and has no option to stop. A message can quote the
+caller's input or a Backstop record. So, unless `ERROR_DETAILS_POLICY=disclose`, the span
+processor `ErrorDetailsRedaction` rewrites each span as it ends, before export: an `exception`
+event keeps `exception.type` and a stack of frames and exception types, as an ERROR log line
+does, and loses `exception.message`; the status keeps its code and loses its description. It does
+not judge whether the caller or a bug caused the failure. The SDK ignores `set_status` once a span
+has ended and offers no way to edit events, so the processor replaces the span's private `_status`
+and `_events`. An SDK upgrade can break it; `mcp-observability`'s tests catch that.
+
+What a span carries is declared on the code it describes, from `mcp_observability`:
+
+- `@trace_arguments("search_type", "party_id", "status")`, under `@tool`, puts those arguments on
+  the `tools/call <tool>` span as `tool.argument.<name>` and on the tool call's log lines. It
+  opens no span.
+- `@traced(arguments=("search_type", "entity_id"), result=lambda r: {"total": r.total})` on a
+  query or command `run` opens a child span named `<Class>.run`, with the arguments as
+  `input.<name>` and the result as `result.<name>`. On an exception the span gets status ERROR
+  and `error.type`, no message.
+- An argument is a name, or a dotted path into a pydantic input model (`"person.owner_login"`).
+  `identifying=` values (logins, names) are hashed through `identifiable_value`. Strings,
+  numbers, booleans, `Literal`s, enums (as their value), dates (ISO) and sequences of those may
+  be declared. Nothing is traced unless declared.
+- `create_app` calls `validate_trace_declarations()`: an unknown argument or field, an annotation
+  that does not resolve or a type that cannot go on a span crashes the app at startup, naming the
+  function, the path and the reason. A test runs the same check in CI.
+- A lambda (`arguments=lambda args: {...}`) is the escape hatch for a computed value. It is not
+  checked at startup or by the type checker.
+- Tracing never fails the call: a value that cannot go on the span is skipped with one WARNING
+  (`Trace attribute skipped`) naming the function and the argument, never the value. A path
+  through `None` is skipped silently.
+
+No log line is written to a span and no span is read by the logging. The only thing they share is
+`trace_id`, `span_id` and `trace_flags` on each log line, for correlation.
 
 ## Related Documentation
 

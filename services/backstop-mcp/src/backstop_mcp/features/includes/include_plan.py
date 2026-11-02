@@ -180,7 +180,7 @@ def _include_resources[AttrT](
     )
     if not entries and resource.related_ids(planned.include.relationship):
         logger.warning(
-            "includes.side_load.unresolved",
+            "Include relationship did not resolve",
             extra={"include": planned.name, "relationship": planned.include.relationship},
         )
     return [
@@ -203,7 +203,7 @@ def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel 
     """One related resource as the field's model, or `None` if unusable."""
     if entry.type != planned.include.resource_type:
         logger.warning(
-            "includes.side_load.unexpected_type",
+            "Included resource has unexpected type",
             extra={
                 "include": planned.name,
                 "expected_type": planned.include.resource_type,
@@ -217,7 +217,7 @@ def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel 
     # as unreadable: one broken location must not look like a real one.
     if not entry.attributes.model_dump():
         logger.warning(
-            "includes.side_load.unreadable",
+            "Included resource unreadable",
             extra={"include": planned.name, "resource_type": planned.include.resource_type},
         )
         return None
@@ -225,7 +225,7 @@ def _project(*, entry: _IncludeResource, planned: _PlannedInclude) -> BaseModel 
         return planned.model.model_validate(_with_resource_id(entry))
     except ValidationError as exc:
         logger.warning(
-            "includes.side_load.unreadable",
+            "Included resource unreadable",
             extra={"include": planned.name, "resource_type": planned.include.resource_type},
             exc_info=exc,
         )

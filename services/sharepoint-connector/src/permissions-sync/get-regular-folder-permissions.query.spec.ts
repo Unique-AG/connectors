@@ -1,8 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import type { SharepointDirectoryItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import type {
+  SharepointContentItem,
+  SharepointDirectoryItem,
+} from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
 import type { DiscoveredSubsite } from '../sharepoint-synchronization/subsite-discovery.service';
+import { buildIngestionItemKey } from '../utils/sharepoint.util';
 import { Smeared } from '../utils/smeared';
 import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
 import type { Membership } from './types';
@@ -100,6 +104,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
     const permissions = [createGroupMembership('group-1', 'Test Group')];
 
     const result = query.run({
+      items: [],
       directories: [directory],
       permissionsMap: { [permissionsKey]: permissions },
       rootPath,
@@ -127,6 +132,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
     };
 
     const result = query.run({
+      items: [],
       directories: [topFolder1, topFolder2],
       permissionsMap,
       rootPath,
@@ -155,6 +161,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
     };
 
     const result = query.run({
+      items: [],
       directories: [topFolder, regularFolder],
       permissionsMap,
       rootPath,
@@ -187,6 +194,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
     };
 
     const result = query.run({
+      items: [],
       directories: [subsiteLibrary, subsiteFolder],
       permissionsMap,
       rootPath,
@@ -214,6 +222,7 @@ describe('GetRegularFolderPermissionsQuery', () => {
     );
 
     const result = query.run({
+      items: [],
       directories: [directory],
       permissionsMap: {},
       rootPath,
@@ -227,5 +236,34 @@ describe('GetRegularFolderPermissionsQuery', () => {
         `No SharePoint permissions found for directory with key ${mockSiteId}/folder-no-perms`,
       ),
     );
+  });
+
+  it('assigns the list item permissions to the item folder', () => {
+    const attachment = {
+      itemType: 'listItemAttachment',
+      siteId: new Smeared(mockSiteId, false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'policy.pdf',
+      attachment: {
+        absoluteUrl: 'https://tenant.sharepoint.com/sites/TestSite/Attachments/4/policy.pdf',
+        size: 2048,
+      },
+      item: { id: '4' },
+    } as SharepointContentItem;
+    const permissions = [createGroupMembership('group-item', 'Item Group')];
+
+    const result = query.run({
+      directories: [],
+      items: [attachment],
+      permissionsMap: { [buildIngestionItemKey(attachment)]: permissions },
+      rootPath,
+      siteName,
+      discoveredSubsites: [],
+    });
+
+    expect(result.get('/TestSite/Procedures/Policy')).toEqual(permissions);
+    expect(result.has('/TestSite/Procedures')).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import { LogsDiagnosticDataPolicy } from '../config/app.config';
 import {
   shouldDiscloseLogs,
   smear,
+  smearSharepointRestPath,
   smearSiteIdFromPath,
   smearSiteNameFromPath,
 } from './logging.util';
@@ -91,6 +92,24 @@ describe('logging utilities', () => {
     it('handles edge cases', () => {
       expect(smearSiteNameFromPath('/sites//_api/web')).toBe('/sites//_api/web');
       expect(smearSiteNameFromPath('/sites/a/_api/web')).toBe('/sites/[Smeared]/_api/web');
+    });
+  });
+
+  describe('smearSharepointRestPath', () => {
+    it('smears the site name and the attachment file name', () => {
+      expect(
+        smearSharepointRestPath(
+          "/sites/my-site/_api/web/lists(guid'list-1')/items(4)/AttachmentFiles('o''brien.pdf')/$value",
+        ),
+      ).toBe(
+        "/sites/**-site/_api/web/lists(guid'list-1')/items(4)/AttachmentFiles('*''*****.pdf')/$value",
+      );
+    });
+
+    it('leaves paths without an attachment file name smeared like smearSiteNameFromPath', () => {
+      expect(smearSharepointRestPath('/sites/my-site/_api/web/sitegroups')).toBe(
+        '/sites/**-site/_api/web/sitegroups',
+      );
     });
   });
 

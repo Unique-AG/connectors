@@ -8,7 +8,6 @@ Status is `EmploymentIndex` over those side-loads and the organization's
 false they are counted on `former_omitted` rather than listed.
 """
 
-import logging
 from http import HTTPStatus
 from typing import Annotated, Literal
 
@@ -16,6 +15,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopApiError
@@ -43,8 +43,6 @@ from backstop_mcp.features.resolution import (
 )
 from backstop_mcp.models import published_output_schema
 
-logger = logging.getLogger(__name__)
-
 type GetPeopleForPartyResponse = (
     PartyAmbiguousResponse | NotFoundResponse | OrgPeopleResolvedResponse
 )
@@ -59,6 +57,7 @@ type GetPeopleForPartyResponse = (
     ),
     output_schema=published_output_schema(GetPeopleForPartyResponse),
 )
+@trace_arguments("search_type", "party_id", "include_former", identifying=("search",))
 async def get_people_for_party(
     ctx: Context,
     party_id: Annotated[
@@ -129,10 +128,6 @@ async def get_people_for_party(
         return unresolved_party_response(result)
 
     party = result.value
-    logger.info(
-        "org_people.start",
-        extra={"entity_id": party.id, "include_former": include_former},
-    )
     try:
         listing = await get_people_for_organization_query.run(
             organization_id=party.id,
@@ -144,15 +139,6 @@ async def get_people_for_party(
         if exc.status_code == HTTPStatus.NOT_FOUND:
             return NotFoundResponse(query=party.id, scope="organizations")
         raise
-    logger.info(
-        "org_people.completed",
-        extra={
-            "entity_id": party.id,
-            "returned": len(listing.people),
-            "former_omitted": listing.former_omitted,
-            "people_omitted": listing.people_omitted,
-        },
-    )
     return OrgPeopleResolvedResponse.from_people(
         resolved=ResolvedPartyResponse.from_party(party),
         people=listing.people,

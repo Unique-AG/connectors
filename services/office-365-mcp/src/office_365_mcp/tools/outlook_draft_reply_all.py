@@ -35,6 +35,7 @@ from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
+from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -60,7 +61,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-    "body_html": "Thanks, Friday works for all of us.",
+    "body": "Thanks, Friday works for all of us.",
 }
 
 GRAPH_NOT_FOUND = (
@@ -454,13 +455,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        body_html: Annotated[
+        body: Annotated[
             str,
             Field(
                 min_length=1,
                 description=(
-                    "What to say to everyone on the message, as HTML. Escape `&`, `<` and `>`, "
-                    + "and use `<p>` or `<br>` for structure."
+                    "What to say to everyone on the message, as Markdown. This tool turns it "
+                    + "into HTML."
                 ),
             ),
         ],
@@ -503,7 +504,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await draft_reply_all(
             client,
             message_ref=message_ref,
-            body_html=body_html,
+            body_html=markdown_to_html(body),
             confirm=a_person_agrees(ctx),
             cc=cc,
             importance=importance,

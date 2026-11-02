@@ -3,6 +3,8 @@
 import logging
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiSingleResourceDocument,
     BackstopClient,
@@ -40,6 +42,11 @@ class UpdateTaskCommand:
         self._system_users_service: SystemUsersService = system_users_service
         self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
 
+    @traced(
+        arguments=("activity.kind", "activity.activity_id"),
+        identifying=("activity.assigned_user",),
+        result=lambda response: {"id": response.id},
+    )
     async def run(self, *, activity: UpdateTaskInput) -> UpdatedActivityResponse:
         handle = parse_activity_handle(activity.activity_id)
         collection, resource_id = extract_collection(handle, kind=activity.kind)
@@ -66,7 +73,7 @@ class UpdateTaskCommand:
             or None,
         )
         document = await self._client.patch(path, schema=_Document, json=payload)
-        logger.info("activity_writes.task.updated", extra={"id": document.data.id})
+        logger.info("Updated task", extra={"id": document.data.id})
         return UpdatedActivityResponse(
             id=document.data.id,
             resource_type="tasks",

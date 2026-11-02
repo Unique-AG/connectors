@@ -13,18 +13,18 @@
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
-    "@opentelemetry/auto-instrumentations-node": "0.81.0",
-    "@opentelemetry/context-async-hooks": "2.11.0",
-    "@opentelemetry/core": "2.11.0",
-    "@opentelemetry/exporter-metrics-otlp-proto": "0.222.0",
-    "@opentelemetry/exporter-prometheus": "0.222.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
-    "@opentelemetry/instrumentation": "0.222.0",
-    "@opentelemetry/propagator-b3": "2.11.0",
-    "@opentelemetry/resources": "2.11.0",
-    "@opentelemetry/sdk-metrics": "2.11.0",
-    "@opentelemetry/sdk-node": "0.222.0",
-    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@opentelemetry/auto-instrumentations-node": "0.82.0",
+    "@opentelemetry/context-async-hooks": "3.0.0",
+    "@opentelemetry/core": "3.0.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.300.0",
+    "@opentelemetry/exporter-prometheus": "0.300.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.300.0",
+    "@opentelemetry/instrumentation": "0.300.0",
+    "@opentelemetry/propagator-b3": "3.0.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-metrics": "3.0.0",
+    "@opentelemetry/sdk-node": "0.300.0",
+    "@opentelemetry/sdk-trace": "3.0.0",
     "@opentelemetry/semantic-conventions": "1.43.0",
     "async-cleanup": "1.0.0",
     "zod": "catalog:"
@@ -32,11 +32,11 @@
   "devDependencies": {
     "@opentelemetry/instrumentation-pg": "catalog:",
     "@types/node": "catalog:",
-    "dotenv": "18.0.5",
+    "dotenv": "18.0.9",
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "@opentelemetry/instrumentation-pg": "^0.74.0"
+    "@opentelemetry/instrumentation-pg": "^0.77.0"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/instrumentation-pg": {

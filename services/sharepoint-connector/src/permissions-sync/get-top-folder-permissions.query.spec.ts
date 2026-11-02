@@ -455,4 +455,32 @@ describe('GetTopFolderPermissionsQuery', () => {
       ),
     );
   });
+
+  it('aggregates attachment groups onto the list folder', () => {
+    const attachment = {
+      itemType: 'listItemAttachment',
+      siteId: new Smeared(mockSiteId, false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'policy.pdf',
+      attachment: {
+        absoluteUrl: 'https://tenant.sharepoint.com/sites/TestSite/Attachments/4/policy.pdf',
+        size: 2048,
+      },
+      item: { id: '4' },
+    } as SharepointContentItem;
+    const group = createSiteGroupMembership('readers', 'Readers');
+
+    const result = query.run({
+      items: [attachment],
+      directories: [],
+      permissionsMap: { [`${mockSiteId}/list-1::4::policy.pdf`]: [group] },
+      rootPath,
+      siteName,
+      discoveredSubsites: [],
+    });
+
+    expect(result.get('/TestSite/Procedures')).toEqual([group]);
+  });
 });

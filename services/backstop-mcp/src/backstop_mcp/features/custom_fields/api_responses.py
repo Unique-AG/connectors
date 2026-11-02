@@ -25,6 +25,7 @@ __all__ = [
     "RegularCustomFieldValues",
     "RegularCustomFieldValuesAttributes",
 ]
+from backstop_mcp.utils import sample_ids
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttribut
     if not isinstance(value, list):
         return []
     rows: list[CustomFieldValueAttributes] = []
+    unreadable_ids: list[str | None] = []
     for item in cast(list[object], value):
         if isinstance(item, CustomFieldValueAttributes):
             rows.append(item)
@@ -117,8 +119,22 @@ def _regular_custom_field_values(value: object) -> list[CustomFieldValueAttribut
             continue
         try:
             rows.append(CustomFieldValueAttributes.model_validate(item))
-        except ValidationError:
-            logger.warning("custom_fields.values.unreadable", exc_info=True)
+        except ValidationError as exc:
+            definition_id = _id_str_or_none(cast(Mapping[str, object], item).get("definitionId"))
+            unreadable_ids.append(definition_id)
+            logger.debug(
+                "Skipped unreadable custom field value",
+                extra={"definition_id": definition_id},
+                exc_info=exc,
+            )
+    if unreadable_ids:
+        logger.warning(
+            "Skipped unreadable custom field values",
+            extra={
+                "count": len(unreadable_ids),
+                "sample_ids": sample_ids(unreadable_ids),
+            },
+        )
     return rows
 
 

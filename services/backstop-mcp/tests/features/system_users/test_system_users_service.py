@@ -1,4 +1,3 @@
-import hashlib
 import logging
 
 import httpx
@@ -158,12 +157,42 @@ class TestResolveByUserName:
                 result = await system_users_service(client).resolve_by_user_name("mlucas")
 
         assert result.id == "u1"
-        messages = [record.getMessage() for record in caplog.records]
-        assert any("duplicate login" in message for message in messages)
-        joined = "\n".join(messages)
-        assert "mlucas" not in joined
-        digest = hashlib.sha256(b"mlucas").hexdigest()
-        assert f"sha256:{digest}" in joined
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert [record.getMessage() for record in warnings] == [
+            "Ignored conflicting system users for duplicate logins"
+        ]
+        assert warnings[0].__dict__["count"] == 1
+        assert warnings[0].__dict__["sample_ids"] == ["u2"]
+        assert "mlucas" not in str(warnings[0].__dict__).casefold()
+
+    @respx.mock
+    async def test_duplicate_logins_are_one_warning_with_capped_sample_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("su-resolve-dup-many")
+        respx.get(f"{base_url}/system-users").mock(
+            return_value=_collection_page(
+                _user("u0", user_name="mlucas"),
+                *(
+                    _user(f"u{index}", name=f"Other {index}", user_name="MLUCAS")
+                    for index in range(1, 8)
+                ),
+            )
+        )
+
+        with caplog.at_level(
+            logging.DEBUG,
+            logger="backstop_mcp.features.system_users.system_users_service",
+        ):
+            async with tool_client(base_url) as client:
+                await system_users_service(client).resolve_by_user_name("mlucas")
+
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert warnings[0].__dict__["count"] == 7
+        assert warnings[0].__dict__["sample_ids"] == ["u1", "u2", "u3", "u4", "u5"]
+        debug = [record for record in caplog.records if record.levelno == logging.DEBUG]
+        assert [record.__dict__["id"] for record in debug] == [f"u{index}" for index in range(1, 8)]
 
     @respx.mock
     async def test_resolve_relationship_returns_a_json_api_relationship(self) -> None:

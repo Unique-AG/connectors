@@ -2,6 +2,8 @@
 
 from typing import assert_never
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import BackstopApiError
 from backstop_mcp.features.activity_writes.commands._write_error_utils import (
     reraise_activity_write_error,
@@ -43,6 +45,9 @@ class UpdateActivityCommand:
         self._update_email_command: UpdateEmailCommand = update_email_command
         self._update_document_command: UpdateDocumentCommand = update_document_command
 
+    @traced(
+        arguments=("activity.kind", "activity.activity_id"),
+    )
     async def run(self, *, activity: UpdateActivityInput) -> UpdatedActivityResponse:
         try:
             match activity.kind:

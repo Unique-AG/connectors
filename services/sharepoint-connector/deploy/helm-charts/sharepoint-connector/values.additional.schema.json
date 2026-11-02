@@ -118,6 +118,15 @@
                   "type": "string",
                   "enum": ["enabled", "disabled"],
                   "description": "Default subsitesScan setting"
+                },
+                "listAttachmentsScan": {
+                  "type": "string",
+                  "enum": ["enabled", "disabled"],
+                  "description": "Default listAttachmentsScan setting"
+                },
+                "itemNameColumnName": {
+                  "type": "string",
+                  "description": "Default column naming the folder of a synced list item"
                 }
               },
               "additionalProperties": false
@@ -181,6 +190,17 @@
                     "enum": ["enabled", "disabled"],
                     "description": "Whether to recursively discover and sync content from subsites",
                     "default": "disabled"
+                  },
+                  "listAttachmentsScan": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to sync attachments of list items flagged with the sync column",
+                    "default": "disabled"
+                  },
+                  "itemNameColumnName": {
+                    "type": "string",
+                    "description": "Display name or internal name of the column naming the folder of a synced list item",
+                    "default": "Title"
                   }
                 },
                 "additionalProperties": false

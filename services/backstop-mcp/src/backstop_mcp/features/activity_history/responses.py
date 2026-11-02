@@ -514,7 +514,7 @@ def _cap_recipients(emails: tuple[str, ...]) -> tuple[tuple[str, ...], int | Non
     if len(emails) <= _MAX_RECIPIENTS:
         return emails, None
     logger.debug(
-        "activity_history.recipients.capped",
+        "Capped email recipients",
         extra={"total": len(emails), "kept": _MAX_RECIPIENTS},
     )
     return emails[:_MAX_RECIPIENTS], len(emails)

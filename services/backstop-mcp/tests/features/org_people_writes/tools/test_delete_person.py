@@ -1,5 +1,6 @@
 """`delete_person`: format a confirmation prompt, then delete unless elicitation was declined."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 import httpx
@@ -188,6 +189,42 @@ class TestDeletePerson:
         assert loc_1.call_count == 0
         assert loc_2.call_count == 0
         assert party.call_count == 0
+
+    @respx.mock
+    async def test_a_successful_delete_logs_a_warning(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_cascade()
+
+        with caplog.at_level(logging.INFO):
+            await delete_person(
+                ctx_no_elicitation_capability(),
+                person=_PERSON.validate_python({"search_type": "people", "party_id": _ID}),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            )
+
+        [record] = [r for r in caplog.records if r.getMessage() == "Deleted party"]
+        assert record.levelno == logging.WARNING
+
+    @respx.mock
+    async def test_a_declined_delete_logs_one_info_sentence(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_cascade()
+
+        with caplog.at_level(logging.INFO), pytest.raises(ToolError):
+            await delete_person(
+                ctx_decline(),
+                person=_PERSON.validate_python({"search_type": "people", "party_id": _ID}),
+                resolve_party_query=make_resolve_party_query(client),
+                delete_party_with_locations_command=make_command(client),
+            )
+
+        [record] = [r for r in caplog.records if r.getMessage() == "Person deletion not confirmed"]
+        assert record.levelno == logging.INFO
+        assert record.__dict__["party_id"] == _ID
+        assert [r for r in caplog.records if r.getMessage() == "Deleted party"] == []
 
     @respx.mock
     async def test_confirmed_elicitation_deletes(self, client: BackstopClient) -> None:

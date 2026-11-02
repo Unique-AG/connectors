@@ -296,12 +296,24 @@ export class FetchGroupsWithMembershipsQuery {
       `${logPrefix} Fetching site groups memberships map for ${siteGroupIds.length} site groups`,
     );
 
-    const result = pipe(
+    const { membershipsByGroupId, unreadableGroupIds } =
       await this.sharepointRestClientService.getSiteGroupsMemberships(
         rootSiteName,
         managedPath,
         siteGroupIds,
-      ),
+      );
+
+    if (unreadableGroupIds.length > 0) {
+      this.logger.warn(
+        `${logPrefix} Cannot read the members of site groups ${unreadableGroupIds.join(', ')}: ` +
+          `SharePoint answered 403. Syncing these groups without members. The groups' "Who can ` +
+          `view the membership of the group?" setting is most likely not "Everyone". Set it to ` +
+          `"Everyone", or make the app a member or owner of these groups.`,
+      );
+    }
+
+    const result = pipe(
+      membershipsByGroupId,
       mapKeys((id) =>
         groupDistinctId({
           type: 'siteGroup',

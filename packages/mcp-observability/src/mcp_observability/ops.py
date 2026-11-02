@@ -22,7 +22,9 @@ from mcp_observability.metrics import HttpMetricsMiddleware
 from mcp_observability.metrics import MetricNamespace
 from mcp_observability.metrics import metrics_text
 
-OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
+# Never counted or access-logged. An MCP whose readiness depends on its own backends serves `/ready`
+# itself, and Kubernetes calls it as often as the others.
+OPS_PATHS = frozenset({"/probe", "/health", "/ready", "/metrics"})
 
 _log = logging.getLogger("mcp_observability")
 _mcp_metrics = MetricNamespace("mcp")
@@ -104,6 +106,6 @@ async def _measured[T, R](
         if failure is None:
             _log.info("%s '%s' completed", kind, name, extra=extra)
         else:
-            # FastMCP logs an unexpected error with its traceback already, and reaches here with
-            # it wrapped in a ToolError, so this line adds only the outcome.
-            _log.warning("%s '%s' failed: %s", kind, name, failure, extra=extra)
+            # FastMCP already logs the traceback; the message can quote the input, so it stays in
+            # `exc_info`, which the output handler cleans.
+            _log.warning("%s '%s' failed", kind, name, exc_info=failure, extra=extra)

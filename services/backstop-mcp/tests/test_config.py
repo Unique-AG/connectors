@@ -14,7 +14,6 @@ from backstop_mcp.config import (
     EncryptionConfig,
     normalize_asyncpg_url,
 )
-from backstop_mcp.utils import LogsDiagnosticDataPolicy
 
 
 class TestNormalizeAsyncpgUrl:
@@ -388,22 +387,6 @@ class TestPublicBaseUrl:
 
         with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
             AppConfig()
-
-
-class TestLogsDiagnosticsDataPolicy:
-    def test_defaults_to_conceal(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("LOGS_DIAGNOSTICS_DATA_POLICY", raising=False)
-
-        config = AppConfig(app_env=AppEnv.DEVELOPMENT)
-
-        assert config.logs_diagnostics_data_policy == LogsDiagnosticDataPolicy.CONCEAL
-
-    def test_disclose_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("LOGS_DIAGNOSTICS_DATA_POLICY", "disclose")
-
-        config = AppConfig(app_env=AppEnv.DEVELOPMENT)
-
-        assert config.logs_diagnostics_data_policy == LogsDiagnosticDataPolicy.DISCLOSE
 
 
 class TestDatabaseConfigSsl:

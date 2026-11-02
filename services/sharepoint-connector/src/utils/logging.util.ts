@@ -11,6 +11,8 @@ import { LogsDiagnosticDataPolicy } from '../config/app.config';
 const SHAREPOINT_SITE_NAME_REGEX =
   /\/(sites|teams)\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/(_api|_layouts|_vti_bin)\//gi;
 
+const ATTACHMENT_FILE_NAME_REGEX = /AttachmentFiles\('((?:[^']|'')*)'\)/g;
+
 const guidPattern = regexes.guid.source.slice(2, -2);
 const SHAREPOINT_SITE_ID_REGEX = new RegExp(
   `/(sites|teams)/(${guidPattern}|[^/,]+,${guidPattern},${guidPattern})(?=/|$)`,
@@ -43,6 +45,13 @@ export function smearSiteNameFromPath(path: string): string {
         .split('/')
         .map((segment) => smear(segment))
         .join('/')}/${keyword}/`,
+  );
+}
+
+export function smearSharepointRestPath(path: string): string {
+  return smearSiteNameFromPath(path).replace(
+    ATTACHMENT_FILE_NAME_REGEX,
+    (_, fileName: string) => `AttachmentFiles('${smear(fileName)}')`,
   );
 }
 

@@ -506,7 +506,7 @@ class TestTheSchemaItPublishes:
         assert set(_properties(parameters)) == {
             "message_ref",
             "subject",
-            "body_html",
+            "body",
             "to",
             "cc",
             "importance",

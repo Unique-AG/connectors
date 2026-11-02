@@ -8,6 +8,7 @@ import Bottleneck from 'bottleneck';
 import { Config } from '../../config';
 import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
+import { columnsOf, resolveColumnName } from '../../utils/list-columns.util';
 import { getTitle } from '../../utils/list-item.util';
 import { sanitizeError } from '../../utils/normalize-error';
 import { extractSitePathInfoFromWebUrl, type ManagedPath } from '../../utils/paths.util';
@@ -67,28 +68,6 @@ export class GraphApiService {
     );
   }
 
-  public async getAllSiteItems(
-    siteId: Smeared,
-    syncColumnName: string,
-  ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
-    const logPrefix = `[Site: ${siteId}]`;
-
-    // Both scans must succeed — partial results would cause the diff to treat missing items as
-    // deletions and result in unnecessary re-ingestions. We have retries in place to handle
-    // transient errors so if any call for site fails, so does entire site scan.
-    const [aspxPages, filesResult] = await Promise.all([
-      this.getAspxPagesForSite(siteId, syncColumnName),
-      this.getAllFilesForSite(siteId, syncColumnName),
-    ]);
-
-    const items = [...aspxPages, ...filesResult.items];
-
-    this.logger.log(
-      `${logPrefix} Completed scan. Found ${items.length} total items marked for synchronization.`,
-    );
-    return { items, directories: filesResult.directories };
-  }
-
   public async getAllFilesForSite(
     siteId: Smeared,
     syncColumnName: string,
@@ -115,7 +94,7 @@ export class GraphApiService {
       const smearedDriveName = createSmeared(drive.name);
       const driveColumns = await this.getDriveColumns(drive.id);
 
-      const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
+      const resolvedColumnName = resolveColumnName(driveColumns, syncColumnName);
       if (!resolvedColumnName) {
         this.logger.log(
           `[Site: ${siteId}] Drive "${smearedDriveName}" does not have sync column "${syncColumnName}", skipping`,
@@ -177,10 +156,10 @@ export class GraphApiService {
   public async getAspxPagesForSite(
     siteId: Smeared,
     syncColumnName: string,
+    lists: List[],
   ): Promise<SharepointContentItem[]> {
     const logPrefix = `[Site: ${siteId}]`;
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
-    const lists = await this.getSiteLists(siteId);
 
     if (maxFilesToScan) {
       this.logger.warn(`Items scan limit set to ${maxFilesToScan} items for testing purpose.`);
@@ -192,8 +171,7 @@ export class GraphApiService {
       return [];
     }
 
-    const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
-    const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
+    const resolvedColumnName = resolveColumnName(columnsOf(sitePagesList), syncColumnName);
     if (!resolvedColumnName) {
       this.logger.log(
         `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
@@ -228,7 +206,8 @@ export class GraphApiService {
         (url) =>
           this.graphClient
             .api(url)
-            .select('system,name,id,displayName')
+            .select('id,name,displayName,list,system')
+            .expand('columns($select=name,displayName)')
             .top(GRAPH_API_PAGE_SIZE)
             .get(),
       );
@@ -680,16 +659,6 @@ export class GraphApiService {
     }
 
     return allItems;
-  }
-
-  private resolveSyncColumnName(columns: ListColumn[], syncColumnName: string): string | undefined {
-    const byDisplayName = columns.find((col) => col.displayName === syncColumnName);
-    if (byDisplayName) {
-      return byDisplayName.name;
-    }
-
-    const byName = columns.find((col) => col.name === syncColumnName);
-    return byName?.name;
   }
 
   private isFolder(driveItem: DriveItem): boolean {

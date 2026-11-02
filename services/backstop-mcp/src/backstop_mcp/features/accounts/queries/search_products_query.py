@@ -18,6 +18,8 @@ from datetime import date
 from http import HTTPStatus
 from urllib.parse import quote
 
+from mcp_observability import traced
+
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopApiResource,
@@ -45,6 +47,16 @@ class SearchProductsQuery:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=lambda args: {
+            "product_id_count": len(args["product_ids"]),
+            "has_modified_since": args["modified_since"] is not None,
+            "has_is_onshore": args["is_onshore"] is not None,
+            "custom_field_count": len(args["custom_fields"]),
+        },
+        identifying=("name", "product_type"),
+        result=lambda catalog: {"returned": len(catalog.products)},
+    )
     async def run(
         self,
         *,

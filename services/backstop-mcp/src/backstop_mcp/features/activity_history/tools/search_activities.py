@@ -15,6 +15,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
+from mcp_observability import failure_level, trace_arguments
 from pydantic import BaseModel, Field
 
 from backstop_mcp.backstop_client import BackstopAuthError, BackstopRateLimitError
@@ -156,6 +157,18 @@ def _row_urls(
         open_world_hint=False,
     ),
     output_schema=published_output_schema(GetSearchActivitiesResponse),
+)
+@trace_arguments(
+    lambda args: {
+        "mode": args["mode"],
+        "include_description": args["include_description"],
+        "has_search": args["search"] is not None,
+        "type_count": len(args["types"] or ()),
+        "activity_tag_count": len(args["activity_tag_ids"] or ()),
+        "author_count": len(args["authors"] or ()),
+        "attendee_count": len(args["attendees"] or ()),
+        "has_cursor": args["cursor"] is not None,
+    }
 )
 async def search_activities(
     ctx: Context,
@@ -445,15 +458,6 @@ async def search_activities(
         },
     )
 
-    logger.info(
-        "activity_history.search.start",
-        extra={
-            "mode": mode,
-            "include_description": include_description,
-            "party": None if resolved_party is None else resolved_party.id,
-            "cursor": cursor is not None,
-        },
-    )
     try:
         fetch = await search_activities_query.run(
             start_date=start_date,
@@ -482,10 +486,7 @@ async def search_activities(
         # out), and letting it propagate is the one path where the "name the fallback" contract
         # silently would not fire, on the failure an unbounded-payload UI endpoint is likeliest
         # to produce.
-        logger.warning(
-            "activity_history.search.primary_unavailable",
-            exc_info=exc,
-        )
+        logger.log(failure_level(exc), "Activity search unavailable", exc_info=exc)
         return SearchActivitiesUnavailableResponse(message=_FALLBACK_MESSAGE)
 
     aggregates = ()

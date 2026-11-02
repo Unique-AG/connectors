@@ -103,14 +103,27 @@ describe('MimeTypeResolverService', () => {
       expect(service.resolve('document.pdf', 'application/pdf')).toBe('application/pdf');
     });
 
-    it('falls back to DEFAULT_MIME_TYPE when no override matches and raw mimeType is undefined', async () => {
+    it.each([
+      ['document.pdf', 'application/pdf'],
+      ['document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      ['document.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+      [
+        'document.pptx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ],
+      ['document.txt', 'text/plain'],
+      ['notes.md', 'text/markdown'],
+      ['photo.JPG', 'image/jpeg'],
+      ['page.asp', 'application/x-asp'],
+      ['document.aspx', 'application/x-asp'],
+    ])('infers the MIME type of %s from its extension', async (fileName, expectedMimeType) => {
       const service = await buildService({ '.csv': 'text/csv' });
-      expect(service.resolve('document.pdf', undefined)).toBe(DEFAULT_MIME_TYPE);
+      expect(service.resolve(fileName, undefined)).toBe(expectedMimeType);
     });
 
-    it('falls back to DEFAULT_MIME_TYPE when overrides are empty and raw mimeType is undefined', async () => {
+    it('falls back to DEFAULT_MIME_TYPE for an unknown extension', async () => {
       const service = await buildService({});
-      expect(service.resolve('document.pdf', undefined)).toBe(DEFAULT_MIME_TYPE);
+      expect(service.resolve('document.unknown', undefined)).toBe(DEFAULT_MIME_TYPE);
     });
 
     it('returns DEFAULT_MIME_TYPE for an empty filename and undefined raw mimeType', async () => {

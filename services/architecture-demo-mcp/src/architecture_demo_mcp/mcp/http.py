@@ -25,7 +25,8 @@ def run_server(mcp: FastMCP, settings: ServerSettings) -> None:
         transport="streamable-http",
         host=settings.host,
         port=settings.port,
-        uvicorn_config={"access_log": False},
+        # `None`, not `{}`: uvicorn's default config puts its lines on plain-text handlers.
+        uvicorn_config={"access_log": False, "log_config": None},
         **_http_options(mcp, settings),
     )
 

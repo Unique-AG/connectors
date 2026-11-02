@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 import respx
@@ -8,6 +10,7 @@ from tests.features.tasks.conftest import make_get_tasks_for_party_query
 from tests.helpers import BASE_URL, recorded_requests
 
 _ORG_ID = "341764767"
+_QUERY_LOGGER = "backstop_mcp.features.tasks.queries.get_tasks_for_party_query"
 
 
 def _page(*items: dict[str, object]) -> httpx.Response:
@@ -59,6 +62,55 @@ class TestGetTasksForPartyQuery:
         assert fetched.completed_count == 1
         assert fetched.scan_truncated is False
         assert fetched.tasks[0].url is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_logs_one_fetched_line_with_counts(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        respx.get(f"{BASE_URL}/tasks").mock(
+            return_value=_page(
+                _task("t1", title="Call back", status="Open"),
+                _task("t2", title="Done item", completed=True),
+            )
+        )
+
+        with caplog.at_level(logging.INFO, logger=_QUERY_LOGGER):
+            await make_get_tasks_for_party_query(client).run(
+                search_type="organizations", entity_id=_ORG_ID, status="open"
+            )
+
+        [record] = caplog.records
+        assert record.getMessage() == "Fetched tasks for party"
+        assert record.__dict__["entity_id"] == _ORG_ID
+        assert record.__dict__["status"] == "open"
+        assert record.__dict__["total"] == 2
+        assert record.__dict__["returned"] == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_hitting_the_scan_ceiling_logs_a_warning_sentence(
+        self,
+        client: BackstopClient,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "backstop_mcp.features.tasks.queries.get_tasks_for_party_query.MAX_TASK_SCAN_RECORDS", 1
+        )
+        respx.get(f"{BASE_URL}/tasks").mock(
+            return_value=_page(_task("t1", title="Call back", status="Open"))
+        )
+
+        with caplog.at_level(logging.WARNING, logger=_QUERY_LOGGER):
+            await make_get_tasks_for_party_query(client).run(
+                search_type="organizations", entity_id=_ORG_ID
+            )
+
+        [record] = caplog.records
+        assert record.getMessage() == "Task scan ceiling reached"
+        assert record.levelno == logging.WARNING
+        assert record.__dict__["ceiling"] == 1
 
     @pytest.mark.asyncio
     @respx.mock

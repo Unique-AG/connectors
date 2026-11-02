@@ -6,6 +6,7 @@ import { ConfluencePageScanner } from '../../../src/synchronization/confluence-p
 import { ConfluenceSynchronizationService } from '../../../src/synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../../../src/synchronization/file-diff.service';
 import { IngestionService } from '../../../src/synchronization/ingestion.service';
+import { PageImageInliner } from '../../../src/synchronization/page-image-inliner';
 import { RootScopeMigrationService } from '../../../src/synchronization/root-scope-migration.service';
 import { ScopeManagementService } from '../../../src/synchronization/scope-management.service';
 import type { TenantContext } from '../../../src/tenant';
@@ -73,6 +74,8 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     blobStorage.asDispatcher(),
   );
 
+  const pageImageInliner = new PageImageInliner(tenantConfig, fakeConfluence);
+
   const scopeManagementService = new ScopeManagementService(
     tenantConfig.ingestion,
     scenario.tenant.name,
@@ -87,6 +90,7 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     contentFetcher,
     fileDiffService,
     ingestionService,
+    pageImageInliner,
     scopeManagementService,
     metrics,
   );

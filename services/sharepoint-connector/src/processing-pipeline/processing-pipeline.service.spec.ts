@@ -300,4 +300,34 @@ describe('ProcessingPipelineService', () => {
 
     expect(context?.mimeType).toBe('text/csv');
   });
+
+  it('takes an attachment MIME type from its file name and its size from the scan', async () => {
+    const attachment = {
+      itemType: 'listItemAttachment',
+      siteId: new Smeared('site-1', false),
+      driveId: 'list-1',
+      driveName: 'Procedures',
+      folderPath: '/Policy',
+      fileName: 'export.csv',
+      attachment: {
+        absoluteUrl:
+          'https://contoso.sharepoint.com/sites/Contoso/Sub/Lists/Procedures/Attachments/4/export.csv',
+        size: 2048,
+      },
+      item: {
+        id: '4',
+        webUrl: 'https://contoso.sharepoint.com/item',
+        lastModifiedDateTime: '2024-01-01T00:00:00Z',
+        createdDateTime: '2024-01-01T00:00:00Z',
+        createdBy: { user: { email: 'a@b.c', id: 'u', displayName: 'A' } },
+        fields: { '@odata.etag': 'etag', Title: 'Policy' },
+      },
+    } as SharepointContentItem;
+
+    await service.processItem(attachment, 'test-scope-id', 'new', mockSyncContext);
+
+    const context = vi.mocked(mockSteps.aspxProcessing.execute).mock.calls[0]?.[0];
+    expect(context?.mimeType).toBe('text/csv');
+    expect(context?.fileSize).toBe(2048);
+  });
 });

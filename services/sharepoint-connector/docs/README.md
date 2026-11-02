@@ -42,6 +42,10 @@ Microsoft Graph:
 - `Sites.Selected` - Fetch sites, folders and effective content of granted sites (if site-specific access is granted)
 - `Lists.SelectedOperations.Selected` - Fetch content from specifically granted document libraries (if library-specific access is granted)
 
+SharePoint REST API (list attachment sync on sites with `listAttachmentsScan` enabled, including `content_only`):
+
+- `Sites.Selected` - List and download list-item attachments. Requires certificate authentication, a site grant, and network access to `https://{tenant}.sharepoint.com/_api`. SharePoint REST rejects app-only tokens obtained with a client secret.
+
 **Permission sync** (only if permission sync is enabled):
 
 Microsoft Graph:
@@ -256,6 +260,7 @@ See [Content Sync Flow](./technical/flows.md#Content-Sync-Flow) for additional d
 ### Not Supported
 
 - Maximum 100,000 objects to sync per site
+- Attachment sync from lists with more than 5,000 items, SharePoint's list view threshold, or with item-level read permissions limited to the item's creator (see [Unsupported lists](./operator/configuration.md#Unsupported-lists))
 - Multiple SharePoint tenants (requires separate deployments)
 - Real-time synchronization (periodic scanning only)
 - Detection of sensitivity/classification levels (can be configured via Ingestion Metadata Filter on the Unique side)

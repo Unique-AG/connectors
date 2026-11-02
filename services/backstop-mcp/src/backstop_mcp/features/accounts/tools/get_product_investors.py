@@ -6,7 +6,6 @@ one request per account, capped at `_MAX_VALUED_ACCOUNTS` — so the model never
 `get_time_series` over a fund's accounts.
 """
 
-import logging
 from collections.abc import Sequence
 from typing import Annotated
 
@@ -14,7 +13,7 @@ from fastmcp import Context
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp.types import InputRequiredResult, ToolAnnotations
-from opentelemetry import trace
+from mcp_observability import trace_arguments
 from pydantic import Field
 
 from backstop_mcp.backstop_client import BackstopClient
@@ -29,9 +28,6 @@ from backstop_mcp.features.accounts import (
 from backstop_mcp.features.accounts.dependencies import get_product_investors_query_factory
 from backstop_mcp.features.resolution import NotFoundResponse, input_required
 from backstop_mcp.models import CoercedId, coerce_ids, published_output_schema
-
-logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 type GetProductInvestorsResponse = (
     ProductAmbiguousResponse | NotFoundResponse | ProductInvestorsResolvedResponse
@@ -48,6 +44,13 @@ _MAX_PRODUCTS = 25
         open_world_hint=False,
     ),
     output_schema=published_output_schema(GetProductInvestorsResponse),
+)
+@trace_arguments(
+    "include_closed",
+    "include_latest_value",
+    "exclude_custom_fields",
+    "investor_ids",
+    identifying=("products",),
 )
 async def get_product_investors(
     ctx: Context,
@@ -156,49 +159,16 @@ async def get_product_investors(
     Call like: {"products": ["NGUP"], "include_latest_value": false}
     Several vehicles: {"products": ["NWON", "NWOF"]}
     """
-    with _tracer.start_as_current_span("accounts.product_investors") as span:
-        span.set_attribute("product_count", len(products))
-        span.set_attribute("include_closed", include_closed)
-        span.set_attribute("include_latest_value", include_latest_value)
-        span.set_attribute("exclude_custom_fields", exclude_custom_fields)
-        requested_investors = coerce_ids(investor_ids)
-        span.set_attribute("investor_id_count", len(requested_investors))
-        resolved_products = await _resolve_products(ctx, client, products=products)
-        if not isinstance(resolved_products, tuple):
-            return resolved_products
-
-        logger.info(
-            "accounts.product_investors.start",
-            extra={
-                "product_ids": [item.id for item in resolved_products],
-                "include_closed": include_closed,
-                "include_latest_value": include_latest_value,
-                "exclude_custom_fields": exclude_custom_fields,
-                "investor_id_count": len(requested_investors),
-            },
-        )
-        result = await get_product_investors_query.run(
-            products=resolved_products,
-            include_closed=include_closed,
-            include_latest_value=include_latest_value,
-            exclude_custom_fields=exclude_custom_fields,
-            investor_ids=requested_investors,
-        )
-        accounts = [account for listing in result.products for account in listing.accounts]
-        logger.info(
-            "accounts.product_investors.completed",
-            extra={
-                "product_ids": [listing.product.id for listing in result.products],
-                "returned": len(accounts),
-                "closed_omitted": sum(listing.closed_omitted for listing in result.products),
-                "valued": sum(
-                    1
-                    for account in accounts
-                    if account.latest_value is not None and account.latest_value.available
-                ),
-            },
-        )
-        return result
+    resolved_products = await _resolve_products(ctx, client, products=products)
+    if not isinstance(resolved_products, tuple):
+        return resolved_products
+    return await get_product_investors_query.run(
+        products=resolved_products,
+        include_closed=include_closed,
+        include_latest_value=include_latest_value,
+        exclude_custom_fields=exclude_custom_fields,
+        investor_ids=coerce_ids(investor_ids),
+    )
 
 
 async def _resolve_products(

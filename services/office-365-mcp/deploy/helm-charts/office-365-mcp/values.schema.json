@@ -180,6 +180,38 @@
           "examples": [
             80
           ]
+        },
+        "extra": {
+          "type": "array",
+          "description": "Extra named container ports beyond http/metrics, e.g. for a caller that must be network-scoped (L3/L4) to a single route without L7 filtering. Pair with service.extraPorts to expose one on the Service.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "port"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Port name, referenced by service.extraPorts[].name as the Service targetPort. Must be a valid IANA_SVC_NAME (Kubernetes limit): lowercase alphanumeric and '-', at most 15 characters.",
+                "maxLength": 15,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                "examples": [
+                  "protected"
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "description": "Container port.",
+                "minimum": 1,
+                "maximum": 65535,
+                "examples": [
+                  8081
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -194,6 +226,38 @@
           "examples": [
             true
           ]
+        },
+        "extraPorts": {
+          "type": "array",
+          "description": "Extra named Service ports beyond http/metrics, targeting a matching ports.extra[].name container port by name.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "port"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Port name; must match a ports.extra[].name entry (used as the Service targetPort). Must be a valid IANA_SVC_NAME (Kubernetes limit): lowercase alphanumeric and '-', at most 15 characters.",
+                "maxLength": 15,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                "examples": [
+                  "protected"
+                ]
+              },
+              "port": {
+                "type": "integer",
+                "description": "Service port.",
+                "minimum": 1,
+                "maximum": 65535,
+                "examples": [
+                  81
+                ]
+              }
+            }
+          }
         },
         "type": {
           "type": "string",
@@ -580,6 +644,26 @@
     "podLabels": {
       "type": "object",
       "description": "Extra labels added to every pod"
+    },
+    "responsibility": {
+      "type": "object",
+      "description": "Teams responsible for the workload, rendered as unique.app/application-owner and unique.app/operations-owner labels on all resources and pods. The operations owner also defaults the alert team label.",
+      "properties": {
+        "application": {
+          "type": "string",
+          "description": "Team that develops the application",
+          "examples": [
+            "team-a"
+          ]
+        },
+        "operations": {
+          "type": "string",
+          "description": "Team that operates the application. An explicit alert team wins; when unset or empty it falls back to the application owner.",
+          "examples": [
+            "team-b"
+          ]
+        }
+      }
     },
     "podAnnotations": {
       "type": "object",
@@ -1003,6 +1087,29 @@
                 "description": "Volumes added only to this hook Job pod spec",
                 "items": {
                   "type": "object"
+                }
+              },
+              "argocd": {
+                "type": "object",
+                "description": "Argo CD sync options for this hook Job. When hook is set, Argo CD ignores this Job's helm.sh/hook annotations; other hook Jobs keep their Helm hook mapping.",
+                "additionalProperties": false,
+                "properties": {
+                  "hook": {
+                    "type": "string",
+                    "description": "Rendered as argocd.argoproj.io/hook",
+                    "enum": [
+                      "PreSync",
+                      "Sync",
+                      "PostSync",
+                      "SyncFail",
+                      "PostDelete",
+                      "Skip"
+                    ]
+                  },
+                  "syncWave": {
+                    "type": "integer",
+                    "description": "Rendered as argocd.argoproj.io/sync-wave"
+                  }
                 }
               }
             }
@@ -1441,7 +1548,7 @@
                     "UDP",
                     "ANY"
                   ],
-                  "default": "TCP",
+                  "default": "ANY",
                   "description": "Protocol for the ephemeral port range."
                 }
               }
@@ -1495,6 +1602,42 @@
           "description": "Map of logical name to dependent descriptor. One entry per service that calls this chart.",
           "additionalProperties": {
             "$ref": "#/$defs/internalServiceDependent"
+          }
+        }
+      }
+    },
+    "backends": {
+      "type": "object",
+      "description": "Public gateway-fronted backend endpoints this webapp calls (e.g. via base.backends.url). Distinct from internalServices, which resolves in-cluster Service DNS names; backends resolves public hostnames.",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Default public hostname (no scheme) shared by endpoints that omit their own host, e.g. gateway.qa.unique.app."
+        },
+        "endpoints": {
+          "type": "object",
+          "description": "Map of logical endpoint name to descriptor. One entry per backend this webapp calls.",
+          "additionalProperties": {
+            "$ref": "#/$defs/backendEndpoint"
+          }
+        }
+      }
+    },
+    "frontends": {
+      "type": "object",
+      "description": "Public URLs of peer frontend web apps this webapp links to for cross-app navigation (e.g. via base.frontends.url). Distinct from backends, which resolves public backend API hostnames.",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Default public hostname (no scheme) shared by apps that omit their own host, e.g. next.qa.unique.app."
+        },
+        "apps": {
+          "type": "object",
+          "description": "Map of logical peer app name to descriptor. One entry per frontend app this webapp links to.",
+          "additionalProperties": {
+            "$ref": "#/$defs/frontendApp"
           }
         }
       }
@@ -1604,6 +1747,14 @@
                 false
               ]
             },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder for provisioned dashboards (ConfigMap annotation grafana_folder). Defaults to apps.",
+              "examples": [
+                "apps",
+                "connectors"
+              ]
+            },
             "replacements": {
               "type": "object",
               "description": "Map of placeholder to resolved datasource UID. Dashboard JSON files should use %%PLACEHOLDER%% markers (e.g. %%PROMETHEUS_UID%%) instead of hardcoded UIDs. Each entry replaces a marker with the actual UID before the ConfigMap is rendered. The dedicated chart sets defaults; customer overlays override per tenant.",
@@ -1648,6 +1799,30 @@
               "examples": [
                 "uniqueapp.azurecr.io"
               ]
+            }
+          }
+        },
+        "internalServices": {
+          "type": "object",
+          "description": "Optional environment-wide name/namespace values for internalServices keys. Only takes effect for a chart's internalServices.dependencies/dependents field that is itself written as a base.internalService.registryOr tpl expression in that chart's values.yaml; absent or empty has no effect.",
+          "properties": {
+            "registry": {
+              "type": "object",
+              "description": "Map of internalServices logical key to the name/namespace a chart's base.internalService.registryOr call for that key resolves to. A present, non-empty entry here takes precedence over the call's own chart-level fallback.",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Value returned for this key's name field."
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Value returned for this key's namespace field."
+                  }
+                }
+              }
             }
           }
         }
@@ -2117,6 +2292,29 @@
     }
   },
   "$defs": {
+    "backendEndpoint": {
+      "type": "object",
+      "description": "A public gateway-fronted backend this webapp calls. Used to build the backend URL via base.backends.url.",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls whether this endpoint is active. Referenced by env[*].if template expressions to conditionally emit the corresponding env var."
+        },
+        "host": {
+          "type": "string",
+          "description": "Per-endpoint public hostname override (no scheme). Falls back to backends.host when omitted."
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path segment (no leading slash), tpl-evaluated. Mandatory — no fallback derivation from the endpoint's key. Use an empty string for a bare host with no path."
+        }
+      }
+    },
     "internalServiceDependency": {
       "type": "object",
       "description": "A service this chart calls (outbound dependency). Used to build the service URL and to generate pod-selector egress rules in Cilium network policies.",
@@ -2232,6 +2430,29 @@
         "enabled": {
           "type": "boolean",
           "description": "Controls whether this dependent's ingress rule is emitted. Absent means true."
+        }
+      }
+    },
+    "frontendApp": {
+      "type": "object",
+      "description": "A peer frontend web app this webapp links to. Used to build the navigation URL via base.frontends.url.",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls whether this app is active. Referenced by env[*].if template expressions to conditionally emit the corresponding env var."
+        },
+        "host": {
+          "type": "string",
+          "description": "Per-app public hostname override (no scheme). Falls back to frontends.host when omitted."
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path segment (no leading slash), tpl-evaluated. Mandatory — no fallback derivation from the app's key. Use an empty string for a bare host with no path."
         }
       }
     },

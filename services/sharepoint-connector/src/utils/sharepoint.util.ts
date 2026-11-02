@@ -6,6 +6,19 @@ import type {
 import { normalizeSlashes } from './paths.util';
 import { createSmeared, type Smeared } from './smeared';
 
+type ListItemAttachment = Extract<SharepointContentItem, { itemType: 'listItemAttachment' }>;
+
+// SharePoint REST returns `ServerRelativeUrl` decoded, so names with spaces, `%` or `#` must be
+// encoded per segment to form a working link.
+export function buildAttachmentAbsoluteUrl(baseUrl: string, serverRelativeUrl: string): string {
+  const origin = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const encodedPath = normalizeSlashes(serverRelativeUrl)
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  return `${origin}/${encodedPath}`;
+}
+
 /**
  * Gets the web URL for a SharePoint item with ?web=1 parameter.
  *
@@ -20,37 +33,68 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem): string
 }
 
 /**
- * Separator used between the subsite ID and the item ID in file keys. We use `::` instead of `/`
- * because the file-diff API splits stored keys by `/` and compares only the last segment. Using
- * `/` would cause the diff to lose the subsite prefix and produce phantom new+deleted results.
+ * Separator between the segments of a file key below the site: subsite ID, list ID, item ID and
+ * attachment file name. We use `::` instead of `/` because the file-diff API splits stored keys by
+ * `/` and compares only the last segment. Using `/` would lose the leading segments and produce
+ * phantom new+deleted results.
  */
-export const SUBSITE_KEY_SEPARATOR = '::';
+export const KEY_SEPARATOR = '::';
 
 /**
  * Builds the key portion submitted to the file-diff API.
  *
  * The diff API scopes to items whose full key starts with `partialKey/` (the parent siteId) and
- * compares the remainder against submitted keys. For main-site items the remainder is just the
- * itemId; for subsite items it is `subsiteId::{itemId}` (using `::` to avoid `/`-based splitting).
+ * compares the remainder against submitted keys:
+ *
+ * Main-site items:        `{itemId}`
+ * Subsite items:          `{subsiteId}::{itemId}`
+ * Main-site attachments:  `{listId}::{itemId}::{fileName}`
+ * Subsite attachments:    `{subsiteId}::{listId}::{itemId}::{fileName}`
  */
 export function buildFileDiffKey(sharepointContentItem: SharepointContentItem): string {
+  const itemKey = itemKeyWithinSite(sharepointContentItem);
   if (sharepointContentItem.syncSiteId) {
-    return `${sharepointContentItem.siteId.value}${SUBSITE_KEY_SEPARATOR}${sharepointContentItem.item.id}`;
+    return `${sharepointContentItem.siteId.value}${KEY_SEPARATOR}${itemKey}`;
   }
-  return sharepointContentItem.item.id;
+  return itemKey;
 }
 
 /**
  * Builds a unique hierarchical key for ingestion.
  *
- * Main-site items:  `{siteId}/{itemId}`
- * Subsite items:    `{parentSiteId}/{subsiteId}::{itemId}`
+ * Main-site items:        `{siteId}/{itemId}`
+ * Subsite items:          `{parentSiteId}/{subsiteId}::{itemId}`
+ * Main-site attachments:  `{siteId}/{listId}::{itemId}::{fileName}`
+ * Subsite attachments:    `{parentSiteId}/{subsiteId}::{listId}::{itemId}::{fileName}`
  */
 export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem): string {
+  const itemKey = itemKeyWithinSite(sharepointContentItem);
   if (sharepointContentItem.syncSiteId) {
-    return `${sharepointContentItem.syncSiteId.value}/${sharepointContentItem.siteId.value}${SUBSITE_KEY_SEPARATOR}${sharepointContentItem.item.id}`;
+    return `${sharepointContentItem.syncSiteId.value}/${sharepointContentItem.siteId.value}${KEY_SEPARATOR}${itemKey}`;
   }
-  return `${sharepointContentItem.siteId.value}/${sharepointContentItem.item.id}`;
+  return `${sharepointContentItem.siteId.value}/${itemKey}`;
+}
+
+function itemKeyWithinSite(item: AnySharepointItem): string {
+  if (item.itemType === 'listItemAttachment') {
+    return [item.driveId, item.item.id, item.fileName].join(KEY_SEPARATOR);
+  }
+  return item.item.id;
+}
+
+// Only attachment keys end in `{listId}::{itemId}::{fileName}`: other keys have at most one
+// separator, and SharePoint forbids `:` in file names.
+const ATTACHMENT_KEY_REGEX = new RegExp(`^(.+${KEY_SEPARATOR}\\d+${KEY_SEPARATOR})([^:]+)$`);
+
+/**
+ * Smears the file name of a list item attachment key, which is customer data, and leaves its ids
+ * readable. Works for both ingestion and file-diff keys; any other key is returned unchanged.
+ */
+export function smearContentKey(key: string): string {
+  return key.replace(
+    ATTACHMENT_KEY_REGEX,
+    (_, ids: string, fileName: string) => `${ids}${createSmeared(fileName)}`,
+  );
 }
 
 /**
@@ -98,6 +142,9 @@ export function getUniquePathFromItem(
   siteName: Smeared,
 ): Smeared {
   assert.ok(rootPath.value, 'rootPath cannot be empty');
+  if (item.itemType === 'listItemAttachment') {
+    return createSmeared(`${buildListItemFolderPath(item, rootPath)}/${item.fileName}`);
+  }
   const fileUrl = extractFileUrl(item);
   const uniquePath = getRelativeUniquePathFromUrl(fileUrl, siteName);
 
@@ -111,13 +158,42 @@ export function getUniqueParentPathFromItem(
   siteName: Smeared,
 ): Smeared {
   assert.ok(rootPath.value, 'rootPath cannot be empty');
+  if (item.itemType === 'listItemAttachment') {
+    return createSmeared(buildListItemFolderPath(item, rootPath));
+  }
   const fileUrl = extractFileUrl(item);
   const uniqueParentPath = getRelativeUniqueParentPathFromUrl(fileUrl, siteName);
 
   return createSmeared(`/${normalizeSlashes(rootPath.value)}${uniqueParentPath}`);
 }
 
+export function getUniqueListFolderPathFromItem(
+  item: ListItemAttachment,
+  rootPath: Smeared,
+): Smeared {
+  assert.ok(rootPath.value, 'rootPath cannot be empty');
+  return createSmeared(buildListFolderPath(item, rootPath));
+}
+
+// `{rootPath}/{subsite relative path, if any}/{list folder}`.
+function buildListFolderPath(item: ListItemAttachment, rootPath: Smeared): string {
+  const segments = [normalizeSlashes(rootPath.value)];
+  if (item.subsiteRelativePath) {
+    segments.push(normalizeSlashes(item.subsiteRelativePath));
+  }
+  segments.push(item.driveName);
+  return `/${segments.filter((segment) => segment.length > 0).join('/')}`;
+}
+
+// `{list folder path}/{item folder}`.
+function buildListItemFolderPath(item: ListItemAttachment, rootPath: Smeared): string {
+  return `${buildListFolderPath(item, rootPath)}/${normalizeSlashes(item.folderPath)}`;
+}
+
 function extractFileUrl(item: AnySharepointItem): string {
+  if (item.itemType === 'listItemAttachment') {
+    return item.attachment.absoluteUrl;
+  }
   if (item.itemType === 'driveItem') {
     return item.item.listItem?.webUrl || item.item.webUrl;
   }

@@ -270,10 +270,11 @@ internalServices:
       when the hostname cannot match). A privately signed certificate needs its CA in
       `DB_SSL_ROOT_CERT`.
 - [ ] `/metrics` is not reachable from outside the cluster.
-- [ ] `LOGS_DIAGNOSTICS_DATA_POLICY` is `conceal` (the default), so tool-level events write Backstop
-      logins as `sha256:<hex>`. The Backstop HTTP client's request and re-check events
-      (`backstop.request.*`, `backstop.auth_recheck.*`) carry the plain username under either
-      setting, so treat logs as containing Backstop logins. API tokens are never logged.
+- [ ] `LOGS_DIAGNOSTICS_DATA_POLICY` is `conceal` and `ERROR_DETAILS_POLICY` is `redact` (the
+      defaults; in the chart, `mcpConfig.logging.diagnosticsDataPolicy` and
+      `mcpConfig.logging.errorDetailsPolicy`), so log lines write Backstop logins, including those
+      of the client's request and login lines, as `hmac-sha256:<hex>` and exception text stays out
+      of logs. API tokens are never logged.
 - [ ] Database backups follow your policy for credentials. The table `backstop_credentials` holds
       encrypted API tokens.
 
@@ -300,7 +301,7 @@ the Backstop API host (`mcpConfig.backstop.baseUrl`). See the [FAQ](../faq.md#Co
 |---|---|---|
 | `/health` | The process is up | Liveness and startup probes |
 | `/probe` | The process is up | Not used by the chart |
-| `/ready` | PostgreSQL answers `SELECT 1` | Readiness probe. A database outage takes the pod out of service without restarting it |
+| `/ready` | PostgreSQL answers `SELECT 1` within 2 seconds | Readiness probe (timeout 3 seconds). A database outage takes the pod out of service without restarting it, and logs one WARNING when it starts and one INFO when it ends |
 | `/metrics` | Prometheus metrics | Scraping, through a ServiceMonitor |
 
 The ServiceMonitor and the alert rules are rendered only when the Prometheus Operator CRDs

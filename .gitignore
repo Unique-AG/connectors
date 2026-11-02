@@ -62,6 +62,8 @@ lerna-debug.log*
 # We do not use .zed/ because we want to ignore symlinks
 .zed
 *.code-workspace
+# Shared: VS Code and Cursor run one basedpyright per Python project from it.
+!/connectors.code-workspace
 
 # OS — macOS
 .DS_Store

@@ -13,6 +13,7 @@ from typing import ClassVar
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
+from mcp_observability import failure_level
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,12 @@ def extract_gist_from_html(html: str, *, max_chars: int | None = None) -> Gist:
     """
     try:
         return _gist(_html_to_markdown(html), max_chars=max_chars)
-    except Exception:
-        logger.warning(
-            "activity_history.gist.conversion_failed",
+    except Exception as exc:
+        logger.log(
+            failure_level(exc),
+            "Converting activity HTML to markdown failed",
             extra={"html_chars": len(html)},
-            exc_info=True,
+            exc_info=exc,
         )
         if max_chars is None or len(html) <= max_chars:
             return Gist(text=html, truncated=False, full_length=len(html))
@@ -81,7 +83,7 @@ def _gist(markdown: str, *, max_chars: int | None) -> Gist:
         return Gist(text=squeezed, truncated=False, full_length=full_length)
     truncated_text = _truncate_at_word_boundary(squeezed, max_chars)
     logger.debug(
-        "activity_history.gist.truncated",
+        "Truncated activity gist",
         extra={"full_length": full_length, "max_chars": max_chars, "kept": len(truncated_text)},
     )
     return Gist(text=truncated_text, truncated=True, full_length=full_length)
@@ -94,7 +96,7 @@ def _html_to_markdown(html: str) -> str:
     except RecursionError:
         capped = _cap_nesting(html, max_depth=_MAX_TAG_DEPTH)
         logger.warning(
-            "activity_history.gist.nesting_capped",
+            "Capped activity HTML nesting",
             extra={"html_chars": len(html), "max_depth": _MAX_TAG_DEPTH},
         )
         return markdownify(capped)

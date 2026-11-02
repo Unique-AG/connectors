@@ -220,12 +220,34 @@ class TestListContactCategoriesTool:
         assert first.categories[0].name == "Prospect"
         assert route.call_count == 3
         assert refreshed.categories[0].name == "Prospect"
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            f"Conflicting contact categories for duplicate id {_PROSPECT_ID!r}; "
-            + "retaining first category"
-        ]
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.getMessage() == "Ignored duplicate contact category ids"
+        assert warning.__dict__["count"] == 1
+        assert warning.__dict__["sample_ids"] == [_PROSPECT_ID]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_warns_once_per_load_with_a_capped_sample_of_conflicting_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("cc-many-conflicts")
+        ids = [str(2000 + index) for index in range(7)]
+        originals = [_category(category_id, name=f"Category {category_id}") for category_id in ids]
+        conflicting = [_category(category_id, name="Changed") for category_id in ids]
+        respx.get(f"{base_url}/contact-categories").mock(
+            return_value=_collection_page(*originals, *conflicting)
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_contact_categories(
+                    refresh=True,
+                    list_contact_categories_query=list_contact_categories_query(client),
+                )
+
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
 
 class TestListContactCategoriesInput:

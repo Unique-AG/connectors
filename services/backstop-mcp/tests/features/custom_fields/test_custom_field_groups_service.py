@@ -5,6 +5,7 @@ The TTL, single-flight and serve-stale protocol behind `get` is `CachedValue`, e
 `tests/features/test_cached_catalog.py`.
 """
 
+import logging
 from collections.abc import AsyncGenerator, Callable
 
 import httpx
@@ -69,3 +70,41 @@ class TestCustomFieldGroupsService:
         assert groups["9"].full_path_name == ["Overview", "Status"]
         assert groups["9"].parent is not None
         assert groups["9"].parent.name == "Overview"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_conflicting_duplicates_log_one_warning_with_a_capped_sample(
+        self, clients: ClientBuilder, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = f"{BASE_URL}/custom-field-groups-conflicts"
+        ids = [str(70 + index) for index in range(7)]
+        service = CustomFieldGroupsService.with_ttl_minutes(
+            client=clients(base_url), ttl_minutes=60
+        )
+        respx.get(f"{base_url}/custom-field-groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        *(
+                            resource(group_id, "custom-field-groups", name="Status")
+                            for group_id in ids
+                        ),
+                        *(
+                            resource(group_id, "custom-field-groups", name="Renamed")
+                            for group_id in ids
+                        ),
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+        with caplog.at_level(logging.WARNING):
+            groups, _cache = await service.get()
+
+        assert groups[ids[0]].name == "Status"
+        [warning] = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert warning.getMessage() == "Ignored duplicate custom field group ids"
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]

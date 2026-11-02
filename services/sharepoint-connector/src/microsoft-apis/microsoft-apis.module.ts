@@ -25,6 +25,11 @@ import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-htt
     SharepointRestHttpService,
     BottleneckFactory,
   ],
-  exports: [GraphApiService, SitesConfigurationService, SharepointRestClientService],
+  exports: [
+    FileFilterService,
+    GraphApiService,
+    SitesConfigurationService,
+    SharepointRestClientService,
+  ],
 })
 export class MicrosoftApisModule {}

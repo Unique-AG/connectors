@@ -3,7 +3,7 @@
 import logging
 
 from fastmcp.exceptions import ToolError
-from opentelemetry import trace
+from mcp_observability import traced
 
 from backstop_mcp.backstop_client import (
     BackstopClient,
@@ -34,7 +34,6 @@ from backstop_mcp.features.custom_fields.update_custom_field_values_input import
 )
 
 logger = logging.getLogger(__name__)
-_tracer = trace.get_tracer(__name__)
 
 
 class UpdateCustomFieldValuesCommand:
@@ -46,58 +45,66 @@ class UpdateCustomFieldValuesCommand:
         self._client: BackstopClient = client
         self._custom_fields_service: CustomFieldsService = custom_fields_service
 
+    @traced(
+        arguments=lambda args: {
+            "entity_type": args["update"].entity_type,
+            "entity_id": args["update"].entity_id,
+            "record_count": len(args["update"].values),
+        },
+        result=lambda response: {
+            "total_count": response.total_count,
+            "applied_count": response.applied_count,
+        },
+    )
     async def run(self, *, update: UpdateCustomFieldValuesInput) -> UpdateCustomFieldValuesResponse:
-        with _tracer.start_as_current_span("custom_fields.command.update_values") as span:
-            span.set_attribute("entity_type", update.entity_type)
-            span.set_attribute("record_count", len(update.values))
-            catalog, _freshness = await self._custom_fields_service.get()
-            for requested_row in update.values:
-                self._raise_if_invalid(requested_row, catalog, entity_type=update.entity_type)
-            payload = json_api_create(
-                resource_type="bulk-custom-field-values",
-                attributes={
-                    "records": [
-                        {
-                            "definitionId": requested_row.definition_id,
-                            # `value` is written even when null — that is how a non-required
-                            # field is cleared. Dropping it would post a record with nothing
-                            # to write, which Backstop echoes back as if it had landed.
-                            "value": requested_row.value,
-                            **omit_none_values(
-                                {"effectiveDate": isoformat(requested_row.effective_date)}
-                            ),
-                        }
-                        for requested_row in update.values
-                    ],
-                    "resource": resource_pointer(
-                        resource_id=update.entity_id,
-                        resource_type=update.entity_type,
-                    ),
-                },
-            )
-            document = await self._client.post(
-                "/bulk-custom-field-values",
-                schema=BulkCustomFieldValuesDocument,
-                json=payload,
-            )
-            outcomes, warnings = self._outcomes(update.values, document.data.attributes)
-            applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
-            logger.info(
-                "custom_fields.values.updated",
-                extra={
-                    "entity_type": update.entity_type,
-                    "total_count": len(outcomes),
-                    "applied_count": applied_count,
-                    "failed_count": len(outcomes) - applied_count,
-                    "warning_count": len(warnings),
-                },
-            )
-            return UpdateCustomFieldValuesResponse(
-                total_count=len(outcomes),
-                applied_count=applied_count,
-                records=outcomes,
-                warnings=warnings,
-            )
+        catalog, _freshness = await self._custom_fields_service.get()
+        for requested_row in update.values:
+            self._raise_if_invalid(requested_row, catalog, entity_type=update.entity_type)
+        payload = json_api_create(
+            resource_type="bulk-custom-field-values",
+            attributes={
+                "records": [
+                    {
+                        "definitionId": requested_row.definition_id,
+                        # `value` is written even when null — that is how a non-required
+                        # field is cleared. Dropping it would post a record with nothing
+                        # to write, which Backstop echoes back as if it had landed.
+                        "value": requested_row.value,
+                        **omit_none_values(
+                            {"effectiveDate": isoformat(requested_row.effective_date)}
+                        ),
+                    }
+                    for requested_row in update.values
+                ],
+                "resource": resource_pointer(
+                    resource_id=update.entity_id,
+                    resource_type=update.entity_type,
+                ),
+            },
+        )
+        document = await self._client.post(
+            "/bulk-custom-field-values",
+            schema=BulkCustomFieldValuesDocument,
+            json=payload,
+        )
+        outcomes, warnings = self._outcomes(update.values, document.data.attributes)
+        applied_count = sum(1 for outcome in outcomes if outcome.status == "applied")
+        logger.info(
+            "Updated custom field values",
+            extra={
+                "entity_type": update.entity_type,
+                "total_count": len(outcomes),
+                "applied_count": applied_count,
+                "failed_count": len(outcomes) - applied_count,
+                "warning_count": len(warnings),
+            },
+        )
+        return UpdateCustomFieldValuesResponse(
+            total_count=len(outcomes),
+            applied_count=applied_count,
+            records=outcomes,
+            warnings=warnings,
+        )
 
     def _raise_if_invalid(
         self,

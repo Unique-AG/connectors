@@ -228,12 +228,33 @@ class TestListContactSourcesTool:
         assert first.sources[0].description == "Referral"
         assert route.call_count == 3
         assert refreshed.sources[0].description == "Referral"
-        assert [
-            record.getMessage() for record in caplog.records if record.name == _FETCH_LOGGER
-        ] == [
-            f"Conflicting contact sources for duplicate id {_LIVE_SOURCE_ID!r}; "
-            + "retaining first source"
-        ]
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.getMessage() == "Ignored duplicate contact source ids"
+        assert warning.__dict__["count"] == 1
+        assert warning.__dict__["sample_ids"] == [_LIVE_SOURCE_ID]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_warns_once_per_load_with_a_capped_sample_of_conflicting_ids(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base_url = tenant("cs-many-conflicts")
+        ids = [str(3000 + index) for index in range(7)]
+        originals = [_source(source_id, name=f"Source {source_id}") for source_id in ids]
+        conflicting = [_source(source_id, name="Changed") for source_id in ids]
+        respx.get(f"{base_url}/contact-sources").mock(
+            return_value=_collection_page(*originals, *conflicting)
+        )
+
+        async with tool_client(base_url) as client:
+            with caplog.at_level(logging.WARNING, logger=_FETCH_LOGGER):
+                await list_contact_sources(
+                    refresh=True, list_contact_sources_query=list_contact_sources_query(client)
+                )
+
+        [warning] = [record for record in caplog.records if record.name == _FETCH_LOGGER]
+        assert warning.__dict__["count"] == 7
+        assert warning.__dict__["sample_ids"] == ids[:5]
 
 
 class TestListContactSourcesInput:

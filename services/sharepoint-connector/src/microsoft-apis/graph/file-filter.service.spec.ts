@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
 import { MimeTypeResolverService } from '../../shared/services/mime-type-resolver.service';
+import { createSmeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem } from './types/sharepoint.types';
 
@@ -306,6 +307,83 @@ describe('FileFilterService', () => {
         file: { mimeType: 'application/vnd.ms-excel', hashes: { quickXorHash: 'hash1' } },
       });
       expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
+    });
+  });
+
+  describe('isGenericListItemInScope', () => {
+    const fields = {
+      '@odata.etag': 'etag',
+      _ModerationStatus: ModerationStatus.Approved,
+      Title: 'Policy',
+      FileSizeDisplay: '1',
+      FileLeafRef: 'unused',
+      Sync: true,
+      Attachments: true,
+    };
+
+    it('includes a flagged item with attachments when moderation is missing', () => {
+      const { _ModerationStatus: _ignored, ...withoutModeration } = fields;
+
+      expect(service.isGenericListItemInScope(withoutModeration, 'Sync')).toBe(true);
+    });
+
+    it('excludes items that are not flagged, unapproved, or without attachments', () => {
+      expect(service.isGenericListItemInScope({ ...fields, Sync: false }, 'Sync')).toBe(false);
+      expect(
+        service.isGenericListItemInScope(
+          { ...fields, _ModerationStatus: ModerationStatus.Pending },
+          'Sync',
+        ),
+      ).toBe(false);
+      expect(service.isGenericListItemInScope({ ...fields, Attachments: false }, 'Sync')).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('isAttachmentValidForIngestion', () => {
+    const attachment = (fileName: string, size: number) => ({
+      fileName: createSmeared(fileName),
+      size,
+    });
+
+    beforeEach(async () => {
+      const { unit } = await TestBed.solitary(FileFilterService)
+        .mock(ConfigService)
+        .impl(() => ({
+          get: vi.fn((key: string) => {
+            if (key === 'processing.allowedMimeTypes') {
+              return ['application/pdf'];
+            }
+            if (key === 'processing.maxFileSizeToIngestBytes') {
+              return DEFAULT_MAX_FILE_SIZE_BYTES;
+            }
+            return undefined;
+          }),
+        }))
+        .mock(MimeTypeResolverService)
+        .impl(() => ({
+          resolve: vi.fn((fileName: string) =>
+            fileName.endsWith('.pdf') ? 'application/pdf' : DEFAULT_MIME_TYPE,
+          ),
+        }))
+        .compile();
+
+      service = unit;
+    });
+
+    it.each([
+      [1, true],
+      [DEFAULT_MAX_FILE_SIZE_BYTES, true],
+      [0, false],
+      [DEFAULT_MAX_FILE_SIZE_BYTES + 1, false],
+      [Number.NaN, false],
+    ])('treats an allowed file of size %s as valid: %s', (size, expected) => {
+      expect(service.isAttachmentValidForIngestion(attachment('policy.pdf', size))).toBe(expected);
+    });
+
+    it('rejects an attachment whose MIME type is not allowed', () => {
+      expect(service.isAttachmentValidForIngestion(attachment('setup.exe', 1024))).toBe(false);
     });
   });
 });

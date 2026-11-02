@@ -4,7 +4,7 @@ from typing import Never
 from urllib.parse import quote
 
 from fastmcp.exceptions import ToolError
-from opentelemetry import trace
+from mcp_observability import traced
 
 from backstop_mcp.backstop_client import (
     BackstopApiError,
@@ -20,7 +20,6 @@ from backstop_mcp.features.org_people_writes.contact_location_input import Conta
 
 _Document = BackstopApiSingleResourceDocument[ContactLocationAttributes]
 _RESOURCE_TYPE = "contact-locations"
-_tracer = trace.get_tracer(__name__)
 
 
 class ModifyContactLocationCommand:
@@ -29,6 +28,10 @@ class ModifyContactLocationCommand:
     def __init__(self, *, client: BackstopClient) -> None:
         self._client: BackstopClient = client
 
+    @traced(
+        arguments=("party_id", "delete_location_ids"),
+        result=lambda location_ids: {"written_count": len(location_ids)},
+    )
     async def run(
         self,
         *,
@@ -36,23 +39,22 @@ class ModifyContactLocationCommand:
         locations: tuple[ContactLocationInput, ...] = (),
         delete_location_ids: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
-        with _tracer.start_as_current_span("org_people_writes.command.modify_contact_location"):
-            for delete_location_id in delete_location_ids:
-                try:
-                    await self._delete(delete_location_id)
-                except BackstopApiError as exc:
-                    self._reraise_write_error(exc, operation="deleted")
-            written: list[str] = []
-            for location in locations:
-                try:
-                    if location.location_id is None:
-                        written.append(await self._create(party_id=party_id, location=location))
-                    else:
-                        written.append(await self._update(location=location))
-                except BackstopApiError as exc:
-                    operation = "created" if location.location_id is None else "updated"
-                    self._reraise_write_error(exc, operation=operation)
-            return tuple(written)
+        for delete_location_id in delete_location_ids:
+            try:
+                await self._delete(delete_location_id)
+            except BackstopApiError as exc:
+                self._reraise_write_error(exc, operation="deleted")
+        written: list[str] = []
+        for location in locations:
+            try:
+                if location.location_id is None:
+                    written.append(await self._create(party_id=party_id, location=location))
+                else:
+                    written.append(await self._update(location=location))
+            except BackstopApiError as exc:
+                operation = "created" if location.location_id is None else "updated"
+                self._reraise_write_error(exc, operation=operation)
+        return tuple(written)
 
     async def _create(self, *, party_id: str, location: ContactLocationInput) -> str:
         created = await self._client.post(

@@ -108,6 +108,7 @@ export class SitesConfigurationService {
       const siteConfig = {
         siteId: getFieldValue('siteId'),
         syncColumnName: getFieldValue('syncColumnName'),
+        itemNameColumnName: getFieldValue('itemNameColumnName'),
         ingestionMode: getFieldValue('ingestionMode'),
         scopeId: getFieldValue('uniqueScopeId'),
         // when unset sharepoint list item, maxFilesToIngest is set to 0
@@ -117,6 +118,7 @@ export class SitesConfigurationService {
         syncMode: getFieldValue('syncMode'),
         permissionsInheritanceMode: getFieldValue('permissionsInheritanceMode'),
         subsitesScan: getFieldValue('subsitesScan'),
+        listAttachmentsScan: getFieldValue('listAttachmentsScan'),
       };
 
       return PartialSiteConfigSchema.parse(siteConfig);

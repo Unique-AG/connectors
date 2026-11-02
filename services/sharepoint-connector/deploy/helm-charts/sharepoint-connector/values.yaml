@@ -55,7 +55,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/sharepoint-connector
-  tag: 3.1.4 # x-release-please-version
+  tag: 3.2.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -271,6 +271,8 @@ connectorConfig:
     #   syncMode: content_only
     #   permissionsInheritanceMode: inherit_scopes_and_files
     #   subsitesScan: disabled
+    #   listAttachmentsScan: disabled
+    #   itemNameColumnName: Title
     siteDefaults: {}
     # -- Sites source configuration
     # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
@@ -295,6 +297,8 @@ connectorConfig:
     #     syncMode: content_and_permissions
     #     permissionsInheritanceMode: inherit_scopes_and_files
     #     subsitesScan: disabled
+    #     listAttachmentsScan: disabled
+    #     itemNameColumnName: Title
 
   unique:
     # -- communication mode for the Unique Services

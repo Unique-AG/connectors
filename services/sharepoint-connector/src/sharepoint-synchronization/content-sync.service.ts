@@ -14,10 +14,16 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl, SUBSITE_KEY_SEPARATOR } from '../utils/sharepoint.util';
+import {
+  buildFileDiffKey,
+  getItemUrl,
+  KEY_SEPARATOR,
+  smearContentKey,
+} from '../utils/sharepoint.util';
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { MoveUpdatedFilesToExpectedScopeCommand } from './move-updated-files-to-expected-scope.command';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -30,6 +36,7 @@ export class ContentSyncService {
     private readonly uniqueFileIngestionService: UniqueFileIngestionService,
     private readonly uniqueFilesService: UniqueFilesService,
     private readonly fileMoveProcessor: FileMoveProcessor,
+    private readonly moveUpdatedFilesToExpectedScopeCommand: MoveUpdatedFilesToExpectedScopeCommand,
     private readonly scopeManagementService: ScopeManagementService,
     @Inject(SPC_FILE_DIFF_EVENTS_TOTAL) private readonly spcFileDiffEventsTotal: Counter,
     @Inject(SPC_FILE_DELETED_TOTAL) private readonly spcFileDeletedTotal: Counter,
@@ -103,8 +110,20 @@ export class ContentSyncService {
       return;
     }
 
+    // A file that was edited and moved is reported only as updated. Move it into the scope for
+    // its new path before upsert, and leave files that could not be moved out of this cycle.
+    const keysToLeaveOut = await this.moveUpdatedFilesToExpectedScopeCommand.execute({
+      updatedFileKeys: Array.from(updatedFileKeys),
+      items,
+      scopes,
+      context,
+    });
+
     const newItems = items.filter((item) => newFileKeys.has(buildFileDiffKey(item)));
-    const updatedItems = items.filter((item) => updatedFileKeys.has(buildFileDiffKey(item)));
+    const updatedItems = items.filter((item) => {
+      const key = buildFileDiffKey(item);
+      return updatedFileKeys.has(key) && !keysToLeaveOut.has(key);
+    });
 
     const getScopeIdForItem = (item: SharepointContentItem): string => {
       const rootScopeId = context.rootScopeId;
@@ -269,7 +288,7 @@ export class ContentSyncService {
 
         this.logger.error({
           msg: `${logPrefix} Failed to delete content`,
-          fileKey: file.key,
+          fileKey: smearContentKey(file.key),
           fileId: file.id,
           error: sanitizeError(error),
         });
@@ -282,11 +301,13 @@ export class ContentSyncService {
   }
 }
 
-/**
- * Extracts the base item ID from a file diff key by stripping any subsite prefix.
- * E.g. "subsiteId::itemId" → "itemId", "itemId" → "itemId".
- */
-function extractItemId(key: string): string {
-  const separatorIndex = key.indexOf(SUBSITE_KEY_SEPARATOR);
-  return separatorIndex >= 0 ? key.slice(separatorIndex + SUBSITE_KEY_SEPARATOR.length) : key;
+// Strips a subsite prefix only. Root items have 1 segment and root attachments have 3
+// (`listId::itemId::fileName`), so their first segment is not a subsite id. Subsite items have 2
+// segments and subsite attachments have 4.
+export function extractItemId(key: string): string {
+  const segments = key.split(KEY_SEPARATOR);
+  if (segments.length === 2 || segments.length === 4) {
+    return segments.slice(1).join(KEY_SEPARATOR);
+  }
+  return key;
 }

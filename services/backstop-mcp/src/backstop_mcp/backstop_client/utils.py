@@ -73,10 +73,12 @@ def deserialize(content: bytes, schema: SchemaInput, *, path: str) -> object:
     except ValidationError as exc:
         name = schema_label(schema)
         logger.error(
-            "backstop.response.schema_error",
-            extra={"path": path, "schema": name},
+            "Backstop response failed schema validation",
+            extra={"route": metric_route(path), "schema": name},
         )
-        raise BackstopResponseSchemaError(path, name, exc) from exc
+        # `from None`: a chained cause would print pydantic's text, record values included, in
+        # every traceback. The error keeps it as `.cause`.
+        raise BackstopResponseSchemaError(path, name, exc) from None
 
 
 def resolve_request_url(base_url: str, path: str) -> str:

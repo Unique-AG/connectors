@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/sharepoint-connector",
   "description": "Take content from SharePoint and send it to Unique AI for RAG ingestion..",
-  "version": "3.1.4",
+  "version": "3.2.0",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -29,7 +29,7 @@
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
-    "@azure/msal-node": "7.0.1",
+    "@azure/msal-node": "7.1.2",
     "@microsoft/microsoft-graph-client": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/config": "catalog:",
@@ -48,6 +48,7 @@
     "graphql": "catalog:",
     "graphql-request": "catalog:",
     "js-yaml": "catalog:",
+    "mime-types": "3.0.2",
     "nestjs-otel": "catalog:",
     "nestjs-pino": "catalog:",
     "p-limit": "catalog:",
@@ -71,6 +72,7 @@
     "@swc/cli": "catalog:",
     "@swc/core": "catalog:",
     "@types/express": "catalog:",
+    "@types/mime-types": "3.0.1",
     "@types/node": "catalog:",
     "@types/supertest": "catalog:",
     "@vitest/coverage-v8": "catalog:",

@@ -1,12 +1,15 @@
 """`UpdateOpportunityCommand`: PATCH payload shape, stage guards, notify-list append."""
 
+import logging
 from collections.abc import AsyncGenerator
 from datetime import date
+from typing import cast
 
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from mcp_observability import identifiable_value
 from pydantic import TypeAdapter
 
 from backstop_mcp.backstop_client import BackstopClient
@@ -209,6 +212,56 @@ class TestUpdateOpportunityCommand:
         assert result.warnings == ()
         stage = object_dict(_relationships(recorded_json_bodies(route)[0])["stage"])
         assert object_dict(stage["data"]) == {"type": "opportunity-stages", "id": "42482"}
+
+    @respx.mock
+    async def test_logs_the_stage_id_and_not_the_stage_name(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_catalogs()
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(
+            side_effect=[
+                _opportunity_document(_ID, stage_id="42478"),
+                _opportunity_document(_ID, stage_id="42482"),
+            ]
+        )
+        respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(
+            return_value=_opportunity_document(_ID, stage_id="42482")
+        )
+
+        with caplog.at_level(logging.INFO):
+            await make_command(client).run(
+                new_opportunity=_update(opportunity_id=_ID, stage="Stage B")
+            )
+
+        [updated] = [r for r in caplog.records if r.getMessage() == "Updated opportunity"]
+        assert updated.__dict__["stage_id"] == "42482"
+        assert "stage" not in updated.__dict__
+        assert "Stage B" not in repr(updated.__dict__)
+
+    @respx.mock
+    async def test_logs_notify_logins_as_identifiable_values(
+        self, client: BackstopClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _mock_catalogs()
+        respx.get(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=_opportunity_document(_ID))
+        respx.patch(f"{BASE_URL}/opportunities/{_ID}").mock(return_value=_opportunity_document(_ID))
+
+        with caplog.at_level(logging.INFO):
+            await make_command(client).run(
+                new_opportunity=_update(
+                    opportunity_id=_ID, add_users_to_notify=["plee", "not-a-user"]
+                )
+            )
+
+        resolved = next(r for r in caplog.records if r.getMessage() == "Resolved notify login")
+        unresolved = next(r for r in caplog.records if r.getMessage() == "Notify login not found")
+        resolved_login = str(cast("object", resolved.__dict__["login"]))
+        unresolved_login = str(cast("object", unresolved.__dict__["login"]))
+        assert resolved_login == str(identifiable_value("plee"))
+        assert unresolved_login == str(identifiable_value("not-a-user"))
+        assert unresolved.levelno == logging.WARNING
+        assert "plee" not in resolved_login
+        assert "not-a-user" not in unresolved_login
 
     @respx.mock
     async def test_derived_fields_are_never_sent(self, client: BackstopClient) -> None:

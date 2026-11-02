@@ -43,6 +43,8 @@ from collections.abc import Awaitable, Callable, Sized
 from datetime import timedelta
 from typing import Literal
 
+from mcp_observability import failure_level
+
 from backstop_mcp.metrics import CATALOG_FETCH_DURATION, CATALOG_GET_DURATION
 from backstop_mcp.timed_gate import TimedGate
 
@@ -77,14 +79,12 @@ class CachedValue[T]:
         ttl: timedelta,
         snapshot: Callable[[T], T],
         name: str,
-        log_prefix: str,
         caching_enabled: bool = True,
         serve_stale: bool = True,
         on_load: Callable[[CacheSource], None] | None = None,
     ) -> None:
         self._snapshot: Callable[[T], T] = snapshot
         self._name: str = name
-        self._log_prefix: str = log_prefix
         self._caching_enabled: bool = caching_enabled
         self._serve_stale: bool = serve_stale
         self._on_load: Callable[[CacheSource], None] | None = on_load
@@ -226,8 +226,9 @@ class CachedValue[T]:
         except Exception as error:
             held = self._value
             if self._serve_stale and held is not None:
-                logger.warning(
-                    f"{self._log_prefix}.refresh_failed_serving_stale",
+                logger.log(
+                    failure_level(error),
+                    "Refresh failed, serving stale catalog",
                     extra={
                         "catalog": self._name,
                         "fetched_at": (
@@ -236,7 +237,7 @@ class CachedValue[T]:
                             else None
                         ),
                     },
-                    exc_info=True,
+                    exc_info=error,
                 )
                 self._record_load("stale")
                 self._freshness.mark()
@@ -256,7 +257,7 @@ class CachedValue[T]:
         count = _item_count(value)
         if count is not None:
             extra["items"] = count
-        logger.info(f"{self._log_prefix}.refreshed", extra=extra)
+        logger.info("Refreshed catalog", extra=extra)
         result = (self._snapshot(value), "ok")
         in_flight.set_result(result)
         return result
