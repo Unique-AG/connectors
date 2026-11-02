@@ -40,8 +40,8 @@ It never reads, stores or prints a token. It never prints or stores a password.
    goes out. The user has `employeeType` `seed-v1`.
 8. `meeting_policy`: the policy `seed-v1 recording` (cloud recording and transcription on), granted
    to Mia, Anna and Tom. Needs `pwsh`. The Teams sign-in uses a device code.
-9. `room_mailbox`: the room `seed-v1 room` with auto-accept, capacity 8, building `Lakeside HQ`,
-   floor 1. Needs `pwsh`.
+9. `room_mailbox`: the room `seed-v1 room` with auto-accept, capacity 8. Needs `pwsh`. The
+   tenant mailbox region does not allow `Set-Place`, so the room has no building or floor.
 10. `shared_mailbox`: the shared mailbox `seed-v1 shared` with FullAccess (no automapping) and
     SendAs for Mia. Needs `pwsh`.
 11. `room_visible`: the room appears in `/places/microsoft.graph.room`. No command can force this.

@@ -9,7 +9,6 @@ if ($Mode -eq 'apply') {
     if (-not (Get-Mailbox -Identity $alias -ErrorAction SilentlyContinue)) {
         New-Mailbox -Shared -Name 'seed-v1 shared' -Alias $alias -PrimarySmtpAddress $Address | Out-Null
     }
-    Set-Mailbox -Identity $alias -EmailAddressPolicyEnabled $false -PrimarySmtpAddress $Address
     if (-not (& $full)) { Add-MailboxPermission -Identity $alias -User $User -AccessRights FullAccess -AutoMapping $false | Out-Null }
     if (-not (& $send)) { Add-RecipientPermission -Identity $alias -Trustee $User -AccessRights SendAs -Confirm:$false | Out-Null }
     return
