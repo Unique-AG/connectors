@@ -51,14 +51,18 @@ async def create_document_order(
     "Pending"`, poll `get_order(data.orderId)` until `data.documentJson` is populated or
     `status` is `Failed`. Never mention download URLs.
     """
+    defaults = {
+        "customer_reference": settings.kyckr_default_customer_reference,
+        "contact_email": settings.kyckr_default_contact_email,
+    }
     response = await api.call(
         operations.POST_ORDERS,
         PostOrdersRequest(
             body=PostOrdersBody(
                 kyckr_id=kyckr_id,
                 product_id=product_id,
-                customer_reference=settings.kyckr_default_customer_reference,
-                contact_email=settings.kyckr_default_contact_email,
+                # A field set to None is sent as null, so a default nobody configured is left out.
+                **{name: value for name, value in defaults.items() if value is not None},
             )
         ),
     )
