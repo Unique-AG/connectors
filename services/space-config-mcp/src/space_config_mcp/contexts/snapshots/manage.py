@@ -1,5 +1,8 @@
+from datetime import datetime
+from datetime import UTC
 import json
 from typing import cast
+import uuid
 
 import unique_sdk
 
@@ -16,24 +19,54 @@ async def snapshot_space(
     space_id: str,
     label: str = "",
 ) -> dict[str, str]:
+    """Capture full space config as a named snapshot stored in the knowledge base.
+
+    Snapshots are point-in-time captures. Config changes made through
+    the portal between MCP calls are not reflected until the next call.
+    """
     space = await upstream.get_space(user_id, company_id, space_id)
-    return persistence.save_snapshot(dict(space), label=label)
+    snapshot_id = str(uuid.uuid4())
+    captured_at = datetime.now(UTC).isoformat()
+    effective_label = label or f"snapshot-{captured_at}"
+    await persistence.save_snapshot(
+        user_id,
+        company_id,
+        space_id=space_id,
+        snapshot_id=snapshot_id,
+        label=effective_label,
+        captured_at=captured_at,
+        config=dict(space),
+    )
+    return {"snapshot_id": snapshot_id, "label": effective_label}
 
 
-def list_snapshots(
+async def list_snapshots(
     *,
     persistence: Persistence,
-    space_id: str | None = None,
+    user_id: str,
+    company_id: str,
+    space_id: str,
 ) -> list[dict[str, object]]:
-    return persistence.list_snapshots(space_id=space_id)
+    """List stored snapshots for a space, newest first.
+
+    Only shows snapshots created by this MCP. Config changes made in the
+    portal since the last snapshot are not reflected here.
+    """
+    return await persistence.list_snapshots(user_id, company_id, space_id)
 
 
-def get_snapshot(
+async def get_snapshot(
     *,
     persistence: Persistence,
+    user_id: str,
+    company_id: str,
+    space_id: str,
     snapshot_id: str,
 ) -> dict[str, object]:
-    return persistence.get_snapshot(snapshot_id)
+    """Return the full stored config JSON for a snapshot."""
+    return await persistence.get_snapshot(
+        user_id, company_id, space_id=space_id, snapshot_id=snapshot_id
+    )
 
 
 async def revert_space(
@@ -43,11 +76,11 @@ async def revert_space(
     user_id: str,
     company_id: str,
     snapshot_id: str,
+    space_id: str,
 ) -> dict[str, object]:
-    snap = persistence.get_snapshot(snapshot_id)
-    space_id_val = snap.get("_space_id")
-    assert isinstance(space_id_val, str), f"snapshot {snapshot_id!r} missing _space_id"
-    space_id = space_id_val
+    snap = await persistence.get_snapshot(
+        user_id, company_id, space_id=space_id, snapshot_id=snapshot_id
+    )
 
     pre_revert = await snapshot_space(
         upstream=upstream,

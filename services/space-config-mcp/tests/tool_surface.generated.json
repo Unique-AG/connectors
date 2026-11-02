@@ -128,7 +128,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return a portable JSON string of the full space config. No storage side-effects.",
+    "description": "Return a portable JSON string of the full space config. No storage side-effects.\n\nReflects the live config at call time. Use snapshot_space to persist a named version.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -240,16 +240,31 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return the full JSON content of a stored snapshot.",
+    "description": "Return the full JSON content of a stored snapshot.\n\nSnapshots reflect the space config at the time snapshot_space was called.\nChanges made through the portal since then are not included.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
         "snapshot_id": {
           "description": "ID of the snapshot to retrieve.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space the snapshot belongs to.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
+        "user_id",
+        "company_id",
+        "space_id",
         "snapshot_id"
       ],
       "type": "object"
@@ -372,7 +387,7 @@
           "type": "string"
         },
         "config_json": {
-          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying.",
+          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying. Portal changes since the export was taken are not included.",
           "type": "string"
         },
         "space_id": {
@@ -436,23 +451,28 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List stored snapshots, sorted newest first. Optionally filter by space_id.",
+    "description": "List snapshots for a space stored in the knowledge base, newest first.\n\nOnly shows snapshots created by this MCP. Config changes made in the\nportal since the last snapshot are not reflected.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
         "space_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Filter snapshots to this space ID. Omit to list all."
+          "description": "ID of the space to list snapshots for.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
         }
       },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
       "type": "object"
     },
     "name": "list_snapshots",
@@ -530,7 +550,7 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Restore a space to a prior snapshot. Auto-snapshots current state first.",
+    "description": "Restore a space to a prior snapshot. Auto-snapshots current state first.\n\nSnapshots reflect the config at the time snapshot_space was called.\nPortal changes made since then are not part of the snapshot and will be lost on revert.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -542,6 +562,10 @@
           "description": "ID of the snapshot to restore from.",
           "type": "string"
         },
+        "space_id": {
+          "description": "ID of the space to revert.",
+          "type": "string"
+        },
         "user_id": {
           "description": "Unique platform user ID of the caller.",
           "type": "string"
@@ -550,6 +574,7 @@
       "required": [
         "user_id",
         "company_id",
+        "space_id",
         "snapshot_id"
       ],
       "type": "object"
@@ -565,7 +590,7 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Capture the full space configuration as a named JSON snapshot. Returns snapshot_id.",
+    "description": "Capture the full space configuration as a named JSON snapshot stored in the knowledge base.\n\nReturns snapshot_id for later revert. Snapshots are point-in-time captures:\nconfig changes made through the portal since the last snapshot are not reflected.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
