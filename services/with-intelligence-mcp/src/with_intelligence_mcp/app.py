@@ -24,6 +24,7 @@ from with_intelligence_mcp.logging import configure_logging
 from with_intelligence_mcp.metrics import configure_metrics
 from with_intelligence_mcp.server.instructions import INSTRUCTIONS
 from with_intelligence_mcp.server.tools import TOOLS
+from with_intelligence_mcp.server_icons import SERVER_ICONS
 from with_intelligence_mcp.teardown import close_singletons
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def create_app() -> Starlette:
     mcp = FastMCP(
         "With Intelligence MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
