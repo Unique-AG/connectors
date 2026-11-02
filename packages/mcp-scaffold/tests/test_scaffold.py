@@ -475,9 +475,8 @@ def test_the_scaffolds_registered_their_release_and_scope(
         assert config["packages"][f"services/{name}"]["component"] == name
         assert manifest[f"services/{name}"] == "0.0.0"
         assert f"{name} = services/{name}/**" in (repo / ".gitcommitizen").read_text()
-        assert (
-            f"          - {name}\n" in (repo / ".github/workflows/release-rerun.yaml").read_text()
-        )
+        for workflow in ("release-dev.yaml", "release-rerun.yaml"):
+            assert f"          - {name}\n" in (repo / ".github/workflows" / workflow).read_text()
         assert f'"!services/{name}"' in (repo / "pnpm-workspace.yaml").read_text()
 
 
