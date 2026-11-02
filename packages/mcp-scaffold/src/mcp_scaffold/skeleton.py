@@ -16,7 +16,9 @@ NAME = "mcp-skeleton"
 
 
 def copy_skeleton(target: Path) -> None:
-    shutil.copytree(FILES / "skeleton", target, symlinks=True)
+    shutil.copytree(FILES / "skeleton", target)
+    # Linked here, not in the skeleton, where AGENTS.md is still a template and the link dangles
+    (target / "CLAUDE.md").symlink_to("AGENTS.md")
 
 
 def render_templates(target: Path, **context: object) -> None:

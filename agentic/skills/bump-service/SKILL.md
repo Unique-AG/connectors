@@ -104,6 +104,14 @@ For the `dev` target, use `FETCH_HEAD` in place of `<service>@<VERSION>`.
 
 Tell the user which of these you found. Do not skip the infrastructure PR without saying so.
 
+### Env variables on a dev pin
+
+A dev pin moves only the chart source. The values come from the overlay `values.yaml` in the monorepo, and a dev build does not change it.
+
+- To tune an env variable in QA, change the overlay `values.yaml` in a normal monorepo PR. Do not start a dev build.
+- After a dev build, compare the chart `values.yaml` on `dev/<service>/main` with the overlay. Copy each new, renamed, or removed key. The chart ignores an overlay key that it no longer reads, and ArgoCD shows green.
+- A default value in the code changes only with a new dev build.
+
 ## Step 4 - Monorepo PRs
 
 Open one PR for each cluster and environment. Branch each PR from `origin/master`. Do not stack them. Each PR must stay independent to merge and to revert.

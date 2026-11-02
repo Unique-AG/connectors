@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@2.0.0...backstop-mcp@3.0.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **backstop-mcp,mcp-configs,mcp-observability,architecture-demo-mcp,mcp-scaffold:** keep exception text out of logs and set library log levels ([#1311](https://github.com/Unique-AG/connectors/issues/1311))
+
+### Features
+
+* **backstop-mcp,mcp-configs,mcp-observability,architecture-demo-mcp,mcp-scaffold:** keep exception text out of logs and set library log levels ([#1311](https://github.com/Unique-AG/connectors/issues/1311)) ([1a69e3d](https://github.com/Unique-AG/connectors/commit/1a69e3dfe881dd98830e9e7722aa992f6e4d2313))
+* **backstop-mcp,mcp-observability,architecture-demo-mcp,mcp-scaffold:** turn on tracing and cut exception text from spans ([#1312](https://github.com/Unique-AG/connectors/issues/1312)) ([a03f4df](https://github.com/Unique-AG/connectors/commit/a03f4df9a4ca49de4e464cb37f05dea13bdbbace))
+* **backstop-mcp,mcp-observability,architecture-demo-mcp:** declare traced arguments with decorators and log each tool call ([#1313](https://github.com/Unique-AG/connectors/issues/1313)) ([b03f5de](https://github.com/Unique-AG/connectors/commit/b03f5dee047bc7284745f6b77e0cfe3835db68a1))
+* **backstop-mcp,mcp-observability:** log and trace every call site through the abstractions ([#1321](https://github.com/Unique-AG/connectors/issues/1321)) ([1be4097](https://github.com/Unique-AG/connectors/commit/1be4097e7f60ecf344b518c5026c71bcfe374cc9))
+* **backstop-mcp,mcp-observability:** trace each Backstop request and declare its failure level ([#1314](https://github.com/Unique-AG/connectors/issues/1314)) ([bf8cd4c](https://github.com/Unique-AG/connectors/commit/bf8cd4c79ba12839540c7c62672615f801dc7751))
+* **backstop-mcp:** bound the readiness check and log only its transitions ([#1315](https://github.com/Unique-AG/connectors/issues/1315)) ([203e654](https://github.com/Unique-AG/connectors/commit/203e654897c2c00f1d363cba90833e126d5519d9))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** bump base chart for network policy sync-wave ordering ([#1307](https://github.com/Unique-AG/connectors/issues/1307)) ([8e9eba5](https://github.com/Unique-AG/connectors/commit/8e9eba588c9052ef87a356a0bd9c575170848ca2))
+* **main:** vulna squash MAJOR VERSION BUMP pillow 12.3.0 to 13.0.0 ([#1296](https://github.com/Unique-AG/connectors/issues/1296)) ([1704f7c](https://github.com/Unique-AG/connectors/commit/1704f7c9a36082c6deff1615b1dfbf3a55b48ac0))
+
+
+### Dependencies
+
+* **architecture-demo-mcp,backstop-mcp,ci,exp-kyckr-mcp,exp-tiingo-mcp,hello-mcp,kb-mcp,mcp-openapi,mcp-scaffold,office-365-mcp,with-intelligence-mcp:** pin one version of each shared dependency ([#1291](https://github.com/Unique-AG/connectors/issues/1291)) ([a5cfdb8](https://github.com/Unique-AG/connectors/commit/a5cfdb8fc888e64a212fdf6dbe0457a453737ccf))
+* **architecture-demo-mcp,backstop-mcp,exp-kyckr-mcp,exp-tiingo-mcp,hello-mcp,kb-mcp,main,mcp-configs,mcp-credential-auth,mcp-observability,mcp-openapi,mcp-scaffold,office-365-mcp,with-intelligence-mcp:** give every Python project the same poe tasks ([#1292](https://github.com/Unique-AG/connectors/issues/1292)) ([71547e7](https://github.com/Unique-AG/connectors/commit/71547e7c1f447d8eefe270b076f91129514cd96c))
+* **architecture-demo-mcp,backstop-mcp,exp-kyckr-mcp,exp-tiingo-mcp,hello-mcp,kb-mcp,mcp-architecture,mcp-configs,mcp-credential-auth,mcp-observability,mcp-openapi,mcp-scaffold,office-365-mcp,with-intelligence-mcp:** require Python 3.14 and resolve one version of every package in every lock ([#1293](https://github.com/Unique-AG/connectors/issues/1293)) ([8f0a04b](https://github.com/Unique-AG/connectors/commit/8f0a04b87a2c33a0b0cb191dbee7f74286b2d1f1))
+* bump sqlalchemy[asyncio] in /services/backstop-mcp ([#1279](https://github.com/Unique-AG/connectors/issues/1279)) ([20a0493](https://github.com/Unique-AG/connectors/commit/20a049381f043dc295ce22434483c0ab28c5a672))
+* **main:** refresh dependencies and drop unneeded overrides ([#1322](https://github.com/Unique-AG/connectors/issues/1322)) ([a4f2390](https://github.com/Unique-AG/connectors/commit/a4f239000fc35b5809f6c7b50c920ac3c8419ef9))
+
 ## [2.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@1.0.1...backstop-mcp@2.0.0) (2026-10-23)
 
 

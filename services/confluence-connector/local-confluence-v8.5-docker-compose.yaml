@@ -31,6 +31,9 @@ services:
       ATL_TOMCAT_PORT: 8090
       JVM_MINIMUM_MEMORY: 1g
       JVM_MAXIMUM_MEMORY: 2g
+      # Fixed, so a fresh volume keeps the instance id the connector checks on the
+      # root scope, and a 30-day trial key keeps working.
+      ATL_PRODUCT_SERVER_ID: BDQU-16UU-RFI3-CW5W
     ports:
       - "8090:8090"
     volumes:
@@ -41,6 +44,19 @@ services:
       timeout: 5s
       retries: 20
       start_period: 120s
+
+  # Sets Confluence up and creates the test content. See local-confluence/seed.py.
+  seed:
+    image: atlassian/confluence:8.5.18
+    entrypoint: ["python3", "/seed/seed.py"]
+    restart: "no"
+    depends_on:
+      confluence:
+        condition: service_healthy
+    environment:
+      CONFLUENCE_ADMIN_PASSWORD: ${CONFLUENCE_PASSWORD_LOCAL_DC:-admin}
+    volumes:
+      - ./local-confluence:/seed:ro
 
 volumes:
   confluence_pgdata:

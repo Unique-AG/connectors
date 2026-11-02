@@ -117,6 +117,16 @@ The comment shows that the pin has no fixed version.
 
 The image label `org.opencontainers.image.revision` holds the full commit SHA of the build.
 
+## Change an env variable in QA
+
+The env variables of QA are not part of a dev build. They come from the overlay `values.yaml` of the service in the monorepo, which stays on `master`.
+
+| You want to change | Do this |
+|---|---|
+| An env variable in QA | Change the overlay `values.yaml` in a monorepo PR. ArgoCD syncs it. Do not start a dev build. |
+| A default value in the code | Merge to `main`, then start a dev build. |
+| A key in the chart `values.yaml` | Merge to `main`, start a dev build, then copy the change to the overlay. |
+
 ## Return to a release
 
 Use the `bump-service` skill with the target `<version>` for the QA cluster. The PR sets the pin to the release again. The cluster then stops following the branch.
@@ -134,6 +144,6 @@ Use the `bump-service` skill with the target `<version>` for the QA cluster. The
 | Someone commits to the branch | The next run replaces the commit. The count restarts if the version is not `<release>-dev.<n>`. | Do not commit to the branch. |
 | The release build fails | The job `dev <service>` of the release run fails. QA stays on the last dev build. | Open the job. Start `[Release] Dev Build` by hand for the service. |
 | The service is not in the dropdown | You cannot choose it for a manual run. A release still builds it. | Add the service to `release-dev.yaml`. |
-| `main` changes keys in the chart `values.yaml` | ArgoCD ignores an unknown key and shows green. | Copy each new key to the QA overlay values in the monorepo. |
+| `main` adds, renames, or removes a key in the chart `values.yaml` | The chart ignores an overlay key that it no longer reads. ArgoCD shows green. | Copy each change to the QA overlay values in the monorepo. |
 | `main` changes `deploy/terraform/` | A dev build does not move Terraform. | Make a release. Use `bump-service` for the Terraform pin. |
 | A prod cluster follows the branch | Prod runs code that is not released. | Never do this. |
