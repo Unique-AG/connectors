@@ -11,7 +11,7 @@ flowchart LR
   gate -->|fixable critical or high| stop[Release cannot merge]
   gate -->|clean or skip label| publish[Image published]
   publish --> scan[Nightly scan of published images]
-  scan --> slack[Slack report with image tag and CVE]
+  scan --> slack[Slack report with images and packages to fix]
   slack --> patch[Daily patch run opens fix PRs]
   patch --> releasePr
 ```
@@ -73,7 +73,7 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack with the image tag and each CVE. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has one row for each image, with its image tag, and one line for each package to fix. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
 
@@ -112,7 +112,7 @@ The cron automation `connectors-vulna-patchy` starts the skill `vulna-squash` in
 
 ```mermaid
 flowchart LR
-  scan[Nightly scan] --> slack[Slack report with image tag and CVE]
+  scan[Nightly scan] --> slack[Slack report with images and packages to fix]
   scan --> agent[Agent reads the findings at 05:00]
   agent --> fix[Fix PR with an agent run]
   fix --> release[Release PR and release gate]
