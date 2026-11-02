@@ -81,7 +81,7 @@ flowchart LR
 | Who skipped the release gate | The bot comment on the release PR |
 | Which dependencies stay fixed | The pins: `override-dependencies` and `pnpm.overrides` |
 
-## Setup that needs an admin
+## Required configuration
 
 | What | Why |
 |---|---|
