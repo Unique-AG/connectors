@@ -1,3 +1,6 @@
+import { crc32 } from 'node:zlib';
+import { type Entry, fromBufferPromise, type ZipFile } from 'yauzl';
+
 // Arbitrary external URLs are intentionally not supported.
 // Fetching user-supplied URLs server-side would expose the service to SSRF attacks:
 // an attacker (or a prompt-injected LLM) could target internal infrastructure
@@ -20,11 +23,8 @@ export type ParsedUri =
 
 const UNIQUE_URI_PATTERN = /^unique:\/\/content\/([^/]+)$/;
 const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
-const ZIP_LOCAL_HEADER_SIGNATURE = 0x04034b50;
-const ZIP_EOCD_SIGNATURE = 0x06054b50;
-const ZIP_EOCD_SIZE = 22;
-const ZIP_MAX_COMMENT_LENGTH = 0xffff;
-const ZIP64_MARKER = 0xffffffff;
+const ZIP_FILE_SIGNATURE = Buffer.from('PK\x03\x04', 'latin1');
+const MAX_UNCOMPRESSED_ATTACHMENT_SIZE = 1024 * 1024 * 1024;
 const TRUNCATED_ATTACHMENT_MESSAGE = 'Attachment data is truncated and cannot be opened';
 
 const OOXML_MIME_TYPES = new Set([
@@ -33,7 +33,10 @@ const OOXML_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]);
 
-export function parseAttachmentUri(uri: string): ParsedUri {
+export async function parseAttachmentUri(
+  uri: string,
+  { maxUncompressedSize = MAX_UNCOMPRESSED_ATTACHMENT_SIZE } = {},
+): Promise<ParsedUri> {
   const uniqueMatch = uri.match(UNIQUE_URI_PATTERN);
   if (uniqueMatch) {
     const contentId = uniqueMatch[1];
@@ -49,21 +52,14 @@ export function parseAttachmentUri(uri: string): ParsedUri {
       ? decodeBase64Attachment(rawData)
       : Buffer.from(decodeURIComponent(rawData));
 
-    if (isBase64 && shouldCheckZipStructure(mimeType, data)) {
-      assertOfficeZipIsComplete(data);
+    if (isBase64) {
+      await assertZipIsReadable(mimeType, data, maxUncompressedSize);
     }
 
     return { type: 'data', mimeType, data };
   }
 
   throw new Error(`Unsupported attachment URI scheme: ${uri.slice(0, 30)}`);
-}
-
-function shouldCheckZipStructure(mimeType: string, data: Buffer): boolean {
-  if (OOXML_MIME_TYPES.has(mimeType.toLowerCase())) {
-    return true;
-  }
-  return data.length >= 4 && data.readUInt32LE(0) === ZIP_LOCAL_HEADER_SIGNATURE;
 }
 
 // TypeScript 5.9 does not declare Uint8Array.fromBase64, which Node 26 provides.
@@ -80,44 +76,54 @@ function decodeBase64Attachment(rawData: string): Buffer {
   }
 }
 
-function assertOfficeZipIsComplete(data: Buffer): void {
-  const eocdOffset = findZipEocdOffset(data);
-  if (eocdOffset === undefined) {
+async function assertZipIsReadable(
+  mimeType: string,
+  data: Buffer,
+  maxUncompressedSize: number,
+): Promise<void> {
+  const isZip = data.subarray(0, ZIP_FILE_SIGNATURE.length).equals(ZIP_FILE_SIGNATURE);
+  if (OOXML_MIME_TYPES.has(mimeType.toLowerCase()) && !isZip) {
     throw new Error('Attachment is not a valid Office file and cannot be opened');
   }
-
-  const centralDirectorySize = data.readUInt32LE(eocdOffset + 12);
-  const centralDirectoryOffset = data.readUInt32LE(eocdOffset + 16);
-  // ZIP64 archives are not checked: the real offset lives in a locator this parser does not read.
-  if (centralDirectoryOffset === ZIP64_MARKER || centralDirectorySize === ZIP64_MARKER) {
+  if (!isZip) {
     return;
   }
 
-  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
-  if (
-    centralDirectoryOffset > eocdOffset ||
-    centralDirectorySize > eocdOffset ||
-    centralDirectoryEnd > eocdOffset
-  ) {
+  const { zipFile, entries } = await readZipDirectory(data);
+  // yauzl fails a stream that inflates past the entry's uncompressedSize, so the sum bounds the work.
+  const uncompressedSize = entries.reduce((total, entry) => total + entry.uncompressedSize, 0);
+  if (uncompressedSize > maxUncompressedSize) {
+    throw new Error('Attachment unpacks to more data than allowed and cannot be attached');
+  }
+
+  for (const entry of entries) {
+    if ((await computeEntryCrc32(zipFile, entry)) !== entry.crc32) {
+      throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+    }
+  }
+}
+
+async function readZipDirectory(data: Buffer): Promise<{ zipFile: ZipFile; entries: Entry[] }> {
+  try {
+    const zipFile = await fromBufferPromise(data, { lazyEntries: true });
+    const entries: Entry[] = [];
+    for await (const entry of zipFile.eachEntry()) {
+      entries.push(entry);
+    }
+    return { zipFile, entries };
+  } catch {
     throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
   }
 }
 
-function findZipEocdOffset(data: Buffer): number | undefined {
-  if (data.length < ZIP_EOCD_SIZE) {
-    return undefined;
-  }
-
-  const earliest = Math.max(0, data.length - ZIP_EOCD_SIZE - ZIP_MAX_COMMENT_LENGTH);
-  for (let offset = data.length - ZIP_EOCD_SIZE; offset >= earliest; offset -= 1) {
-    if (data.readUInt32LE(offset) !== ZIP_EOCD_SIGNATURE) {
-      continue;
+async function computeEntryCrc32(zipFile: ZipFile, entry: Entry): Promise<number> {
+  try {
+    let checksum = 0;
+    for await (const chunk of await zipFile.openReadStreamPromise(entry)) {
+      checksum = crc32(chunk, checksum);
     }
-    const commentLength = data.readUInt16LE(offset + 20);
-    if (offset + ZIP_EOCD_SIZE + commentLength === data.length) {
-      return offset;
-    }
+    return checksum;
+  } catch {
+    throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
   }
-
-  return undefined;
 }
