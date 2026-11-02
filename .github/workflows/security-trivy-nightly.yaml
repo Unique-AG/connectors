@@ -254,13 +254,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      SLACK_SECURITY_WEBHOOK_URL: ${{ secrets.SLACK_SECURITY_WEBHOOK_URL }}
+      SLACK_VULN_SCAN_WEBHOOK_URL: ${{ secrets.SLACK_VULN_SCAN_WEBHOOK_URL }}
     steps:
       - name: Check the Slack webhook
         id: webhook
         run: |
-          if [ -z "$SLACK_SECURITY_WEBHOOK_URL" ]; then
-            echo "::notice title=Slack report skipped::The secret SLACK_SECURITY_WEBHOOK_URL is empty, so the report is not posted."
+          if [ -z "$SLACK_VULN_SCAN_WEBHOOK_URL" ]; then
+            echo "::notice title=Slack report skipped::The secret SLACK_VULN_SCAN_WEBHOOK_URL is empty, so the report is not posted."
             echo "configured=false" >> "$GITHUB_OUTPUT"
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -301,7 +301,7 @@ jobs:
         if: steps.webhook.outputs.configured == 'true'
         with:
           other_alerts: ${{ steps.other.outputs.text }}
-          webhook: ${{ env.SLACK_SECURITY_WEBHOOK_URL }}
+          webhook: ${{ env.SLACK_VULN_SCAN_WEBHOOK_URL }}
           title: Security Trivy Scan (Registry)
           version_label: published-images
           reports_path: trivy-reports
