@@ -26,6 +26,7 @@ const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
 const ZIP_FILE_SIGNATURE = Buffer.from('PK\x03\x04', 'latin1');
 const MAX_UNCOMPRESSED_ATTACHMENT_SIZE = 1024 * 1024 * 1024;
 const TRUNCATED_ATTACHMENT_MESSAGE = 'Attachment data is truncated and cannot be opened';
+const UNPACKED_SIZE_MESSAGE = 'Attachment unpacks to more data than allowed and cannot be attached';
 
 const OOXML_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -89,29 +90,43 @@ async function assertZipIsReadable(
     return;
   }
 
-  const { zipFile, entries } = await readZipDirectory(data);
-  // yauzl fails a stream that inflates past the entry's uncompressedSize, so the sum bounds the work.
-  const uncompressedSize = entries.reduce((total, entry) => total + entry.uncompressedSize, 0);
-  if (uncompressedSize > maxUncompressedSize) {
-    throw new Error('Attachment unpacks to more data than allowed and cannot be attached');
-  }
-
-  for (const entry of entries) {
-    if ((await computeEntryCrc32(zipFile, entry)) !== entry.crc32) {
-      throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
-    }
+  const zipFile = await openZip(data);
+  try {
+    await assertEntriesMatchChecksum(zipFile, maxUncompressedSize);
+  } finally {
+    zipFile.close();
   }
 }
 
-async function readZipDirectory(data: Buffer): Promise<{ zipFile: ZipFile; entries: Entry[] }> {
+async function openZip(data: Buffer): Promise<ZipFile> {
   try {
-    const zipFile = await fromBufferPromise(data, { lazyEntries: true });
-    const entries: Entry[] = [];
-    for await (const entry of zipFile.eachEntry()) {
-      entries.push(entry);
-    }
-    return { zipFile, entries };
+    return await fromBufferPromise(data, { lazyEntries: true, autoClose: false });
   } catch {
+    throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+  }
+}
+
+async function assertEntriesMatchChecksum(
+  zipFile: ZipFile,
+  maxUncompressedSize: number,
+): Promise<void> {
+  try {
+    let uncompressedSize = 0;
+    // Read each entry before iteration ends. A closed archive rejects the checksum stream.
+    for await (const entry of zipFile.eachEntry()) {
+      uncompressedSize += entry.uncompressedSize;
+      // A stream that inflates past uncompressedSize fails, so the sum bounds the work.
+      if (uncompressedSize > maxUncompressedSize) {
+        throw new Error(UNPACKED_SIZE_MESSAGE);
+      }
+      if ((await computeEntryCrc32(zipFile, entry)) !== entry.crc32) {
+        throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === UNPACKED_SIZE_MESSAGE) {
+      throw error;
+    }
     throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
   }
 }

@@ -116,6 +116,19 @@ describe('parseAttachmentUri', () => {
       });
     });
 
+    it('parses a deflated Word file with more than one entry', async () => {
+      const zip = await buildWordFile({ compress: true, directory: true });
+      const result = await parseAttachmentUri(
+        `data:${WORD_MIME_TYPE};base64,${zip.toString('base64')}`,
+      );
+
+      expect(result).toEqual({
+        type: 'data',
+        mimeType: WORD_MIME_TYPE,
+        data: zip,
+      });
+    });
+
     it('rejects a Word file whose zip directory sits past the end of the buffer', async () => {
       const truncated = truncateZip(await buildWordFile());
 
@@ -214,9 +227,14 @@ describe('parseAttachmentUri', () => {
   });
 });
 
-function buildWordFile(): Promise<Buffer> {
+function buildWordFile(options?: { compress?: boolean; directory?: boolean }): Promise<Buffer> {
   const zip = new ZipFile();
-  zip.addBuffer(Buffer.from('<document/>'), 'word/document.xml', { compress: false });
+  if (options?.directory) {
+    zip.addEmptyDirectory('word/');
+  }
+  zip.addBuffer(Buffer.from('<document/>'), 'word/document.xml', {
+    compress: options?.compress ?? false,
+  });
   zip.end();
   return buffer(zip.outputStream);
 }
