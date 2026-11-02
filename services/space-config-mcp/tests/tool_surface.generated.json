@@ -172,7 +172,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return the SwappableIntelligence module configuration for a Conduct space.",
+    "description": "Return the SwappableIntelligence module ID and its typed ConductConfig for a Conduct space.\n\nThe configuration dict uses camelCase keys matching the stored format. Use this before\ncalling update_conduct_config to inspect the current state.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -607,17 +607,175 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Update a Conduct space's harness configuration. Merges into the existing config.",
+    "description": "Update a Conduct space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "agent_md_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Admin AGENT.md content injected into the workspace (setup.agentMdInstructions)."
+        },
+        "claude_autocompact_pct": {
+          "anyOf": [
+            {
+              "maximum": 95,
+              "minimum": 10,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Context autocompact threshold percentage for claude_code (10\u201395)."
+        },
+        "claude_effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reasoning effort level for the claude_code strategy."
+        },
+        "claude_max_context_tokens": {
+          "anyOf": [
+            {
+              "maximum": 500000,
+              "minimum": 50000,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum context window tokens for claude_code (50 000\u2013500 000)."
+        },
+        "claude_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Claude model ID for the claude_code/claude_sandbox strategy."
+        },
+        "claude_permission_mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "default",
+                "acceptEdits",
+                "bypassPermissions"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool permission mode for the claude_code strategy. 'bypassPermissions' skips all confirmation prompts."
+        },
+        "codex_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model ID for the codex strategy."
+        },
+        "codex_reasoning_effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reasoning effort level for the codex strategy."
+        },
         "company_id": {
           "description": "Unique platform company ID of the caller.",
           "type": "string"
         },
+        "custom_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Instructions appended to the agent system prompt (setup.customInstructions)."
+        },
+        "enable_browser_control": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable browser automation tools (setup.enableBrowserControl)."
+        },
+        "enable_code_execution": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable bash/write/read tools in the agent (setup.enableCodeExecution)."
+        },
         "max_turns": {
           "anyOf": [
             {
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             },
@@ -626,24 +784,128 @@
             }
           ],
           "default": null,
-          "description": "Set the claude.maxTurns limit for this Conduct agent."
+          "description": "Maximum agent turns (1\u20131000). Applied to the active strategy block (claude.maxTurns, piAgent.maxTurns, or codex.maxTurns)."
         },
-        "setup_patch": {
+        "mcp_integration_mode": {
           "anyOf": [
             {
-              "additionalProperties": true,
-              "type": "object"
+              "enum": [
+                "tools",
+                "skills"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Keys to merge into the setup block of the harness configuration."
+          "description": "How MCP servers are exposed to the agent: as 'tools' or 'skills' (setup.mcpIntegrationMode)."
+        },
+        "pi_agent_model_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model ID for the pi_agent strategy."
+        },
+        "pi_agent_thinking_level": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Thinking depth for the pi_agent strategy."
+        },
+        "progress_update_abort_s": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Abort the agent after this many seconds without a progress update. Set to null/None to disable (setup.progressUpdateAbortS)."
+        },
+        "show_thinking_in_chat": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Show agent thinking steps in the chat UI (setup.showThinkingInChat)."
+        },
+        "show_tool_calls_in_chat": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Show tool calls in the chat UI (setup.showToolCallsInChat)."
         },
         "space_id": {
           "description": "ID of the Conduct space to update.",
           "type": "string"
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "enum": [
+                "claude_code",
+                "pi_agent",
+                "codex",
+                "cursor_sdk",
+                "claude_sandbox"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agent execution strategy. 'claude_code' is the standard Claude Code runner. 'pi_agent' uses a Pi-model runner. 'codex' uses an OpenAI Codex runner."
+        },
+        "system_prompt_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When non-empty, fully replaces the agent system prompt (setup.systemPromptOverride)."
         },
         "user_id": {
           "description": "Unique platform user ID of the caller.",
@@ -674,7 +936,7 @@
         },
         "config_patch": {
           "additionalProperties": true,
-          "description": "Keys to merge into the module's configuration dict. Existing keys not in the patch are preserved.",
+          "description": "Keys to merge into the module's configuration dict. Existing keys not in the patch are preserved. For Conduct spaces, prefer update_conduct_config instead.",
           "type": "object"
         },
         "module_id": {
