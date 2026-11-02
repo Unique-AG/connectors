@@ -1,0 +1,173 @@
+onenote_list_notebooks-seed:
+  needs: &seed [onenote_seed]
+  chain:
+    - &dogfood {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Dogfood"}}
+
+onenote_list_recent_notebooks-recent:
+  needs: [onenote_recent]
+  chain:
+    - {tool: onenote_list_recent_notebooks}
+
+onenote_find_notebook_from_url-seed:
+  needs: *seed
+  chain:
+    - *dogfood
+    - {tool: onenote_find_notebook_from_url, bind: {web_url: "$prev.notebooks[0].web_url"}}
+
+onenote_list_sections-notebook:
+  needs: *seed
+  chain:
+    - *dogfood
+    - {tool: onenote_list_sections, bind: {parent: "$1.notebooks[0].uri"}}
+
+onenote_list_sections-group:
+  needs: *seed
+  scopes: [Notes.ReadWrite.All]
+  chain:
+    - *dogfood
+    - {tool: onenote_list_sections, bind: {parent: "$1.notebooks[0].uri"}}
+    - {tool: onenote_list_sections, bind: {parent: "$2.section_groups[0].uri"}}
+
+onenote_list_pages-section:
+  needs: *seed
+  chain:
+    - *dogfood
+    - &planning {tool: onenote_list_sections, args: {name_contains: Planning}, bind: {parent: "$1.notebooks[0].uri"}}
+    - {tool: onenote_list_pages, bind: {section: "$prev.sections[0].uri"}}
+
+onenote_list_pages-title:
+  needs: *seed
+  chain:
+    - *dogfood
+    - *planning
+    - {tool: onenote_list_pages, args: {title_contains: Launch}, bind: {section: "$prev.sections[0].uri"}}
+
+onenote_preview_page-gallery:
+  needs: *seed
+  chain:
+    - *dogfood
+    - &reading {tool: onenote_list_sections, args: {name_contains: Reading}, bind: {parent: "$1.notebooks[0].uri"}}
+    - &gallery {tool: onenote_list_pages, args: {title_contains: Gallery}, bind: {section: "$prev.sections[0].uri"}}
+    - &preview {tool: onenote_preview_page, bind: {page: "$prev.pages[0].uri"}}
+
+onenote_read_page-gallery:
+  needs: *seed
+  chain:
+    - *dogfood
+    - *reading
+    - *gallery
+    - &read {tool: onenote_read_page, bind: {page: "$prev.pages[0].uri"}}
+
+onenote_read_resource-gallery:
+  needs: *seed
+  chain:
+    - *dogfood
+    - *reading
+    - *gallery
+    - *read
+    - {tool: onenote_read_resource, bind: {resource: "$prev.html~img[src]"}}
+
+onenote_create_notebook-new:
+  chain:
+    - {tool: onenote_create_notebook, args: {name: "seed-v1 case-onenote_create_notebook-new ~tomorrow"}}
+
+onenote_create_section-new:
+  needs: *seed
+  chain:
+    - &scratch {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Scratch"}}
+    - {tool: onenote_create_section, args: {name: "seed-v1 case-section ~tomorrow"}, bind: {parent: "$prev.notebooks[0].uri"}}
+
+onenote_create_section_group-new:
+  needs: *seed
+  chain:
+    - *scratch
+    - {tool: onenote_create_section_group, args: {name: "seed-v1 case-group ~tomorrow"}, bind: {parent: "$prev.notebooks[0].uri"}}
+
+onenote_create_page-seed:
+  needs: *seed
+  chain:
+    - *scratch
+    - &pad {tool: onenote_list_sections, args: {name_contains: Pad}, bind: {parent: "$1.notebooks[0].uri"}}
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_create_page-seed", body_html: "<p>One paragraph.</p>"}, bind: {section: "$prev.sections[0].uri"}}
+
+onenote_append_to_page-seed:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_append_to_page-seed", body_html: "<p>Start.</p>"}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_append_to_page, args: {body_html: "<p>End.</p>"}, bind: {page: "$prev.uri"}}
+
+onenote_edit_page-insert:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_edit_page-insert", body_html: '<p data-id="intro">Start.</p>'}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_edit_page, args: {commands: [{target: "#intro", action: insert, position: after, content: "<p>Next.</p>"}]}, bind: {page: "$prev.uri"}}
+
+onenote_edit_page-title:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_edit_page-title", body_html: "<p>Start.</p>"}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_edit_page, args: {commands: [{target: title, action: replace, content: "seed-v1 case-onenote_edit_page-title new"}]}, bind: {page: "$prev.uri"}}
+
+onenote_rename_page-seed:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_rename_page-seed", body_html: "<p>Start.</p>"}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_rename_page, args: {title: "seed-v1 case-onenote_rename_page-seed new"}, bind: {page: "$prev.uri"}}
+
+onenote_delete_page-seed:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_delete_page-seed", body_html: "<p>Start.</p>"}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_delete_page, bind: {page: "$prev.uri"}}
+
+onenote_copy_page-section:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - &copies {tool: onenote_list_sections, args: {name_contains: Copies}, bind: {parent: "$1.notebooks[0].uri"}}
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_copy_page-section", body_html: "<p>Start.</p>"}, bind: {section: "$2.sections[0].uri"}}
+    - {tool: onenote_copy_page, bind: {page: "$prev.uri", to_section: "$3.sections[0].uri"}}
+
+onenote_copy_section-notebook:
+  needs: *seed
+  chain:
+    - *dogfood
+    - *reading
+    - *scratch
+    - {tool: onenote_copy_section, args: {new_name: "seed-v1 case-copy ~tomorrow"}, bind: {section: "$2.sections[0].uri", to_notebook: "$3.notebooks[0].uri"}}
+
+onenote_copy_section-group:
+  needs: *seed
+  chain:
+    - *dogfood
+    - *reading
+    - *scratch
+    - {tool: onenote_list_sections, args: {name_contains: Bin}, bind: {parent: "$3.notebooks[0].uri"}}
+    - {tool: onenote_copy_section, args: {new_name: "seed-v1 case-copy2 ~tomorrow"}, bind: {section: "$2.sections[0].uri", to_section_group: "$4.section_groups[0].uri"}}
+
+onenote_copy_notebook-spare:
+  needs: *seed
+  chain:
+    - {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Spare"}}
+    - {tool: onenote_copy_notebook, args: {new_name: "seed-v1 case-notebook-copy ~tomorrow"}, bind: {notebook: "$prev.notebooks[0].uri"}}
+
+onenote_get_operation-copy:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - *copies
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_get_operation-copy", body_html: "<p>Start.</p>"}, bind: {section: "$2.sections[0].uri"}}
+    - {tool: onenote_copy_page, bind: {page: "$prev.uri", to_section: "$3.sections[0].uri"}}
+    - {tool: onenote_get_operation, bind: {operation: "$prev.uri"}}

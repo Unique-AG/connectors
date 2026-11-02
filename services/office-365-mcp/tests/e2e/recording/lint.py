@@ -2,7 +2,12 @@
 a fixture or a body: plain, URL-, HTML-, JSON- and MIME-encoded, base64 and base32 at every
 alignment, gzip, and inside zip members, also nested. A recorded fixture also gets the corpus
 check: every kept key is in the projection, every text is corpus text, every address is
-synthetic, every id was made by the mapper, every binary is a seed file. It never prints a value.
+synthetic, every id was made by the mapper, every binary is a seed file. A finding in a JSON file
+names the path of the leaf and the class of the match. It never prints a value.
+
+A short form of an identity, such as the tenant short name, is not a leak when the match lies
+inside text that the seed corpus holds. The text must contain the seed tag and must not run on
+into other words. The full identity always counts.
 
   python -m tests.e2e.recording.lint [ROOT] [--require-identities]
 
@@ -27,31 +32,39 @@ from base64 import b32decode, b64decode, urlsafe_b64decode
 from collections.abc import Collection, Iterator, Mapping
 from pathlib import Path
 from typing import cast
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 import yaml
 
+from tests.e2e.recording.guard import GRAPH_HOST
 from tests.e2e.recording.scrub import (
+    KEPT_HOSTS,
+    PAGE_EMBEDS,
     RESPONSE_HEADERS,
     SCHEMA,
     SYNTHETIC_DOMAIN,
     Corpus,
+    holds_bytes,
     load_corpus,
     made_by_the_mapper,
     normalized,
+    page_attribute_kind,
+    rewritten_page,
 )
 from tests.e2e.test_scenarios import HERE, Json
 
 IDENTITIES_VARIABLE = "RECORD_LINT_IDENTITIES"
+_SHORT_FORM = ", a short form"
 REQUEST_HEADERS = frozenset({"prefer", "consistencylevel"})
 _RESERVED = r"(?:example\.(?:com|net|org|test)|[a-z0-9\-.]+\.(?:example|test|invalid|localhost))"
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "an address outside the reserved domains",
         re.compile(
-            r"[A-Za-z0-9._%+\-]+@(?!"
+            r"(?<![A-Za-z0-9._%+\-])(?!user@odata\.bind(?![\w.\-]))[A-Za-z0-9._%+\-]+@(?!"
             + _RESERVED
-            + r"(?![A-Za-z0-9\-])|thread\.(?:v2|skype|tacv2)\b)"
+            + r"(?![A-Za-z0-9\-])|(?:thread\.(?:v2|skype|tacv2)|(?:[a-z]{2,4}\.){2,3}spaces)"
+            + r"(?![\w.\-]))"
             + r"[A-Za-z0-9\-]+\.[A-Za-z]",
             re.I,
         ),
@@ -176,7 +189,33 @@ def _forms(identity: str) -> Iterator[tuple[str, str]]:
     labels = [w for w in words if w not in {"onmicrosoft", "com", "ch", "de", "mail", "net"}]
     for label in {*labels, "".join(labels), *(label.replace("-", "") for label in labels)}:
         if len(label) >= 5 and label != plain:
-            yield ", a short form", label
+            yield _SHORT_FORM, label
+
+
+def _grown(plain: str, start: int, end: int, corpus: Corpus) -> tuple[int, int]:
+    while True:
+        if start and _in_blob(plain[start - 1 : end], corpus):
+            start -= 1
+        elif end < len(plain) and _in_blob(plain[start : end + 1], corpus):
+            end += 1
+        else:
+            return start, end
+
+
+def _in_blob(piece: str, corpus: Corpus) -> bool:
+    return "\x00" not in piece and piece in corpus.blob
+
+
+def _only_corpus_text(folded: str, needle: str, corpus: Corpus) -> bool:
+    plain = folded
+    while (decoded := unquote(plain)) != plain:
+        plain = decoded
+    for found in re.finditer(re.escape(needle), plain):
+        start, end = _grown(plain, *found.span(), corpus)
+        around = plain[max(start - 1, 0) : start] + plain[end : end + 1]
+        if corpus.tag.casefold() not in plain[start:end] or any(c.isalnum() for c in around):
+            return False
+    return True
 
 
 def _binary_forms(identity: str) -> list[bytes]:
@@ -186,7 +225,9 @@ def _binary_forms(identity: str) -> list[bytes]:
     return forms
 
 
-def _scan(where: str, text: str, identities: Collection[str], strict: bool) -> list[str]:
+def _scan(
+    where: str, text: str, identities: Collection[str], strict: bool, corpus: Corpus | None
+) -> list[str]:
     rules = _RULES if strict else _RULES[:-2]
     found: list[str] = []
     for view, shown in _views(text):
@@ -197,6 +238,9 @@ def _scan(where: str, text: str, identities: Collection[str], strict: bool) -> l
             for n, identity in enumerate(sorted(identities), 1)
             for form, needle in _forms(identity)
             if needle in folded
+            and not (
+                form == _SHORT_FORM and _only_corpus_text(folded, needle, corpus or load_corpus())
+            )
         ]
         for raw in _decoded(shown):
             lowered = raw.lower()
@@ -212,25 +256,26 @@ def _scan(where: str, text: str, identities: Collection[str], strict: bool) -> l
     return found
 
 
-def _strings(value: object, key: str = "") -> Iterator[tuple[str, str]]:
+def _strings(value: object, key: str = "", path: str = "") -> Iterator[tuple[str, str, str]]:
     if isinstance(value, str):
-        yield key, value
+        yield path, key, value
     elif isinstance(value, list):
-        for one in cast("list[object]", value):
-            yield from _strings(one, key)
+        for n, one in enumerate(cast("list[object]", value)):
+            yield from _strings(one, key, f"{path}[{n}]")
     elif isinstance(value, Mapping):
         for name, one in cast("Json", value).items():
-            yield from _strings(one, name)
+            yield from _strings(one, name, f"{path}.{name}" if path else name)
 
 
-def _keys(value: object) -> Iterator[str]:
+def _keys(value: object, path: str = "") -> Iterator[tuple[str, str]]:
     if isinstance(value, list):
-        for one in cast("list[object]", value):
-            yield from _keys(one)
+        for n, one in enumerate(cast("list[object]", value)):
+            yield from _keys(one, f"{path}[{n}]")
     elif isinstance(value, Mapping):
         for name, one in cast("Json", value).items():
-            yield name
-            yield from _keys(one)
+            here = f"{path}.{name}" if path else name
+            yield here, name
+            yield from _keys(one, here)
 
 
 def _recorded(files: Mapping[str, bytes]) -> dict[str, frozenset[str]]:
@@ -246,8 +291,8 @@ def _recorded(files: Mapping[str, bytes]) -> dict[str, frozenset[str]]:
 
 def _ids(name: str, value: object) -> list[str]:
     found = [
-        f"{name}: an id the mapper did not make"
-        for key, text in _strings(value)
+        f"{name} at {path}: an id the mapper did not make"
+        for path, key, text in _strings(value)
         if (SCHEMA.get(key) == "id" and not made_by_the_mapper(text))
         or any(
             not made_by_the_mapper(token)
@@ -257,7 +302,45 @@ def _ids(name: str, value: object) -> list[str]:
     return found[:1]
 
 
+def _page(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) -> list[str]:
+    extra = "\x00".join(normalized(one) for one in sorted(literals))
+    found: list[str] = []
+
+    def text(value: str) -> str:
+        if not corpus.accepts(value, extra):
+            found.append(f"{name}: a text node that is not corpus text")
+        return value
+
+    def attribute(key: str, value: str) -> str:
+        match page_attribute_kind(key, value):
+            case "text":
+                if not corpus.accepts(value, extra):
+                    found.append(f"{name}: an attribute {key} that is not corpus text")
+            case "url":
+                host = (urlsplit(value).hostname or "").casefold()
+                if not host:
+                    _ = text(value)
+                elif host not in ({GRAPH_HOST} if key in PAGE_EMBEDS else KEPT_HOSTS) and not (
+                    host.endswith(f".{SYNTHETIC_DOMAIN}") and key not in PAGE_EMBEDS
+                ):
+                    found.append(
+                        f"{name}: an attribute {key} that is not a Graph or synthetic address"
+                    )
+            case "id" | "plain":
+                pass
+        if any(
+            not made_by_the_mapper(t) for t in cast("list[str]", _ID_TOKEN.findall(unquote(value)))
+        ):
+            found.append(f"{name}: an attribute {key} holds an id the mapper did not make")
+        return value
+
+    _ = rewritten_page(body.decode(errors="replace"), text, attribute)
+    return list(dict.fromkeys(found))
+
+
 def _corpus(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) -> list[str]:
+    if name.endswith(".html"):
+        return _page(name, body, corpus, literals)
     if not name.endswith(".json"):
         if hashlib.sha256(body).hexdigest() in corpus.binaries:
             return []
@@ -265,16 +348,20 @@ def _corpus(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) ->
     parsed = cast("object", json.loads(body))
     extra = "\x00".join(normalized(one) for one in sorted(literals))
     found = [
-        f"{name}: the key {key!r} is not in the projection"
-        for key in _keys(parsed)
+        f"{name} at {path}: a key that is not in the projection"
+        for path, key in _keys(parsed)
         if key not in SCHEMA
     ]
-    for key, text in _strings(parsed):
+    for path, key, text in _strings(parsed):
         kind = SCHEMA.get(key)
-        if kind == "text" and not corpus.accepts(text, extra):
-            found.append(f"{name}: a {key} that is not corpus text")
+        if (
+            kind == "text"
+            and not corpus.accepts(text, extra)
+            and not (key == "contentBytes" and holds_bytes(corpus, text))
+        ):
+            found.append(f"{name} at {path}: a {key} that is not corpus text")
         if kind == "address" and not text.casefold().endswith(f"@{SYNTHETIC_DOMAIN}"):
-            found.append(f"{name}: an {key} that is not synthetic")
+            found.append(f"{name} at {path}: an {key} that is not synthetic")
     return found + _ids(name, parsed)
 
 
@@ -294,6 +381,25 @@ def _headers(name: str, interactions: list[Json]) -> list[str]:
     return found
 
 
+def _rule(finding: str) -> str:
+    return re.sub(r" \([^()]*\)$", "", finding).rpartition(": ")[2]
+
+
+def _located(
+    name: str, body: bytes, identities: Collection[str], strict: bool, corpus: Corpus | None
+) -> list[str]:
+    try:
+        parsed = cast("object", json.loads(body))
+    except ValueError:
+        return []
+    keys = ((f"{path.removesuffix(key)}(a key)", key) for path, key in _keys(parsed))
+    return [
+        found
+        for path, text in (*((path, text) for path, _, text in _strings(parsed)), *keys)
+        for found in _scan(f"{name} at {path}", text, identities, strict, corpus)
+    ]
+
+
 def lint_files(
     files: Mapping[str, bytes], identities: Collection[str] = (), corpus: Corpus | None = None
 ) -> list[str]:
@@ -307,8 +413,17 @@ def lint_files(
         if "body" in interaction
     }
     for name, body in files.items():
-        for where, text in _texts(name, body):
-            findings += _scan(where, text, identities, name in strict)
+        whole = [
+            found
+            for where, text in _texts(name, body)
+            for found in _scan(where, text, identities, name in strict, corpus)
+        ]
+        if whole and name.endswith(".json"):
+            located = _located(name, body, identities, name in strict, corpus)
+            seen = {_rule(found) for found in located}
+            findings += located
+            whole = [found for found in whole if _rule(found) not in seen]
+        findings += whole
         if not (name.startswith("fixtures/") and name.endswith(".json")):
             continue
         interactions = cast("list[Json]", json.loads(body))

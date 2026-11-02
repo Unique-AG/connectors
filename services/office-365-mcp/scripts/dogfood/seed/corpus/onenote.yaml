@@ -1,0 +1,36 @@
+notebooks:
+  - name: Dogfood Notes
+    sections:
+      - name: Planning
+        pages:
+          - title: Launch plan
+            paragraphs:
+              - id: intro
+                text: The launch is on the first Monday of next month.
+              - text: The team checks the plan every Friday.
+          - title: Meeting notes
+            paragraphs:
+              - text: The team agrees on three tasks for the week.
+      - name: Reading
+        pages:
+          - title: Gallery
+            image: true
+            paragraphs:
+              - text: This page holds one picture.
+    groups:
+      - name: Archive
+        sections:
+          - name: Old plans
+            pages:
+              - title: Last year plan
+                paragraphs:
+                  - text: The old plan is closed.
+  - name: Scratch
+    sections:
+      - name: Pad
+      - name: Copies
+    groups:
+      - name: Bin
+  - name: Spare
+    sections:
+      - name: Leftovers

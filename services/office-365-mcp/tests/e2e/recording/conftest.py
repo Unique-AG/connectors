@@ -23,6 +23,7 @@ def record_on(
     *,
     allow_writes: bool = True,
     upns: tuple[str, ...] = stand_in.UPNS,
+    refused: Path | None = None,
 ) -> Outcome:
     chosen = resolve(plan) if isinstance(plan, str) else plan
     graph = graph or StandIn()
@@ -34,6 +35,7 @@ def record_on(
             upns=upns,
             allow_writes=allow_writes,
             stand_in=graph,
+            refused=refused,
         )
     )
 

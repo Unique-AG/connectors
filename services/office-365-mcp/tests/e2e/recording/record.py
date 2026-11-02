@@ -6,9 +6,10 @@ stand-in, scrubs it, lints it, replays it through the runner, and writes the fix
   python -m tests.e2e.recording.record uc-02-01 --target stand-in [--dry-run] [--allow-writes]
 
 The chain comes from the scenario's entry in features/*.calls.yaml, changed by its variant in
-recorded.calls.yaml. The recording user is position 1 of SEED_UPNS. The token goes into the
-Authorization header of requests to graph.microsoft.com and nowhere else; the app itself only ever
-holds the runner's synthetic token. Raw answers stay in memory. Exit 0 when written, 1 when
+recorded.calls.yaml. A tool case of cases/*.yaml names its own chain, persona and fixture. The
+recording user is the persona's position of SEED_UPNS, position 1 by default. The token goes into
+the Authorization header of requests to graph.microsoft.com and nowhere else; the app itself only
+ever holds the runner's synthetic token. Raw answers stay in memory. Exit 0 when written, 1 when
 written but the variant's expect does not hold, 2 when refused (nothing written)."""
 
 import argparse
@@ -17,6 +18,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -24,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast, override
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import httpx
 import pytest
@@ -36,6 +38,8 @@ from fastmcp.client.transports import FastMCPTransport
 import tests.e2e.test_scenarios as runner
 from tests.conftest import RecordedSleeps
 from tests.e2e.recording import stand_in as stand_in_graph
+from tests.e2e.recording.cases import CASES, case_entries
+from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import (
     DEFAULT_CAP,
     GRAPH_HOST,
@@ -54,6 +58,7 @@ from tests.e2e.recording.scrub import (
     Target,
     files_of,
     load_corpus,
+    mapped_guid,
     scrub,
 )
 from tests.e2e.recording.stand_in import StandIn
@@ -77,8 +82,12 @@ from tests.e2e.test_scenarios import (
 HERE = Path(__file__).parent
 RECORDED = HERE / "recorded.calls.yaml"
 STAND_IN_OUT = Path(tempfile.gettempdir()) / "office-365-mcp-stand-in"
+REFUSED = HERE.parents[2] / ".record-all" / "refused"
 GRAPH = f"https://{GRAPH_HOST}/v1.0"
 _TRANSIENT = frozenset({429, 503, 504})
+_SCOPE = re.compile(r"[A-Za-z]+(?:\.[A-Za-z]+)+")
+_MAX_GAP = 600
+_PERSONA = re.compile(r"persona:[a-z]+(?:\.[a-z]+)?")
 _REPLACED = re.compile(
     r"synthetic text \d+|user-\d+@example\.test|user_\d+_example_test|host-\d+\."
 )
@@ -91,11 +100,21 @@ class Plan:
     scenario: str
     fixture: str
     steps: tuple[Json, ...]
+    case: bool = False
+    persona: int = 1
+    destructive: bool = False
+    reseed: tuple[str, ...] = ()
+    external: bool = False
+    needs: tuple[str, ...] = ()
+    cap: int = 0
+    scopes: tuple[str, ...] = ()
+    gap: int = 0
 
     @property
     def literals(self) -> frozenset[str]:
         given = [{**mapping(s.get("args", {})), **mapping(s.get("bind", {}))} for s in self.steps]
-        return frozenset(v for _, v in strings(given) if not v.startswith("$") and len(v) >= 4)
+        found = [v for _, v in strings(given) if not v.startswith("$") and len(v) >= 4]
+        return frozenset(one for v in found for one in (v, str(_given(v, ()))))
 
 
 @dataclass(frozen=True, repr=False)
@@ -110,22 +129,100 @@ class Outcome:
         return f"Outcome({self.recording.scenario}, {len(self.unmet)} unmet)"
 
 
-def resolve(scenario: str, recorded: Path = RECORDED) -> Plan:
-    found = dict(entries())
+def catalogs(cases: Path | None = None) -> tuple[dict[str, Json], dict[str, Json]]:
+    case = dict(case_entries(cases or CASES))
+    return dict(entries()) | case, case
+
+
+def resolve(
+    scenario: str,
+    recorded: Path = RECORDED,
+    cases: Path | None = None,
+    loaded: tuple[dict[str, Json], dict[str, Json]] | None = None,
+) -> Plan:
+    found, case = loaded or catalogs(cases)
     if scenario not in found:
-        raise Refused(f"{scenario} is not an entry of features/*.calls.yaml")
+        raise Refused(f"{scenario} is not an entry of features/*.calls.yaml or of cases/*.yaml")
     variants = mapping(cast("object", yaml.safe_load(recorded.read_text())) or {})
-    variant = mapping(variants.get(scenario, {}))
+    variant: Json = mapping(variants.get(scenario, {})) if scenario not in case else {}
     overrides = cast("Mapping[object, object]", variant)
     chain = items(found[scenario]["chain"])
     steps = tuple(
         {**mapping(step), **mapping(overrides.get(n, {}))} for n, step in enumerate(chain, 1)
     )
-    return Plan(scenario, str(variant.get("fixture", f"rec-{scenario}")), steps)
+    spec: Json = case.get(scenario, {})
+    scopes = tuple(map(str, cast("list[object]", spec.get("scopes", []))))
+    gap = int(cast("int", spec.get("gap", load().gaps.get(tool_of(steps[-1]), 0))))
+    if bad := [name for name in scopes if not _SCOPE.fullmatch(name)]:
+        raise Refused(f"{scenario}: {bad} is not a Graph permission name such as Group.Read.All")
+    if not 0 <= gap <= _MAX_GAP:
+        raise Refused(f"{scenario}: the gap must be within 0..{_MAX_GAP} seconds")
+    default = f"rec-tool-{scenario}" if spec else f"rec-{scenario}"
+    return Plan(
+        scenario,
+        str((spec or variant).get("fixture", default)),
+        steps,
+        bool(spec),
+        int(cast("int", spec.get("persona", 1))),
+        bool(spec.get("destructive", False)),
+        tuple(map(str, cast("list[object]", spec.get("reseed", [])))),
+        bool(spec.get("external", False)),
+        tuple(map(str, cast("list[object]", spec.get("needs", [])))),
+        int(cast("int", spec.get("cap", 0))),
+        scopes,
+        gap,
+    )
 
 
-def _tool(step: Json) -> str:
+def guard_for(upns: Sequence[str], plan: Plan, allow_writes: bool, cap: int) -> Guard:
+    if not 1 <= plan.persona <= len(upns):
+        raise Refused(f"{plan.scenario}: persona {plan.persona} is not within 1..{len(upns)}")
+    wanted = plan.cap or cap
+    if not 1 <= wanted <= MAX_CAP:
+        raise Refused(f"{plan.scenario}: the request cap must be within 1..{MAX_CAP}")
+    return Guard(upns[plan.persona - 1], frozenset(upns), allow_writes, wanted)
+
+
+def tool_of(step: Json) -> str:
     return str(step.get("pick", step.get("tool")))
+
+
+def persona_values(
+    upns: Sequence[str], ids: Mapping[str, str], *, synthetic: bool
+) -> dict[str, str]:
+    found: dict[str, str] = {}
+    for persona in load_corpus().personas:
+        if persona.index > len(upns):
+            continue
+        key = f"persona:{persona.key}"
+        found[key] = f"{persona.key}@example.test" if synthetic else upns[persona.index - 1]
+        found[f"{key}.name"] = persona.display_name
+        if persona.key in ids:
+            found[f"{key}.id"] = mapped_guid(ids[persona.key]) if synthetic else ids[persona.key]
+    return found
+
+
+def with_personas(value: object, values: Mapping[str, str]) -> object:
+    if isinstance(value, str):
+
+        def one(found: re.Match[str]) -> str:
+            if found[0] not in values:
+                raise Refused(f"{found[0]} names no test user, or a user whose id was not read")
+            return values[found[0]]
+
+        return _PERSONA.sub(one, value)
+    if isinstance(value, list):
+        return [with_personas(item, values) for item in cast("list[object]", value)]
+    if isinstance(value, Mapping):
+        return {key: with_personas(one, values) for key, one in cast("Json", value).items()}
+    return value
+
+
+def uses_ids(plan: Plan) -> bool:
+    return any(
+        found.endswith(".id")
+        for found in cast("list[str]", _PERSONA.findall(json.dumps(plan.steps)))
+    )
 
 
 def _literal_args(step: Json) -> dict[str, object]:
@@ -138,7 +235,7 @@ def check(plan: Plan, guard: Guard) -> list[str]:
     for number, step in enumerate(plan.steps, 1):
         if "fault" in step:
             refusals.append(f"step {number}: a fault is synthetic and is never recorded")
-        refusal = guard.refuses_call(_tool(step), _literal_args(step))
+        refusal = guard.refuses_call(tool_of(step), _literal_args(step))
         refusals += [f"step {number}: {refusal}"] if refusal else []
     return refusals
 
@@ -147,11 +244,11 @@ def describe(plan: Plan, guard: Guard) -> list[str]:
     lines = [f"{plan.scenario} -> fixture {plan.fixture} (dry run, nothing is sent):"]
     for number, step in enumerate(plan.steps, 1):
         given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
-        refusal = guard.refuses_call(_tool(step), _literal_args(step))
+        refusal = guard.refuses_call(tool_of(step), _literal_args(step))
         verdict = "allowed" if refusal is None else f"REFUSED: {refusal}"
         if "fault" in step:
             verdict = "REFUSED: a fault is synthetic and is never recorded"
-        lines.append(f"  step {number}: {_tool(step)}({json.dumps(given)}) -> {verdict}")
+        lines.append(f"  step {number}: {tool_of(step)}({json.dumps(given)}) -> {verdict}")
     return lines
 
 
@@ -186,7 +283,11 @@ class Recorder(Replay):
             else request.headers
         )
         sent = httpx.Request(request.method, request.url, headers=headers, content=request.content)
-        response = await self.send(transport, sent)
+        try:
+            response = await self.send(transport, sent)
+        except httpx.HTTPError:
+            self.guard.write_failed = True
+            raise
         raw = b"".join([chunk async for chunk in response.aiter_raw()])
         await response.aclose()
         headers_back = tuple(response.headers.multi_items())
@@ -235,9 +336,15 @@ def _redacted(text: str, secrets: Sequence[str]) -> str:
 
 
 async def preflight(
-    send: Send, transport: httpx.AsyncBaseTransport, guard: Guard, token: str, upns: Sequence[str]
-) -> Identities:
-    async def get(path: str) -> Json:
+    send: Send,
+    transport: httpx.AsyncBaseTransport,
+    guard: Guard,
+    token: str,
+    upns: Sequence[str],
+    *,
+    people: bool = False,
+) -> tuple[Identities, dict[str, str]]:
+    async def get(path: str, *, required: bool = True) -> Json:
         request = httpx.Request(
             "GET", f"{GRAPH}{path}", headers={"authorization": f"Bearer {token}"}
         )
@@ -245,6 +352,8 @@ async def preflight(
             raise Refused(f"preflight: {refusal}")
         response = await send(transport, request)
         body = await response.aread()
+        if response.status_code != 200 and not required:
+            return {}
         if response.status_code != 200:
             raise Refused(
                 f"preflight GET {path} answered {response.status_code}; nothing was recorded"
@@ -253,25 +362,37 @@ async def preflight(
 
     me = await get("/me?$select=id,userPrincipalName,mail,displayName")
     if str(me.get("userPrincipalName", "")).casefold() != guard.allowed_upn.casefold():
-        raise Refused("GET /me does not answer SEED_UPNS position 1; nothing was recorded")
+        position = upns.index(guard.allowed_upn) + 1
+        raise Refused(
+            f"GET /me does not answer SEED_UPNS position {position}; nothing was recorded"
+        )
     organization = mapping(
         items((await get("/organization?$select=id,displayName,verifiedDomains"))["value"])[0]
     )
-    drive = await get("/me/drive?$select=id")
-    guard.me_id, guard.drive_ids = str(me["id"]), frozenset({str(drive["id"])})
+    drive = await get("/me/drive?$select=id", required=False)
+    guard.me_id = str(me["id"])
+    keys = {persona.index: persona.key for persona in load_corpus().personas}
+    mine = upns.index(guard.allowed_upn) + 1
+    ids = {keys[mine]: guard.me_id}
+    for position, upn in enumerate(upns, 1):
+        if people and position != mine:
+            ids[keys[position]] = str((await get(f"/users/{quote(upn)}?$select=id"))["id"])
+    guard.people = frozenset(ids.values())
+    guard.drive_ids = frozenset({str(drive["id"])}) if "id" in drive else frozenset[str]()
     names = {str(me.get("displayName") or ""), str(organization.get("displayName") or "")}
     personas = {persona.display_name for persona in load_corpus().personas}
     values = {
         str(me["id"]),
         str(organization["id"]),
-        str(drive["id"]),
+        *guard.drive_ids,
         *upns,
+        *ids.values(),
         *(str(me[key]) for key in ("userPrincipalName", "mail") if me.get(key)),
         *(str(mapping(d)["name"]) for d in items(organization.get("verifiedDomains", []))),
         *(name for name in names if len(name) >= 5 and name not in personas),
         *{upn.rpartition("@")[2] for upn in upns},
     }
-    return Identities(frozenset(values), token)
+    return Identities(frozenset(values), token), ids
 
 
 async def capture(
@@ -283,7 +404,7 @@ async def capture(
     guard: Guard,
     server: FastMCP[None],
     stand_in: StandIn | None,
-) -> tuple[Recording, list[object]]:
+) -> tuple[Recording, list[object], dict[str, str]]:
     if refusals := check(plan, guard):
         raise Refused(f"{plan.scenario}: refused before any request: " + "; ".join(refusals))
     original = httpx.AsyncHTTPTransport.handle_async_request
@@ -301,7 +422,8 @@ async def capture(
             return await delegate.handle_async_request(request)
 
         send = answered
-    identities = await preflight(send, delegate, guard, token, upns)
+    identities, people = await preflight(send, delegate, guard, token, upns, people=uses_ids(plan))
+    values = persona_values(upns, people, synthetic=False)
     secrets = sorted(identities.everything())
     recorder = Recorder(interactions=[], send=send, guard=guard, token=token)
     results: list[object] = []
@@ -312,21 +434,16 @@ async def capture(
         async with Client(
             FastMCPTransport(server), elicitation_handler=Person(), mode="legacy"
         ) as client:
-            for number, step in enumerate(plan.steps, 1):
-                recorder.tool = _tool(step)
+            for number, written in enumerate(plan.steps, 1):
+                step = mapping(with_personas(written, values))
+                recorder.tool = tool_of(step)
+                given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
                 try:
-                    bound = {
-                        key: _given(value, results)
-                        for key, value in {
-                            **mapping(step.get("args", {})),
-                            **mapping(step.get("bind", {})),
-                        }.items()
-                    }
-                except (IndexError, KeyError) as missing:
+                    bound = {key: _given(value, results) for key, value in given.items()}
+                except (AssertionError, IndexError, KeyError) as missing:
                     raise Refused(
                         f"{plan.scenario}: step {number} binds a value that the earlier answer"
-                        + " does not have. A search with no hit yet is the usual cause: wait"
-                        + " for the search index, then record again."
+                        + f" does not have: {unbound(given, results)}"
                     ) from missing
                 if (refusal := guard.refuses_call(recorder.tool, bound)) is not None:
                     raise Refused(
@@ -336,17 +453,12 @@ async def capture(
                     )
                 failure = ""
                 try:
-                    results.append(
-                        await _step(
-                            client,
-                            recorder,
-                            Person(),
-                            RecordedSleeps(),
-                            number,
-                            _bare(step),
-                            results,
-                        )
+                    outcome = await _step(
+                        client, recorder, Person(), RecordedSleeps(), number, _bare(step), results
                     )
+                    if outcome is None and "tool_error" not in mapping(step.get("expect", {})):
+                        failure = "the tool answered with an error"
+                    results.append(outcome)
                 except AssertionError as failed:
                     failure = str(failed)
                 if recorder.refusals:
@@ -369,9 +481,17 @@ async def capture(
     if leaked:
         raise Refused(f"{plan.scenario}: a token went to a host that is not Graph")
     if transient:
+        waits = [
+            int(value)
+            for hop in recorder.hops
+            if hop.status in _TRANSIENT
+            for name, value in hop.headers
+            if name.lower() == "retry-after" and value.isdigit()
+        ]
         raise Refused(
             f"{plan.scenario}: transient answers {transient} were captured; faults stay "
-            + "synthetic, so record again"
+            + "synthetic, so record again."
+            + f" retry-after {max(waits, default=0)}"
         )
     corpus = load_corpus()
     personas = {
@@ -387,7 +507,24 @@ async def capture(
         personas,
         plan.literals,
     )
-    return recording, results
+    return recording, results, people
+
+
+def unbound(given: Json, results: Sequence[object]) -> str:
+    for _, text in strings(given):
+        if not text.startswith("$"):
+            continue
+        root, _, path = text[1:].partition(".")
+        try:
+            _ = _given(text, results)
+        except AssertionError, IndexError, KeyError:
+            try:
+                answer = results[-1] if root == "prev" else results[int(root) - 1]
+                empty = select(answer, path.rpartition("[")[0]) == []
+            except AssertionError, IndexError, KeyError:
+                empty = False
+            return f"{text} reads an empty list" if empty else f"{text} reads no value"
+    return "no selector"
 
 
 def _bare(step: Json) -> dict[str, object]:
@@ -431,8 +568,10 @@ def changed(live: object, replayed: object) -> dict[str, str]:
 def covers(selector: str) -> re.Pattern[str]:
     parts: list[str] = []
     for found in _SELECTOR.finditer(selector):
-        index, name = found.groups()
-        if index is not None:
+        index, field_name, _, name = found.groups()
+        if field_name is not None:
+            parts.append(r"\[\d+\]")
+        elif index is not None:
             parts.append(r"\[\d+\]" if index == "*" else rf"\[{index}\]")
         else:
             parts.append(("\\." if parts else "") + re.escape(name))
@@ -459,7 +598,7 @@ def _unmet(number: int, expect: Json, outcome: object, replay: Replay) -> list[s
 
 
 async def replay_check(
-    plan: Plan, fixture: Fixture, server: FastMCP[None]
+    plan: Plan, fixture: Fixture, server: FastMCP[None], values: Mapping[str, str]
 ) -> tuple[list[object], list[str], list[str]]:
     replay = Replay([mapping(one) for one in fixture.interactions])
     outcomes: list[object] = []
@@ -476,7 +615,8 @@ async def replay_check(
             async with Client(
                 FastMCPTransport(server), elicitation_handler=Person(), mode="legacy"
             ) as client:
-                for number, step in enumerate(plan.steps, 1):
+                for number, written in enumerate(plan.steps, 1):
+                    step = mapping(with_personas(written, values))
                     try:
                         outcome = await _step(
                             client,
@@ -496,7 +636,12 @@ async def replay_check(
                     outcomes.append(outcome)
                     unmet += _unmet(number, mapping(step.get("expect", {})), outcome, replay)
     unused = [n for n in range(len(fixture.interactions)) if n not in replay.seen]
-    broken += [f"interaction {n + 1} is never reached on replay" for n in unused]
+    broken += [
+        "interaction {} ({} {}) is never reached on replay".format(
+            n + 1, fixture.interactions[n]["method"], fixture.interactions[n]["path"]
+        )
+        for n in unused
+    ]
     return outcomes, broken, unmet
 
 
@@ -509,31 +654,39 @@ async def record(
     allow_writes: bool,
     cap: int = DEFAULT_CAP,
     stand_in: StandIn | None = None,
+    refused: Path | None = None,
 ) -> Outcome:
     if not upns:
         raise Refused("SEED_UPNS is not set; the recorder records only its position 1")
-    guard = Guard(upns[0], frozenset({upns[0].rpartition("@")[2].casefold()}), allow_writes, cap)
+    guard = guard_for(upns, plan, allow_writes, cap)
     server = build_server()
     logging.getLogger().setLevel(logging.ERROR)
-    recording, live = await capture(
+    recording, live, people = await capture(
         plan, target, token=token, upns=upns, guard=guard, server=server, stand_in=stand_in
     )
     secrets = sorted(recording.identities.everything())
     fixture = scrub(recording)
     findings = lint_files(files_of(fixture), recording.identities.everything())
     if findings:
-        raise Refused(
+        raise _refuse(
             f"{plan.scenario}: the lint found {len(findings)} leak(s), nothing was written:\n  "
-            + "\n  ".join(findings)
+            + "\n  ".join(findings),
+            fixture,
+            plan.scenario,
+            refused,
         )
-    replayed, broken, unmet = await replay_check(plan, fixture, server)
+    synthetic = persona_values(upns, people, synthetic=True)
+    replayed, broken, unmet = await replay_check(plan, fixture, server, synthetic)
     if broken:
-        raise Refused(
+        raise _refuse(
             _redacted(
                 f"{plan.scenario}: the scrubbed fixture does not replay, nothing was written:\n  "
                 + "\n  ".join(broken),
                 secrets,
-            )
+            ),
+            fixture,
+            plan.scenario,
+            refused,
         )
     kinds: dict[str, str] = {}
     for number, (before, after) in enumerate(zip(live, replayed, strict=True), 1):
@@ -563,7 +716,17 @@ async def record(
         "  scrub: " + ", ".join(f"{k} {v}" for k, v in fixture.counts.items()),
         "  tool output changed by the scrub: " + ", ".join(f"{k} {v}" for k, v in tally.items()),
     ]
+    if fixture.dropped:
+        report.append("  dropped: " + ", ".join(f"{k} x{v}" for k, v in fixture.dropped.items()))
     return Outcome(recording, fixture, report, unmet)
+
+
+def _refuse(message: str, fixture: Fixture, case: str, root: Path | None) -> Refused:
+    if root is not None:
+        shutil.rmtree(root / case, ignore_errors=True)
+        (root / case).mkdir(parents=True, mode=0o700)
+        _ = write(fixture, root / case)
+    return Refused(message)
 
 
 def write(fixture: Fixture, out: Path) -> list[Path]:
@@ -669,10 +832,15 @@ def main(argv: list[str] | None = None) -> int:
             raise Refused("--link needs a graph recording that goes into the repository")
         upns = stand_in_graph.UPNS if stand_in else upns_from_environment()
         secrets += upns
-        guard = Guard(upns[0], frozenset({upns[0].rpartition("@")[2].casefold()}), allow_writes)
         plans = [resolve(scenario) for scenario in scenarios]
+        if linked and any(plan.case for plan in plans):
+            raise Refused("--link does not apply to a tool case; a case has no sidecar entry")
         if cast("bool", arguments.dry_run):
-            lines = [line for plan in plans for line in describe(plan, guard)]
+            lines = [
+                line
+                for plan in plans
+                for line in describe(plan, guard_for(upns, plan, allow_writes, cap))
+            ]
             print(_redacted("\n".join(lines), secrets))
             return 2 if any("REFUSED" in line for line in lines) else 0
         token = stand_in_graph.TOKEN if stand_in else os.environ.get("GRAPH_TOKEN", "").strip()
@@ -692,8 +860,10 @@ def main(argv: list[str] | None = None) -> int:
                     allow_writes=allow_writes,
                     cap=cap,
                     stand_in=graph,
+                    refused=REFUSED,
                 )
             )
+            shutil.rmtree(REFUSED / plan.scenario, ignore_errors=True)
             secrets += sorted(outcome.recording.identities.values)
             written = write(outcome.fixture, out)
             print(

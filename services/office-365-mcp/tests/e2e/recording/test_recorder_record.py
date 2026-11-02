@@ -1,22 +1,36 @@
+import asyncio
 import os
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+import httpx
 import pytest
 import yaml
 from fastmcp import FastMCP
 
+import tests.e2e.recording.record as record_module
 import tests.e2e.test_scenarios as runner
 from tests.conftest import RecordedSleeps
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.conftest import SCENARIOS, Recorded, record_on
 from tests.e2e.recording.drift import differences, stored
 from tests.e2e.recording.drift import main as drift_main
-from tests.e2e.recording.guard import Refused
-from tests.e2e.recording.record import RECORDED, Plan, link, main, resolve
+from tests.e2e.recording.guard import Guard, Refused
+from tests.e2e.recording.record import (
+    GRAPH,
+    RECORDED,
+    Plan,
+    Recorder,
+    link,
+    main,
+    preflight,
+    replay_check,
+    resolve,
+)
 from tests.e2e.recording.scrub import files_of
 from tests.e2e.recording.stand_in import StandIn
 from tests.e2e.test_scenarios import Json, build_server, entries, mapping
@@ -75,6 +89,52 @@ def test_an_expect_on_a_replaced_field_is_refused() -> None:
         _ = record_on(replace(plan, steps=(step,)))
     assert "messages[*].subject reads messages[" in str(refused.value)
     assert "(replaced)" in str(refused.value)
+
+
+def test_a_lint_refusal_keeps_the_scrubbed_candidate_for_inspection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+
+    def leaking(*_: object) -> list[str]:
+        return ["bodies/x.json at value[0].id: a GUID"]
+
+    monkeypatch.setattr(record_module, "lint_files", leaking)
+    with pytest.raises(Refused, match=r"at value\[0\]\.id: a GUID"):
+        _ = record_on("uc-02-01", refused=tmp_path)
+    kept = tmp_path / "uc-02-01"
+    assert kept.stat().st_mode & 0o777 == 0o700
+    assert sorted(p.name for p in (kept / "fixtures").glob("*.json"))[0] == "rec-uc-02-01.json"
+    assert len(list((kept / "bodies").glob("*.json"))) == 4
+    assert stand_in.TOKEN not in "".join(p.read_text() for p in kept.rglob("*.json"))
+
+
+def test_a_replay_refusal_keeps_the_candidate_and_names_the_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recorded: Recorded, server: FastMCP[None]
+) -> None:
+    fixture = recorded.outcomes["uc-02-01"].fixture
+    extra = {"method": "DELETE", "path": "/v1.0/me/never", "status": 204}
+    unused = replace(fixture, interactions=[*fixture.interactions, extra])
+    _, broken, _ = asyncio.run(replay_check(resolve("uc-02-01"), unused, server, {}))
+    assert broken == ["interaction 5 (DELETE /v1.0/me/never) is never reached on replay"]
+
+    async def failing(*_: object) -> tuple[list[object], list[str], list[str]]:
+        return [], broken, []
+
+    monkeypatch.setattr(record_module, "replay_check", failing)
+    with pytest.raises(Refused, match=r"interaction 5 \(DELETE /v1.0/me/never\)"):
+        _ = record_on("uc-02-01", refused=tmp_path)
+    assert (tmp_path / "uc-02-01" / "fixtures" / "rec-uc-02-01.json").is_file()
+
+
+def test_a_later_success_deletes_the_refused_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stale = tmp_path / "refused" / "uc-02-01"
+    stale.mkdir(parents=True)
+    _ = (stale / "old.json").write_text("{}")
+    monkeypatch.setattr(record_module, "REFUSED", tmp_path / "refused")
+    assert main(["uc-02-01", "--target", "stand-in", "--out", str(tmp_path / "out")]) == 0
+    assert not stale.exists()
 
 
 def test_an_expect_that_does_not_hold_is_reported() -> None:
@@ -156,9 +216,51 @@ def test_nothing_prints_the_tempauth_url_or_the_upn(recorded: Recorded) -> None:
         assert secret not in shown
 
 
-def test_a_search_without_a_hit_is_refused_with_advice() -> None:
-    with pytest.raises(Refused, match="wait for the search index"):
+def test_a_search_without_a_hit_is_refused_and_names_the_empty_list() -> None:
+    with pytest.raises(
+        Refused, match=r"step 2 binds .* does not have: \$prev\.\S+ reads an empty list"
+    ):
         record_on("uc-01-06", StandIn(variants=frozenset({"unindexed"})))
+
+
+ANSWERS: list[tuple[list[object], str, str]] = [
+    ([{"channels": []}], "$prev.channels[0].id", "reads an empty list"),
+    ([{"channels": [{"id": "a"}]}], "$1.channels[0].name", "reads no value"),
+    ([{"other": 1}], "$prev.channels[0].id", "reads no value"),
+    ([{"channels": []}], "$9.channels[0].id", "reads no value"),
+]
+
+
+@pytest.mark.parametrize(("results", "selector", "said"), ANSWERS)
+def test_a_bind_that_finds_nothing_names_its_selector(
+    results: list[object], selector: str, said: str
+) -> None:
+    assert record_module.unbound({"id": selector}, results) == f"{selector} {said}"
+
+
+def test_a_literal_with_a_day_symbol_is_also_a_literal_in_its_resolved_form() -> None:
+    steps: tuple[Json, ...] = (
+        {"tool": "t", "args": {"name": "seed-v1 case-x ~today", "n": "$prev.a"}},
+    )
+    day = datetime.now(UTC).date().isoformat()
+    assert Plan("s", "f", steps).literals == {"seed-v1 case-x ~today", f"seed-v1 case-x {day}"}
+
+
+def test_a_family_gap_is_the_default_gap_of_its_cases_and_a_case_gap_wins(tmp_path: Path) -> None:
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    _ = (cases / "x.yaml").write_text(
+        "a-one:\n  chain:\n    - tool: onenote_list_notebooks\n"
+        + "a-two:\n  gap: 3\n  chain:\n    - tool: onenote_list_notebooks\n"
+        + "a-three:\n  chain:\n    - tool: outlook_list_mail\n"
+    )
+    assert [resolve(name, cases=cases).gap for name in ("a-one", "a-two", "a-three")] == [20, 3, 0]
+
+
+def test_a_selector_with_a_field_test_covers_any_index_of_its_list() -> None:
+    covered = record_module.covers("teams[display_name=seed-v1 team].team_id")
+    assert covered.fullmatch("teams[3].team_id") is not None
+    assert covered.fullmatch("teams.team_id") is None
 
 
 def test_drift_exits_1_on_a_changed_field_type(
@@ -193,6 +295,63 @@ def test_the_cli_records_and_refuses_under_python_o(tmp_path: Path) -> None:
     )
     assert refused.returncode == 2
     assert "outlook_move_mail is a write and needs --allow-writes" in refused.stderr
+
+
+def test_a_failing_step_stops_the_chain_under_python_o(tmp_path: Path) -> None:
+    failed = subprocess.run(
+        [
+            sys.executable,
+            "-O",
+            "-W",
+            "ignore",
+            "-m",
+            "tests.e2e.recording.record",
+            "onenote_list_notebooks-seed",
+            "--target",
+            "stand-in",
+            "--allow-writes",
+            "--out",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=SERVICE,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(["src", "."])},
+    )
+    assert failed.returncode == 2
+    assert "step 1 failed while recording" in failed.stderr
+    assert not list(tmp_path.rglob("*.json"))
+
+
+async def test_a_send_that_raises_stops_every_later_write() -> None:
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
+
+    async def timed_out(_: httpx.AsyncBaseTransport, request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow", request=request)
+
+    recorder = Recorder(interactions=[], send=timed_out, guard=seen, token="t")
+    token = f"Bearer {runner._OBO_TOKEN}"  # pyright: ignore[reportPrivateUsage]
+    request = httpx.Request("GET", f"{GRAPH}/me", headers={"authorization": token})
+    with pytest.raises(httpx.ReadTimeout):
+        _ = await recorder.hop(httpx.AsyncBaseTransport(), request)
+    assert seen.write_failed
+
+
+async def test_a_preflight_answers_without_a_drive() -> None:
+    bodies = {
+        "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},
+        "/v1.0/organization": {"value": [{"id": "o1", "displayName": "Org"}]},
+    }
+
+    async def send(_: httpx.AsyncBaseTransport, request: httpx.Request) -> httpx.Response:
+        body = bodies.get(request.url.path)
+        return httpx.Response(200 if body else 403, json=body or {}, request=request)
+
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), False)
+    _ = await preflight(send, httpx.AsyncBaseTransport(), seen, "t", (stand_in.UPN,))
+    assert seen.drive_ids == frozenset()
+    assert seen.me_id == "u1"
 
 
 _RECORDED_BLOCK = """\

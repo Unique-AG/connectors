@@ -29,7 +29,7 @@ recorder replaces any text that is not seed text, but unknown mail still changes
 
 1. The Entra app registration has "Allow public client flows" = Yes. The device-code flow needs it.
 2. The app has these delegated permissions with consent: Mail.ReadWrite, Calendars.ReadWrite,
-   Contacts.ReadWrite, Files.ReadWrite, Files.Read.All, Sites.Read.All and User.Read.
+   Contacts.ReadWrite, Files.ReadWrite, Files.Read.All, Sites.Read.All, Team.Create and User.Read.
 3. `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `SEED_UPNS` are set in your shell. Do not put a client
    secret in the environment.
 
@@ -57,6 +57,15 @@ dates, run `cleanup` and then `apply`.
 `cleanup` deletes an item only when it has the category `seed-v1` and a seed key that is in the
 corpus. A folder or file is deleted only when its name has the `seed-v1` prefix. Items with the tag
 but no known key are listed as "orphan kept". Mail and events are deleted for good.
+
+The phase `teams` runs as Mia only. It creates the team `seed-v1 team` with Mia as owner and Anna
+and Tom as members, unless Mia has joined a team with that name. It needs the permission
+Team.Create. Graph answers with 202, and the seed waits at most two minutes for the operation to
+succeed. `cleanup` never deletes a team, and lists it as "kept". Graph cannot delete a chat, so
+every chat with `seed-v1 case-` in its topic stays.
+
+The phase `cal-invites` runs the invitation as Anna. As Mia, it then adds the category `seed-v1` to
+the copy of that invitation. Run it for Mia last, after Anna.
 
 ## Corpus
 
@@ -89,6 +98,7 @@ the fallback that makes plain drafts.
 - Every address in every request must be in `SEED_UPNS`. The check runs before the first request.
 - `GET /me` must answer the address at position `--as`, before any other request.
 - Requests go only to `https://graph.microsoft.com/v1.0/me`, one at a time, at most 300 per run.
+  Two requests are the exception: `POST /v1.0/teams`, and `GET` of the operation that it returns.
 - The checks use `if` and exceptions, not `assert`, so `python -O` keeps them.
 
 ## Tests

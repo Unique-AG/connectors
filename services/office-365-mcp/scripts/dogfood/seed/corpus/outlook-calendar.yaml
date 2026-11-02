@@ -1,0 +1,94 @@
+# Calendar, contact and calendar items of the outlook-calendar family. Only Mia owns them, except the
+# invitation that Anna sends to Mia. The seed tags Mia's copy of it with seed-v1.
+# phase:      the seed phase that creates the event; `cal-invites` runs as the owner of the event
+# day:        days from the anchor date
+# start/end:  local wall-clock time "HH:MM" in `time_zone` (a Windows time zone name)
+# reminder:   minutes before the start; the reminder is on only when this is set
+# attendees:  persona keys; an event with attendees sends one invitation when it is created
+# attachment: the key of an entry of `attachments`
+events:
+  - id: c01
+    phase: cal-events
+    subject: Daily standup
+    body: Yesterday, today, blockers.
+    location: Room Pilatus
+    time_zone: W. Europe Standard Time
+    day: -1
+    start: "09:15"
+    end: "09:30"
+    recurrence: {count: 10}
+  - id: c02
+    phase: cal-events
+    subject: Submit the expense report
+    body: Upload the receipts before the end of the day.
+    time_zone: W. Europe Standard Time
+    day: 0
+    start: "16:00"
+    end: "16:30"
+    reminder: 15
+  - id: c03
+    phase: cal-events
+    subject: Offsite agenda review
+    body: Read the agenda before the call.
+    time_zone: W. Europe Standard Time
+    day: 0
+    start: "11:00"
+    end: "11:30"
+    attachment: agenda
+  - id: c04
+    phase: cal-events
+    subject: Budget alignment
+    body: Agree the numbers before the review.
+    time_zone: W. Europe Standard Time
+    day: 0
+    start: "13:00"
+    end: "13:30"
+    attendees: [anna]
+  - id: c05
+    phase: cal-events
+    subject: Hosting review
+    body: Check the hosting plan for the relaunch.
+    time_zone: W. Europe Standard Time
+    day: 0
+    start: "14:00"
+    end: "14:30"
+    attendees: [anna]
+  - id: a01
+    phase: cal-invites
+    owner: anna
+    subject: Roadmap check
+    body: Walk through the roadmap for the next quarter.
+    time_zone: W. Europe Standard Time
+    day: 0
+    start: "15:00"
+    end: "15:30"
+    attendees: [mia]
+
+attachments:
+  agenda:
+    name: calendar-agenda.txt
+    content_type: text/plain
+    text: "Offsite agenda.\nMorning: workshop. Afternoon: review.\n"
+
+contacts:
+  - id: k01
+    display_name: Lena Fischer
+    given_name: Lena
+    surname: Fischer
+    company: Alpine Print
+    job_title: Account Manager
+    phone: "+41 44 555 01 01"
+  - id: k02
+    display_name: Marc Dubois
+    given_name: Marc
+    surname: Dubois
+    company: Rhein Logistics
+    job_title: Dispatcher
+    phone: "+41 44 555 01 02"
+    email: anna
+
+calendars:
+  - id: shared
+    name: Shared calendar
+  - id: spare
+    name: Spare calendar

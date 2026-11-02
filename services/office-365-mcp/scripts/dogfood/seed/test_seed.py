@@ -25,6 +25,7 @@ import seed
 UPNS = ("mia@dogfood.test", "anna@dogfood.test", "tom@dogfood.test")
 ENV = {"SEED_UPNS": ",".join(UPNS), "GRAPH_TOKEN": "tok-SECRET-0123456789abcdef"}
 ANCHOR = ["--anchor", "2026-10-23"]
+CORE_PHASES = ("folders", "mail", "events", "files")
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 WELL_KNOWN = ("inbox", "sentitems", "drafts", "deleteditems", "archive")
 
@@ -46,6 +47,10 @@ class FakeGraph:
             "root": {"id": "root", "name": "root", "parent": None, "folder": True}
         }
         self.fault = None  # callable(request) -> httpx.Response | None
+        self.teams: list[dict[str, str]] = [
+            {"id": "team-1", "displayName": "seed-v1 team"},
+            {"id": "team-2", "displayName": "Other team"},
+        ]
 
     # ------------------------------------------------------------ helpers for tests
     def transport(self) -> httpx.MockTransport:
@@ -98,6 +103,8 @@ class FakeGraph:
         )
         m = request.method
 
+        if path == "/me/joinedTeams" and m == "GET":
+            return httpx.Response(200, json={"value": self.teams})
         if path == "/me" and m == "GET":
             return httpx.Response(200, json={"id": "user-guid-1", "userPrincipalName": self.upn})
         if path == "/me/mailFolders" and m == "GET":
@@ -284,8 +291,9 @@ class FakeGraph:
 def run(
     argv: list[str], fake: FakeGraph | None = None, env: dict[str, str] | None = None, **kwargs: Any
 ) -> int:
+    phases = [] if "--phase" in argv or argv[0] not in ("apply", "plan") else CORE_PHASES
     return seed.main(
-        [*argv, *ANCHOR],
+        [*argv, *ANCHOR, *(arg for phase in phases for arg in ("--phase", phase))],
         transport=fake.transport() if fake else None,
         env=ENV if env is None else env,
         sleep=kwargs.pop("sleep", lambda _: None),
@@ -662,7 +670,7 @@ def ctx(mode: str = "extprops") -> seed.Context:
 
 def bodies(context: seed.Context) -> dict[str, dict[str, Any]]:
     return {
-        s.key: s.body for s in seed.build_steps(context, 1, set(seed.PHASES)) if s.kind == "create"
+        s.key: s.body for s in seed.build_steps(context, 1, set(CORE_PHASES)) if s.kind == "create"
     }
 
 
@@ -753,6 +761,98 @@ def test_corpus_manifest_lists_every_string_and_binary(
     other_day = tmp_path / "other.json"
     assert seed.main(["corpus", "--out", str(other_day), "--anchor", "2027-03-01"], env=ENV) == 0
     assert other_day.read_text() == out.read_text()
-    assert len(manifest["binaries"]) == 8
+    assert len(manifest["binaries"]) == 13
     created = {b["name"] for b in manifest["binaries"]}
-    assert {"seed-v1 Project Plan.docx", "q3-numbers.csv"} <= created
+    assert {"seed-v1 Project Plan.docx", "q3-numbers.csv", "seed-v1 Gallery picture.png"} <= created
+
+
+def test_cleanup_keeps_every_team_and_says_that_graph_cannot_delete_a_chat(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake = FakeGraph()
+    assert run(["cleanup", "--as", "1", "--phase", "teams"], fake) == 0
+    shown = capsys.readouterr().out
+    assert "kept team 'seed-v1 team'" in shown
+    assert "Other team" not in shown
+    assert "Graph cannot delete a chat" in shown
+    assert fake.writes() == []
+
+
+def test_the_guard_lets_through_a_team_create_and_its_operation_and_nothing_else_outside_me() -> (
+    None
+):
+    sent: list[tuple[str, str]] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append((request.method, request.url.path))
+        return httpx.Response(200, json={})
+
+    graph = seed.Graph("t", transport=httpx.MockTransport(answer))
+    team = "11111111-2222-4333-8444-555555555555"
+    operation = f"/teams('{team}')/operations('66666666-7777-4888-8999-000000000000')"
+    for method, path in [("POST", "/teams"), ("GET", operation)]:
+        assert graph.request(method, path).status_code == 200
+    refused = [
+        ("GET", "/teams"),
+        ("PATCH", "/teams"),
+        ("DELETE", operation),
+        ("POST", operation),
+        ("POST", f"/teams/{team}/members"),
+        ("GET", f"/teams('{team}')"),
+        ("GET", "/users/anna@dogfood.test"),
+    ]
+    for method, path in refused:
+        with pytest.raises(seed.Refused):
+            graph.request(method, path)
+    assert sent == [("POST", "/v1.0/teams"), ("GET", f"/v1.0{operation}")]
+
+
+def test_a_202_create_waits_for_its_operation_and_gives_up_after_a_bounded_wait() -> None:
+    team = "11111111-2222-4333-8444-555555555555"
+    where = f"/teams('{team}')/operations('66666666-7777-4888-8999-000000000000')"
+    states = iter(["running", "running", "succeeded"])
+    waits: list[float] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            headers = {"location": where, "content-location": f"/teams('{team}')"}
+            return httpx.Response(202, headers=headers)
+        return httpx.Response(200, json={"status": next(states)})
+
+    graph = seed.Graph("t", transport=httpx.MockTransport(answer), sleep=waits.append)
+    made = graph.created_by_operation(graph.request("POST", "/teams", body={"displayName": "x"}))
+    assert made == {"id": team}
+    assert waits == [seed.OPERATION_WAIT] * 2
+
+    stuck = seed.Graph(
+        "t",
+        transport=httpx.MockTransport(
+            lambda r: (
+                httpx.Response(
+                    202, headers={"location": where, "content-location": f"/teams('{team}')"}
+                )
+                if r.method == "POST"
+                else httpx.Response(200, json={"status": "running"})
+            )
+        ),
+        sleep=lambda _: None,
+    )
+    with pytest.raises(seed.GraphError, match="did not finish"):
+        _ = stuck.created_by_operation(stuck.request("POST", "/teams", body={}))
+    failed = seed.Graph(
+        "t",
+        transport=httpx.MockTransport(
+            lambda r: (
+                httpx.Response(
+                    202, headers={"location": where, "content-location": f"/teams('{team}')"}
+                )
+                if r.method == "POST"
+                else httpx.Response(200, json={"status": "failed"})
+            )
+        ),
+    )
+    with pytest.raises(seed.GraphError, match="failed"):
+        _ = failed.created_by_operation(failed.request("POST", "/teams", body={}))
+    bare = seed.Graph("t", transport=httpx.MockTransport(lambda r: httpx.Response(202)))
+    with pytest.raises(seed.GraphError, match="no Location"):
+        _ = bare.created_by_operation(bare.request("POST", "/teams", body={}))

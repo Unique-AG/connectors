@@ -6,6 +6,7 @@ is not seed corpus text becomes `synthetic text NN`. An address that is not a pe
 digits come from a keyed hash, so a re-record gives the same ids. A binary body must be a file
 that the seed generator made."""
 
+import base64
 import functools
 import hashlib
 import hmac
@@ -15,10 +16,12 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from html.parser import HTMLParser
 from importlib.metadata import version
 from pathlib import Path
 from string import ascii_lowercase, ascii_uppercase, digits
@@ -28,6 +31,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 import httpx
 import yaml
 
+from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import GRAPH_HOST, Refused
 from tests.e2e.test_scenarios import _DATETIME, Json
 
@@ -39,7 +43,7 @@ SDKS = ("msgraph-sdk", "msgraph-core", "microsoft-kiota-http", "httpx", "fastmcp
 
 type Kind = Literal["text", "id", "address", "date", "enum", "number", "url", "path", "object"]
 
-SCHEMA: Mapping[str, Kind] = {
+_CORE_SCHEMA: Mapping[str, Kind] = {
     **dict.fromkeys(
         ("subject", "bodyPreview", "content", "name", "displayName", "summary", "categories")
         + ("searchTerms", "message", "title", "description"),
@@ -76,6 +80,9 @@ SCHEMA: Mapping[str, Kind] = {
         "object",
     ),
 }
+if clash := sorted(k for k, kind in load().schema.items() if _CORE_SCHEMA.get(k, kind) != kind):
+    raise ValueError(f"a family changes the Kind of the core SCHEMA keys {clash}")
+SCHEMA: Mapping[str, Kind] = {**_CORE_SCHEMA, **cast("Mapping[str, Kind]", load().schema)}
 WELL_KNOWN_TEXT = frozenset(
     {"Inbox", "Archive", "Drafts", "Sent Items", "Deleted Items", "Junk Email", "Outbox"}
 )
@@ -90,24 +97,34 @@ _GUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?")
 _ENUM = re.compile(r"[A-Za-z#][A-Za-z0-9 .#()+\-:/_;=]{0,99}")
 _TOKEN = re.compile(r"[A-Za-z#$][A-Za-z0-9._#$\-]{0,63}")
+_TOKEN_LIST = re.compile(r"[a-z][A-Za-z]*(?:, ?[a-z][A-Za-z]*)+")
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 _ADDRESS = re.compile(r"[^\s@<>()\[\],;:\"']+@[a-z0-9\-]+(?:\.[a-z0-9\-]+)+")
 _ADDRESS_IN = re.compile(r"[^\s@<>()\[\],;:\"'=&?/]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
 _LONG_ID = re.compile(r"(?=.*\d)[A-Za-z0-9!_\-=+]{20,}")
-_CALL = re.compile(r"([A-Za-z_]+)\('([^'/]*)'\)")
+_ARGUMENT = r"(?:[A-Za-z]+=)?(?:'[^'/]*'|true|false)"
+_CALL = re.compile(rf"([A-Za-z_]+)\(({_ARGUMENT}(?:,{_ARGUMENT})*)?\)")
+_QUOTED = re.compile(r"'([^'/]*)'")
+_URL_IN_TEXT = re.compile(r"https://[^'\s]+")
 _API_WORD = re.compile(r"[A-Za-z_$][A-Za-z0-9_.$:]{0,40}|v1\.0|\d{1,4}")
 _URL_WORDS = frozenset(
     {"personal", "sites", "teams", "_layouts", "15", "download.aspx", "Documents", "Forms"}
     | {"Shared Documents", "owa", "mail", "Doc.aspx", "WopiFrame.aspx", "AllItems.aspx"}
 )
-_KEPT_HOSTS = frozenset(
+KEPT_HOSTS = frozenset(
     {GRAPH_HOST, "outlook.office365.com", "outlook.office.com", "teams.microsoft.com"}
     | {"contoso.sharepoint.com", "contoso-my.sharepoint.com"}
 )
 _ID_PARAMETERS = frozenset({"$skiptoken", "$deltatoken", "itemid", "uniqueid"})
 _PLAIN_PARAMETERS = frozenset(
     {"$select", "$filter", "$top", "$skip", "$orderby", "$expand", "$count", "$search"}
-    | {"$format", "format", "translate", "apiversion", "exvsurl", "viewmodel"}
+    | {"$format", "format", "translate", "apiversion", "exvsurl", "viewmodel", "search"}
+    | {"startdatetime", "enddatetime", "@microsoft.graph.conflictbehavior"}
+)
+_PAGE = re.compile(
+    r'(<!DOCTYPE html><html><head><title>)(.*?)(</title><meta name="created" content="[^"<>@]*"'
+    + r" /></head><body>)(.*)(</body></html>)",
+    re.S,
 )
 _PLACEHOLDER = re.compile(r"synthetic text \d+")
 _ADDRESS_KEYS = ("address", "email")
@@ -117,11 +134,14 @@ _STYLE = re.compile(r"<style[^<>@]*>[^<>@]*</style>", re.S | re.I)
 _INLINE = re.compile(r"</?c0>", re.I)
 _SAFE_TAG = re.compile(
     r"</?(?:html|head|body|meta|p|b|i|u|ul|ol|li|h[1-6]|br|div|span|strong|em|table|tr|td)"
-    + r'(?:\s+(?:http-equiv|content|charset|style|dir|class|type|lang)="[^"<>@]*")*\s*/?>',
+    + r'(?:\s+(?:http-equiv|content|charset|style|dir|class|type|lang)="[^"<>@]*"'
+    + r'|\s+data-id="[A-Za-z][\w\-]{0,30}")*\s*/?>',
     re.I,
 )
 _ANY_TAG = re.compile(r"<[^>]*>")
 _ELLIPSIS = re.compile(r"<ddd/>|…|\.\.\.", re.I)
+_EMOJI_JOINERS = frozenset({"\u200d", "\ufe0f"})
+MAX_EMOJI_CODE_POINTS = 8
 _SYMBOLS = {-1: "~yesterday", 0: "~today", 1: "~tomorrow"}
 _SUFFIXES = {"wordprocessingml": ".docx", "spreadsheetml": ".xlsx", "pdf": ".pdf", "text/": ".txt"}
 
@@ -201,6 +221,14 @@ class Corpus:
         return True
 
 
+def holds_bytes(corpus: Corpus, encoded: str) -> bool:
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except ValueError:
+        return False
+    return hashlib.sha256(raw).hexdigest() in corpus.binaries
+
+
 def _within(normal: str, blob: str, cut: bool) -> bool:
     end = "" if cut else r"(?![\w])"
     return re.search(r"(?<![\w])" + re.escape(normal) + end, blob) is not None
@@ -231,6 +259,94 @@ def load_corpus() -> Corpus:
     return Corpus(str(manifest["tag"]), strings, binaries, personas, blob)
 
 
+_PAGE_CONTENT = re.compile(r"/v1\.0/me/onenote/pages/[^/]+/content")
+_PAGE_IDS = frozenset({"id", "data-id"})
+_PAGE_URLS = frozenset({"src", "data-fullres-src", "data", "href"})
+PAGE_EMBEDS = frozenset({"src", "data-fullres-src", "data"})
+_PAGE_LAYOUT = re.compile(r"[A-Za-z0-9 :;.,%#()\-]*")
+_PAGE_LAYOUT_NAMES = frozenset(
+    {"style", "class", "lang", "dir", "charset", "type", "width", "height", "name", "content"}
+    | {"data-src-type", "data-fullres-src-type", "data-absolute-enabled"}
+)
+_PAGE_MEDIA = re.compile(r"[a-z]+/[a-z0-9.+\-]+")
+_PAGE_NAME = re.compile(r"[a-z][a-z0-9\-]*")
+_PAGE_FONT = re.compile(r"(font-family:[A-Za-z ]+)(?=;|$)")
+type PageText = Callable[[str], str]
+type PageAttribute = Callable[[str, str], str]
+
+
+def is_page_content(hop: Hop) -> bool:
+    media = dict((k.lower(), v) for k, v in hop.headers).get("content-type", "")
+    path = str(hop.asked["path"])
+    return (
+        hop.asked["method"] == "GET"
+        and hop.status == 200
+        and media.startswith("text/html")
+        and _PAGE_CONTENT.fullmatch(path) is not None
+    )
+
+
+def page_attribute_kind(name: str, value: str) -> Literal["id", "url", "plain", "text"]:
+    if name in _PAGE_IDS:
+        return "id"
+    if name in _PAGE_URLS:
+        return "url"
+    layout = name in _PAGE_LAYOUT_NAMES and _PAGE_LAYOUT.fullmatch(value) is not None
+    media = name.endswith("-type") and _PAGE_MEDIA.fullmatch(value) is not None
+    return "plain" if layout or media or _DATE.fullmatch(value) else "text"
+
+
+def _generic_font(name: str, value: str) -> str:
+    return _PAGE_FONT.sub(r"\1,sans-serif", value) if name == "style" else value
+
+
+class _Page(HTMLParser):
+    def __init__(self, text: PageText, attribute: PageAttribute) -> None:
+        super().__init__(convert_charrefs=True)
+        self.text: PageText = text
+        self.attribute: PageAttribute = attribute
+        self.out: list[str] = []
+
+    def _value(self, name: str, value: str) -> str:
+        return _generic_font(name, self.attribute(name, value))
+
+    def _tag(self, tag: str, attrs: list[tuple[str, str | None]], end: str) -> None:
+        safe = _PAGE_NAME.fullmatch(tag) is not None
+        shown = "".join(
+            f' {name}="{html.escape(self._value(name, value or ""), quote=True)}"'
+            for name, value in attrs
+            if _PAGE_NAME.fullmatch(name) is not None
+        )
+        self.out.append(f"<{tag}{shown}{end}>" if safe else "")
+
+    @override
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._tag(tag, attrs, "")
+
+    @override
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._tag(tag, attrs, " /")
+
+    @override
+    def handle_endtag(self, tag: str) -> None:
+        self.out.append(f"</{tag}>" if _PAGE_NAME.fullmatch(tag) else "")
+
+    @override
+    def handle_data(self, data: str) -> None:
+        self.out.append(html.escape(data if not data.strip() else self.text(data), quote=False))
+
+    @override
+    def handle_decl(self, decl: str) -> None:
+        self.out.append("<!DOCTYPE html>" if decl.casefold() == "doctype html" else "")
+
+
+def rewritten_page(raw: str, text: PageText, attribute: PageAttribute) -> str:
+    page = _Page(text, attribute)
+    page.feed(raw)
+    page.close()
+    return "".join(page.out)
+
+
 def _stream(seed: bytes) -> Iterator[int]:
     counter = 0
     while True:
@@ -250,6 +366,15 @@ def mapped_guid(raw: str) -> str:
     return made.upper() if raw.isupper() else made
 
 
+def is_emoji(raw: str) -> bool:
+    categories = [unicodedata.category(char) for char in raw if char not in _EMOJI_JOINERS]
+    return (
+        len(raw) <= MAX_EMOJI_CODE_POINTS
+        and "So" in categories
+        and all(category in {"So", "Sk"} for category in categories)
+    )
+
+
 def _split(value: str) -> tuple[str, str]:
     prefix = next((p for p in _PREFIXES if value.startswith(p)), "")
     return prefix, value[len(prefix) :]
@@ -266,8 +391,16 @@ def _tag(body: str, positions: Sequence[int]) -> list[str]:
     return [_like(body[at], tag[n]) for n, at in enumerate(positions[-_TAG_LENGTH:])]
 
 
+def _thread_suffix(body: str) -> tuple[str, str]:
+    head, at, tail = body.rpartition("@")
+    return (
+        (head, at + tail) if at and any(p.fullmatch(body) for p in load().thread_id) else (body, "")
+    )
+
+
 def map_id(raw: str) -> str:
-    prefix, body = _split(raw)
+    prefix, whole = _split(raw)
+    body, suffix = _thread_suffix(whole)
     chars = list(_GUID.sub(lambda found: mapped_guid(found[0]), body))
     positions = _mappable("".join(chars))
     stream = _stream(b"id:" + raw.encode())
@@ -276,15 +409,23 @@ def map_id(raw: str) -> str:
     if len(positions) >= MIN_TAGGED:
         for at, char in zip(positions[-_TAG_LENGTH:], _tag("".join(chars), positions), strict=True):
             chars[at] = char
-    return prefix + "".join(chars)
+    return prefix + "".join(chars) + suffix
 
 
 def made_by_the_mapper(value: str) -> bool:
-    _, body = _split(value)
+    body, _ = _thread_suffix(_split(value)[1])
     positions = _mappable(body)
     if len(positions) < MIN_TAGGED:
         return True
     return [body[at] for at in positions[-_TAG_LENGTH:]] == _tag(body, positions)
+
+
+def _shared_link(token: str) -> str | None:
+    try:
+        link = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)).decode()
+    except ValueError:
+        return None
+    return link if link.startswith("https://") else None
 
 
 @dataclass
@@ -298,6 +439,7 @@ class Mapper:
     homes: dict[str, str] = field(default_factory=dict[str, str])
     hosts: dict[str, str] = field(default_factory=dict[str, str])
     counts: Counter[str] = field(default_factory=Counter[str])
+    dropped: Counter[str] = field(default_factory=Counter[str])
 
     def text(self, raw: str, exact: bool = False) -> str:
         kept = raw in self.corpus.strings if exact else self.corpus.accepts(raw, self.extra)
@@ -340,7 +482,7 @@ class Mapper:
 
     def host(self, raw: str) -> str:
         lowered = raw.casefold()
-        if lowered in _KEPT_HOSTS or lowered.endswith(f".{SYNTHETIC_DOMAIN}"):
+        if lowered in KEPT_HOSTS or lowered.endswith(f".{SYNTHETIC_DOMAIN}"):
             return lowered
         if lowered.endswith(".sharepoint.com"):
             mine = lowered.endswith("-my.sharepoint.com")
@@ -349,17 +491,22 @@ class Mapper:
         return self.hosts.setdefault(lowered, f"host-{len(self.hosts) + 1:02d}.{SYNTHETIC_DOMAIN}")
 
     def plain(self, raw: str) -> str:
+        raw = _URL_IN_TEXT.sub(lambda found: self.url(found[0]), raw)
         for known in sorted(self.ids, key=len, reverse=True):
             if known and known in raw:
                 raw = raw.replace(known, self.id(known))
         raw = _GUID.sub(lambda found: mapped_guid(found[0]), raw)
-        return _ADDRESS_IN.sub(lambda found: self.address(found[0]), raw)
+        return _ADDRESS_IN.sub(self._address_or_thread, raw)
+
+    def _address_or_thread(self, found: re.Match[str]) -> str:
+        mapped = _thread_suffix(found[0])[1] and made_by_the_mapper(found[0])
+        return found[0] if mapped else self.address(found[0])
 
     def query(self, raw: Mapping[str, str]) -> dict[str, str]:
         kept: dict[str, str] = {}
         for key, value in raw.items():
             if key.casefold() in _ID_PARAMETERS:
-                kept[key] = self.id(value)
+                kept[key] = "/".join(self.id(part) for part in value.split("/"))
             elif key.casefold() in _PLAIN_PARAMETERS:
                 kept[key] = self.plain(value)
             else:
@@ -369,12 +516,17 @@ class Mapper:
     def segment(self, raw: str, api: bool, previous: str) -> str:
         if not raw:
             return raw
+        if api and raw.endswith(":"):
+            return self.segment(raw[:-1], api, previous) + ":"
         if previous.casefold() == "personal" and not api:
             return self.home(raw)
+        if api and raw.startswith("u!") and (link := _shared_link(raw[2:])) is not None:
+            return "u!" + base64.urlsafe_b64encode(self.url(link).encode()).decode().rstrip("=")
         if raw in self.ids or _LONG_ID.fullmatch(raw):
             return self.id(raw)
         if (call := _CALL.fullmatch(raw)) is not None:
-            return f"{call[1]}('{self._inner(call[2])}')"
+            quoted = _QUOTED.sub(lambda one: f"'{self._inner(one[1])}'", call[2] or "")
+            return f"{call[1]}({quoted})"
         if "@" in raw:
             return self.address(raw)
         if _GUID.fullmatch(raw):
@@ -384,6 +536,8 @@ class Mapper:
         return self.text(raw, exact=not api)
 
     def _inner(self, raw: str) -> str:
+        if _DATE.fullmatch(raw):
+            return raw
         if "@" in raw:
             return self.address(raw)
         if _GUID.fullmatch(raw):
@@ -411,13 +565,35 @@ class Mapper:
         encoded = urlencode(query, quote_via=quote, safe="!$'(),:*")
         return urlunsplit((parts.scheme, self.host(parts.hostname), path, encoded, ""))
 
+    def page_attribute(self, name: str, value: str) -> str:
+        match page_attribute_kind(name, value):
+            case "id":
+                return self.plain(value)
+            case "url":
+                parts = urlsplit(value)
+                graph = parts.scheme == "https" and (parts.hostname or "").casefold() == GRAPH_HOST
+                return (
+                    self.url(value)
+                    if graph or (name not in PAGE_EMBEDS and parts.hostname)
+                    else self.text(value)
+                )
+            case "plain":
+                return value
+            case "text":
+                return self.text(value)
+
     def request_value(self, raw: str) -> str:
         if raw in self.ids:
             return self.id(raw)
         if _GUID.fullmatch(raw):
             return mapped_guid(raw)
-        if _DATE.fullmatch(raw) or _TOKEN.fullmatch(raw):
+        if _DATE.fullmatch(raw) or _TOKEN.fullmatch(raw) or _TOKEN_LIST.fullmatch(raw):
             return raw
+        if is_emoji(raw):
+            return raw
+        if (page := _PAGE.fullmatch(raw)) is not None:
+            text = (page[1], self.text(page[2]), page[3], self.text(page[4]), page[5])
+            return "".join(text)
         if _ADDRESS.fullmatch(raw.strip().casefold()):
             return self.address(raw)
         return self.url(raw) if raw.startswith("https://") else self.text(raw)
@@ -435,10 +611,15 @@ class Mapper:
                 nested = isinstance(one, Mapping)
                 if key not in SCHEMA or (nested and SCHEMA[key] != "object"):
                     self.counts["keys dropped"] += 1
+                    self.dropped[key] += 1
                     continue
                 if owner and key in _NAME_KEYS and isinstance(one, str):
                     self.counts["persona names"] += 1
                     kept[key] = owner
+                    continue
+                if key == "contentBytes" and isinstance(one, str) and holds_bytes(self.corpus, one):
+                    self.counts["attachments kept by hash"] += 1
+                    kept[key] = one
                     continue
                 kept[key] = self.response(one, SCHEMA[key])
             return kept
@@ -454,7 +635,7 @@ class Mapper:
                 return self.url(raw)
             case "path":
                 return self.path(raw, api=True)
-            case "date" if _DATE.fullmatch(raw):
+            case "date" | "object" if _DATE.fullmatch(raw):
                 return raw
             case "enum" if _ENUM.fullmatch(raw) and "@" not in raw:
                 return raw
@@ -481,6 +662,7 @@ class Fixture:
     bodies: dict[str, bytes]
     metadata: dict[str, object]
     counts: dict[str, int]
+    dropped: dict[str, int] = field(default_factory=dict[str, int])
 
 
 def _parsed(hop: Hop) -> object:
@@ -544,7 +726,7 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         interaction: dict[str, object] = {"method": asked["method"]}
         if not api:
             interaction["host"] = mapper.host(str(asked["host"]))
-        interaction["path"] = mapper.path(str(asked["path"]), api)
+        interaction["path"] = symbolize(mapper.path(str(asked["path"]), api))
         if asked["headers"]:
             interaction["headers"] = dict(cast("Json", asked["headers"]))
         query = mapper.query(cast("Mapping[str, str]", asked["query"]))
@@ -566,6 +748,14 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
             scrubbed = mapper.response(cast("object", body))
             text = json.dumps(scrubbed, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
             bodies[name] = text.encode()
+            interaction["body"] = name
+        elif is_page_content(hop):
+            name = f"{recording.fixture}.{n:02d}.html"
+            page = rewritten_page(
+                hop.body.decode(errors="replace"), mapper.text, mapper.page_attribute
+            )
+            mapper.counts["page htmls scrubbed"] += 1
+            bodies[name] = page.encode()
             interaction["body"] = name
         elif hop.body:
             if hashlib.sha256(hop.body).hexdigest() not in corpus.binaries:
@@ -592,7 +782,14 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         "literals": sorted(recording.literals),
         "sdk_versions": {name: version(name) for name in SDKS},
     }
-    return Fixture(recording.fixture, interactions, bodies, metadata, counts)
+    return Fixture(
+        recording.fixture,
+        interactions,
+        bodies,
+        metadata,
+        counts,
+        dict(sorted(mapper.dropped.items())),
+    )
 
 
 def files_of(fixture: Fixture) -> dict[str, bytes]:

@@ -14,10 +14,10 @@ from tests.e2e.recording.guard import (
     foreign_address,
 )
 from tests.e2e.recording.record import check, describe, main, resolve
-from tests.e2e.recording.stand_in import DOMAIN, DRIVE_ID, UPN, USER_ID
+from tests.e2e.recording.stand_in import DOMAIN, DRIVE_ID, UPN, UPNS, USER_ID
 from tests.e2e.test_scenarios import Json
 
-ALLOWED = frozenset({DOMAIN})
+ALLOWED = frozenset(UPNS)
 SEED_MESSAGE = "AAMkSEED"
 FOREIGN_MESSAGE = "AAMkFOREIGN"
 
@@ -25,74 +25,79 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
     "C1 display-name syntax": (
         "outlook_draft_mail",
         {"to": ["Jonas <jonas@evil.com>"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2a upper-case foreign": (
         "outlook_draft_mail",
         {"to": ["x@EVIL.COM"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2b look-alike suffix": (
         "outlook_draft_mail",
         {"to": [f"x@{DOMAIN}.evil.com"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
-    "C2c upper-case allowed": ("outlook_draft_mail", {"to": [f"x@{DOMAIN.upper()}"]}, None),
+    "C2c upper-case allowed": ("outlook_draft_mail", {"to": [UPN.upper()]}, None),
+    "C2k other user of the domain": (
+        "outlook_draft_mail",
+        {"to": [f"ceo@{DOMAIN}"]},
+        "that is not a test user",
+    ),
     "C2d Cyrillic homoglyph": (
         "outlook_draft_mail",
         {"to": [f"x@{DOMAIN.replace('o', 'о', 1)}"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
-    "C2e IDN domain": ("outlook_draft_mail", {"to": ["x@évil.com"]}, "outside the allowed domain"),
+    "C2e IDN domain": ("outlook_draft_mail", {"to": ["x@évil.com"]}, "that is not a test user"),
     "C2f quoted local part": (
         "outlook_draft_mail",
         {"to": ['"jonas"@evil.com']},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2g IP literal": ("outlook_draft_mail", {"to": ["jonas@[203.0.113.5]"]}, "holds an"),
     "C2h full-width at": (
         "outlook_draft_mail",
         {"to": ["jonas＠evil.com"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2i small form at": (
         "outlook_draft_mail",
         {"to": ["jonas﹫evil.com"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2j percent-encoded at": (
         "outlook_draft_mail",
         {"to": ["jonas%40evil.com"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2k double percent-encoded": (
         "outlook_draft_mail",
         {"to": ["jonas%2540evil.com"]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2l HTML entity at": (
         "outlook_draft_mail",
         {"subject": "jonas&#64;evil.com"},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C2m folded address": (
         "outlook_draft_mail",
         {"body": "jonas.huber\r\n @evil.com"},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C3a cc nested object": (
         "outlook_draft_mail",
         {"cc": [{"address": "x@evil.com"}]},
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "C3b attendees in-domain": (
         "outlook_create_event",
         {"subject": "s", "attendees": [f"ceo@{DOMAIN}"]},
         "would invite",
     ),
-    "C3c location in-domain": (
+    "C3c location is a test user": (
         "outlook_create_event",
-        {"subject": "s", "location": f"ceo@{DOMAIN}"},
+        {"subject": "s", "location": UPN},
         None,
     ),
     "C3d online meeting": (
@@ -105,24 +110,9 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
         {"subject": "s", "room_addresses": [f"r@{DOMAIN}"]},
         "would invite",
     ),
-    "C4a write not on the list": (
-        "outlook_forward_event",
-        {"uri": "x", "to": [f"a@{DOMAIN}"]},
-        "not on the read or the write allowlist",
-    ),
-    "C4b anonymous share link": (
-        "sharepoint_create_share_link",
-        {"item": "x", "audience": "anyone"},
-        "not on the read or the write allowlist",
-    ),
-    "C4c auto-reply": (
-        "outlook_set_automatic_reply",
-        {"status": "alwaysEnabled"},
-        "not on the read or the write allowlist",
-    ),
-    "C4d Teams message": (
-        "teams_send_chat_message",
-        {"chat_id": "19:x", "message": "hi"},
+    "C4a transcript not on the list": (
+        "teams_read_transcript",
+        {"uri": "x"},
         "not on the read or the write allowlist",
     ),
     "C6 another mailbox (write)": (
@@ -135,19 +125,9 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
         {"mailbox": f"ceo@{DOMAIN}"},
         "args.mailbox",
     ),
-    "C6c directory search": (
-        "outlook_find_recipient",
-        {"query": "a"},
-        "not on the read or the write allowlist",
-    ),
-    "C6d free/busy": (
-        "outlook_check_availability",
-        {"addresses": [f"ceo@{DOMAIN}"]},
-        "not on the read or the write allowlist",
-    ),
-    "C6e mail search": (
-        "outlook_search_mail",
-        {"query": "budget"},
+    "C6d transcript read": (
+        "teams_read_transcript",
+        {"uri": "x"},
         "not on the read or the write allowlist",
     ),
     "C6f own mailbox by name": ("outlook_list_mail", {"mailbox": UPN.upper()}, None),
@@ -167,7 +147,22 @@ def graph(method: str, path: str, body: object = None, **headers: str) -> httpx.
     )
 
 
+STRANGER = {"emailAddress": {"address": f"stranger@{DOMAIN}"}}
 REQUEST_PLANTS: dict[str, tuple[httpx.Request, str, str | None]] = {
+    "R16 draft to a stranger of the domain": (
+        graph("POST", "/v1.0/me/messages", {"toRecipients": [STRANGER]}),
+        "outlook_draft_mail",
+        "that is not a test user",
+    ),
+    "R17 share with a stranger of the domain": (
+        graph(
+            "POST",
+            "/v1.0/me/calendars/CAL1/calendarPermissions",
+            {"emailAddress": STRANGER["emailAddress"], "role": "write"},
+        ),
+        "outlook_share_calendar",
+        "that is not a test user",
+    ),
     "R1 move in another mailbox": (
         graph(
             "POST",
@@ -184,7 +179,7 @@ REQUEST_PLANTS: dict[str, tuple[httpx.Request, str, str | None]] = {
             {"toRecipients": [{"emailAddress": {"address": "x@évil.com"}}]},
         ),
         "outlook_draft_mail",
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "R3 quoted local part in the body": (
         graph(
@@ -193,7 +188,7 @@ REQUEST_PLANTS: dict[str, tuple[httpx.Request, str, str | None]] = {
             {"toRecipients": [{"emailAddress": {"address": '"x"@evil.com'}}]},
         ),
         "outlook_draft_mail",
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "R4 allowed tool, unrelated write": (
         graph(
@@ -241,7 +236,7 @@ REQUEST_PLANTS: dict[str, tuple[httpx.Request, str, str | None]] = {
     "R11 address in the filter": (
         graph("GET", "/v1.0/me/messages?$filter=from/emailAddress/address eq 'x%40evil.com'"),
         "outlook_list_mail",
-        "outside the allowed domain",
+        "that is not a test user",
     ),
     "R12 plain http": (
         httpx.Request("GET", "http://graph.microsoft.com/v1.0/me"),
@@ -284,6 +279,53 @@ def test_a_red_team_request_plant_gets_its_verdict(plant: str) -> None:
         assert refusal is None
     else:
         assert refusal is not None and expected in refusal, refusal
+
+
+def test_a_send_is_refused_when_its_draft_holds_a_stranger() -> None:
+    made = guard()
+    own = {"emailAddress": {"address": UPN}}
+    made.saw(graph("POST", "/v1.0/me/messages"), 201, None, {"id": "D1", "toRecipients": [own]})
+    made.saw(
+        graph("POST", f"/v1.0/me/messages/{SEED_MESSAGE}/createReply"),
+        201,
+        None,
+        {"id": "D2", "toRecipients": [own, STRANGER]},
+    )
+    assert (
+        made.refuses_request(graph("POST", "/v1.0/me/messages/D1/send"), "outlook_send_draft")
+        is None
+    )
+    refusal = made.refuses_request(graph("POST", "/v1.0/me/messages/D2/send"), "outlook_send_draft")
+    assert refusal is not None and "recipients hold" in refusal
+
+
+@pytest.mark.parametrize(("method", "status"), [("GET", 429), ("GET", 503), ("POST", 501)])
+def test_a_throttle_or_a_server_error_on_any_call_stops_the_writes(
+    method: str, status: int
+) -> None:
+    made = guard()
+    made.saw(graph(method, "/v1.0/me/messages"), status, None, None)
+    refusal = made.refuses_request(
+        graph("POST", f"/v1.0/me/messages/{SEED_MESSAGE}/move", {"DestinationId": "archive"}),
+        "outlook_move_mail",
+    )
+    assert refusal is not None and "failed or throttled" in refusal
+
+
+def test_a_write_to_an_event_of_the_default_calendar_passes() -> None:
+    made = guard()
+    calendars = {"value": [{"id": "DEFCAL", "name": "Calendar", "isDefaultCalendar": True}]}
+    made.saw(graph("GET", "/v1.0/me/calendars"), 200, None, calendars)
+    made.saw(graph("POST", "/v1.0/me/events"), 201, None, {"id": "EV1"})
+    for method, tool in (("DELETE", "outlook_delete_event"), ("PATCH", "outlook_update_event")):
+        event = graph(method, "/v1.0/me/calendars/DEFCAL/events/EV1")
+        assert made.refuses_request(event, tool) is None
+    other = graph("DELETE", "/v1.0/me/calendars/OTHER/events/EV1")
+    assert "did not read as seed data" in str(made.refuses_request(other, "outlook_delete_event"))
+    whole = graph("DELETE", "/v1.0/me/calendars/DEFCAL")
+    assert "did not read as seed data" in str(
+        made.refuses_request(whole, "outlook_delete_calendar")
+    )
 
 
 def test_every_allowlisted_tool_exists() -> None:
@@ -359,10 +401,46 @@ def test_a_seed_item_is_known_by_its_tag() -> None:
 
 def test_an_address_check_is_quiet_on_text_without_an_at() -> None:
     assert foreign_address("Lunch on Friday?", ALLOWED) is None
-    assert foreign_address(f"Mia <mia@{DOMAIN}>, tom@{DOMAIN}", ALLOWED) is None
+    assert foreign_address(f"Mia <{UPNS[0]}>, {UPNS[1]}", ALLOWED) is None
     assert (
         foreign_address("Lunch @ noon", ALLOWED) == "an @ that is not part of one parseable address"
     )
+
+
+COPY = f"/v1.0/drives/{DRIVE_ID}/items/01SEED/children"
+
+
+@pytest.mark.parametrize(
+    "key", ["@microsoft.graph.conflictBehavior", "%40microsoft.graph.conflictBehavior"]
+)
+def test_a_graph_annotation_key_in_the_query_is_no_address(key: str) -> None:
+    made = guard()
+    made.seen_seed.add("01SEED")
+    body: Json = {"name": "seed-v1 case-x", "folder": {}}
+    request = graph("POST", f"{COPY}?{key}=fail", body)
+    assert made.refuses_request(request, "sharepoint_create_folder") is None
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        "?x=@microsoft.graph.conflictBehavior",
+        "?%40microsoft.graph.conflictBehavior=a%40evil.example",
+        "?%2540microsoft.graph.conflictBehavior=fail",
+        "?@evil.example=fail",
+        "?%40microsoft.graph.conflict.Behavior=fail",
+    ],
+)
+def test_an_at_that_is_not_a_graph_annotation_key_is_still_refused(tail: str) -> None:
+    made = guard()
+    made.seen_seed.add("01SEED")
+    request = graph("POST", f"{COPY}{tail}", {"name": "seed-v1 case-x", "folder": {}})
+    assert "request URL holds" in str(made.refuses_request(request, "sharepoint_create_folder"))
+
+
+def test_an_annotation_key_in_the_path_is_still_refused() -> None:
+    request = graph("POST", f"{COPY.replace('01SEED', '@microsoft.graph.x')}/children")
+    assert "holds" in str(guard().refuses_request(request, "sharepoint_create_folder"))
 
 
 def test_the_dry_run_plans_the_calls_and_shows_the_refusals() -> None:
@@ -392,7 +470,7 @@ def test_the_guard_refuses_under_python_o() -> None:
     script = (
         "import httpx\n"
         "from tests.e2e.recording.guard import Guard\n"
-        f"g = Guard({UPN!r}, frozenset({{{DOMAIN!r}}}), True)\n"
+        f"g = Guard({UPN!r}, frozenset({{{UPN!r}}}), True)\n"
         "print(g.refuses_call('outlook_draft_mail', {'to': ['x＠evil.com']}))\n"
         "print(g.refuses_call('outlook_list_mail', {'mailbox': 'ceo@x.ch'}))\n"
         "print(g.refuses_request(httpx.Request('POST', 'https://graph.microsoft.com/v1.0/me/"

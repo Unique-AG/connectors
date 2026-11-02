@@ -9,8 +9,9 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from fnmatch import fnmatch
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import cast
+from typing import cast, override
 from urllib.parse import parse_qsl, unquote
 
 import httpx
@@ -43,11 +44,13 @@ _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_HEADERS = ("prefer", "consistencylevel")
 _DATETIME = r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?"
 _SYMBOL = re.compile(r"~(yesterday|today|tomorrow)")
+_GENERATED_KEYS = frozenset({"transactionId", "externalId"})
 _TODAY = datetime.now(UTC).date()
 _DAYS = {
     word: _TODAY + timedelta(n) for n, word in enumerate(("yesterday", "today", "tomorrow"), -1)
 }
-_SELECTOR = re.compile(r"\[(\d+|\*)\]|\.?([^.\[]+)")
+_SELECTOR = re.compile(r"\[(\d+|\*)\]|\[(\w+)=([^\]]*)\]|\.?([^.\[]+)")
+_MARKUP = re.compile(r"([a-z][a-z0-9]*)\[([\w\-]+)\]")
 _REFERENCE = re.compile(r"(?:tools|shared|graph_client)(?:\.\w+)+")
 
 
@@ -81,8 +84,12 @@ def select(value: object, path: str) -> object:
         return value
     token = _SELECTOR.match(path)
     assert token is not None, f"{path!r} is not a selector"
-    index, name = token.groups()
+    index, field_name, field_value, name = token.groups()
     rest = path[token.end() :]
+    if field_name is not None:
+        hits = [one for one in items(value) if mapping(one).get(field_name) == field_value]
+        assert hits, f"{path}: no item with {field_name} {field_value!r} in {value!r:.200}"
+        return select(hits[0], rest)
     if index == "*":
         return [select(item, rest) for item in items(value)]
     if index is not None:
@@ -92,14 +99,41 @@ def select(value: object, path: str) -> object:
     return select(found[name], rest)
 
 
+class _Markup(HTMLParser):
+    def __init__(self, tag: str, name: str) -> None:
+        super().__init__()
+        self.tag: str = tag
+        self.name: str = name
+        self.found: list[str] = []
+
+    @override
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.found += [one for key, one in attrs if tag == self.tag and key == self.name and one]
+
+
+def attribute_in(markup: object, query: str) -> str:
+    wanted = _MARKUP.fullmatch(query)
+    if wanted is None or not isinstance(markup, str):
+        raise AssertionError(f"{query!r} is not tag[attribute] of text")
+    parser = _Markup(*wanted.groups())
+    parser.feed(markup)
+    if not parser.found:
+        raise AssertionError(f"no <{wanted[1]}> with {wanted[2]} in {markup!r:.200}")
+    return parser.found[0]
+
+
 def _given(value: object, results: Sequence[object]) -> object:
     if isinstance(value, list):
         return [_given(item, results) for item in cast("list[object]", value)]
+    if isinstance(value, Mapping):
+        return {key: _given(one, results) for key, one in cast("Json", value).items()}
     if not isinstance(value, str):
         return value
     if value.startswith("$"):
         root, _, path = value[1:].partition(".")
-        return select(results[-1] if root == "prev" else results[int(root) - 1], path)
+        path, _, markup = path.partition("~")
+        found = select(results[-1] if root == "prev" else results[int(root) - 1], path)
+        return attribute_in(found, markup) if markup else found
     if value in _DAYS:
         return _DAYS[value].isoformat()
     return _SYMBOL.sub(lambda word: _DAYS[word[1]].isoformat(), value)
@@ -161,13 +195,20 @@ def _asked(request: httpx.Request) -> Json:
     return where | {"query": query, "headers": headers, "json": body}
 
 
+def _without_generated(body: object) -> object:
+    if isinstance(body, Mapping):
+        return {key: one for key, one in cast("Json", body).items() if key not in _GENERATED_KEYS}
+    return body
+
+
 def _matches(interaction: Json, asked: Json) -> bool:
     return (
-        all(interaction.get(key) == asked[key] for key in ("method", "path"))
+        interaction.get("method") == asked["method"]
+        and same(interaction.get("path"), asked["path"])
         and interaction.get("host", "graph.microsoft.com") == asked["host"]
         and interaction.get("headers", {}) == asked["headers"]
         and same(interaction.get("query", {}), asked["query"])
-        and same(interaction.get("json"), asked["json"])
+        and same(_without_generated(interaction.get("json")), _without_generated(asked["json"]))
     )
 
 
@@ -376,3 +417,75 @@ def test_the_number_of_executable_scenarios_only_goes_up() -> None:
         f"{len(runs())} runs, fewer than _MINIMUM_EXECUTABLE = {_MINIMUM_EXECUTABLE}. The number "
         + "only goes up: restore the run, or lower the constant in a change that says why."
     )
+
+
+def _status(interaction: Json, method: str, path: str, body: object = None) -> int:
+    headers = {"authorization": f"Bearer {_OBO_TOKEN}"}
+    request = httpx.Request(
+        method, f"https://graph.microsoft.com{path}", json=body, headers=headers
+    )
+    return Replay([interaction])(request).status_code
+
+
+def test_a_transaction_id_at_the_top_of_a_body_never_decides_the_match() -> None:
+    saved = {"transactionId": "00000000-1111-4222-8333-444444444444"}
+    first = {"method": "POST", "path": "/v1.0/me/events", "status": 201}
+    interaction = first | {"json": {"subject": "s"} | saved}
+    derived = {"transactionId": "25d08be4-0986-5ceb-ac2a-fbd5a0e689f5"}
+    assert _status(interaction, "POST", "/v1.0/me/events", {"subject": "s"} | derived) == 201
+    assert _status(interaction, "POST", "/v1.0/me/events", {"subject": "t"} | derived) == 418
+    nested = first | {"json": {"event": saved}}
+    assert _status(nested, "POST", "/v1.0/me/events", {"event": saved}) == 201
+    assert _status(nested, "POST", "/v1.0/me/events", {"event": derived}) == 418
+
+
+def test_an_external_id_at_the_top_of_a_body_never_decides_the_match() -> None:
+    saved = {"externalId": "00000000-1111-4222-8333-444444444444"}
+    first = {"method": "POST", "path": "/v1.0/me/onlineMeetings/createOrGet", "status": 200}
+    interaction = first | {"json": {"subject": "s"} | saved}
+    derived = {"externalId": "25d08be4-0986-5ceb-ac2a-fbd5a0e689f5"}
+    path = "/v1.0/me/onlineMeetings/createOrGet"
+    assert _status(interaction, "POST", path, {"subject": "s"} | derived) == 200
+    assert _status(interaction, "POST", path, {"subject": "t"} | derived) == 418
+    nested = first | {"json": {"meeting": saved}}
+    assert _status(nested, "POST", path, {"meeting": derived}) == 418
+
+
+def test_a_path_with_a_day_symbol_matches_on_another_day_and_other_paths_match_exactly() -> None:
+    def window(first: date | str, last: date | str) -> str:
+        stamp = "T00:00:00.0000000"
+        return f"/v1.0/me/reminderView(startDateTime='{first}{stamp}',endDateTime='{last}{stamp}')"
+
+    saved = window("~yesterday", "~tomorrow")
+    interaction = {"method": "GET", "path": saved, "status": 200}
+    assert _status(interaction, "GET", window(_DAYS["yesterday"], _DAYS["tomorrow"])) == 200
+    assert _status(interaction, "GET", window(_DAYS["today"], _DAYS["tomorrow"])) == 200
+    far = _TODAY + timedelta(5)
+    assert _status(interaction, "GET", window(far, far)) == 418
+    fixed = {"method": "GET", "path": "/v1.0/me/outlook/supportedTimeZones()", "status": 200}
+    assert _status(fixed, "GET", "/v1.0/me/outlook/supportedTimeZones()") == 200
+    assert _status(fixed, "GET", "/v1.0/me/outlook/supportedTimeZones") == 418
+
+
+def test_a_selector_picks_an_item_by_the_value_of_a_field() -> None:
+    answer = {"teams": [{"name": "a", "id": "1"}, {"name": "seed-v1 team", "id": "2"}]}
+    assert select(answer, "teams[name=seed-v1 team].id") == "2"
+    with pytest.raises((AssertionError, IndexError)):
+        _ = select(answer, "teams[name=other].id")
+
+
+def test_a_bind_reads_an_attribute_of_the_markup_a_step_returned() -> None:
+    answer = {"html": '<html><body><p src="no">x</p><img alt="a" src="https://g/x"/></body></html>'}
+    assert _given("$prev.html~img[src]", [answer]) == "https://g/x"
+    assert _given("$1.html~img[alt]", [answer]) == "a"
+    with pytest.raises(AssertionError, match="no <object> with data"):
+        _ = _given("$prev.html~object[data]", [answer])
+    with pytest.raises(AssertionError, match="is not tag"):
+        _ = _given("$prev.html~img", [answer])
+
+
+def test_a_bind_builds_a_person_object_from_earlier_answers() -> None:
+    answer = {"people": [{"id": "1", "name": "Anna"}]}
+    spec = {"user_id": "$prev.people[0].id", "name": "$prev.people[0].name"}
+    assert _given([spec], [answer]) == [{"user_id": "1", "name": "Anna"}]
+    assert _given({"x": ["plain", "$prev.people[0].id"]}, [answer]) == {"x": ["plain", "1"]}

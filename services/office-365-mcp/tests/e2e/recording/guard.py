@@ -9,43 +9,23 @@ import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from email.utils import getaddresses
-from fnmatch import fnmatch
+from fnmatch import fnmatchcase
 from typing import cast
 from urllib.parse import unquote
 
 import httpx
+
+from tests.e2e.recording.families import load
 
 GRAPH_HOST = "graph.microsoft.com"
 SEED_TAG = "seed-v1"
 PREFLIGHT = "preflight"
 DEFAULT_CAP = 40
 MAX_CAP = 100
-READ_TOOLS = frozenset(
-    {
-        "outlook_list_mail",
-        "outlook_read_mail",
-        "outlook_read_thread",
-        "outlook_browse_folders",
-        "outlook_list_attachments",
-        "outlook_read_attachment",
-        "outlook_list_events",
-        "outlook_read_event",
-        "sharepoint_search_files",
-        "sharepoint_read_file",
-        "sharepoint_browse_folder",
-    }
-)
-SEARCH_TOOLS = frozenset({"sharepoint_search_files"})
-WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
-    "outlook_move_mail": ("POST /v1.0/me/messages/*/move",),
-    "outlook_mark_mail": ("PATCH /v1.0/me/messages/*",),
-    "outlook_draft_mail": ("POST /v1.0/me/messages", "POST /v1.0/me/mailFolders/*/messages"),
-    "outlook_create_event": (
-        "POST /v1.0/me/events",
-        "POST /v1.0/me/calendar/events",
-        "POST /v1.0/me/calendars/*/events",
-    ),
-}
+FAMILIES = load()
+READ_TOOLS = FAMILIES.read_tools
+WRITE_TOOLS: Mapping[str, tuple[str, ...]] = FAMILIES.write_tools
+SEED_CASE = f"{SEED_TAG} case-"
 INVITING_ARGUMENTS = frozenset(
     {"attendees", "optional_attendees", "room_addresses", "online_meeting"}
 )
@@ -54,10 +34,17 @@ WELL_KNOWN_FOLDERS = frozenset(
 )
 _WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _PREFLIGHT_PATHS = frozenset({"/v1.0/me", "/v1.0/organization", "/v1.0/me/drive"})
-_TARGET = re.compile(r"/v1\.0/me/(?:messages|events|mailFolders)/([^/]+)")
 _DESTINATIONS = frozenset({"DestinationId", "destinationId"})
-_FAILED = frozenset({429, 500, 502, 503, 504})
+_NAMES = frozenset({"name", "displayName", "subject", "title", "topic"})
+_RECIPIENTS = ("toRecipients", "ccRecipients", "bccRecipients")
+_EVENT_CALENDAR = "/calendars/*/events/"
+_FOLDERS = "/v1.0/me/mailFolders/"
+_CREATE_OR_GET = "/v1.0/me/onlineMeetings/createOrGet"
+_TEAM_CHANNELS = re.compile(r"/v1\.0/teams/([^/]+)/channels")
+_OTHER_USER = re.compile(r"/v1\.0/users/([^/]+)")
+_BOUND_USER = re.compile(r"/users\('([^']*)'\)")
 _SEPARATORS = re.compile(r"[\s,;:'\"()<>&?=/\[\]{}|\\]+")
+_ANNOTATION_KEY = re.compile(r"(?<=[?&])(?:%40|@)microsoft\.graph\.[A-Za-z]+(?==)")
 
 
 class Refused(Exception):
@@ -70,24 +57,37 @@ def unwrapped(text: str) -> str:
     return text
 
 
-def foreign_address(text: str, domains: frozenset[str]) -> str | None:
-    """Names the first part of `text` that is not an address in `domains`, or None. Any @, a
+def foreign_address(text: str, addresses: frozenset[str]) -> str | None:
+    """Names the first part of `text` that is not one of `addresses`, or None. Any @, a
     full-width one or a percent-encoded one included, must belong to an address that
-    `getaddresses` parses and whose IDNA domain is on the allowlist."""
+    `getaddresses` parses and that is on the allowlist once its domain is IDNA-encoded."""
     for token in _SEPARATORS.split(unwrapped(text)):
-        if "@" not in token:
+        if "@" not in token or any(shape.fullmatch(token) for shape in FAMILIES.thread_id):
             continue
         parsed = [address for _, address in getaddresses([token]) if "@" in address]
         if len(parsed) != 1 or parsed[0].count("@") != token.count("@"):
             return "an @ that is not part of one parseable address"
-        domain = parsed[0].rpartition("@")[2]
+        local, _, domain = parsed[0].rpartition("@")
         try:
-            ascii_domain = domain.encode("idna").decode().casefold()
+            ascii_domain = domain.encode("idna").decode()
         except UnicodeError:
             return "an address whose domain is not a valid IDNA name"
-        if ascii_domain not in domains:
-            return "an address outside the allowed domain"
+        if f"{local}@{ascii_domain}".casefold() not in addresses:
+            return "an address that is not a test user"
     return None
+
+
+def match_glob(glob: str, shown: str) -> list[str] | None:
+    pattern, path = glob.split("/"), shown.split("/")
+    if len(pattern) != len(path) or not all(
+        fnmatchcase(p, g) for g, p in zip(pattern, path, strict=True)
+    ):
+        return None
+    return [p[: len(p) - len(g) + 1] for g, p in zip(pattern, path, strict=True) if g[:1] == "*"]
+
+
+def _name(where: str) -> bool:
+    return where.rsplit(".", 1)[-1] in _NAMES
 
 
 def strings(value: object, where: str = "args") -> Iterator[tuple[str, str]]:
@@ -109,28 +109,44 @@ def _is_tagged(found: Mapping[str, object]) -> bool:
     return isinstance(named, str) and named.startswith(f"{SEED_TAG} ")
 
 
-def seed_ids(value: object) -> Iterator[str]:
+def mappings(value: object) -> Iterator[Mapping[str, object]]:
     if isinstance(value, list):
         for one in cast("list[object]", value):
-            yield from seed_ids(one)
+            yield from mappings(one)
     elif isinstance(value, Mapping):
         found = cast("Mapping[str, object]", value)
+        yield found
+        for one in found.values():
+            yield from mappings(one)
+
+
+def seed_ids(value: object) -> Iterator[str]:
+    for found in mappings(value):
         if isinstance(found.get("id"), str) and _is_tagged(found):
             yield cast("str", found["id"])
-        for one in found.values():
-            yield from seed_ids(one)
+
+
+def default_calendar_ids(value: object) -> Iterator[str]:
+    for found in mappings(value):
+        if isinstance(found.get("id"), str) and found.get("isDefaultCalendar") is True:
+            yield cast("str", found["id"])
 
 
 @dataclass
 class Guard:
     allowed_upn: str
-    allowed_domains: frozenset[str]
+    allowed_addresses: frozenset[str]
     allow_writes: bool
     cap: int = DEFAULT_CAP
     me_id: str = ""
     drive_ids: frozenset[str] = frozenset()
+    people: frozenset[str] = frozenset()
     sent: int = 0
     seen_seed: set[str] = field(default_factory=set[str])
+    created: set[str] = field(default_factory=set[str])
+    default_calendars: set[str] = field(default_factory=set[str])
+    well_known: set[str] = field(default_factory=set[str])
+    drafted: dict[str, tuple[str, ...]] = field(default_factory=dict[str, tuple[str, ...]])
     redirect: str | None = None
     write_failed: bool = False
 
@@ -147,7 +163,7 @@ class Guard:
         if writes and inviting:
             return f"{tool} would invite people or rooms through {inviting}"
         for where, value in strings(args):
-            if (outside := foreign_address(value, self.allowed_domains)) is not None:
+            if (outside := foreign_address(value, self.allowed_addresses)) is not None:
                 return f"{tool} {where} holds {outside}"
         return None
 
@@ -169,13 +185,18 @@ class Guard:
             return self._refuses_hop(request)
         if not self._pinned(method, path, tool):
             return f"{shown} is outside /v1.0/me/ and the recording user's own drive"
-        if outside := foreign_address(str(request.url.raw_path, "ascii"), self.allowed_domains):
+        target = _ANNOTATION_KEY.sub("", str(request.url.raw_path, "ascii"))
+        if outside := foreign_address(target, self.allowed_addresses):
             return f"{method} request URL holds {outside}"
         body = self._body_strings(request)
         for _, value in body:
-            if (outside := foreign_address(value, self.allowed_domains)) is not None:
+            if (outside := foreign_address(value, self.allowed_addresses)) is not None:
                 return f"{shown} body holds {outside}"
-        if method not in _WRITE_METHODS or (method, path) == ("POST", "/v1.0/search/query"):
+            known = self.people | self.allowed_addresses | {self.me_id.casefold()}
+            for bound in cast("list[str]", _BOUND_USER.findall(value)):
+                if bound.casefold() not in known - {""}:
+                    return f"{shown} body binds a person that is not a test user"
+        if method not in _WRITE_METHODS or self._reads_by_glob(shown, tool):
             return None
         return self._refuses_write(shown, path, tool, body)
 
@@ -192,16 +213,49 @@ class Guard:
     ) -> str | None:
         if not self.allow_writes or tool not in WRITE_TOOLS:
             return f"{shown} is a write that {tool} may not make here"
-        if not any(fnmatch(shown, pattern) for pattern in WRITE_TOOLS[tool]):
+        hit = next(
+            (
+                (glob, found)
+                for glob in WRITE_TOOLS[tool]
+                if (found := match_glob(glob, shown)) is not None
+            ),
+            None,
+        )
+        if hit is None:
             return f"{shown} is not a write path of {tool}"
+        glob, matched = hit
         if self.write_failed:
             return f"{shown} would repeat a write after a failed or throttled write"
-        targets = [unquote(found[1]) for found in [_TARGET.match(path)] if found]
-        targets += [value for where, value in body if where.rsplit(".", 1)[-1] in _DESTINATIONS]
+        targets = [unquote(one) for one in matched]
+        targets += [
+            value
+            for where, value in body
+            if where.removeprefix("json.") in _DESTINATIONS | FAMILIES.destinations
+        ]
+        only = FAMILIES.created_only.get(tool)
+        if only is not None and unquote(matched[only]) not in self.created:
+            return f"{shown} is a write of {tool} to an item that this run did not create"
+        defaults = self.default_calendars if _EVENT_CALENDAR in glob else set[str]()
         for target in targets:
-            if target.casefold() not in WELL_KNOWN_FOLDERS and target not in self.seen_seed:
+            known = target in self.seen_seed | self.created | self.well_known | defaults
+            if target.casefold() not in WELL_KNOWN_FOLDERS and not known:
                 return f"{shown} targets an item that this run did not read as seed data"
+            for value in self.drafted.get(target, ()):
+                if (outside := foreign_address(value, self.allowed_addresses)) is not None:
+                    return f"{shown} sends a draft whose recipients hold {outside}"
+        for where, value in body:
+            if value in FAMILIES.forbidden.get(where.rsplit(".", 1)[-1], ()):
+                return f"{shown} body sets {where} to {value}, which no recording may do"
+        if not matched and not path.startswith("/v1.0/me/"):
+            tagged = any(SEED_CASE in value for where, value in body if _name(where))
+            if not tagged:
+                return f"{shown} creates an item outside /v1.0/me/ with no {SEED_CASE} name"
         return None
+
+    @staticmethod
+    def _reads_by_glob(shown: str, tool: str) -> bool:
+        globs = (*FAMILIES.read_posts.get(tool, ()), *FAMILIES.read_gets.get(tool, ()))
+        return any(match_glob(glob, shown) is not None for glob in globs)
 
     def _own(self, path: str) -> str:
         for user in filter(None, (self.me_id, self.allowed_upn)):
@@ -214,11 +268,22 @@ class Guard:
 
     def _pinned(self, method: str, path: str, tool: str) -> bool:
         if tool == PREFLIGHT:
-            return method == "GET" and path in _PREFLIGHT_PATHS
+            other = _OTHER_USER.fullmatch(path)
+            return method == "GET" and (
+                path in _PREFLIGHT_PATHS
+                or (other is not None and other[1].casefold() in self.allowed_addresses)
+            )
         if path == "/v1.0/me" or path.startswith("/v1.0/me/"):
             return True
-        if path == "/v1.0/search/query":
-            return method == "POST" and tool in SEARCH_TOOLS
+        writes = WRITE_TOOLS.get(tool, ())
+        if method in _WRITE_METHODS and any(
+            match_glob(glob, f"{method} {path}") is not None for glob in writes
+        ):
+            return True
+        if self._reads_by_glob(f"{method} {path}", tool):
+            return True
+        if method == "GET" and any(path.startswith(prefix) for prefix in FAMILIES.prefixes):
+            return True
         return any(path.startswith(f"/v1.0/drives/{drive}/") for drive in self.drive_ids)
 
     @staticmethod
@@ -231,8 +296,73 @@ class Guard:
         except ValueError:
             return [("body", text)]
 
+    def _answers_a_create(self, request: httpx.Request) -> bool:
+        if request.method == "PUT":
+            return True
+        named = any(
+            SEED_CASE in value for where, value in self._body_strings(request) if _name(where)
+        )
+        return request.url.path.endswith(_CREATE_OR_GET) and named
+
+    def _remember_well_known(self, request: httpx.Request, status: int, body: object) -> None:
+        path = self._own(unquote(request.url.path))
+        named = path.removeprefix(_FOLDERS)
+        identifier = (
+            cast("Mapping[str, object]", body).get("id") if isinstance(body, Mapping) else None
+        )
+        if (
+            request.method == "GET"
+            and status == 200
+            and named != path
+            and named.casefold() in WELL_KNOWN_FOLDERS
+            and isinstance(identifier, str)
+        ):
+            self.well_known.add(identifier)
+
+    def _remember_channels(self, request: httpx.Request, status: int, body: object) -> None:
+        listed = _TEAM_CHANNELS.fullmatch(unquote(request.url.path))
+        if (
+            request.method == "GET"
+            and status == 200
+            and listed is not None
+            and listed[1] in self.seen_seed
+            and isinstance(body, Mapping)
+        ):
+            self.seen_seed.update(
+                cast("str", found["id"])
+                for found in mappings(cast("Mapping[str, object]", body).get("value"))
+                if isinstance(found.get("id"), str)
+            )
+
+    def _remember_members(self, body: object) -> None:
+        for found in mappings(body):
+            mail = next((found[k] for k in ("email", "mail") if isinstance(found.get(k), str)), "")
+            if (
+                isinstance(found.get("id"), str)
+                and "userId" in found
+                and str(mail).casefold() in self.allowed_addresses
+            ):
+                self.seen_seed.add(cast("str", found["id"]))
+
+    def _remember_draft(self, found: Mapping[str, object]) -> None:
+        identifier = found.get("id")
+        if isinstance(identifier, str) and any(key in found for key in _RECIPIENTS):
+            recipients = [found.get(key) for key in _RECIPIENTS]
+            self.drafted[identifier] = tuple(value for _, value in strings(recipients))
+
     def saw(self, request: httpx.Request, status: int, location: str | None, body: object) -> None:
         self.redirect = location if 300 <= status < 400 else None
-        if request.method in _WRITE_METHODS and status in _FAILED:
+        if status == 429 or status >= 500:
             self.write_failed = True
         self.seen_seed.update(seed_ids(body))
+        self.default_calendars.update(default_calendar_ids(body))
+        self._remember_well_known(request, status, body)
+        self._remember_channels(request, status, body)
+        self._remember_members(body)
+        for found in mappings(body):
+            self._remember_draft(found)
+        made = status == 201 or (status == 200 and self._answers_a_create(request))
+        if request.method in _WRITE_METHODS and made and isinstance(body, Mapping):
+            created = cast("Mapping[str, object]", body).get("id")
+            if isinstance(created, str):
+                self.created.add(created)

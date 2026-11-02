@@ -3,8 +3,9 @@ import io
 import json
 import re
 import zipfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 from urllib.parse import quote
@@ -14,11 +15,16 @@ import pytest
 import tests.e2e.test_scenarios as runner
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.conftest import Recorded
-from tests.e2e.recording.guard import Refused
+from tests.e2e.recording.guard import GRAPH_HOST, Refused
 from tests.e2e.recording.lint import IDENTITIES_VARIABLE, lint_dir, lint_files, main
 from tests.e2e.recording.scrub import (
     RESPONSE_HEADERS,
+    Fixture,
+    Hop,
+    Identities,
     Mapper,
+    Recording,
+    files_of,
     load_corpus,
     made_by_the_mapper,
     map_id,
@@ -128,7 +134,7 @@ PLANTED: dict[str, tuple[Plant, str]] = {
     ),
     "unknown key": (
         swap(MOVED, '"bodyPreview"', '"internetMessageId": "x", "bodyPreview"'),
-        "the key 'internetMessageId' is not in the projection",
+        "at internetMessageId: a key that is not in the projection",
     ),
     "foreign address key": (
         swap(MAIL, "anna@example.test", "anna@example.com"),
@@ -176,6 +182,23 @@ def test_an_identity_is_found_in_its_encoded_form(recorded: Recorded, plant: str
     planted, form = ENCODED[plant]
     findings = lint_files(swap(MAIL, PREVIEW, planted)(files_in(recorded.out)), IDENTITIES)
     assert any("identity #" in line and form in line for line in findings), findings
+
+
+def test_a_finding_names_the_path_and_class_but_never_the_text() -> None:
+    body = {
+        "value": [
+            {"name": "ok", "owner": "bob@corp-secret.com"},
+            {"links": {"href": "https://leaky.sharepoint.com/a"}, "note": "see Zebra Corp"},
+        ]
+    }
+    files = {"bodies/x.01.json": json.dumps(body).encode()}
+    findings = lint_files(files, {"zebra corp"})
+    assert findings == [
+        "bodies/x.01.json at value[0].owner: an address outside the reserved domains (plain)",
+        "bodies/x.01.json at value[1].links.href: a SharePoint host (plain)",
+        "bodies/x.01.json at value[1].note: identity #1 (plain)",
+    ]
+    assert not re.search(r"secret|leaky|zebra", "".join(findings), re.I)
 
 
 def test_the_lint_fails_closed_without_identities(
@@ -273,3 +296,300 @@ def test_a_binary_that_the_seed_did_not_make_is_refused(recorded: Recorded) -> N
     hops[3] = replace(hops[3], body=hops[3].body + b"\x00")
     with pytest.raises(Refused, match="not a file that the seed generator made"):
         _ = scrub(replace(recording, hops=tuple(hops)))
+
+
+def one_hop(
+    path: str,
+    *,
+    method: str = "GET",
+    query: Mapping[str, str] | None = None,
+    sent: object = None,
+    answer: object = None,
+    literals: Collection[str] = (),
+) -> Fixture:
+    asked = {"method": method, "host": GRAPH_HOST, "path": path, "query": dict(query or {})}
+    asked |= {"headers": {}, "json": sent}
+    body = json.dumps(answer).encode() if answer is not None else b""
+    headers = (("content-type", "application/json"),) if body else ()
+    hop = Hop(asked, f"https://{GRAPH_HOST}{path}", False, 200, headers, body)
+    day = datetime(2026, 10, 29, tzinfo=UTC)
+    identities = Identities(frozenset(), "token")
+    recording = Recording(
+        "one", "rec-one", "stand-in", day, (hop,), identities, {}, frozenset(literals)
+    )
+    return scrub(recording)
+
+
+def shared(link: str) -> str:
+    return "u!" + base64.urlsafe_b64encode(link.encode()).decode().rstrip("=")
+
+
+def interaction_of(fixture: Fixture) -> Mapping[str, object]:
+    return mapping(fixture.interactions[0])
+
+
+class TestQueryAndPath:
+    def test_a_date_window_in_the_query_becomes_day_symbols(self) -> None:
+        window = {
+            "startDateTime": "2026-10-28T00:00:00+00:00",
+            "endDateTime": "2026-10-30T00:00:00+00:00",
+        }
+        fixture = one_hop("/v1.0/me/calendars/x/calendarView", query=window)
+        assert interaction_of(fixture)["query"] == {
+            "startDateTime": "~yesterday",
+            "endDateTime": "~tomorrow",
+        }
+
+    def test_a_conflict_behavior_and_a_search_key_survive_and_a_stray_key_does_not(self) -> None:
+        asked = {"@microsoft.graph.conflictBehavior": "fail", "search": "seed-v1", "stray": "x"}
+        fixture = one_hop("/v1.0/sites", query=asked)
+        assert interaction_of(fixture)["query"] == {
+            "@microsoft.graph.conflictBehavior": "fail",
+            "search": "seed-v1",
+        }
+
+    def test_an_id_with_a_slash_is_mapped_in_pieces_and_passes_the_lint(self) -> None:
+        item = "AAMkAbCdEfGhIjKlMnOpQrSt%2FUvWxYzAbCdEfGhIjKlMnOp"
+        link = f"https://outlook.office365.com/owa/?ItemID={item}&exvsurl=1"
+        fixture = one_hop("/v1.0/me/reminders", answer={"webLink": link})
+        assert lint_files(files_of(fixture)) == []
+        assert "AbCdEfGhIjKlMnOpQrSt" not in fixture.bodies["rec-one.01.json"].decode()
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/v1.0/me/outlook/supportedTimeZones()",
+            "/v1.0/me/onenote/notebooks/getRecentNotebooks(includePersonalNotebooks=true)",
+            "/v1.0/me/preview()",
+        ],
+    )
+    def test_a_function_call_in_a_path_is_kept(self, path: str) -> None:
+        assert interaction_of(one_hop(path))["path"] == path
+
+    def test_a_dated_function_call_gets_day_symbols_and_an_address_argument_is_replaced(
+        self,
+    ) -> None:
+        dates = (
+            "startDateTime='2026-10-28T00:00:00.0000000',endDateTime='2026-10-30T00:00:00.0000000'"
+        )
+        window = f"reminderView({dates})"
+        assert interaction_of(one_hop(f"/v1.0/me/{window}"))["path"] == (
+            "/v1.0/me/reminderView(startDateTime='~yesterday',endDateTime='~tomorrow')"
+        )
+        found = one_hop("/v1.0/me/lookup(who='real@corp.ch',day='x')")
+        assert (
+            interaction_of(found)["path"] == "/v1.0/me/lookup(who='user-01@example.test',day='x')"
+        )
+
+    def test_a_call_with_an_argument_outside_the_grammar_is_not_kept(self) -> None:
+        path = interaction_of(one_hop("/v1.0/me/lookup(name=secret)"))["path"]
+        assert path == "/v1.0/me/synthetic text 01"
+
+    def test_a_segment_that_ends_in_a_colon_maps_its_id_and_keeps_the_colon(self) -> None:
+        parent, name = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ012345", "seed-v1 case-x.txt"
+        drive = "b!" + "Q7" * 15
+        path = f"/v1.0/drives/{drive}/items/{parent}:/{name}:/content"
+        fixture = one_hop(
+            path,
+            method="PUT",
+            sent="seed-v1 text",
+            answer={"id": parent, "name": name, "parentReference": {"driveId": drive}},
+            literals=frozenset({name, "seed-v1 text"}),
+        )
+        shown = interaction_of(fixture)
+        assert shown["path"] == (
+            f"/v1.0/drives/{map_id(drive)}/items/{map_id(parent)}:/{name}:/content"
+        )
+        assert shown["json"] == "seed-v1 text"
+        assert lint_files(files_of(fixture)) == []
+
+    def test_a_share_token_is_decoded_scrubbed_and_encoded_again(self) -> None:
+        link = "https://acme-my.sharepoint.com/personal/jane_acme_ch/Documents/secret.docx"
+        fixture = one_hop(f"/v1.0/shares/{shared(link)}/driveItem")
+        scrubbed = (
+            "https://contoso-my.sharepoint.com/personal/user_01_example_test/Documents/"
+            + "synthetic%20text%2001"
+        )
+        assert interaction_of(fixture)["path"] == f"/v1.0/shares/{shared(scrubbed)}/driveItem"
+        assert lint_files(files_of(fixture)) == []
+
+    def test_a_share_token_that_holds_no_link_is_mapped_as_an_id(self) -> None:
+        token = shared("jane acme secret document text")
+        path = str(interaction_of(one_hop(f"/v1.0/shares/{token}/driveItem"))["path"])
+        assert token not in path
+
+
+class TestRequestValues:
+    def test_a_list_of_option_words_stays_and_a_list_of_names_does_not(self) -> None:
+        tips = "automaticReplies, mailboxFullStatus, customMailTip"
+        body = {"EmailAddresses": ["mia@example.test"], "MailTipsOptions": tips}
+        kept = one_hop("/v1.0/me/getMailTips", method="POST", sent=body)
+        assert mapping(interaction_of(kept)["json"])["MailTipsOptions"] == tips
+        named = one_hop("/v1.0/me/getMailTips", method="POST", sent={"x": "Smith, John"})
+        assert mapping(interaction_of(named)["json"])["x"] == "synthetic text 01"
+
+    @pytest.mark.parametrize(
+        "emoji",
+        [
+            "\U0001f44d",
+            "\U0001f44d\U0001f3fd",
+            "\u2764\ufe0f",
+            "\U0001f468\u200d\U0001f469\u200d\U0001f467",
+        ],
+    )
+    def test_a_reaction_emoji_stays_and_passes_the_lint(self, emoji: str) -> None:
+        path = "/v1.0/me/messages/x/setReaction"
+        fixture = one_hop(path, method="POST", sent={"reactionType": emoji})
+        assert mapping(interaction_of(fixture)["json"])["reactionType"] == emoji
+        assert lint_files(files_of(fixture)) == []
+
+    @pytest.mark.parametrize(
+        "word", ["great job", "John Smith", "\U0001f44d thanks", "\U0001f44d1", "\U0001f44d" * 9]
+    )
+    def test_a_word_in_the_reaction_key_is_still_replaced(self, word: str) -> None:
+        fixture = one_hop("/v1.0/me/x", method="POST", sent={"reactionType": word})
+        assert mapping(interaction_of(fixture)["json"])["reactionType"] == "synthetic text 01"
+
+    def test_the_webdav_address_of_a_file_matches_the_attachment_that_carries_it(self) -> None:
+        address = "https://tenant-my.sharepoint.com/personal/mia_tenant_com/Documents/seed-v1%20Seed%20Files/a.txt"
+        item = one_hop("/v1.0/me/drive/items/x", answer={"name": "a.txt", "webDavUrl": address})
+        message = one_hop(
+            "/v1.0/me/chats/x/messages",
+            method="POST",
+            sent={"attachments": [{"contentUrl": address}]},
+        )
+        answered = mapping(cast("object", json.loads(item.bodies["rec-one.01.json"])))["webDavUrl"]
+        sent = mapping(items(mapping(interaction_of(message)["json"])["attachments"])[0])[
+            "contentUrl"
+        ]
+        assert answered == sent
+        assert "tenant" not in str(answered)
+        assert lint_files(files_of(item)) == []
+
+    def test_a_page_keeps_its_envelope_and_scrubs_only_its_text(self) -> None:
+        page = (
+            "<!DOCTYPE html><html><head><title>{}</title>"
+            + '<meta name="created" content="2026-10-29T09:00:00+00:00" /></head><body><p>{}</p>'
+            + "</body></html>"
+        )
+        literals = frozenset({"seed-v1 case-x", "seed-v1 text"})
+        sent = page.format("seed-v1 case-x", "seed-v1 text")
+        kept = one_hop("/v1.0/me/onenote/pages", method="POST", sent=sent, literals=literals)
+        assert interaction_of(kept)["json"] == sent.replace("2026-10-29T09:00:00+00:00", "~today")
+        foreign = page.format("seed-v1 case-x", "Contract renewal")
+        shown = str(interaction_of(one_hop("/v1.0/x", method="POST", sent=foreign))["json"])
+        assert shown.startswith("<!DOCTYPE html><html><head><title>")
+        assert "<body>synthetic text 02</body>" in shown
+        assert "Contract" not in shown
+
+    @pytest.mark.parametrize("tag", ['<p data-id="intro">', '<p data-id="a-b_1">'])
+    def test_a_page_keeps_a_paragraph_with_a_data_id(self, tag: str) -> None:
+        page = (
+            "<!DOCTYPE html><html><head><title>seed-v1 case-x</title>"
+            + '<meta name="created" content="2026-10-29T09:00:00+00:00" /></head><body>{}'
+            + "seed-v1 text</p></body></html>"
+        )
+        literals = frozenset({"seed-v1 case-x", "seed-v1 text"})
+        sent = page.format(tag)
+        kept = one_hop("/v1.0/me/onenote/pages", method="POST", sent=sent, literals=literals)
+        assert interaction_of(kept)["json"] == sent.replace("2026-10-29T09:00:00+00:00", "~today")
+        assert lint_files(files_of(kept)) == []
+
+    @pytest.mark.parametrize(
+        "tag", ['<p data-id="Contract renewal">', '<p data-id="x@evil.ch">', '<p data-other="a">']
+    )
+    def test_a_page_with_another_attribute_or_a_free_data_id_is_replaced(self, tag: str) -> None:
+        page = (
+            "<!DOCTYPE html><html><head><title>seed-v1 case-x</title>"
+            + '<meta name="created" content="2026-10-29T09:00:00+00:00" /></head><body>{}'
+            + "seed-v1 text</p></body></html>"
+        )
+        literals = frozenset({"seed-v1 case-x", "seed-v1 text"})
+        sent = page.format(tag)
+        shown = str(
+            interaction_of(one_hop("/v1.0/x", method="POST", sent=sent, literals=literals))["json"]
+        )
+        assert "<body>synthetic text 01</body>" in shown
+
+    def test_a_date_under_an_object_key_stays_and_other_text_does_not(self) -> None:
+        fixture = one_hop("/v1.0/me/x", answer={"value": [{"start": "2026-10-29T14:00:00Z"}]})
+        assert '"start": "2026-10-29T14:00:00Z"' in fixture.bodies["rec-one.01.json"].decode()
+        other = one_hop("/v1.0/me/x", answer={"start": "late afternoon"})
+        assert "late afternoon" not in other.bodies["rec-one.01.json"].decode()
+
+    def test_a_join_link_in_a_filter_is_scrubbed_like_the_link_in_the_answer(self) -> None:
+        link = (
+            "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abcdefghijklmnop%40thread.v2/0"
+        )
+        fixture = one_hop(
+            "/v1.0/me/onlineMeetings",
+            query={"$filter": f"JoinWebUrl eq '{link}'"},
+            answer={"value": [{"joinWebUrl": link}]},
+        )
+        body = mapping(cast("object", json.loads(fixture.bodies["rec-one.01.json"])))
+        joined = mapping(items(body["value"])[0])["joinWebUrl"]
+        wanted = f"JoinWebUrl eq '{joined}'"
+        assert mapping(interaction_of(fixture)["query"])["$filter"] == wanted
+        assert "abcdefghijklmnop" not in wanted
+
+
+class TestThreadIds:
+    @pytest.mark.parametrize(
+        "thread",
+        ["19:Zm9vYmFyYmF6cXV4MTIzNDU2@thread.v2", "19:a1b2c3d4_e5f6a7b8c9d0e1f2@unq.gbl.spaces"],
+    )
+    def test_a_thread_id_keeps_its_suffix_and_stays_made_by_the_mapper(self, thread: str) -> None:
+        mapped = map_id(thread)
+        suffix = thread.partition("@")[2]
+        assert mapped.endswith(f"@{suffix}") and mapped != thread
+        assert made_by_the_mapper(mapped) and not made_by_the_mapper(thread)
+
+    def test_an_address_that_looks_like_a_thread_id_is_not_kept(self) -> None:
+        mapper = Mapper(load_corpus(), {}, frozenset(), "")
+        raw = "19:Zm9vYmFyYmF6cXV4MTIzNDU2@thread.v2"
+        assert mapper.plain(f"chatId eq '{raw}'") == "chatId eq '19:user-01@example.test'"
+        assert mapper.plain(f"x eq '{map_id(raw)}'") == f"x eq '{map_id(raw)}'"
+
+    @pytest.mark.parametrize(
+        ("text", "clean"),
+        [
+            ("19:abc@thread.v2", True),
+            ("19:abc@unq.gbl.spaces", True),
+            ("19:abc@xyz.unq.gbl.spaces", True),
+            ("abc@aa.bb.cc.dd.spaces", False),
+            ("abc@xyz.unq.gbl.spaces.evil.ch", False),
+            ("abc@thread.v2.evil.ch", False),
+            ("abc@unq.gbl.spaces.evil.ch", False),
+            ("abc@unq.gbl.evil.ch", False),
+        ],
+    )
+    def test_the_lint_exempts_a_thread_suffix_and_nothing_longer(
+        self, text: str, clean: bool
+    ) -> None:
+        found = lint_files({"x.json": json.dumps([text]).encode()})
+        assert (found == []) == clean, found
+
+
+BIND_FIXTURE = "fixtures/rec-x.json"
+
+
+class TestTheBindKey:
+    def lint_key(self, key: str) -> list[str]:
+        interaction = {"method": "POST", "path": "/v1.0/chats", "json": {"members": [{key: "x"}]}}
+        return lint_files({BIND_FIXTURE: json.dumps([interaction]).encode()})
+
+    def test_the_bind_key_of_a_member_is_no_address(self) -> None:
+        assert self.lint_key("user@odata.bind") == []
+
+    @pytest.mark.parametrize(
+        "key",
+        ["xuser@odata.bind", "user@odata.bind.evil.ch", "user@odata.bindings", "a@odata.bind"],
+    )
+    def test_a_look_alike_key_is_still_an_address_and_the_finding_names_its_path(
+        self, key: str
+    ) -> None:
+        found = self.lint_key(key)
+        assert found == [
+            f"{BIND_FIXTURE} at [0].json.members[0].(a key): an address outside the reserved "
+            + "domains (plain)"
+        ]

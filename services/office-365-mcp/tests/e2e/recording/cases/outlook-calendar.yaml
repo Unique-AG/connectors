@@ -1,0 +1,250 @@
+outlook_list_calendars-all:
+  chain:
+    - tool: outlook_list_calendars
+
+outlook_list_calendar_groups-all:
+  chain:
+    - tool: outlook_list_calendar_groups
+
+outlook_list_events-today:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+
+outlook_read_event-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_list_event_instances-standup:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Daily standup}
+    - tool: outlook_list_event_instances
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+      bind: {uri: "$prev.events[0].series_master_uri"}
+
+outlook_list_event_attachments-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_list_event_attachments
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_read_event_attachment-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_list_event_attachments
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_read_event_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+
+outlook_list_reminders-today:
+  chain:
+    - tool: outlook_list_reminders
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+
+outlook_list_time_zones-windows:
+  chain:
+    - tool: outlook_list_time_zones
+
+outlook_list_contacts-all:
+  chain:
+    - tool: outlook_list_contacts
+
+outlook_read_contact-first:
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_read_contact
+      bind: {uri: "$prev.contacts[0].uri"}
+
+outlook_find_recipient-anna:
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+
+outlook_find_rooms-all:
+  needs: [rooms]
+  chain:
+    - tool: outlook_find_rooms
+
+outlook_check_availability-tomorrow:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_check_availability
+      args: {starts_at: "~tomorrowT08:00:00", ends_at: "~tomorrowT18:00:00", time_zone: Europe/Zurich}
+      bind: {addresses: ["$prev.attendees[0].address"]}
+
+outlook_suggest_meeting_times-tomorrow:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_suggest_meeting_times
+      args:
+        starts_at: "~tomorrowT08:00:00"
+        ends_at: "~tomorrowT18:00:00"
+        time_zone: Europe/Zurich
+        duration_minutes: 30
+      bind: {attendees: ["$prev.attendees[0].address"]}
+
+outlook_list_calendar_shares-default:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~today", ends_on: "~today", limit: 1}
+    - tool: outlook_list_calendar_shares
+      bind: {calendar_ref: "$prev.calendar.uri"}
+
+outlook_list_group_events-team:
+  needs: [group_calendar]
+  scopes: [Group.Read.All]
+  chain:
+    - tool: teams_list_my_teams
+    - tool: outlook_list_group_events
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+      bind: {group_id: "$prev.teams[0].team_id"}
+
+outlook_create_contact-person:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_create_contact-person
+        given_name: Nora
+        surname: Weber
+        company_name: Lakeside Demo AG
+        job_title: Buyer
+        business_phones: ["+41 44 555 01 03"]
+
+outlook_update_contact-title:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-title
+        given_name: Omar
+        surname: Haddad
+    - tool: outlook_update_contact
+      args: {job_title: Head of Sales}
+      bind: {uri: "$prev.uri"}
+
+outlook_create_event-simple:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_create_event-simple
+        starts_at: "~tomorrowT10:00:00"
+        ends_at: "~tomorrowT10:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+
+outlook_create_event_on_behalf-shared-calendar:
+  chain:
+    - tool: outlook_list_calendars
+      expect: {result: {"calendars[1].name": seed-v1 Shared calendar}}
+    - tool: outlook_create_event_on_behalf
+      args:
+        subject: seed-v1 case-outlook_create_event_on_behalf-shared-calendar
+        starts_at: "~tomorrowT11:00:00"
+        ends_at: "~tomorrowT11:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+      bind: {calendar_ref: "$prev.calendars[1].uri"}
+
+outlook_update_event-subject:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_update_event-subject
+        starts_at: "~tomorrowT12:00:00"
+        ends_at: "~tomorrowT12:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+    - tool: outlook_update_event
+      args: {subject: seed-v1 case-outlook_update_event-subject moved}
+      bind: {uri: "$prev.uri"}
+
+outlook_delete_event-created:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_delete_event-created
+        starts_at: "~tomorrowT13:00:00"
+        ends_at: "~tomorrowT13:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+    - tool: outlook_delete_event
+      bind: {uri: "$prev.uri"}
+
+outlook_share_calendar-anna:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_list_calendars
+      expect: {result: {"calendars[1].name": seed-v1 Shared calendar}}
+    - tool: outlook_share_calendar
+      args: {role: freeBusyRead}
+      bind: {calendar_ref: "$prev.calendars[1].uri", address: "$2.attendees[0].address"}
+
+outlook_unshare_calendar-anna:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_list_calendars
+      expect: {result: {"calendars[1].name": seed-v1 Shared calendar}}
+    - tool: outlook_share_calendar
+      args: {role: freeBusyRead}
+      bind: {calendar_ref: "$prev.calendars[1].uri", address: "$2.attendees[0].address"}
+    - tool: outlook_unshare_calendar
+      bind: {share_ref: "$prev.uri"}
+
+outlook_forward_event-hosting:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_forward_event
+      args: {comment: Please join for the hosting part.}
+      bind: {uri: "$1.events[0].uri", to: ["$prev.attendees[0].address"]}
+
+outlook_cancel_event-budget:
+  destructive: true
+  external: true
+  reseed: [cal-events]
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Budget alignment}
+    - tool: outlook_cancel_event
+      args: {comment: The numbers are not final.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_respond_to_invite-accept:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Roadmap check}
+    - tool: outlook_respond_to_invite
+      args: {response: accept, comment: I will join.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_delete_calendar-spare:
+  destructive: true
+  reseed: [cal-calendars]
+  chain:
+    - tool: outlook_list_calendars
+      expect: {result: {"calendars[2].name": seed-v1 Spare calendar}}
+    - tool: outlook_delete_calendar
+      bind: {calendar_ref: "$prev.calendars[2].uri"}

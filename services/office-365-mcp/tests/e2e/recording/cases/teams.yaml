@@ -1,0 +1,274 @@
+teams_list_my_teams-all:
+  needs: [teams-team]
+  chain:
+    - &teams {tool: teams_list_my_teams}
+
+teams_list_channels-all:
+  needs: [teams-team]
+  chain:
+    - *teams
+    - tool: teams_list_channels
+      bind: {team_id: "$prev.teams[0].team_id"}
+
+teams_get_channel_files_folder-standard:
+  needs: [teams-team]
+  chain:
+    - *teams
+    - tool: teams_list_channels
+      args: {membership_type: standard}
+      bind: {team_id: "$prev.teams[0].team_id"}
+    - tool: teams_get_channel_files_folder
+      bind: {team_id: "$1.teams[0].team_id", channel_id: "$prev.channels[0].channel_id"}
+
+teams_browse_channel-standard:
+  needs: [teams-team]
+  chain:
+    - *teams
+    - &standard
+      tool: teams_list_channels
+      args: {membership_type: standard}
+      bind: {team_id: "$prev.teams[0].team_id"}
+    - tool: teams_browse_channel
+      args: {limit: 10}
+      bind: {team_id: "$1.teams[0].team_id", channel_id: "$prev.channels[0].channel_id"}
+
+teams_list_chats-all:
+  needs: [teams-chat]
+  chain:
+    - tool: teams_list_chats
+      args: {limit: 10, include_member_emails: true}
+
+teams_list_chat_members-first:
+  needs: [teams-chat]
+  chain:
+    - &chats {tool: teams_list_chats, args: {limit: 5, include_member_emails: true}}
+    - tool: teams_list_chat_members
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+
+teams_list_chat_messages-first:
+  needs: [teams-chat]
+  chain:
+    - *chats
+    - tool: teams_list_chat_messages
+      args: {limit: 10}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+
+teams_read_message-chat:
+  needs: [teams-chat]
+  chain:
+    - *chats
+    - tool: teams_list_chat_messages
+      args: {limit: 5}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+    - tool: teams_read_message
+      bind: {uri: "$prev.messages[0].uri"}
+
+teams_search_messages-seed:
+  needs: [teams-team]
+  chain:
+    - tool: teams_search_messages
+      args: {query: seed-v1 case, size: 5}
+
+teams_list_meeting_recordings-past:
+  needs: [teams-meeting]
+  chain:
+    - &meetings {tool: teams_list_chats, args: {chat_type: meeting, limit: 50}}
+    - tool: teams_list_meeting_recordings
+      expect: {result: {status: available}}
+      bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
+
+teams_list_meeting_transcripts-past:
+  needs: [teams-meeting]
+  chain:
+    - *meetings
+    - tool: teams_list_meeting_transcripts
+      expect: {result: {status: available}}
+      bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
+
+teams_read_meeting-past:
+  needs: [teams-meeting]
+  chain:
+    - *meetings
+    - tool: teams_read_meeting
+      expect: {result: {status: available}}
+      bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
+
+teams_list_message_replies-reply:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - &seed_channels
+      tool: teams_list_channels
+      args: {membership_type: standard}
+      bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_list_message_replies-reply post"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_list_message_replies-reply reply"}
+      bind:
+        team_id: "$1.teams[display_name=seed-v1 team].team_id"
+        channel_id: "$2.channels[0].channel_id"
+        reply_to_id: "$prev.message_id"
+    - tool: teams_list_message_replies
+      bind: {uri: "$3.uri"}
+
+teams_send_channel_message-post:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_send_channel_message-post hello team"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+
+teams_send_channel_message_with_files-post:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message_with_files
+      args: {message: "seed-v1 case-teams_send_channel_message_with_files-post notes"}
+      bind:
+        attachments: ["$1.files[0].uri"]
+        team_id: "$2.teams[display_name=seed-v1 team].team_id"
+        channel_id: "$prev.channels[0].channel_id"
+
+teams_edit_message-post:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_edit_message-post before"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_edit_message
+      args: {message: "seed-v1 case-teams_edit_message-post after"}
+      bind: {uri: "$prev.uri"}
+
+teams_react_to_message-post:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_react_to_message-post target"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d"}
+      bind: {uri: "$prev.uri"}
+
+teams_delete_message-post:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_delete_message-post doomed"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_delete_message
+      bind: {uri: "$prev.uri"}
+
+teams_create_chat-group:
+  external: true
+  chain:
+    - &new_chat
+      tool: teams_create_chat
+      args:
+        chat_type: group
+        topic: seed-v1 case-teams-chat
+        members: &people
+          - {user_id: persona:anna.id, name: persona:anna.name}
+          - {user_id: persona:tom.id, name: persona:tom.name}
+
+teams_rename_chat-group:
+  external: true
+  chain:
+    - *new_chat
+    - tool: teams_rename_chat
+      args: {topic: seed-v1 case-teams-chat renamed}
+      bind: {chat_id: "$prev.chat_id"}
+
+teams_remove_chat_member-tom:
+  external: true
+  chain:
+    - *new_chat
+    - &chat_members
+      tool: teams_list_chat_members
+      bind: {chat_id: "$prev.chat_id"}
+    - tool: teams_remove_chat_member
+      bind:
+        chat_id: "$1.chat_id"
+        membership_id: "$prev.members[email=persona:tom].membership_id"
+
+teams_add_chat_member-tom:
+  external: true
+  chain:
+    - *new_chat
+    - *chat_members
+    - tool: teams_remove_chat_member
+      bind:
+        chat_id: "$1.chat_id"
+        membership_id: "$prev.members[email=persona:tom].membership_id"
+    - tool: teams_add_chat_member
+      args: {member: {user_id: persona:tom.id, name: persona:tom.name}}
+      bind: {chat_id: "$1.chat_id"}
+
+teams_send_chat_message-group:
+  external: true
+  chain:
+    - *new_chat
+    - tool: teams_send_chat_message
+      args: {message: seed-v1 case-teams_send_chat_message-group hello}
+      bind: {chat_id: "$prev.chat_id"}
+
+teams_send_chat_message_with_files-group:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - *new_chat
+    - tool: teams_send_chat_message_with_files
+      args: {message: seed-v1 case-teams_send_chat_message_with_files-group notes}
+      bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
+
+teams_create_meeting-solo:
+  chain:
+    - tool: teams_create_meeting
+      args:
+        subject: seed-v1 case-teams_create_meeting-solo meeting
+        starts_at: "~tomorrowT14:00:00Z"
+        ends_at: "~tomorrowT14:30:00Z"
+        attendees: []
+
+teams_update_meeting-subject:
+  chain:
+    - tool: teams_create_meeting
+      args:
+        subject: seed-v1 case-teams_update_meeting-subject meeting
+        starts_at: "~tomorrowT16:00:00Z"
+        ends_at: "~tomorrowT16:30:00Z"
+        attendees: []
+    - tool: teams_update_meeting
+      args: {subject: seed-v1 case-teams_update_meeting-subject renamed}
+      bind: {meeting_uri: "$prev.meeting_uri"}
+
+teams_delete_meeting-created:
+  chain:
+    - tool: teams_create_meeting
+      args:
+        subject: seed-v1 case-teams_delete_meeting-created meeting
+        starts_at: "~tomorrowT17:00:00Z"
+        ends_at: "~tomorrowT17:30:00Z"
+        attendees: []
+    - tool: teams_delete_meeting
+      bind: {meeting_uri: "$prev.meeting_uri"}

@@ -20,19 +20,25 @@ import sys
 import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 import docgen
+import families
 import httpx
 import yaml
+from model import ConfigError, Context, SeedError, Step
 
 TAG = "seed-v1"
 BASE = "https://graph.microsoft.com/v1.0"
 MAX_REQUESTS = 300
 MAX_RETRY_WAIT = 120.0
+OPERATION_POLLS = 24
+OPERATION_WAIT = 5.0
+TEAMS_PATH = "/v1.0/teams"
+TEAM_OPERATION = re.compile(r"/v1\.0/teams\('[0-9a-f\-]{36}'\)/operations\('[0-9a-f\-]{36}'\)")
+TEAM_LOCATION = re.compile(r"teams\('([0-9a-f\-]{36})'\)")
 SEED_GUID = "8c0e3b2a-6f1d-4d6e-9a57-2f3c5b7e9d10"
 KEY_PROP = f"String {{{SEED_GUID}}} Name SeedKey"
 FLAGS_PROP = "Integer 0x0E07"
@@ -44,7 +50,8 @@ MSGFLAG_READ = 0x1
 TAG_FILTER = f"categories/any(c:c eq '{TAG}')"
 KEY_EXPAND = f"singleValueExtendedProperties($filter=id eq '{KEY_PROP}')"
 WELL_KNOWN_FOLDERS = {"inbox", "sentitems", "drafts"}
-PHASES = ("folders", "mail", "events", "files")
+FAMILIES = families.load()
+PHASES = ("folders", "mail", "events", "files", *(p for family in FAMILIES for p in family.PHASES))
 MAIL_MODES = ("extprops", "draft")
 ADDRESS_TOKEN = re.compile(r"[^\s<>\"',;()\[\]]*(?:@|＠|%40)[^\s<>\"',;()\[\]]*", re.IGNORECASE)
 UPLOAD_TYPES = {
@@ -59,14 +66,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-class SeedError(Exception):
-    code = 1
-
-
-class ConfigError(SeedError):
-    code = 2
-
-
 class Refused(SeedError):
     code = 3
 
@@ -77,48 +76,6 @@ class GraphError(SeedError):
 
 class CapReached(SeedError):
     code = 5
-
-
-@dataclass(frozen=True)
-class Step:
-    phase: str
-    kind: str  # "lookup" or "create"
-    method: str
-    path: str  # "{key}" placeholders name ids found or created earlier in the run
-    params: tuple[tuple[str, str], ...] = ()
-    body: Any = None  # dict (JSON) or bytes (file upload)
-    content_type: str | None = None
-    key: str | None = None
-    lookup: str | None = None  # "tagged", "drive-folder" or "drive-children"
-
-
-@dataclass(frozen=True)
-class Context:
-    corpus: dict[str, Any]
-    upns: tuple[str, str, str]
-    anchor: dt.date
-    mail_mode: str
-
-    def persona(self, index: int) -> str:
-        for name, persona in self.corpus["personas"]["personas"].items():
-            if persona["index"] == index:
-                return name
-        raise ConfigError(f"no persona has index {index}")
-
-    def address(self, person: str) -> dict[str, dict[str, str]]:
-        personas = self.corpus["personas"]["personas"]
-        if person in personas:
-            persona = personas[person]
-            return {
-                "emailAddress": {
-                    "name": persona["display_name"],
-                    "address": self.upns[persona["index"] - 1],
-                }
-            }
-        return {"emailAddress": {"address": person}}
-
-    def display_name(self, person: str) -> str:
-        return self.corpus["personas"]["personas"].get(person, {}).get("display_name", person)
 
 
 # ---------------------------------------------------------------- corpus
@@ -491,6 +448,7 @@ def build_steps(ctx: Context, index: int, phases: set[str]) -> list[Step]:
         *mail_steps(ctx, owner, phases),
         *event_steps(ctx, owner, phases),
         *file_steps(ctx, owner, phases),
+        *(step for family in FAMILIES for step in family.steps(ctx, owner, phases)),
     ]
 
 
@@ -583,8 +541,16 @@ class Graph:
     def close(self) -> None:
         self._client.close()
 
-    def _guard(self, url: str) -> None:
+    def _guard(self, method: str, url: str) -> None:
         parts = urlsplit(url)
+        creates_team = method == "POST" and parts.path == TEAMS_PATH
+        polls_team = method == "GET" and TEAM_OPERATION.fullmatch(parts.path) is not None
+        if (
+            parts.scheme == "https"
+            and parts.netloc == "graph.microsoft.com"
+            and (creates_team or polls_team)
+        ):
+            return
         prefixes = ["/v1.0/me"]
         if self.me_id:
             prefixes += [f"/v1.0/users/{self.me_id}", f"/v1.0/users('{self.me_id}')"]
@@ -608,7 +574,7 @@ class Graph:
         ok_statuses: tuple[int, ...] = (),
     ) -> httpx.Response:
         url = path_or_url if path_or_url.startswith("https://") else BASE + path_or_url
-        self._guard(url)
+        self._guard(method, url)
         shown = urlsplit(url).path
         for attempt in range(5):
             if self.count >= self.max_requests:
@@ -637,6 +603,23 @@ class Graph:
         if response.status_code >= 400 and response.status_code not in ok_statuses:
             raise GraphError(f"{method} {shown} -> {response.status_code} {_graph_error(response)}")
         return response
+
+    def created_by_operation(self, response: httpx.Response) -> dict[str, Any]:
+        """The team of a 202 answer, once its operation reports `succeeded`."""
+        location = response.headers.get("location", "")
+        team = TEAM_LOCATION.search(response.headers.get("content-location", ""))
+        if team is None or not location:
+            raise GraphError("Graph answered 202 with no Location and Content-Location headers")
+        for _ in range(OPERATION_POLLS):
+            status = self.request("GET", location).json().get("status")
+            if status == "succeeded":
+                return {"id": team[1]}
+            if status == "failed":
+                raise GraphError(f"the Teams operation {location} failed")
+            self._sleep(OPERATION_WAIT)
+        raise GraphError(
+            f"the Teams operation did not finish in {int(OPERATION_POLLS * OPERATION_WAIT)} seconds"
+        )
 
     def get_all(self, path: str, params: Mapping[str, str]) -> Iterator[dict[str, Any]]:
         response = self.request("GET", path, params=params)
@@ -704,7 +687,13 @@ def run_lookup(
             found["drive:folder"] = response.json()
         return
     for item in graph.get_all(path, params):
-        key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
+        if step.lookup == "named":
+            name = str(item.get("displayName") or item.get("title") or "")
+            key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
+        elif step.lookup == "subject":
+            key = f"subject:{item.get('subject')}"
+        else:
+            key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
         if key:
             found[key] = item
 
@@ -730,7 +719,9 @@ def apply(
                 f"{step.key}: {step.path} needs an item that does not exist yet; run the earlier phase first"
             )
         response = graph.request(step.method, path, body=step.body, content_type=step.content_type)
-        found[str(step.key)] = response.json()
+        found[str(step.key)] = (
+            graph.created_by_operation(response) if step.poll else response.json()
+        )
         created += 1
         out(f"created {step.key}")
     return created, skipped
@@ -802,6 +793,12 @@ def cleanup(
             else:
                 out(f"kept {key}: it still holds items or folders the seed did not create")
 
+    if "teams" in phases:
+        for team in graph.get_all("/me/joinedTeams", {"$select": "id,displayName"}):
+            if str(team.get("displayName", "")).startswith(f"{TAG} "):
+                out(f"kept team {team['displayName']!r}: the seed never deletes a team")
+        out(f"kept every chat with {TAG} case- in its topic: Graph cannot delete a chat")
+
     if "files" in phases:
         names = {f"{TAG} {f['name']}" for f in ctx.corpus["files"]["files"] if _owner(f) == owner}
         folder = graph.request(
@@ -826,6 +823,19 @@ def cleanup(
                 delete("DELETE", f"/me/drive/items/{folder_id}", "drive:folder")
             else:
                 out("kept drive:folder: it still holds items the seed did not create")
+    return deleted
+
+
+def cleanup_cases(
+    graph: Graph, ctx: Context, index: int, dry_run: bool, out: Callable[[str], None]
+) -> int:
+    deleted = 0
+    for family in FAMILIES:
+        for method, path in family.sweep(graph, ctx.persona(index)):
+            out(f"{'would delete' if dry_run else 'delete'} {method} {path}")
+            if not dry_run:
+                graph.request(method, path)
+            deleted += 1
     return deleted
 
 
@@ -927,6 +937,17 @@ def corpus_manifest(ctx: Context) -> dict[str, Any]:
                     for p in step.body.get("singleValueExtendedProperties", [])
                     if p["id"] != CONV_INDEX_PROP
                 )
+    for family in FAMILIES:
+        strings.update(cast("tuple[str, ...]", getattr(family, "STRINGS", ())))
+        for name, raw in cast("Mapping[str, bytes]", getattr(family, "ASSETS", {})).items():
+            binaries.append(
+                {
+                    "name": name,
+                    "owner": "mia",
+                    "size": len(raw),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                }
+            )
     strings = {
         s
         for s in strings
@@ -996,6 +1017,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         default="extprops",
         help="extprops: received, non-draft mail (default); draft: fallback, plain drafts",
     )
+    parser.add_argument(
+        "--cases",
+        action="store_true",
+        help="cleanup: delete only the items that hold 'seed-v1 case-' in their name",
+    )
     parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS)
     parser.add_argument(
         "--dry-run", action="store_true", help="cleanup: list what would be deleted, delete nothing"
@@ -1021,6 +1047,8 @@ def main(
         if not 1 <= args.max_requests <= MAX_REQUESTS:
             raise ConfigError(f"--max-requests must be within 1..{MAX_REQUESTS}")
         writes = args.command in ("apply", "cleanup")
+        if args.cases and args.command != "cleanup":
+            raise ConfigError("--cases applies to cleanup only")
         if writes and args.index is None:
             raise ConfigError(f"{args.command} needs --as 1|2|3")
         ctx = Context(
@@ -1058,7 +1086,10 @@ def main(
                 created, skipped = apply(graph, plans[args.index], ctx, print)
                 print(f"done: {created} created, {skipped} already there, {graph.count} requests")
             else:
-                deleted = cleanup(graph, ctx, args.index, phases, args.dry_run, print)
+                if args.cases:
+                    deleted = cleanup_cases(graph, ctx, args.index, args.dry_run, print)
+                else:
+                    deleted = cleanup(graph, ctx, args.index, phases, args.dry_run, print)
                 print(
                     f"done: {deleted} {'to delete' if args.dry_run else 'deleted'}, {graph.count} requests"
                 )

@@ -1,0 +1,330 @@
+outlook_list_mail-inbox:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 3}
+
+outlook_move_mail-archive:
+  destructive: true
+  reseed: [mail]
+  chain:
+    - tool: outlook_list_mail
+      args: {category: seed-v1, limit: 1}
+    - tool: outlook_move_mail
+      args: {destination: archive}
+      bind: {message_refs: "$prev.messages[*].uri"}
+
+outlook_list_mail-sentitems:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: sentitems, category: seed-v1, limit: 5}
+
+outlook_list_mail-drafts:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: drafts, category: seed-v1, limit: 5}
+
+outlook_list_mail-flagged:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, flagged: true, limit: 5}
+
+outlook_read_mail-latest:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_read_mail
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_mail-with-attachment:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_read_mail
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_thread-relaunch:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: Website, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_search_mail-budget:
+  chain:
+    - tool: outlook_search_mail
+      args: {query: Q3 budget review, category: seed-v1, limit: 5}
+
+outlook_list_attachments-with-files:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_attachment-first:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$1.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$2.attachments[0].uri"}
+
+outlook_get_mail_tips-personas:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_get_mail_tips
+      bind: {addresses: ["$1.messages[0].sender.address", "$1.messages[1].sender.address"]}
+
+outlook_browse_folders-top:
+  chain:
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+
+outlook_browse_folders-children:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_browse_folders-children"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_browse_folders-children child"}
+      bind: {parent_ref: "$1.uri"}
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+      bind: {parent: "$1.uri"}
+
+outlook_create_folder-top:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-top"}
+
+outlook_create_folder-child:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-child"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-child inner"}
+      bind: {parent_ref: "$1.uri"}
+
+outlook_rename_folder-renamed:
+  cap: 60
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_rename_folder-renamed"}
+    - tool: outlook_rename_folder
+      args: {name: "seed-v1 case-outlook_rename_folder-renamed again"}
+      bind: {folder_ref: "$1.uri"}
+
+outlook_delete_folder-created:
+  cap: 60
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_delete_folder-created"}
+    - tool: outlook_delete_folder
+      bind: {folder_ref: "$1.uri"}
+
+outlook_copy_mail-to-folder:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_copy_mail-to-folder"}
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_copy_mail
+      bind: {message_refs: ["$2.messages[0].uri"], folder_ref: "$1.uri"}
+
+outlook_move_mail-copy:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_move_mail-copy from"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_move_mail-copy to"}
+    - tool: outlook_copy_mail
+      bind: {message_refs: ["$1.messages[0].uri"], folder_ref: "$2.uri"}
+    - tool: outlook_move_mail
+      bind: {message_refs: ["$4.messages[0].new_uri"], folder_ref: "$3.uri"}
+
+outlook_create_category-basic:
+  chain:
+    - tool: outlook_create_category
+      args: {name: "seed-v1 case-outlook_create_category-basic", color: preset3}
+
+outlook_list_categories-created:
+  chain:
+    - tool: outlook_create_category
+      args: {name: "seed-v1 case-outlook_list_categories-created", color: preset5}
+    - tool: outlook_list_categories
+
+outlook_create_mail_rule-basic:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-basic"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_create_mail_rule-basic"]}
+        actions: {mark_as_read: true}
+
+outlook_update_mail_rule-rename:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_update_mail_rule-rename"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_update_mail_rule-rename"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_update_mail_rule
+      args: {display_name: "seed-v1 case-outlook_update_mail_rule-rename again"}
+      bind: {rule_ref: "$1.uri"}
+
+outlook_disable_mail_rule-off:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_disable_mail_rule-off"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_disable_mail_rule-off"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_disable_mail_rule
+      args: {enabled: false}
+      bind: {rule_ref: "$1.uri"}
+
+outlook_delete_mail_rule-created:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_delete_mail_rule-created"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_delete_mail_rule-created"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_delete_mail_rule
+      bind: {rule_ref: "$1.uri"}
+
+outlook_get_mailbox_settings-rules:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_get_mailbox_settings-rules"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_get_mailbox_settings-rules"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_get_mailbox_settings
+      args: {include: rules}
+
+outlook_get_mailbox_settings-replies:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+
+outlook_set_automatic_reply-disabled:
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+
+outlook_draft_mail-basic:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_draft_mail-basic"
+        body_html: "<p>Written by the recorder.</p>"
+        importance: high
+        categories: [Website]
+      bind: {to: ["$1.messages[0].sender.address"], cc: ["$1.messages[1].sender.address"]}
+
+outlook_update_draft-basic:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_update_draft-basic", body_html: "<p>First text.</p>"}
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_update_draft
+      args:
+        subject: "seed-v1 case-outlook_update_draft-basic changed"
+        body_html: "<p>Second text.</p>"
+        importance: high
+      bind: {message_ref: "$2.uri"}
+
+outlook_draft_reply-reply:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_reply
+      args:
+        mode: reply
+        body_html: "<p>Thanks for the note.</p>"
+        categories: ["seed-v1 case-outlook_draft_reply-reply"]
+      bind: {message_ref: "$1.messages[0].uri"}
+
+outlook_draft_reply-forward:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_draft_reply
+      args:
+        mode: forward
+        body_html: "<p>Please read this.</p>"
+        categories: ["seed-v1 case-outlook_draft_reply-forward"]
+      bind: {message_ref: "$1.messages[0].uri", to: ["$1.messages[1].sender.address"]}
+
+outlook_draft_reply_all-everyone:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_draft_reply_all
+      args:
+        body_html: "<p>Thanks to all.</p>"
+        categories: ["seed-v1 case-outlook_draft_reply_all-everyone"]
+      bind: {message_ref: "$1.messages[0].uri"}
+
+outlook_mark_mail-flag:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body_html: "<p>A draft to mark.</p>"}
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_mark_mail
+      args: {flagged: true, add_categories: [Website]}
+      bind: {message_refs: ["$2.uri"]}
+
+outlook_set_focused_override-new:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+
+outlook_set_focused_override-update:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+    - tool: outlook_set_focused_override
+      args: {classify_as: other}
+      bind: {sender: "$1.messages[0].sender.address"}
+
+outlook_list_focused_overrides-set:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+    - tool: outlook_list_focused_overrides
+
+outlook_send_draft-persona:
+  external: true
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_send_draft-persona", body_html: "<p>Sent by the recorder.</p>"}
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_send_draft
+      bind: {message_ref: "$2.uri"}
