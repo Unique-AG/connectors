@@ -6,5 +6,6 @@ CLIENT_BACKED = [
     "get-companies-kyckrId-documents",
     "post-orders",
     "get-orders-orderId",
+    "get-orders-orderId-download",
     "get-order",
 ]

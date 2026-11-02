@@ -177,15 +177,14 @@ def generate_request_models(
     spec_url: str | None = None,
     client: httpx2.Client | None = None,
     operation_ids: Collection[str],
-    snake_case_fields: bool = True,
     output: Path,
 ) -> dict[str, str]:
     """Write an `<Operation>Request` per operationId for the typed `OperationClient.call`, with
     its path parameters as `path`, its query parameters as `query` and its JSON body as `body`.
 
-    Each field is named in snake_case and serialized to the spec's name, unless
-    `snake_case_fields` is False, so a request is built with Python names and sent with the
-    vendor's. A model rejects a field it does not have. A component schema becomes
+    Each field is named in snake_case and serialized to the spec's name, so a request is built
+    with Python names and sent with the vendor's, whatever `snake-case-fields` says for the
+    responses. A model rejects a field it does not have. A component schema becomes
     `<Name>Input`, so it does not clash with the `<Name>` the responses parse into. Headers are
     left to the client, and readOnly properties are left out. An operation `call` cannot send,
     such as one with a body that is not JSON, gets no model: it is returned with the reason, and
@@ -219,9 +218,8 @@ def generate_request_models(
         name: available[name].model_dump(by_alias=True, exclude_none=True, mode="json")
         for name in sorted(names)
     }
-    snake_case = ["--snake-case-field"] if snake_case_fields else []
     request_options = [
-        # A request is built with the Python names, even where a spec name is not one.
+        "--snake-case-field",
         "--use-serialization-alias",
         "--base-class",
         "mcp_openapi.upstream.RequestModel",
@@ -230,7 +228,7 @@ def generate_request_models(
         "--enum-field-as-literal",
         "all",
     ]
-    _write_models(selected, output, [*request_options, *snake_case])
+    _write_models(selected, output, request_options)
     return untyped
 
 

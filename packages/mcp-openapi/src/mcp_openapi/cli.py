@@ -131,7 +131,6 @@ def _generate(root: Path, config: CodegenConfig) -> None:
             spec_path=spec_path,
             spec_url=config.spec_url,
             operation_ids=config.operation_ids,
-            snake_case_fields=config.snake_case_fields,
             output=root / config.requests_output,
         )
         for operation_id, reason in untyped.items():
