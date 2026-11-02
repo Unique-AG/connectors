@@ -24,11 +24,12 @@ two ways:
   `operations.py` in `upstream/generated/`; never edit that package by hand. Every model names
   its fields in snake_case: a response validates the vendor's JSON into them, and a request is
   built with them and sent with the vendor's names. Keep that default rather than
-  `snake-case-fields = false`. Export the operation's constant and its request models from
-  `upstream/__init__.py`, then write a context that calls it and a tool over it. `Upstream` is
-  mcp-openapi's `OperationClient`, which parses each response into its generated model. On an
-  error status it raises `UpstreamError` with the status, method and URL, followed by the first
-  200 characters of the error body, which reach the client.
+  `snake-case-fields = false`. A component schema a request sends is named `<Name>Input`, so it
+  does not clash with the response model of the same schema. Export the operation's constant and
+  its request models from `upstream/__init__.py`, then write a context that calls it and a tool
+  over it. `Upstream` is mcp-openapi's `OperationClient`, which parses each response into its
+  generated model. On an error status it raises `UpstreamError` with the status, method and URL,
+  followed by the first 200 characters of the error body, which reach the client.
 
   Call an operation with `upstream.call(GET_X, GetXRequest(path=..., query=..., body=...))`.
   The type check verifies every path and query parameter and the body against the spec, so a

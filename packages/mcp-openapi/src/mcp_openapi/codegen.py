@@ -177,9 +177,11 @@ def generate_request_models(
 
     Each field is named in snake_case and serialized to the spec's name, unless
     `snake_case_fields` is False, so a request is built with Python names and sent with the
-    vendor's. Headers are left to the client, and readOnly properties are left out. An operation
-    `call` cannot send, such as one with a body that is not JSON, gets no model: it is returned
-    with the reason, and only `call_untyped` calls it.
+    vendor's. A model rejects a field it does not have. A component schema becomes
+    `<Name>Input`, so it does not clash with the `<Name>` the responses parse into. Headers are
+    left to the client, and readOnly properties are left out. An operation `call` cannot send,
+    such as one with a body that is not JSON, gets no model: it is returned with the reason, and
+    only `call_untyped` calls it.
     """
     spec = OpenAPI.model_validate(_load_spec(spec_path, spec_url, client))
     declared = {
@@ -205,14 +207,19 @@ def generate_request_models(
         return untyped
     available = {**declared, **requests}
     names = _schema_names_reached(list(requests.values()), available) | requests.keys()
+    renamed = {name: f"{name}Input" for name in names if name in declared}
     selected = {
-        name: available[name].model_dump(by_alias=True, exclude_none=True, mode="json")
+        renamed.get(name, name): _with_refs_renamed(
+            available[name].model_dump(by_alias=True, exclude_none=True, mode="json"), renamed
+        )
         for name in sorted(names)
     }
     snake_case = ["--snake-case-field"] if snake_case_fields else []
     request_options = [
         # A request is built with the Python names, even where a spec name is not one.
         "--use-serialization-alias",
+        "--base-class",
+        "mcp_openapi.upstream.RequestModel",
         "--field-constraints",
         "--use-default-kwarg",
         "--enum-field-as-literal",
@@ -220,6 +227,26 @@ def generate_request_models(
     ]
     _write_models(selected, output, [*request_options, *snake_case])
     return untyped
+
+
+def _with_refs_renamed(node: object, renamed: Mapping[str, str]) -> object:
+    """`node`, a dumped schema, with each reference to a schema of `renamed` pointing at its new
+    name."""
+    if isinstance(node, dict):
+        return {
+            key: _renamed_ref(value, renamed)
+            if key == "$ref" and isinstance(value, str)
+            else _with_refs_renamed(value, renamed)
+            for key, value in cast(dict[str, object], node).items()
+        }
+    if isinstance(node, list):
+        return [_with_refs_renamed(item, renamed) for item in cast(list[object], node)]
+    return node
+
+
+def _renamed_ref(ref: str, renamed: Mapping[str, str]) -> str:
+    name = ref.rsplit("/", 1)[-1]
+    return _schema_reference(renamed.get(name, name)).ref
 
 
 def _write_models(schemas: Mapping[str, object], output: Path, options: list[str]) -> None:

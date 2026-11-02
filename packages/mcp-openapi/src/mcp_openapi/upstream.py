@@ -3,7 +3,7 @@ import re
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import Generic, TypeVar, cast
+from typing import ClassVar, Generic, TypeVar, cast
 from urllib.parse import quote
 
 import httpx2
@@ -11,7 +11,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.utilities.openapi import HTTPRoute, parse_openapi_to_http_routes
 from fastmcp.utilities.openapi.director import RequestDirector
 from jsonschema_path import SchemaPath
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from mcp_openapi.lock import LockConfig
 from mcp_openapi.retry import RetryPolicy
@@ -30,6 +30,13 @@ class UpstreamError(ToolError):
 
 class LockTimeoutError(UpstreamError):
     """The lock of the `LockConfig` was not acquired within its timeout."""
+
+
+class RequestModel(BaseModel):
+    """The base of each generated request model. It rejects a field it does not have, so a
+    misspelt one fails instead of going unsent."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
 
 _T = TypeVar("_T")
@@ -85,7 +92,8 @@ class OperationClient:
 
         A query parameter left as None is not sent. The body sends the fields that were set, so
         one set to None is sent as null. `headers` carries what the client does not set itself.
-        UpstreamError on HTTP or body problems.
+        UpstreamError on HTTP or body problems, ValueError on a path value that is empty, `.` or
+        `..`, which would send the request to another endpoint.
         """
         route = self._route(operation)
         parameters = cast(
@@ -95,6 +103,9 @@ class OperationClient:
         values = parameters.get("path", {})
         missing = set(_PATH_PARAMETER.findall(route.path)) - values.keys()
         assert not missing, f"{operation.operation_id}: no value for path {sorted(missing)}"
+        unsafe = sorted(name for name, value in values.items() if str(value) in ("", ".", ".."))
+        if unsafe:
+            raise ValueError(f"{operation.operation_id}: path {unsafe} is empty, . or ..")
         path = _PATH_PARAMETER.sub(lambda name: _path_segment(values[name[1]]), route.path)
         body = request.model_dump(mode="json", by_alias=True, exclude_unset=True, include={"body"})
         built = self._http.build_request(

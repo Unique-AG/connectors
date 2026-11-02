@@ -2,6 +2,7 @@ import asyncio
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import cast
@@ -124,21 +125,32 @@ components:
         caseName: {type: string}
         note: {type: string, nullable: true}
         version: {type: integer, readOnly: true}
+        owner: {$ref: "#/components/schemas/Owner"}
+    Owner:
+      type: object
+      properties: {name: {type: string}}
     Where:
       type: object
       properties: {caseName: {type: string}}
 """
 
 
-def requests_for(tmp_path: Path, operation_ids: list[str]) -> ModuleType:
-    spec = tmp_path / "spec.yml"
-    spec.write_text(SPEC)
-    output = tmp_path / "requests.py"
-    generate_request_models(spec_path=spec, operation_ids=operation_ids, output=output)
-    module = ModuleType("generated_requests")
-    sys.modules[module.__name__] = module
-    exec(compile(output.read_text(), str(output), "exec"), module.__dict__)  # noqa: S102
-    return module
+type RequestsFor = Callable[[list[str]], ModuleType]
+
+
+@pytest.fixture
+def requests_for(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> RequestsFor:
+    def generate(operation_ids: list[str]) -> ModuleType:
+        spec = tmp_path / "spec.yml"
+        spec.write_text(SPEC)
+        output = tmp_path / "requests.py"
+        generate_request_models(spec_path=spec, operation_ids=operation_ids, output=output)
+        module = ModuleType("generated_requests")
+        monkeypatch.setitem(sys.modules, module.__name__, module)
+        exec(compile(output.read_text(), str(output), "exec"), module.__dict__)  # noqa: S102
+        return module
+
+    return generate
 
 
 def model(module: ModuleType, name: str) -> type[BaseModel]:
@@ -163,12 +175,14 @@ def sent_by(operation_id: str, request: BaseModel, **headers: str) -> httpx2.Req
     return seen[0]
 
 
-def test_a_request_takes_snake_case_names_and_sends_the_spec_names(tmp_path: Path) -> None:
-    generated = requests_for(tmp_path, ["updateCase"])
+def test_a_request_takes_snake_case_names_and_sends_the_spec_names(
+    requests_for: RequestsFor,
+) -> None:
+    generated = requests_for(["updateCase"])
     request = model(generated, "UpdateCaseRequest")(
         path=model(generated, "UpdateCasePath")(case_id="a/b"),
         query=model(generated, "UpdateCaseQuery")(screen_mode="SYNC", tags=["x", "y"]),
-        body=model(generated, "CaseUpdate")(case_name="n"),
+        body=model(generated, "CaseUpdateInput")(case_name="n"),
     )
 
     sent = sent_by("updateCase", request, **{"X-Trace": "t1"})
@@ -181,10 +195,13 @@ def test_a_request_takes_snake_case_names_and_sends_the_spec_names(tmp_path: Pat
     assert sent.headers["x-trace"] == "t1"
 
 
-def test_a_required_body_whose_fields_are_all_optional_is_sent_empty(tmp_path: Path) -> None:
-    generated = requests_for(tmp_path, ["updateCase"])
+def test_a_required_body_whose_fields_are_all_optional_is_sent_empty(
+    requests_for: RequestsFor,
+) -> None:
+    generated = requests_for(["updateCase"])
     request = model(generated, "UpdateCaseRequest")(
-        path=model(generated, "UpdateCasePath")(case_id="c"), body=model(generated, "CaseUpdate")()
+        path=model(generated, "UpdateCasePath")(case_id="c"),
+        body=model(generated, "CaseUpdateInput")(),
     )
 
     sent = sent_by("updateCase", request)
@@ -193,12 +210,12 @@ def test_a_required_body_whose_fields_are_all_optional_is_sent_empty(tmp_path: P
     assert json.loads(sent.content) == {}
 
 
-def test_a_body_field_set_to_none_is_sent_as_null(tmp_path: Path) -> None:
-    generated = requests_for(tmp_path, ["updateCase"])
+def test_a_body_field_set_to_none_is_sent_as_null(requests_for: RequestsFor) -> None:
+    generated = requests_for(["updateCase"])
     request = model(generated, "UpdateCaseRequest")(
         path=model(generated, "UpdateCasePath")(case_id="c"),
         query=model(generated, "UpdateCaseQuery")(screen_mode=None),
-        body=model(generated, "CaseUpdate")(note=None),
+        body=model(generated, "CaseUpdateInput")(note=None),
     )
 
     sent = sent_by("updateCase", request)
@@ -207,21 +224,58 @@ def test_a_body_field_set_to_none_is_sent_as_null(tmp_path: Path) -> None:
     assert json.loads(sent.content) == {"note": None}
 
 
-def test_a_request_body_leaves_out_the_read_only_fields(tmp_path: Path) -> None:
-    case_update = model(requests_for(tmp_path, ["updateCase"]), "CaseUpdate")
+def test_a_request_body_leaves_out_the_read_only_fields(requests_for: RequestsFor) -> None:
+    case_update = model(requests_for(["updateCase"]), "CaseUpdateInput")
 
-    assert set(case_update.model_fields) == {"case_name", "note"}
+    assert set(case_update.model_fields) == {"case_name", "note", "owner"}
 
 
-def test_a_boolean_path_parameter_is_sent_in_lowercase(tmp_path: Path) -> None:
-    generated = requests_for(tmp_path, ["setFlag"])
+def test_a_component_the_request_sends_is_named_as_an_input(requests_for: RequestsFor) -> None:
+    generated = requests_for(["updateCase"])
+    request = model(generated, "UpdateCaseRequest")(
+        path=model(generated, "UpdateCasePath")(case_id="c"),
+        body=model(generated, "CaseUpdateInput")(owner=model(generated, "OwnerInput")(name="o")),
+    )
+
+    sent = sent_by("updateCase", request)
+
+    assert json.loads(sent.content) == {"owner": {"name": "o"}}
+    assert not hasattr(generated, "CaseUpdate")
+    assert not hasattr(generated, "Owner")
+
+
+def test_a_request_model_rejects_a_field_it_does_not_have(requests_for: RequestsFor) -> None:
+    generated = requests_for(["updateCase"])
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        model(generated, "UpdateCaseQuery")(screen_mod="SYNC")
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        model(generated, "UpdateCasePath").model_validate({"caseId": "c"})
+
+
+@pytest.mark.parametrize("case_id", ["", ".", ".."])
+def test_a_path_value_that_would_reach_another_endpoint_is_rejected(
+    requests_for: RequestsFor, case_id: str
+) -> None:
+    generated = requests_for(["updateCase"])
+    request = model(generated, "UpdateCaseRequest")(
+        path=model(generated, "UpdateCasePath")(case_id=case_id),
+        body=model(generated, "CaseUpdateInput")(),
+    )
+
+    with pytest.raises(ValueError, match=r"updateCase: path \['caseId'\] is empty, \. or \.\."):
+        sent_by("updateCase", request)
+
+
+def test_a_boolean_path_parameter_is_sent_in_lowercase(requests_for: RequestsFor) -> None:
+    generated = requests_for(["setFlag"])
     request = model(generated, "SetFlagRequest")(path=model(generated, "SetFlagPath")(enabled=True))
 
     assert sent_by("setFlag", request).url.raw_path == b"/v3/flags/true"
 
 
-def test_a_request_needs_its_path_and_its_required_body(tmp_path: Path) -> None:
-    generated = requests_for(tmp_path, ["updateCase"])
+def test_a_request_needs_its_path_and_its_required_body(requests_for: RequestsFor) -> None:
+    generated = requests_for(["updateCase"])
 
     with pytest.raises(ValidationError) as missing:
         model(generated, "UpdateCaseRequest")()
@@ -229,8 +283,10 @@ def test_a_request_needs_its_path_and_its_required_body(tmp_path: Path) -> None:
     assert {error["loc"] for error in missing.value.errors()} == {("path",), ("body",)}
 
 
-def test_a_body_written_in_place_gets_a_model_that_keeps_the_spec_bounds(tmp_path: Path) -> None:
-    body = model(requests_for(tmp_path, ["createCase"]), "CreateCaseBody")
+def test_a_body_written_in_place_gets_a_model_that_keeps_the_spec_bounds(
+    requests_for: RequestsFor,
+) -> None:
+    body = model(requests_for(["createCase"]), "CreateCaseBody")
 
     assert body(case_name="short").model_dump(by_alias=True) == {"caseName": "short"}
     with pytest.raises(ValidationError, match="at most 5 characters"):
@@ -259,7 +315,7 @@ def test_an_operation_the_typed_call_cannot_send_gets_no_request_model(
 
     assert untyped == {operation_id: reason}
     generated = output.read_text()
-    assert "class UpdateCaseRequest(BaseModel):" in generated
+    assert "class UpdateCaseRequest(RequestModel):" in generated
     assert f"class {operation_id[0].upper()}{operation_id[1:]}Request(" not in generated
 
 
@@ -300,22 +356,22 @@ def test_each_operation_constant_carries_its_request_model(tmp_path: Path) -> No
 
 
 def test_the_type_check_rejects_a_wrong_field_a_missing_body_and_another_request(
-    tmp_path: Path,
+    tmp_path: Path, requests_for: RequestsFor
 ) -> None:
-    requests_for(tmp_path, ["updateCase"])
+    requests_for(["updateCase"])
     usage = [
         "from mcp_openapi.upstream import Operation, OperationClient",
         "from pydantic import TypeAdapter",
-        "from requests import CaseUpdate, UpdateCasePath, UpdateCaseRequest",
+        "from requests import CaseUpdateInput, UpdateCasePath, UpdateCaseRequest",
         "",
         'UPDATE_CASE = Operation[object, UpdateCaseRequest]("updateCase", TypeAdapter(object))',
         "",
-        'UpdateCaseRequest(path=UpdateCasePath(case_id="c"), body=CaseUpdate())',
+        'UpdateCaseRequest(path=UpdateCasePath(case_id="c"), body=CaseUpdateInput())',
         'UpdateCaseRequest(path=UpdateCasePath(case_id="c"))',
         'UpdateCasePath(caseId="c")',
         "",
         "async def call_with_another_request(upstream: OperationClient) -> None:",
-        "    _ = await upstream.call(UPDATE_CASE, CaseUpdate())",
+        "    _ = await upstream.call(UPDATE_CASE, CaseUpdateInput())",
     ]
     (tmp_path / "usage.py").write_text("\n".join([*usage, ""]))
 
