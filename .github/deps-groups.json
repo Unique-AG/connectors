@@ -9,11 +9,13 @@
     { "name": "suites", "ecosystem": "npm", "patterns": ["@suites/*"] },
     { "name": "swc", "ecosystem": "npm", "patterns": ["@swc/*"] },
     { "name": "rollup", "ecosystem": "npm", "patterns": ["rollup", "@rollup/*"] },
+    { "name": "rolldown", "ecosystem": "npm", "patterns": ["rolldown", "@rolldown/*"] },
     { "name": "esbuild", "ecosystem": "npm", "patterns": ["esbuild", "@esbuild/*"] },
     { "name": "babel", "ecosystem": "npm", "patterns": ["@babel/*"] },
     { "name": "biome", "ecosystem": "npm", "patterns": ["@biomejs/*"] },
     { "name": "opentelemetry", "ecosystem": "uv", "patterns": ["opentelemetry-*"] },
     { "name": "unique", "ecosystem": "uv", "patterns": ["unique-*"] },
-    { "name": "fastmcp", "ecosystem": "uv", "patterns": ["fastmcp", "fastmcp-slim"] }
+    { "name": "fastmcp", "ecosystem": "uv", "patterns": ["fastmcp", "fastmcp-slim"] },
+    { "name": "microsoft-kiota", "ecosystem": "uv", "patterns": ["microsoft-kiota-*"] }
   ]
 }
