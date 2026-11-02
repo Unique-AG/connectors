@@ -17,7 +17,6 @@ const SECTION_TEXT_LIMIT = 3000;
 const CONTEXT_TEXT_LIMIT = 2000;
 
 export const IMAGES_LIMIT = 10;
-export const VULNERABILITIES_PER_IMAGE_LIMIT = 5;
 
 function truncate(text, limit) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
@@ -234,34 +233,12 @@ export function buildTopOffendersBlocks(images) {
   ];
 }
 
-export function buildImageDetailText(image) {
-  const shown = image.vulnerabilities.slice(0, VULNERABILITIES_PER_IMAGE_LIMIT);
-  const hidden = image.vulnerabilities.length - shown.length;
-  const lines = [
-    `*${escapeMrkdwn(image.service)}:${escapeMrkdwn(image.version)}* ${formatSeveritySummary(image)}`,
-    ...shown.map(
-      (vulnerability) =>
-        `${ICON[vulnerability.severity]} ${vulnerability.severity.toUpperCase()} \`${escapeMrkdwn(vulnerability.id)}\` ${escapeMrkdwn(vulnerability.pkg)} ${escapeMrkdwn(vulnerability.installed)} → ${escapeMrkdwn(vulnerability.fixed || 'no fix')}`,
-    ),
-  ];
-  if (hidden > 0) {
-    lines.push(`_${hidden} more not shown_`);
-  }
-  return lines.join('\n');
-}
-
-function buildDetailBlocks(images) {
-  const offenders = topOffendingImages(images);
-  const omitted = topOffendingImages(images, Number.POSITIVE_INFINITY).length - offenders.length;
-  const blocks = offenders
-    .filter((image) => image.vulnerabilities.length > 0)
-    .map((image) => sectionBlock(buildImageDetailText(image)));
-  if (omitted > 0) {
-    blocks.push(
-      sectionBlock(`_${omitted} more image(s) have findings. Open the run for the full list._`),
-    );
-  }
-  return blocks;
+function buildOmittedBlocks(images) {
+  const omitted =
+    topOffendingImages(images, Number.POSITIVE_INFINITY).length - topOffendingImages(images).length;
+  return omitted > 0
+    ? [sectionBlock(`_${omitted} more image(s) have findings. Open the run for the full list._`)]
+    : [];
 }
 
 function sectionBlock(text) {
@@ -324,7 +301,7 @@ export function buildPayload(env) {
       sectionBlock(buildMainSectionText(summary)),
       ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       ...buildTopOffendersBlocks(summary.images),
-      ...buildDetailBlocks(summary.images),
+      ...buildOmittedBlocks(summary.images),
       {
         type: 'context',
         elements: [{ type: 'mrkdwn', text: truncate(footer, CONTEXT_TEXT_LIMIT) }],

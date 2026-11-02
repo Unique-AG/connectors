@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   buildHeadlineText,
-  buildImageDetailText,
   buildMainSectionText,
   buildPayload,
   buildTopOffendersBlocks,
@@ -15,7 +14,6 @@ import {
   IMAGES_LIMIT,
   summarize,
   topOffendingImages,
-  VULNERABILITIES_PER_IMAGE_LIMIT,
 } from './build-payload.mjs';
 
 const vulnerability = (id, severity, pkg = 'openssl') => ({
@@ -222,37 +220,7 @@ test('buildTopOffendersBlocks returns no table for clean images', () => {
   assert.deepEqual(buildTopOffendersBlocks([image('admin')]), []);
 });
 
-test('buildImageDetailText lists id, package, versions, and severity', () => {
-  const text = buildImageDetailText(
-    image('admin', [vulnerability('CVE-2025-1', 'high', 'libssl')]),
-  );
-
-  assert.equal(
-    text,
-    '*admin:1.2.3* 🟣 0 critical · 🔴 1 high · 🟠 0 medium\n🔴 HIGH `CVE-2025-1` libssl 3.0.1 → 3.0.2',
-  );
-});
-
-test('buildImageDetailText caps the list and counts the rest', () => {
-  const vulnerabilities = Array.from({ length: VULNERABILITIES_PER_IMAGE_LIMIT + 4 }, (_, index) =>
-    vulnerability(`CVE-${String(index).padStart(2, '0')}`, 'medium'),
-  );
-  const lines = buildImageDetailText(image('admin', vulnerabilities)).split('\n');
-
-  assert.equal(lines.length, VULNERABILITIES_PER_IMAGE_LIMIT + 2);
-  assert.equal(lines.at(-1), '_4 more not shown_');
-});
-
-test('buildImageDetailText escapes Slack control characters', () => {
-  const text = buildImageDetailText(
-    image('admin', [vulnerability('CVE-1', 'high', '<!channel>&')]),
-  );
-
-  assert.equal(text.includes('<!channel>'), false);
-  assert.match(text, /&lt;!channel&gt;&amp;/);
-});
-
-test('buildPayload reads the reports and builds header, table, details, and footer', () => {
+test('buildPayload reads the reports and builds header, table, and footer', () => {
   const payload = withReports(
     (root) => {
       writeReport(root, 'admin', {
@@ -289,7 +257,7 @@ test('buildPayload reads the reports and builds header, table, details, and foot
   const types = payload.blocks.map((block) => block.type);
 
   assert.equal(payload.text, '🛡️ Security Trivy Scan (Registry) → published-images');
-  assert.deepEqual(types, ['header', 'section', 'table', 'section', 'context']);
+  assert.deepEqual(types, ['header', 'section', 'table', 'context']);
   assert.match(
     payload.blocks[1].text.text,
     /🟣 1 critical · 🔴 0 high · 🟠 1 medium unique across 2 images/,
@@ -299,8 +267,6 @@ test('buildPayload reads the reports and builds header, table, details, and foot
     payload.blocks[2].rows[1].map((cell) => cell.text),
     ['admin:1.2.3', '1', '0', '1'],
   );
-  assert.match(payload.blocks[3].text.text, /`CVE-1` openssl 3\.0\.1 → 3\.0\.2/);
-  assert.equal(payload.blocks[3].text.text.includes('CVE-3'), false);
   const footer = payload.blocks.at(-1).elements[0].text;
   assert.equal(
     footer.startsWith(
@@ -410,5 +376,30 @@ test('buildPayload rejects a missing CHANNEL', () => {
   assert.throws(
     () => buildPayload({ ...baseEnv, CHANNEL: '', REPORTS_PATH: '.', SERVICES: '[]' }),
     /CHANNEL is required/,
+  );
+});
+
+test('buildPayload says how many images the table leaves out', () => {
+  const services = Array.from({ length: IMAGES_LIMIT + 2 }, (_, index) => `s${index}`);
+  const payload = withReports(
+    (root) => {
+      for (const service of services) {
+        writeReport(root, service, {
+          meta: { found: true },
+          results: { Results: [{ Vulnerabilities: [trivyVulnerability(`CVE-${service}`, 'HIGH')] }] },
+        });
+      }
+    },
+    (root) =>
+      buildPayload({
+        ...baseEnv,
+        REPORTS_PATH: root,
+        SERVICES: JSON.stringify(services.map((service) => ({ service, version: '1.0.0' }))),
+      }),
+  );
+
+  assert.equal(
+    payload.blocks.at(-2).text.text,
+    '_2 more image(s) have findings. Open the run for the full list._',
   );
 });

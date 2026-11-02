@@ -302,7 +302,7 @@ jobs:
         with:
           other_alerts: ${{ steps.other.outputs.text }}
           webhook: ${{ env.SLACK_LEGACY_WEBHOOK_URL }}
-          channel: C0C1PR9CNMP
+          channel: C0CDPSVHPAB
           title: Security Trivy Scan (Registry)
           version_label: published-images
           reports_path: trivy-reports
