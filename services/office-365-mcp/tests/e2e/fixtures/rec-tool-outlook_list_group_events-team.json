@@ -1,0 +1,25 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_group_events-team.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-d034-4a82-8630-01e372765b48/calendarView",
+    "query": {
+      "endDateTime": "~tomorrow",
+      "startDateTime": "~yesterday",
+      "$select": "subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,location,onlineMeeting,organizer,webLink"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_group_events-team.02.json"
+  }
+]

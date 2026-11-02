@@ -1,0 +1,32 @@
+{
+  "value": [
+    {
+      "automaticReplies": {},
+      "deliveryRestricted": false,
+      "emailAddress": {
+        "address": "tom@example.test",
+        "name": "Tom Berger"
+      },
+      "externalMemberCount": 0,
+      "isModerated": false,
+      "mailboxFull": false,
+      "maxMessageSize": 37748736,
+      "recipientScope": "synthetic text 01",
+      "totalMemberCount": 1
+    },
+    {
+      "automaticReplies": {},
+      "deliveryRestricted": false,
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      },
+      "externalMemberCount": 0,
+      "isModerated": false,
+      "mailboxFull": false,
+      "maxMessageSize": 37748736,
+      "recipientScope": "synthetic text 01",
+      "totalMemberCount": 1
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/outlook/masterCategories",
+    "json": {
+      "color": "preset5",
+      "displayName": "seed-v1 case-outlook_list_categories-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/MasterCategories('00000000-c2e8-4888-8ccc-e242d579ee27')"
+    },
+    "body": "rec-tool-outlook_list_categories-created.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/outlook/masterCategories",
+    "query": {
+      "$select": "displayName,color"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_categories-created.02.json"
+  }
+]

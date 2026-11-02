@@ -1,0 +1,19 @@
+{
+  "createdBy": {
+    "user": {
+      "displayName": "synthetic text 01"
+    }
+  },
+  "createdDateTime": "2026-10-30T10:04:45Z",
+  "displayName": "seed-v1 case-group 2026-10-31",
+  "id": "7-00000000-07ac-4326-8ce9-aab09f3c8836",
+  "lastModifiedBy": {
+    "user": {
+      "displayName": "synthetic text 01"
+    }
+  },
+  "lastModifiedDateTime": "2026-10-30T10:04:45Z",
+  "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/7-00000000-07ac-4326-8ce9-aab09f3c8836/sectionGroups",
+  "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/7-00000000-07ac-4326-8ce9-aab09f3c8836/sections",
+  "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/7-00000000-07ac-4326-8ce9-aab09f3c8836"
+}

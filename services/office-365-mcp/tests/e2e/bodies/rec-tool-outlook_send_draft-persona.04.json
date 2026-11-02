@@ -1,0 +1,37 @@
+{
+  "@odata.etag": "W/\"QOGWDRQXXJQjdWrpQonuATMgOwEu/TkvXQEgRfBQ\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Sent by the recorder.</p></body></html>",
+    "contentType": "html"
+  },
+  "bodyPreview": "Sent by the recorder.",
+  "categories": [],
+  "ccRecipients": [],
+  "changeKey": "CFLUKVZDYVQcyKhwEjglYZObQmMo/AqiWWYpElSP",
+  "conversationId": "AAQkJGmsVRI0YNP7TOFxXZcjQOP3VW87Qck8WXD2XVJhCTYrN8YaGNBSJSTVGiVgZTbQzUviTRzQ5Ks=",
+  "createdDateTime": "2026-10-29T15:15:57Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "hasAttachments": false,
+  "id": "AOrWVwOFZFSNFYZDElurQb7qnFViJU-IWb8Hi0Egrz35YhRSPy8H9nhbazYZ35nFHWFE",
+  "importance": "normal",
+  "isDraft": true,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-10-29T15:15:57Z",
+  "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+  "receivedDateTime": "2026-10-29T15:15:57Z",
+  "replyTo": [],
+  "sentDateTime": "2026-10-29T15:15:57Z",
+  "subject": "seed-v1 case-outlook_send_draft-persona",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=VJcSZiYUSIWBQPYINptdGb3lcDGsRI%2FBLp2Hg4Wrbr34KhKTRg4O0llszmAX36bZQCTI&exvsurl=1&viewmodel=ReadMessageItem"
+}

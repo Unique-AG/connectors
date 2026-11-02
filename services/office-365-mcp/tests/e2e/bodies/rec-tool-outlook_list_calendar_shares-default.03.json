@@ -1,0 +1,14 @@
+{
+  "value": [
+    {
+      "allowedRoles": ["none", "freeBusyRead", "limitedRead", "read", "write"],
+      "emailAddress": {
+        "name": "synthetic text 01"
+      },
+      "id": "PHPuFUIleT==",
+      "isInsideOrganization": true,
+      "isRemovable": false,
+      "role": "freeBusyRead"
+    }
+  ]
+}

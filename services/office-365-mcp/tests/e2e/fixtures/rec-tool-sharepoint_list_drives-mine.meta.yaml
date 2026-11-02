@@ -1,0 +1,21 @@
+scenario: sharepoint_list_drives-mine
+fixture: rec-tool-sharepoint_list_drives-mine
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:59:23+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 4
+  keys dropped: 1
+  persona addresses: 2
+  persona names: 2
+  response headers dropped: 10
+  text kept: 1
+  text replaced: 5
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

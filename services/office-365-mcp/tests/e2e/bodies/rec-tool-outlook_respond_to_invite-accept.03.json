@@ -1,0 +1,58 @@
+{
+  "@odata.etag": "W/\"l1Pgwx78OyXLTy4J8bvixeLD00gJkA==\"",
+  "allowNewTimeProposals": true,
+  "attendees": [
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      },
+      "type": "required"
+    },
+    {
+      "emailAddress": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      },
+      "type": "required"
+    }
+  ],
+  "bodyPreview": "Walk through the roadmap for the next quarter.",
+  "categories": ["seed-v1"],
+  "end": {
+    "dateTime": "2026-10-29T14:30:00.0000000",
+    "timeZone": "UTC"
+  },
+  "id": "AVaODxRUVVCKLPPMOlqyRd0bcHIdAD-MBt1Qg6Azsr86QqRQLf5Y1upirwJK91me4WIB",
+  "importance": "normal",
+  "isAllDay": false,
+  "isCancelled": false,
+  "isOnlineMeeting": false,
+  "isOrganizer": false,
+  "location": {
+    "displayName": "",
+    "locationType": "default",
+    "uniqueIdType": "unknown"
+  },
+  "onlineMeeting": null,
+  "organizer": {
+    "emailAddress": {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  },
+  "responseStatus": {
+    "response": "notResponded",
+    "time": "0001-01-01T00:00:00Z"
+  },
+  "sensitivity": "normal",
+  "seriesMasterId": null,
+  "showAs": "tentative",
+  "start": {
+    "dateTime": "2026-10-29T14:00:00.0000000",
+    "timeZone": "UTC"
+  },
+  "subject": "Roadmap check",
+  "type": "singleInstance",
+  "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FVHo7My3Hiwt25BtKEJc6N3mzekqED00uh5GSS&exvsurl=1"
+}

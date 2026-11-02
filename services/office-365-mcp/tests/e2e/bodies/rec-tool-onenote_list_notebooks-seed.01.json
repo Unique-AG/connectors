@@ -1,0 +1,26 @@
+{
+  "value": [
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-29T14:27:10Z",
+      "displayName": "seed-v1 Dogfood Notes",
+      "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 02"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2003/seed-v1%20Dogfood%20Notes"
+        }
+      },
+      "userRole": "Owner"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+    "query": {
+      "$select": "id,name,owner,isDefaultCalendar,isRemovable"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=/events",
+    "query": {
+      "$select": "id",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=/events",
+    "query": {
+      "$select": "id",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_calendar-spare.06.json"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1.0/me/calendars/AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+    "status": 204
+  }
+]

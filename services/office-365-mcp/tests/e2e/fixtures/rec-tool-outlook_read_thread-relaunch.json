@@ -1,0 +1,123 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "2"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "3"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/SSoGKoBZAATULRIYHnhqIk4roAYsSX-DDp6Se0Rfvi15OdWUSj2Z4ccckbVP7G38eiMD",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,conversationId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.06.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$filter": "conversationId eq 'AAQkNEghUAX4SYF4FYXcWKerKSI8WM38Amf4RER5ICLtLJTuQ1SjDGPWMA-AhDXw-0-vuFXmuwktsxL='",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,conversationId,sentDateTime",
+      "$top": "1000"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-relaunch.07.json"
+  }
+]

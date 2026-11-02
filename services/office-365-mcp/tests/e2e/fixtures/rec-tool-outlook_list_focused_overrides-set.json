@@ -1,0 +1,85 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "json": {
+      "classifyAs": "focused",
+      "senderEmailAddress": {
+        "address": "anna@example.test"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/inferenceClassificationOverrides('00000000-72b0-48a5-858d-73d4b4350b2e')"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-set.06.json"
+  }
+]

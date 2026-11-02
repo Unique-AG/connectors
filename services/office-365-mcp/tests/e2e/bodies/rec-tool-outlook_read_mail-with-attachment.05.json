@@ -1,0 +1,13 @@
+{
+  "value": [
+    {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentType": "text/csv",
+      "id": "URdKCkCRSARMXXWXRfpxQi3umQJvDX-OXu0Zk2Htgj50CbUZHf4L5hlynaGT1T37sCTIDLDKYTXYcwoTKCvCMr98poCyu9Bf",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-10-26T14:17:19Z",
+      "name": "q3-numbers.csv",
+      "size": 244
+    }
+  ]
+}

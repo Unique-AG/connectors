@@ -1,0 +1,201 @@
+{
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=5&$skip=15",
+  "value": [
+    {
+      "@odata.etag": "W/\"YKMCZCCHCBBlnGdvTapySDUqBnCc/JrrVXQmuoKU\"",
+      "bodyPreview": "Three candidates are available on Wednesday morning. Which slots do you want?",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "hasAttachments": false,
+      "id": "VCsOZxEKAZXGIXXYDmsvQm4ttPXhYB-CJi6Ln5Qbkn38PhYXLy6R8izwbpMI8V775ZJH",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-22T13:35:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "subject": "Hiring: junior designer interview slots",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=XMwDVfJXRNYRGHRRQygoPt3knQWeMJ%2FGFp8Kz1Yjvk03IdLCXz0H8scvneFB4B984NUQ&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"AYYJVUAYTJZgkOfzTqudDMWhMfIa/ExlQMHisqAR\"",
+      "bodyPreview": "Do we need the paper samples before we sign?",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "CErBYtHSQDENWSSFEoglVs6puHQaPG-JQz9Rd8Sdbn63ChKWGr8C3hfcseVE0Y474RQH",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-22T10:10:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Print vendor contract: questions",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=COtRJyVQZCAHIYKLRxqwKd7ghHJmGB%2FJVu0Qp4Ondm77TgGGAc3A4iogmyWY4M423DQV&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"QQQVPVGFNLSarBxoPmvoKWGdPaHs/UjlBSQhcrKn\"",
+      "bodyPreview": "The purchase order for the agency is approved. Order number PO-4471.",
+      "categories": ["seed-v1", "Website", "Finance"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "hasAttachments": false,
+      "id": "IFxKDpNZKXIYQUKUJzbzQi1whCAeGQ-SRf0Ga2Ihzt53YsMIDe2M0ugwgbFP4R43ftDO",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-22T08:45:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "subject": "RE: Website relaunch: launch checklist",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=FMmTThSTESIVVVGKWzhlBq3jsJVmGR%2FVAw2Il3Pdzt16GrOOVa4V0qqqlvJW0L41tvKB&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"BCYGQTYSUIWzmIsfZlkeUVRkNhIk/BhcICBsjvCJ\"",
+      "bodyPreview": "The agency sent the press pages. I put them on staging.",
+      "categories": ["seed-v1", "Website"],
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "WVgTBsHSKUFUCSSEDfotDe4jwZZhVT-DNk9Ag7Jlnh87EfFBZm9Z7ogzhgOE4X52uMYH",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-21T11:15:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "RE: Website relaunch: launch checklist",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=NDcQOjRMAJJUGWGYNlehUm5wuNYdRJ%2FERh7Pz8Mkfn00ByOLBx1J0akdsgDG7R41qYZB&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"KUDOIWFZSECnmGdpCqhqEHAcKeIe/ItfGEApetMT\"",
+      "bodyPreview": "The feedback form for the interviews is on the team site.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "GGcYPcIBBTNHYLICZsvwPg2jyUZrEN-VGz6Hl2Dous95ZcEFMt4W3njcteWJ0I870hTV",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-21T09:50:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Hiring: feedback form",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAmXXkWONJBRFRYXDuqoJw5klFSaIC%2FDAo4Ij9Gyzp55YsVFFm9F4erljlRC4V424gYS&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

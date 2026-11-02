@@ -1,0 +1,45 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Project Plan"
+          },
+          "size": 1
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_resolve_url-plan.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/shares/u!aHR0cHM6Ly9jb250b3NvLW15LnNoYXJlcG9pbnQuY29tL3BlcnNvbmFsL21pYV9leGFtcGxlX3Rlc3QvRG9jdW1lbnRzL3NlZWQtdjElMjBTZWVkJTIwRmlsZXMvc2VlZC12MSUyMFByb2plY3QlMjBQbGFuLmRvY3g/driveItem",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_resolve_url-plan.02.json"
+  }
+]

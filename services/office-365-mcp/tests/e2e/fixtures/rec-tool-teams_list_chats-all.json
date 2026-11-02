@@ -1,0 +1,31 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chats-all.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "10",
+      "$skiptoken": "2.zqyCTe4M4oHBCTTf3b6HedBgv6PtteTvSSHXrPQ0yiNIlUY8FeeFyRK4NbchY7yoNL6FlUdDPpMmI9Y9Sbr0LJY7JKKWA3FdHvQEuLXcGAlKrJr0XAFANtrBFGQGCHQbOvFFE59rHFnPirM0FAiNLD0Uj2bHTC30FCHZp8tiAiZiT2q4JSeYd59iWCLIRWv1DXCzFM4HvuMGMVD5MDcRgB7rHIFETJP4ZIUNzVGXxWqAjl0lKKlBVYtnw9lFJJueZERci67PULkMEgHQOMFzAO9rYUYdPETRkcM5JHZTiB6MGxBTMXB2ZGYTkjzY-m4gXjFmb0rkcGteeBbRJIOUYBMOEiBuCFbhI53Xa8UyLn2cM7M3HBvVuQ9xyRvB7WIlBXbOjAF4NOGxoR3UBLpQKN5LXON2JIE6ZF5GKOPTvNnSIfzkaTRM3RnWm9zMQJaIYNC0H8jEbL8hGNYYjkT1G9oQi12vDRiCjnMoRNFWlqRhAmZWG3bdVyfWcF2aZZKHaSu3WCS2YJqWHgQaAHh9TBYxBECJLSLcEQdfUtecVgzQNES5EFDnNJVpfdZbYZW="
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chats-all.02.json"
+  }
+]

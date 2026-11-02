@@ -1,0 +1,12 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks/getRecentNotebooks(includePersonalNotebooks=true)",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_recent_notebooks-recent.01.json"
+  }
+]

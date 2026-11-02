@@ -1,0 +1,21 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onlineMeetings/createOrGet",
+    "json": {
+      "endDateTime": "~tomorrow",
+      "externalId": "00000000-66ee-43b9-8fc1-fdbdcf165e7e",
+      "participants": {
+        "attendees": []
+      },
+      "startDateTime": "~tomorrow",
+      "subject": "seed-v1 case-teams_create_meeting-solo meeting"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_create_meeting-solo.01.json"
+  }
+]

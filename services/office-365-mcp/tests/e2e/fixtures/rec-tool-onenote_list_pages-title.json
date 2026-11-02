@@ -1,0 +1,91 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 dogfood')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+    "query": {
+      "$expand": "parentNotebook($select=id,displayName)",
+      "$filter": "contains(tolower(displayName),'planning')",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links",
+      "$top": "50"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+    "query": {
+      "$filter": "contains(tolower(displayName),'planning')",
+      "$select": "id,displayName,createdBy,createdDateTime,lastModifiedDateTime",
+      "$top": "50"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections/8-00000000-5d58-4d20-82c2-9abfd58e5c72/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "contains(tolower(title),'launch')",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-title.06.json"
+  }
+]

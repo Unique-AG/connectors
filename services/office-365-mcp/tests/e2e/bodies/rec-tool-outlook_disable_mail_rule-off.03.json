@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "markAsRead": true
+  },
+  "conditions": {
+    "subjectContains": ["seed-v1 case-outlook_disable_mail_rule-off"]
+  },
+  "displayName": "seed-v1 case-outlook_disable_mail_rule-off",
+  "hasError": false,
+  "id": "DMCBBKmiqzz=",
+  "isEnabled": false,
+  "isReadOnly": false,
+  "sequence": 1
+}

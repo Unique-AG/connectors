@@ -1,0 +1,44 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 dogfood')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-seed.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-seed.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-seed.03.json"
+  }
+]

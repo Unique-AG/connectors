@@ -1,0 +1,19 @@
+{
+  "createdDateTime": "0001-01-01T00:00:00Z",
+  "folder": {
+    "childCount": 0
+  },
+  "id": "01S91FWMZFZCYFS39ISGMEM5QMZCNGPAXV",
+  "lastModifiedDateTime": "2026-08-17T08:55:10Z",
+  "name": "synthetic text 02",
+  "parentReference": {
+    "driveId": "b!2wpEMzgb_8EC23h4rOlmsCIDlUD4Qr3JaEPoryek6hpUX02I7MjaWYD3GN98rdhf",
+    "driveType": "documentLibrary",
+    "id": null,
+    "name": null,
+    "path": null,
+    "siteId": null
+  },
+  "size": 0,
+  "webUrl": "https://contoso.sharepoint.com/teams/Z3FBbzikfHpbolbaEpkg/Shared%20Documents/synthetic%20text%2002"
+}

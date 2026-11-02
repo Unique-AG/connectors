@@ -1,0 +1,43 @@
+{
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=2",
+  "value": [
+    {
+      "@odata.etag": "W/\"BZLGZBRPEOSzbOxoRshjUFAjUoKf/PbiPIArroyQ\"",
+      "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
+      "categories": ["seed-v1", "Finance"],
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "hasAttachments": true,
+      "id": "UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW",
+      "importance": "high",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-25T10:05:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "subject": "RE: Q3 budget review",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=BTnWQrMHCJDYPWKARukpDr6phUDsUP%2FMPn7Uf7Mnyt80McKQHp0A5wxhfjRU3H03iLJO&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

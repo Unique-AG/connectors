@@ -1,0 +1,119 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>First text.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_update_draft-basic",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "isDraft,subject,toRecipients,ccRecipients"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.05.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Second text.</p>",
+        "contentType": "html"
+      },
+      "importance": "high",
+      "subject": "seed-v1 case-outlook_update_draft-basic changed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_draft-basic.06.json"
+  }
+]

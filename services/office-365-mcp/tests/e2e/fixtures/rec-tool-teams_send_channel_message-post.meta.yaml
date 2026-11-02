@@ -1,0 +1,23 @@
+scenario: teams_send_channel_message-post
+fixture: rec-tool-teams_send_channel_message-post
+source: recorded
+target: graph
+recorded_at: '2026-10-30T13:19:34+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 17
+  keys dropped: 28
+  query parameters dropped: 4
+  response headers dropped: 24
+  text kept: 5
+  text replaced: 8
+literals:
+- seed-v1 case-teams_send_channel_message-post hello team
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

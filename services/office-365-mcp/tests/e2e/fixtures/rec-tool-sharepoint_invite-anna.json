@@ -1,0 +1,96 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Project Plan"
+          },
+          "size": 1
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_invite-anna.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_invite-anna.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR/children",
+    "query": {
+      "@microsoft.graph.conflictBehavior": "fail"
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.driveItem",
+      "name": "seed-v1 case-sharepoint_invite-anna",
+      "folder": {}
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://contoso.sharepoint.com/synthetic%20text%2004/synthetic%20text%2005/drives('b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_')/items('01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR')/children('01GPIQL51AUIOS7PJHFHL27YDG6ULOYHOR')"
+    },
+    "body": "rec-tool-sharepoint_invite-anna.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01GPIQL51AUIOS7PJHFHL27YDG6ULOYHOR",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_invite-anna.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01GPIQL51AUIOS7PJHFHL27YDG6ULOYHOR/invite",
+    "json": {
+      "recipients": [
+        {
+          "email": "anna@example.test"
+        }
+      ],
+      "requireSignIn": true,
+      "retainInheritedPermissions": true,
+      "roles": ["read"],
+      "sendInvitation": false
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-sharepoint_invite-anna.05.json"
+  }
+]

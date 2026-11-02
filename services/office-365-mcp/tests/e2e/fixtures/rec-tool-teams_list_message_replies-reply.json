@@ -1,0 +1,74 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_message_replies-reply.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "membershipType eq 'standard'",
+      "$select": "id,displayName,description,createdDateTime,membershipType"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_message_replies-reply.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/messages",
+    "json": {
+      "body": {
+        "content": "seed-v1 case-teams_list_message_replies-reply post",
+        "contentType": "text"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2003/teams('00000000-e7a0-41c6-863d-0548ee2dacdd')/channels('synthetic%20text%2004')/messages('2265840079457')"
+    },
+    "body": "rec-tool-teams_list_message_replies-reply.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/messages/2265840079457/replies",
+    "json": {
+      "body": {
+        "content": "seed-v1 case-teams_list_message_replies-reply reply",
+        "contentType": "text"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2003/teams('00000000-e7a0-41c6-863d-0548ee2dacdd')/channels('synthetic%20text%2004')/messages('2265840079457')/replies('3565099881699')"
+    },
+    "body": "rec-tool-teams_list_message_replies-reply.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/messages/2265840079457/replies",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$top": "20"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_message_replies-reply.05.json"
+  }
+]

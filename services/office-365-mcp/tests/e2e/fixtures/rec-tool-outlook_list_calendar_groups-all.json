@@ -1,0 +1,50 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_calendar_groups-all.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendarGroups",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_calendar_groups-all.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendarGroups/AAMkETobHBE9ZPJ2OYBmLGyaNGM9MN42Csm6CFL8EUQvXDElA5ZxZWUMSGRGOBUgpboWJPhzIRsiU0o5OEH3PxRxaWucXgroQTXvZeLk-InoWMHPOLWJCJIbkPpuGhzyWZWrWsFh-DfzXHXInjNPXTM=/calendars",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_calendar_groups-all.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendarGroups/AAMkUIdvFVR2AVM4DSTeJBfeAOO0RN21Kbu7VTI1DOVuJSUuN7YhQJVMWUMLWZUvlykRMOnqQIvhI8y4CFY7NiDmkZhwGbacISNpPsTa-RnjVVCXUVKBMTDxlEpzJyrsRMVvDuTi-IhkFBGZjvWDEKZ=/calendars",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_calendar_groups-all.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendarGroups/AAMkAAlhNKH7MNK9YBXgKTgdNQS7BV36Bdv4FSE0SMQjPUMiL9SwFUVQWSEGUHTgoclRIHffXJhlP6t8TOH0CcWiuAlxEhffMHNvGyKr-OhfNIDPSHOVPCFalPkwQoxoIIPmEtPo-WboUMTQfqNXHQD=/calendars",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_calendar_groups-all.05.json"
+  }
+]

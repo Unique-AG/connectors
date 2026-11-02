@@ -1,0 +1,35 @@
+{
+  "@odata.etag": "W/\"MFRZZMOLPQPzkKrgEvznRDPzLaYo/XdhUGPsDayt\"",
+  "assistantName": null,
+  "birthday": null,
+  "businessAddress": {},
+  "businessPhones": ["+41 44 555 01 02"],
+  "categories": ["seed-v1"],
+  "children": [],
+  "companyName": "Rhein Logistics",
+  "department": null,
+  "displayName": "Marc Dubois",
+  "emailAddresses": [
+    {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  ],
+  "givenName": "Marc",
+  "homeAddress": {},
+  "homePhones": [],
+  "id": "EFgJBuLNOVXOAIEPKztyTj4boIPzWP-SVu0Ev3Iuzt45HvAQZg8W7ffifqZC42raTpDY",
+  "imAddresses": [],
+  "jobTitle": "Dispatcher",
+  "lastModifiedDateTime": "2026-10-29T14:52:30Z",
+  "manager": null,
+  "middleName": null,
+  "mobilePhone": null,
+  "nickName": null,
+  "officeLocation": null,
+  "otherAddress": {},
+  "personalNotes": "",
+  "profession": null,
+  "spouseName": null,
+  "surname": "Dubois"
+}

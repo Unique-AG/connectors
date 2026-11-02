@@ -1,0 +1,58 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 spare')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_copy_notebook-spare.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_copy_notebook-spare.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_copy_notebook-spare.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onenote/notebooks/4-00000000-bbfe-4ebd-87a1-958461e83610/copyNotebook",
+    "json": {
+      "renameAs": "seed-v1 case-notebook-copy ~tomorrow"
+    },
+    "status": 202,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-bbfe-4ebd-87a1-958461e83610",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_copy_notebook-spare.04.json"
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Project Plan"
+          },
+          "size": 1
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_create_share_link-plan.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_create_share_link-plan.02.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+    "json": {
+      "@odata.type": "#microsoft.graph.driveItem",
+      "name": "seed-v1 case-sharepoint_create_share_link-plan.docx"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_create_share_link-plan.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_create_share_link-plan.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ/createLink",
+    "json": {
+      "type": "view",
+      "scope": "organization"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://contoso.sharepoint.com/synthetic%20text%2003/synthetic%20text%2004/drives('b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_')/items('01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ')/permissions('00000000-1f0c-4d95-8b55-1e548f56f28f')"
+    },
+    "body": "rec-tool-sharepoint_create_share_link-plan.05.json"
+  }
+]

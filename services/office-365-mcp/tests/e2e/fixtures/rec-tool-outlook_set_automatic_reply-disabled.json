@@ -1,0 +1,39 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailboxSettings",
+    "query": {
+      "$select": "automaticRepliesSetting"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_set_automatic_reply-disabled.01.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/mailboxSettings",
+    "json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "~tomorrow",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "~today",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_set_automatic_reply-disabled.02.json"
+  }
+]

@@ -1,0 +1,87 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-everyone.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-everyone.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-everyone.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW/createReplyAll",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {},
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('QTbGKbOIYNZIQYRSTlujLu4alITdZF-DRe3Pc5Kjyf36BbQDJt0P8rdkeiTM02mGESQP')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-everyone.04.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/QTbGKbOIYNZIQYRSTlujLu4alITdZF-DRe3Pc5Kjyf36BbQDJt0P8rdkeiTM02mGESQP",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "categories": ["seed-v1 case-outlook_draft_reply_all-everyone"],
+      "body": {
+        "content": "<p>Thanks to all.</p>",
+        "contentType": "html"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-everyone.05.json"
+  }
+]

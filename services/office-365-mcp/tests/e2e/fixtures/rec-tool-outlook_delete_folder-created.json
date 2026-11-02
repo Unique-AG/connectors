@@ -1,0 +1,256 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/mailFolders",
+    "json": {
+      "displayName": "seed-v1 case-outlook_delete_folder-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=')"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=",
+    "query": {
+      "$select": "displayName,totalItemCount,childFolderCount,parentFolderId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/msgfolderroot",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/syncissues",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conflicts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.06.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/archive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.07.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conversationhistory",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.08.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.09.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.10.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.11.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/clutter",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.12.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/junkemail",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.13.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/localfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.14.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/outbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.15.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/recoverableitemsdeletions",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.16.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/scheduled",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.17.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/sentitems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.18.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/searchfolders",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.19.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/serverfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.20.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/mailFolders/AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=/move",
+    "json": {
+      "DestinationId": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN="
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=')"
+    },
+    "body": "rec-tool-outlook_delete_folder-created.21.json"
+  }
+]

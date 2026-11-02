@@ -1,0 +1,22 @@
+scenario: outlook_list_mail-sentitems
+fixture: rec-tool-outlook_list_mail-sentitems
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:57:39+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 21
+  keys dropped: 2
+  persona addresses: 16
+  persona names: 16
+  response headers dropped: 14
+  text kept: 19
+literals:
+- seed-v1
+- sentitems
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

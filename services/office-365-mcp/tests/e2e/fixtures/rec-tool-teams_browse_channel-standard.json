@@ -1,0 +1,40 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_browse_channel-standard.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-d034-4a82-8630-01e372765b48/channels",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "membershipType eq 'standard'",
+      "$select": "id,displayName,description,createdDateTime,membershipType"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_browse_channel-standard.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-d034-4a82-8630-01e372765b48/channels/19:oHNJRH__z0OVmeRGLYjS3VjT_6EO8K3bkVN-APXTHtS9@thread.tacv2/messages",
+    "query": {
+      "$expand": "replies",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_browse_channel-standard.03.json"
+  }
+]

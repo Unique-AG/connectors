@@ -1,0 +1,42 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_find_recipient-anna.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/people",
+    "query": {
+      "$search": "\"Anna Meier\"",
+      "$select": "displayName,scoredEmailAddresses,userPrincipalName,personType,jobTitle,department",
+      "$top": "20"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_find_recipient-anna.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"participants:\\\"Anna Meier\\\"\"",
+      "$select": "from,toRecipients,ccRecipients,receivedDateTime",
+      "$top": "1000"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_find_recipient-anna.03.json"
+  }
+]

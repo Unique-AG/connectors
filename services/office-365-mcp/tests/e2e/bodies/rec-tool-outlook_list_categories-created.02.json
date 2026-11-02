@@ -1,0 +1,39 @@
+{
+  "value": [
+    {
+      "color": "preset0",
+      "displayName": "synthetic text 01",
+      "id": "00000000-1778-4b5f-81c9-82bdcafa9d36"
+    },
+    {
+      "color": "preset1",
+      "displayName": "synthetic text 02",
+      "id": "00000000-dd53-45d3-8be1-e8095699e012"
+    },
+    {
+      "color": "preset3",
+      "displayName": "synthetic text 03",
+      "id": "00000000-1002-4bb9-8fa0-1558bdd96cf0"
+    },
+    {
+      "color": "preset4",
+      "displayName": "synthetic text 04",
+      "id": "00000000-b772-4ba7-8f51-5035ce048628"
+    },
+    {
+      "color": "preset7",
+      "displayName": "synthetic text 05",
+      "id": "00000000-c318-4505-8606-d8a1a04a9539"
+    },
+    {
+      "color": "preset8",
+      "displayName": "synthetic text 06",
+      "id": "00000000-f1cc-46f8-810a-7b98bf48b975"
+    },
+    {
+      "color": "preset5",
+      "displayName": "seed-v1 case-outlook_list_categories-created",
+      "id": "00000000-c2e8-4888-8ccc-e242d579ee27"
+    }
+  ]
+}

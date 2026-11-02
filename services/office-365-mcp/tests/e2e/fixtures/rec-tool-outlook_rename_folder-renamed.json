@@ -1,0 +1,243 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/mailFolders",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=')"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+    "query": {
+      "$select": "id,parentFolderId,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/syncissues",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/msgfolderroot",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conflicts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conversationhistory",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.06.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/archive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.07.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.08.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/clutter",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.09.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.10.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.11.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/localfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.12.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/junkemail",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.13.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/outbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.14.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/recoverableitemsdeletions",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.15.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/searchfolders",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.16.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/sentitems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.17.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/scheduled",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.18.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/serverfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.19.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/mailFolders/AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed again"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_rename_folder-renamed.20.json"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "@odata.type": "#microsoft.graph.fileAttachment",
+  "contentBytes": "RGF5IDE6IGFycml2YWwsIHdvcmtzaG9wLCBkaW5uZXIuCkRheSAyOiBib2F0IHRyaXAsIHJldmlldywgcmV0dXJuLgo=",
+  "contentType": "text/plain",
+  "id": "RAaFWzKAXSKPZHGIXmzlCr8gpMNdBU-GWj9Hv8Eyzq61ImKVGz1V5ollqhKQ0H12lAVNBLCQRERGSpQoTMVqIAuKB5V5nSeU",
+  "isInline": false,
+  "lastModifiedDateTime": "2026-10-26T14:17:20Z",
+  "name": "offsite-agenda.txt",
+  "size": 274
+}

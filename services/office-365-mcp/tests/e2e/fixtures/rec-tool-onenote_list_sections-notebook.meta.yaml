@@ -1,0 +1,21 @@
+scenario: onenote_list_sections-notebook
+fixture: rec-tool-onenote_list_sections-notebook
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:54:39+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 111
+  keys dropped: 31
+  query parameters dropped: 10
+  response headers dropped: 45
+  text kept: 50
+  text replaced: 88
+literals:
+- seed-v1 Dogfood
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

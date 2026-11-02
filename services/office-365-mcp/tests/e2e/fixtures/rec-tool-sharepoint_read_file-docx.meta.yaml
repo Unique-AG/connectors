@@ -1,0 +1,24 @@
+scenario: sharepoint_read_file-docx
+fixture: rec-tool-sharepoint_read_file-docx
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:59:31+00:00'
+scrub_version: 1.0.0
+replacements:
+  binaries kept by hash: 1
+  ids mapped: 21
+  keys dropped: 8
+  persona addresses: 4
+  persona names: 4
+  query parameters dropped: 6
+  response headers dropped: 56
+  text kept: 10
+  text replaced: 3
+literals:
+- seed-v1 Project Plan
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

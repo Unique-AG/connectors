@@ -1,0 +1,44 @@
+{
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=1",
+  "value": [
+    {
+      "@odata.etag": "W/\"RjVPCLQKEVUncYikYaqxFUHmViKj/BqxGBVyIfqz\"",
+      "@odata.type": "#microsoft.graph.eventMessageRequest",
+      "bodyPreview": "Walk through the roadmap for the next quarter.",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "hasAttachments": false,
+      "id": "CBnBCfOGAGOZRQCSTkipVr6veQLdGJ-TDz9Vq4Fkjn96HmKGNv4K8dpmdxLJ42xw9jUX",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-10-29T14:52:38Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "subject": "Roadmap check",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=GXgFZzIQGCGJTSCEGydcJd6wbFMpJS%2FKZo5Oc4Yfpu80DaLWVq6O1ipkxpMQ55hm0nIH&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

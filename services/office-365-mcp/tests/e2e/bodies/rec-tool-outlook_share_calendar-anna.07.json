@@ -1,0 +1,11 @@
+{
+  "allowedRoles": ["freeBusyRead", "limitedRead", "read", "write"],
+  "emailAddress": {
+    "address": "anna@example.test",
+    "name": "Anna Meier"
+  },
+  "id": "Z827GOdtlVNwD3TVYGVlM762KEY8A6fghiaaXXXwePmctKJ7aqX4jEQwAFynv4WuTRpYJUYMBj5DCrJgR2OSSYLeN6KjZYEmD0epwQXwlGUuW944IPb9PUMlDCdsL1BkLDCzFEGmUERfK1N2NBgkHHB1SHVjO4BbZlp8PAnbAuV=",
+  "isInsideOrganization": true,
+  "isRemovable": true,
+  "role": "freeBusyRead"
+}

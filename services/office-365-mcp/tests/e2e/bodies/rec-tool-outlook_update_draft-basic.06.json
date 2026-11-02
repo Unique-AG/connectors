@@ -1,0 +1,37 @@
+{
+  "@odata.etag": "W/\"CCWVKDOAJGWgaGkyEeplKFXtSzRn/QayAMApKgCm\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Second text.</p></body></html>",
+    "contentType": "html"
+  },
+  "bodyPreview": "Second text.",
+  "categories": [],
+  "ccRecipients": [],
+  "changeKey": "LGOCWTSITUAhrUssDtvwYWOnTyGj/NhyFFQzLhJa",
+  "conversationId": "AAQkAIzgBAM1LLG9IXNqLQavGJZ4DD45Yne2QPF7NXFsAVAjX8DkCTPSKLO-AGrEovBJa8YJsthP2WR=",
+  "createdDateTime": "2026-10-29T15:13:41Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "hasAttachments": false,
+  "id": "QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+  "importance": "high",
+  "isDraft": true,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-10-29T15:13:41Z",
+  "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+  "receivedDateTime": "2026-10-29T15:13:41Z",
+  "replyTo": [],
+  "sentDateTime": "2026-10-29T15:13:41Z",
+  "subject": "seed-v1 case-outlook_update_draft-basic changed",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=GKvAYcSUBYUUKIMKUzmaAe5uuESbIC%2FWTp9Uy8Kgnz03PpNVBt5Q1guthyFN89qMIzGI&exvsurl=1&viewmodel=ReadMessageItem"
+}

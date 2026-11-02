@@ -1,0 +1,24 @@
+scenario: teams_delete_message-post
+fixture: rec-tool-teams_delete_message-post
+source: recorded
+target: graph
+recorded_at: '2026-10-30T13:17:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 32
+  keys dropped: 31
+  persona addresses: 2
+  query parameters dropped: 8
+  response headers dropped: 47
+  text kept: 6
+  text replaced: 13
+literals:
+- seed-v1 case-teams_delete_message-post doomed
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

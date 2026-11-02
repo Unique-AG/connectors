@@ -1,0 +1,17 @@
+{
+  "contentUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/pages/3-i8nf7g2i6ui60u21boq91zc61t980159!5-00000000-534c-4cdb-8c29-121f79453370/content",
+  "createdByAppId": "RBHMU-00000000-2CE7-4CFD-8583-FEC34DB3BE6C",
+  "createdDateTime": "2026-10-30T10:07:52Z",
+  "id": "3-i8nf7g2i6ui60u21boq91zc61t980159!5-00000000-534c-4cdb-8c29-121f79453370",
+  "lastModifiedDateTime": "2026-10-30T10:07:55.5079449Z",
+  "links": {
+    "oneNoteClientUrl": {
+      "href": "synthetic text 21"
+    },
+    "oneNoteWebUrl": {
+      "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2003/seed-v1%20Scratch"
+    }
+  },
+  "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/pages/3-i8nf7g2i6ui60u21boq91zc61t980159!5-00000000-534c-4cdb-8c29-121f79453370",
+  "title": "seed-v1 case-onenote_get_operation-copy"
+}

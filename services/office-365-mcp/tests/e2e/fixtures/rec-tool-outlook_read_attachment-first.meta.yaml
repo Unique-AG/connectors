@@ -1,0 +1,23 @@
+scenario: outlook_read_attachment-first
+fixture: rec-tool-outlook_read_attachment-first
+source: recorded
+target: graph
+recorded_at: '2026-10-30T13:15:13+00:00'
+scrub_version: 1.0.0
+replacements:
+  attachments kept by hash: 1
+  ids mapped: 39
+  keys dropped: 15
+  persona addresses: 19
+  persona names: 19
+  response headers dropped: 70
+  text kept: 24
+literals:
+- inbox
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

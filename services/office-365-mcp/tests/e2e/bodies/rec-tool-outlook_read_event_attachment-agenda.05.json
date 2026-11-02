@@ -1,0 +1,10 @@
+{
+  "@odata.type": "#microsoft.graph.fileAttachment",
+  "contentBytes": "T2Zmc2l0ZSBhZ2VuZGEuCk1vcm5pbmc6IHdvcmtzaG9wLiBBZnRlcm5vb246IHJldmlldy4K",
+  "contentType": "text/plain",
+  "id": "IHjOPkGKKAILMSFJZfwoZg8lrQVwUU-ICt9Em1Rcay66GoSNQp6G6vmondUD45o9MqLTKXJAXUIy66GNJOJBWVD67rX-GtSl",
+  "isInline": false,
+  "lastModifiedDateTime": "2026-10-29T14:52:28Z",
+  "name": "calendar-agenda.txt",
+  "size": 264
+}

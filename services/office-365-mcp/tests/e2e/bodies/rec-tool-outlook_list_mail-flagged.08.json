@@ -1,0 +1,202 @@
+{
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=5&$skip=35",
+  "value": [
+    {
+      "@odata.etag": "W/\"MKGHTEVULPIlhNfeVisvBVGjOoOl/VmhXHKqagAg\"",
+      "bodyPreview": "synthetic text 11",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "user-02@example.test",
+          "name": "synthetic text 06"
+        }
+      },
+      "hasAttachments": false,
+      "id": "MFbMUyZQRSICAARJRetgVr4kiDBtCV-KDa9Yu8Eovk12CyLRYy5C5kjapkLSe0U-xAYP",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-04-16T08:27:35Z",
+      "replyTo": [
+        {
+          "emailAddress": {
+            "address": "user-02@example.test",
+            "name": "synthetic text 06"
+          }
+        }
+      ],
+      "sender": {
+        "emailAddress": {
+          "address": "user-02@example.test",
+          "name": "synthetic text 06"
+        }
+      },
+      "subject": "synthetic text 12",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=TTpMUyCYIRBBVFFIPimjSp0unLScSK%2FXFu8Ly4Huqx46PiZIXw4C1uxlmjKXe5I%2FgRBZ&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"CDIFNYFULGOraJlqFzwzTEIjGeDe/EgaIMDxdLcx\"",
+      "bodyPreview": "synthetic text 13",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "user-04@example.test",
+          "name": "synthetic text 14"
+        }
+      },
+      "hasAttachments": false,
+      "id": "FQyDHjAFCXGBNLFNEqpqAc1nfSXaMW-EAk5Tg0Wkvy74EeIEHl7M4spbygPYfW1_NCPT",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-04-15T02:56:36Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "user-04@example.test",
+          "name": "synthetic text 14"
+        }
+      },
+      "subject": "synthetic text 15",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=YJlFKuYQNKKBXERQLzgpZq6uuTIdDI%2FRNb3Dp8Suea24CyVRIb2U9jpvxkGGgJ7%2BAOEO&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"WAESUSOJRDUytXuoHzggTQDsVfGw/BfdJHSeuUZ3\"",
+      "bodyPreview": "synthetic text 16",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "user-04@example.test",
+          "name": "synthetic text 14"
+        }
+      },
+      "hasAttachments": false,
+      "id": "KSpPKoVDTMAJEWOFIgmdIr2geNDsBN-NRl8Me8Mqap45QnBYJn0Y2bkhvqHYaL76YbBD",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-04-14T12:19:30Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "user-04@example.test",
+          "name": "synthetic text 14"
+        }
+      },
+      "subject": "synthetic text 15",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=ZXsIFeQPUFFMFVYJKfcoAc8tgMWmIJ%2FKEh4Fi4Nxis74DpBIYl2F4etjloTFxJ76BjJX&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"BZLRMDFZMZZqlIcbSqipSDYiRvCv/AjfIPUPflog\"",
+      "bodyPreview": "synthetic text 17",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "user-03@example.test",
+          "name": "synthetic text 09"
+        }
+      },
+      "hasAttachments": false,
+      "id": "GHhCPvCMNCLTWBLOQejqPd2ouZBzKM-BZt7An4Qfqw93BmRPXa0T1ahwblOMQEFAgpWT",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-03-18T15:11:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "user-03@example.test",
+          "name": "synthetic text 09"
+        }
+      },
+      "subject": "synthetic text 18",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=PAoUXyLFKWUZWGVLMvtgOf8daXFoQJ%2FBGk9Dm6Bxid74DzJKBy4R2vequrDZXSEDjpSM&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"ZXZFDYNTTLLdsHwbDcmwTEWfQkUq/AeyEQMUnkeV\"",
+      "bodyPreview": "synthetic text 19",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "user-05@example.test",
+          "name": "synthetic text 20"
+        }
+      },
+      "hasAttachments": false,
+      "id": "GSvVEtCMDOGKNHITJoocCl8aoQZqFQ-RVj4Jx4Okfm94PfOXGt7B4cnogxKFBcf2fyFO",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "receivedDateTime": "2026-03-10T08:28:03Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "user-05@example.test",
+          "name": "synthetic text 20"
+        }
+      },
+      "subject": "synthetic text 21",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=EEbFApAFPTVJMNXRAoyeRc8nyNYpXU%2FKCd6Tm2Qihf03VnIQTb8J5rxdfqPEXwm9xkYT&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

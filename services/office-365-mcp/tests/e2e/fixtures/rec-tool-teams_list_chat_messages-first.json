@@ -1,0 +1,62 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-first.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "5",
+      "$skiptoken": "8.jctJAz7T7rMOPQWx1p9KgyAcx7TkwcIrDGOBzGL2erNBxDG6QukGpWB2RzisR1cdFD7OkIkBGzMmU5I2Faf2WCU4DTVGV8FhXzUNzCVbORaIeCp0VAIHUgdQKGFOHMRyWtHRO50dLVsYrgL4QTeTBJ8Bb9pDJT53TGPZl6jpWiVcO4i8MHmVw02aTSYHJEc7NJJgNK5HfsCCJOL7LIpIxH2eKUISREC9JERLjWMGmMuKdn0iYVqPKJaow5dZLAjqBZAyl55WYFdOWtGLBDVhXT6zUPUbYKBOypM0QGVTfC3CVkDCHVC6TPXAvrvL-c7zFnNbd3lccMuzcZkUSKYUKRUIFgHqUBjrI75Oo6QxVc5eP2Z8DEvNuG6lgKdD4W9mRDdHgQT3BMNqcm8ITDkSKJ83UDJud45vCPVTPImeCTfWQ6xmNm0vPzMAHApBJT48XsIWc49wVKxHgpUsDWoTcRk8NDtSihD4ET3iVHwLVzvwA5euGKZGp2kJASiQvlLwFS8abEvpgOByU1FmHluOkaFOUXACJ0t4QQnWQNdVWR7qNJYviOTvZ4JOdUfadEQ="
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-first.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "5",
+      "$skiptoken": "0.tzmRZw0SznQERUQS6K-WanOih2MrnlKmWSGNkBA3enYLeFO0EnzAWSI5JddaC3ldHZ5DdPoEPtUvL3V1Utj2UIR8IEZEV8BqZpTCuVXbDEcGjEm5S6Dkv3dTTLhLUZFDUEN0I0xAELHEnhbM_pWSlFgnUjv9q0pqn9gCluW7Juhme78WFFvLORV3A9ElaF24d0fKBdH0ZaEoa11Kx5fPL3w6BRB9eMPrDdooACwPQHXDJRgJMCCCdY3WTBQZICP7IPXVSMRFIZEHrtTLeVH9LBjLIR7oUSVhzikxZH0YgGjVLKCSnoa0QCvDeE9HLHWBvcFCKLEZDj5RTVSAIHZ1KQGXmg6MZOPBZJIpFiMty7wqCzWubhGPR20JaUItFVSTP4tqCPi8aeDNGmsvNfXuG802BDUBQoFBesIiZ25TuFCEVO8xQKLodLJjO6QGvOstgSY="
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-first.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:1j94t52t92wo3a7601bw9d8vnxk1n7m8@thread.v2/messages",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$orderby": "createdDateTime desc",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-first.04.json"
+  }
+]

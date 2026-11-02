@@ -1,0 +1,66 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/calendars/AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~tomorrow",
+        "timeZone": "Europe/Zurich"
+      },
+      "isAllDay": false,
+      "start": {
+        "dateTime": "~tomorrow",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_create_event_on_behalf-shared-calendar",
+      "transactionId": "00000000-1387-47ff-8ff0-5b7314b40b8c"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('ODbDRfSNOUZHTTRVClkjYy6igSScRK-JZd6Br4Egdk48SgDUDc1U3uazjnPT6_sEPDSP')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.04.json"
+  }
+]

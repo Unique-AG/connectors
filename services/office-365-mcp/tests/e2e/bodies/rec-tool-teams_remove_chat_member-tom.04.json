@@ -1,0 +1,10 @@
+{
+  "@odata.type": "#microsoft.graph.aadUserConversationMember",
+  "displayName": "Tom Berger",
+  "email": "tom@example.test",
+  "id": "LRHfCVWrFbu4URImJezbJVW5Df65UMYzXHcpEBRnRkV6DEA8NVUnUUPeSpQqYLxjZGS5HgNcPnFtULI9RIAeBWVjPkLmCELzNnYfODE7FIZ9zVYzMHFuayErI1J6IOTpL3R8ZOtzEFUfDQIxDI56MoqlPPRnSmEwGCGbTiIeXS==",
+  "roles": ["owner"],
+  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+  "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+  "visibleHistoryStartDateTime": "2026-10-30T13:41:40.457Z"
+}

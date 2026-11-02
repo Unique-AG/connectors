@@ -1,0 +1,115 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 dogfood')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+    "query": {
+      "$expand": "parentNotebook($select=id,displayName)",
+      "$filter": "contains(tolower(displayName),'reading')",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links",
+      "$top": "50"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+    "query": {
+      "$filter": "contains(tolower(displayName),'reading')",
+      "$select": "id,displayName,createdBy,createdDateTime,lastModifiedDateTime",
+      "$top": "50"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/sections/0-00000000-8621-4abd-81ad-44105fbe9522/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "contains(tolower(title),'gallery')",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.06.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages/2-xg3x76jvb91036pq67p8qe17zx5u8jdv!248-00000000-8621-4abd-81ad-44105fbe9522",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.07.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages/2-xg3x76jvb91036pq67p8qe17zx5u8jdv!248-00000000-8621-4abd-81ad-44105fbe9522/content",
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/html; charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-gallery.08.html"
+  }
+]

@@ -1,0 +1,77 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_remove_chat_member-tom.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats",
+    "json": {
+      "chatType": "group",
+      "members": [
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
+          "roles": ["owner"]
+        }
+      ],
+      "topic": "seed-v1 case-teams-chat"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_remove_chat_member-tom.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:vg130vncnmj27923eznee032u0m72827@thread.v2/members",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_remove_chat_member-tom.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:vg130vncnmj27923eznee032u0m72827@thread.v2/members/LRHfCVWrFbu4URImJezbJVW5Df65UMYzXHcpEBRnRkV6DEA8NVUnUUPeSpQqYLxjZGS5HgNcPnFtULI9RIAeBWVjPkLmCELzNnYfODE7FIZ9zVYzMHFuayErI1J6IOTpL3R8ZOtzEFUfDQIxDI56MoqlPPRnSmEwGCGbTiIeXS==",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_remove_chat_member-tom.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:vg130vncnmj27923eznee032u0m72827@thread.v2",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_remove_chat_member-tom.05.json"
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1.0/chats/19:vg130vncnmj27923eznee032u0m72827@thread.v2/members/LRHfCVWrFbu4URImJezbJVW5Df65UMYzXHcpEBRnRkV6DEA8NVUnUUPeSpQqYLxjZGS5HgNcPnFtULI9RIAeBWVjPkLmCELzNnYfODE7FIZ9zVYzMHFuayErI1J6IOTpL3R8ZOtzEFUfDQIxDI56MoqlPPRnSmEwGCGbTiIeXS==",
+    "status": 204
+  }
+]

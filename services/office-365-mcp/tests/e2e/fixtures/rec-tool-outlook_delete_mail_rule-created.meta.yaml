@@ -1,0 +1,19 @@
+scenario: outlook_delete_mail_rule-created
+fixture: rec-tool-outlook_delete_mail_rule-created
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:09:29+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 5
+  keys dropped: 2
+  response headers dropped: 20
+  text kept: 6
+literals:
+- seed-v1 case-outlook_delete_mail_rule-created
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

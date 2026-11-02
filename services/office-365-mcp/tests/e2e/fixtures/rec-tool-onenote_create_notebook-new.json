@@ -1,0 +1,17 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onenote/notebooks",
+    "json": {
+      "@odata.type": "#microsoft.graph.notebook",
+      "displayName": "seed-v1 case-onenote_create_notebook-new ~tomorrow"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/8-00000000-9507-49ad-8546-c07b2c2daf7c",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_notebook-new.01.json"
+  }
+]

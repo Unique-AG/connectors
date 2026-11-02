@@ -1,0 +1,71 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_update_event-subject.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~tomorrow",
+        "timeZone": "Europe/Zurich"
+      },
+      "isAllDay": false,
+      "start": {
+        "dateTime": "~tomorrow",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_update_event-subject",
+      "transactionId": "00000000-4166-4d1f-806e-d2dc1cda3dfe"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('LCzSTjVNYCJVWNMOAlnxWg9hmWWaJH-GSg0Ja3Gjff27LlIWSt1I7ghtuvPR0_nSHIRQ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_event-subject.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/LCzSTjVNYCJVWNMOAlnxWg9hmWWaJH-GSg0Ja3Gjff27LlIWSt1I7ghtuvPR0_nSHIRQ",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_event-subject.03.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/LCzSTjVNYCJVWNMOAlnxWg9hmWWaJH-GSg0Ja3Gjff27LlIWSt1I7ghtuvPR0_nSHIRQ",
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "subject": "seed-v1 case-outlook_update_event-subject moved"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_update_event-subject.04.json"
+  }
+]

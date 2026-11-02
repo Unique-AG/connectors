@@ -1,0 +1,57 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_rename_chat-group.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats",
+    "json": {
+      "chatType": "group",
+      "members": [
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
+          "roles": ["owner"]
+        }
+      ],
+      "topic": "seed-v1 case-teams-chat"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_rename_chat-group.02.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/chats/19:555x9t5g40a570fkr6a15b6q905qf95m@thread.v2",
+    "json": {
+      "topic": "seed-v1 case-teams-chat renamed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_rename_chat-group.03.json"
+  }
+]

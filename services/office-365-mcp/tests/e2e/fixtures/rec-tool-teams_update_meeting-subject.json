@@ -1,0 +1,58 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onlineMeetings/createOrGet",
+    "json": {
+      "endDateTime": "~tomorrow",
+      "externalId": "00000000-cfab-4bb9-833c-5d3c696c82c6",
+      "participants": {
+        "attendees": []
+      },
+      "startDateTime": "~tomorrow",
+      "subject": "seed-v1 case-teams_update_meeting-subject meeting"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_update_meeting-subject.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onlineMeetings",
+    "query": {
+      "$filter": "JoinWebUrl eq 'https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:lngetsm_Q6N6MrHhFdSyDfNmHg67NcYwCRo5VUGiH0Y7CAC3RaCqBsJr@thread.v2/synthetic%20text%2003'"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-subject.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-subject.03.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/onlineMeetings/STsmOhYvOGZuDy4wSGDeFIJqJXCpWbXtCG6rZRc5FGXpD9SbUtWzBCqbHHn5dBZdvJxgP42PGxfuHxcZlsmeNYTRevGsCLdsAB7nUlkEAPwdT7KYxUdzSPKlQNomRliCb80yZrmXrIlpIOCzIjLi",
+    "json": {
+      "@odata.type": "#microsoft.graph.onlineMeeting",
+      "subject": "seed-v1 case-teams_update_meeting-subject renamed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-subject.04.json"
+  }
+]
