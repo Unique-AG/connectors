@@ -412,8 +412,8 @@ describe('createDockerLookup', () => {
     assert.deepStrictEqual(await createDockerLookup(fetchImpl).tags('node'), []);
   });
 
-  it('throws on a rate limit or a server error', async () => {
-    for (const status of [429, 500, 503]) {
+  it('throws on an access error, a rate limit, or a server error', async () => {
+    for (const status of [401, 403, 429, 500, 503]) {
       const fetchImpl = async () => answer({}, status);
       await assert.rejects(createDockerLookup(fetchImpl).tags('node'), new RegExp(`${status}`));
     }

@@ -142,7 +142,7 @@ export function applyDocker(files, { name, data }) {
 
 async function getJson(fetchImpl, url, headers) {
   const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (response.status === 429 || response.status >= 500) {
+  if ([401, 403, 429].includes(response.status) || response.status >= 500) {
     throw new Error(`The registry answered ${response.status} for ${url}.`);
   }
   return response.status === 200 ? response.json() : undefined;
