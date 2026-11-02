@@ -888,7 +888,7 @@ uc-05-57:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread, outlook_read_mail]
     - tool: outlook_draft_reply
-      args: {mode: reply, body_html: I will sign it on Friday}
+      args: {mode: reply, body: I will sign it on Friday}
       uses: {message_ref: uri of the message of Anna}
     - tool: outlook_browse_folders
       optional: true

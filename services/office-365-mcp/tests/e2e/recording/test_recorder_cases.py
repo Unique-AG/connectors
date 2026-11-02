@@ -1,12 +1,17 @@
+import asyncio
 import re
 import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
+from uuid import UUID
 
 import httpx
+import jsonschema
 import pytest
+from fastmcp import Client
+from fastmcp.client.transports import FastMCPTransport
 from starlette.responses import JSONResponse
 
 from office_365_mcp.tools import TOOL_NAMES
@@ -16,10 +21,18 @@ from tests.e2e.recording.cases import case_entries
 from tests.e2e.recording.conftest import record_on
 from tests.e2e.recording.families import Merged, load, merge
 from tests.e2e.recording.guard import SEED_CASE, WRITE_TOOLS, Guard, foreign_address, match_glob
-from tests.e2e.recording.record import guard_for, main, resolve, tool_of
+from tests.e2e.recording.record import (
+    guard_for,
+    main,
+    persona_values,
+    resolve,
+    tool_of,
+    with_personas,
+)
+from tests.e2e.recording.scrub import load_corpus
 from tests.e2e.recording.stand_in import UPN
 from tests.e2e.recording.stand_in import UPNS as STAND_IN_UPNS
-from tests.e2e.test_scenarios import Json
+from tests.e2e.test_scenarios import Json, build_server, items, mapping
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 LIST_CASE = "outlook_list_mail-inbox"
@@ -344,3 +357,37 @@ class TestCases:
 def test_the_scrub_keeps_a_json_plan_literal() -> None:
     steps: tuple[Json, ...] = resolve(MOVE_CASE).steps
     assert steps[1]["args"] == {"destination": "archive"}
+
+
+async def _input_schemas() -> dict[str, Json]:
+    async with Client(FastMCPTransport(build_server()), mode="legacy") as client:
+        return {tool.name: mapping(tool.input_schema) for tool in await client.list_tools()}
+
+
+_SCHEMAS = asyncio.run(_input_schemas())
+STEPS = [
+    pytest.param(case_id, number, mapping(step), id=f"{case_id}-{number}")
+    for case_id, entry in case_entries()
+    for number, step in enumerate(items(entry["chain"]), 1)
+]
+
+
+@pytest.mark.parametrize(("case_id", "number", "step"), STEPS)
+def test_each_step_of_every_case_fits_the_input_schema_of_its_tool(
+    case_id: str, number: int, step: Json
+) -> None:
+    schema = _SCHEMAS[tool_of(step)]
+    properties = mapping(schema["properties"])
+    personas = persona_values(
+        STAND_IN_UPNS,
+        {one.key: str(UUID(int=one.index)) for one in load_corpus().personas},
+        synthetic=False,
+    )
+    args = mapping(with_personas(step.get("args", {}), personas))
+    given = args.keys() | mapping(step.get("bind", {})).keys()
+    assert given <= properties.keys(), (
+        f"{case_id} step {number}: unknown {given - properties.keys()}"
+    )
+    assert set(items(schema.get("required", []))) <= given, f"{case_id} step {number}: missing"
+    for key, value in args.items():
+        jsonschema.validate(value, dict(mapping(properties[key])))

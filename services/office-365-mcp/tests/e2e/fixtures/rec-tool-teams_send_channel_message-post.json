@@ -29,14 +29,14 @@
     "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/messages",
     "json": {
       "body": {
-        "content": "seed-v1 case-teams_send_channel_message-post hello team",
-        "contentType": "text"
+        "content": "<p>seed-v1 case-teams_send_channel_message-post hello team</p>",
+        "contentType": "html"
       }
     },
     "status": 201,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
-      "location": "https://host-01.example.test/synthetic%20text%2003/teams('00000000-e7a0-41c6-863d-0548ee2dacdd')/channels('synthetic%20text%2004')/messages('6178641100529')"
+      "location": "https://host-01.example.test/synthetic%20text%2003/teams('00000000-e7a0-41c6-863d-0548ee2dacdd')/channels('synthetic%20text%2004')/messages('7238004944331')"
     },
     "body": "rec-tool-teams_send_channel_message-post.03.json"
   }

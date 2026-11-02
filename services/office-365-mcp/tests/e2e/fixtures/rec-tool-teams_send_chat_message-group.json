@@ -20,17 +20,23 @@
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
-          "roles": ["owner"]
+          "roles": [
+            "owner"
+          ]
         },
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
-          "roles": ["owner"]
+          "roles": [
+            "owner"
+          ]
         },
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
-          "roles": ["owner"]
+          "roles": [
+            "owner"
+          ]
         }
       ],
       "topic": "seed-v1 case-teams-chat"
@@ -44,17 +50,17 @@
   },
   {
     "method": "POST",
-    "path": "/v1.0/chats/19:6h01q0bj0v7905u9739f1y2t80665594@thread.v2/messages",
+    "path": "/v1.0/chats/19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2/messages",
     "json": {
       "body": {
-        "content": "seed-v1 case-teams_send_chat_message-group hello",
-        "contentType": "text"
+        "content": "<p>seed-v1 case-teams_send_chat_message-group hello</p>",
+        "contentType": "html"
       }
     },
     "status": 201,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
-      "location": "https://host-01.example.test/synthetic%20text%2006/chats('synthetic%20text%2007')/messages('6753299093220')"
+      "location": "https://host-01.example.test/synthetic%20text%2006/chats('synthetic%20text%2007')/messages('4424366441638')"
     },
     "body": "rec-tool-teams_send_chat_message-group.03.json"
   }

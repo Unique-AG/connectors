@@ -228,7 +228,7 @@ outlook_draft_mail-basic:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_draft_mail-basic"
-        body_html: "<p>Written by the recorder.</p>"
+        body: "Written by the recorder."
         importance: high
         categories: [Website]
       bind: {to: ["$1.messages[0].sender.address"], cc: ["$1.messages[1].sender.address"]}
@@ -238,12 +238,12 @@ outlook_update_draft-basic:
     - tool: outlook_list_mail
       args: {folder: inbox, category: seed-v1, limit: 1}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_update_draft-basic", body_html: "<p>First text.</p>"}
+      args: {subject: "seed-v1 case-outlook_update_draft-basic", body: "First text."}
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_update_draft
       args:
         subject: "seed-v1 case-outlook_update_draft-basic changed"
-        body_html: "<p>Second text.</p>"
+        body: "Second text."
         importance: high
       bind: {message_ref: "$2.uri"}
 
@@ -254,7 +254,7 @@ outlook_draft_reply-reply:
     - tool: outlook_draft_reply
       args:
         mode: reply
-        body_html: "<p>Thanks for the note.</p>"
+        body: "Thanks for the note."
         categories: ["seed-v1 case-outlook_draft_reply-reply"]
       bind: {message_ref: "$1.messages[0].uri"}
 
@@ -265,7 +265,7 @@ outlook_draft_reply-forward:
     - tool: outlook_draft_reply
       args:
         mode: forward
-        body_html: "<p>Please read this.</p>"
+        body: "Please read this."
         categories: ["seed-v1 case-outlook_draft_reply-forward"]
       bind: {message_ref: "$1.messages[0].uri", to: ["$1.messages[1].sender.address"]}
 
@@ -275,7 +275,7 @@ outlook_draft_reply_all-everyone:
       args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
     - tool: outlook_draft_reply_all
       args:
-        body_html: "<p>Thanks to all.</p>"
+        body: "Thanks to all."
         categories: ["seed-v1 case-outlook_draft_reply_all-everyone"]
       bind: {message_ref: "$1.messages[0].uri"}
 
@@ -284,7 +284,7 @@ outlook_mark_mail-flag:
     - tool: outlook_list_mail
       args: {folder: inbox, category: seed-v1, limit: 1}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body_html: "<p>A draft to mark.</p>"}
+      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body: "A draft to mark."}
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_mark_mail
       args: {flagged: true, add_categories: [Website]}
@@ -324,7 +324,7 @@ outlook_send_draft-persona:
     - tool: outlook_list_mail
       args: {folder: inbox, category: seed-v1, limit: 1}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_send_draft-persona", body_html: "<p>Sent by the recorder.</p>"}
+      args: {subject: "seed-v1 case-outlook_send_draft-persona", body: "Sent by the recorder."}
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_send_draft
       bind: {message_ref: "$2.uri"}

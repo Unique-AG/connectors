@@ -412,7 +412,7 @@ class TestAgainstAnswersRecordedFromGraph:
 
         (only_reply,) = rows(listed, "messages")
         assert only_reply["uri"] == reply["uri"]
-        assert only_reply["body"] == "seed-v1 case-teams_list_message_replies-reply reply"
+        assert only_reply["body"] == "<p>seed-v1 case-teams_list_message_replies-reply reply</p>"
         assert only_reply["reply_to_id"] == post["message_id"]
         assert listed["more_replies"] is False
         assert uncalled(routes) == []

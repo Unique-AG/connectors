@@ -1,17 +1,17 @@
 {
   "attachments": [],
   "body": {
-    "content": "seed-v1 case-teams_send_channel_message-post hello team",
-    "contentType": "text"
+    "content": "<p>seed-v1 case-teams_send_channel_message-post hello team</p>",
+    "contentType": "html"
   },
   "channelIdentity": {
     "channelId": "19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2",
     "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
   },
   "chatId": null,
-  "createdDateTime": "2026-10-30T13:19:36.43Z",
+  "createdDateTime": "2026-11-02T08:50:12.275Z",
   "deletedDateTime": null,
-  "etag": "6178641100529",
+  "etag": "7238004944331",
   "eventDetail": null,
   "from": {
     "application": null,
@@ -24,10 +24,10 @@
       "userIdentityType": "aadUser"
     }
   },
-  "id": "6178641100529",
+  "id": "7238004944331",
   "importance": "normal",
   "lastEditedDateTime": null,
-  "lastModifiedDateTime": "2026-10-30T13:19:36.43Z",
+  "lastModifiedDateTime": "2026-11-02T08:50:12.275Z",
   "locale": "en-us",
   "mentions": [],
   "messageType": "message",
@@ -35,5 +35,5 @@
   "replyToId": null,
   "subject": null,
   "summary": null,
-  "webUrl": "https://teams.microsoft.com/synthetic%20text%2006/synthetic%20text%2007/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/6178641100529"
+  "webUrl": "https://teams.microsoft.com/synthetic%20text%2006/synthetic%20text%2007/19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2/7238004944331"
 }

@@ -1496,7 +1496,7 @@ class TestAgainstAnswersRecordedFromGraph:
             "outlook_draft_mail",
             to=[sender["address"]],
             subject=_FLAGGED_DRAFT,
-            body_html="<p>A draft to mark.</p>",
+            body="A draft to mark.",
         )
 
         marked = await call(

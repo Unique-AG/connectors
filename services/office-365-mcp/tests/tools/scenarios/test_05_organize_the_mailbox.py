@@ -1185,7 +1185,7 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
             "outlook_draft_reply",
             message_ref=_Q3_MESSAGE,
             mode="reply",
-            body_html="<p>I will sign it on Friday.</p>",
+            body="I will sign it on Friday.",
         )
         moved = await call("outlook_move_mail", message_refs=[_Q3_MESSAGE], destination="archive")
 
@@ -1213,7 +1213,7 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
             "outlook_draft_mail",
             to=["tom@example.test"],
             subject="Invoice filed",
-            body_html="<p>The invoice is filed in Finance.</p>",
+            body="The invoice is filed in Finance.",
         )
 
         assert (moved["moved_count"], moved["destination"]) == (1, "Finance")

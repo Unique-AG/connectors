@@ -1078,7 +1078,7 @@ class TestAgainstAnswersRecordedFromGraph:
         post = await post_in_seed_channel("seed-v1 case-teams_send_channel_message-post hello team")
 
         assert post["team_id"] == "00000000-e7a0-41c6-863d-0548ee2dacdd"
-        assert post["body"] == "seed-v1 case-teams_send_channel_message-post hello team"
+        assert post["body"] == "<p>seed-v1 case-teams_send_channel_message-post hello team</p>"
         assert post["reply_to_id"] is None
         assert was_sent(routes, "POST", f"/channels/{post['channel_id']}/messages")
         assert uncalled(routes) == []

@@ -2,7 +2,7 @@ scenario: teams_send_chat_message-group
 fixture: rec-tool-teams_send_chat_message-group
 source: recorded
 target: graph
-recorded_at: '2026-10-30T13:42:55+00:00'
+recorded_at: '2026-11-02T08:50:41+00:00'
 scrub_version: 1.0.0
 replacements:
   hosts replaced: 1
@@ -26,4 +26,4 @@ sdk_versions:
   msgraph-core: 1.5.2
   microsoft-kiota-http: 1.14.2
   httpx: 0.28.1
-  fastmcp: 4.1.3
+  fastmcp: 4.1.4

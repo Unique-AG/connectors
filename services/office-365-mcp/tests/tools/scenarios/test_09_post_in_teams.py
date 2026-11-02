@@ -289,14 +289,16 @@ class TestAMessageIsPostedAfterMiaApproves:
         assert _uncalled(routes) == []
         assert THREAD_REPLY in mia.asked[1]
         assert reply["reply_to_id"] == post["message_id"]
-        assert [message["body"] for message in _rows(thread["messages"])] == [THREAD_REPLY]
+        assert [message["body"] for message in _rows(thread["messages"])] == [
+            f"<p>{THREAD_REPLY}</p>"
+        ]
         channel_path = f"/teams/{channel['team_id']}/channels/{channel['channel_id']}/messages"
         assert _request_body(routes[("POST", f"{channel_path}/{post['message_id']}/replies")])[
             "body"
-        ] == {"contentType": "text", "content": THREAD_REPLY}
+        ] == {"contentType": "html", "content": f"<p>{THREAD_REPLY}</p>"}
         assert (
             cast("Row", _request_body(routes[("POST", channel_path)])["body"])["content"]
-            == THREAD_POST
+            == f"<p>{THREAD_POST}</p>"
         )
 
     async def test_it_makes_a_new_top_level_post_after_mia_approves_it(
@@ -311,11 +313,11 @@ class TestAMessageIsPostedAfterMiaApproves:
         assert _uncalled(routes) == []
         assert len(mia.asked) == 1 and HELLO_TEAM in mia.asked[0]
         assert sent["reply_to_id"] is None
-        assert sent["body"] == HELLO_TEAM
+        assert sent["body"] == f"<p>{HELLO_TEAM}</p>"
         posted = routes[
             ("POST", f"/teams/{channel['team_id']}/channels/{channel['channel_id']}/messages")
         ]
-        assert cast("Row", _request_body(posted)["body"])["content"] == HELLO_TEAM
+        assert cast("Row", _request_body(posted)["body"])["content"] == f"<p>{HELLO_TEAM}</p>"
 
     async def test_it_attaches_a_file_that_is_in_sharepoint_to_a_channel_post(
         self, graph: respx.MockRouter
@@ -337,7 +339,7 @@ class TestAMessageIsPostedAfterMiaApproves:
         assert attachment["contentUrl"] == f"{SITE}/Q3%20Plan.pptx"
         assert _request_body(post)["body"] == {
             "contentType": "html",
-            "content": f'v2 ships on Friday <attachment id="{DECK_GUID}"></attachment>',
+            "content": f'<p>v2 ships on Friday</p> <attachment id="{DECK_GUID}"></attachment>',
         }
 
     async def test_it_attaches_a_file_that_is_in_sharepoint_to_a_chat_message(
@@ -357,7 +359,7 @@ class TestAMessageIsPostedAfterMiaApproves:
         assert attachment["contentUrl"] == f"{SITE}/Q3%20Plan.pptx"
         assert _request_body(post)["body"] == {
             "contentType": "html",
-            "content": f'The build is green <attachment id="{DECK_GUID}"></attachment>',
+            "content": f'<p>The build is green</p> <attachment id="{DECK_GUID}"></attachment>',
         }
 
     async def test_it_does_not_post_a_file_that_is_in_a_personal_onedrive(

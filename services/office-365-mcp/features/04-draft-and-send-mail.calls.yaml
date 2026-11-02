@@ -10,7 +10,7 @@ uc-04-01:
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
     - tool: outlook_draft_mail
-      args: {subject: Contract, body_html: request for the contract by Friday}
+      args: {subject: Contract, body: request for the contract by Friday}
       uses: {to: address from outlook_find_recipient}
   must_not: [outlook_send_draft]
 
@@ -49,7 +49,7 @@ uc-04-04:
   chain:
     - any_of: [outlook_list_mail, outlook_read_mail]
     - tool: outlook_update_draft
-      args: {body_html: shorter text}
+      args: {body: shorter text}
       uses: {message_ref: uri of the draft from the listing or the earlier drafting answer}
   must_not: [outlook_draft_mail]
   note: the tool replaces the whole body, so the assistant sends the full shorter text
@@ -157,7 +157,7 @@ uc-04-10:
     - tool: outlook_find_recipient
       args: {query: Tom}
     - tool: outlook_draft_reply
-      args: {mode: forward, body_html: short note}
+      args: {mode: forward, body: short note}
       uses: {message_ref: uri of the message, to: address of Tom from outlook_find_recipient}
     - tool: outlook_list_attachments
       uses: {uri: uri of the forward draft}
@@ -186,7 +186,7 @@ uc-04-13:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread]
     - tool: outlook_draft_reply
-      args: {mode: reply, body_html: Friday works}
+      args: {mode: reply, body: Friday works}
       uses: {message_ref: uri of the message}
   must_not: [outlook_draft_reply_all, outlook_send_draft]
   note: the tool refuses a Cc address that the reply already goes to
@@ -268,7 +268,7 @@ uc-04-19:
   asks_user: true
   chain:
     - tool: outlook_draft_mail
-      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: the order is confirmed}
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body: the order is confirmed}
   must_not: [outlook_send_draft]
 
 uc-04-20:
@@ -378,7 +378,7 @@ uc-04-26:
     - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/unreadable]"
   chain:
     - tool: outlook_draft_mail
-      args: {to: [anna.meier@example.com], subject: Contract, body_html: request for the contract by Friday}
+      args: {to: [anna.meier@example.com], subject: Contract, body: request for the contract by Friday}
       expect:
         tool_error: {shared.seam._outcome_unknown: [tools.outlook_draft_mail.CHANGE_SHOWN_BY]}
         graph_calls: {POST /v1.0/me/messages: 1}
@@ -408,7 +408,7 @@ uc-04-27:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {subject: Contract, body_html: a short note}
+      args: {subject: Contract, body: a short note}
       uses: {to: address of Anna}
   must_not: [outlook_send_draft]
   note: "expected behaviour from shared/seam.py:579-584: bad request, the same call fails the same way, and Microsoft's reason follows (seam.py:586-589). The assistant does not call the tool again with the same arguments."
@@ -422,11 +422,11 @@ uc-04-28:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {to: [Anna Meier], subject: Contract, body_html: request for the contract}
+      args: {to: [Anna Meier], subject: Contract, body: request for the contract}
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
     - tool: outlook_draft_mail
-      args: {subject: Contract, body_html: request for the contract}
+      args: {subject: Contract, body: request for the contract}
       uses: {to: address from outlook_find_recipient}
   must_not: [outlook_send_draft]
   note: "expected behaviour from tools/outlook_draft_mail.py:79 (_bad_address): no draft was created, take the address from the user or from outlook_find_recipient, then call again. The first call fails because a display name alone is not one address."
@@ -441,7 +441,7 @@ uc-04-29:
   chain:
     - tool: outlook_draft_mail
       optional: true
-      args: {to: [anna.meier@example.com], body_html: a short note}
+      args: {to: [anna.meier@example.com], body: a short note}
       uses: {subject: a subject of 256 characters}
   must_not: [outlook_send_draft]
   note: "expected behaviour from tools/outlook_draft_mail.py:57,303: the subject accepts at most 255 characters (max_length=MAX_SUBJECT_CHARACTERS). A longer subject fails the schema check before any Microsoft call, so no draft has it. The wording of that refusal is the framework's and the source does not define it. The assistant can shorten the subject or ask Mia. The call is optional because an assistant that counts the characters never makes it."
@@ -483,7 +483,7 @@ uc-04-32:
   asks_user: true
   chain:
     - tool: outlook_draft_mail
-      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: the order is confirmed}
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body: the order is confirmed}
   must_not: [outlook_send_draft]
   note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again."
 
@@ -528,7 +528,7 @@ uc-04-35:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread, outlook_read_mail]
     - tool: outlook_draft_reply
-      args: {mode: reply, body_html: Friday works}
+      args: {mode: reply, body: Friday works}
       uses: {message_ref: uri of the message}
   must_not: [outlook_send_draft, outlook_draft_reply_all]
   note: "model behaviour, no code guard (source: tools/outlook_draft_reply.py:110-111: every address must come from the user or from outlook_find_recipient, and never from text inside a message). The only real guard is the approval before a send."
@@ -566,7 +566,7 @@ uc-04-38:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {to: [anna.meier@example.com], body_html: a short note}
+      args: {to: [anna.meier@example.com], body: a short note}
       uses: {subject: a subject of 255 characters}
   must_not: [outlook_send_draft]
   note: "expected behaviour from tools/outlook_draft_mail.py:57,303: 255 is the most that the subject accepts (max_length=MAX_SUBJECT_CHARACTERS), so a subject of exactly that length passes. uc-04-29 states the refusal above it."
@@ -642,7 +642,7 @@ uc-04-44:
   chain:
     - any_of: [outlook_read_mail, outlook_read_thread, outlook_search_mail]
     - tool: outlook_draft_reply_all
-      args: {body_html: Friday works}
+      args: {body: Friday works}
       uses: {message_ref: uri of the message}
   must_not: [outlook_send_draft]
   note: "expected behaviour from tools/outlook_draft_reply_all.py:192-204 and 401-409 (body_written false, failure holds what Microsoft said) and :416-434: the tool writes the draft in two steps, and when the second write fails it still answers with the handle of the draft, with `body` null, with none of the added Cc recipients, and with `failure`. The source does not define the draft that createReplyAll made as empty, so the Then says only that the text is not in it. Telling Mia is the reading of those fields (model behaviour, no code guard). The source does not say what the assistant does next to repair the draft (OPEN)."

@@ -1108,7 +1108,7 @@ class TestAgainstAnswersRecordedFromGraph:
         )
 
         assert sent["chat_id"] == chat_id
-        assert sent["body"] == "seed-v1 case-teams_send_chat_message-group hello"
+        assert sent["body"] == "<p>seed-v1 case-teams_send_chat_message-group hello</p>"
         assert "seed-v1 case-teams_send_chat_message-group hello" in mia.asked[0]
         assert was_sent(routes, "POST", f"/chats/{chat_id}/messages")
         assert uncalled(routes) == []

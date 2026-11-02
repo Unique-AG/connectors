@@ -86,7 +86,7 @@ class TestADraftGoesToTheRealAddressOfTheRightPerson:
             to=[address],
             cc=["tom@example.test"],
             subject="Contract",
-            body_html="<p>Please send me the contract by Friday.</p>",
+            body="Please send me the contract by Friday.",
             importance="high",
             categories=["Contracts"],
         )
@@ -161,12 +161,10 @@ class TestADraftChangesUntilMiaApproves:
             "outlook_draft_mail",
             to=[_ANNA],
             subject="Contract",
-            body_html="<p>A long text of four paragraphs.</p>",
+            body="A long text of four paragraphs.",
         )
 
-        _ = await call(
-            "outlook_update_draft", message_ref=draft["uri"], body_html="<p>The short text.</p>"
-        )
+        _ = await call("outlook_update_draft", message_ref=draft["uri"], body="The short text.")
 
         patched = sent_json(
             graph, "PATCH", cast("str", draft["uri"])[len("outlook:///messages/") :]
@@ -178,9 +176,7 @@ class TestADraftChangesUntilMiaApproves:
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_update_draft-basic")
-        draft = await call(
-            "outlook_draft_mail", to=[_ANNA], subject="Contract", body_html="<p>Text.</p>"
-        )
+        draft = await call("outlook_draft_mail", to=[_ANNA], subject="Contract", body="Text.")
 
         advice = await advice_for("outlook_update_draft", message_ref=draft["uri"], cc=[_ANNA])
 
@@ -199,7 +195,7 @@ class TestADraftChangesUntilMiaApproves:
             "outlook_draft_mail",
             to=[_ANNA, "priya@example.test"],
             subject="Contract",
-            body_html="<p>Text.</p>",
+            body="Text.",
         )
 
         _ = await call(
@@ -305,7 +301,7 @@ class TestADraftInASharedMailbox:
                 "mailbox": "support@example.com",
                 "to": ["customer@acme.example"],
                 "subject": "Your order",
-                "body_html": "<p>The order is confirmed.</p>",
+                "body": "The order is confirmed.",
             },
             person=person,
         )
@@ -332,7 +328,7 @@ class TestADraftInASharedMailbox:
                 "mailbox": "support@example.com",
                 "to": ["customer@acme.example"],
                 "subject": "Your order",
-                "body_html": "<p>The order is confirmed.</p>",
+                "body": "The order is confirmed.",
             },
             person=Person(approval=approval),
         )
@@ -348,7 +344,7 @@ class TestAReplyKeepsTheConversation:
         _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
 
         draft = await call(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Thanks to all.</p>"
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Thanks to all."
         )
 
         assert _addresses(draft) + _addresses(draft, "cc") == [_ANNA, "tom@example.test"]
@@ -366,7 +362,7 @@ class TestAReplyKeepsTheConversation:
             "outlook_draft_reply",
             message_ref=_Q3_MESSAGE,
             mode="reply",
-            body_html="<p>Friday works.</p>",
+            body="Friday works.",
         )
 
         assert _addresses(draft) == [_ANNA]
@@ -389,7 +385,7 @@ class TestAReplyKeepsTheConversation:
             message_ref=_Q3_MESSAGE,
             mode="forward",
             to=["tom@example.test"],
-            body_html="<p>Please read this.</p>",
+            body="Please read this.",
         )
         forward_id = cast("str", forward["uri"]).removeprefix("outlook:///messages/")
         _ = graph.get(f"/me/messages/{forward_id}/attachments").mock(
@@ -420,7 +416,7 @@ class TestAReplyKeepsTheConversation:
             message_ref=_Q3_MESSAGE,
             mode="reply",
             to=["outsider@example.net"],
-            body_html="<p>Friday works.</p>",
+            body="Friday works.",
         )
 
         assert "takes no `to` on a reply" in advice
@@ -549,7 +545,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         )
 
         advice = await advice_for(
-            "outlook_draft_mail", to=[_ANNA], subject="Contract", body_html="<p>Text.</p>"
+            "outlook_draft_mail", to=[_ANNA], subject="Contract", body="Text."
         )
 
         assert "One of the recipients is not valid." in advice
@@ -561,12 +557,12 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         [
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA], "subject": "Contract", "body_html": "<p>Text.</p>"},
+                {"to": [_ANNA], "subject": "Contract", "body": "Text."},
                 "/me/messages",
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "body_html": "<p>Friday works.</p>"},
+                {"message_ref": _Q3_MESSAGE, "body": "Friday works."},
                 f"/me/messages/{_Q3_MESSAGE_ID}/createReplyAll",
             ),
         ],
@@ -622,7 +618,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         )
 
         advice = await advice_for(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works."
         )
 
         assert "This tool created no draft" in advice
@@ -644,7 +640,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         create = graph.post(path).mock(side_effect=[failure])
 
         advice = await advice_for(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works."
         )
 
         assert "does not know if Microsoft 365 made the change" in advice
@@ -663,9 +659,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
             )
         )
 
-        draft = await call(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
-        )
+        draft = await call("outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works.")
 
         assert draft["body_written"] is False
         assert draft["body"] is None
@@ -684,13 +678,13 @@ class TestAWrongValueChangesNothing:
             "outlook_draft_mail",
             to=[_ANNA_MEIER],
             subject="Contract",
-            body_html="<p>Please send the contract.</p>",
+            body="Please send the contract.",
         )
         made = await call(
             "outlook_draft_mail",
             to=[_ANNA],
             subject="Contract",
-            body_html="<p>Please send the contract.</p>",
+            body="Please send the contract.",
         )
 
         assert "is not one email address" in refused
@@ -701,9 +695,7 @@ class TestAWrongValueChangesNothing:
     async def test_a_subject_of_256_characters_creates_no_draft(
         self, graph: respx.MockRouter
     ) -> None:
-        advice = await advice_for(
-            "outlook_draft_mail", to=[_ANNA], subject="s" * 256, body_html="<p>Text.</p>"
-        )
+        advice = await advice_for("outlook_draft_mail", to=[_ANNA], subject="s" * 256, body="Text.")
 
         assert "255" in advice
         assert graph.calls.call_count == 0
@@ -711,9 +703,7 @@ class TestAWrongValueChangesNothing:
     async def test_a_subject_of_255_characters_is_kept(self, graph: respx.MockRouter) -> None:
         _ = serve(graph, "rec-tool-outlook_draft_mail-basic")
 
-        _ = await call(
-            "outlook_draft_mail", to=[_ANNA], subject="s" * 255, body_html="<p>Text.</p>"
-        )
+        _ = await call("outlook_draft_mail", to=[_ANNA], subject="s" * 255, body="Text.")
 
         assert sent_json(graph, "POST", "/me/messages")["subject"] == "s" * 255
 

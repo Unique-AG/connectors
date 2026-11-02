@@ -5,7 +5,7 @@
     "json": {
       "@odata.type": "#microsoft.graph.message",
       "body": {
-        "content": "request for the contract by Friday",
+        "content": "<p>request for the contract by Friday</p>",
         "contentType": "html"
       },
       "ccRecipients": [],
