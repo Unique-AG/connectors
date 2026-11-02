@@ -5,6 +5,9 @@ from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp_types import ToolAnnotations
 from pydantic import Field
+from unique_mcp.meta.context_requirements import ContextRequirements
+from unique_mcp.meta.keys import MetaKeys
+from unique_mcp.meta.part import merge_tool_meta
 import unique_sdk
 
 from space_config_mcp import contexts
@@ -24,9 +27,12 @@ from space_config_mcp.shared import PiAgentThinkingLevel
 from space_config_mcp.shared import SpaceConfigError
 from space_config_mcp.upstream import Upstream
 
+_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
+
 
 @tool(
     title="List Modules",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def list_modules(
@@ -44,6 +50,7 @@ async def list_modules(
 
 @tool(
     title="Get Module",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def get_module(
@@ -61,6 +68,7 @@ async def get_module(
 
 @tool(
     title="Update Module Config",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def update_module_config(
@@ -92,6 +100,7 @@ async def update_module_config(
 
 @tool(
     title="Get Conduct Config",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def get_conduct_config(
@@ -116,6 +125,7 @@ async def get_conduct_config(
 
 @tool(
     title="Update Conduct Config",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=True),
 )
 async def update_conduct_config(  # noqa: PLR0913

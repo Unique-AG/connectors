@@ -4,6 +4,9 @@ from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
 from mcp_types import ToolAnnotations
 from pydantic import Field
+from unique_mcp.meta.context_requirements import ContextRequirements
+from unique_mcp.meta.keys import MetaKeys
+from unique_mcp.meta.part import merge_tool_meta
 import unique_sdk
 
 from space_config_mcp import contexts
@@ -11,9 +14,12 @@ from space_config_mcp.mcp.dependencies import get_caller
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.upstream import Upstream
 
+_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
+
 
 @tool(
     title="Get Space Access",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def get_space_access(
@@ -31,6 +37,7 @@ async def get_space_access(
 
 @tool(
     title="Add Space Access",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def add_space_access(
@@ -57,6 +64,7 @@ async def add_space_access(
 
 @tool(
     title="Delete Space Access",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=True),
 )
 async def delete_space_access(

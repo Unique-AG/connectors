@@ -5,6 +5,9 @@ from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp_types import ToolAnnotations
 from pydantic import Field
+from unique_mcp.meta.context_requirements import ContextRequirements
+from unique_mcp.meta.keys import MetaKeys
+from unique_mcp.meta.part import merge_tool_meta
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
@@ -14,9 +17,12 @@ from space_config_mcp.persistence import Persistence
 from space_config_mcp.shared import SpaceConfigError
 from space_config_mcp.upstream import Upstream
 
+_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
+
 
 @tool(
     title="Snapshot Space",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def snapshot_space(
@@ -48,6 +54,7 @@ async def snapshot_space(
 
 @tool(
     title="List Snapshots",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def list_snapshots(
@@ -72,6 +79,7 @@ async def list_snapshots(
 
 @tool(
     title="Get Snapshot",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def get_snapshot(
@@ -101,6 +109,7 @@ async def get_snapshot(
 
 @tool(
     title="Revert Space",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def revert_space(
@@ -132,6 +141,7 @@ async def revert_space(
 
 @tool(
     title="Export Space Config",
+    meta=_META,
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
 async def export_space_config(
@@ -152,6 +162,7 @@ async def export_space_config(
 
 @tool(
     title="Import Space Config",
+    meta=_META,
     annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def import_space_config(
