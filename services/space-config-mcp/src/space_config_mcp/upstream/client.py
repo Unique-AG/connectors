@@ -14,10 +14,6 @@ class UpstreamError(ToolError):
 class Upstream:
     """Thin async wrapper around unique_sdk Space and Module API resources."""
 
-    def __init__(self, settings: UpstreamSettings) -> None:
-        self._service_user_id: str | None = settings.service_user_id
-        self._service_company_id: str | None = settings.service_company_id
-
     async def get_spaces(
         self,
         user_id: str,
@@ -125,4 +121,4 @@ async def open_upstream(
     unique_sdk.api_key = settings.unique_api_key.get_secret_value()
     unique_sdk.app_id = settings.unique_app_id
     unique_sdk.api_base = settings.unique_api_base
-    yield Upstream(settings)
+    yield Upstream()

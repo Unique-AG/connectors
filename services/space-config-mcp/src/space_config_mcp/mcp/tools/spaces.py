@@ -8,6 +8,7 @@ from pydantic import Field
 import unique_sdk
 
 from space_config_mcp import contexts
+from space_config_mcp.mcp.dependencies import get_caller
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.upstream import Upstream
 
@@ -18,8 +19,6 @@ from space_config_mcp.upstream import Upstream
 )
 async def list_spaces(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     name: Annotated[
         str | None, Field(description="Optional case-insensitive partial name filter.")
     ] = None,
@@ -28,8 +27,10 @@ async def list_spaces(
         int, Field(description="Maximum number of records to return.", ge=1, le=1000)
     ] = 20,
     upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> unique_sdk.Space.Spaces:
     """List Unique AI spaces. Optionally filter by name substring."""
+    user_id, company_id = caller
     return await contexts.list_spaces(
         upstream=upstream, user_id=user_id, company_id=company_id, name=name, skip=skip, take=take
     )
@@ -41,12 +42,12 @@ async def list_spaces(
 )
 async def get_space(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to retrieve.")],
     upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> unique_sdk.Space:
     """Get full space configuration: metadata, modules, scope rules, MCP servers, and access."""
+    user_id, company_id = caller
     return await contexts.get_space(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
     )
@@ -58,8 +59,6 @@ async def get_space(
 )
 async def update_space(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to update.")],
     name: Annotated[str | None, Field(description="New display name for the space.")] = None,
     explanation: Annotated[
@@ -82,8 +81,10 @@ async def update_space(
         Field(description="Arbitrary settings dict merged at space level."),
     ] = None,
     upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> unique_sdk.Space:
     """Update space metadata. Only the fields you provide are changed."""
+    user_id, company_id = caller
     try:
         return await contexts.update_space(
             upstream=upstream,
