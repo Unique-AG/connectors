@@ -55,6 +55,39 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Case"}
+  /flags/{enabled}:
+    put:
+      operationId: setFlag
+      parameters:
+        - {name: enabled, in: path, required: true, schema: {type: boolean}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Case"}
+  /reports/{ids}:
+    get:
+      operationId: getReports
+      parameters:
+        - {name: ids, in: path, required: true, schema: {type: array, items: {type: integer}}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Case"}
+  /lookup:
+    get:
+      operationId: lookupCases
+      parameters:
+        - {name: where, in: query, schema: {$ref: "#/components/schemas/Where"}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Case"}
   /search:
     get:
       operationId: searchCases
@@ -86,7 +119,14 @@ components:
       properties: {caseId: {type: string}, caseName: {type: string}}
     CaseUpdate:
       type: object
-      properties: {caseName: {type: string}, note: {type: string}}
+      required: [version]
+      properties:
+        caseName: {type: string}
+        note: {type: string, nullable: true}
+        version: {type: integer, readOnly: true}
+    Where:
+      type: object
+      properties: {caseName: {type: string}}
 """
 
 
@@ -105,7 +145,7 @@ def model(module: ModuleType, name: str) -> type[BaseModel]:
     return cast(type[BaseModel], getattr(module, name))
 
 
-def sent_by(request_model: type[BaseModel], request: BaseModel, **headers: str) -> httpx2.Request:
+def sent_by(operation_id: str, request: BaseModel, **headers: str) -> httpx2.Request:
     seen: list[httpx2.Request] = []
 
     def handler(sent: httpx2.Request) -> httpx2.Response:
@@ -116,21 +156,22 @@ def sent_by(request_model: type[BaseModel], request: BaseModel, **headers: str) 
         base_url="https://upstream.example/v3", transport=httpx2.MockTransport(handler)
     )
     client = OperationClient(cast(dict[str, object], yaml.safe_load(SPEC)), http)
-    operation = Operation("updateCase", TypeAdapter(dict[str, object]), request_model)
+    operation = Operation[dict[str, object], BaseModel](
+        operation_id, TypeAdapter(dict[str, object])
+    )
     asyncio.run(client.call(operation, request, headers=headers or None))
     return seen[0]
 
 
 def test_a_request_takes_snake_case_names_and_sends_the_spec_names(tmp_path: Path) -> None:
     generated = requests_for(tmp_path, ["updateCase"])
-    request_model = model(generated, "UpdateCaseRequest")
-    request = request_model(
+    request = model(generated, "UpdateCaseRequest")(
         path=model(generated, "UpdateCasePath")(case_id="a/b"),
         query=model(generated, "UpdateCaseQuery")(screen_mode="SYNC", tags=["x", "y"]),
         body=model(generated, "CaseUpdate")(case_name="n"),
     )
 
-    sent = sent_by(request_model, request, **{"X-Trace": "t1"})
+    sent = sent_by("updateCase", request, **{"X-Trace": "t1"})
 
     assert (sent.method, sent.url.raw_path) == (
         "PATCH",
@@ -142,15 +183,41 @@ def test_a_request_takes_snake_case_names_and_sends_the_spec_names(tmp_path: Pat
 
 def test_a_required_body_whose_fields_are_all_optional_is_sent_empty(tmp_path: Path) -> None:
     generated = requests_for(tmp_path, ["updateCase"])
-    request_model = model(generated, "UpdateCaseRequest")
-    request = request_model(
+    request = model(generated, "UpdateCaseRequest")(
         path=model(generated, "UpdateCasePath")(case_id="c"), body=model(generated, "CaseUpdate")()
     )
 
-    sent = sent_by(request_model, request)
+    sent = sent_by("updateCase", request)
 
     assert sent.url.raw_path == b"/v3/cases/c"
     assert json.loads(sent.content) == {}
+
+
+def test_a_body_field_set_to_none_is_sent_as_null(tmp_path: Path) -> None:
+    generated = requests_for(tmp_path, ["updateCase"])
+    request = model(generated, "UpdateCaseRequest")(
+        path=model(generated, "UpdateCasePath")(case_id="c"),
+        query=model(generated, "UpdateCaseQuery")(screen_mode=None),
+        body=model(generated, "CaseUpdate")(note=None),
+    )
+
+    sent = sent_by("updateCase", request)
+
+    assert sent.url.raw_path == b"/v3/cases/c"
+    assert json.loads(sent.content) == {"note": None}
+
+
+def test_a_request_body_leaves_out_the_read_only_fields(tmp_path: Path) -> None:
+    case_update = model(requests_for(tmp_path, ["updateCase"]), "CaseUpdate")
+
+    assert set(case_update.model_fields) == {"case_name", "note"}
+
+
+def test_a_boolean_path_parameter_is_sent_in_lowercase(tmp_path: Path) -> None:
+    generated = requests_for(tmp_path, ["setFlag"])
+    request = model(generated, "SetFlagRequest")(path=model(generated, "SetFlagPath")(enabled=True))
+
+    assert sent_by("setFlag", request).url.raw_path == b"/v3/flags/true"
 
 
 def test_a_request_needs_its_path_and_its_required_body(tmp_path: Path) -> None:
@@ -171,17 +238,40 @@ def test_a_body_written_in_place_gets_a_model_that_keeps_the_spec_bounds(tmp_pat
 
 
 @pytest.mark.parametrize(
-    ("operation_id", "problem"),
+    ("operation_id", "reason"),
     [
-        ("searchCases", r"searchCases: query parameters \['filter'\] use a style call cannot send"),
-        ("uploadFile", "uploadFile: the request body is not JSON"),
+        ("searchCases", "the query parameter filter uses the deepObject style"),
+        ("getReports", "the path parameter ids is not a single value"),
+        ("lookupCases", "the query parameter where is not a single value or a list of them"),
+        ("uploadFile", "the request body is not JSON"),
     ],
 )
-def test_an_operation_the_typed_call_cannot_send_is_refused(
-    tmp_path: Path, operation_id: str, problem: str
+def test_an_operation_the_typed_call_cannot_send_gets_no_request_model(
+    tmp_path: Path, operation_id: str, reason: str
 ) -> None:
-    with pytest.raises(ValueError, match=problem):
-        requests_for(tmp_path, [operation_id])
+    spec = tmp_path / "spec.yml"
+    spec.write_text(SPEC)
+    output = tmp_path / "requests.py"
+
+    untyped = generate_request_models(
+        spec_path=spec, operation_ids=["updateCase", operation_id], output=output
+    )
+
+    assert untyped == {operation_id: reason}
+    generated = output.read_text()
+    assert "class UpdateCaseRequest(BaseModel):" in generated
+    assert f"class {operation_id[0].upper()}{operation_id[1:]}Request(" not in generated
+
+
+def test_a_requests_module_without_a_typed_operation_is_still_written(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(SPEC)
+    output = tmp_path / "requests.py"
+
+    untyped = generate_request_models(spec_path=spec, operation_ids=["uploadFile"], output=output)
+
+    assert untyped == {"uploadFile": "the request body is not JSON"}
+    assert output.read_text().startswith("# generated by mcp_openapi.codegen")
 
 
 def test_each_operation_constant_carries_its_request_model(tmp_path: Path) -> None:
@@ -191,7 +281,7 @@ def test_each_operation_constant_carries_its_request_model(tmp_path: Path) -> No
 
     generate_operations(
         spec_path=spec,
-        operation_ids=["updateCase"],
+        operation_ids=["updateCase", "uploadFile"],
         operation_module="mcp_openapi.upstream",
         models_module="models",
         requests_module="requests",
@@ -200,20 +290,32 @@ def test_each_operation_constant_carries_its_request_model(tmp_path: Path) -> No
 
     generated = output.read_text()
     assert (
-        'UPDATE_CASE = Operation[Case, UpdateCaseRequest]("updateCase", TypeAdapter(Case), '
-        "UpdateCaseRequest)"
+        'UPDATE_CASE = Operation[Case, UpdateCaseRequest]("updateCase", TypeAdapter(Case))\n'
+    ) in generated
+    assert (
+        "# call_untyped only: the request body is not JSON\n"
+        'UPLOAD_FILE = Operation[Case]("uploadFile", TypeAdapter(Case))\n'
     ) in generated
     assert "from requests import UpdateCaseRequest\n" in generated
 
 
-def test_the_type_check_rejects_a_wrong_field_and_a_missing_body(tmp_path: Path) -> None:
+def test_the_type_check_rejects_a_wrong_field_a_missing_body_and_another_request(
+    tmp_path: Path,
+) -> None:
     requests_for(tmp_path, ["updateCase"])
     usage = [
+        "from mcp_openapi.upstream import Operation, OperationClient",
+        "from pydantic import TypeAdapter",
         "from requests import CaseUpdate, UpdateCasePath, UpdateCaseRequest",
+        "",
+        'UPDATE_CASE = Operation[object, UpdateCaseRequest]("updateCase", TypeAdapter(object))',
         "",
         'UpdateCaseRequest(path=UpdateCasePath(case_id="c"), body=CaseUpdate())',
         'UpdateCaseRequest(path=UpdateCasePath(case_id="c"))',
         'UpdateCasePath(caseId="c")',
+        "",
+        "async def call_with_another_request(upstream: OperationClient) -> None:",
+        "    _ = await upstream.call(UPDATE_CASE, CaseUpdate())",
     ]
     (tmp_path / "usage.py").write_text("\n".join([*usage, ""]))
 
@@ -228,9 +330,13 @@ def test_the_type_check_rejects_a_wrong_field_and_a_missing_body(tmp_path: Path)
     errors = [
         line for line in checked.stdout.splitlines() if "usage.py:" in line and "error" in line
     ]
-    assert len(errors) == 3, checked.stdout
-    assert 'usage.py:4:1 - error: Argument missing for parameter "body"' in checked.stdout
-    assert 'usage.py:5:16 - error: No parameter named "caseId"' in checked.stdout
+    assert len(errors) == 4, checked.stdout
+    assert 'usage.py:8:1 - error: Argument missing for parameter "body"' in checked.stdout
+    assert 'usage.py:9:16 - error: No parameter named "caseId"' in checked.stdout
+    assert any(
+        "usage.py:12:" in line and 'cannot be assigned to parameter "operation"' in line
+        for line in errors
+    ), checked.stdout
 
 
 def test_the_requests_module_and_its_output_are_configured_together() -> None:

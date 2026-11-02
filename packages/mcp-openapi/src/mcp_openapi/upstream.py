@@ -3,7 +3,7 @@ import re
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import cast
+from typing import Generic, TypeVar, cast
 from urllib.parse import quote
 
 import httpx2
@@ -32,15 +32,20 @@ class LockTimeoutError(UpstreamError):
     """The lock of the `LockConfig` was not acquired within its timeout."""
 
 
+_T = TypeVar("_T")
+# Declared invariant: the class never uses `R`, so the inferred variance would be covariant, and
+# `call` would then accept the request model of any operation.
+_R = TypeVar("_R", default=None)
+
+
 @dataclass(frozen=True)
-class Operation[T, R = None]:
-    """An operationId, the type its response is parsed into, and the `<Operation>Request` model
-    the typed `call` takes. An operation written by hand has no request model, so only
-    `call_untyped` calls it."""
+class Operation(Generic[_T, _R]):
+    """An operationId and the type its response is parsed into. The second type argument is the
+    `<Operation>Request` model the typed `call` takes. It is None for an operation written by
+    hand, which only `call_untyped` calls."""
 
     operation_id: str
-    adapter: TypeAdapter[T]
-    request: type[R] | None = None
+    adapter: TypeAdapter[_T]
 
 
 class OperationClient:
@@ -78,20 +83,25 @@ class OperationClient:
         """Call an operation with its generated `<Operation>Request`, whose `path`, `query` and
         `body` the type check verifies. Use it for every operation the spec gets right.
 
-        Fields left as None are not sent. `headers` carries what the client does not set itself.
+        A query parameter left as None is not sent. The body sends the fields that were set, so
+        one set to None is sent as null. `headers` carries what the client does not set itself.
         UpstreamError on HTTP or body problems.
         """
         route = self._route(operation)
-        parts = cast(
-            dict[str, object], request.model_dump(mode="json", by_alias=True, exclude_none=True)
+        parameters = cast(
+            dict[str, dict[str, object]],
+            request.model_dump(mode="json", by_alias=True, exclude_none=True, exclude={"body"}),
         )
-        values = cast(dict[str, object], parts.get("path", {}))
-        path = _PATH_PARAMETER.sub(lambda name: quote(str(values[name[1]]), safe=""), route.path)
+        values = parameters.get("path", {})
+        missing = set(_PATH_PARAMETER.findall(route.path)) - values.keys()
+        assert not missing, f"{operation.operation_id}: no value for path {sorted(missing)}"
+        path = _PATH_PARAMETER.sub(lambda name: _path_segment(values[name[1]]), route.path)
+        body = request.model_dump(mode="json", by_alias=True, exclude_unset=True, include={"body"})
         built = self._http.build_request(
             route.method,
             path,
-            params=cast(dict[str, _QueryValue], parts.get("query")) or None,
-            json=parts.get("body"),
+            params=cast(dict[str, _QueryValue], parameters.get("query")) or None,
+            json=cast(dict[str, object], body).get("body"),
             headers=headers,
         )
         return self._parse(operation.adapter, await self._send(built))
@@ -202,6 +212,13 @@ class OperationClient:
 
 
 _PATH_PARAMETER = re.compile(r"\{([^}]+)\}")
+
+
+def _path_segment(value: object) -> str:
+    text = str(value).lower() if isinstance(value, bool) else str(value)
+    return quote(text, safe="")
+
+
 # What a query parameter dumps to in JSON mode: a value, or a list of them sent repeated.
 type _Scalar = str | int | float | bool | None
 type _QueryValue = _Scalar | list[_Scalar]
