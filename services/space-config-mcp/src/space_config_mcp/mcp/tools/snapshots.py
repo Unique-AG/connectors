@@ -30,7 +30,11 @@ async def snapshot_space(
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
 ) -> dict[str, str]:
-    """Capture the full space configuration as a named JSON snapshot. Returns snapshot_id."""
+    """Capture the full space configuration as a named JSON snapshot stored in the knowledge base.
+
+    Returns snapshot_id for later revert. Snapshots are point-in-time captures:
+    config changes made through the portal since the last snapshot are not reflected.
+    """
     return await contexts.snapshot_space(
         upstream=upstream,
         persistence=persistence,
@@ -45,30 +49,51 @@ async def snapshot_space(
     title="List Snapshots",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
-def list_snapshots(
+async def list_snapshots(
     *,
-    space_id: Annotated[
-        str | None,
-        Field(description="Filter snapshots to this space ID. Omit to list all."),
-    ] = None,
+    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
+    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
+    space_id: Annotated[str, Field(description="ID of the space to list snapshots for.")],
     persistence: Persistence = Depends(get_persistence),
 ) -> list[dict[str, object]]:
-    """List stored snapshots, sorted newest first. Optionally filter by space_id."""
-    return contexts.list_snapshots(persistence=persistence, space_id=space_id)
+    """List snapshots for a space stored in the knowledge base, newest first.
+
+    Only shows snapshots created by this MCP. Config changes made in the
+    portal since the last snapshot are not reflected.
+    """
+    return await contexts.list_snapshots(
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+    )
 
 
 @tool(
     title="Get Snapshot",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
 )
-def get_snapshot(
+async def get_snapshot(
     *,
+    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
+    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
+    space_id: Annotated[str, Field(description="ID of the space the snapshot belongs to.")],
     snapshot_id: Annotated[str, Field(description="ID of the snapshot to retrieve.")],
     persistence: Persistence = Depends(get_persistence),
 ) -> dict[str, object]:
-    """Return the full JSON content of a stored snapshot."""
+    """Return the full JSON content of a stored snapshot.
+
+    Snapshots reflect the space config at the time snapshot_space was called.
+    Changes made through the portal since then are not included.
+    """
     try:
-        return contexts.get_snapshot(persistence=persistence, snapshot_id=snapshot_id)
+        return await contexts.get_snapshot(
+            persistence=persistence,
+            user_id=user_id,
+            company_id=company_id,
+            space_id=space_id,
+            snapshot_id=snapshot_id,
+        )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
 
@@ -81,11 +106,16 @@ async def revert_space(
     *,
     user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
     company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
+    space_id: Annotated[str, Field(description="ID of the space to revert.")],
     snapshot_id: Annotated[str, Field(description="ID of the snapshot to restore from.")],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
 ) -> dict[str, object]:
-    """Restore a space to a prior snapshot. Auto-snapshots current state first."""
+    """Restore a space to a prior snapshot. Auto-snapshots current state first.
+
+    Snapshots reflect the config at the time snapshot_space was called.
+    Portal changes made since then are not part of the snapshot and will be lost on revert.
+    """
     try:
         return await contexts.revert_space(
             upstream=upstream,
@@ -93,6 +123,7 @@ async def revert_space(
             user_id=user_id,
             company_id=company_id,
             snapshot_id=snapshot_id,
+            space_id=space_id,
         )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
@@ -109,7 +140,10 @@ async def export_space_config(
     space_id: Annotated[str, Field(description="ID of the space to export.")],
     upstream: Upstream = Depends(get_upstream),
 ) -> str:
-    """Return a portable JSON string of the full space config. No storage side-effects."""
+    """Return a portable JSON string of the full space config. No storage side-effects.
+
+    Reflects the live config at call time. Use snapshot_space to persist a named version.
+    """
     return await contexts.export_space_config(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
     )
@@ -129,7 +163,8 @@ async def import_space_config(
         Field(
             description=(
                 "JSON string previously returned by export_space_config. "
-                "Auto-snapshots current state before applying."
+                "Auto-snapshots current state before applying. "
+                "Portal changes since the export was taken are not included."
             )
         ),
     ],

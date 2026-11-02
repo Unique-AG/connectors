@@ -22,10 +22,8 @@ def fake_upstream_settings() -> UpstreamSettings:
     )
 
 
-def fake_persistence_settings(
-    tmp_path: str = "/tmp/test-space-config-snapshots.json",
-) -> PersistenceSettings:
-    return PersistenceSettings(snapshot_store_path=tmp_path)
+def fake_persistence_settings() -> PersistenceSettings:
+    return PersistenceSettings(history_folder="_space-config-history-test")
 
 
 def build_server(

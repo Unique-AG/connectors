@@ -1,7 +1,11 @@
-"""Storage the MCP owns: a file-backed JSON snapshot store.
+"""Storage the MCP owns: a content-store-backed snapshot history.
 
-Expose the store's interface here, never its driver: contexts depend on what is stored,
-not where.
+Each snapshot is stored as an application/json blob in the platform
+knowledge base under a hidden folder, so it persists across restarts
+and is visible to space managers in the file browser.
+
+Expose the store's interface here, never its driver: contexts depend on
+what is stored, not where.
 """
 
 from collections.abc import AsyncGenerator
@@ -15,7 +19,7 @@ from space_config_mcp.persistence.store import Persistence
 async def open_persistence(
     settings: PersistenceSettings,
 ) -> AsyncGenerator[Persistence]:
-    yield Persistence(settings.snapshot_store_path)
+    yield Persistence(settings)
 
 
 __all__ = ["open_persistence", "Persistence", "PersistenceSettings"]
