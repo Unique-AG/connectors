@@ -77,13 +77,10 @@ class TestPlanning:
         assert "## Simulated or human steps\n- Sign in" in text
         assert "- Book a talk." in text
         assert "## Not recorded (" in text
-        assert "- teams_read_transcript: " in text
-        spoken = load().needs["teams-meeting"]
         assert "## Simulated or human steps\n- Sign in" in text
-        assert text.count(f"- {spoken}") == 1
 
     def test_a_dry_run_marks_a_refused_case(self) -> None:
-        refused = plan("teams_read_transcript", "s1")
+        refused = plan("teams_unlisted_tool", "s1")
         found = plan_runs([READ, refused], frozenset(), {}, False)
         results = dry_results(found, UPNS)
         assert results["r1"]["status"] == "would-record"
@@ -138,10 +135,43 @@ class TestExecution:
             "d1": "recorded",
         }
         assert [c[-1] for c in calls.seeds("cleanup", "--cases")][:3] == ["1", "2", "3"]
-        assert calls.seeds("apply", "--phase", "mail") == [
-            [calls.commands[0][0], SEED, "apply", "--phase", "mail", "--as", "1"]
+        assert calls.seeds("cleanup", "--phases", "mail") == [
+            [calls.commands[0][0], SEED, "cleanup", "--phases", "mail", "--as", "1"]
+        ]
+        assert calls.seeds("apply", "--phases", "mail") == [
+            [calls.commands[0][0], SEED, "apply", "--phases", "mail", "--as", "1"]
         ]
         assert (tmp_path / "results.json").is_file()
+
+    def test_a_reseed_cleans_then_applies_its_phases_for_its_personas_in_its_order(
+        self, fixtures: Path, tmp_path: Path
+    ) -> None:
+        calls = Calls(fixtures)
+        invites = plan(
+            "outlook_respond_to_invite",
+            "i1",
+            destructive=True,
+            external=True,
+            reseed=("cal-invites", "cal-answers"),
+            reseed_personas=(2, 3, 1),
+        )
+        _ = execute(
+            plan_runs([invites], frozenset(), {}, False),
+            UPNS,
+            calls,
+            calls.sleeps.append,
+            tmp_path / "r.json",
+        )
+        seeded = [c[2:] for c in calls.commands if c[1] == SEED and "--phases" in c]
+        phases = ["--phases", "cal-invites,cal-answers"]
+        assert seeded == [
+            ["cleanup", *phases, "--as", "2"],
+            ["cleanup", *phases, "--as", "3"],
+            ["cleanup", *phases, "--as", "1"],
+            ["apply", *phases, "--as", "2"],
+            ["apply", *phases, "--as", "3"],
+            ["apply", *phases, "--as", "1"],
+        ]
 
     def test_the_token_reaches_only_the_record_child(self, fixtures: Path, tmp_path: Path) -> None:
         calls = Calls(fixtures)
@@ -360,19 +390,22 @@ class TestRetries:
         assert lagging.attempts == 3
         assert results["b1"]["status"] == "recorded"
 
-    def test_the_search_retry_stops_after_three_more_runs(
-        self, fixtures: Path, tmp_path: Path
+    @pytest.mark.parametrize(
+        ("tool", "attempts"), [("outlook_search_mail", 4), ("teams_search_messages", 6)]
+    )
+    def test_the_search_retry_stops_after_its_count_of_more_runs(
+        self, fixtures: Path, tmp_path: Path, tool: str, attempts: int
     ) -> None:
         calls = Calls(fixtures)
         lagging = Scripted(calls, [BINDS] * 9)
         results = execute(
-            plan_runs([bind_plan("teams_search_messages")], frozenset(), {}, False),
+            plan_runs([bind_plan(tool)], frozenset(), {}, False),
             UPNS,
             lagging,
             calls.sleeps.append,
             tmp_path / "r.json",
         )
-        assert lagging.attempts == 4
+        assert lagging.attempts == attempts
         assert results["b1"]["note"] == BINDS.strip()
 
     @pytest.mark.parametrize("first", ["outlook_list_calendars", "outlook_mark_mail"])
@@ -617,6 +650,16 @@ def test_a_seed_marked_probe_counts_only_rows_named_seed(monkeypatch: pytest.Mon
     assert runbook.probed("tok", "/me/joinedTeams#seed") == 1
 
 
+def test_a_seed_marked_probe_reads_the_topic_of_a_chat(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows = [{"topic": "seed-v1 case-teams-unread chat"}, {"topic": "lunch"}, {"topic": None}]
+
+    def send(*_: object) -> httpx.Response:
+        return httpx.Response(200, json={"value": rows})
+
+    monkeypatch.setattr(httpx.Client, "send", send)
+    assert runbook.probed("tok", "/me/chats#seed") == 1
+
+
 def test_the_seed_runs_mia_last_so_that_her_copy_of_the_invitation_exists(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -630,3 +673,5 @@ def test_the_seed_runs_mia_last_so_that_her_copy_of_the_invitation_exists(
     monkeypatch.setenv("SEED_UPNS", "mia@x.test,anna@x.test,tom@x.test")
     assert runbook.main(["seed"]) == 0
     assert seen[0][-4:] == ["apply", "2", "3", "1"]
+    assert seen[1][-5:] == ["--phases", "teams,teams-posts,teams-chats", "1", "2", "3"]
+    assert len(seen) == 2

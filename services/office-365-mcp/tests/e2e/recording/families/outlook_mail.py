@@ -48,6 +48,11 @@ WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_update_mail_rule": (f"PATCH {_RULES}/*",),
 }
 EXTERNAL = frozenset({"outlook_send_draft"})
+ADDRESSES: Mapping[str, frozenset[str]] = {
+    "SEED_DIRECTORY_UPN": frozenset({"outlook_get_mail_tips"}),
+    "SEED_GUEST_UPN": frozenset({"outlook_get_mail_tips"}),
+    "SEED_SHARED_UPN": frozenset(READ_TOOLS | WRITE_TOOLS.keys()),
+}
 DESTINATIONS = frozenset({"actions.moveToFolder", "actions.copyToFolder"})
 FORBIDDEN: Mapping[str, frozenset[str]] = {
     "status": frozenset({"alwaysEnabled", "scheduled"}),
@@ -79,4 +84,20 @@ SCHEMA: Mapping[str, str] = {
         + ("forwardAsAttachmentTo",),
         "object",
     ),
+}
+NEEDS: Mapping[str, str] = {
+    "mail-search-index": (
+        "Run scripts/dogfood/run_all.sh apply --phases folders,mail,mail-attach 1. Then wait "
+        + "until the mail search finds the message Printer replacement. This takes up to one "
+        + "hour. Then run record_all.sh discover again."
+    ),
+    "people-index": (
+        "Run scripts/dogfood/run_all.sh apply --phases mail-people 1 2 3. Then wait until "
+        + "Exchange lists Tom in the people of Mia. This takes one to 24 hours. Then run "
+        + "record_all.sh discover again."
+    ),
+}
+PROBES: Mapping[str, tuple[int, str, int]] = {
+    "mail-search-index": (1, '/me/messages?$search="Printer replacement"&$top=1', 1),
+    "people-index": (1, '/me/people?$search="Tom"&$top=5', 1),
 }

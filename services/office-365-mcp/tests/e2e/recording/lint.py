@@ -17,6 +17,7 @@ that variable is missing, which is what a push to main runs."""
 
 import argparse
 import binascii
+import contextlib
 import gzip
 import hashlib
 import html
@@ -36,9 +37,12 @@ from urllib.parse import unquote, urlsplit
 
 import yaml
 
+from tests.e2e.recording.families import Scrubber, load
 from tests.e2e.recording.guard import GRAPH_HOST
 from tests.e2e.recording.scrub import (
+    FILLER_STUB,
     KEPT_HOSTS,
+    LARGE_BODY,
     PAGE_EMBEDS,
     RESPONSE_HEADERS,
     SCHEMA,
@@ -109,6 +113,9 @@ _BASE32 = re.compile(r"[A-Z2-7]{16,}={0,6}")
 _ENCODED_WORD = re.compile(r"=\?[^?\s]+\?([bBqQ])\?([^?\s]*)\?=")
 _ESCAPE = re.compile(r"\\+u([0-9a-fA-F]{4})")
 _FOLD = re.compile(r"\r?\n[ \t]+")
+_LEAF = re.compile(r"<generated:([0-9a-f]{64})>")
+_ZONE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 .()+\-:/_]{0,99}")
+_STUB_KEYS = frozenset({"generator", "label", "size", "sha256"})
 
 
 def _mime(found: re.Match[str]) -> str:
@@ -302,12 +309,22 @@ def _ids(name: str, value: object) -> list[str]:
     return found[:1]
 
 
+def _filler(corpus: Corpus, value: str) -> bool:
+    stub = FILLER_STUB.fullmatch(value)
+    return stub is not None and any(
+        entry["generator"] == "onenote-html"
+        and entry["label"] == stub[2]
+        and LARGE_BODY < int(stub[1]) <= cast("int", entry["size"])
+        for entry in corpus.generated.values()
+    )
+
+
 def _page(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) -> list[str]:
     extra = "\x00".join(normalized(one) for one in sorted(literals))
     found: list[str] = []
 
     def text(value: str) -> str:
-        if not corpus.accepts(value, extra):
+        if not corpus.accepts(value, extra) and not _filler(corpus, value):
             found.append(f"{name}: a text node that is not corpus text")
         return value
 
@@ -338,9 +355,44 @@ def _page(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) -> l
     return list(dict.fromkeys(found))
 
 
+def _scrubbed(
+    name: str, body: bytes, corpus: Corpus, literals: frozenset[str], scrubber: Scrubber
+) -> list[str]:
+    extra = "\x00".join(normalized(one) for one in sorted(literals))
+    personas = {one.display_name for one in corpus.personas}
+    found: list[str] = []
+
+    def text(value: str) -> str:
+        if value not in personas and not corpus.accepts(value, extra):
+            found.append(f"{name}: a spoken line or a speaker that is not corpus text")
+        return value
+
+    raw = body.decode(errors="replace")
+    if scrubber(text, raw) != raw:
+        found.append(f"{name}: a line that is not a cue identifier, a timing or a voice line")
+    return list(dict.fromkeys(found))
+
+
+def _stub(name: str, body: bytes, corpus: Corpus) -> list[str]:
+    sha = name.rpartition("/")[2].removesuffix(".gen")
+    stub: Json = {}
+    with contextlib.suppress(ValueError):
+        stub = cast("Json", json.loads(body))
+    entry: Json = corpus.generated.get(sha) or {}
+    held = bool(entry) and stub.keys() == _STUB_KEYS and stub["sha256"] == sha
+    if not held or any(stub[key] != entry[key] for key in ("generator", "label", "size")):
+        return [f"{name}: a stub whose generator, label, size or hash the corpus manifest lacks"]
+    return []
+
+
 def _corpus(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) -> list[str]:
     if name.endswith(".html"):
         return _page(name, body, corpus, literals)
+    if name.endswith(".gen"):
+        return _stub(name, body, corpus)
+    for media, scrubber in load().bodies.items():
+        if name.endswith(f".{media.rpartition('/')[2]}"):
+            return _scrubbed(name, body, corpus, literals, scrubber)
     if not name.endswith(".json"):
         if hashlib.sha256(body).hexdigest() in corpus.binaries:
             return []
@@ -354,10 +406,14 @@ def _corpus(name: str, body: bytes, corpus: Corpus, literals: frozenset[str]) ->
     ]
     for path, key, text in _strings(parsed):
         kind = SCHEMA.get(key)
+        zone = path.endswith("timeZone.name") and _ZONE_NAME.fullmatch(text) is not None
+        leaf = _LEAF.fullmatch(text)
         if (
             kind == "text"
+            and not zone
             and not corpus.accepts(text, extra)
             and not (key == "contentBytes" and holds_bytes(corpus, text))
+            and not (key == "contentBytes" and leaf is not None and leaf[1] in corpus.generated)
         ):
             found.append(f"{name} at {path}: a {key} that is not corpus text")
         if kind == "address" and not text.casefold().endswith(f"@{SYNTHETIC_DOMAIN}"):
@@ -436,6 +492,11 @@ def lint_files(
                     findings.append(f"{name}: the body {body_name} is missing")
                     continue
                 findings += _corpus(key, files[key], corpus or load_corpus(), recorded[name])
+                findings += [
+                    f"{name}: the stub bodies/{leaf[1]}.gen of {body_name} is missing"
+                    for leaf in _LEAF.finditer(files[key].decode(errors="replace"))
+                    if f"bodies/{leaf[1]}.gen" not in files
+                ]
     first: dict[str, str] = {}
     for finding in findings:
         first.setdefault(re.sub(r" \([^()]*\)$", "", finding), finding)

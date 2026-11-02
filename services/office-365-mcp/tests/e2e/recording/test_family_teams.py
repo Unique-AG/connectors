@@ -1,10 +1,13 @@
 import json
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 from urllib.parse import quote
 
 import httpx
 import pytest
+import yaml
 
 from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.recording import stand_in
@@ -108,7 +111,11 @@ class TestCases:
         assert not [line for line in describe(plan, seen) if "REFUSED" in line]
 
     def test_a_case_that_posts_to_a_channel_picks_the_seed_team_by_name(self) -> None:
-        posting = [case for case in CASES if resolve(case).external and "chat" not in case]
+        posting = [
+            case
+            for case in CASES
+            if resolve(case).external and "chat" not in case and "meeting" not in case
+        ]
         assert len(posting) == 6
         for case in posting:
             given = json.dumps(resolve(case).steps)
@@ -128,7 +135,8 @@ class TestCases:
 
     def test_a_case_needs_a_key_that_a_probe_can_check(self) -> None:
         merged = load()
-        keys = {"teams-team", "teams-seed-team", "teams-chat", "teams-meeting"}
+        keys = {"teams-team", "teams-seed-team", "teams-seed-chats", "teams-chat"}
+        keys |= {"teams-meeting", "teams-meeting-attendance"}
         needed = {key for case in CASES for key in resolve(case).needs}
         assert needed == keys | {"sharepoint-seed-files"}
         assert keys <= set(merged.needs)
@@ -360,12 +368,8 @@ class TestRefusedRequests:
     ) -> None:
         assert a_guard_with_a_post().refuses_request(ask(method, path), tool) is not None
 
-    @pytest.mark.parametrize(
-        "tool",
-        ["teams_read_transcript"],
-    )
-    def test_a_tool_without_a_case_is_not_on_the_allowlist(self, tool: str) -> None:
-        refusal = guard().refuses_call(tool, {})
+    def test_a_tool_without_a_case_is_not_on_the_allowlist(self) -> None:
+        refusal = guard().refuses_call("teams_unlisted_tool", {})
         assert refusal is not None
         assert "allowlist" in refusal
 
@@ -548,6 +552,107 @@ SHAPES: dict[str, object] = {
             }
         ]
     },
+}
+
+
+IDENTITY = {"id": stand_in.USER_ID, "displayName": "Mia Keller", "tenantId": stand_in.TENANT_ID}
+MEETING_ARTIFACT = {
+    "id": TEAM,
+    "meetingId": TEAM,
+    "callId": TEAM,
+    "contentCorrelationId": TEAM,
+    "createdDateTime": "2026-10-28T09:00:00Z",
+    "endDateTime": "2026-10-28T09:10:00Z",
+    "meetingOrganizer": {"user": PERSON["user"]},
+}
+CONTENT = f"{GRAPH}/users/{stand_in.USER_ID}/onlineMeetings/{TEAM}"
+SHAPES.update(
+    {
+        "/me/onlineMeetings/x/attendanceReports/y": {
+            "id": TEAM,
+            "totalParticipantCount": 3,
+            "meetingStartDateTime": "2026-10-28T09:00:00Z",
+            "meetingEndDateTime": "2026-10-28T09:10:00Z",
+            "attendanceRecords": [
+                {
+                    "id": TEAM,
+                    "emailAddress": stand_in.UPN,
+                    "totalAttendanceInSeconds": 540,
+                    "role": "Presenter",
+                    "identity": IDENTITY,
+                    "attendanceIntervals": [
+                        {
+                            "joinDateTime": "2026-10-28T09:00:00Z",
+                            "leaveDateTime": "2026-10-28T09:09:00Z",
+                            "durationInSeconds": 540,
+                        }
+                    ],
+                }
+            ],
+        },
+        "/me/onlineMeetings/x/transcripts": {
+            "value": [
+                {
+                    **MEETING_ARTIFACT,
+                    "transcriptContentUrl": f"{CONTENT}/transcripts/{TEAM}/content",
+                }
+            ]
+        },
+        "/me/onlineMeetings/x/recordings": {
+            "value": [
+                {**MEETING_ARTIFACT, "recordingContentUrl": f"{CONTENT}/recordings/{TEAM}/content"}
+            ]
+        },
+        "/search/query": {
+            "value": [
+                {
+                    "searchTerms": ["Alpine"],
+                    "hitsContainers": [
+                        {
+                            "total": 3,
+                            "moreResultsAvailable": False,
+                            "hits": [
+                                {
+                                    "hitId": POST,
+                                    "rank": 1,
+                                    "summary": "The <c0>Alpine</c0> Print offer",
+                                    "resource": {
+                                        "@odata.type": "#microsoft.graph.chatMessage",
+                                        "id": POST,
+                                        "createdDateTime": "2026-10-28T09:00:00Z",
+                                        "from": {
+                                            "emailAddress": {
+                                                "name": "Mia Keller",
+                                                "address": stand_in.UPN,
+                                            }
+                                        },
+                                        "chatId": CHAT,
+                                        "channelIdentity": {"teamId": TEAM, "channelId": CHANNEL},
+                                        "webLink": "https://teams.microsoft.com/l/message/x/1",
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+        f"/teams/{TEAM}/channels/{CHANNEL}/messages/{POST}/replies": {
+            "value": [{**MESSAGE, "replyToId": POST, "chatId": None, "subject": None}]
+        },
+    }
+)
+SHAPES[f"/teams/{TEAM}/channels/{TEAM}/messages"] = {
+    "@odata.nextLink": f"{GRAPH}/teams/{TEAM}/channels/{TEAM}/messages?$top=50&$skiptoken=abc",
+    "value": [
+        {
+            **MESSAGE,
+            "subject": "seed-v1 post p01",
+            "chatId": None,
+            "channelIdentity": {"teamId": TEAM, "channelId": TEAM},
+            "replies": [{**MESSAGE, "replyToId": POST, "chatId": None}],
+        }
+    ],
 }
 
 
@@ -755,3 +860,193 @@ def test_the_reaction_case_sends_one_emoji_because_graph_takes_no_name() -> None
     reaction = str(args["reaction"])
     assert len(reaction) == 1
     assert not reaction.isascii()
+
+
+CASE_CHAT = "19:Y2FzZWNoYXRyZWFkYnl0aGVydW4xMjM0NTY3OA@thread.v2"
+MESSAGE_ID = "1770000000001"
+SEED = Path(__file__).resolve().parents[3] / "scripts/dogfood/seed/corpus/teams.yaml"
+SEED_TEXT = cast("dict[str, object]", yaml.safe_load(SEED.read_text(encoding="utf-8")))
+
+
+def a_guard_that_sent_to_a_case_chat() -> Guard:
+    seen = guard()
+    saw(seen, "GET", "/me/chats", 200, {"value": [{"id": CASE_CHAT, "topic": "seed-v1 case-x"}]})
+    saw(seen, "POST", f"/chats/{an_id(CASE_CHAT)}/messages", 201, {"id": MESSAGE_ID})
+    return seen
+
+
+CHAT_MESSAGE = f"/chats/{an_id(CASE_CHAT)}/messages/{MESSAGE_ID}"
+REACT = f"{CHAT_MESSAGE}/setReaction"
+UNREACT = f"{CHAT_MESSAGE}/unsetReaction"
+DELETE = f"/users/{stand_in.USER_ID}{CHAT_MESSAGE}/softDelete"
+
+
+class TestWritesToAChatMessage:
+    @pytest.mark.parametrize(
+        ("tool", "path"),
+        [
+            ("teams_react_to_message", REACT),
+            ("teams_react_to_message", UNREACT),
+            ("teams_delete_message", DELETE),
+        ],
+    )
+    def test_a_message_that_this_run_sent_to_a_case_chat_takes_the_write_of_its_tool(
+        self, tool: str, path: str
+    ) -> None:
+        assert sent(a_guard_that_sent_to_a_case_chat(), "POST", path, {}, tool) is None
+
+    @pytest.mark.parametrize(
+        ("tool", "path"),
+        [
+            ("teams_react_to_message", DELETE),
+            ("teams_delete_message", REACT),
+            ("teams_delete_message", UNREACT),
+            ("teams_edit_message", REACT),
+            ("teams_edit_message", DELETE),
+            ("teams_send_chat_message", REACT),
+        ],
+    )
+    def test_the_write_of_one_tool_is_not_a_write_of_a_neighbor(self, tool: str, path: str) -> None:
+        assert sent(a_guard_that_sent_to_a_case_chat(), "POST", path, {}, tool) is not None
+
+    def test_a_delete_in_a_chat_needs_the_own_user_path(self) -> None:
+        path = f"/chats/{an_id(CASE_CHAT)}/messages/{MESSAGE_ID}/softDelete"
+        refusal = sent(a_guard_that_sent_to_a_case_chat(), "POST", path, {}, "teams_delete_message")
+        assert "is outside /v1.0/me/" in str(refusal)
+
+    @pytest.mark.parametrize("tool", ["teams_react_to_message", "teams_delete_message"])
+    def test_a_chat_that_the_run_did_not_read_as_a_case_chat_is_refused(self, tool: str) -> None:
+        made = guard()
+        saw(made, "POST", "/chats", 201, {"id": MESSAGE_ID})
+        other = an_id(OTHER_CHAT)
+        react = f"/chats/{other}/messages/{MESSAGE_ID}/setReaction"
+        delete = f"/users/{stand_in.USER_ID}/chats/{other}/messages/{MESSAGE_ID}/softDelete"
+        refusal = sent(
+            made, "POST", react if tool == "teams_react_to_message" else delete, {}, tool
+        )
+        assert "did not read as seed data" in str(refusal)
+
+    @pytest.mark.parametrize("tool", ["teams_react_to_message", "teams_delete_message"])
+    def test_a_message_of_an_earlier_run_in_a_case_chat_is_refused(self, tool: str) -> None:
+        made = guard()
+        saw(
+            made, "GET", "/me/chats", 200, {"value": [{"id": CASE_CHAT, "topic": "seed-v1 case-x"}]}
+        )
+        refusal = sent(made, "POST", REACT if "react" in tool else DELETE, {}, tool)
+        assert "did not read as seed data" in str(refusal)
+
+
+NEW_CASES = (
+    "teams_list_channels-seed",
+    "teams_list_channels-private",
+    "teams_get_channel_files_folder-private",
+    "teams_browse_channel-posts",
+    "teams_browse_channel-long",
+    "teams_browse_channel-private",
+    "teams_list_message_replies-thread-51",
+    "teams_list_message_replies-thread-small",
+    "teams_read_message-channel-post",
+    "teams_list_chats-unread",
+    "teams_list_chat_messages-unread",
+    "teams_list_chat_members-send-chat",
+    "teams_send_chat_message-mention",
+    "teams_send_chat_message_with_files-existing",
+    "teams_react_to_message-chat",
+    "teams_delete_message-chat",
+    "teams_search_messages-alpine",
+    "teams_search_messages-lena",
+    "teams_search_messages-person-window",
+    "teams_read_meeting-attendance",
+    "teams_read_transcript-lines",
+)
+
+
+class TestNewCases:
+    def corpus_accepts(self, text: str) -> bool:
+        return load_corpus().accepts(text)
+
+    def test_every_new_case_exists_and_ends_in_the_tool_of_its_name(self) -> None:
+        assert set(NEW_CASES) <= set(CASES)
+        for case in NEW_CASES:
+            assert case.startswith(f"{tool_of(resolve(case).steps[-1])}-")
+
+    def test_every_string_that_a_new_case_expects_or_selects_is_corpus_text(self) -> None:
+        for case in NEW_CASES:
+            given = json.dumps(resolve(case).steps, ensure_ascii=False)
+            wanted = cast(
+                "list[str]", re.findall(r"(?:display_name|subject|speaker)=([^\]]+)\]", given)
+            )
+            for step in resolve(case).steps:
+                expected = mapping(mapping(step.get("expect", {})).get("result", {}))
+                wanted += [one for one in expected.values() if isinstance(one, str)]
+            for text in wanted:
+                assert self.corpus_accepts(text), f"{case}: {text!r} is no corpus text"
+
+    def test_a_chat_case_finds_its_chat_by_the_topic_of_the_seed(self) -> None:
+        topics = {one["topic"] for one in cast("list[dict[str, str]]", SEED_TEXT["chats"])}
+        found: set[str] = set()
+        for case in CASES:
+            for step in resolve(case).steps:
+                if tool_of(step) == "teams_list_chats" and "topic_contains" in mapping(
+                    step["args"]
+                ):
+                    found.add(str(mapping(step["args"])["topic_contains"]))
+        assert found
+        assert all(any(topic.startswith(one) for topic in topics) for one in found)
+
+    def test_a_search_case_looks_for_words_of_the_seed_posts(self) -> None:
+        for case in ("teams_search_messages-alpine", "teams_search_messages-lena"):
+            query = str(mapping(resolve(case).steps[-1]["args"])["query"])
+            assert self.corpus_accepts(query)
+            assert query in json.dumps(SEED_TEXT)
+
+    def test_a_search_case_waits_for_the_seed_and_runs_as_a_read(self) -> None:
+        for case in CASES:
+            if case.startswith("teams_search_messages-") and case != "teams_search_messages-seed":
+                plan = resolve(case)
+                assert plan.needs == ("teams-seed-chats",)
+                assert not plan.external
+                assert len(plan.steps) == 1
+
+    def test_the_chat_writes_of_a_case_run_after_the_reads_and_reach_other_personas(self) -> None:
+        for case in (
+            "teams_send_chat_message-mention",
+            "teams_send_chat_message_with_files-existing",
+            "teams_react_to_message-chat",
+            "teams_delete_message-chat",
+        ):
+            assert resolve(case).external
+            assert resolve(case).needs[-1] == "teams-seed-chats"
+
+    def test_the_mention_binds_the_id_and_the_name_of_a_member_that_an_earlier_step_listed(
+        self,
+    ) -> None:
+        bound = mapping(resolve("teams_send_chat_message-mention").steps[-1]["bind"])
+        mention = mapping(cast("list[object]", bound["mentions"])[0])
+        assert set(mention) == {"user_id", "name"}
+        assert all(
+            str(one).startswith("$prev.members[email=persona:anna]") for one in mention.values()
+        )
+
+    def test_the_probe_of_the_seed_chats_reads_a_topic_that_the_seed_creates(self) -> None:
+        _, path, minimum = load().probes["teams-seed-chats"]
+        topics = {one["topic"] for one in cast("list[dict[str, str]]", SEED_TEXT["chats"])}
+        assert minimum == 1
+        assert any(f"'{topic}'" in path for topic in topics)
+        assert path.startswith("/me/")
+
+    def test_the_probe_of_the_attendance_reads_the_reports_of_the_held_meeting(self) -> None:
+        persona, path, minimum = load().probes["teams-meeting-attendance"]
+        assert (persona, minimum) == (1, 1)
+        assert path == "/me/onlineMeetings/{meeting}/attendanceReports"
+
+    def test_the_transcript_lines_that_a_case_expects_are_lines_that_a_person_reads(self) -> None:
+        lines = {
+            line
+            for spoken in cast("dict[str, list[str]]", SEED_TEXT["transcript"]).values()
+            for line in spoken
+        }
+        expect = mapping(
+            mapping(resolve("teams_read_transcript-lines").steps[-1]["expect"])["result"]
+        )
+        assert {str(v) for v in expect.values() if isinstance(v, str)} <= lines

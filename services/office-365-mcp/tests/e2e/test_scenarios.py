@@ -43,15 +43,47 @@ _CLIENT_TOKEN = "synthetic-fastmcp-session-token"
 _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_HEADERS = ("prefer", "consistencylevel")
 _DATETIME = r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?"
-_SYMBOL = re.compile(r"~(yesterday|today|tomorrow)")
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_SYMBOL = re.compile(rf"~(yesterday|today|tomorrow|next(?:{'|'.join(_WEEKDAYS)})(?:[+-]\d+)?)")
+_SIZED = re.compile(r"<generated:(\d+)>")
+MAX_GENERATED = 20_000_000
 _GENERATED_KEYS = frozenset({"transactionId", "externalId"})
 _TODAY = datetime.now(UTC).date()
 _DAYS = {
     word: _TODAY + timedelta(n) for n, word in enumerate(("yesterday", "today", "tomorrow"), -1)
 }
+_NEXT = re.compile(r"next([A-Za-z]+)([+-]\d+)?")
 _SELECTOR = re.compile(r"\[(\d+|\*)\]|\[(\w+)=([^\]]*)\]|\.?([^.\[]+)")
 _MARKUP = re.compile(r"([a-z][a-z0-9]*)\[([\w\-]+)\]")
 _REFERENCE = re.compile(r"(?:tools|shared|graph_client)(?:\.\w+)+")
+
+
+def day_named(word: str, today: date = _TODAY) -> date:
+    """A day symbol of a case or a fixture. `nextMonday` is the next Monday on or after tomorrow;
+    `+N` or `-N` after it moves that many days."""
+    found = _NEXT.fullmatch(word)
+    if found is None:
+        return today + timedelta(("yesterday", "today", "tomorrow").index(word) - 1)
+    first = today + timedelta(1)
+    return first + timedelta((_WEEKDAYS.index(found[1]) - first.weekday()) % 7 + int(found[2] or 0))
+
+
+def generated(value: object) -> object:
+    """Expands `{repeat: {text: a, count: 1000000}}` into a string. It leaves any other value."""
+    if isinstance(value, list):
+        return [generated(one) for one in cast("list[object]", value)]
+    if not isinstance(value, Mapping):
+        return value
+    found = cast("Json", value)
+    if set(found) != {"repeat"}:
+        return {key: generated(one) for key, one in found.items()}
+    spec = mapping(found["repeat"])
+    text, count = spec.get("text"), spec.get("count")
+    if not (isinstance(text, str) and text and isinstance(count, int) and count > 0):
+        raise ValueError(f"repeat needs a text and a count above 0, got {spec!r:.80}")
+    if len(text) * count > MAX_GENERATED:
+        raise ValueError(f"repeat gives more than {MAX_GENERATED} characters")
+    return text * count
 
 
 def mapping(value: object) -> Json:
@@ -126,7 +158,10 @@ def _given(value: object, results: Sequence[object]) -> object:
     if isinstance(value, list):
         return [_given(item, results) for item in cast("list[object]", value)]
     if isinstance(value, Mapping):
-        return {key: _given(one, results) for key, one in cast("Json", value).items()}
+        found = cast("Json", value)
+        if set(found) == {"repeat"}:
+            return generated(found)
+        return {key: _given(one, results) for key, one in found.items()}
     if not isinstance(value, str):
         return value
     if value.startswith("$"):
@@ -136,7 +171,7 @@ def _given(value: object, results: Sequence[object]) -> object:
         return attribute_in(found, markup) if markup else found
     if value in _DAYS:
         return _DAYS[value].isoformat()
-    return _SYMBOL.sub(lambda word: _DAYS[word[1]].isoformat(), value)
+    return _SYMBOL.sub(lambda word: day_named(word[1]).isoformat(), value)
 
 
 def _text(spec: object) -> object:
@@ -175,11 +210,13 @@ def same(expected: object, actual: object) -> bool:
         )
     if not (isinstance(expected, str) and isinstance(actual, str)):
         return expected == actual
+    if (sized := _SIZED.fullmatch(expected)) is not None:
+        return len(actual) == int(sized[1])
     parts = _SYMBOL.split(expected)
     pattern = "".join(re.escape(p) if n % 2 == 0 else f"({_DATETIME})" for n, p in enumerate(parts))
     found = re.fullmatch(pattern, actual)
     return found is not None and all(
-        abs((_utc_date(stamp) - _DAYS[word]).days) <= 1
+        abs((_utc_date(stamp) - day_named(word)).days) <= 1
         for word, stamp in zip(parts[1::2], found.groups(), strict=True)
     )
 

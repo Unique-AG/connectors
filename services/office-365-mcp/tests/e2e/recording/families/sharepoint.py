@@ -14,11 +14,14 @@ READ_TOOLS = frozenset(
 READ_POSTS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_search_files": ("POST /v1.0/search/query",),
 }
+_ITEM = "/v1.0/drives/b!*/items/*"
 READ_GETS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_resolve_url": ("GET /v1.0/shares/u!*/driveItem",),
     "sharepoint_search_sites": ("GET /v1.0/sites",),
+    "sharepoint_browse_folder": (f"GET {_ITEM}/children",),
+    "sharepoint_create_folder": (f"GET {_ITEM}",),
+    "sharepoint_copy_item": (f"GET {_ITEM}",),
 }
-_ITEM = "/v1.0/drives/b!*/items/*"
 WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_rename_item": (f"PATCH {_ITEM}",),
     "sharepoint_move_item": (f"PATCH {_ITEM}",),
@@ -54,12 +57,28 @@ SCHEMA: Mapping[str, str] = {
     "type": "enum",
     "scope": "enum",
 }
+SEED_FOLDER = "/me/drive/root:/seed-v1 Seed Files"
 NEEDS: Mapping[str, str] = {
     "sharepoint-seed-files": (
         "Run seed.py apply --as 1 for the first test user. Then wait one hour. Microsoft Search "
         + "must index the new files and the folder."
     ),
+    "sharepoint-tree": (
+        "Run seed.py apply --phases files-tree for Mia, then for Anna. Then wait one hour. "
+        + "Microsoft Search must index the folders and the files."
+    ),
+    "sharepoint-big-files": (
+        "Run seed.py apply --phases files-big for Mia. The upload of two files of 10 MiB can take "
+        + "some minutes. Then wait one hour for Microsoft Search."
+    ),
+    "sharepoint-team-files": (
+        "Run seed.py apply --phases team-files for Mia, after the team exists and its SharePoint "
+        + "site is ready. Then run record_all.sh discover again."
+    ),
 }
 PROBES: Mapping[str, tuple[int, str, int]] = {
-    "sharepoint-seed-files": (1, "/me/drive/root:/seed-v1 Seed Files:/children", 4),
+    "sharepoint-seed-files": (1, f"{SEED_FOLDER}:/children", 4),
+    "sharepoint-tree": (1, f"{SEED_FOLDER}/seed-v1 Contracts:/children", 3),
+    "sharepoint-big-files": (1, f"{SEED_FOLDER}:/children", 12),
+    "sharepoint-team-files": (1, "/me/joinedTeams#seed", 1),
 }

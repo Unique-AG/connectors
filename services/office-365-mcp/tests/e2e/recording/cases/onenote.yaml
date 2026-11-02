@@ -171,3 +171,102 @@ onenote_get_operation-copy:
     - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_get_operation-copy", body_html: "<p>Start.</p>"}, bind: {section: "$2.sections[0].uri"}}
     - {tool: onenote_copy_page, bind: {page: "$prev.uri", to_section: "$3.sections[0].uri"}}
     - {tool: onenote_get_operation, bind: {operation: "$prev.uri"}}
+
+onenote_list_notebooks-group:
+  needs: &group [onenote_group]
+  scopes: &group-scopes [Notes.ReadWrite.All, Group.Read.All]
+  chain:
+    - &teams {tool: teams_list_my_teams}
+    - &team-notebook
+      tool: onenote_list_notebooks
+      args: {name_contains: seed-v1 Shared}
+      bind: {group: "$prev.teams[display_name=seed-v1 team].team_id"}
+      expect: {result: {"notebooks[0].name": seed-v1 Shared Notes}}
+
+onenote_list_sections-team:
+  needs: *group
+  scopes: *group-scopes
+  chain:
+    - *teams
+    - *team-notebook
+    - tool: onenote_list_sections
+      bind: {parent: "$prev.notebooks[0].uri"}
+      expect: {result: {"sections[0].name": seed-v1 Team notes}}
+
+onenote_list_pages-team:
+  needs: *group
+  scopes: *group-scopes
+  chain:
+    - *teams
+    - tool: onenote_list_pages
+      args: {title_contains: Team plan}
+      bind: {group: "$prev.teams[display_name=seed-v1 team].team_id"}
+      expect: {result: {"pages[0].title": seed-v1 Team plan}}
+
+onenote_read_page-team:
+  needs: *group
+  scopes: *group-scopes
+  chain:
+    - *teams
+    - tool: onenote_list_pages
+      args: {title_contains: Team plan}
+      bind: {group: "$prev.teams[display_name=seed-v1 team].team_id"}
+    - tool: onenote_read_page
+      args: {include_ids: true}
+      bind: {page: "$prev.pages[0].uri"}
+
+onenote_create_page-team-section:
+  external: true
+  needs: *group
+  scopes: *group-scopes
+  chain:
+    - *teams
+    - *team-notebook
+    - tool: onenote_create_page
+      args: {title: seed-v1 case-onenote_create_page-team-section, body_html: "<p>One paragraph.</p>"}
+      bind: {section: "$prev.notebooks[0].sections[name=seed-v1 Team notes].uri"}
+      expect: {result: {title: seed-v1 case-onenote_create_page-team-section}}
+
+onenote_copy_notebook-team:
+  external: true
+  needs: *group
+  scopes: *group-scopes
+  chain:
+    - *teams
+    - {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Spare"}}
+    - tool: onenote_copy_notebook
+      args: {new_name: "seed-v1 case-copy-team ~tomorrow"}
+      bind: {notebook: "$prev.notebooks[0].uri", to_group: "$1.teams[display_name=seed-v1 team].team_id"}
+
+onenote_read_page-big:
+  cap: 30
+  needs: &big [onenote_big]
+  chain:
+    - {tool: onenote_list_pages, args: {title_contains: Big page}}
+    - tool: onenote_read_page
+      bind: {page: "$prev.pages[0].uri"}
+
+onenote_list_pages-created-after:
+  needs: *seed
+  chain:
+    - {tool: onenote_list_pages, args: {created_after: ~yesterday, order_by: created_desc, limit: 10}}
+
+onenote_edit_page-replace-sentence:
+  needs: *seed
+  chain:
+    - *scratch
+    - *pad
+    - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_edit_page-replace-sentence", body_html: '<p data-id="one">First sentence.</p><p data-id="two">Second sentence.</p>'}, bind: {section: "$prev.sections[0].uri"}}
+    - {tool: onenote_read_page, args: {include_ids: true}, bind: {page: "$prev.uri"}}
+    - {tool: onenote_edit_page, args: {commands: [{target: "#two", action: replace, content: '<p data-id="two">Changed sentence.</p>'}]}, bind: {page: "$3.uri"}}
+
+onenote_get_operation-notebook:
+  needs: *seed
+  chain:
+    - {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Spare"}}
+    - {tool: onenote_copy_notebook, args: {new_name: "seed-v1 case-copy-follow ~tomorrow"}, bind: {notebook: "$prev.notebooks[0].uri"}}
+    - {tool: onenote_get_operation, bind: {operation: "$prev.uri"}}
+    - {tool: onenote_get_operation, bind: {operation: "$2.uri"}}
+    - tool: onenote_get_operation
+      bind: {operation: "$2.uri"}
+      expect: {result: {status: Completed}}

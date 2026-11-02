@@ -1,11 +1,15 @@
 """Seed the three dogfood test mailboxes and OneDrives from the corpus, idempotently.
 
-  seed.py plan     [--as N] [--phase P ...]   print every Graph call; makes no call (default)
-  seed.py apply    --as N   [--phase P ...]   create what is missing
-  seed.py cleanup  --as N   [--dry-run]       delete only what the seed can prove it created
+  seed.py plan     [--as N] [--phases P,Q]    print every Graph call; makes no call (default)
+  seed.py apply    --as N   [--phases P,Q]    create what is missing
+  seed.py cleanup  --as N   [--phases P,Q] [--dry-run]   delete only what the seed can prove it created
+  seed.py cleanup  --as N   --cases           delete the items that hold "seed-v1 case-" in their name
   seed.py corpus   [--out FILE]               write every string and binary hash the seed creates
 
 Environment: SEED_UPNS (Mia, Anna, Tom, comma-separated) and, for apply and cleanup, GRAPH_TOKEN.
+Optional: SEED_DIRECTORY_UPN, SEED_GUEST_UPN, SEED_ROOM_UPN and SEED_SHARED_UPN name the one
+address of each kind that a family may use (`env:<NAME>` in the corpus). The cap of requests is
+for each phase (--phase-cap).
 """
 
 import argparse
@@ -19,10 +23,11 @@ import re
 import sys
 import time
 import uuid
+from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import docgen
 import families
@@ -32,11 +37,27 @@ from model import ConfigError, Context, SeedError, Step
 
 TAG = "seed-v1"
 BASE = "https://graph.microsoft.com/v1.0"
-MAX_REQUESTS = 300
+MAX_REQUESTS = 600
+INLINE_MAX = 3 * 1024 * 1024
+CHUNK = 12 * 320 * 1024
+SEND_PHASE = "mail-people"
+MAX_SENDS = 12
+EXTRA_ENV = ("SEED_DIRECTORY_UPN", "SEED_GUEST_UPN", "SEED_ROOM_UPN", "SEED_SHARED_UPN")
+SHARED_ENV = "SEED_SHARED_UPN"
+MEMBER_PATHS = (
+    ("team", re.compile(r"/v1\.0/teams/([^/]+)/channels(?:/.*)?")),
+    ("team", re.compile(r"/v1\.0/groups/([^/]+)/(?:events|calendar\w*|drive|onenote)(?:/.*)?")),
+    ("drive", re.compile(r"/v1\.0/drives/([^/]+)(?:/.*)?")),
+    ("chat", re.compile(r"/v1\.0/chats/([^/]+)/messages")),
+)
 MAX_RETRY_WAIT = 120.0
 OPERATION_POLLS = 24
 OPERATION_WAIT = 5.0
 TEAMS_PATH = "/v1.0/teams"
+CHATS_PATH = "/v1.0/chats"
+SENDING = re.compile(
+    r"/v1\.0/me/(?:mailfolders/[^/]+/)?(?:messages|events)/[^/]+/(?:send|forward|reply|replyall)"
+)
 TEAM_OPERATION = re.compile(r"/v1\.0/teams\('[0-9a-f\-]{36}'\)/operations\('[0-9a-f\-]{36}'\)")
 TEAM_LOCATION = re.compile(r"teams\('([0-9a-f\-]{36})'\)")
 SEED_GUID = "8c0e3b2a-6f1d-4d6e-9a57-2f3c5b7e9d10"
@@ -49,9 +70,10 @@ CONV_TOPIC_PROP = "String 0x0070"
 MSGFLAG_READ = 0x1
 TAG_FILTER = f"categories/any(c:c eq '{TAG}')"
 KEY_EXPAND = f"singleValueExtendedProperties($filter=id eq '{KEY_PROP}')"
-WELL_KNOWN_FOLDERS = {"inbox", "sentitems", "drafts"}
+WELL_KNOWN_FOLDERS = {"inbox", "sentitems", "drafts", "junkemail", "deleteditems"}
 FAMILIES = families.load()
 PHASES = ("folders", "mail", "events", "files", *(p for family in FAMILIES for p in family.PHASES))
+OPT_IN = frozenset(p for family in FAMILIES for p in getattr(family, "OPT_IN", ()))
 MAIL_MODES = ("extprops", "draft")
 ADDRESS_TOKEN = re.compile(r"[^\s<>\"',;()\[\]]*(?:@|＠|%40)[^\s<>\"',;()\[\]]*", re.IGNORECASE)
 UPLOAD_TYPES = {
@@ -59,6 +81,8 @@ UPLOAD_TYPES = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "pdf": "application/pdf",
     "txt": "text/plain",
+    "filler": "application/octet-stream",
+    "filler-text": "text/plain",
 }
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 
@@ -189,7 +213,19 @@ def file_bytes(spec: Mapping[str, Any], ctx: Context) -> bytes:
         return docgen.pdf(spec["lines"], props)
     if kind == "txt":
         return spec["text"].encode("utf-8")
+    if kind in docgen.GENERATORS:
+        return docgen.generate(kind, spec["size"], spec["label"])
     raise ConfigError(f"{spec['id']}: unknown file kind {kind}")
+
+
+def is_large(spec: Mapping[str, Any]) -> bool:
+    return spec["kind"] in docgen.GENERATORS and spec["size"] > INLINE_MAX
+
+
+def generated_of(spec: Mapping[str, Any]) -> tuple[str, int, str] | None:
+    return (
+        (spec["kind"], spec["size"], spec["label"]) if spec["kind"] in docgen.GENERATORS else None
+    )
 
 
 def drive_folder_name(ctx: Context) -> str:
@@ -285,7 +321,8 @@ def message_body(message: Mapping[str, Any], ctx: Context) -> dict[str, Any]:
         props.append({"id": SUBMIT_PROP, "value": moment})
     body["singleValueExtendedProperties"] = props
     attachments = {a["id"]: a for a in ctx.corpus["files"]["attachments"]}
-    if message.get("attachments"):
+    inline = [ref for ref in message.get("attachments", []) if not is_large(attachments[ref])]
+    if inline:
         body["attachments"] = [
             {
                 "@odata.type": "#microsoft.graph.fileAttachment",
@@ -293,9 +330,46 @@ def message_body(message: Mapping[str, Any], ctx: Context) -> dict[str, Any]:
                 "contentType": attachments[ref]["content_type"],
                 "contentBytes": base64.b64encode(file_bytes(attachments[ref], ctx)).decode("ascii"),
             }
-            for ref in message["attachments"]
+            for ref in inline
         ]
     return body
+
+
+def attachment_steps(message: Mapping[str, Any], ctx: Context) -> list[Step]:
+    attachments = {a["id"]: a for a in ctx.corpus["files"]["attachments"]}
+    steps: list[Step] = []
+    for spec in (attachments[ref] for ref in message.get("attachments", [])):
+        if not is_large(spec):
+            continue
+        parent = f"/me/messages/{{mail:{message['id']}}}/attachments"
+        item = {
+            "attachmentType": "file",
+            "name": spec["name"],
+            "size": spec["size"],
+            "contentType": spec["content_type"],
+        }
+        steps += [
+            Step(
+                "mail",
+                "lookup",
+                "GET",
+                parent,
+                (("$select", "id,name"),),
+                key=message["id"],
+                lookup="attachments",
+            ),
+            Step(
+                "mail",
+                "upload",
+                "POST",
+                f"{parent}/createUploadSession",
+                body={"AttachmentItem": item},
+                key=f"attachment:{message['id']}:{spec['name']}",
+                payload=file_bytes(spec, ctx),
+                generated=generated_of(spec),
+            ),
+        ]
+    return steps
 
 
 def mail_steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
@@ -322,6 +396,7 @@ def mail_steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
                 key=f"mail:{message['id']}",
             )
         )
+        steps += attachment_steps(message, ctx)
     return steps
 
 
@@ -427,15 +502,20 @@ def file_steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
     ]
     for spec in files:
         name = f"{TAG} {spec['name']}"
+        data, large = file_bytes(spec, ctx), is_large(spec)
+        at = f"/me/drive/items/{{drive:folder}}:/{name}:"
+        session = {"item": {"@microsoft.graph.conflictBehavior": "fail"}}
         steps.append(
             Step(
                 "files",
-                "create",
-                "PUT",
-                f"/me/drive/items/{{drive:folder}}:/{name}:/content",
-                body=file_bytes(spec, ctx),
+                "upload" if large else "create",
+                "POST" if large else "PUT",
+                f"{at}/{'createUploadSession' if large else 'content'}",
+                body=session if large else data,
                 content_type=UPLOAD_TYPES[spec["kind"]],
                 key=f"file:{name}",
+                payload=data if large else None,
+                generated=generated_of(spec),
             )
         )
     return steps
@@ -484,6 +564,22 @@ def read_upns(env: Mapping[str, str], required: bool) -> tuple[str, str, str]:
     return (upns[0], upns[1], upns[2])
 
 
+def read_extras(env: Mapping[str, str], upns: tuple[str, ...], required: bool) -> dict[str, str]:
+    found: dict[str, str] = {}
+    for name in EXTRA_ENV:
+        raw = env.get(name, "").strip().lower()
+        local, _, domain = raw.partition("@")
+        if raw and (raw.count("@") != 1 or not local or "." not in domain or "," in raw):
+            raise ConfigError(f"{name} must hold one address")
+        if raw:
+            found[name] = raw
+        elif not required:
+            found[name] = f"{name.lower()}@seed.invalid"
+    if set(found.values()) & set(upns) or len(set(found.values())) != len(found):
+        raise ConfigError("SEED_UPNS and the SEED_*_UPN addresses must all differ")
+    return found
+
+
 def _strings(value: Any) -> Iterator[str]:
     if isinstance(value, str):
         yield value
@@ -495,15 +591,20 @@ def _strings(value: Any) -> Iterator[str]:
             yield from _strings(item)
 
 
-def check_recipients(steps: list[Step], upns: tuple[str, ...]) -> None:
-    """Refuse any address-like token in any request that is not one of SEED_UPNS."""
-    allowed = {u.lower() for u in upns}
+def check_recipients(
+    steps: list[Step], upns: tuple[str, ...], extras: Mapping[str, str] | None = None
+) -> None:
+    """Refuse any address-like token in any request that is not one of SEED_UPNS. The extra
+    addresses pass everywhere except in a sendMail request."""
+    personas = {u.lower() for u in upns}
+    elsewhere = personas | {e.lower() for e in (extras or {}).values()}
     for step in steps:
+        allowed = personas if step.path.lower().endswith("/sendmail") else elsewhere
         texts = [step.path, *(v for _, v in step.params)]
         if isinstance(step.body, Mapping):
             texts += list(_strings(step.body))
         for text in texts:
-            for token in ADDRESS_TOKEN.findall(text):
+            for token in ADDRESS_TOKEN.findall(text.replace("/", " ")):
                 if token.lower() not in allowed:
                     raise Refused(
                         f"{step.key or step.path}: address {token!r} is not in SEED_UPNS; nothing was sent"
@@ -527,12 +628,19 @@ class Graph:
         transport: httpx.BaseTransport | None = None,
         max_requests: int = MAX_REQUESTS,
         sleep: Callable[[float], None] = time.sleep,
+        shared_upn: str | None = None,
     ) -> None:
         self._token = token
         self._client = httpx.Client(transport=transport, timeout=60.0, follow_redirects=False)
         self._sleep = sleep
+        self._shared = f"/v1.0/users/{shared_upn.lower()}/mailfolders" if shared_upn else None
+        self._upload_url: str | None = None
+        self._known: dict[str, set[str]] = {"team": set(), "drive": set(), "chat": set()}
         self.max_requests = max_requests
         self.count = 0
+        self.sends = 0
+        self.phase = ""
+        self.phase_counts: Counter[str] = Counter()
         self.me_id: str | None = None
 
     def __repr__(self) -> str:
@@ -541,14 +649,47 @@ class Graph:
     def close(self) -> None:
         self._client.close()
 
+    def learn(self, kind: str, identifier: str) -> None:
+        self._known[kind].add(identifier)
+
     def _guard(self, method: str, url: str) -> None:
         parts = urlsplit(url)
+        if method == "PUT" and url == self._upload_url:
+            return
+        path = unquote(parts.path)
+        decoded = path
+        for _ in range(3):
+            decoded = unquote(decoded)
+        if "\\" in decoded or any(part in ("", ".", "..") for part in decoded.split("/")[1:]):
+            raise Refused(f"refused {parts.path}: it holds an empty segment or a dot segment")
+        mine = [f"/v1.0/users/{self.me_id}", f"/v1.0/users('{self.me_id}')"] if self.me_id else []
+        own = next(
+            (
+                "/v1.0/me" + path[len(prefix) :]
+                for prefix in mine
+                if path.lower().startswith(prefix.lower() + "/")
+            ),
+            path,
+        ).lower()
+        if SENDING.fullmatch(own):
+            raise Refused(f"refused {parts.path}: only POST /me/sendMail sends mail")
+        if method == "POST" and own == "/v1.0/me/sendmail":
+            if (
+                parts.scheme == "https"
+                and parts.netloc == "graph.microsoft.com"
+                and (self.phase != SEND_PHASE or self.sends >= MAX_SENDS)
+            ):
+                raise Refused(
+                    f"refused a send: only the {SEND_PHASE} phase sends, {MAX_SENDS} at most"
+                )
+            self.sends += 1
         creates_team = method == "POST" and parts.path == TEAMS_PATH
+        creates_chat = method == "POST" and parts.path == CHATS_PATH
         polls_team = method == "GET" and TEAM_OPERATION.fullmatch(parts.path) is not None
         if (
             parts.scheme == "https"
             and parts.netloc == "graph.microsoft.com"
-            and (creates_team or polls_team)
+            and (creates_team or creates_chat or polls_team)
         ):
             return
         prefixes = ["/v1.0/me"]
@@ -558,6 +699,13 @@ class Graph:
             raise Refused(
                 f"refused a request to {parts.scheme}://{parts.netloc}: only {BASE}/me is allowed"
             )
+        if self._shared and (path.lower() + "/").startswith(self._shared + "/"):
+            return
+        if any(
+            (found := rule.fullmatch(path)) is not None and found[1] in self._known[kind]
+            for kind, rule in MEMBER_PATHS
+        ):
+            return
         if not any(parts.path == p or parts.path.startswith(p + "/") for p in prefixes):
             raise Refused(
                 f"refused a request to {parts.path}: only the signed-in user's own data is allowed"
@@ -572,20 +720,23 @@ class Graph:
         body: Any = None,
         content_type: str | None = None,
         ok_statuses: tuple[int, ...] = (),
+        headers: Mapping[str, str] | None = None,
     ) -> httpx.Response:
         url = path_or_url if path_or_url.startswith("https://") else BASE + path_or_url
         self._guard(method, url)
         shown = urlsplit(url).path
         for attempt in range(5):
-            if self.count >= self.max_requests:
+            if self.phase_counts[self.phase] >= self.max_requests:
                 raise CapReached(
-                    f"stopped at the cap of {self.max_requests} requests; run apply again to continue"
+                    f"stopped at the cap of {self.max_requests} requests for phase {self.phase or '-'}; run apply again to continue"
                 )
             self.count += 1
-            headers = {"Authorization": f"Bearer {self._token}"}
-            kwargs: dict[str, Any] = {"params": params, "headers": headers}
+            self.phase_counts[self.phase] += 1
+            sent = {"Authorization": f"Bearer {self._token}"} if url != self._upload_url else {}
+            sent |= headers or {}
+            kwargs: dict[str, Any] = {"params": params, "headers": sent}
             if isinstance(body, bytes):
-                headers["Content-Type"] = content_type or "application/octet-stream"
+                sent["Content-Type"] = content_type or "application/octet-stream"
                 kwargs["content"] = body
             elif body is not None:
                 kwargs["json"] = body
@@ -603,6 +754,23 @@ class Graph:
         if response.status_code >= 400 and response.status_code not in ok_statuses:
             raise GraphError(f"{method} {shown} -> {response.status_code} {_graph_error(response)}")
         return response
+
+    def upload(self, session: Mapping[str, Any], payload: bytes) -> httpx.Response:
+        url = str(session.get("uploadUrl", ""))
+        if not url.startswith("https://"):
+            raise GraphError("Graph answered no https uploadUrl")
+        self._upload_url = url
+        try:
+            response = None
+            for start in range(0, len(payload), CHUNK):
+                chunk = payload[start : start + CHUNK]
+                span = f"bytes {start}-{start + len(chunk) - 1}/{len(payload)}"
+                response = self.request("PUT", url, body=chunk, headers={"Content-Range": span})
+            if response is None:
+                raise GraphError("nothing to upload")
+            return response
+        finally:
+            self._upload_url = None
 
     def created_by_operation(self, response: httpx.Response) -> dict[str, Any]:
         """The team of a 202 answer, once its operation reports `succeeded`."""
@@ -681,21 +849,32 @@ def run_lookup(
     graph: Graph, step: Step, path: str, found: dict[str, dict[str, Any]], ctx: Context
 ) -> None:
     params = dict(step.params)
-    if step.lookup == "drive-folder":
+    if step.lookup in ("drive-folder", "single"):
         response = graph.request("GET", path, params=params, ok_statuses=(404,))
-        if response.status_code == 200 and response.json().get("name") == drive_folder_name(ctx):
-            found["drive:folder"] = response.json()
+        key = "drive:folder" if step.lookup == "drive-folder" else str(step.key)
+        named = step.lookup == "single" or response.json().get("name") == drive_folder_name(ctx)
+        if response.status_code == 200 and named:
+            found[key] = response.json()
+            _learn(graph, step, response.json())
         return
     for item in graph.get_all(path, params):
         if step.lookup == "named":
-            name = str(item.get("displayName") or item.get("title") or "")
+            name = str(item.get("displayName") or item.get("title") or item.get("topic") or "")
             key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
         elif step.lookup == "subject":
             key = f"subject:{item.get('subject')}"
+        elif step.lookup == "attachments":
+            key = f"attachment:{step.key}:{item.get('name')}"
         else:
             key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
         if key:
             found[key] = item
+            _learn(graph, step, item)
+
+
+def _learn(graph: Graph, step: Step, item: Mapping[str, Any]) -> None:
+    if step.learns:
+        graph.learn(step.learns, str(item["id"]))
 
 
 def apply(
@@ -706,6 +885,7 @@ def apply(
     for step in steps:
         refs = {key: item["id"] for key, item in found.items()}
         path = _resolve(step.path, refs)
+        graph.phase = step.phase
         if step.kind == "lookup":
             if path is None:
                 continue
@@ -719,9 +899,17 @@ def apply(
                 f"{step.key}: {step.path} needs an item that does not exist yet; run the earlier phase first"
             )
         response = graph.request(step.method, path, body=step.body, content_type=step.content_type)
-        found[str(step.key)] = (
-            graph.created_by_operation(response) if step.poll else response.json()
-        )
+        if step.kind == "upload":
+            sent = graph.upload(response.json(), cast("bytes", step.payload))
+            found[str(step.key)] = sent.json() if sent.content else {"id": str(step.key)}
+        else:
+            if step.poll:
+                answer = graph.created_by_operation(response)
+            else:
+                body = response.json() if response.content else {}
+                answer = {"id": str(step.key), **body}
+            found[str(step.key)] = answer
+        _learn(graph, step, found[str(step.key)])
         created += 1
         out(f"created {step.key}")
     return created, skipped
@@ -739,12 +927,18 @@ def cleanup(
     known = known_keys(ctx, owner)
     deleted = 0
 
-    def delete(method: str, path: str, label: str) -> None:
+    def delete(method: str, path: str, label: str, body: Any = None) -> None:
         nonlocal deleted
         out(f"{'would delete' if dry_run else 'delete'} {label}")
         if not dry_run:
-            graph.request(method, path)
+            graph.request(method, path, body=body)
         deleted += 1
+
+    for family in FAMILIES:
+        hook = getattr(family, "cleanup", None)
+        if hook and (own := phases & set(family.PHASES)):
+            for method, path, *rest in hook(graph, ctx, owner, own):
+                delete(method, path, f"{method} {path}", rest[0] if rest else None)
 
     params = {
         "$filter": TAG_FILTER,
@@ -831,10 +1025,10 @@ def cleanup_cases(
 ) -> int:
     deleted = 0
     for family in FAMILIES:
-        for method, path in family.sweep(graph, ctx.persona(index)):
+        for method, path, *rest in family.sweep(graph, ctx.persona(index)):
             out(f"{'would delete' if dry_run else 'delete'} {method} {path}")
             if not dry_run:
-                graph.request(method, path)
+                graph.request(method, path, body=rest[0] if rest else None)
             deleted += 1
     return deleted
 
@@ -879,6 +1073,8 @@ def render_plan(ctx: Context, index: int, steps: list[Step]) -> list[str]:
         lines.append(f"{step.method} {step.path}{'?' + query if query else ''}{note}")
         if step.body is not None:
             lines.append(f"    {_shown_body(step.body)}")
+        if step.payload is not None:
+            lines.append(f"    upload {_shown_body(step.payload)}")
     summary = {phase: [s for s in steps if s.phase == phase] for phase in PHASES}
     for phase, phase_steps in summary.items():
         if phase_steps:
@@ -887,7 +1083,7 @@ def render_plan(ctx: Context, index: int, steps: list[Step]) -> list[str]:
                 f"-- phase {phase}: {len(phase_steps)} calls ({lookups} lookups, {len(phase_steps) - lookups} creates)"
             )
     lines.append(
-        f"-- total for --as {index}: {len(steps) + 1} calls at most on an empty mailbox (cap {MAX_REQUESTS})"
+        f"-- total for --as {index}: {len(steps) + 1} calls at most on an empty mailbox (cap {MAX_REQUESTS} for each phase)"
     )
     return lines
 
@@ -897,22 +1093,27 @@ def corpus_manifest(ctx: Context) -> dict[str, Any]:
     binaries = []
     for index in (1, 2, 3):
         for step in build_steps(ctx, index, set(PHASES)):
-            if isinstance(step.body, bytes):
+            raw = step.payload if step.payload is not None else step.body
+            if isinstance(raw, bytes):
                 name = (
                     step.path.split(":/")[1].removesuffix(":/content")
                     if ":/" in step.path
                     else step.path
                 )
+                if step.payload is not None:
+                    name = str(step.key).rpartition(":")[2]
                 strings.add(name)
+                generator, _, label = step.generated or ("", 0, "")
                 binaries.append(
                     {
                         "name": name,
                         "owner": ctx.persona(index),
-                        "size": len(step.body),
-                        "sha256": hashlib.sha256(step.body).hexdigest(),
+                        "size": len(raw),
+                        "sha256": hashlib.sha256(raw).hexdigest(),
+                        **({"generator": generator, "label": label} if generator else {}),
                     }
                 )
-            elif isinstance(step.body, Mapping):
+            if isinstance(step.body, Mapping):
                 for attachment in step.body.get("attachments", []):
                     raw = base64.b64decode(attachment["contentBytes"])
                     binaries.append(
@@ -1001,10 +1202,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="1 = Mia, 2 = Anna, 3 = Tom (position in SEED_UPNS)",
     )
     parser.add_argument(
-        "--phase",
-        action="append",
-        choices=PHASES,
-        help="limit to these phases (repeatable); default: all",
+        "--phases",
+        type=lambda text: text.split(","),
+        help="limit to these phases, comma-separated; default: every phase that is not opt-in",
     )
     parser.add_argument(
         "--anchor",
@@ -1022,7 +1222,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="cleanup: delete only the items that hold 'seed-v1 case-' in their name",
     )
-    parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS)
+    parser.add_argument(
+        "--phase-cap", type=int, default=MAX_REQUESTS, help="the cap of requests for each phase"
+    )
     parser.add_argument(
         "--dry-run", action="store_true", help="cleanup: list what would be deleted, delete nothing"
     )
@@ -1044,20 +1246,26 @@ def main(
     args = parse_args(argv)
     token: str | None = None
     try:
-        if not 1 <= args.max_requests <= MAX_REQUESTS:
-            raise ConfigError(f"--max-requests must be within 1..{MAX_REQUESTS}")
+        if not 1 <= args.phase_cap <= MAX_REQUESTS:
+            raise ConfigError(f"--phase-cap must be within 1..{MAX_REQUESTS}")
+        if unknown := sorted(set(args.phases or ()) - set(PHASES)):
+            raise ConfigError(f"unknown phases {unknown}; the phases are {list(PHASES)}")
         writes = args.command in ("apply", "cleanup")
         if args.cases and args.command != "cleanup":
             raise ConfigError("--cases applies to cleanup only")
         if writes and args.index is None:
             raise ConfigError(f"{args.command} needs --as 1|2|3")
+        upns = read_upns(environ, required=writes)
+        extras = read_extras(environ, upns, required=writes)
         ctx = Context(
             corpus=load_corpus(args.corpus),
-            upns=read_upns(environ, required=writes),
+            upns=upns,
             anchor=args.anchor or dt.datetime.now(dt.UTC).date(),
             mail_mode=args.mail_mode,
+            extras=extras,
         )
-        phases = set(args.phase or PHASES)
+        default = set(PHASES) if args.command == "cleanup" else set(PHASES) - OPT_IN
+        phases = set(args.phases or default)
         if args.command == "corpus":
             text = json.dumps(corpus_manifest(ctx), indent=2, ensure_ascii=False) + "\n"
             if args.out:
@@ -1069,7 +1277,7 @@ def main(
         indexes = [args.index] if args.index else [1, 2, 3]
         plans = {i: build_steps(ctx, i, phases) for i in indexes}
         for steps in plans.values():
-            check_recipients(steps, ctx.upns)
+            check_recipients(steps, ctx.upns, extras)
         if args.command == "plan":
             for index, steps in plans.items():
                 print("\n".join(render_plan(ctx, index, steps)))
@@ -1079,7 +1287,13 @@ def main(
             raise ConfigError(
                 "set GRAPH_TOKEN (see README: export GRAPH_TOKEN=$(... get_token.py))"
             )
-        graph = Graph(token, transport=transport, max_requests=args.max_requests, sleep=sleep)
+        graph = Graph(
+            token,
+            transport=transport,
+            max_requests=args.phase_cap,
+            sleep=sleep,
+            shared_upn=extras.get(SHARED_ENV),
+        )
         try:
             verify_me(graph, ctx.upns, args.index)
             if args.command == "apply":

@@ -27,7 +27,7 @@ ENV = {"SEED_UPNS": ",".join(UPNS), "GRAPH_TOKEN": "tok-SECRET-0123456789abcdef"
 ANCHOR = ["--anchor", "2026-10-23"]
 CORE_PHASES = ("folders", "mail", "events", "files")
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-WELL_KNOWN = ("inbox", "sentitems", "drafts", "deleteditems", "archive")
+WELL_KNOWN = ("inbox", "sentitems", "drafts", "deleteditems", "archive", "junkemail")
 
 
 class FakeGraph:
@@ -136,6 +136,9 @@ class FakeGraph:
             return httpx.Response(204)
         if match := re.fullmatch(r"/me/mailFolders/([^/]+)/messages", path):
             folder = self.folder_id(match[1])
+            if m == "GET":
+                held = [i for i in self.messages.values() if i["folder"] == folder]
+                return self.page(request, [self.item_json(i, params) for i in held])
             mid = self.new_id("msg")
             self.messages[mid] = {
                 "id": mid,
@@ -291,9 +294,11 @@ class FakeGraph:
 def run(
     argv: list[str], fake: FakeGraph | None = None, env: dict[str, str] | None = None, **kwargs: Any
 ) -> int:
-    phases = [] if "--phase" in argv or argv[0] not in ("apply", "plan") else CORE_PHASES
+    phases = (
+        [] if "--phases" in argv or argv[0] not in ("apply", "plan", "cleanup") else CORE_PHASES
+    )
     return seed.main(
-        [*argv, *ANCHOR, *(arg for phase in phases for arg in ("--phase", phase))],
+        [*argv, *ANCHOR, *(["--phases", ",".join(phases)] if phases else [])],
         transport=fake.transport() if fake else None,
         env=ENV if env is None else env,
         sleep=kwargs.pop("sleep", lambda _: None),
@@ -362,11 +367,13 @@ def test_apply_as_mia_creates_the_whole_corpus() -> None:
     ]
     assert sorted(folders) == [
         "seed-v1 Archive",
+        "seed-v1 Archive",
+        "seed-v1 Clients",
         "seed-v1 Handled",
         "seed-v1 Projects",
         "seed-v1 Website Relaunch",
     ]
-    assert len(fake.messages) == 43
+    assert len(fake.messages) == 65
     assert all(seed.TAG in m["categories"] for m in fake.messages.values())
     assert all(
         m["props"][seed.KEY_PROP].startswith("seed-v1:mail:") for m in fake.messages.values()
@@ -386,7 +393,7 @@ def test_apply_as_mia_creates_the_whole_corpus() -> None:
 
 def test_apply_resumes_after_a_partial_run() -> None:
     fake = FakeGraph()
-    assert run(["apply", "--as", "1", "--phase", "folders"], fake) == 0
+    assert run(["apply", "--as", "1", "--phases", "folders"], fake) == 0
     assert fake.messages == {}
     assert run(["apply", "--as", "1"], fake) == 0
     full = FakeGraph()
@@ -396,8 +403,8 @@ def test_apply_resumes_after_a_partial_run() -> None:
 
 def test_mail_phase_alone_needs_the_folders() -> None:
     fake = FakeGraph()
-    assert run(["apply", "--as", "1", "--phase", "mail"], fake) == seed.ConfigError.code
-    assert fake.messages and len(fake.messages) < 43
+    assert run(["apply", "--as", "1", "--phases", "mail"], fake) == seed.ConfigError.code
+    assert fake.messages and len(fake.messages) < 65
 
 
 def test_retry_after_is_honoured_on_429() -> None:
@@ -412,15 +419,15 @@ def test_retry_after_is_honoured_on_429() -> None:
         return None
 
     fake.fault = throttle_once
-    assert run(["apply", "--as", "1", "--phase", "folders"], fake, sleep=waits.append) == 0
+    assert run(["apply", "--as", "1", "--phases", "folders"], fake, sleep=waits.append) == 0
     assert waits == [7.0]
-    assert len([f for f in fake.folders.values() if f["displayName"].startswith(seed.TAG)]) == 4
+    assert len([f for f in fake.folders.values() if f["displayName"].startswith(seed.TAG)]) == 6
 
 
 def test_a_write_is_not_retried_on_503() -> None:
     fake = FakeGraph()
     fake.fault = lambda r: httpx.Response(503) if r.method == "POST" else None
-    assert run(["apply", "--as", "1", "--phase", "folders"], fake) == seed.GraphError.code
+    assert run(["apply", "--as", "1", "--phases", "folders"], fake) == seed.GraphError.code
     assert len([c for c in fake.calls if c[0] == "POST"]) == 1
 
 
@@ -591,11 +598,9 @@ def test_the_request_cap_stops_a_runaway() -> None:
         return None
 
     fake.fault = endless
-    assert run(["apply", "--as", "1", "--phase", "mail"], fake) == seed.CapReached.code
-    assert len(fake.calls) == seed.MAX_REQUESTS
-    assert (
-        run(["apply", "--as", "1", "--max-requests", "301"], FakeGraph()) == seed.ConfigError.code
-    )
+    assert run(["apply", "--as", "1", "--phases", "mail"], fake) == seed.CapReached.code
+    assert fake.calls.count(("GET", "/me/messages")) == seed.MAX_REQUESTS
+    assert run(["apply", "--as", "1", "--phase-cap", "601"], FakeGraph()) == seed.ConfigError.code
 
 
 def test_the_token_never_appears_in_output_logs_or_errors(
@@ -648,14 +653,14 @@ def test_safety_checks_hold_under_python_dash_o(tmp_path: Path) -> None:
         outside = test_seed.FakeGraph()
         b = seed.main(["apply", "--as", "1", "--corpus", {str(corpus)!r}], transport=outside.transport(), env=env)
         runaway = test_seed.FakeGraph()
-        c = seed.main(["apply", "--as", "1", "--max-requests", "5"], transport=runaway.transport(), env=env)
+        c = seed.main(["apply", "--as", "1", "--phase-cap", "5"], transport=runaway.transport(), env=env)
         print(__debug__, a, len(wrong.calls), b, len(outside.calls), c, len(runaway.calls))
         """
     )
     result = subprocess.run(
         [sys.executable, "-O", "-c", driver], capture_output=True, text=True, check=True
     )
-    assert result.stdout.splitlines()[-1].split() == ["False", "3", "1", "3", "0", "5", "5"]
+    assert result.stdout.splitlines()[-1].split() == ["False", "3", "1", "3", "0", "5", "6"]
     assert ENV["GRAPH_TOKEN"] not in result.stdout + result.stderr
 
 
@@ -745,14 +750,14 @@ def test_corpus_manifest_lists_every_string_and_binary(
     manifest = json.loads(out.read_text())
     counts = json.loads(capsys.readouterr().err)
     assert counts == {
-        "mails": 47,
-        "mails_unread_inbox_mia": 17,
-        "threads": 4,
+        "mails": 69,
+        "mails_unread_inbox_mia": 28,
+        "threads": 5,
         "longest_thread": 12,
         "events": 9,
         "files": 5,
         "attachments": 3,
-        "folders": 4,
+        "folders": 6,
     }
     assert "Website relaunch: launch checklist" in manifest["strings"]
     assert "seed-v1 Website Relaunch" in manifest["strings"]
@@ -761,7 +766,7 @@ def test_corpus_manifest_lists_every_string_and_binary(
     other_day = tmp_path / "other.json"
     assert seed.main(["corpus", "--out", str(other_day), "--anchor", "2027-03-01"], env=ENV) == 0
     assert other_day.read_text() == out.read_text()
-    assert len(manifest["binaries"]) == 13
+    assert len(manifest["binaries"]) >= 16
     created = {b["name"] for b in manifest["binaries"]}
     assert {"seed-v1 Project Plan.docx", "q3-numbers.csv", "seed-v1 Gallery picture.png"} <= created
 
@@ -770,7 +775,7 @@ def test_cleanup_keeps_every_team_and_says_that_graph_cannot_delete_a_chat(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake = FakeGraph()
-    assert run(["cleanup", "--as", "1", "--phase", "teams"], fake) == 0
+    assert run(["cleanup", "--as", "1", "--phases", "teams"], fake) == 0
     shown = capsys.readouterr().out
     assert "kept team 'seed-v1 team'" in shown
     assert "Other team" not in shown

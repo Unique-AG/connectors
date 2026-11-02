@@ -1,6 +1,7 @@
 """The runbook behind scripts/dogfood/record_all.sh. It plans the tool cases, records them one by
 one through `record.py`, and writes the report. With `--dry-run` it sends no request and writes
-no state. State goes to `.record-all/`: `discover.json`, `results.json` and `report.md`."""
+no state. State goes to `.record-all/`: `discover.json`, `results.json`, `report.md` and
+`meeting.json`. The `meeting` mode holds the one live step: Mia and Anna join a Teams meeting."""
 
 import argparse
 import json
@@ -11,26 +12,58 @@ import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 import httpx
+import yaml
 
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.cases import case_entries
 from tests.e2e.recording.families import load
-from tests.e2e.recording.guard import DEFAULT_CAP, READ_TOOLS, WRITE_TOOLS, Guard
-from tests.e2e.recording.record import GRAPH, Plan, catalogs, describe, guard_for, resolve, tool_of
+from tests.e2e.recording.guard import DEFAULT_CAP, PREFLIGHT, READ_TOOLS, WRITE_TOOLS, Guard
+from tests.e2e.recording.record import (
+    GRAPH,
+    Plan,
+    catalogs,
+    describe,
+    guard_for,
+    planned_values,
+    resolve,
+    tool_of,
+)
 
 SERVICE = Path(__file__).resolve().parents[3]
 STATE = SERVICE / ".record-all"
 FIXTURES = SERVICE / "tests" / "e2e" / "fixtures"
 SCRIPTS = SERVICE / "scripts" / "dogfood"
+SPOKEN = cast(
+    "Mapping[str, Sequence[str]]",
+    yaml.safe_load((SCRIPTS / "seed" / "corpus" / "teams.yaml").read_text())["transcript"],
+)
 PERSONAS = 3
 WAIT = 60
 MAX_WAIT = 300
 BIND_RETRIES = 3
+SLOW_INDEX = {"teams_search_messages": 5}
 TIMEOUT = 600
+MEETING_SUBJECT = "seed-v1 meeting"
+TEAM_PHASES = ("teams", "teams-posts", "teams-chats")
+MEETING_CASES = (
+    "teams_list_meeting_recordings-past",
+    "teams_list_meeting_transcripts-past",
+    "teams_read_meeting-past",
+    "teams_read_transcript-past",
+)
+MEETING_TOOLS = (
+    "teams_list_meeting_transcripts",
+    "teams_list_meeting_recordings",
+    "teams_read_meeting",
+)
+MEETING_POLL = 120
+MEETING_POLLS = 60
 _ASKED_FOR_BIND = re.compile(r"step (\d+) binds a value that the earlier answer does not have")
 _REFERENCE = re.compile(r"\$(prev|\d+)")
 _SEARCH = re.compile(r"_(?:search|find)_|^onenote_list_")
@@ -40,6 +73,10 @@ type Shell = Callable[[Sequence[str], Mapping[str, str]], subprocess.CompletedPr
 
 
 class SignInRequired(Exception):
+    pass
+
+
+class MeetingFailed(Exception):
     pass
 
 
@@ -167,6 +204,14 @@ def sweep(sh: Shell, upns: Sequence[str], indexes: Sequence[int]) -> None:
     seed(sh, upns, indexes, "cleanup", "--cases")
 
 
+def reseed(sh: Shell, upns: Sequence[str], plan: Plan, wide: Sequence[int]) -> None:
+    order = plan.reseed_personas or wide
+    chosen = ["--phases", ",".join(plan.reseed)] if plan.reseed else []
+    if chosen:
+        seed(sh, upns, order, "cleanup", *chosen)
+    seed(sh, upns, order, "apply", *chosen)
+
+
 def _once(
     sh: Shell, upns: Sequence[str], plan: Plan
 ) -> tuple[subprocess.CompletedProcess[str], bool]:
@@ -197,7 +242,8 @@ def record_one(
         sleep(min(max(int(wait[1]), WAIT), MAX_WAIT))
         sweep(sh, upns, range(1, PERSONAS + 1))
         done, recorded = _once(sh, upns, plan)
-    for _ in range(BIND_RETRIES):
+    retries = max(BIND_RETRIES, *(SLOW_INDEX.get(tool_of(step), 0) for step in plan.steps))
+    for _ in range(retries):
         if recorded or not index_lag(plan, done.stderr):
             break
         sleep(WAIT)
@@ -244,7 +290,7 @@ def execute(
             wide = everyone if plan.external else [plan.persona]
             sweep(sh, upns, wide)
             if plan.destructive:
-                seed(sh, upns, wide, "apply", *(a for p in plan.reseed for a in ("--phase", p)))
+                reseed(sh, upns, plan, wide)
         _ = path.write_text(json.dumps(results, indent=2, sort_keys=True))
     sweep(sh, upns, everyone)
     _ = path.write_text(json.dumps(results, indent=2, sort_keys=True))
@@ -264,15 +310,39 @@ def login(upns: Sequence[str], dry: bool, sh: Shell, extra: Sequence[str] = ()) 
     return 0
 
 
-def discover(upns: Sequence[str], dry: bool, sh: Shell, get: Callable[[str, str], int]) -> None:
-    found: dict[str, bool] = {}
+def meeting_state() -> Mapping[str, str] | None:
+    saved = STATE / "meeting.json"
+    return cast("Mapping[str, str]", json.loads(saved.read_text())) if saved.is_file() else None
+
+
+def discover(
+    upns: Sequence[str],
+    dry: bool,
+    sh: Shell,
+    get: Callable[[str, str], int],
+    only: Sequence[str] = (),
+) -> None:
+    known = STATE / "discover.json"
+    found = (
+        cast("dict[str, bool]", json.loads(known.read_text())) if only and known.is_file() else {}
+    )
+    meeting = meeting_state()
     for key, (persona, path, minimum) in sorted(load().probes.items()):
+        if only and key not in only:
+            continue
         print(f"probe {key}: persona {persona} GET {path}, at least {minimum}")
         if not dry:
-            found[key] = get(token(sh, upns[persona - 1]), path) >= minimum
+            asked = (
+                path
+                if meeting is None
+                else path.replace("{meeting}", quote(meeting["id"], safe=""))
+            )
+            found[key] = (
+                "{meeting}" not in asked and get(token(sh, upns[persona - 1]), asked) >= minimum
+            )
     if not dry:
         STATE.mkdir(exist_ok=True)
-        _ = (STATE / "discover.json").write_text(json.dumps(found, indent=2, sort_keys=True))
+        _ = known.write_text(json.dumps(found, indent=2, sort_keys=True))
 
 
 def check(dry: bool) -> int:
@@ -295,7 +365,9 @@ def check(dry: bool) -> int:
 def dry_results(found: Sequence[Run], upns: Sequence[str]) -> Results:
     results: Results = {}
     for run in found:
-        lines = describe(run.plan, guard_for(upns, run.plan, True, DEFAULT_CAP))
+        lines = describe(
+            run.plan, guard_for(upns, run.plan, True, DEFAULT_CAP), planned_values(upns)
+        )
         refused = [line.strip() for line in lines if "REFUSED" in line]
         if run.status == "run":
             results[run.plan.scenario] = {
@@ -322,8 +394,137 @@ def probed(token_: str, path: str) -> int:
     )
     rows = body["value"] if body and "value" in body else []
     if seed_only:
-        rows = [row for row in rows if str(row.get("displayName", "")).startswith("seed-v1")]
+        rows = [
+            row
+            for row in rows
+            if str(row.get("displayName") or row.get("topic") or "").startswith("seed-v1")
+        ]
     return len(rows)
+
+
+def graph(
+    method: str, path: str, token_: str, tool: str, upns: Sequence[str], body: object = None
+) -> Mapping[str, str]:
+    request = httpx.Request(
+        method, f"{GRAPH}{path}", headers={"authorization": f"Bearer {token_}"}, json=body
+    )
+    guard = Guard(upns[0], frozenset(one.casefold() for one in upns), method != "GET")
+    if (refusal := guard.refuses_request(request, tool)) is not None:
+        raise MeetingFailed(f"the guard refused {method} {path}: {refusal}")
+    with httpx.Client() as client:
+        answer = client.send(request)
+    if not answer.is_success:
+        raise MeetingFailed(f"{method} {path} answered {answer.status_code}")
+    return cast("Mapping[str, str]", answer.json())
+
+
+def instructions(join_url: str) -> str:
+    lines = [
+        f"Join URL: {join_url}",
+        "Join as Mia in the Teams app. Join as Anna in a private window.",
+        "Join as Tom in a second private window.",
+        "Mia: choose More > Record and transcribe > Start.",
+        "Say these lines. Each person says the lines of that person, in this order:",
+        *(f"{name.title()}: {line}" for name, said in SPOKEN.items() for line in said),
+        "Then stop the recording and leave the meeting.",
+        "The Teams meeting policy must allow recording and transcription.",
+        "The admin runbook sets that policy.",
+    ]
+    width = max(len(line) for line in lines)
+    rule = f"+{'-' * (width + 2)}+"
+    return "\n".join([rule, *(f"| {line:<{width}} |" for line in lines), rule])
+
+
+def meeting_start(upns: Sequence[str], dry: bool, sh: Shell, force: bool) -> None:
+    held = meeting_state()
+    if dry or (held is not None and not force):
+        print(instructions(held["join_url"] if held else "(the join URL of the new meeting)"))
+        print(
+            f"{'would POST' if dry else 'kept'} {MEETING_SUBJECT}: "
+            + "Mia organizes, Anna and Tom attend"
+        )
+        return
+    token_ = token(sh, upns[0], ("teams_create_meeting",), ("User.ReadBasic.All",))
+    others = [
+        {
+            "upn": upn,
+            "identity": {
+                "user": {
+                    "id": graph("GET", f"/users/{upn}?$select=id", token_, PREFLIGHT, upns)["id"]
+                }
+            },
+        }
+        for upn in upns[1:]
+    ]
+    opens = datetime.now(UTC)
+    body = {
+        "externalId": f"seed-v1-meeting-{int(opens.timestamp())}",
+        "subject": MEETING_SUBJECT,
+        "startDateTime": opens.isoformat(timespec="seconds"),
+        "endDateTime": (opens + timedelta(hours=2)).isoformat(timespec="seconds"),
+        "participants": {"attendees": others},
+    }
+    made = graph(
+        "POST", "/me/onlineMeetings/createOrGet", token_, "teams_create_meeting", upns, body
+    )
+    STATE.mkdir(exist_ok=True)
+    saved = {"id": made["id"], "join_url": made["joinWebUrl"], "subject": MEETING_SUBJECT}
+    _ = (STATE / "meeting.json").write_text(json.dumps(saved, indent=2, sort_keys=True))
+    print(instructions(saved["join_url"]))
+
+
+def meeting_wait(
+    upns: Sequence[str],
+    dry: bool,
+    sh: Shell,
+    get: Callable[[str, str], int],
+    sleep: Callable[[float], None],
+) -> int:
+    held = meeting_state()
+    if held is None and not dry:
+        raise MeetingFailed("no .record-all/meeting.json: run record_all.sh meeting start")
+    base = f"/me/onlineMeetings/{quote(held['id'], safe='') if held else '{meeting}'}"
+    kinds = ("transcripts", "recordings", "attendanceReports")
+    if dry:
+        print(f"would poll every {MEETING_POLL} seconds, {MEETING_POLLS} times, GET {base}/<kind>")
+        print(f"kinds: {', '.join(kinds)}; ready when a transcript and a recording exist")
+        return 0
+    for number in range(1, MEETING_POLLS + 1):
+        asked = token(sh, upns[0], MEETING_TOOLS)
+        counts = {kind: get(asked, f"{base}/{kind}") for kind in kinds}
+        print(f"poll {number}/{MEETING_POLLS}: " + ", ".join(f"{k} {n}" for k, n in counts.items()))
+        if counts["transcripts"] and counts["recordings"]:
+            return 0
+        if number < MEETING_POLLS:
+            sleep(MEETING_POLL)
+    print("timeout: no transcript and recording after 120 minutes", file=sys.stderr)
+    return 3
+
+
+def meeting(
+    step: str, upns: Sequence[str], dry: bool, force: bool, found: Callable[[bool], list[Run]]
+) -> int:
+    for one in ("start", "wait", "record") if step == "all" else (step,):
+        print(f"== meeting {one}{' (dry run, nothing is sent)' if dry else ''} ==")
+        if one == "start":
+            meeting_start(upns, dry, shell, force)
+        elif one == "wait":
+            if code := meeting_wait(upns, dry, shell, probed, time.sleep):
+                return code
+        else:
+            discover(upns, dry, shell, probed, ("teams-meeting",))
+            if dry:
+                results = dry_results(found(True), upns)
+            else:
+                STATE.mkdir(exist_ok=True)
+                results = execute(found(False), upns, shell, time.sleep, STATE / "results.json")
+            for name, one_result in sorted(results.items()):
+                print(f"{name}: {one_result['status']} {one_result['note']}".rstrip())
+            if any(
+                one_result["status"] in ("refused", "blocked") for one_result in results.values()
+            ):
+                return 1
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -332,36 +533,46 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SignInRequired as stop:
         print(stop, file=sys.stderr)
         return 3
+    except MeetingFailed as stop:
+        print(stop, file=sys.stderr)
+        return 1
 
 
 def _main(argv: Sequence[str] | None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = ["login", "discover", "seed", "record", "check", "report"]
-    parser.add_argument("mode", choices=[*modes, "all"])
+    parser.add_argument("mode", choices=[*modes, "all", "meeting"])
+    parser.add_argument("step", nargs="?", choices=["start", "wait", "record", "all"])
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     arguments = parser.parse_args(argv)
+    chosen = cast("str", arguments.mode)
+    step = cast("str | None", arguments.step)
+    if (chosen == "meeting") != (step is not None):
+        parser.error("meeting takes one step: start, wait, record or all; no other mode does")
     dry = cast("bool", arguments.dry_run)
     upns = stand_in.UPNS if dry else tuple(os.environ.get("SEED_UPNS", "").split(","))
     if not dry and len(upns) != PERSONAS:
         print("SEED_UPNS must list the three test users: Mia, Anna, Tom.", file=sys.stderr)
         return 2
-    wanted = cast("list[str]", arguments.case)
+    wanted = cast("list[str]", arguments.case) or (list(MEETING_CASES) if step else [])
     loaded = catalogs()
     every = [resolve(case, loaded=loaded) for case, _ in case_entries()]
     plans = [one for one in every if not wanted or one.scenario in wanted]
 
-    def found() -> list[Run]:
+    def found(assume_meeting: bool = False) -> list[Run]:
         known = STATE / "discover.json"
         discovered = cast(
             "Mapping[str, bool]", json.loads(known.read_text()) if known.is_file() else {}
         )
+        discovered = {**discovered, "teams-meeting": True} if assume_meeting else discovered
         stored = frozenset(one.stem for one in FIXTURES.glob("*.json"))
         return plan_runs(plans, stored, discovered, cast("bool", arguments.force))
 
     results: Results = {}
-    chosen = cast("str", arguments.mode)
+    if step:
+        return meeting(step, upns, dry, cast("bool", arguments.force), found)
     for mode in modes if chosen == "all" else [chosen]:
         print(f"== {mode}{' (dry run, nothing is sent)' if dry else ''} ==")
         code = 0
@@ -370,22 +581,29 @@ def _main(argv: Sequence[str] | None) -> int:
         elif mode == "discover":
             discover(upns, dry, shell, probed)
         elif mode == "seed":
-            command = (
-                [str(SCRIPTS / "run_all.sh"), "apply", "2", "3", "1"]
-                if not dry
-                else _python(str(SCRIPTS / "seed" / "seed.py"), "plan")
+            apply = [str(SCRIPTS / "run_all.sh"), "apply"]
+            commands = (
+                [_python(str(SCRIPTS / "seed" / "seed.py"), "plan")]
+                if dry
+                else [
+                    [*apply, "2", "3", "1"],
+                    [*apply, "--phases", ",".join(TEAM_PHASES), "1", "2", "3"],
+                ]
             )
-            done = shell(command, {"SEED_UPNS": ",".join(upns)})
-            lines = done.stdout.splitlines()
-            print("\n".join(lines[-4:] if dry else lines))
-            print(done.stderr, end="", file=sys.stderr)
-            code = done.returncode
+            for command in commands:
+                done = shell(command, {"SEED_UPNS": ",".join(upns)})
+                lines = done.stdout.splitlines()
+                print("\n".join(lines[-4:] if dry else lines))
+                print(done.stderr, end="", file=sys.stderr)
+                code = done.returncode
+                if code:
+                    break
         elif mode == "record":
             if dry:
                 results = dry_results(found(), upns)
             else:
                 STATE.mkdir(exist_ok=True)
-                results = execute(found(), upns, shell, time.sleep, STATE / "results.json")
+                results = execute(found(False), upns, shell, time.sleep, STATE / "results.json")
         elif mode == "check":
             code = check(dry)
         else:

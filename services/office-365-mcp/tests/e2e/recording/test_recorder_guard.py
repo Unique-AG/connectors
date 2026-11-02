@@ -93,6 +93,11 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
     "C3b attendees in-domain": (
         "outlook_create_event",
         {"subject": "s", "attendees": [f"ceo@{DOMAIN}"]},
+        "that is not a test user",
+    ),
+    "C3b2 attendees of a tool that may not invite": (
+        "outlook_forward_event",
+        {"event_id": "e", "attendees": [UPN]},
         "would invite",
     ),
     "C3c location is a test user": (
@@ -103,15 +108,30 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
     "C3d online meeting": (
         "outlook_create_event",
         {"subject": "s", "online_meeting": True},
+        None,
+    ),
+    "C3d2 online meeting of a tool that may not invite": (
+        "outlook_forward_event",
+        {"event_id": "e", "online_meeting": True},
         "would invite",
     ),
     "C3e rooms": (
         "outlook_create_event",
         {"subject": "s", "room_addresses": [f"r@{DOMAIN}"]},
+        "that is not a test user",
+    ),
+    "C3f persona attendee": (
+        "outlook_create_event",
+        {"subject": "s", "attendees": [UPN, UPNS[1]]},
+        None,
+    ),
+    "C3g attendee by name": (
+        "outlook_create_event",
+        {"subject": "s", "attendees": ["Anna"]},
         "would invite",
     ),
-    "C4a transcript not on the list": (
-        "teams_read_transcript",
+    "C4a unlisted tool": (
+        "teams_unlisted_tool",
         {"uri": "x"},
         "not on the read or the write allowlist",
     ),
@@ -125,11 +145,7 @@ CALL_PLANTS: dict[str, tuple[str, dict[str, object], str | None]] = {
         {"mailbox": f"ceo@{DOMAIN}"},
         "args.mailbox",
     ),
-    "C6d transcript read": (
-        "teams_read_transcript",
-        {"uri": "x"},
-        "not on the read or the write allowlist",
-    ),
+    "C6d transcript read": ("teams_read_transcript", {"uri": "x"}, None),
     "C6f own mailbox by name": ("outlook_list_mail", {"mailbox": UPN.upper()}, None),
 }
 
@@ -483,3 +499,23 @@ def test_the_guard_refuses_under_python_o() -> None:
     lines = finished.stdout.splitlines()
     assert finished.returncode == 0, finished.stderr[-2000:]
     assert len(lines) == 4 and "None" not in lines, lines
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/v1.0/me/%2e%2e/users/other/messages",
+        "/v1.0/me/%2E%2E/%2E%2E/users/other",
+        "/v1.0/me/..%2fusers/other",
+        "/v1.0/me/..%5cusers/other",
+        "/v1.0/me/%252e%252e/users/other",
+        "/v1.0/me//messages",
+    ],
+)
+def test_an_encoded_dot_segment_or_an_empty_segment_does_not_leave_the_own_data(path: str) -> None:
+    refusal = guard().refuses_request(graph("GET", path), "outlook_list_mail")
+    assert refusal is not None and "segment" in refusal
+
+
+def test_a_plain_path_of_the_own_data_still_goes_through() -> None:
+    assert guard().refuses_request(graph("GET", "/v1.0/me/messages"), "outlook_list_mail") is None

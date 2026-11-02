@@ -15,3 +15,10 @@ folders:
     owner: mia
     name: Website Relaunch
     parent: projects
+  - key: clients
+    owner: mia
+    name: Clients
+  - key: projects_archive
+    owner: mia
+    name: Archive
+    parent: projects

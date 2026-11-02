@@ -51,6 +51,8 @@ from tests.e2e.recording.guard import (
 )
 from tests.e2e.recording.lint import lint_files
 from tests.e2e.recording.scrub import (
+    LARGE_BODY,
+    SYNTHETIC_DOMAIN,
     Fixture,
     Hop,
     Identities,
@@ -65,6 +67,7 @@ from tests.e2e.recording.stand_in import StandIn
 from tests.e2e.test_scenarios import (
     _OBO_TOKEN,
     _SELECTOR,
+    _SYMBOL,
     Json,
     Person,
     Replay,
@@ -73,6 +76,7 @@ from tests.e2e.test_scenarios import (
     _step,
     build_server,
     entries,
+    generated,
     items,
     mapping,
     patch_obo,
@@ -87,7 +91,8 @@ GRAPH = f"https://{GRAPH_HOST}/v1.0"
 _TRANSIENT = frozenset({429, 503, 504})
 _SCOPE = re.compile(r"[A-Za-z]+(?:\.[A-Za-z]+)+")
 _MAX_GAP = 600
-_PERSONA = re.compile(r"persona:[a-z]+(?:\.[a-z]+)?")
+_PERSONA = re.compile(r"persona:[a-z]+(?:\.[a-z]+)?|env:SEED_[A-Z]+_UPN")
+_PERSONAS = 3
 _REPLACED = re.compile(
     r"synthetic text \d+|user-\d+@example\.test|user_\d+_example_test|host-\d+\."
 )
@@ -109,12 +114,19 @@ class Plan:
     cap: int = 0
     scopes: tuple[str, ...] = ()
     gap: int = 0
+    reseed_personas: tuple[int, ...] = ()
 
     @property
     def literals(self) -> frozenset[str]:
-        given = [{**mapping(s.get("args", {})), **mapping(s.get("bind", {}))} for s in self.steps]
-        found = [v for _, v in strings(given) if not v.startswith("$") and len(v) >= 4]
+        given = [_literal_args(s) for s in self.steps]
+        found = [
+            v for _, v in strings(given) if not v.startswith("$") and 4 <= len(v) <= LARGE_BODY
+        ]
         return frozenset(one for v in found for one in (v, str(_given(v, ()))))
+
+    @property
+    def tokens(self) -> frozenset[str]:
+        return frozenset(found[0] for found in _SYMBOL.finditer(json.dumps(self.steps)))
 
 
 @dataclass(frozen=True, repr=False)
@@ -158,6 +170,9 @@ def resolve(
     if not 0 <= gap <= _MAX_GAP:
         raise Refused(f"{scenario}: the gap must be within 0..{_MAX_GAP} seconds")
     default = f"rec-tool-{scenario}" if spec else f"rec-{scenario}"
+    phases, order = reseed_of(spec)
+    if bad := [one for one in order if not 1 <= one <= _PERSONAS]:
+        raise Refused(f"{scenario}: reseed personas {bad} are not within 1..{_PERSONAS}")
     return Plan(
         scenario,
         str((spec or variant).get("fixture", default)),
@@ -165,32 +180,68 @@ def resolve(
         bool(spec),
         int(cast("int", spec.get("persona", 1))),
         bool(spec.get("destructive", False)),
-        tuple(map(str, cast("list[object]", spec.get("reseed", [])))),
+        phases,
         bool(spec.get("external", False)),
         tuple(map(str, cast("list[object]", spec.get("needs", [])))),
         int(cast("int", spec.get("cap", 0))),
         scopes,
         gap,
+        order,
     )
 
 
-def guard_for(upns: Sequence[str], plan: Plan, allow_writes: bool, cap: int) -> Guard:
+def reseed_of(spec: Json) -> tuple[tuple[str, ...], tuple[int, ...]]:
+    wanted = spec.get("reseed", [])
+    if not isinstance(wanted, Mapping):
+        return tuple(map(str, cast("list[object]", wanted))), ()
+    found = cast("Json", wanted)
+    phases = tuple(map(str, cast("list[object]", found.get("phases", []))))
+    return phases, tuple(
+        int(cast("int", one)) for one in cast("list[object]", found.get("personas", []))
+    )
+
+
+def guard_for(
+    upns: Sequence[str],
+    plan: Plan,
+    allow_writes: bool,
+    cap: int,
+    extras: Mapping[str, str] | None = None,
+) -> Guard:
     if not 1 <= plan.persona <= len(upns):
         raise Refused(f"{plan.scenario}: persona {plan.persona} is not within 1..{len(upns)}")
     wanted = plan.cap or cap
     if not 1 <= wanted <= MAX_CAP:
         raise Refused(f"{plan.scenario}: the request cap must be within 1..{MAX_CAP}")
-    return Guard(upns[plan.persona - 1], frozenset(upns), allow_writes, wanted)
+    return Guard(
+        upns[plan.persona - 1],
+        frozenset(upns),
+        allow_writes,
+        wanted,
+        people=frozenset(f"persona:{persona.key}.id" for persona in load_corpus().personas),
+        extras=extras or {},
+    )
 
 
 def tool_of(step: Json) -> str:
     return str(step.get("pick", step.get("tool")))
 
 
+def synthetic_extra(name: str) -> str:
+    return f"{name.removeprefix('SEED_').removesuffix('_UPN').lower()}@{SYNTHETIC_DOMAIN}"
+
+
 def persona_values(
-    upns: Sequence[str], ids: Mapping[str, str], *, synthetic: bool
+    upns: Sequence[str],
+    ids: Mapping[str, str],
+    *,
+    synthetic: bool,
+    extras: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    found: dict[str, str] = {}
+    found = {
+        f"env:{name}": synthetic_extra(name) if synthetic else address
+        for name, address in (extras or {}).items()
+    }
     for persona in load_corpus().personas:
         if persona.index > len(upns):
             continue
@@ -207,7 +258,10 @@ def with_personas(value: object, values: Mapping[str, str]) -> object:
 
         def one(found: re.Match[str]) -> str:
             if found[0] not in values:
-                raise Refused(f"{found[0]} names no test user, or a user whose id was not read")
+                raise Refused(
+                    f"{found[0]} names no test user, or a user whose id was not read, "
+                    + "or an address variable that is not set"
+                )
             return values[found[0]]
 
         return _PERSONA.sub(one, value)
@@ -225,26 +279,45 @@ def uses_ids(plan: Plan) -> bool:
     )
 
 
-def _literal_args(step: Json) -> dict[str, object]:
+def planned_values(upns: Sequence[str], extras: Mapping[str, str] | None = None) -> dict[str, str]:
+    ids = {persona.key: f"persona:{persona.key}.id" for persona in load_corpus().personas}
+    named = {**{name: synthetic_extra(name) for name in load().address_uses}, **(extras or {})}
+    return persona_values(upns, ids, synthetic=False, extras=named)
+
+
+def _literal_args(step: Json, values: Mapping[str, str] | None = None) -> dict[str, object]:
     given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
-    return {key: value for key, value in given.items() if not str(value).startswith("$")}
+    return {
+        key: generated(value if values is None else with_personas(value, values))
+        for key, value in given.items()
+        if not str(value).startswith("$")
+    }
 
 
-def check(plan: Plan, guard: Guard) -> list[str]:
+def check(plan: Plan, guard: Guard, values: Mapping[str, str] | None = None) -> list[str]:
     refusals: list[str] = []
     for number, step in enumerate(plan.steps, 1):
         if "fault" in step:
             refusals.append(f"step {number}: a fault is synthetic and is never recorded")
-        refusal = guard.refuses_call(tool_of(step), _literal_args(step))
+        refusal = guard.refuses_call(tool_of(step), _literal_args(step, values))
         refusals += [f"step {number}: {refusal}"] if refusal else []
+    replies = [
+        mapping(step.get("args", {})).get("status")
+        for step in plan.steps
+        if tool_of(step) == "outlook_set_automatic_reply"
+    ]
+    if "scheduled" in replies and not (
+        tool_of(plan.steps[-1]) == "outlook_set_automatic_reply" and replies[-1] == "disabled"
+    ):
+        refusals.append("a scheduled automatic reply needs a last step that sets it to disabled")
     return refusals
 
 
-def describe(plan: Plan, guard: Guard) -> list[str]:
+def describe(plan: Plan, guard: Guard, values: Mapping[str, str] | None = None) -> list[str]:
     lines = [f"{plan.scenario} -> fixture {plan.fixture} (dry run, nothing is sent):"]
     for number, step in enumerate(plan.steps, 1):
         given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
-        refusal = guard.refuses_call(tool_of(step), _literal_args(step))
+        refusal = guard.refuses_call(tool_of(step), _literal_args(step, values))
         verdict = "allowed" if refusal is None else f"REFUSED: {refusal}"
         if "fault" in step:
             verdict = "REFUSED: a fault is synthetic and is never recorded"
@@ -404,8 +477,9 @@ async def capture(
     guard: Guard,
     server: FastMCP[None],
     stand_in: StandIn | None,
+    extras: Mapping[str, str] | None = None,
 ) -> tuple[Recording, list[object], dict[str, str]]:
-    if refusals := check(plan, guard):
+    if refusals := check(plan, guard, planned_values(upns, extras)):
         raise Refused(f"{plan.scenario}: refused before any request: " + "; ".join(refusals))
     original = httpx.AsyncHTTPTransport.handle_async_request
     if target == "graph":
@@ -423,7 +497,9 @@ async def capture(
 
         send = answered
     identities, people = await preflight(send, delegate, guard, token, upns, people=uses_ids(plan))
-    values = persona_values(upns, people, synthetic=False)
+    extras = extras or {}
+    identities = Identities(identities.values | frozenset(extras.values()), identities.token)
+    values = persona_values(upns, people, synthetic=False, extras=extras)
     secrets = sorted(identities.everything())
     recorder = Recorder(interactions=[], send=send, guard=guard, token=token)
     results: list[object] = []
@@ -496,6 +572,8 @@ async def capture(
     corpus = load_corpus()
     personas = {
         upns[p.index - 1].casefold(): p.key for p in corpus.personas if p.index <= len(upns)
+    } | {
+        address.casefold(): synthetic_extra(name).split("@")[0] for name, address in extras.items()
     }
     recording = Recording(
         plan.scenario,
@@ -506,6 +584,7 @@ async def capture(
         identities,
         personas,
         plan.literals,
+        plan.tokens,
     )
     return recording, results, people
 
@@ -655,14 +734,22 @@ async def record(
     cap: int = DEFAULT_CAP,
     stand_in: StandIn | None = None,
     refused: Path | None = None,
+    extras: Mapping[str, str] | None = None,
 ) -> Outcome:
     if not upns:
         raise Refused("SEED_UPNS is not set; the recorder records only its position 1")
-    guard = guard_for(upns, plan, allow_writes, cap)
+    guard = guard_for(upns, plan, allow_writes, cap, extras)
     server = build_server()
     logging.getLogger().setLevel(logging.ERROR)
     recording, live, people = await capture(
-        plan, target, token=token, upns=upns, guard=guard, server=server, stand_in=stand_in
+        plan,
+        target,
+        token=token,
+        upns=upns,
+        guard=guard,
+        server=server,
+        stand_in=stand_in,
+        extras=extras,
     )
     secrets = sorted(recording.identities.everything())
     fixture = scrub(recording)
@@ -675,7 +762,7 @@ async def record(
             plan.scenario,
             refused,
         )
-    synthetic = persona_values(upns, people, synthetic=True)
+    synthetic = persona_values(upns, people, synthetic=True, extras=extras)
     replayed, broken, unmet = await replay_check(plan, fixture, server, synthetic)
     if broken:
         raise _refuse(
@@ -801,6 +888,17 @@ def upns_from_environment() -> tuple[str, ...]:
     return upns
 
 
+def extras_from_environment() -> dict[str, str]:
+    found = {
+        name: os.environ[name].strip().casefold()
+        for name in sorted(os.environ)
+        if re.fullmatch(r"SEED_[A-Z]+_UPN", name) and os.environ[name].strip()
+    }
+    if bad := [name for name, address in found.items() if address.count("@") != 1]:
+        raise Refused(f"{bad} must each hold one address")
+    return found
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -831,7 +929,8 @@ def main(argv: list[str] | None = None) -> int:
         if linked and (stand_in or out_dir):
             raise Refused("--link needs a graph recording that goes into the repository")
         upns = stand_in_graph.UPNS if stand_in else upns_from_environment()
-        secrets += upns
+        extras = {} if stand_in else extras_from_environment()
+        secrets += [*upns, *extras.values()]
         plans = [resolve(scenario) for scenario in scenarios]
         if linked and any(plan.case for plan in plans):
             raise Refused("--link does not apply to a tool case; a case has no sidecar entry")
@@ -839,7 +938,11 @@ def main(argv: list[str] | None = None) -> int:
             lines = [
                 line
                 for plan in plans
-                for line in describe(plan, guard_for(upns, plan, allow_writes, cap))
+                for line in describe(
+                    plan,
+                    guard_for(upns, plan, allow_writes, cap, extras),
+                    planned_values(upns, extras),
+                )
             ]
             print(_redacted("\n".join(lines), secrets))
             return 2 if any("REFUSED" in line for line in lines) else 0
@@ -861,6 +964,7 @@ def main(argv: list[str] | None = None) -> int:
                     cap=cap,
                     stand_in=graph,
                     refused=REFUSED,
+                    extras=extras,
                 )
             )
             shutil.rmtree(REFUSED / plan.scenario, ignore_errors=True)

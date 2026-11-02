@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -14,8 +15,16 @@ from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import GRAPH_HOST, READ_TOOLS, WRITE_TOOLS, Guard
 from tests.e2e.recording.lint import lint_files
 from tests.e2e.recording.record import describe, guard_for, resolve
-from tests.e2e.recording.scrub import Fixture, Hop, Identities, Recording, files_of, scrub
-from tests.e2e.test_scenarios import Json, items, mapping
+from tests.e2e.recording.scrub import (
+    Fixture,
+    Hop,
+    Identities,
+    Recording,
+    files_of,
+    load_corpus,
+    scrub,
+)
+from tests.e2e.test_scenarios import Json, expected_error, items, mapping
 
 CASES = mapping(
     cast(
@@ -23,6 +32,8 @@ CASES = mapping(
         yaml.safe_load((Path(cases_module.__file__).parent / "sharepoint.yaml").read_text()),
     )
 )
+SEED = Path(__file__).resolve().parents[3] / "scripts" / "dogfood" / "seed" / "corpus"
+TREE = mapping(cast("object", yaml.safe_load((SEED / "files-tree.yaml").read_text())))
 GRAPH = f"https://{GRAPH_HOST}/v1.0"
 ITEM = "01SEEDITEMAAAAAAAAAAAAAAAAAAAAAAAA"
 TARGET = "01TARGETAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -33,8 +44,32 @@ CREATING = frozenset(
 )
 KEEPING_THE_SEED = CREATING | {"sharepoint_invite"}
 EXTERNAL = frozenset({"sharepoint_create_share_link", "sharepoint_invite"})
+OLD_EXTERNAL = {"sharepoint_create_share_link-plan", "sharepoint_invite-anna"}
+NEW_EXTERNAL = {
+    "sharepoint_copy_item-cross-drive",
+    "sharepoint_invite-write-notify",
+    "sharepoint_invite-note-2000",
+    "sharepoint_create_share_link-organization-edit",
+    "sharepoint_resolve_url-sharing-link",
+}
+INDEX_NEEDS = {"sharepoint-seed-files", "sharepoint-tree", "sharepoint-big-files"}
+TEAM_DRIVE = "b!TEAMLIBRARYAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 NEW_FILE = f"{PATH}/{ITEM}:/seed-v1 case-x.txt:/content"
 SHARE = "/shares/u!aHR0cHM6Ly9jb250b3NvLXRlc3QvYQ/driveItem"
+
+
+OLD_CASES = {
+    c
+    for c in (
+        "get_me-profile sharepoint_list_drives-mine sharepoint_browse_folder-root "
+        + "sharepoint_browse_folder-seed-folder sharepoint_search_files-plan "
+        + "sharepoint_read_file-docx sharepoint_rename_item-notes sharepoint_delete_item-brochure "
+        + "sharepoint_create_folder-seed-folder sharepoint_copy_item-brochure "
+        + "sharepoint_move_item-budget sharepoint_create_share_link-plan "
+        + "sharepoint_create_text_file-seed-folder sharepoint_invite-anna "
+        + "sharepoint_resolve_url-plan sharepoint_search_sites-all"
+    ).split()
+}
 
 
 def last_tool(case: str) -> str:
@@ -81,28 +116,35 @@ class TestCases:
         for case in CASES:
             plan = resolve(case)
             wrote = last_tool(case) in set(WRITE_TOOLS) - KEEPING_THE_SEED
-            assert plan.destructive == wrote
-            assert plan.reseed == (("files",) if wrote else ())
-            assert plan.external == (last_tool(case) in EXTERNAL)
             assert plan.persona == 1
+            if case in OLD_CASES:
+                assert plan.destructive == wrote
+                assert plan.reseed == (("files",) if wrote else ())
+                assert plan.external == (case in OLD_EXTERNAL)
+            else:
+                assert (plan.destructive, plan.reseed) == (False, ())
+                assert plan.external == (case in NEW_EXTERNAL)
 
     def test_a_case_that_needs_the_index_waits_for_the_seed_files(self) -> None:
         searching = [c for c in CASES if "sharepoint_search_files" in json.dumps(CASES[c])]
         assert searching
-        assert all(resolve(c).needs == ("sharepoint-seed-files",) for c in searching)
+        assert all(set(resolve(c).needs) & INDEX_NEEDS for c in searching)
         assert {"sharepoint-seed-files"} <= set(load().probes) & set(load().needs)
+        for case in CASES:
+            assert set(resolve(case).needs) <= set(load().probes) & set(load().needs)
 
     def test_a_case_names_no_address(self) -> None:
         assert "@" not in json.dumps(CASES)
 
     def test_a_case_names_what_it_creates_with_its_own_case_tag(self) -> None:
         naming = CREATING | {"sharepoint_rename_item"}
-        names = [
-            (case, str(mapping(mapping(step)["args"])["name"]))
+        arguments = [
+            (case, mapping(mapping(step).get("args", {})))
             for case in CASES
             for step in items(mapping(CASES[case])["chain"])
             if mapping(step)["tool"] in naming
         ]
+        names = [(case, str(given["name"])) for case, given in arguments if "name" in given]
         assert {case for case, _ in names} >= {c for c in CASES if last_tool(c) in CREATING}
         assert all(name.startswith(f"seed-v1 case-{case}") for case, name in names)
 
@@ -426,3 +468,158 @@ class TestScrubShapes:
         fixture = scrubbed(f"/v1.0{PATH}/{ITEM}", None, method="DELETE", status=204)
         assert fixture.interactions[0]["status"] == 204
         assert "body" not in fixture.interactions[0]
+
+
+def library(suffix: str) -> str:
+    return f"/drives/{TEAM_DRIVE}/items/{ITEM}{suffix}"
+
+
+class TestTeamLibraryAndSharing:
+    @pytest.mark.parametrize(
+        ("tool", "suffix", "allowed"),
+        [
+            ("sharepoint_browse_folder", "/children", True),
+            ("sharepoint_browse_folder", "", False),
+            ("sharepoint_browse_folder", "/content", False),
+            ("sharepoint_browse_folder", "/permissions", False),
+            ("sharepoint_read_file", "", False),
+            ("sharepoint_read_file", "/content", False),
+            ("sharepoint_create_folder", "", True),
+            ("sharepoint_create_folder", "/children", False),
+            ("sharepoint_copy_item", "", True),
+            ("sharepoint_copy_item", "/content", False),
+            ("sharepoint_search_files", "/children", False),
+            ("sharepoint_resolve_url", "", False),
+            ("sharepoint_rename_item", "", False),
+            ("sharepoint_delete_item", "", False),
+            ("sharepoint_invite", "", False),
+        ],
+    )
+    def test_another_drive_is_open_to_a_named_tool_on_a_named_path_for_reading_only(
+        self, tool: str, suffix: str, allowed: bool
+    ) -> None:
+        assert (refusal(tool, "GET", library(suffix)) is None) == allowed
+        assert "outside" in str(refusal("sharepoint_browse_folder", "DELETE", library("/children")))
+
+    def test_a_folder_in_the_team_library_needs_a_parent_that_the_run_read_as_seed_data(
+        self,
+    ) -> None:
+        body = json.dumps({"name": "seed-v1 case-x", "folder": {}})
+        unseen = httpx.Request(
+            "POST", f"{GRAPH}/drives/{TEAM_DRIVE}/items/01OTHER/children", content=body
+        )
+        seen = httpx.Request("POST", f"{GRAPH}{library('/children')}", content=body)
+        assert "did not read as seed" in str(
+            guard().refuses_request(unseen, "sharepoint_create_folder")
+        )
+        assert guard().refuses_request(seen, "sharepoint_create_folder") is None
+        assert "outside" in str(guard().refuses_request(seen, "sharepoint_rename_item"))
+
+    def test_a_copy_into_another_drive_goes_into_a_folder_that_the_run_knows(self) -> None:
+        made = guard()
+        made.created.add(FOLDER)
+        path = f"{GRAPH}{PATH}/{ITEM}/copy"
+
+        def copy(folder: str) -> str | None:
+            body = {"parentReference": {"driveId": TEAM_DRIVE, "id": folder}}
+            return made.refuses_request(
+                httpx.Request("POST", path, content=json.dumps(body)), "sharepoint_copy_item"
+            )
+
+        assert copy(FOLDER) is None
+        assert "did not read as seed" in str(copy("01OTHER"))
+
+    def test_an_invitation_may_give_write_access_with_a_notice_and_a_note_of_2000_characters(
+        self,
+    ) -> None:
+        made = guard()
+        made.created.add(FOLDER)
+        body = {
+            "recipients": [{"email": stand_in.UPNS[1]}],
+            "roles": ["write"],
+            "sendInvitation": True,
+            "message": "a" * 2000,
+        }
+        assert refusal_of(made, FOLDER, body) is None
+        leaking = body | {"message": "write to x@outside.example"}
+        assert "address that is not a test user" in str(refusal_of(made, FOLDER, leaking))
+
+    def test_a_link_for_the_organization_may_edit_and_an_anonymous_link_stays_refused(self) -> None:
+        made = guard()
+        made.created.add(FOLDER)
+        link = f"{GRAPH}{PATH}/{FOLDER}/createLink"
+
+        def create(scope: str) -> str | None:
+            body = json.dumps({"type": "edit", "scope": scope})
+            return made.refuses_request(
+                httpx.Request("POST", link, content=body), "sharepoint_create_share_link"
+            )
+
+        assert create("organization") is None
+        assert "no recording may do" in str(create("anonymous"))
+
+    def test_a_text_of_one_million_characters_passes_the_guard_for_its_own_tool_only(self) -> None:
+        request = httpx.Request("PUT", f"{GRAPH}{NEW_FILE}", content="a" * 1_000_000)
+        assert guard().refuses_request(request, "sharepoint_create_text_file") is None
+        assert "may not make here" in str(guard().refuses_request(request, "sharepoint_read_file"))
+
+    def test_the_over_cap_case_names_the_size_text_of_the_tool_as_its_error(self) -> None:
+        last = mapping(items(mapping(CASES["sharepoint_read_file-over-cap"])["chain"])[-1])
+        assert expected_error(mapping(last["expect"])["tool_error"]) == "10.0"
+
+    def test_the_probe_counts_follow_the_corpus(self) -> None:
+        core = mapping(cast("object", yaml.safe_load((SEED / "files.yaml").read_text())))
+        mine = [mapping(one) for one in (*items(TREE["folders"]), *items(TREE["files"]))]
+        inside = sum(
+            one.get("parent") == "Contracts" or one.get("folder") == "Contracts" for one in mine
+        )
+        top = sum(
+            one.get("owner", "mia") == "mia" and "parent" not in one and "folder" not in one
+            for one in mine
+        )
+        mia = sum(mapping(one).get("owner", "mia") == "mia" for one in items(core["files"]))
+        assert load().probes["sharepoint-tree"][2] == inside
+        assert load().probes["sharepoint-big-files"][2] == top + mia
+
+    def test_the_channel_cases_pick_the_channel_that_the_seed_creates(self) -> None:
+        channel = f"seed-v1 {mapping(TREE['team'])['channel']}"
+        assert f"display_name={channel}]" in json.dumps(CASES)
+
+    def test_a_name_that_a_case_selects_or_expects_is_corpus_text(self) -> None:
+        text = json.dumps(CASES)
+        wanted = set(re.findall(r"\[(?:name|display_name)=([^\]\"]+)\]", text))
+        expected = [
+            mapping(mapping(step).get("expect", {})).get("result", {})
+            for case in CASES.values()
+            for step in items(mapping(case)["chain"])
+        ]
+        for result in expected:
+            for value in mapping(result).values():
+                listed = cast("list[object]", value) if isinstance(value, list) else [value]
+                wanted |= {one for one in listed if isinstance(one, str)}
+        assert wanted > {"seed-v1 Order D.txt", "Anna Meier", "seed-v1 Team Files"}
+        assert sorted(wanted - load_corpus().strings) == []
+
+
+def test_the_team_library_shapes_scrub_and_pass_the_lint() -> None:
+    web = "https://contoso.sharepoint.com/sites/seedteam/Shared%20Documents"
+    by = {"user": {"displayName": "Mia Keller"}}
+    parent = {"driveId": TEAM_DRIVE, "driveType": "documentLibrary", "id": ITEM}
+    folder: Json = {
+        "id": TARGET,
+        "name": "seed-v1 Team Files",
+        "size": 2400,
+        "webUrl": f"{web}/seed-v1%20Team%20Files",
+        "createdBy": by,
+        "lastModifiedBy": by,
+        "createdDateTime": "2026-10-29T08:00:00Z",
+        "lastModifiedDateTime": "2026-10-29T08:00:00Z",
+        "folder": {"childCount": 3},
+        "parentReference": parent,
+    }
+    fixture = scrubbed(f"/v1.0{library('/children')}", {"value": [folder]})
+    found = mapping(items(kept(fixture)["value"])[0])
+    assert fixture.dropped == {}
+    assert found["name"] == "seed-v1 Team Files"
+    assert mapping(found["parentReference"])["driveType"] == "documentLibrary"
+    assert mapping(found["createdBy"]) == {"user": {"displayName": "Mia Keller"}}

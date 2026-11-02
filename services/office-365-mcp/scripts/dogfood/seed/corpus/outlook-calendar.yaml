@@ -1,10 +1,16 @@
-# Calendar, contact and calendar items of the outlook-calendar family. Only Mia owns them, except the
-# invitation that Anna sends to Mia. The seed tags Mia's copy of it with seed-v1.
-# phase:      the seed phase that creates the event; `cal-invites` runs as the owner of the event
-# day:        days from the anchor date
+# Calendar, contact and calendar items of the outlook-calendar family.
+# phase:      the seed phase that creates the event; the owner of the event runs it
+# owner:      the persona that creates the event (default mia)
+# day:        a number of days from the anchor date, or the first such weekday on or after
+#             tomorrow with an optional shift (`nextMonday`, `nextMonday+1`). The recorder cases use the
+#             same words as `~nextMonday+1`
 # start/end:  local wall-clock time "HH:MM" in `time_zone` (a Windows time zone name)
 # reminder:   minutes before the start; the reminder is on only when this is set
 # attendees:  persona keys; an event with attendees sends one invitation when it is created
+# answers:    what an attendee answers once: accept, decline or tentativelyAccept. Mia tags her own copy
+#             of every invitation. Another attendee tags a copy only when it answers
+# recurrence: `count` occurrences, daily or (type weekly) on `days`
+# edits:      for a series: `move` shifts one occurrence by `days`, `cancel` cancels one occurrence
 # attachment: the key of an entry of `attachments`
 events:
   - id: c01
@@ -53,6 +59,96 @@ events:
     start: "14:00"
     end: "14:30"
     attendees: [anna]
+  - id: c09
+    phase: cal-events
+    subject: Overlap A
+    body: The first of two meetings that overlap.
+    time_zone: W. Europe Standard Time
+    day: nextTuesday
+    start: "10:00"
+    end: "11:00"
+  - id: c10
+    phase: cal-events
+    subject: Overlap B
+    body: The second of two meetings that overlap.
+    time_zone: W. Europe Standard Time
+    day: nextTuesday
+    start: "10:30"
+    end: "11:30"
+  - id: c11
+    phase: cal-events
+    subject: Morning block
+    body: Focus time. Nobody books this morning.
+    time_zone: W. Europe Standard Time
+    day: nextMonday
+    start: "09:00"
+    end: "12:00"
+  - id: a11
+    phase: cal-events
+    owner: anna
+    subject: Morning block Anna
+    body: Month-end close. Nobody books this morning.
+    time_zone: W. Europe Standard Time
+    day: nextMonday
+    start: "09:00"
+    end: "12:00"
+  - id: a12
+    phase: cal-events
+    owner: anna
+    subject: Prep block
+    body: Prepare the figures for the afternoon.
+    time_zone: W. Europe Standard Time
+    day: nextMonday
+    start: "13:00"
+    end: "13:30"
+  - id: t-c01
+    phase: cal-events
+    owner: tom
+    subject: Offsite day
+    body: Whole day at the partner site.
+    time_zone: W. Europe Standard Time
+    day: nextWednesday
+    start: "08:00"
+    end: "18:00"
+  - id: c06
+    phase: cal-answers
+    subject: Design workshop
+    body: Sketch the pages of the relaunch together.
+    location: Room Titlis
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "10:00"
+    end: "11:00"
+    attendees: [anna, tom]
+    answers:
+      - {who: anna, response: accept, comment: I will bring the sketches.}
+      - {who: tom, response: decline, comment: I am on call that day.}
+  - id: c07
+    phase: cal-answers
+    subject: Content review
+    body: Read the new copy and note the changes.
+    location: Room Rigi
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "11:30"
+    end: "12:00"
+    attendees: [anna, tom]
+    answers:
+      - {who: anna, response: tentativelyAccept, comment: I may join late.}
+  - id: c08
+    phase: cal-series
+    subject: Weekly design sync
+    body: Walk through the open design tasks.
+    location: Room Pilatus
+    time_zone: W. Europe Standard Time
+    day: nextMonday-7
+    start: "09:00"
+    end: "09:30"
+    attendees: [anna]
+    recurrence: {type: weekly, days: [monday], count: 6}
+    edits:
+      move: {occurrence: 3, days: 1}
+      cancel: {occurrence: 5, comment: The room is closed that day.}
   - id: a01
     phase: cal-invites
     owner: anna
@@ -63,6 +159,163 @@ events:
     start: "15:00"
     end: "15:30"
     attendees: [mia]
+  - id: a02
+    phase: cal-invites
+    owner: anna
+    subject: Vendor call
+    body: Talk to the vendor about the new price.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "09:00"
+    end: "09:30"
+    attendees: [mia]
+  - id: a03
+    phase: cal-invites
+    owner: anna
+    subject: Design critique
+    body: Give feedback on the first mock-ups.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "10:00"
+    end: "10:30"
+    attendees: [mia]
+  - id: a04
+    phase: cal-invites
+    owner: anna
+    subject: Planning session
+    body: Plan the work of the next sprint.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "11:00"
+    end: "11:30"
+    attendees: [mia]
+  - id: a05
+    phase: cal-invites
+    owner: anna
+    subject: Workshop prep
+    body: Prepare the room and the material for the workshop.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "12:00"
+    end: "12:30"
+    attendees: [mia]
+    allow_new_time_proposals: true
+  - id: a06
+    phase: cal-invites
+    owner: anna
+    subject: Fixed slot
+    body: The room is booked for this slot only.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "13:00"
+    end: "13:30"
+    attendees: [mia]
+    allow_new_time_proposals: false
+  - id: a07
+    phase: cal-invites
+    owner: anna
+    subject: Leave day review 1
+    body: Review the open requests for the leave day.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "14:00"
+    end: "14:30"
+    attendees: [mia]
+  - id: a08
+    phase: cal-invites
+    owner: anna
+    subject: Leave day review 2
+    body: Review the open requests for the leave day.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "14:30"
+    end: "15:00"
+    attendees: [mia]
+  - id: t-a03
+    phase: cal-invites
+    owner: tom
+    subject: Leave day review 3
+    body: Review the open requests for the leave day.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "15:00"
+    end: "15:30"
+    attendees: [mia]
+  - id: a10
+    phase: cal-invites
+    owner: anna
+    subject: Offsite forward target
+    body: Plan the transport for the offsite.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "16:00"
+    end: "16:30"
+    attendees: [mia]
+  - id: t-a01
+    phase: cal-invites
+    owner: tom
+    subject: Hosting standby
+    body: Be reachable while the hosting moves.
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "08:00"
+    end: "08:30"
+    attendees: [mia]
+    answers:
+      - {who: mia, response: accept, comment: I will be reachable.}
+
+# One week of 40 short meetings, 8 for each day from Monday to Friday, two weeks after the next Monday.
+bulk:
+  phase: cal-bulk
+  subject: Slot
+  body: A short slot of the busy week.
+  time_zone: W. Europe Standard Time
+  week_shift: 14
+  days: 5
+  start: "08:00"
+  step_minutes: 75
+  per_day: 8
+  length_minutes: 20
+
+# Four events in the calendar of the seed team (phase cal-group, run by Mia after the phase teams).
+group_events:
+  - id: g01
+    subject: Team standup
+    body: Short status of every member.
+    time_zone: W. Europe Standard Time
+    day: nextMonday
+    start: "09:00"
+    end: "10:00"
+  - id: g02
+    subject: Release review
+    body: Check the release notes.
+    time_zone: W. Europe Standard Time
+    day: nextMonday+1
+    start: "14:00"
+    end: "15:00"
+  - id: g03
+    subject: Retro
+    body: What went well and what to change.
+    time_zone: W. Europe Standard Time
+    day: nextMonday+2
+    start: "16:00"
+    end: "17:00"
+  - id: g04
+    subject: Planning
+    body: Plan the next two weeks.
+    time_zone: W. Europe Standard Time
+    day: nextMonday+3
+    start: "10:00"
+    end: "11:00"
+
+# The working hours that two colleagues set, so that a comparison shows a difference.
+# `default` is what the cleanup writes back.
+settings:
+  default: {days: [monday, tuesday, wednesday, thursday, friday], start: "08:00", end: "17:00"}
+  time_zone: W. Europe Standard Time
+  users:
+    - {owner: anna, days: [monday, tuesday, wednesday, thursday], start: "08:00", end: "16:00"}
+    - {owner: tom, days: [monday, tuesday, wednesday, thursday, friday], start: "07:00", end: "15:30"}
 
 attachments:
   agenda:
@@ -87,8 +340,52 @@ contacts:
     phone: "+41 44 555 01 02"
     email: anna
 
+# A calendar named `seed-v1 <name>`. With `share`, the owner shares it with a persona and Mia
+# accepts the sharing mail by hand. `events` lie inside that calendar.
 calendars:
   - id: shared
     name: Shared calendar
   - id: spare
     name: Spare calendar
+  - id: anna-planning
+    phase: cal-shared
+    owner: anna
+    name: Anna Planning
+    share: {with: mia, role: write}
+    events:
+      - id: s01
+        subject: Design review
+        body: Review the pages of the relaunch.
+        day: nextMonday
+        start: "10:00"
+        end: "11:00"
+      - id: s02
+        subject: Budget walkthrough
+        body: Walk through the budget lines.
+        day: nextMonday
+        start: "14:00"
+        end: "15:00"
+      - id: s03
+        subject: Team lunch
+        body: Lunch with the team.
+        day: nextMonday+1
+        start: "12:00"
+        end: "13:00"
+  - id: tom-rota
+    phase: cal-shared
+    owner: tom
+    name: Tom Rota
+    share: {with: mia, role: read}
+    events:
+      - id: s04
+        subject: Early shift
+        body: Cover the service desk.
+        day: nextMonday
+        start: "07:00"
+        end: "15:00"
+      - id: s05
+        subject: Late shift
+        body: Cover the service desk.
+        day: nextMonday+1
+        start: "12:00"
+        end: "20:00"

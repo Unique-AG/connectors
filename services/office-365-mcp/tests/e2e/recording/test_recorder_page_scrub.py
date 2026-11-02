@@ -39,6 +39,7 @@ from tests.e2e.recording.scrub import (
     scrub,
 )
 from tests.e2e.test_scenarios import Json, attribute_in, mapping, select
+from tests.graph_fixtures import generate, response
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 KEPT = b"seed attachment bytes"
@@ -385,3 +386,65 @@ class TestOneNoteCases:
         ]
         assert mapping(picture.steps[-1]["bind"])["resource"] == "$prev.html~img[src]"
         assert page.needs == picture.needs == ("onenote_seed",)
+
+
+BIG_LABEL = "seed-v1 Big page"
+BIG_SIZE = 400_000
+BIG = Corpus(
+    "seed-v1",
+    frozenset({BIG_LABEL}),
+    frozenset({"a" * 64}),
+    (Persona("anna", 2, "Anna Meier"),),
+    normalized(BIG_LABEL),
+    {
+        "a" * 64: {
+            "generator": "onenote-html",
+            "size": 900_000,
+            "label": BIG_LABEL,
+            "sha256": "a" * 64,
+        }
+    },
+)
+
+
+def big_files(text: str) -> dict[str, bytes]:
+    markup = f"<html><head><title>{BIG_LABEL}</title></head><body><p>{text}</p></body></html>"
+    path = f"/v1.0/me/onenote/pages/{PAGE_ID}/content"
+    recording = Recording(
+        "page-scrub",
+        "rec-tool-page-scrub",
+        "stand-in",
+        datetime(2026, 10, 29, tzinfo=UTC),
+        (hop(path, markup.encode(), "text/html"),),
+        Identities(frozenset({stand_in.USER_ID, stand_in.UPN}), "token"),
+        {stand_in.UPN.casefold(): "mia"},
+        frozenset(),
+    )
+    return files_of(scrub(recording, BIG))
+
+
+class TestBigPage:
+    def test_a_text_node_that_the_generator_made_is_stored_as_a_stub_and_comes_back_whole(
+        self, tmp_path: Path
+    ) -> None:
+        text = generate("filler-text", BIG_SIZE, BIG_LABEL).decode()
+        files = big_files(text)
+        shown = page_text(files)
+        assert len(shown) < 1000
+        assert f"&lt;generated:filler-text:{BIG_SIZE}:{BIG_LABEL}&gt;" in shown
+        assert lint_files(files, {stand_in.USER_ID, stand_in.UPN}, BIG) == []
+        _ = (tmp_path / "page.html").write_bytes(files["bodies/rec-tool-page-scrub.01.html"])
+        replayed = response({"body": "page.html", "status": 200}, tmp_path)
+        assert text in replayed.text
+
+    def test_a_large_text_node_that_the_generator_did_not_make_is_replaced(self) -> None:
+        shown = page_text(big_files("x" * BIG_SIZE))
+        assert "generated:" not in shown
+        assert "synthetic text 01" in shown
+
+    def test_a_stub_for_a_label_that_the_corpus_lacks_fails_the_lint(self) -> None:
+        files = big_files(generate("filler-text", BIG_SIZE, BIG_LABEL).decode())
+        name = "bodies/rec-tool-page-scrub.01.html"
+        files[name] = files[name].replace(BIG_LABEL.encode() + b"&gt;", b"other&gt;")
+        found = lint_files(files, {stand_in.USER_ID}, BIG)
+        assert any("not corpus text" in line for line in found)

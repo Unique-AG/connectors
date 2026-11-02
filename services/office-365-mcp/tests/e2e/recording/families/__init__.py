@@ -6,7 +6,7 @@ import pkgutil
 import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from types import ModuleType
 from typing import cast
@@ -36,6 +36,8 @@ class Merged:
     unrecorded: Mapping[str, str]
     probes: Mapping[str, tuple[int, str, int]]
     gaps: Mapping[str, int]
+    address_uses: Mapping[str, frozenset[str]] = field(default_factory=dict[str, frozenset[str]])
+    inviters: frozenset[str] = frozenset()
 
 
 def _union[V](name: str, parts: list[Mapping[str, V]]) -> dict[str, V]:
@@ -44,6 +46,19 @@ def _union[V](name: str, parts: list[Mapping[str, V]]) -> dict[str, V]:
         for key, value in part.items():
             if merged.setdefault(key, value) != value:
                 raise ValueError(f"{name}: {key} is claimed twice with different values")
+    return merged
+
+
+_ADDRESS_VARIABLE = re.compile(r"SEED_[A-Z]+_UPN")
+
+
+def _address_uses(parts: Sequence[Mapping[str, frozenset[str]]]) -> dict[str, frozenset[str]]:
+    merged: dict[str, frozenset[str]] = {}
+    for part in parts:
+        for name, tools in part.items():
+            if _ADDRESS_VARIABLE.fullmatch(name) is None:
+                raise ValueError(f"ADDRESSES: {name} is not a SEED_<KIND>_UPN variable")
+            merged[name] = merged.get(name, frozenset()) | tools
     return merged
 
 
@@ -102,6 +117,14 @@ def merge(modules: Sequence[ModuleType]) -> Merged:
     )
     if bad := [p.pattern for p in thread_id if _broad(p)]:
         raise ValueError(f"THREAD_ID must hold whole-token Teams id shapes: {bad}")
+    uses = _address_uses(get("ADDRESSES", cast("Mapping[str, frozenset[str]]", {})))
+    inviters = _all(get("INVITERS", frozenset[str]()))
+    unknown = sorted(
+        (inviters - write_tools.keys())
+        | {tool for tools in uses.values() for tool in tools} - _all(reads) - write_tools.keys()
+    )
+    if unknown:
+        raise ValueError(f"INVITERS and ADDRESSES name tools that no family claims: {unknown}")
     return Merged(
         _all(reads),
         read_posts,
@@ -120,6 +143,8 @@ def merge(modules: Sequence[ModuleType]) -> Merged:
         _union("UNRECORDED", get("UNRECORDED", cast("Mapping[str, str]", {}))),
         _union("PROBES", get("PROBES", cast("Mapping[str, tuple[int, str, int]]", {}))),
         gaps,
+        uses,
+        inviters,
     )
 
 

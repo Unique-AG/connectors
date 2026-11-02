@@ -32,7 +32,7 @@ from tests.e2e.recording.record import (
 from tests.e2e.recording.scrub import load_corpus
 from tests.e2e.recording.stand_in import UPN
 from tests.e2e.recording.stand_in import UPNS as STAND_IN_UPNS
-from tests.e2e.test_scenarios import Json, build_server, items, mapping
+from tests.e2e.test_scenarios import Json, build_server, generated, items, mapping
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 LIST_CASE = "outlook_list_mail-inbox"
@@ -383,7 +383,7 @@ def test_each_step_of_every_case_fits_the_input_schema_of_its_tool(
         {one.key: str(UUID(int=one.index)) for one in load_corpus().personas},
         synthetic=False,
     )
-    args = mapping(with_personas(step.get("args", {}), personas))
+    args = mapping(generated(with_personas(step.get("args", {}), personas)))
     given = args.keys() | mapping(step.get("bind", {})).keys()
     assert given <= properties.keys(), (
         f"{case_id} step {number}: unknown {given - properties.keys()}"

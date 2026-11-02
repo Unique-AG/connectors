@@ -1,5 +1,8 @@
+import html
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+
+from tests.e2e.recording.families import Scrubber
 
 READ_TOOLS = frozenset(
     {
@@ -14,6 +17,7 @@ READ_TOOLS = frozenset(
         "teams_search_messages",
         "teams_list_meeting_recordings",
         "teams_list_meeting_transcripts",
+        "teams_read_transcript",
     }
 )
 READ_POSTS: Mapping[str, tuple[str, ...]] = {
@@ -21,6 +25,7 @@ READ_POSTS: Mapping[str, tuple[str, ...]] = {
 }
 _POSTS = "/v1.0/teams/*/channels/*/messages"
 _REPLIES = f"{_POSTS}/*/replies"
+_CHAT_MESSAGE = "/v1.0/chats/*/messages/*"
 _MEETINGS = "/v1.0/me/onlineMeetings"
 WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "teams_list_message_replies": (),
@@ -33,8 +38,14 @@ WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
         f"POST {_POSTS}/*/unsetReaction",
         f"POST {_REPLIES}/*/setReaction",
         f"POST {_REPLIES}/*/unsetReaction",
+        f"POST {_CHAT_MESSAGE}/setReaction",
+        f"POST {_CHAT_MESSAGE}/unsetReaction",
     ),
-    "teams_delete_message": (f"POST {_POSTS}/*/softDelete", f"POST {_REPLIES}/*/softDelete"),
+    "teams_delete_message": (
+        f"POST {_POSTS}/*/softDelete",
+        f"POST {_REPLIES}/*/softDelete",
+        "POST /v1.0/me/chats/*/messages/*/softDelete",
+    ),
     "teams_create_meeting": (f"POST {_MEETINGS}/createOrGet",),
     "teams_update_meeting": (f"PATCH {_MEETINGS}/*",),
     "teams_delete_meeting": (f"DELETE {_MEETINGS}/*",),
@@ -60,6 +71,8 @@ EXTERNAL = frozenset(
     }
     | {"teams_send_chat_message", "teams_send_chat_message_with_files"}
 )
+INVITERS = frozenset({"teams_create_meeting", "teams_update_meeting"})
+ADDRESSES: Mapping[str, frozenset[str]] = {"SEED_GUEST_UPN": INVITERS}
 PREFIXES = ("/v1.0/teams/", "/v1.0/chats/")
 THREAD_ID = (
     re.compile(r"[\w\-=.]+@thread\.(?:v2|tacv2|skype)"),
@@ -68,13 +81,15 @@ THREAD_ID = (
 SCHEMA: Mapping[str, str] = {
     **dict.fromkeys(
         ("tenantId", "userId", "chatId", "teamId", "channelId", "replyToId", "etag", "threadId")
-        + ("replyChatMessageId", "calendarEventId", "externalId", "teamsAppId"),
+        + ("replyChatMessageId", "calendarEventId", "externalId", "teamsAppId")
+        + ("meetingId", "callId", "contentCorrelationId"),
         "id",
     ),
     **dict.fromkeys(("topic", "mentionText"), "text"),
     **dict.fromkeys(
         ("lastUpdatedDateTime", "lastEditedDateTime", "deletedDateTime", "creationDateTime")
-        + ("endDateTime", "visibleHistoryStartDateTime", "lastMessageReadDateTime"),
+        + ("endDateTime", "visibleHistoryStartDateTime", "lastMessageReadDateTime")
+        + ("meetingStartDateTime", "meetingEndDateTime", "joinDateTime", "leaveDateTime"),
         "date",
     ),
     **dict.fromkeys(
@@ -83,51 +98,88 @@ SCHEMA: Mapping[str, str] = {
         "enum",
     ),
     **dict.fromkeys(
-        ("isArchived", "isHidden", "isDeleted", "isDialInBypassEnabled", "messageId"), "number"
+        ("isArchived", "isHidden", "isDeleted", "isDialInBypassEnabled", "messageId")
+        + ("totalParticipantCount", "totalAttendanceInSeconds", "durationInSeconds"),
+        "number",
     ),
-    **dict.fromkeys(("joinWebUrl", "contentUrl", "thumbnailUrl"), "url"),
+    **dict.fromkeys(
+        ("joinWebUrl", "contentUrl", "thumbnailUrl", "transcriptContentUrl", "recordingContentUrl"),
+        "url",
+    ),
     "upn": "address",
     **dict.fromkeys(
         ("members", "onlineMeetingInfo", "organizer", "viewpoint", "lastMessagePreview")
         + ("eventDetail", "application", "device", "attachments", "mentions", "mentioned")
         + ("reactions", "channelIdentity", "participants", "attendees", "identity")
-        + ("chatInfo", "lobbyBypassSettings"),
+        + ("chatInfo", "lobbyBypassSettings", "replies", "meetingOrganizer")
+        + ("attendanceRecords", "attendanceIntervals"),
         "object",
     ),
 }
 _MEETING = (
-    "Sign in to Teams as Mia. Start a meeting with Anna. Turn on recording and transcription. "
-    + "Join as Mia and as Anna. Talk for one minute. End the meeting. Wait one hour."
+    "Run record_all.sh meeting all. Mia, Anna and Tom join the meeting. As Mia, start the "
+    + "recording and the transcription. Each person reads aloud the lines of that person in "
+    + "the transcript of scripts/dogfood/seed/corpus/teams.yaml. Then all three stop and leave."
 )
-UNRECORDED: Mapping[str, str] = {
-    "teams_read_transcript": (
-        f"{_MEETING} Then add a case that reads the first transcript, and a scrub policy for the "
-        + "VTT file: it holds spoken words, so the scrub refuses it today."
-    ),
-}
+_SEED_ORDER = (
+    "Run run_all.sh apply with --phases teams,teams-posts,teams-chats for the indexes 1, 2 and 3, "
+    + "in this order. Then wait one hour for the search index."
+)
 NEEDS: Mapping[str, str] = {
     "teams-team": (
         'Sign in to Teams as Mia. Create a team named "seed-v1 team". Add Anna and Tom as the '
         + "only other members."
     ),
     "teams-seed-team": (
-        'Run record_all.sh seed. Mia creates the team "seed-v1 team" with a General channel, and '
-        + "Anna and Tom are its only other members. The login of Mia must have consented to "
-        + "Team.Create. Then run record_all.sh discover again."
+        f"{_SEED_ORDER} Mia creates the team, its channels and its posts. The login of Mia must "
+        + "have consented to Team.Create and Channel.Create. Then run record_all.sh discover again."
     ),
+    "teams-seed-chats": f"{_SEED_ORDER} Then run record_all.sh discover again.",
     "teams-chat": (
         "Sign in to Teams as Mia. Start a group chat with Anna and Tom. Send one message in the "
         + "chat."
     ),
     "teams-meeting": _MEETING,
+    "teams-meeting-attendance": _MEETING,
 }
-_CALENDAR = (
-    "/me/calendarView?startDateTime=2026-01-01T00:00:00Z&endDateTime=2032-01-01T00:00:00Z"
-    + "&$filter=isOnlineMeeting eq true&$top=1"
-)
+_SEED_CHAT = "/me/chats?$filter=topic eq 'seed-v1 case-teams-unread chat'"
 PROBES: Mapping[str, tuple[int, str, int]] = {
     "teams-team": (1, "/me/joinedTeams", 1),
     "teams-seed-team": (1, "/me/joinedTeams#seed", 1),
+    "teams-seed-chats": (1, _SEED_CHAT, 1),
     "teams-chat": (1, "/me/chats", 1),
-    "teams-meeting": (1, _CALENDAR, 1),
+    "teams-meeting-attendance": (1, "/me/onlineMeetings/{meeting}/attendanceReports", 1),
+    "teams-meeting": (1, "/me/onlineMeetings/{meeting}/transcripts", 1),
 }
+_STAMP = r"-?(?:\d+:)?\d{1,2}:\d{1,2}[.,]\d{1,3}"
+_TIMING = re.compile(rf"{_STAMP} --> {_STAMP}")
+_VOICE = re.compile(r"<v(?:\.[^\s>]+)?\s+([^>]*)>(.*?)(?:</v>)?$")
+_MARKUP = re.compile(r"<[^>]*>")
+
+
+def _spoken(text: Callable[[str], str], line: str) -> str:
+    voice = _VOICE.match(line.strip())
+    speaker = html.unescape(voice[1]).strip() if voice else ""
+    said = voice[2] if voice else line
+    words = " ".join(html.unescape(_MARKUP.sub("", said)).replace("\xa0", " ").split())
+    kept = html.escape(text(words), quote=False) if words else ""
+    return f"<v {html.escape(text(speaker), quote=False)}>{kept}</v>" if speaker and kept else kept
+
+
+def _cue(text: Callable[[str], str], number: int, lines: list[str]) -> str | None:
+    for at, line in enumerate(lines):
+        if timing := _TIMING.match(line):
+            said = [one for one in (_spoken(text, rest) for rest in lines[at + 1 :]) if one]
+            return "\n".join([f"cue-{number}", timing[0], *said]) if said else None
+    return None
+
+
+def vtt(text: Callable[[str], str], raw: str) -> str:
+    cues: list[str] = []
+    for block in re.split(r"\n\s*\n", raw.removeprefix("\ufeff").replace("\r\n", "\n")):
+        if (cue := _cue(text, len(cues) + 1, block.split("\n"))) is not None:
+            cues.append(cue)
+    return "\n\n".join(["WEBVTT", *cues]) + "\n"
+
+
+BODIES: Mapping[str, Scrubber] = {"text/vtt": vtt}

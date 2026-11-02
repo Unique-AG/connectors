@@ -33,7 +33,8 @@ import yaml
 
 from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import GRAPH_HOST, Refused
-from tests.e2e.test_scenarios import _DATETIME, Json
+from tests.e2e.test_scenarios import _DATETIME, Json, day_named
+from tests.graph_fixtures import generate
 
 SCRUB_VERSION = "1.0.0"
 SEED = Path(__file__).resolve().parents[3] / "scripts" / "dogfood" / "seed"
@@ -41,7 +42,12 @@ SYNTHETIC_DOMAIN = "example.test"
 RESPONSE_HEADERS = frozenset({"content-type", "location", "retry-after", "preference-applied"})
 SDKS = ("msgraph-sdk", "msgraph-core", "microsoft-kiota-http", "httpx", "fastmcp")
 
-type Kind = Literal["text", "id", "address", "date", "enum", "number", "url", "path", "object"]
+LARGE_BODY = 256 * 1024
+_NO_TOKENS: frozenset[str] = frozenset()
+
+type Kind = Literal[
+    "text", "id", "address", "date", "time", "enum", "number", "url", "path", "object"
+]
 
 _CORE_SCHEMA: Mapping[str, Kind] = {
     **dict.fromkeys(
@@ -98,6 +104,7 @@ _DATE = re.compile(r"\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?")
 _ENUM = re.compile(r"[A-Za-z#][A-Za-z0-9 .#()+\-:/_;=]{0,99}")
 _TOKEN = re.compile(r"[A-Za-z#$][A-Za-z0-9._#$\-]{0,63}")
 _TOKEN_LIST = re.compile(r"[a-z][A-Za-z]*(?:, ?[a-z][A-Za-z]*)+")
+_TIME = re.compile(r"\d{2}:\d{2}:\d{2}(?:\.\d+)?")
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 _ADDRESS = re.compile(r"[^\s@<>()\[\],;:\"']+@[a-z0-9\-]+(?:\.[a-z0-9\-]+)+")
 _ADDRESS_IN = re.compile(r"[^\s@<>()\[\],;:\"'=&?/]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
@@ -187,6 +194,7 @@ class Recording:
     identities: Identities
     personas: Mapping[str, str]
     literals: frozenset[str]
+    tokens: frozenset[str] = frozenset()
 
     @override
     def __repr__(self) -> str:
@@ -207,6 +215,7 @@ class Corpus:
     binaries: frozenset[str]
     personas: tuple[Persona, ...]
     blob: str = field(repr=False)
+    generated: Mapping[str, Json] = field(default_factory=dict[str, Json])
 
     def accepts(self, value: str, extra: str = "") -> bool:
         if _PLACEHOLDER.fullmatch(value) or value in WELL_KNOWN_TEXT:
@@ -222,12 +231,37 @@ class Corpus:
         return True
 
 
-def holds_bytes(corpus: Corpus, encoded: str) -> bool:
+def attachment_hash(corpus: Corpus, encoded: str) -> str | None:
     try:
-        raw = base64.b64decode(encoded, validate=True)
+        found = hashlib.sha256(base64.b64decode(encoded, validate=True)).hexdigest()
     except ValueError:
-        return False
-    return hashlib.sha256(raw).hexdigest() in corpus.binaries
+        return None
+    return found if found in corpus.binaries else None
+
+
+def holds_bytes(corpus: Corpus, encoded: str) -> bool:
+    return attachment_hash(corpus, encoded) is not None
+
+
+def stub_of(corpus: Corpus, sha: str) -> bytes:
+    made = {k: corpus.generated[sha][k] for k in ("generator", "size", "label")} | {"sha256": sha}
+    return (json.dumps(made, indent=2, sort_keys=True) + "\n").encode()
+
+
+FILLER_STUB = re.compile(r"<generated:filler-text:(\d+):(.+)>")
+
+
+def filler_stub(corpus: Corpus, raw: str) -> str | None:
+    if len(raw) <= LARGE_BODY:
+        return None
+    for entry in corpus.generated.values():
+        label = str(entry["label"])
+        if (
+            entry["generator"] == "onenote-html"
+            and generate("filler-text", len(raw), label) == raw.encode()
+        ):
+            return f"<generated:filler-text:{len(raw)}:{label}>"
+    return None
 
 
 def _within(normal: str, blob: str, cut: bool) -> bool:
@@ -255,12 +289,14 @@ def load_corpus() -> Corpus:
         for key, one in cast("Mapping[str, Json]", loaded["personas"]).items()
     )
     strings = frozenset(cast("list[str]", manifest["strings"]))
-    binaries = frozenset(str(one["sha256"]) for one in cast("list[Json]", manifest["binaries"]))
+    listed = cast("list[Json]", manifest["binaries"])
+    binaries = frozenset(str(one["sha256"]) for one in listed)
+    generated = {str(one["sha256"]): one for one in listed if "generator" in one}
     blob = "\x00".join(normalized(one) for one in sorted(strings))
-    return Corpus(str(manifest["tag"]), strings, binaries, personas, blob)
+    return Corpus(str(manifest["tag"]), strings, binaries, personas, blob, generated)
 
 
-_PAGE_CONTENT = re.compile(r"/v1\.0/me/onenote/pages/[^/]+/content")
+_PAGE_CONTENT = re.compile(r"/v1\.0/(?:me|groups/[^/]+)/onenote/pages/[^/]+/content")
 _PAGE_IDS = frozenset({"id", "data-id"})
 _PAGE_URLS = frozenset({"src", "data-fullres-src", "data", "href"})
 PAGE_EMBEDS = frozenset({"src", "data-fullres-src", "data"})
@@ -274,6 +310,10 @@ _PAGE_NAME = re.compile(r"[a-z][a-z0-9\-]*")
 _PAGE_FONT = re.compile(r"(font-family:[A-Za-z ]+)(?=;|$)")
 type PageText = Callable[[str], str]
 type PageAttribute = Callable[[str, str], str]
+
+
+def media_type(hop: Hop) -> str:
+    return dict((k.lower(), v) for k, v in hop.headers).get("content-type", "").partition(";")[0]
 
 
 def is_page_content(hop: Hop) -> bool:
@@ -438,9 +478,12 @@ class Mapper:
     texts: dict[str, str] = field(default_factory=dict[str, str])
     addresses: dict[str, str] = field(default_factory=dict[str, str])
     homes: dict[str, str] = field(default_factory=dict[str, str])
+    speakers: dict[str, str] = field(default_factory=dict[str, str])
     hosts: dict[str, str] = field(default_factory=dict[str, str])
     counts: Counter[str] = field(default_factory=Counter[str])
     dropped: Counter[str] = field(default_factory=Counter[str])
+    stubs: dict[str, bytes] = field(default_factory=dict[str, bytes])
+    sizes: list[int] = field(default_factory=list[int])
 
     def text(self, raw: str, exact: bool = False) -> str:
         kept = raw in self.corpus.strings if exact else self.corpus.accepts(raw, self.extra)
@@ -449,6 +492,9 @@ class Mapper:
             return raw
         self.counts["text replaced"] += 1
         return self.texts.setdefault(raw, f"synthetic text {len(self.texts) + 1:02d}")
+
+    def voice(self, raw: str) -> str:
+        return self.speakers.get(raw.strip().casefold()) or self.text(raw)
 
     def id(self, raw: str) -> str:
         if not raw:
@@ -584,6 +630,9 @@ class Mapper:
                 return self.text(value)
 
     def request_value(self, raw: str) -> str:
+        if len(raw) > LARGE_BODY:
+            self.sizes.append(len(raw))
+            return f"<generated:{len(raw)}>"
         if raw in self.ids:
             return self.id(raw)
         if _GUID.fullmatch(raw):
@@ -614,18 +663,28 @@ class Mapper:
             owner = self.persona_name(found)
             for key, one in sorted(found.items()):
                 nested = isinstance(one, Mapping)
-                if key not in SCHEMA or (nested and SCHEMA[key] != "object"):
+                if key == "timeZone" and nested:
+                    zone = cast("Json", one).get("name")
+                    kept[key] = {"name": self._string(str(zone), "enum")} if zone else {}
+                    continue
+                if key not in SCHEMA or (nested and SCHEMA[key] != "object" and key != "status"):
                     self.counts["keys dropped"] += 1
                     self.dropped[key] += 1
                     continue
                 if owner and key in _NAME_KEYS and isinstance(one, str):
                     self.counts["persona names"] += 1
+                    self.speakers[one.strip().casefold()] = owner
                     kept[key] = owner
                     continue
-                if key == "contentBytes" and isinstance(one, str) and holds_bytes(self.corpus, one):
-                    self.counts["attachments kept by hash"] += 1
-                    kept[key] = one
-                    continue
+                if key == "contentBytes" and isinstance(one, str):
+                    sha = attachment_hash(self.corpus, one)
+                    if sha is not None:
+                        self.counts["attachments kept by hash"] += 1
+                        if len(one) > LARGE_BODY and sha in self.corpus.generated:
+                            self.stubs[f"{sha}.gen"] = stub_of(self.corpus, sha)
+                            one = f"<generated:{sha}>"
+                        kept[key] = one
+                        continue
                 kept[key] = self.response(one, SCHEMA[key])
             return kept
         return self._string(str(value), kind)
@@ -641,6 +700,8 @@ class Mapper:
             case "path":
                 return self.path(raw, api=True)
             case "date" | "object" if _DATE.fullmatch(raw):
+                return raw
+            case "time" if _TIME.fullmatch(raw):
                 return raw
             case "enum" if _ENUM.fullmatch(raw) and "@" not in raw:
                 return raw
@@ -700,13 +761,18 @@ def _unchanged(text: str) -> str:
     return text
 
 
-def _symbols(day: date, where: str) -> Callable[[str], str]:
+def _symbols(day: date, where: str, tokens: frozenset[str] = _NO_TOKENS) -> Callable[[str], str]:
+    named = {day_named(word.removeprefix("~"), day): word for word in sorted(tokens)}
+
     def symbol(found: re.Match[str]) -> str:
-        offset = (date.fromisoformat(found[0][:10]) - day).days
+        wanted = date.fromisoformat(found[0][:10])
+        if wanted in named:
+            return named[wanted]
+        offset = (wanted - day).days
         if offset not in _SYMBOLS:
             raise Refused(
                 f"{where}: a request date is {offset} days from the record day, and the runner "
-                + "has a symbol only for -1, 0 and +1"
+                + "has a symbol only for -1, 0 and +1 and for the day tokens of the case"
             )
         return _SYMBOLS[offset]
 
@@ -723,9 +789,12 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
     interactions: list[dict[str, object]] = []
     bodies: dict[str, bytes] = {}
     followed: list[tuple[str, list[tuple[str, str]]]] = []
+    request_sizes: dict[int, list[int]] = {}
     for n, (hop, body) in enumerate(zip(recording.hops, parsed, strict=True), 1):
         where = f"{recording.scenario} hop {n}"
-        symbolize = _unchanged if _target(hop.url) in followed else _symbols(day, where)
+        symbolize = (
+            _unchanged if _target(hop.url) in followed else _symbols(day, where, recording.tokens)
+        )
         asked = hop.asked
         api = asked["host"] == GRAPH_HOST
         interaction: dict[str, object] = {"method": asked["method"]}
@@ -738,7 +807,10 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         if query:
             interaction["query"] = {key: symbolize(value) for key, value in query.items()}
         if asked["json"] is not None:
+            before = len(mapper.sizes)
             interaction["json"] = mapper.request(asked["json"], symbolize)
+            if sizes := mapper.sizes[before:]:
+                request_sizes[n] = sizes
         interaction["status"] = hop.status
         headers = {k.lower(): v for k, v in hop.headers if k.lower() in RESPONSE_HEADERS}
         mapper.counts["response headers dropped"] += len(hop.headers) - len(headers)
@@ -757,13 +829,21 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         elif is_page_content(hop):
             name = f"{recording.fixture}.{n:02d}.html"
             page = rewritten_page(
-                hop.body.decode(errors="replace"), mapper.text, mapper.page_attribute
+                hop.body.decode(errors="replace"),
+                lambda raw: filler_stub(corpus, raw) or mapper.text(raw),
+                mapper.page_attribute,
             )
             mapper.counts["page htmls scrubbed"] += 1
             bodies[name] = page.encode()
             interaction["body"] = name
+        elif hop.body and (scrubber := load().bodies.get(media_type(hop))) is not None:
+            name = f"{recording.fixture}.{n:02d}.{media_type(hop).rpartition('/')[2]}"
+            mapper.counts["scrubbed bodies"] += 1
+            bodies[name] = scrubber(mapper.voice, hop.body.decode(errors="replace")).encode()
+            interaction["body"] = name
         elif hop.body:
-            if hashlib.sha256(hop.body).hexdigest() not in corpus.binaries:
+            sha = hashlib.sha256(hop.body).hexdigest()
+            if sha not in corpus.binaries:
                 raise Refused(
                     f"{where}: a binary body of {len(hop.body)} bytes is not a file that the seed "
                     + "generator made (plan v3 R2c); nothing was written"
@@ -772,10 +852,15 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
             media = headers.get("content-type", "")
             suffix = next((s for k, s in _SUFFIXES.items() if k in media), ".bin")
             name = f"{recording.fixture}.{n:02d}{suffix}"
-            bodies[name] = hop.body
+            if len(hop.body) > LARGE_BODY and sha in corpus.generated:
+                name = f"{sha}.gen"
+                mapper.stubs[name] = stub_of(corpus, sha)
+            else:
+                bodies[name] = hop.body
             interaction["body"] = name
         interactions.append(interaction)
     counts = dict(sorted(mapper.counts.items()))
+    bodies |= mapper.stubs
     metadata: dict[str, object] = {
         "scenario": recording.scenario,
         "fixture": recording.fixture,
@@ -785,6 +870,11 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         "scrub_version": SCRUB_VERSION,
         "replacements": counts,
         "literals": sorted(recording.literals),
+        **(
+            {"request_size": {str(n): sizes for n, sizes in request_sizes.items()}}
+            if request_sizes
+            else {}
+        ),
         "sdk_versions": {name: version(name) for name in SDKS},
     }
     return Fixture(

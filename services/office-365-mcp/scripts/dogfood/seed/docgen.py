@@ -4,8 +4,11 @@ Every timestamp inside a file is a constant, so the same corpus gives the same b
 same SHA-256 on every run and every day.
 """
 
+import base64
+import hashlib
 import io
 import zipfile
+from collections.abc import Callable, Mapping
 from xml.sax.saxutils import escape
 
 FIXED_ZIP_TIME = (2026, 1, 5, 9, 0, 0)
@@ -193,3 +196,32 @@ def pdf(lines: list[str], props: dict[str, str]) -> bytes:
         xref_at,
     )
     return bytes(out)
+
+
+def filler(size: int, label: str) -> bytes:
+    return hashlib.shake_256(label.encode()).digest(size)
+
+
+def filler_text(size: int, label: str) -> bytes:
+    return base64.b64encode(filler(size * 3 // 4 + 3, label))[:size]
+
+
+def onenote_html(size: int, label: str) -> bytes:
+    head = f"<!DOCTYPE html><html><head><title>{escape(label)}</title></head><body><p>".encode()
+    tail = b"</p></body></html>"
+    if size < len(head) + len(tail):
+        raise ValueError(f"onenote-html needs at least {len(head) + len(tail)} bytes")
+    return head + filler_text(size - len(head) - len(tail), label) + tail
+
+
+GENERATORS: Mapping[str, Callable[[int, str], bytes]] = {
+    "filler": filler,
+    "filler-text": filler_text,
+    "onenote-html": onenote_html,
+}
+
+
+def generate(generator: str, size: int, label: str) -> bytes:
+    if generator not in GENERATORS:
+        raise ValueError(f"no generator named {generator}")
+    return GENERATORS[generator](size, label)

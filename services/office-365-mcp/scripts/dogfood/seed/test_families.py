@@ -41,7 +41,7 @@ def test_a_family_adds_its_steps_to_the_plan(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_cleanup_cases_deletes_only_what_the_sweep_names(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = FakeGraph()
-    assert run(["apply", "--as", "1", "--phase", "files"], fake) == 0
+    assert run(["apply", "--as", "1", "--phases", "files"], fake) == 0
     case = {"id": "case-1", "name": "seed-v1 case-x", "parent": "root", "folder": False}
     fake.drive["case-1"] = case
     fake.calls.clear()

@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# Usage: run_all.sh verify|apply|cleanup-dry|cleanup [index ...]   (indexes default to 1 2 3)
+# Usage: run_all.sh verify|apply|cleanup-dry|cleanup|cleanup-cases [--phases a,b] [index ...]
+# The indexes default to 1 2 3 and run in the order that you give. --phases goes to apply, cleanup and cleanup-dry.
 # SEED_UPNS lists the three test users in the order Mia, Anna, Tom. Index N signs in as the Nth address.
 # Each user signs in once (first run only); later runs use the cached refresh token.
 # Needs ENTRA_TENANT_ID and ENTRA_CLIENT_ID.
 set -euo pipefail
 
-command="${1:?usage: run_all.sh verify|apply|cleanup-dry|cleanup [index ...]}"
+command="${1:?usage: run_all.sh verify|apply|cleanup-dry|cleanup|cleanup-cases [--phases a,b] [index ...]}"
 shift
+phases=()
+if [ "${1:-}" = "--phases" ]; then
+  phases=(--phases "${2:?--phases needs a comma-separated list}")
+  shift 2
+fi
 indexes=("${@:-1 2 3}")
 read -r -a indexes <<<"${indexes[*]}"
 cd "$(dirname "$0")/../.."
@@ -23,9 +29,10 @@ for index in "${indexes[@]}"; do
   export GRAPH_TOKEN
   case "$command" in
     verify) "$python" -W ignore scripts/dogfood/seed/verify.py --as "$index" ;;
-    apply) "$python" -W ignore scripts/dogfood/seed/seed.py apply --as "$index" ;;
-    cleanup-dry) "$python" -W ignore scripts/dogfood/seed/seed.py cleanup --as "$index" --dry-run ;;
-    cleanup) "$python" -W ignore scripts/dogfood/seed/seed.py cleanup --as "$index" ;;
+    apply) "$python" -W ignore scripts/dogfood/seed/seed.py apply --as "$index" ${phases[@]+"${phases[@]}"} ;;
+    cleanup-dry) "$python" -W ignore scripts/dogfood/seed/seed.py cleanup --as "$index" --dry-run ${phases[@]+"${phases[@]}"} ;;
+    cleanup) "$python" -W ignore scripts/dogfood/seed/seed.py cleanup --as "$index" ${phases[@]+"${phases[@]}"} ;;
+    cleanup-cases) "$python" -W ignore scripts/dogfood/seed/seed.py cleanup --as "$index" --cases ;;
     *) echo "unknown command: $command" >&2; exit 2 ;;
   esac
   unset GRAPH_TOKEN

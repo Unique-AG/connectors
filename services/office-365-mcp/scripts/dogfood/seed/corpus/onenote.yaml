@@ -34,3 +34,25 @@ notebooks:
   - name: Spare
     sections:
       - name: Leftovers
+
+# The notebook of the seed team. A group owns it, so Graph cannot delete it.
+group_notebooks:
+  - name: Shared Notes
+    sections:
+      - name: Team notes
+        pages:
+          - title: Team plan
+            paragraphs:
+              - id: intro
+                text: The team plan has three parts.
+              - id: plan
+                text: The team meets on Monday to plan the week.
+              - id: risk
+                text: The main risk is a late print proof.
+
+# One page of about 900 KB in an existing section. The text comes from docgen, not from the corpus.
+big_page:
+  notebook: Dogfood Notes
+  section: Planning
+  title: Big page
+  size: 900000

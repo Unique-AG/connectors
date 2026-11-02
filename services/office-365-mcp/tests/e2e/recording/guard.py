@@ -6,8 +6,9 @@ import html
 import json
 import re
 import unicodedata
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from email.utils import getaddresses
 from fnmatch import fnmatchcase
 from typing import cast
@@ -43,12 +44,20 @@ _CREATE_OR_GET = "/v1.0/me/onlineMeetings/createOrGet"
 _TEAM_CHANNELS = re.compile(r"/v1\.0/teams/([^/]+)/channels")
 _OTHER_USER = re.compile(r"/v1\.0/users/([^/]+)")
 _BOUND_USER = re.compile(r"/users\('([^']*)'\)")
+_SHARED = "SEED_SHARED_UPN"
+_CALENDAR_FIELDS = frozenset({"canEdit", "canShare", "isDefaultCalendar"})
+_REPLY = "json.automaticRepliesSetting."
+SCHEDULED_REPLY_DAYS = 3
 _SEPARATORS = re.compile(r"[\s,;:'\"()<>&?=/\[\]{}|\\]+")
 _ANNOTATION_KEY = re.compile(r"(?<=[?&])(?:%40|@)microsoft\.graph\.[A-Za-z]+(?==)")
 
 
 class Refused(Exception):
     pass
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def unwrapped(text: str) -> str:
@@ -149,6 +158,20 @@ class Guard:
     drafted: dict[str, tuple[str, ...]] = field(default_factory=dict[str, tuple[str, ...]])
     redirect: str | None = None
     write_failed: bool = False
+    extras: Mapping[str, str] = field(default_factory=dict[str, str])
+    case_chats: set[str] = field(default_factory=set[str])
+    shared_calendars: set[str] = field(default_factory=set[str])
+    now: Callable[[], datetime] = _utc_now
+
+    def _extra_for(self, tool: str, variable: str | None = None) -> frozenset[str]:
+        return frozenset(
+            address.casefold()
+            for name, address in self.extras.items()
+            if tool in FAMILIES.address_uses.get(name, ()) and variable in (None, name)
+        )
+
+    def _addresses(self, tool: str) -> frozenset[str]:
+        return self.allowed_addresses | self._extra_for(tool)
 
     def refuses_call(self, tool: str, args: Mapping[str, object]) -> str | None:
         writes = tool in WRITE_TOOLS
@@ -157,13 +180,17 @@ class Guard:
         if writes and not self.allow_writes:
             return f"{tool} is a write and needs --allow-writes"
         mailbox = args.get("mailbox")
-        if mailbox is not None and str(mailbox).casefold() != self.allowed_upn.casefold():
+        mailboxes = {self.allowed_upn.casefold()} | self._extra_for(tool, _SHARED)
+        if mailbox is not None and str(mailbox).casefold() not in mailboxes:
             return f"{tool} args.mailbox names a mailbox that is not the recording user's"
         inviting = sorted(key for key in INVITING_ARGUMENTS if args.get(key))
-        if writes and inviting:
+        if writes and inviting and tool not in FAMILIES.inviters:
             return f"{tool} would invite people or rooms through {inviting}"
+        for where, value in strings({key: args[key] for key in inviting} if writes else {}):
+            if "@" not in value and value not in self.people and not _name(where):
+                return f"{tool} would invite {where}, which is no address and no id of a test user"
         for where, value in strings(args):
-            if (outside := foreign_address(value, self.allowed_addresses)) is not None:
+            if (outside := foreign_address(value, self._addresses(tool))) is not None:
                 return f"{tool} {where} holds {outside}"
         return None
 
@@ -177,28 +204,35 @@ class Guard:
 
     def _refuses(self, request: httpx.Request, tool: str) -> str | None:
         method, host = request.method, request.url.host
-        path = self._own(unquote(request.url.path))
+        path = self._own(unquote(request.url.path), tool)
         shown = f"{method} {path}"
+        shared = path != unquote(request.url.path) and self._own(unquote(request.url.path)) == (
+            unquote(request.url.path)
+        )
+        addresses = self._addresses(tool)
         if request.url.scheme != "https":
             return f"{shown} does not use https"
         if host != GRAPH_HOST:
             return self._refuses_hop(request)
+        decoded = unwrapped(request.url.path)
+        if "\\" in decoded or any(part in ("", ".", "..") for part in decoded.split("/")[1:]):
+            return f"{shown} holds an empty segment or a dot segment"
         if not self._pinned(method, path, tool):
             return f"{shown} is outside /v1.0/me/ and the recording user's own drive"
         target = _ANNOTATION_KEY.sub("", str(request.url.raw_path, "ascii"))
-        if outside := foreign_address(target, self.allowed_addresses):
+        if outside := foreign_address(target, addresses):
             return f"{method} request URL holds {outside}"
         body = self._body_strings(request)
         for _, value in body:
-            if (outside := foreign_address(value, self.allowed_addresses)) is not None:
+            if (outside := foreign_address(value, addresses)) is not None:
                 return f"{shown} body holds {outside}"
-            known = self.people | self.allowed_addresses | {self.me_id.casefold()}
+            known = self.people | addresses | {self.me_id.casefold()}
             for bound in cast("list[str]", _BOUND_USER.findall(value)):
                 if bound.casefold() not in known - {""}:
                     return f"{shown} body binds a person that is not a test user"
         if method not in _WRITE_METHODS or self._reads_by_glob(shown, tool):
             return None
-        return self._refuses_write(shown, path, tool, body)
+        return self._refuses_write(shown, path, tool, body, shared)
 
     def _refuses_hop(self, request: httpx.Request) -> str | None:
         host = request.url.host
@@ -209,7 +243,7 @@ class Guard:
         return None if request.method == "GET" else f"{request.method} to {host} is not a GET"
 
     def _refuses_write(
-        self, shown: str, path: str, tool: str, body: list[tuple[str, str]]
+        self, shown: str, path: str, tool: str, body: list[tuple[str, str]], shared: bool = False
     ) -> str | None:
         if not self.allow_writes or tool not in WRITE_TOOLS:
             return f"{shown} is a write that {tool} may not make here"
@@ -233,32 +267,58 @@ class Guard:
             if where.removeprefix("json.") in _DESTINATIONS | FAMILIES.destinations
         ]
         only = FAMILIES.created_only.get(tool)
-        if only is not None and unquote(matched[only]) not in self.created:
+        if only is not None and unquote(matched[only]) not in self.created | self.case_chats:
             return f"{shown} is a write of {tool} to an item that this run did not create"
-        defaults = self.default_calendars if _EVENT_CALENDAR in glob else set[str]()
+        defaults = (
+            self.default_calendars | self.shared_calendars
+            if "/calendars/*/events" in glob
+            else set[str]()
+        )
         for target in targets:
-            known = target in self.seen_seed | self.created | self.well_known | defaults
+            known = (
+                target
+                in self.seen_seed | self.created | self.well_known | self.case_chats | defaults
+            )
             if target.casefold() not in WELL_KNOWN_FOLDERS and not known:
                 return f"{shown} targets an item that this run did not read as seed data"
             for value in self.drafted.get(target, ()):
                 if (outside := foreign_address(value, self.allowed_addresses)) is not None:
                     return f"{shown} sends a draft whose recipients hold {outside}"
         for where, value in body:
-            if value in FAMILIES.forbidden.get(where.rsplit(".", 1)[-1], ()):
+            if value in FAMILIES.forbidden.get(where.rsplit(".", 1)[-1], ()) and not (
+                self._short_reply(where, value, body)
+            ):
                 return f"{shown} body sets {where} to {value}, which no recording may do"
-        if not matched and not path.startswith("/v1.0/me/"):
+        if not matched and (shared or not path.startswith("/v1.0/me/")):
             tagged = any(SEED_CASE in value for where, value in body if _name(where))
             if not tagged:
                 return f"{shown} creates an item outside /v1.0/me/ with no {SEED_CASE} name"
         return None
+
+    def _short_reply(self, where: str, value: str, body: list[tuple[str, str]]) -> bool:
+        """A scheduled automatic reply for nobody outside, and over within three days."""
+        found = dict(body)
+        if (where, value) != (f"{_REPLY}status", "scheduled"):
+            return False
+        try:
+            end = datetime.fromisoformat(found[f"{_REPLY}scheduledEndDateTime.dateTime"])
+        except KeyError, ValueError:
+            return False
+        end = end if end.tzinfo else end.replace(tzinfo=UTC)
+        return (
+            found.get(f"{_REPLY}scheduledEndDateTime.timeZone") == "UTC"
+            and found.get(f"{_REPLY}externalAudience") == "none"
+            and self.now() < end <= self.now() + timedelta(days=SCHEDULED_REPLY_DAYS)
+        )
 
     @staticmethod
     def _reads_by_glob(shown: str, tool: str) -> bool:
         globs = (*FAMILIES.read_posts.get(tool, ()), *FAMILIES.read_gets.get(tool, ()))
         return any(match_glob(glob, shown) is not None for glob in globs)
 
-    def _own(self, path: str) -> str:
-        for user in filter(None, (self.me_id, self.allowed_upn)):
+    def _own(self, path: str, tool: str | None = None) -> str:
+        users = (self.me_id, self.allowed_upn, *(self._extra_for(tool, _SHARED) if tool else ()))
+        for user in filter(None, users):
             for prefix in (f"/v1.0/users/{user}", f"/v1.0/users('{user}')"):
                 if path.casefold() == prefix.casefold() or path.casefold().startswith(
                     prefix.casefold() + "/"
@@ -344,6 +404,24 @@ class Guard:
             ):
                 self.seen_seed.add(cast("str", found["id"]))
 
+    def _remember_chat_and_calendar(self, found: Mapping[str, object]) -> None:
+        identifier, owner = found.get("id"), found.get("owner")
+        if not isinstance(identifier, str):
+            return
+        if "topic" in found and SEED_CASE in str(found["topic"]):
+            self.case_chats.add(identifier)
+        address = (
+            cast("Mapping[str, object]", owner).get("address")
+            if isinstance(owner, Mapping)
+            else None
+        )
+        if (
+            found.keys() & _CALENDAR_FIELDS
+            and isinstance(address, str)
+            and address.casefold() in self.allowed_addresses
+        ):
+            self.shared_calendars.add(identifier)
+
     def _remember_draft(self, found: Mapping[str, object]) -> None:
         identifier = found.get("id")
         if isinstance(identifier, str) and any(key in found for key in _RECIPIENTS):
@@ -351,7 +429,7 @@ class Guard:
             self.drafted[identifier] = tuple(value for _, value in strings(recipients))
 
     def saw(self, request: httpx.Request, status: int, location: str | None, body: object) -> None:
-        self.redirect = location if 300 <= status < 400 else None
+        self.redirect = location if 300 <= status < 400 or status == 202 else None
         if status == 429 or status >= 500:
             self.write_failed = True
         self.seen_seed.update(seed_ids(body))
@@ -361,6 +439,7 @@ class Guard:
         self._remember_members(body)
         for found in mappings(body):
             self._remember_draft(found)
+            self._remember_chat_and_calendar(found)
         made = status == 201 or (status == 200 and self._answers_a_create(request))
         if request.method in _WRITE_METHODS and made and isinstance(body, Mapping):
             created = cast("Mapping[str, object]", body).get("id")
