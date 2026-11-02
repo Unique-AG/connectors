@@ -110,7 +110,7 @@ def api(handler: Callable[[httpx2.Request], httpx2.Response]) -> OperationClient
 
 def get_things(body: object, status: int = 200) -> list[Row]:
     client = api(lambda _: httpx2.Response(status, json=body))
-    return asyncio.run(client.call(Operation("getThings", ROWS)))
+    return asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
 
 
 def test_operation_ids_lists_the_operations_of_the_spec() -> None:
@@ -121,16 +121,16 @@ def test_operation_ids_lists_the_operations_of_the_spec() -> None:
     }
 
 
-def test_call_parses_the_body_as_the_adapter_type() -> None:
+def test_call_untyped_parses_the_body_as_the_adapter_type() -> None:
     assert get_things([{"value": 1}, {"value": 2}]) == [Row(value=1), Row(value=2)]
 
 
-def test_call_names_the_field_that_does_not_fit() -> None:
+def test_call_untyped_names_the_field_that_does_not_fit() -> None:
     with pytest.raises(UpstreamError, match=r"Unexpected response: 1\.value: "):
         get_things([{"value": 1}, {"value": "x"}])
 
 
-def test_call_builds_the_request_from_the_spec() -> None:
+def test_call_untyped_builds_the_request_from_the_spec() -> None:
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -138,7 +138,9 @@ def test_call_builds_the_request_from_the_spec() -> None:
         return httpx2.Response(200, json={"value": 1})
 
     asyncio.run(
-        api(handler).call(Operation("getThing", TypeAdapter(Row)), name="a/b", since="2026-01-02")
+        api(handler).call_untyped(
+            Operation("getThing", TypeAdapter(Row)), name="a/b", since="2026-01-02"
+        )
     )
     request = seen[0]
     assert (request.method, request.url.raw_path) == (
@@ -168,53 +170,55 @@ def test_only_listed_headers_leave_and_fixed_ones_are_set() -> None:
     assert "x-forwarded-for" not in request.headers
 
 
-def test_call_error_does_not_include_the_query_string() -> None:
+def test_call_untyped_error_does_not_include_the_query_string() -> None:
     client = api(lambda _: httpx2.Response(404))
     with pytest.raises(UpstreamError) as error:
-        asyncio.run(client.call(Operation("getThing", TypeAdapter(Row)), name="a", since="SECRET"))
+        asyncio.run(
+            client.call_untyped(Operation("getThing", TypeAdapter(Row)), name="a", since="SECRET")
+        )
     assert str(error.value) == "404 Not Found for GET https://upstream.example/things/a"
 
 
-def test_call_error_includes_the_start_of_the_response_body() -> None:
+def test_call_untyped_error_includes_the_start_of_the_response_body() -> None:
     client = api(lambda _: httpx2.Response(404, text='{"detail":"Not found."}'))
     with pytest.raises(UpstreamError, match=r'404 Not Found for GET .*: \{"detail":"Not found."\}'):
-        asyncio.run(client.call(Operation("getThings", ROWS)))
+        asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
 
 
-def test_call_names_the_body_when_it_is_not_json() -> None:
+def test_call_untyped_names_the_body_when_it_is_not_json() -> None:
     client = api(lambda _: httpx2.Response(200, content=b"<html>"))
     with pytest.raises(UpstreamError, match="Unexpected response: body: Invalid JSON"):
-        asyncio.run(client.call(Operation("getThings", ROWS)))
+        asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
 
 
-def test_call_error_carries_the_status_of_an_error_response() -> None:
+def test_call_untyped_error_carries_the_status_of_an_error_response() -> None:
     with pytest.raises(UpstreamError) as error:
         get_things({"detail": "Not found."}, status=404)
     assert error.value.status_code == 404
 
 
-def test_call_error_carries_no_status_when_the_body_does_not_fit() -> None:
+def test_call_untyped_error_carries_no_status_when_the_body_does_not_fit() -> None:
     with pytest.raises(UpstreamError) as error:
         get_things([{"value": "x"}])
     assert error.value.status_code is None
 
 
-def test_call_error_carries_no_status_when_the_upstream_does_not_answer() -> None:
+def test_call_untyped_error_carries_no_status_when_the_upstream_does_not_answer() -> None:
     def refuse(request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ConnectError("refused", request=request)
 
     with pytest.raises(UpstreamError) as error:
-        asyncio.run(api(refuse).call(Operation("getThings", ROWS)))
+        asyncio.run(api(refuse).call_untyped(Operation("getThings", ROWS)))
     assert error.value.status_code is None
 
 
-def test_call_rejects_an_operation_that_is_not_in_the_spec() -> None:
+def test_call_untyped_rejects_an_operation_that_is_not_in_the_spec() -> None:
     client = api(lambda _: httpx2.Response(200, json=[]))
     with pytest.raises(AssertionError, match="operationId getMissing is not in the spec"):
-        asyncio.run(client.call(Operation("getMissing", ROWS)))
+        asyncio.run(client.call_untyped(Operation("getMissing", ROWS)))
 
 
-def test_call_sends_path_query_header_and_body_arguments_where_the_spec_puts_them() -> None:
+def test_call_untyped_sends_path_query_header_and_body_arguments_where_the_spec_puts_them() -> None:
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -222,7 +226,7 @@ def test_call_sends_path_query_header_and_body_arguments_where_the_spec_puts_the
         return httpx2.Response(200, json={})
 
     arguments = {"name": "a/b", "dry": True, "X-Trace": "t1", "label": "x", "qty": 3}
-    asyncio.run(api(handler).call(Operation("postThing", OBJECT), **arguments))
+    asyncio.run(api(handler).call_untyped(Operation("postThing", OBJECT), **arguments))
     request = seen[0]
     assert (request.method, request.url.raw_path) == ("POST", b"/things/a%2Fb?dry=true")
     assert request.headers["x-trace"] == "t1"
@@ -231,13 +235,13 @@ def test_call_sends_path_query_header_and_body_arguments_where_the_spec_puts_the
     assert request.headers["authorization"] == "Token k"
 
 
-def test_call_rejects_an_argument_the_spec_does_not_know() -> None:
+def test_call_untyped_rejects_an_argument_the_spec_does_not_know() -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": 1}))
     operation = Operation("getThing", TypeAdapter(Row))
     with pytest.raises(
         ValueError, match=r"getThing has no \['sinc'\], it takes \['name', 'since'\]"
     ):
-        asyncio.run(client.call(operation, name="a", sinc="2026-01-02"))
+        asyncio.run(client.call_untyped(operation, name="a", sinc="2026-01-02"))
 
 
 @pytest.mark.parametrize(
@@ -249,15 +253,15 @@ def test_call_rejects_an_argument_the_spec_does_not_know() -> None:
         ({"name": "", "label": "x"}, "['name']"),
     ],
 )
-def test_call_rejects_a_required_argument_that_is_missing(
+def test_call_untyped_rejects_a_required_argument_that_is_missing(
     arguments: dict[str, object], missing: str
 ) -> None:
     client = api(lambda _: httpx2.Response(200, json={}))
     with pytest.raises(ValueError, match=rf"postThing needs {re.escape(missing)}"):
-        asyncio.run(client.call(Operation("postThing", OBJECT), **arguments))
+        asyncio.run(client.call_untyped(Operation("postThing", OBJECT), **arguments))
 
 
-def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() -> None:
+def test_call_raw_sends_the_request_through_the_client_and_parses_the_body() -> None:
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -265,7 +269,7 @@ def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() 
         return httpx2.Response(200, json={"value": 1})
 
     row = asyncio.run(
-        api(handler).request_raw(
+        api(handler).call_raw(
             "POST", "/hidden", TypeAdapter(Row), params={"dry": True}, json={"label": "x"}
         )
     )
@@ -276,17 +280,17 @@ def test_request_raw_sends_the_request_through_the_client_and_parses_the_body() 
     assert request.headers["authorization"] == "Token k"
 
 
-def test_request_raw_names_the_field_that_does_not_fit() -> None:
+def test_call_raw_names_the_field_that_does_not_fit() -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": "x"}))
     with pytest.raises(UpstreamError, match=r"Unexpected response: value: "):
-        asyncio.run(client.request_raw("GET", "/hidden", TypeAdapter(Row)))
+        asyncio.run(client.call_raw("GET", "/hidden", TypeAdapter(Row)))
 
 
 @pytest.mark.parametrize("path", ["https://other.example/x", "//other.example/x", "hidden"])
-def test_request_raw_rejects_anything_but_a_path(path: str) -> None:
+def test_call_raw_rejects_anything_but_a_path(path: str) -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": 1}))
     with pytest.raises(ValueError, match="is not a path"):
-        asyncio.run(client.request_raw("GET", path, TypeAdapter(Row)))
+        asyncio.run(client.call_raw("GET", path, TypeAdapter(Row)))
 
 
 RETRY_AFTER = RetryAfterPolicy()
@@ -303,7 +307,9 @@ def replay(
     )
     client = OperationClient(load_spec(SPEC), http, retry_policy=retry_policy)
     try:
-        result: list[Row] | UpstreamError = asyncio.run(client.call(Operation("getThings", ROWS)))
+        result: list[Row] | UpstreamError = asyncio.run(
+            client.call_untyped(Operation("getThings", ROWS))
+        )
     except UpstreamError as error:
         result = error
     return result, len(responses) - len(list(remaining))
@@ -366,7 +372,7 @@ def replay_write(method: str, responses: list[httpx2.Response]) -> tuple[Row | U
     client = OperationClient(load_spec(SPEC), http, retry_policy=NO_BACKOFF)
     try:
         result: Row | UpstreamError = asyncio.run(
-            client.request_raw(method, "/hidden", TypeAdapter(Row), json={"label": "x"})
+            client.call_raw(method, "/hidden", TypeAdapter(Row), json={"label": "x"})
         )
     except UpstreamError as error:
         result = error
@@ -456,7 +462,7 @@ def test_the_lock_is_held_while_the_request_is_in_flight() -> None:
 
     async def run() -> None:
         client = locked_api(handler, SemaphoreLock(2))
-        await asyncio.gather(*(client.call(Operation("getThings", ROWS)) for _ in range(5)))
+        await asyncio.gather(*(client.call_untyped(Operation("getThings", ROWS)) for _ in range(5)))
 
     asyncio.run(run())
     assert peak[0] == 2
@@ -472,13 +478,13 @@ def test_a_request_fails_when_the_lock_is_not_acquired_in_time() -> None:
             return ok()
 
         client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
-        first = asyncio.create_task(client.call(Operation("getThings", ROWS)))
+        first = asyncio.create_task(client.call_untyped(Operation("getThings", ROWS)))
         await started.wait()
         with pytest.raises(
             LockTimeoutError,
             match=r"No lock acquired within 0\.01s for GET https://upstream\.example/things$",
         ):
-            await client.call(Operation("getThings", ROWS))
+            await client.call_untyped(Operation("getThings", ROWS))
         release.set()
         assert await first == [Row(value=1)]
 
@@ -494,8 +500,8 @@ def test_the_lock_is_released_after_a_failed_request() -> None:
     async def run() -> list[Row]:
         client = locked_api(handler, SemaphoreLock(1), acquire_timeout_seconds=0.01)
         with pytest.raises(UpstreamError):
-            await client.call(Operation("getThings", ROWS))
-        return await client.call(Operation("getThings", ROWS))
+            await client.call_untyped(Operation("getThings", ROWS))
+        return await client.call_untyped(Operation("getThings", ROWS))
 
     assert asyncio.run(run()) == [Row(value=1)]
 
@@ -508,15 +514,17 @@ def test_the_lock_is_held_per_attempt_with_the_request() -> None:
 
     lock = RecordingLock()
     client = locked_api(handler, lock, acquire_timeout_seconds=5)
-    asyncio.run(client.call(Operation("getThing", TypeAdapter(Row)), name="a", since="2026-01-02"))
+    asyncio.run(
+        client.call_untyped(Operation("getThing", TypeAdapter(Row)), name="a", since="2026-01-02")
+    )
     attempt = ("GET", b"/things/a?since=2026-01-02", "Token k")
     assert lock.held == [attempt, attempt]
 
 
-def test_request_raw_holds_the_lock_with_its_request() -> None:
+def test_call_raw_holds_the_lock_with_its_request() -> None:
     lock = RecordingLock()
     client = locked_api(answer_ok, lock)
-    asyncio.run(client.request_raw("POST", "/hidden", ROWS, params={"dry": True}))
+    asyncio.run(client.call_raw("POST", "/hidden", ROWS, params={"dry": True}))
     assert lock.held == [("POST", b"/hidden?dry=true", "Token k")]
 
 
@@ -526,7 +534,7 @@ def test_only_acquiring_the_lock_counts_against_the_timeout() -> None:
         return ok()
 
     client = locked_api(slow, SemaphoreLock(1), acquire_timeout_seconds=0.01)
-    assert asyncio.run(client.call(Operation("getThings", ROWS))) == [Row(value=1)]
+    assert asyncio.run(client.call_untyped(Operation("getThings", ROWS))) == [Row(value=1)]
 
 
 def test_a_timeout_error_of_the_lock_itself_is_not_reported_as_a_lock_timeout() -> None:
@@ -542,7 +550,7 @@ def test_a_timeout_error_of_the_lock_itself_is_not_reported_as_a_lock_timeout() 
 
     client = locked_api(answer_ok, BrokenLock())
     with pytest.raises(TimeoutError, match="socket timed out") as error:
-        asyncio.run(client.call(Operation("getThings", ROWS)))
+        asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
     assert not isinstance(error.value, LockTimeoutError)
 
 
@@ -1259,7 +1267,7 @@ def test_arguments_that_are_none_are_not_sent() -> None:
         seen.append(request)
         return httpx2.Response(200, json={"name": "a"})
 
-    asyncio.run(api(handler).call(Operation("getThing", OBJECT), name="a", since=None))
+    asyncio.run(api(handler).call_untyped(Operation("getThing", OBJECT), name="a", since=None))
 
     assert seen[0].url.query == b""
 
@@ -1269,7 +1277,7 @@ def test_a_timeout_is_an_upstream_error() -> None:
         raise httpx2.ReadTimeout("timed out", request=request)
 
     with pytest.raises(UpstreamError, match="timed out"):
-        asyncio.run(api(handler).call(Operation("getThings", ROWS)))
+        asyncio.run(api(handler).call_untyped(Operation("getThings", ROWS)))
 
 
 def test_the_error_body_in_the_message_is_cut_at_200_characters() -> None:

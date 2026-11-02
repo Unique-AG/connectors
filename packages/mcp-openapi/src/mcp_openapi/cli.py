@@ -7,7 +7,11 @@ from typing import ClassVar, Self, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from mcp_openapi.codegen import generate_operations, generate_response_models
+from mcp_openapi.codegen import (
+    generate_operations,
+    generate_request_models,
+    generate_response_models,
+)
 from mcp_openapi.vendoring import refresh_spec, stale_outputs
 
 
@@ -38,6 +42,8 @@ class CodegenConfig(BaseModel):
     operation_module: str
     models_module: str
     models_output: Path
+    requests_module: str | None = None
+    requests_output: Path | None = None
     operations_output: Path
 
     @field_validator("operation_ids", "response_operation_ids", "fields", mode="before")
@@ -51,6 +57,12 @@ class CodegenConfig(BaseModel):
         return cast(object, getattr(import_module(module), name))
 
     @model_validator(mode="after")
+    def _requests_module_and_output_together(self) -> Self:
+        if (self.requests_module is None) != (self.requests_output is None):
+            raise ValueError("requests-module and requests-output go together")
+        return self
+
+    @model_validator(mode="after")
     def _source_of_a_vendored_spec(self) -> Self:
         if self.spec_source is not None and self.spec is None:
             raise ValueError("spec-source refreshes a vendored spec, so it needs spec")
@@ -59,7 +71,9 @@ class CodegenConfig(BaseModel):
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Generate response models and Operation constants from [tool.mcp-openapi]."
+        description=(
+            "Generate response and request models and Operation constants from [tool.mcp-openapi]."
+        )
     )
     parser.add_argument(
         "project", nargs="?", type=Path, default=Path(), help="folder of the pyproject.toml"
@@ -91,7 +105,8 @@ def main(argv: list[str] | None = None) -> None:
             "\n".join(["operationIds changed:", *changes]) if changes else "No operationId changed."
         )
     if cast(bool, arguments.check):
-        outputs = [root / config.models_output, root / config.operations_output]
+        requests = [root / config.requests_output] if config.requests_output else []
+        outputs = [root / config.models_output, *requests, root / config.operations_output]
         stale = stale_outputs(outputs, lambda: _generate(root, config))
         if stale:
             print("\n\n".join([*stale, "Run `uv run mcp-openapi-codegen` and commit the result."]))
@@ -111,12 +126,21 @@ def _generate(root: Path, config: CodegenConfig) -> None:
         snake_case_fields=config.snake_case_fields,
         output=root / config.models_output,
     )
+    if config.requests_output is not None:
+        generate_request_models(
+            spec_path=spec_path,
+            spec_url=config.spec_url,
+            operation_ids=config.operation_ids,
+            snake_case_fields=config.snake_case_fields,
+            output=root / config.requests_output,
+        )
     generate_operations(
         spec_path=spec_path,
         spec_url=config.spec_url,
         operation_ids=config.operation_ids,
         operation_module=config.operation_module,
         models_module=config.models_module,
+        requests_module=config.requests_module,
         output=root / config.operations_output,
     )
 

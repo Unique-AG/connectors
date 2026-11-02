@@ -134,6 +134,7 @@ STAMP = re.compile(
 NOT_THE_SCAFFOLDS = {
     "uv.lock",
     "operations.py",
+    "vendor_requests.py",
     "vendor_responses.py",
     "tool_surface.generated.json",
     "values.schema.json",
@@ -265,7 +266,7 @@ def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
 
     assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
     operations = upstream / "generated" / "operations.py"
-    assert "GET_FORECAST = Operation[Forecast]" in operations.read_text()
+    assert "GET_FORECAST = Operation[Forecast, GetForecastRequest]" in operations.read_text()
     assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
     offline_server = (service / "tests" / "offline_server.py").read_text()
@@ -535,6 +536,7 @@ def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
     for path in [
         target / "uv.lock",
         generated / "operations.py",
+        generated / "vendor_requests.py",
         generated / "vendor_responses.py",
     ]:
         assert not STAMP.search(path.read_text()), path.name

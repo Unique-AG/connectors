@@ -26,7 +26,7 @@ async def get_daily_closes(
     cached = await cached_price_history(persistence=persistence, key=key, model=DailyClose)
     if cached is not None:
         return cached
-    bars = await upstream.call(
+    bars = await upstream.call_untyped(
         GET_DAILY_PRICES,
         ticker=ticker,
         startDate=start_date.isoformat() if start_date else None,
