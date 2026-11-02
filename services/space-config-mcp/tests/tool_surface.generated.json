@@ -1,0 +1,816 @@
+[
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Grant access to a user or group on a space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "description": "Access entries to add. Each entry must have 'entityId', 'entityType' ('USER' or 'GROUP'), and 'type' ('USE', 'MANAGE', or 'UPLOAD').",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to grant access on.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id",
+        "access"
+      ],
+      "type": "object"
+    },
+    "name": "add_space_access",
+    "outputSchema": {
+      "properties": {
+        "access": {
+          "items": {
+            "properties": {
+              "entityId": {
+                "type": "string"
+              },
+              "entityType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "entityId",
+              "entityType",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "type": "object"
+    },
+    "title": "Add Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Revoke access entries from a space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "access_ids": {
+          "description": "List of access entry IDs to remove.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to revoke access on.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id",
+        "access_ids"
+      ],
+      "type": "object"
+    },
+    "name": "delete_space_access",
+    "outputSchema": {
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "type": "object"
+    },
+    "title": "Delete Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return a portable JSON string of the full space config. No storage side-effects.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to export.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "export_space_config",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Export Space Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the SwappableIntelligence module configuration for a Conduct space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the Conduct space.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_conduct_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Conduct Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get a single module with its full configuration dict.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "module_id": {
+          "description": "ID of the module to retrieve.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "module_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_module",
+    "title": "Get Module"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the full JSON content of a stored snapshot.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "description": "ID of the snapshot to retrieve.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_snapshot",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Snapshot"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get full space configuration: metadata, modules, scope rules, MCP servers, and access.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to retrieve.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_space",
+    "title": "Get Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List current access entries for a space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to read access for.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_space_access",
+    "outputSchema": {
+      "properties": {
+        "access": {
+          "items": {
+            "properties": {
+              "entityId": {
+                "type": "string"
+              },
+              "entityType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "entityId",
+              "entityType",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "type": "object"
+    },
+    "title": "Get Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Apply a previously exported JSON config to a space. Auto-snapshots before applying.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "config_json": {
+          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to apply the config to.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id",
+        "config_json"
+      ],
+      "type": "object"
+    },
+    "name": "import_space_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Import Space Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List all modules belonging to a space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space whose modules to list.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_modules",
+    "title": "List Modules"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List stored snapshots, sorted newest first. Optionally filter by space_id.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "space_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter snapshots to this space ID. Omit to list all."
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_snapshots",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List Snapshots"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List Unique AI spaces. Optionally filter by name substring.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional case-insensitive partial name filter."
+        },
+        "skip": {
+          "default": 0,
+          "description": "Number of records to skip for pagination.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "take": {
+          "default": 20,
+          "description": "Maximum number of records to return.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_spaces",
+    "title": "List Spaces"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Restore a space to a prior snapshot. Auto-snapshots current state first.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "description": "ID of the snapshot to restore from.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "name": "revert_space",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Revert Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Capture the full space configuration as a named JSON snapshot. Returns snapshot_id.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "label": {
+          "default": "",
+          "description": "Human-readable label for this snapshot. Auto-generated if empty.",
+          "type": "string"
+        },
+        "space_id": {
+          "description": "ID of the space to snapshot.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "snapshot_space",
+    "outputSchema": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "title": "Snapshot Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update a Conduct space's harness configuration. Merges into the existing config.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "max_turns": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set the claude.maxTurns limit for this Conduct agent."
+        },
+        "setup_patch": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Keys to merge into the setup block of the harness configuration."
+        },
+        "space_id": {
+          "description": "ID of the Conduct space to update.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "update_conduct_config",
+    "title": "Update Conduct Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Merge config_patch into a module's configuration dict. Existing unpatched keys are kept.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "config_patch": {
+          "additionalProperties": true,
+          "description": "Keys to merge into the module's configuration dict. Existing keys not in the patch are preserved.",
+          "type": "object"
+        },
+        "module_id": {
+          "description": "ID of the module to update.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "module_id",
+        "config_patch"
+      ],
+      "type": "object"
+    },
+    "name": "update_module_config",
+    "title": "Update Module Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update space metadata. Only the fields you provide are changed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "alert": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alert text shown to users of the space."
+        },
+        "allow_model_switching": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether users may switch models."
+        },
+        "company_id": {
+          "description": "Unique platform company ID of the caller.",
+          "type": "string"
+        },
+        "explanation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Description / system-prompt text for the space."
+        },
+        "is_pinned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pin the space to the top of listings."
+        },
+        "language_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language model identifier, e.g. 'gpt-4o'."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New display name for the space."
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Arbitrary settings dict merged at space level."
+        },
+        "space_id": {
+          "description": "ID of the space to update.",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Unique platform user ID of the caller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "company_id",
+        "space_id"
+      ],
+      "type": "object"
+    },
+    "name": "update_space",
+    "title": "Update Space"
+  }
+]

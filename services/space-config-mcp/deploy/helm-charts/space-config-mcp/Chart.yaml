@@ -1,0 +1,11 @@
+# mcp-scaffold-commit: 5264f9f14505, timestamp: 2026-11-02T00:13:01+00:00
+apiVersion: v2
+name: space-config-mcp
+description: "Read and update Unique AI space and module configuration"
+type: application
+version: 0.0.0
+appVersion: 0.0.0
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-3aa55e

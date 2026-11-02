@@ -26,6 +26,7 @@ revert = Reverts a previous commit
 # Services
 polixis-mcp = services/polixis-mcp/**
 world-check-mcp = services/world-check-mcp/**
+space-config-mcp = services/space-config-mcp/**
 architecture-demo-mcp = services/architecture-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**

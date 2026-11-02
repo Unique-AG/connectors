@@ -1,0 +1,8 @@
+{
+  "$comment": "mcp-scaffold-commit: 5264f9f14505, timestamp: 2026-11-02T00:13:01+00:00",
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Space Config MCP Values",
+  "description": "Values for the Space Config MCP Helm chart. A Python FastMCP server on the base chart. Exposure uses base chart Gateway API routes (no custom Ingress).",
+  "type": "object",
+  "properties": {}
+}
