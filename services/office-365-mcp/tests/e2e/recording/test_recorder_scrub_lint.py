@@ -593,3 +593,25 @@ class TestTheBindKey:
             f"{BIND_FIXTURE} at [0].json.members[0].(a key): an address outside the reserved "
             + "domains (plain)"
         ]
+
+
+ATTACHED = "1E3A8B2C-4D5E-4F60-8A7B-9C0D1E2F3A4B"
+NOTES = "seed-v1 case-x notes"
+
+
+def sent_with_tag(text: str, guid: str) -> str:
+    return f'<p>{text}</p> <attachment id="{guid}"></attachment>'
+
+
+class TestAttachmentTags:
+    def request(self, raw: str) -> str:
+        return Mapper(load_corpus(), {}, frozenset(), NOTES).request_value(raw)
+
+    def test_a_request_tag_keeps_its_text_and_maps_its_id_as_the_answer_does(self) -> None:
+        etag = Mapper(load_corpus(), {}, frozenset(), "").id(f'"{{{ATTACHED}}},3"')
+        mapped = mapped_guid(ATTACHED.lower())
+        assert self.request(sent_with_tag(NOTES, ATTACHED.lower())) == sent_with_tag(NOTES, mapped)
+        assert mapped in etag.lower()
+
+    def test_a_request_tag_with_free_text_is_replaced_whole(self) -> None:
+        assert self.request(sent_with_tag("a private word", ATTACHED)) == "synthetic text 01"

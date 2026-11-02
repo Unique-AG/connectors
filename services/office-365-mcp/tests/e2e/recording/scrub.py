@@ -139,6 +139,7 @@ _SAFE_TAG = re.compile(
     re.I,
 )
 _ANY_TAG = re.compile(r"<[^>]*>")
+_ATTACHMENT = re.compile(rf'<attachment id="({_GUID.pattern})"></attachment>')
 _ELLIPSIS = re.compile(r"<ddd/>|…|\.\.\.", re.I)
 _EMOJI_JOINERS = frozenset({"\u200d", "\ufe0f"})
 MAX_EMOJI_CODE_POINTS = 8
@@ -594,6 +595,10 @@ class Mapper:
         if (page := _PAGE.fullmatch(raw)) is not None:
             text = (page[1], self.text(page[2]), page[3], self.text(page[4]), page[5])
             return "".join(text)
+        if _ATTACHMENT.search(raw) and self.corpus.accepts(_ATTACHMENT.sub(" ", raw), self.extra):
+            return _ATTACHMENT.sub(
+                lambda found: f'<attachment id="{mapped_guid(found[1])}"></attachment>', raw
+            )
         if _ADDRESS.fullmatch(raw.strip().casefold()):
             return self.address(raw)
         return self.url(raw) if raw.startswith("https://") else self.text(raw)
