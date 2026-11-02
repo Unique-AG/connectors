@@ -31,6 +31,8 @@ _PAGE_BEGIN = "<!-- use-cases:begin -->"
 _PAGE_END = "<!-- use-cases:end -->"
 _FEATURE_FILES = sorted(_FEATURES.glob("*.feature"))
 _ID = re.compile(r"uc-(?P<file>\d\d)-(?P<number>\d\d)")
+_TOOL_RECORDING = "rec-tool-"
+_SERVED = re.compile(r'serve\(\s*\w+,\s*"([^"]+)"')
 _PROVENANCE = {"observed", "drafted"}
 _STATUSES = {"untested", "working", "partly", "gap"}
 _KINDS = {"tool", "parameter", "description", "preset", "graph", "unknown"}
@@ -47,6 +49,8 @@ _ENTRY_KEYS = {
     "note",
     "fixture",
     "variants",
+    "tests",
+    "no_test",
 }
 _RUNNER_STEP_KEYS = {"args", "pick", "fault", "expect", "approval", "bind"}
 _STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses", *_RUNNER_STEP_KEYS}
@@ -390,11 +394,18 @@ class TestTheScenarioRuns:
     def test_every_fixture_and_body_is_used(self) -> None:
         sidecars = [_sidecar(feature_file) for feature_file in _FEATURE_FILES]
         named = {name for s in sidecars for e in s.values() for name in _fixtures(_object(e))}
+        tests = (_SERVICE_ROOT / "tests" / "tools").rglob("test_*.py")
+        for path in tests:
+            named |= set(cast("list[str]", _SERVED.findall(path.read_text())))
         fixtures = sorted((_E2E / "fixtures").glob("*.json"))
         text = "".join(path.read_text() for path in [*fixtures, *_FEATURES.glob("*.calls.yaml")])
         bodies = sorted((_E2E / "bodies").iterdir())
 
-        problems = [f"no sidecar names fixtures/{p.name}" for p in fixtures if p.stem not in named]
+        problems = [
+            f"no sidecar names fixtures/{p.name}"
+            for p in fixtures
+            if p.stem not in named and not p.stem.startswith(_TOOL_RECORDING)
+        ]
         problems += [f"nothing uses bodies/{p.name}" for p in bodies if p.name not in text]
         assert problems == []
 

@@ -1,5 +1,7 @@
 uc-01-01:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_by_word_and_type_asks_for_that_type_and_shows_the_hit"
   ask: "Find the Brightway agreement as a Word document."
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
@@ -10,6 +12,8 @@ uc-01-01:
 
 uc-01-02:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_the_file_edited_last_comes_first_with_its_editor"
   ask: "Show me the quarterly plan that was edited last, and who edited it."
   provenance: drafted
   asks_user: false
@@ -19,6 +23,8 @@ uc-01-02:
 
 uc-01-03:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_stays_on_the_site_that_a_site_search_named"
   ask: "Find the NDA template on the Legal site only."
   provenance: drafted
   asks_user: false
@@ -31,6 +37,8 @@ uc-01-03:
 
 uc-01-04:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_without_a_match_answers_with_an_empty_list"
   ask: "Find the Zephyr budget."
   provenance: observed
   evidence: sharepoint_search_files alone in 30 sessions
@@ -41,6 +49,8 @@ uc-01-04:
 
 uc-01-05:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_a_folder_lists_one_level_newest_first"
   ask: "What is in the folder 2026 Contracts, newest first?"
   provenance: drafted
   evidence: sharepoint_browse_folder alone in 8 sessions
@@ -58,6 +68,8 @@ uc-01-06:
   provenance: observed
   evidence: sharepoint_search_files then sharepoint_read_file in 9 sessions; sharepoint_read_file alone in 27 sessions
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-06/recorded]"
   chain:
     - tool: sharepoint_search_files
       optional: true
@@ -83,6 +95,8 @@ uc-01-06:
 
 uc-01-07:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_sharing_link_leads_to_the_file_it_opens"
   ask: "Summarize the Q3 plan that Anna sent me a sharing link to."
   provenance: drafted
   asks_user: false
@@ -94,6 +108,8 @@ uc-01-07:
 
 uc-01-08:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_every_file_of_a_folder_is_read_on_its_own"
   ask: "Which of the 6 offers in the Tenders folder has the lowest price?"
   provenance: observed
   evidence: 18 runs of 5 to 14 consecutive sharepoint_read_file calls, between searches and folder listings
@@ -109,6 +125,8 @@ uc-01-10:
   ask: "Summarize the Brightway annual report PDF."
   provenance: drafted
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-10]"
   chain:
     - tool: sharepoint_read_file
       bind: {file: "sharepoint:///files/b%21RUNDRIVE/01RUNREPORT"}
@@ -130,6 +148,8 @@ uc-01-11:
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-11]"
   chain:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
@@ -150,6 +170,8 @@ uc-01-11:
 
 uc-01-16:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_files_that_changed_in_a_window_are_asked_for_with_that_window"
   ask: "Which Brightway files on the Sales site changed this week?"
   provenance: drafted
   asks_user: false
@@ -163,6 +185,8 @@ uc-01-16:
 
 uc-01-12:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_that_needs_no_conversion_comes_back_as_it_is"
   ask: "What is the launch date in the Brightway launch notes?"
   provenance: drafted
   asks_user: false
@@ -175,6 +199,8 @@ uc-01-12:
 
 uc-01-13:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_the_top_of_onedrive_lists_its_files_and_folders"
   ask: "What is in my OneDrive?"
   provenance: drafted
   asks_user: false
@@ -183,6 +209,9 @@ uc-01-13:
 
 uc-01-14:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_sharing_link_leads_to_the_file_it_opens"
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_pasted_address_that_opens_nothing_sends_the_assistant_to_the_search"
   ask: "Summarize the Q3 plan at this web address from my browser."
   provenance: drafted
   asks_user: false
@@ -197,6 +226,8 @@ uc-01-14:
 
 uc-01-15:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_the_files_of_a_channel_are_listed_from_its_files_folder"
   ask: "What files are in the Launch channel of the Platform team?"
   provenance: drafted
   asks_user: false
@@ -214,6 +245,10 @@ uc-01-17:
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: drafted
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-17/sign-in-expired]"
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-17/no-access]"
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-17/gone]"
   chain:
     - tool: sharepoint_search_files
       optional: true
@@ -262,6 +297,8 @@ uc-01-17:
 
 uc-01-18:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_microsoft_that_stays_busy_is_reported_with_the_wait_it_asked_for"
   ask: "Tell me the launch date in the Brightway launch plan."
   provenance: drafted
   asks_user: false
@@ -278,6 +315,10 @@ uc-01-19:
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: drafted
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-19/fails-with-an-internal-error]"
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-19/no-answer-in-time]"
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-01-19/stops-before-the-end]"
   chain:
     - tool: sharepoint_search_files
       optional: true
@@ -363,6 +404,8 @@ uc-01-19:
 
 uc-01-20:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_read_that_fails_twice_is_reported_as_failed_and_not_to_be_repeated"
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: drafted
   asks_user: false
@@ -379,6 +422,8 @@ uc-01-20:
 
 uc-01-21:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_rejected_read_gives_the_reason_and_is_not_to_be_repeated"
   ask: "Look up the launch date in the Brightway launch plan."
   provenance: drafted
   asks_user: false
@@ -392,6 +437,8 @@ uc-01-21:
 
 uc-01-22:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_folder_is_refused_with_the_handle_that_lists_it"
   ask: "Read the Tenders folder."
   provenance: drafted
   asks_user: false
@@ -407,6 +454,8 @@ uc-01-22:
 
 uc-01-23:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_an_item_that_only_looks_like_a_file_is_not_read"
   ask: "Summarize the Customers file in my OneDrive."
   provenance: drafted
   asks_user: false
@@ -419,6 +468,8 @@ uc-01-23:
 
 uc-01-24:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_file_of_unknown_size_is_not_read"
   ask: "Summarize the Brightway Master Agreement."
   provenance: drafted
   asks_user: false
@@ -432,6 +483,8 @@ uc-01-24:
 
 uc-01-25:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_file_that_arrives_empty_is_blamed_on_microsoft"
   ask: "Summarize the Brightway Master Agreement."
   provenance: drafted
   asks_user: false
@@ -445,6 +498,8 @@ uc-01-25:
 
 uc-01-26:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_of_exactly_ten_megabytes_is_read_as_a_whole"
   ask: "What is the launch date in the Brightway launch notes PDF?"
   provenance: drafted
   asks_user: false
@@ -457,6 +512,8 @@ uc-01-26:
 
 uc-01-27:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderListThatIsNotComplete::test_a_folder_of_more_than_a_thousand_items_says_that_the_list_can_miss_files"
   ask: "Show me what is in the Archive folder, newest first."
   provenance: drafted
   asks_user: false
@@ -470,6 +527,8 @@ uc-01-27:
 
 uc-01-28:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderListThatIsNotComplete::test_a_list_that_microsoft_never_finishes_is_reported_on_both_tries"
   ask: "What is in the Archive folder?"
   provenance: drafted
   asks_user: false
@@ -484,6 +543,7 @@ uc-01-28:
 
 uc-01-29:
   status: untested
+  no_test: "assistant: no code guard reads text inside a file, so the model alone must report an order in a file and not obey it."
   ask: "Summarize the Brightway launch plan."
   provenance: drafted
   asks_user: false
@@ -498,6 +558,8 @@ uc-01-29:
 
 uc-01-30:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_one_busy_answer_is_waited_out"
   ask: "Tell me the launch date in the Brightway launch plan."
   provenance: drafted
   asks_user: false
@@ -511,6 +573,8 @@ uc-01-30:
 
 uc-01-31:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_missing_consent_is_explained_and_never_reaches_graph"
   ask: "Tell me the launch date in the Brightway launch plan."
   provenance: drafted
   asks_user: false
@@ -525,6 +589,8 @@ uc-01-31:
 
 uc-01-32:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_drive_of_the_user_is_named_with_its_web_address"
   ask: "Which drive holds my files?"
   provenance: drafted
   evidence: sharepoint_list_drives, 1 call in prod between 2026-10-14 and 2026-10-23; the logs hold the tool name and no chain
@@ -535,6 +601,8 @@ uc-01-32:
 
 uc-01-33:
   status: partly
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_tool_has_no_site_to_list_and_says_it_lists_no_site_library"
   ask: "Which document libraries does the Sales site have?"
   blocker:
     kind: tool
@@ -552,6 +620,8 @@ uc-01-33:
 
 uc-01-34:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_without_a_match_answers_with_an_empty_list"
   ask: "Find the Zephyr site."
   provenance: drafted
   asks_user: false
@@ -562,6 +632,9 @@ uc-01-34:
 
 uc-01-35:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_with_more_matches_than_the_limit_says_that_it_stopped_early"
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_with_more_than_a_thousand_matches_stays_capped_at_the_highest_limit"
   ask: "Which sites mention Project?"
   provenance: drafted
   asks_user: false
@@ -575,6 +648,8 @@ uc-01-35:
 
 uc-01-36:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_that_names_another_file_leads_to_the_named_file"
   ask: "What is the budget that the Brightway launch plan names?"
   provenance: observed
   evidence: "sharepoint_read_file then sharepoint_search_files in 4 sessions, and read, search, read in 3 sessions, between 2026-10-14 and 2026-10-23 (usage report 6c); the logs hold tool names and no arguments, so the reason for the second search is the reading of the analyst"

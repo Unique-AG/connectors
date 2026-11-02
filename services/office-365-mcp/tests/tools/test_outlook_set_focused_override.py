@@ -15,6 +15,7 @@ from office_365_mcp.graph_client import GraphForbidden, GraphSettings, GraphUnav
 from office_365_mcp.shared.focused_inbox import FocusedOverride
 from office_365_mcp.shared.seam import WRITE_IDEMPOTENT
 from office_365_mcp.tools import outlook_set_focused_override as setter
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -579,3 +580,31 @@ class TestHowItDeclaresItself:
             name for name, field in answer["properties"].items() if not field.get("description")
         )
         assert undescribed == [], "a model is handed these values with nothing to say what they are"
+
+
+async def _first_seed_message() -> dict[str, object]:
+    listing = await call("outlook_list_mail", category="seed-v1", limit=1)
+    return cast("list[dict[str, object]]", listing["messages"])[0]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_creates_a_rule_for_a_sender_that_had_none(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_set_focused_override-new")
+        sender = cast("dict[str, str]", (await _first_seed_message())["sender"])
+
+        override = await call(
+            "outlook_set_focused_override", sender=sender["address"], classify_as="focused"
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert _sent(routes[("POST", "/me/inferenceClassification/overrides")]) == {
+            "classifyAs": "focused",
+            "senderEmailAddress": {"address": "anna@example.test"},
+        }
+        assert override == {
+            "sender_address": "anna@example.test",
+            "sender_name": "Anna Meier",
+            "classify_as": "focused",
+        }

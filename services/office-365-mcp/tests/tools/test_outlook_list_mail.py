@@ -1335,3 +1335,21 @@ class TestAgainstAnswersRecordedFromGraph:
 
         with pytest.raises(GraphUnavailable):
             _ = await lister.list_mail(client, unread_only=True, limit=25)
+
+    async def test_it_lists_the_messages_that_the_person_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_mail-sentitems")
+
+        listing = await lister.list_mail(client, folder="sentitems", category="seed-v1", limit=5)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert (listing.folder_name, listing.total_items, listing.unread_items) == (
+            "Sent Items",
+            9,
+            0,
+        )
+        assert {message.sender.address for message in listing.messages if message.sender} == {
+            "mia@example.test"
+        }
+        assert len(listing.messages) == 5

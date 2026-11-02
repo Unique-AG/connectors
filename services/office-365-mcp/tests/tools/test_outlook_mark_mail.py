@@ -40,6 +40,7 @@ from office_365_mcp.tools.outlook_mark_mail import (
     mark_mail,
     register,
 )
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import ME
 
@@ -1475,3 +1476,47 @@ class TestHowItDeclaresItself:
 
         assert "ctx" not in _arguments(tool)
         assert "confirm" not in _arguments(tool)
+
+
+_FLAGGED_DRAFT = "seed-v1 case-outlook_mark_mail-flag"
+
+
+async def _first_seed_message() -> dict[str, object]:
+    listing = await call("outlook_list_mail", category="seed-v1", limit=1)
+    return cast("list[dict[str, object]]", listing["messages"])[0]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_flags_a_draft_and_adds_the_category_it_was_given(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_mark_mail-flag")
+        sender = cast("dict[str, str]", (await _first_seed_message())["sender"])
+        draft = await call(
+            "outlook_draft_mail",
+            to=[sender["address"]],
+            subject=_FLAGGED_DRAFT,
+            body_html="<p>A draft to mark.</p>",
+        )
+
+        marked = await call(
+            "outlook_mark_mail",
+            message_refs=[draft["uri"]],
+            flagged=True,
+            add_categories=["Website"],
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        patch = next(route for (verb, _path), route in routes.items() if verb == "PATCH")
+        assert _sent(patch) == {
+            "@odata.type": "#microsoft.graph.message",
+            "categories": ["Website"],
+            "flag": {"flagStatus": "flagged"},
+        }
+        assert (marked["changed_count"], marked["failed_count"]) == (1, 0)
+        (row,) = cast("list[dict[str, object]]", marked["messages"])
+        assert (row["uri"], row["flag_status"], row["categories"]) == (
+            draft["uri"],
+            "flagged",
+            ["Website"],
+        )

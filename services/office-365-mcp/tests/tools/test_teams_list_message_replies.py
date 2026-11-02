@@ -12,6 +12,8 @@ from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import message_handle
 from office_365_mcp.tools import TOOL_NAMES
 from office_365_mcp.tools import teams_list_message_replies as lister
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import post_in_seed_channel, rows, uncalled
 
 from .conftest import GRAPH_V1, message_payload
 
@@ -390,3 +392,27 @@ class TestHowItDeclaresItself:
         described = cast("str", schema["properties"]["messages"]["description"])
         assert "oldest first" in described
         assert not [name for name in TOOL_NAMES if name in described], described
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_reply_that_was_sent_to_a_post(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_list_message_replies-reply")
+        post = await post_in_seed_channel("seed-v1 case-teams_list_message_replies-reply post")
+        reply = await call(
+            "teams_send_channel_message",
+            team_id=post["team_id"],
+            channel_id=post["channel_id"],
+            reply_to_id=post["message_id"],
+            message="seed-v1 case-teams_list_message_replies-reply reply",
+        )
+
+        listed = await call("teams_list_message_replies", uri=post["uri"])
+
+        (only_reply,) = rows(listed, "messages")
+        assert only_reply["uri"] == reply["uri"]
+        assert only_reply["body"] == "seed-v1 case-teams_list_message_replies-reply reply"
+        assert only_reply["reply_to_id"] == post["message_id"]
+        assert listed["more_replies"] is False
+        assert uncalled(routes) == []

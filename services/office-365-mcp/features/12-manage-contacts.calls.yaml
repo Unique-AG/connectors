@@ -1,5 +1,7 @@
 uc-12-01:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_gives_the_telephone_number_of_a_contact_from_the_list_and_the_full_read"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -13,6 +15,8 @@ uc-12-01:
 
 uc-12-02:
   status: gap
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_gives_no_telephone_number_for_a_person_who_is_only_in_the_directory"
   ask: "What is the telephone number of Tom Berger?"
   blocker:
     kind: tool
@@ -25,6 +29,8 @@ uc-12-02:
 
 uc-12-03:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_saves_a_new_contact_with_the_details_mia_gave"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
   provenance: drafted
   asks_user: false
@@ -34,6 +40,9 @@ uc-12-03:
 
 uc-12-04:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_adds_a_second_telephone_number_next_to_the_first"
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_keeps_the_numbers_a_contact_has_when_it_adds_one"
   ask: "Add the office number +41 44 555 01 03 to Tom Berger."
   provenance: drafted
   asks_user: false
@@ -45,6 +54,8 @@ uc-12-04:
 
 uc-12-05:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_keeps_the_address_of_each_contact_with_its_own_row"
   ask: "What is the email address of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -57,6 +68,8 @@ uc-12-05:
 
 uc-12-06:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_why_the_contacts_cannot_be_read"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -74,6 +87,8 @@ uc-12-06:
 
 uc-12-07:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_reads_the_contacts_at_the_second_try_after_one_failure"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -90,6 +105,8 @@ uc-12-07:
 
 uc-12-08:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_reports_a_lookup_that_fails_twice_and_never_says_missing"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -104,6 +121,9 @@ uc-12-08:
 
 uc-12-09:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_the_assistant_to_find_the_contact_again_when_a_read_finds_none"
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_the_assistant_to_find_the_contact_again_when_a_change_finds_none"
   ask: "What is the mobile number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -121,6 +141,8 @@ uc-12-09:
 
 uc-12-10:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatMicrosoftWillNotSaveIsNotCreated::test_it_tells_why_the_contact_was_not_saved"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
   provenance: drafted
   asks_user: false
@@ -135,6 +157,8 @@ uc-12-10:
 
 uc-12-11:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatMicrosoftWillNotSaveIsNotCreated::test_it_checks_the_contacts_before_it_saves_again"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
   provenance: drafted
   asks_user: false
@@ -154,6 +178,8 @@ uc-12-11:
 
 uc-12-12:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestANewContactHoldsOnlyWhatMiaGives::test_it_saves_no_contact_that_has_no_detail"
   ask: "Save a new contact."
   provenance: drafted
   asks_user: false
@@ -168,6 +194,8 @@ uc-12-12:
 
 uc-12-13:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestANewContactHoldsOnlyWhatMiaGives::test_it_saves_no_contact_with_an_address_that_is_not_an_address"
   ask: "Save Tom Berger with the address tom at acme."
   provenance: drafted
   asks_user: false
@@ -182,6 +210,8 @@ uc-12-13:
 
 uc-12-14:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_refuses_to_clear_the_company_and_leaves_the_contact_as_it_is"
   ask: "Remove the company from Tom Berger."
   provenance: drafted
   asks_user: false
@@ -197,6 +227,8 @@ uc-12-14:
 
 uc-12-15:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_does_not_add_a_number_that_the_contact_already_has"
   ask: "Add the office number +41 44 555 01 03 to Tom Berger."
   provenance: drafted
   asks_user: false
@@ -212,6 +244,8 @@ uc-12-15:
 
 uc-12-16:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_puts_a_first_name_that_fits_two_people_to_mia_without_choosing"
   ask: "What is the email address of Anna?"
   provenance: drafted
   asks_user: false
@@ -226,6 +260,7 @@ uc-12-16:
 
 uc-12-17:
   status: untested
+  no_test: "assistant: Whether the assistant saves an address that a message names depends on the model, and the descriptions of outlook_create_contact and outlook_update_contact only warn that an address must come from the user."
   ask: "Read Tom's last message to me."
   provenance: drafted
   asks_user: false
@@ -244,6 +279,8 @@ uc-12-17:
 
 uc-12-18:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_stops_a_list_that_never_ends_and_says_so"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -260,6 +297,8 @@ uc-12-18:
 
 uc-12-19:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_waits_out_one_busy_answer_inside_the_same_call"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false
@@ -274,6 +313,8 @@ uc-12-19:
 
 uc-12-20:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_names_the_permission_that_no_administrator_gave"
   ask: "What is the telephone number of Anna Meier?"
   provenance: drafted
   asks_user: false

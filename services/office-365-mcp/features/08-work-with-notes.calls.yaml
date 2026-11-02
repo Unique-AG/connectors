@@ -1,5 +1,7 @@
 uc-08-01:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_a_page_is_found_by_a_word_in_its_title"
   ask: "Find my notes from the Acme kickoff."
   provenance: observed
   evidence: onenote_list_pages in 8 sessions
@@ -10,6 +12,8 @@ uc-08-01:
 
 uc-08-02:
   status: gap
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_a_search_by_a_word_of_the_body_is_not_offered"
   ask: "Find my notes that mention Zephyr."
   blocker:
     kind: graph
@@ -22,6 +26,8 @@ uc-08-02:
 
 uc-08-03:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_a_notebook_from_a_web_address_gives_its_sections"
   ask: "Show me the sections of the notebook at this web address."
   provenance: observed
   evidence: onenote_find_notebook_from_url in 2 sessions
@@ -33,6 +39,8 @@ uc-08-03:
 
 uc-08-04:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCapturingNotes::test_three_notes_become_a_page_in_the_section_in_order"
   ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
@@ -45,6 +53,8 @@ uc-08-04:
 
 uc-08-05:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCapturingNotes::test_a_task_list_is_appended_and_nothing_else_is_sent"
   ask: "Add a task list at the end of my Planning page."
   provenance: drafted
   asks_user: false
@@ -57,6 +67,8 @@ uc-08-05:
 
 uc-08-06:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestChangingANote::test_a_sentence_is_replaced_after_the_person_approves_and_nothing_else_is_sent"
   ask: "Change the launch date on my Planning page to 21 June."
   provenance: drafted
   asks_user: true
@@ -72,6 +84,8 @@ uc-08-06:
 
 uc-08-07:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestChangingANote::test_a_page_is_erased_only_after_the_person_approves"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
@@ -82,6 +96,8 @@ uc-08-07:
 
 uc-08-08:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestChangingANote::test_a_page_is_added_to_the_notebook_of_a_team_after_the_person_approves"
   ask: "Add the page Retro to the notebook of the Platform team."
   provenance: drafted
   asks_user: true
@@ -95,6 +111,8 @@ uc-08-08:
 
 uc-08-09:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestReadingAPage::test_a_page_is_read_with_the_notes_it_holds"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -107,6 +125,8 @@ uc-08-09:
 
 uc-08-10:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_notebooks_with_a_word_in_the_name_come_with_their_sections"
   ask: "Which of my notebooks have Customer in the name?"
   provenance: drafted
   asks_user: false
@@ -116,6 +136,8 @@ uc-08-10:
 
 uc-08-11:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_the_notebooks_opened_lately_come_in_the_order_microsoft_gives"
   ask: "Which notebooks did I open lately?"
   provenance: drafted
   asks_user: false
@@ -125,6 +147,8 @@ uc-08-11:
 
 uc-08-12:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCapturingNotes::test_a_notebook_with_sections_and_a_section_group_is_set_up_without_a_question"
   ask: "Create a notebook Project Falcon with the sections Plan and Risks and a section group Archive."
   provenance: drafted
   asks_user: false
@@ -141,6 +165,8 @@ uc-08-12:
 
 uc-08-13:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_page_that_microsoft_will_not_give_is_explained"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -153,6 +179,8 @@ uc-08-13:
 
 uc-08-14:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_microsoft_that_stays_busy_is_reported_with_the_wait_it_asked_for"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -165,6 +193,8 @@ uc-08-14:
 
 uc-08-15:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_read_that_fails_once_is_asked_again_and_gives_the_page"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -179,6 +209,8 @@ uc-08-15:
 
 uc-08-16:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_read_that_fails_twice_is_reported_and_not_to_be_repeated"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -193,6 +225,8 @@ uc-08-16:
 
 uc-08-17:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_page_of_a_team_that_the_person_may_not_open_names_the_membership"
   ask: "Summarize the Retro page in the notebook of the Platform team."
   provenance: drafted
   asks_user: false
@@ -205,6 +239,8 @@ uc-08-17:
 
 uc-08-18:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_page_in_a_team_notebook_that_the_person_may_not_use_is_not_created"
   ask: "Add the page Retro to the notebook of the Platform team."
   provenance: drafted
   asks_user: false
@@ -219,6 +255,8 @@ uc-08-18:
 
 uc-08-19:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_busy_microsoft_is_given_the_time_it_asks_for_and_the_page_is_posted_once"
   ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
@@ -231,6 +269,8 @@ uc-08-19:
 
 uc-08-20:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_page_that_microsoft_fails_to_create_is_posted_once_and_looked_for_first"
   ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
@@ -246,6 +286,8 @@ uc-08-20:
 
 uc-08-21:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_page_that_microsoft_will_not_create_is_explained"
   ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
@@ -258,6 +300,8 @@ uc-08-21:
 
 uc-08-22:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_rejected_page_gives_the_reason_and_is_not_to_be_sent_again"
   ask: "Create the page Weekly sync in my Work section with these three notes."
   provenance: drafted
   asks_user: false
@@ -270,6 +314,8 @@ uc-08-22:
 
 uc-08-23:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestACreateThatFails::test_a_change_that_may_be_partly_done_is_to_be_checked_before_the_rest_is_sent"
   ask: "Change the launch date on my Planning page to 21 June and add a task list at the end."
   provenance: drafted
   asks_user: true
@@ -292,6 +338,8 @@ uc-08-23:
 
 uc-08-24:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_page_above_one_megabyte_is_refused_as_a_whole_with_its_web_address"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -304,6 +352,8 @@ uc-08-24:
 
 uc-08-25:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestReadingAPage::test_a_page_of_exactly_one_megabyte_is_read_as_a_whole"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -316,6 +366,8 @@ uc-08-25:
 
 uc-08-26:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_page_that_arrives_empty_is_blamed_on_microsoft"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -328,6 +380,8 @@ uc-08-26:
 
 uc-08-27:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFindingNotes::test_a_new_page_with_an_empty_title_is_found_by_the_time_it_was_created"
   ask: "Find my notes called Weekly sync."
   provenance: drafted
   asks_user: false
@@ -340,6 +394,8 @@ uc-08-27:
 
 uc-08-28:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_an_address_that_names_no_notebook_is_reported_as_found_nothing"
   ask: "Show me the sections of the notebook at this web address."
   provenance: drafted
   asks_user: false
@@ -350,6 +406,8 @@ uc-08-28:
 
 uc-08-29:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_page_that_is_already_gone_is_not_erased_again"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: false
@@ -364,6 +422,8 @@ uc-08-29:
 
 uc-08-30:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_notebook_name_that_is_already_used_creates_nothing_more"
   ask: "Create a notebook Project Falcon."
   provenance: drafted
   asks_user: false
@@ -374,6 +434,8 @@ uc-08-30:
 
 uc-08-31:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_name_that_is_too_long_creates_nothing"
   ask: "Create a notebook with a name of 129 characters."
   provenance: drafted
   asks_user: false
@@ -383,6 +445,8 @@ uc-08-31:
 
 uc-08-32:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_name_of_the_longest_allowed_length_is_sent_whole"
   ask: "Create a notebook with a name of 128 characters."
   provenance: drafted
   asks_user: false
@@ -392,6 +456,8 @@ uc-08-32:
 
 uc-08-33:
   status: partly
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_section_refused_in_a_section_group_gets_the_generic_administrator_advice"
   ask: "Create a section 2025 in my Archive section group of Project Falcon."
   blocker:
     kind: description
@@ -414,6 +480,8 @@ uc-08-33:
 
 uc-08-34:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAChangeThatIsNotApproved::test_a_declined_change_leaves_the_notes_as_they_were"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
@@ -426,6 +494,8 @@ uc-08-34:
 
 uc-08-35:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAChangeThatIsNotApproved::test_a_change_without_an_answer_does_not_happen_and_can_be_asked_again"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
@@ -436,6 +506,8 @@ uc-08-35:
 
 uc-08-36:
   status: untested
+  tests:
+    - "tests/tools/test_onenote_delete_page.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_request_deletes_nothing"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
@@ -447,6 +519,7 @@ uc-08-36:
 
 uc-08-37:
   status: untested
+  no_test: "assistant: no code guard reads text inside a page, so the model alone must report an order in a page and not obey it."
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -460,6 +533,8 @@ uc-08-37:
 
 uc-08-38:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_one_busy_answer_is_waited_out"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -472,6 +547,8 @@ uc-08-38:
 
 uc-08-39:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAReadThatFails::test_a_missing_consent_is_explained_and_no_page_is_read"
   ask: "Summarize my notes from the Acme kickoff."
   provenance: drafted
   asks_user: false
@@ -486,6 +563,8 @@ uc-08-39:
 
 uc-08-40:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_notebook_is_copied_under_a_new_name_and_followed_to_the_end"
   ask: "Copy my Customers notebook as Customers 2026."
   provenance: drafted
   asks_user: false
@@ -502,6 +581,8 @@ uc-08-40:
 
 uc-08-41:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_notebook_is_copied_into_a_team_after_the_person_approves"
   ask: "Copy my Customers notebook into the Platform team."
   provenance: drafted
   asks_user: true
@@ -518,6 +599,8 @@ uc-08-41:
 
 uc-08-42:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_section_is_copied_into_another_notebook"
   ask: "Copy the section Work of my Customers notebook into my Archive notebook."
   provenance: drafted
   asks_user: false
@@ -534,6 +617,8 @@ uc-08-42:
 
 uc-08-43:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_page_is_copied_into_another_section"
   ask: "Copy my Weekly sync page into my Archive section."
   provenance: drafted
   asks_user: false
@@ -550,6 +635,8 @@ uc-08-43:
 
 uc-08-44:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_a_page_is_renamed_and_only_its_title_is_sent"
   ask: "Rename my page Acme kickoff to Acme kickoff decisions."
   provenance: drafted
   asks_user: false
@@ -563,6 +650,8 @@ uc-08-44:
 
 uc-08-45:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_the_start_of_a_page_is_shown_without_reading_the_page"
   ask: "How does my Weekly sync page start? Do not open the whole page."
   provenance: drafted
   asks_user: false
@@ -575,6 +664,8 @@ uc-08-45:
 
 uc-08-46:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_picture_on_a_page_is_given"
   ask: "Show me the picture on my Acme kickoff page."
   provenance: drafted
   asks_user: false
@@ -589,6 +680,8 @@ uc-08-46:
 
 uc-08-47:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_nothing_is_copied_from_a_notebook_of_a_site"
   ask: "Copy the Intranet notebook into my OneDrive."
   provenance: drafted
   asks_user: false
@@ -606,6 +699,8 @@ uc-08-47:
 
 uc-08-48:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_page_of_a_site_is_not_copied_but_its_content_is_written_again"
   ask: "Copy the Policy page into my Work section."
   provenance: drafted
   asks_user: false
@@ -625,6 +720,8 @@ uc-08-48:
 
 uc-08-50:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_copy_that_microsoft_fails_is_started_once_and_looked_for_before_a_repeat"
   ask: "Copy my Customers notebook as Customers 2026."
   provenance: drafted
   asks_user: false
@@ -641,6 +738,8 @@ uc-08-50:
 
 uc-08-51:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_copy_that_cannot_be_followed_is_looked_for_later_and_not_started_again"
   ask: "Copy my Customers notebook as Customers 2026."
   provenance: drafted
   asks_user: false
@@ -658,6 +757,8 @@ uc-08-51:
 
 uc-08-52:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_copy_that_microsoft_reports_as_failed_gives_the_reason"
   ask: "Copy my Customers notebook as Customers 2026."
   provenance: drafted
   asks_user: false
@@ -674,6 +775,8 @@ uc-08-52:
 
 uc-08-53:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_copy_that_microsoft_no_longer_knows_is_reported_as_unknown"
   ask: "Is the copy of my Customers notebook done?"
   provenance: drafted
   asks_user: false
@@ -686,6 +789,8 @@ uc-08-53:
 
 uc-08-54:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_a_page_that_is_gone_is_looked_for_again_in_the_page_list"
   ask: "Show me how my Acme kickoff page starts."
   provenance: drafted
   asks_user: false
@@ -699,6 +804,8 @@ uc-08-54:
 
 uc-08-55:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_a_change_that_was_made_but_cannot_be_shown_is_not_made_twice"
   ask: "Add a task list at the end of my Planning page."
   provenance: drafted
   asks_user: false
@@ -714,6 +821,8 @@ uc-08-55:
 
 uc-08-56:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_an_addition_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
   ask: "Add a task list at the end of my Planning page."
   provenance: drafted
   asks_user: false
@@ -729,6 +838,8 @@ uc-08-56:
 
 uc-08-57:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_a_change_that_was_made_but_cannot_be_shown_is_not_made_twice"
   ask: "Rename my page Acme kickoff to Acme kickoff decisions."
   provenance: drafted
   asks_user: false
@@ -744,6 +855,8 @@ uc-08-57:
 
 uc-08-58:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_picture_above_ten_megabytes_is_refused_as_a_whole"
   ask: "Show me the picture on my Acme kickoff page."
   provenance: drafted
   asks_user: false
@@ -758,6 +871,8 @@ uc-08-58:
 
 uc-08-59:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_picture_that_arrives_empty_is_blamed_on_microsoft"
   ask: "Show me the picture on my Acme kickoff page."
   provenance: drafted
   asks_user: false
@@ -772,6 +887,8 @@ uc-08-59:
 
 uc-08-60:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageOrPictureThatCannotBeRead::test_a_picture_that_is_gone_sends_the_assistant_back_to_the_page"
   ask: "Show me the picture on my Acme kickoff page."
   provenance: drafted
   asks_user: false

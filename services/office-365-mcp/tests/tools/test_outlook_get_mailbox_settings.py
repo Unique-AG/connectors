@@ -12,6 +12,7 @@ from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle, mail_folder_handle
 from office_365_mcp.shared.rules import MailRule, RuleActions
 from office_365_mcp.tools import outlook_get_mailbox_settings as settings_tool
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -1019,3 +1020,31 @@ class TestGraphFailures:
     def test_a_404_is_answered_as_a_mailbox_that_is_not_there(self) -> None:
         assert "takes no id" in settings_tool.GRAPH_NOT_FOUND
         assert "Exchange Online mailbox" in settings_tool.GRAPH_NOT_FOUND
+
+
+_RECORDED_RULE = "seed-v1 case-outlook_get_mailbox_settings-rules"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_the_rules_section_lists_the_rule_that_was_just_created(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_get_mailbox_settings-rules")
+        created = await call(
+            "outlook_create_mail_rule",
+            display_name=_RECORDED_RULE,
+            sequence=10,
+            conditions={"subject_contains": [_RECORDED_RULE]},
+            actions={"mark_as_read": True},
+        )
+
+        report = await call("outlook_get_mailbox_settings", include="rules")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert report["rules"] == [created]
+        assert created["display_name"] == _RECORDED_RULE
+        assert (report["rules_capped"], report["automatic_reply"], report["categories"]) == (
+            False,
+            None,
+            None,
+        )

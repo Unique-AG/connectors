@@ -15,6 +15,7 @@ from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.calendar import ZONE_NAME, zone_named
 from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_list_time_zones as lister
+from tests.graph_fixtures import serve
 
 from .conftest import GRAPH_V1
 
@@ -328,3 +329,18 @@ class TestGraphFailures:
 
     def test_the_permissions_are_the_ones_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("User.Read",)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_windows_zones_microsoft_sent(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_time_zones-windows")
+
+        listing = await lister.list_time_zones(client)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        aliases = [zone.alias for zone in listing.time_zones]
+        assert len(aliases) == 143
+        assert "W. Europe Standard Time" in aliases
+        assert listing.capped is False

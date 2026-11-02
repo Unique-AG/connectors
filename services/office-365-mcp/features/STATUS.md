@@ -16,6 +16,20 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 Scenarios with an executable run: 19 of 547.
 
+## Tests by surface
+
+A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a reason), or neither while it is in `PENDING.txt`.
+
+| Surface | tests | no test | pending | total |
+| --- | --- | --- | --- | --- |
+| Outlook | 274 | 10 | 0 | 284 |
+| Teams | 101 | 4 | 0 | 105 |
+| SharePoint | 72 | 1 | 0 | 73 |
+| OneNote | 58 | 1 | 0 | 59 |
+| Across sources | 25 | 1 | 0 | 26 |
+
+Scenarios with an executable test: 530 of 547 (17 with an explained reason, 0 pending).
+
 ## Happy and unhappy paths by surface
 
 A scenario is `@unhappy` when something fails, is refused, is limited, or is hostile.

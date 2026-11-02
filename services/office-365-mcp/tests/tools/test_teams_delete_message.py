@@ -31,6 +31,8 @@ from office_365_mcp.tools.teams_delete_message import (
     a_person_agrees,
     delete_message,
 )
+from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import post_in_seed_channel, uncalled, was_sent
 
 from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID, message_payload
 
@@ -879,3 +881,18 @@ class TestHowItDeclaresItself:
         assert set(properties) == {"uri"}
         assert set(cast("Sequence[str]", tool.parameters["required"])) == {"uri"}
         assert set(deleter.GRAPH_CALL_EXAMPLE) <= set(properties)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_deletes_a_post_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        routes = serve(graph, "rec-tool-teams_delete_message-post")
+        post = await post_in_seed_channel("seed-v1 case-teams_delete_message-post doomed")
+        mia = Person()
+
+        deleted = await call("teams_delete_message", person=mia, uri=post["uri"])
+
+        assert deleted["uri"] == post["uri"]
+        assert deleted["deleted"] is True
+        assert "seed-v1 case-teams_delete_message-post doomed" in mia.asked[0]
+        assert was_sent(routes, "POST", f"/messages/{post['message_id']}/softDelete")
+        assert uncalled(routes) == []

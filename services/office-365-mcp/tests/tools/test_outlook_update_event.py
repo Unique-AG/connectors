@@ -27,6 +27,7 @@ from office_365_mcp.shared.calendar import (
 from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.tools.outlook_create_event import CreatedEvent, create_event
 from office_365_mcp.tools.outlook_update_event import (
     STORED_BODY_QUOTE_LIMIT,
     TOOL_NAME,
@@ -35,6 +36,7 @@ from office_365_mcp.tools.outlook_update_event import (
     register,
     update_event,
 )
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -1991,3 +1993,29 @@ class TestTheTeamsMeetingItAdds:
         _ = await _update(client, subject="Renamed", online_meeting=True, confirm=asked)
 
         assert asked.abouts[0] != asked.abouts[1]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_renames_the_event_it_created(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_update_event-subject")
+        subject = "seed-v1 case-outlook_update_event-subject"
+
+        created = await create_event(
+            client,
+            subject=subject,
+            starts_at="2026-10-31T12:00:00",
+            ends_at="2026-10-31T12:30:00",
+            time_zone="Europe/Zurich",
+            attendees=[],
+            confirm=_agrees,
+        )
+        assert isinstance(created, CreatedEvent)
+        updated = await _update(client, uri=created.uri, subject=f"{subject} moved")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (patch,) = (route for (method, _), route in routes.items() if method == "PATCH")
+        assert _sent(patch)["subject"] == f"{subject} moved"
+        assert updated.uri == created.uri
+        assert updated.subject == f"{subject} moved"

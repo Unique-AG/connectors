@@ -13,6 +13,8 @@ from office_365_mcp.shared import handles, identity
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.tools import teams_read_message, teams_search_messages
 from office_365_mcp.tools.teams_search_messages import SearchCriteria
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import rows, uncalled
 
 from .conftest import ME, chat_hit, message_payload, reaction_payload, search_response
 
@@ -674,3 +676,23 @@ class TestTheRoundTripFromASearchResult:
         assert message.sender.display_name == found.messages[0].sender.display_name, (
             "the same person, whichever tool reported them"
         )
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_reads_a_system_event_of_a_group_chat_with_no_sender(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_read_message-chat")
+        chats = rows(await call("teams_list_chats", limit=5, include_member_emails=True), "chats")
+        listed = rows(
+            await call("teams_list_chat_messages", chat_id=chats[0]["chat_id"], limit=5), "messages"
+        )
+
+        read = await call("teams_read_message", uri=listed[0]["uri"])
+
+        assert len(chats) == 3
+        assert read["uri"] == listed[0]["uri"]
+        assert read["chat_id"] == chats[0]["chat_id"]
+        assert read["event"] == "members added"
+        assert read["sender"] is None
+        assert uncalled(routes) == []

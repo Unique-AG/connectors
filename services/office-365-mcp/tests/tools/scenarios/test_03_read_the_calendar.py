@@ -1,0 +1,711 @@
+import functools
+import json
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from datetime import datetime
+from typing import cast
+
+import httpx
+import pytest
+import respx
+from fastmcp import Client, FastMCP
+from fastmcp.client.transports import FastMCPTransport
+from fastmcp.exceptions import ToolError
+from mcp.types import EmbeddedResource, TextResourceContents
+
+from tests.conftest import RecordedSleeps
+from tests.e2e.test_scenarios import build_server, patch_obo
+from tests.graph_fixtures import E2E, Json
+from tests.tools.conftest import GRAPH_V1
+
+from .support import call, response, serve
+
+type Row = Mapping[str, object]
+
+_ZURICH = "Europe/Zurich"
+_MIA: Row = {"name": "Mia Keller", "address": "mia@example.test"}
+_ANNA: Row = {"name": "Anna Meier", "address": "anna@example.test"}
+_TOM: Row = {"name": "Tom Weber", "address": "tom@example.test"}
+_PRIYA: Row = {"name": "Priya Rao", "address": "priya@example.test"}
+_CALENDAR_ID = "AAMkSYNTHETIC-calendar-default"
+_ANNA_CALENDAR_ID = "AAMkSYNTHETIC-calendar-anna"
+_VIEW = f"/me/calendars/{_CALENDAR_ID}/calendarView"
+_REJECTION = {"error": {"code": "ErrorInvalidRequest", "message": "The window is not valid."}}
+_OFFSITE = "Offsite agenda review"
+_TOO_MANY: Json = {
+    "status": 429,
+    "headers": {"Retry-After": "30"},
+    "body": "error.TooManyRequests.json",
+}
+
+_MICROSOFT_REFUSES = [
+    pytest.param(
+        {"status": 401, "body": "error.InvalidAuthenticationToken.json"},
+        "sign in to this connector again",
+        id="expired-sign-in",
+    ),
+    pytest.param(
+        {"status": 403, "body": "error.accessDenied.json"},
+        "Ask a Microsoft 365 administrator to grant the delegated permissions",
+        id="no-access",
+    ),
+]
+
+type Fault = Callable[[httpx.Request], httpx.Response] | type[Exception]
+
+_call = cast("Callable[..., Awaitable[Row]]", call)
+
+
+def _reply(spec: Json) -> Fault:
+    def answer(_request: httpx.Request) -> httpx.Response:
+        return response(spec)
+
+    return answer
+
+
+def _rejection() -> Fault:
+    def answer(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json=_REJECTION)
+
+    return answer
+
+
+def _endless() -> Fault:
+    def answer(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"value": [], "@odata.nextLink": f"{GRAPH_V1}{_VIEW}?$skiptoken=again"}
+        )
+
+    return answer
+
+
+def _calendar(calendar_id: str, owner: Row, *, can_edit: bool) -> dict[str, object]:
+    return {
+        "id": calendar_id,
+        "name": str(owner["name"]),
+        "owner": dict(owner),
+        "canEdit": can_edit,
+        "canShare": can_edit,
+        "canViewPrivateItems": can_edit,
+        "isDefaultCalendar": owner == _MIA,
+        "isTallyingResponses": True,
+        "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+        "defaultOnlineMeetingProvider": "teamsForBusiness",
+    }
+
+
+def _event(
+    event_id: str,
+    subject: str,
+    start: str,
+    end: str,
+    *,
+    organizer: Row = _MIA,
+    kind: str = "singleInstance",
+    series: str | None = None,
+) -> dict[str, object]:
+    return {
+        "id": event_id,
+        "subject": subject,
+        "bodyPreview": f"About {subject}.",
+        "start": {"dateTime": f"{start}.0000000", "timeZone": "UTC"},
+        "end": {"dateTime": f"{end}.0000000", "timeZone": "UTC"},
+        "isAllDay": False,
+        "isCancelled": False,
+        "type": kind,
+        "seriesMasterId": series,
+        "sensitivity": "normal",
+        "showAs": "busy",
+        "location": {"displayName": "Room Pilatus"},
+        "isOnlineMeeting": False,
+        "organizer": {"emailAddress": dict(organizer)},
+        "isOrganizer": organizer == _MIA,
+        "responseStatus": {
+            "response": "organizer" if organizer == _MIA else "notResponded",
+            "time": "0001-01-01T00:00:00Z",
+        },
+        "attendees": [],
+        "categories": [],
+        "importance": "normal",
+        "webLink": "https://outlook.office365.com/owa/?itemid=synthetic",
+    }
+
+
+def _attendee(person: Row, answer: str) -> dict[str, object]:
+    return {
+        "emailAddress": dict(person),
+        "type": "required",
+        "status": {"response": answer, "time": "2026-11-01T08:00:00Z"},
+    }
+
+
+def _view_of(graph: respx.MockRouter, *events: dict[str, object]) -> respx.Route:
+    mine = _calendar(_CALENDAR_ID, _MIA, can_edit=True)
+    _ = graph.get("/me/calendar").mock(return_value=httpx.Response(200, json=mine))
+    return graph.get(_VIEW).mock(return_value=httpx.Response(200, json={"value": list(events)}))
+
+
+def _route(routes: Mapping[tuple[str, str], respx.Route], tail: str) -> respx.Route:
+    return next(route for (_method, path), route in routes.items() if path.endswith(tail))
+
+
+def _recorded(body: str) -> dict[str, object]:
+    return cast("dict[str, object]", json.loads((E2E / "bodies" / f"{body}.json").read_text()))
+
+
+def _list(seen: Row, key: str) -> list[Row]:
+    return cast("list[Row]", seen[key])
+
+
+def _part(parent: Row, key: str) -> Row:
+    return cast("Row", parent[key])
+
+
+def _starts(events: Sequence[Row]) -> list[tuple[str, str]]:
+    return [(str(one["subject"]), str(_part(one, "start")["iso"])) for one in events]
+
+
+def _moment(row: Row, key: str) -> datetime:
+    return datetime.fromisoformat(str(_part(row, key)["iso"]))
+
+
+async def _day(**arguments: object) -> Row:
+    return await _call(
+        "outlook_list_events",
+        **({"starts_on": "2026-10-29", "ends_on": "2026-10-29", "time_zone": _ZURICH} | arguments),
+    )
+
+
+@functools.cache
+def _server() -> FastMCP[None]:
+    return build_server()
+
+
+async def _input_names(tool: str) -> set[str]:
+    async with Client(FastMCPTransport(_server()), mode="legacy") as client:
+        listed = {one.name: one for one in await client.list_tools()}
+    return set(cast("Row", listed[tool].input_schema["properties"]))
+
+
+async def _read_attachment(uri: str) -> str:
+    with pytest.MonkeyPatch.context() as patch:
+        patch_obo(patch)
+        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
+            answer = await client.call_tool("outlook_read_event_attachment", {"uri": uri})
+    resource = cast("EmbeddedResource", answer.content[0]).resource
+    return cast("TextResourceContents", resource).text
+
+
+class TestADayOrAWeek:
+    async def test_it_lists_the_meetings_of_a_day_with_their_times_in_zurich(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+
+        seen = await _day()
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert _part(seen, "window")["time_zone"] == _ZURICH
+        assert (_OFFSITE, "2026-10-29T11:00:00+01:00") in _starts(_list(seen, "events"))
+        assert ("Daily standup", "2026-10-29T09:15:00+01:00") in _starts(_list(seen, "events"))
+
+    async def test_it_lists_a_moved_date_of_a_weekly_meeting_on_its_own_day_only(
+        self, graph: respx.MockRouter
+    ) -> None:
+        moved = _event(
+            "AAMkSYNTHETIC-exception-1",
+            "Team sync",
+            "2026-11-06T09:00:00",
+            "2026-11-06T09:30:00",
+            kind="exception",
+            series="AAMkSYNTHETIC-series-1",
+        )
+        _ = _view_of(graph, moved)
+
+        seen = await _day(starts_on="2026-11-02", ends_on="2026-11-08")
+
+        (sync,) = _list(seen, "events")
+        assert _starts([sync]) == [("Team sync", "2026-11-06T10:00:00+01:00")]
+        assert (sync["kind"], sync["in_series"]) == ("exception", True)
+
+    async def test_it_gives_overlapping_meetings_times_that_show_the_clash(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _view_of(
+            graph,
+            _event("e1", "Budget review", "2026-11-03T13:00:00", "2026-11-03T14:00:00"),
+            _event("e2", "Launch review", "2026-11-03T13:30:00", "2026-11-03T14:30:00"),
+        )
+
+        seen = await _day(starts_on="2026-11-03", ends_on="2026-11-03")
+
+        first, second = _list(seen, "events")
+        assert (first["subject"], second["subject"]) == ("Budget review", "Launch review")
+        assert _moment(second, "start") < _moment(first, "end")
+
+    async def test_it_tells_a_meeting_that_mia_organizes_from_an_invitation(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+
+        seen = await _day()
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        own = {str(one["subject"]): one["owner_is_organizer"] for one in _list(seen, "events")}
+        assert (own["Hosting review"], own["Roadmap check"]) == (True, False)
+
+    async def test_it_lists_a_day_with_nothing_on_as_empty_and_complete(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+        _ = _route(routes, "/calendarView").mock(
+            side_effect=[response({"status": 200, "body": "value.empty.json"})]
+        )
+
+        seen = await _day()
+
+        assert (seen["events"], seen["capped"]) == ([], False)
+
+    async def test_a_week_of_40_meetings_is_cut_at_the_default_limit_and_whole_at_a_limit_of_40(
+        self, graph: respx.MockRouter
+    ) -> None:
+        week = [
+            _event(f"e{n:02}", f"Meeting {n:02}", "2026-11-03T08:00:00", "2026-11-03T08:30:00")
+            for n in range(40)
+        ]
+
+        def page(request: httpx.Request) -> httpx.Response:
+            top = int(request.url.params["$top"])
+            more = {"@odata.nextLink": f"{GRAPH_V1}{_VIEW}?$skip={top}"} if top < len(week) else {}
+            return httpx.Response(200, json={"value": week[:top]} | more)
+
+        _ = _view_of(graph).mock(side_effect=page)
+
+        by_default = await _day(starts_on="2026-11-02", ends_on="2026-11-08")
+        in_full = await _day(starts_on="2026-11-02", ends_on="2026-11-08", limit=40)
+
+        assert (len(_list(by_default, "events")), by_default["capped"]) == (25, True)
+        assert (len(_list(in_full, "events")), in_full["capped"]) == (40, False)
+
+
+class TestWhoIsComingAndWhereTheMeetingIs:
+    async def _read_offsite(
+        self, graph: respx.MockRouter, attendees: Sequence[dict[str, object]]
+    ) -> Row:
+        routes = serve(graph, "rec-tool-outlook_read_event-agenda")
+        one_event = next(route for (_m, path), route in routes.items() if "/events/" in path)
+        _ = one_event.mock(
+            return_value=httpx.Response(
+                200,
+                json=_recorded("rec-tool-outlook_read_event-agenda.03") | {"attendees": attendees},
+            )
+        )
+        found = await _day(subject_contains=_OFFSITE)
+        (listed,) = _list(found, "events")
+        return await call("outlook_read_event", uri=listed["uri"], time_zone=_ZURICH)
+
+    async def test_it_shows_what_each_attendee_answered(self, graph: respx.MockRouter) -> None:
+        seen = await self._read_offsite(
+            graph,
+            [
+                _attendee(_ANNA, "accepted"),
+                _attendee(_TOM, "declined"),
+                _attendee(_PRIYA, "none"),
+            ],
+        )
+
+        answers = {str(one["name"]): one["response"] for one in _list(seen, "attendees")}
+        assert answers == {"Anna Meier": "accepted", "Tom Weber": "declined", "Priya Rao": "none"}
+
+    async def test_it_has_no_attendee_filter_so_a_person_is_found_by_reading_the_events(
+        self, graph: respx.MockRouter
+    ) -> None:
+        seen = await self._read_offsite(graph, [_attendee(_TOM, "accepted")])
+
+        assert await _input_names("outlook_list_events") == {
+            "starts_on",
+            "ends_on",
+            "time_zone",
+            "calendar_ref",
+            "subject_contains",
+            "cancelled",
+            "owner_response",
+            "limit",
+        }
+        assert [one["address"] for one in _list(seen, "attendees")] == ["tom@example.test"]
+
+    async def test_it_opens_the_meeting_of_an_invitation_by_its_subject_with_time_and_attendees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        seen = await self._read_offsite(graph, [_attendee(_ANNA, "accepted")])
+
+        assert seen["subject"] == _OFFSITE
+        assert _part(seen, "start")["iso"] == "2026-10-29T11:00:00+01:00"
+        assert [one["name"] for one in _list(seen, "attendees")] == ["Anna Meier"]
+        assert await _input_names("outlook_read_event") == {"uri", "time_zone"}
+
+    async def test_a_meeting_deleted_after_the_listing_is_reported_as_unread_and_not_as_deleted(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_read_event-agenda")
+        _ = next(route for (_m, path), route in routes.items() if "/events/" in path).mock(
+            side_effect=[response({"status": 404, "body": "error.itemNotFound.json"})]
+        )
+        (listed,) = _list(await _day(subject_contains=_OFFSITE), "events")
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call("outlook_read_event", uri=listed["uri"])
+
+        assert "Report that this tool failed to read the event, never that the meeting" in str(
+            refused.value
+        )
+        assert "list the window again" in str(refused.value)
+
+
+class TestASharedCalendar:
+    async def test_it_lists_the_events_of_a_calendar_that_a_colleague_shared(
+        self, graph: respx.MockRouter
+    ) -> None:
+        shared = _calendar(_ANNA_CALENDAR_ID, _ANNA, can_edit=False)
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "me", **_MIA}))
+        _ = graph.get("/me/calendars").mock(
+            return_value=httpx.Response(200, json={"value": [shared]})
+        )
+        _ = graph.get(f"/me/calendars/{_ANNA_CALENDAR_ID}").mock(
+            return_value=httpx.Response(200, json=shared)
+        )
+        _ = graph.get(f"/me/calendars/{_ANNA_CALENDAR_ID}/calendarView").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        _event(
+                            "e1",
+                            "Design review",
+                            "2026-11-03T10:00:00",
+                            "2026-11-03T11:00:00",
+                            organizer=_ANNA,
+                        )
+                    ]
+                },
+            )
+        )
+
+        calendars = await call("outlook_list_calendars")
+        (anna,) = _list(calendars, "calendars")
+        seen = await _day(starts_on="2026-11-03", ends_on="2026-11-03", calendar_ref=anna["uri"])
+
+        assert _part(_part(seen, "calendar"), "owner")["name"] == "Anna Meier"
+        assert _starts(_list(seen, "events")) == [("Design review", "2026-11-03T11:00:00+01:00")]
+
+    async def test_a_calendar_that_is_no_longer_shared_is_reported_as_unreadable_not_as_empty(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"/me/calendars/{_ANNA_CALENDAR_ID}").mock(
+            return_value=response({"status": 404, "body": "error.itemNotFound.json"})
+        )
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _day(calendar_ref=f"outlook:///calendars/{_ANNA_CALENDAR_ID}")
+
+        assert "stopped sharing it" in str(refused.value)
+        assert "call outlook_list_calendars again" in str(refused.value)
+
+
+class TestAnAttachmentOfAMeeting:
+    async def _agenda(self, graph: respx.MockRouter) -> tuple[str, respx.Route]:
+        routes = serve(graph, "rec-tool-outlook_read_event_attachment-agenda")
+        (listed,) = _list(await _day(subject_contains=_OFFSITE), "events")
+        attachments = await call("outlook_list_event_attachments", uri=listed["uri"])
+        (agenda,) = _list(attachments, "attachments")
+        return str(agenda["uri"]), _route(
+            routes, "/attachments/" + str(agenda["uri"]).rsplit("/", 1)[1]
+        )
+
+    async def test_it_reads_the_agenda_attached_to_a_meeting(self, graph: respx.MockRouter) -> None:
+        uri, _ = await self._agenda(graph)
+
+        text = await _read_attachment(uri)
+
+        assert text == "Offsite agenda.\nMorning: workshop. Afternoon: review.\n"
+
+    @pytest.mark.parametrize(
+        ("attachment", "told"),
+        [
+            pytest.param(
+                {"@odata.type": "#microsoft.graph.itemAttachment", "name": "Mail", "size": 100},
+                "open the attached item in Outlook",
+                id="an-outlook-message",
+            ),
+            pytest.param(
+                {
+                    "@odata.type": "#microsoft.graph.referenceAttachment",
+                    "name": "Link",
+                    "size": 100,
+                },
+                "open the link from the event in Outlook",
+                id="a-link-to-cloud-storage",
+            ),
+            pytest.param(
+                {"@odata.type": "#microsoft.graph.fileAttachment", "name": "agenda.pdf"},
+                "open the event in Outlook",
+                id="a-file-without-a-reported-size",
+            ),
+            pytest.param(
+                {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": "agenda.pdf",
+                    "size": 10_485_761,
+                },
+                "cannot return a file this large",
+                id="a-file-one-byte-above-the-limit",
+            ),
+        ],
+    )
+    async def test_it_names_an_attachment_it_cannot_give_and_shows_no_content_of_it(
+        self, graph: respx.MockRouter, attachment: dict[str, object], told: str
+    ) -> None:
+        uri, route = await self._agenda(graph)
+        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
+        _ = route.mock(return_value=httpx.Response(200, json=described | attachment))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call("outlook_read_event_attachment", uri=uri)
+
+        assert told in str(refused.value)
+        assert "contentBytes" not in str(refused.value)
+
+    async def test_it_reads_a_file_that_microsoft_reports_at_exactly_the_size_limit(
+        self, graph: respx.MockRouter
+    ) -> None:
+        uri, route = await self._agenda(graph)
+        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
+        full = _recorded("rec-tool-outlook_read_event_attachment-agenda.05")
+        _ = route.mock(
+            side_effect=[
+                httpx.Response(200, json=described | {"size": 10_485_760}),
+                httpx.Response(200, json=full | {"size": 10_485_760}),
+            ]
+        )
+
+        text = await _read_attachment(uri)
+
+        assert text.startswith("Offsite agenda.")
+
+    async def test_an_attachment_that_arrives_empty_is_reported_as_a_fault_of_microsoft(
+        self, graph: respx.MockRouter
+    ) -> None:
+        uri, route = await self._agenda(graph)
+        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
+        _ = route.mock(
+            side_effect=[httpx.Response(200, json=described), httpx.Response(200, json=described)]
+        )
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call("outlook_read_event_attachment", uri=uri)
+
+        assert "sent no content for this attachment" in str(refused.value)
+        assert "Ask for this attachment again later" in str(refused.value)
+        assert "tell the user to open the event in Outlook" in str(refused.value)
+
+
+class TestMicrosoftCannotReadTheCalendar:
+    @pytest.mark.parametrize(("answer", "told"), _MICROSOFT_REFUSES)
+    async def test_a_refusal_of_microsoft_is_explained_and_lists_no_meeting(
+        self, graph: respx.MockRouter, answer: Json, told: str
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+        _ = _route(routes, "/calendarView").mock(side_effect=[response(answer)])
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _day()
+
+        assert told in str(refused.value)
+
+    async def test_a_busy_microsoft_at_every_try_asks_to_wait_30_seconds_and_not_sooner(
+        self, graph: respx.MockRouter, retry_sleeps: RecordedSleeps
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+        _ = _route(routes, "/calendarView").mock(side_effect=_reply(_TOO_MANY))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _day()
+
+        assert "asked to be left alone for 30 seconds. Retry after that, not sooner." in str(
+            refused.value
+        )
+        assert retry_sleeps.delays == [30, 30, 30]
+
+    async def test_a_rejected_question_gives_the_reason_and_says_it_fails_again(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+        _ = _route(routes, "/calendarView").mock(side_effect=_rejection())
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _day()
+
+        assert 'gave this reason: "The window is not valid."' in str(refused.value)
+        assert "will fail the same way" in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("fault", "told"),
+        [
+            pytest.param(
+                _reply({"status": 500, "body": "error.generalException.json"}),
+                "Retry once; if it fails again the same way, stop and report it",
+                id="fails",
+            ),
+            pytest.param(
+                httpx.ReadTimeout, "Retry once; if it fails again the same way", id="no-answer"
+            ),
+            pytest.param(
+                _endless(),
+                "would not finish sending this list",
+                id="endless-list",
+            ),
+        ],
+    )
+    async def test_a_calendar_that_cannot_be_read_to_the_end_is_not_reported_as_empty(
+        self, graph: respx.MockRouter, fault: Fault, told: str
+    ) -> None:
+        _ = _view_of(graph).mock(side_effect=fault)
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _day()
+
+        assert told in str(refused.value)
+        assert "Retry once" in str(refused.value)
+
+    async def test_one_busy_answer_is_waited_out_inside_the_same_call(
+        self, graph: respx.MockRouter, retry_sleeps: RecordedSleeps
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_events-today")
+        _ = _route(routes, "/calendarView").mock(
+            side_effect=[
+                response(_TOO_MANY),
+                response({"status": 200, "body": "rec-tool-outlook_list_events-today.02.json"}),
+            ]
+        )
+
+        seen = await _day()
+
+        assert (_OFFSITE, "2026-10-29T11:00:00+01:00") in _starts(_list(seen, "events"))
+        assert retry_sleeps.delays == [30]
+
+
+class TestAWindowNamedBackwards:
+    async def test_it_reads_nothing_and_says_which_bound_goes_first(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _day(starts_on="2026-11-06", ends_on="2026-11-04")
+
+        assert "Put the earlier bound in `starts_on`" in str(refused.value)
+        assert graph.calls.call_count == 0
+
+    async def test_the_corrected_window_lists_the_meetings(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_list_events-today")
+
+        seen = await _day(starts_on="2026-10-28", ends_on="2026-10-29")
+
+        assert (_OFFSITE, "2026-10-29T11:00:00+01:00") in _starts(_list(seen, "events"))
+
+
+class TestAMeetingThatRepeats:
+    async def test_it_lists_the_dates_of_a_series_inside_the_window(
+        self, graph: respx.MockRouter
+    ) -> None:
+        serve(graph, "rec-tool-outlook_list_event_instances-standup")
+        standup = _list(await _day(subject_contains="Daily standup"), "events")[0]
+
+        seen = await call(
+            "outlook_list_event_instances",
+            uri=standup["series_master_uri"],
+            starts_on="2026-10-29",
+            ends_on="2026-10-30",
+            time_zone=_ZURICH,
+        )
+
+        dates = [str(_part(one, "start")["iso"])[:10] for one in _list(seen, "events")]
+        assert dates[:2] == ["2026-10-29", "2026-10-30"]
+        assert {one["in_series"] for one in _list(seen, "events")} == {True}
+
+    async def test_a_meeting_that_does_not_repeat_is_refused_with_the_way_to_read_it(
+        self, graph: respx.MockRouter
+    ) -> None:
+        serve(graph, "rec-tool-outlook_read_event-agenda")
+        (single,) = _list(await _day(subject_contains=_OFFSITE), "events")
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call(
+                "outlook_list_event_instances",
+                uri=single["uri"],
+                starts_on="2026-10-29",
+                ends_on="2026-11-30",
+            )
+
+        assert "not part of a recurring series" in str(refused.value)
+        assert "call outlook_read_event with the same `uri`" in str(refused.value)
+
+    async def test_a_series_that_cannot_be_read_is_reported_as_unread_and_not_as_ended(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_event_instances-standup")
+        standup = _list(await _day(subject_contains="Daily standup"), "events")[0]
+        master = next(
+            route
+            for (_m, path), route in routes.items()
+            if path.endswith(
+                str(standup["series_master_uri"]).rsplit("/", 1)[1].replace("%3D", "=")
+            )
+        )
+        _ = master.mock(side_effect=[response({"status": 404, "body": "error.itemNotFound.json"})])
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call(
+                "outlook_list_event_instances",
+                uri=standup["series_master_uri"],
+                starts_on="2026-10-29",
+                ends_on="2026-11-30",
+            )
+
+        assert "failed to read the series" in str(refused.value)
+        assert "Do not report that the series ended" in str(refused.value)
+
+
+class TestRemindersAndGroups:
+    async def test_it_lists_a_reminder_with_the_time_when_it_fires(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="GET", path__startswith="/me/reminderView").mock(
+            return_value=response(
+                {"status": 200, "body": "rec-tool-outlook_list_reminders-today.01.json"}
+            )
+        )
+
+        seen = await call(
+            "outlook_list_reminders",
+            starts_on="2026-10-29",
+            ends_on="2026-10-29",
+            time_zone=_ZURICH,
+        )
+
+        (reminder,) = _list(seen, "reminders")
+        assert reminder["subject"] == "Submit the expense report"
+        assert _part(reminder, "starts")["iso"] == "2026-10-29T16:00:00+01:00"
+        assert _part(reminder, "fires_at")["iso"] == "2026-10-29T15:45:00+01:00"
+
+    async def test_it_shows_the_calendars_by_group_and_marks_the_own_ones(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_calendar_groups-all")
+        groups_of_calendars = [r for (_m, path), r in routes.items() if path.endswith("/calendars")]
+        anna = _calendar(_ANNA_CALENDAR_ID, _ANNA, can_edit=False)
+        _ = groups_of_calendars[1].mock(return_value=httpx.Response(200, json={"value": [anna]}))
+
+        seen = await call("outlook_list_calendar_groups")
+
+        groups = _list(seen, "groups")
+        mine = {str(one["name"]): one["is_mine"] for g in groups for one in _list(g, "calendars")}
+        assert mine["Anna Meier"] is False
+        assert mine["Calendar"] is True

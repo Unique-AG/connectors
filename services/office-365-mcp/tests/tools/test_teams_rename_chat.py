@@ -27,6 +27,8 @@ from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirmed
 from office_365_mcp.tools import teams_rename_chat as renamer
 from office_365_mcp.tools.teams_rename_chat import RenamedChat, a_person_agrees, rename_chat
+from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import new_group_chat, uncalled, was_sent
 
 _CHAT_ID = "19:release@thread.v2"
 _OTHER_CHAT_ID = "19:pricing@thread.v2"
@@ -505,3 +507,25 @@ class TestHowItDeclaresItself:
         assert set(properties) == {"chat_id", "topic"}
         assert set(cast("Sequence[str]", tool.parameters["required"])) == {"chat_id", "topic"}
         assert set(renamer.GRAPH_CALL_EXAMPLE) == set(properties)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_renames_a_new_chat_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_rename_chat-group")
+        chat_id = (await new_group_chat())["chat_id"]
+        mia = Person()
+
+        renamed = await call(
+            "teams_rename_chat",
+            person=mia,
+            chat_id=chat_id,
+            topic="seed-v1 case-teams-chat renamed",
+        )
+
+        assert renamed["chat_id"] == chat_id
+        assert renamed["topic"] == "seed-v1 case-teams-chat renamed"
+        assert "seed-v1 case-teams-chat renamed" in mia.asked[0]
+        assert was_sent(routes, "PATCH", f"/chats/{chat_id}")
+        assert uncalled(routes) == []

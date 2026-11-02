@@ -7,6 +7,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import MailFolderHandle, MailMessageHandle
 from office_365_mcp.tools import outlook_browse_folders as browser
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -398,3 +399,34 @@ class TestGraphFailures:
 
     def test_a_stale_folder_handle_is_answered_with_the_recovery_that_works(self) -> None:
         assert "outlook_browse_folders" in browser.GRAPH_NOT_FOUND
+
+
+_CHILDREN_PARENT = "seed-v1 case-outlook_browse_folders-children"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_child_of_a_folder_that_it_just_created(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_browse_folders-children")
+        parent = await call("outlook_create_folder", name=_CHILDREN_PARENT)
+        child = await call(
+            "outlook_create_folder", name=f"{_CHILDREN_PARENT} child", parent_ref=parent["uri"]
+        )
+
+        level = await call("outlook_browse_folders", limit=50, parent=parent["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert level == {
+            "folders": [
+                {
+                    "uri": child["uri"],
+                    "display_name": f"{_CHILDREN_PARENT} child",
+                    "total_items": 0,
+                    "unread_items": 0,
+                    "child_folder_count": 0,
+                    "is_hidden": False,
+                }
+            ],
+            "capped": False,
+        }

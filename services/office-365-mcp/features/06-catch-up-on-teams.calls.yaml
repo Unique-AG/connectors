@@ -4,6 +4,8 @@ uc-06-01:
   provenance: observed
   evidence: teams_list_chats alone in 7 sessions; in 30 sessions in total
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-01]"
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
@@ -14,6 +16,8 @@ uc-06-01:
 
 uc-06-02:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_shows_a_chat_without_a_title_by_its_members"
   ask: "Show me my Teams chats."
   provenance: observed
   evidence: teams_list_chats in 30 sessions
@@ -24,6 +28,9 @@ uc-06-02:
 
 uc-06-03:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_finds_a_topic_in_a_chat_and_in_a_channel"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reads_a_hit_in_full"
   ask: "Where did we talk about the pricing change in Teams?"
   provenance: observed
   evidence: teams_search_messages in 19 sessions, alone in 9
@@ -37,6 +44,10 @@ uc-06-03:
 
 uc-06-04:
   status: partly
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_posts_with_their_replies_and_reports_the_posts_it_did_not_read"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_has_no_date_bound_so_it_returns_the_older_posts_as_well"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reports_a_page_that_held_more_posts_than_the_limit"
   ask: "What happened in the Releases channel this week?"
   blocker:
     kind: parameter
@@ -58,6 +69,8 @@ uc-06-04:
 
 uc-06-05:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_who_said_what_in_a_transcript"
   ask: "Summarize yesterday's Design review with the action items."
   provenance: observed
   evidence: teams_list_chats then teams_list_meeting_transcripts then teams_read_transcript in 7 sessions
@@ -71,6 +84,8 @@ uc-06-05:
 
 uc-06-06:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reads_a_transcript_of_three_hours_to_its_last_decision"
   ask: "What did we decide in the three-hour meeting?"
   provenance: drafted
   evidence: teams_read_transcript in 18 calls
@@ -86,6 +101,8 @@ uc-06-06:
 
 uc-06-07:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reports_a_meeting_that_nobody_transcribed"
   ask: "Summarize the Weekly sync."
   provenance: observed
   evidence: teams_list_meeting_transcripts in 17 calls
@@ -98,6 +115,8 @@ uc-06-07:
 
 uc-06-08:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_describes_a_recording_and_gives_none_of_its_content"
   ask: "Send me the recording of the Design review."
   provenance: observed
   evidence: teams_list_meeting_recordings in 1 call
@@ -109,6 +128,8 @@ uc-06-08:
 
 uc-06-09:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_for_messages_that_mention_mia"
   ask: "Show me where people mentioned me in Teams."
   provenance: drafted
   asks_user: false
@@ -121,6 +142,8 @@ uc-06-09:
 
 uc-06-10:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_the_messages_of_one_person_in_a_time_window"
   ask: "What did Tom write in Teams yesterday?"
   provenance: drafted
   asks_user: false
@@ -130,6 +153,9 @@ uc-06-10:
 
 uc-06-11:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_the_newest_messages_of_a_group_chat_with_their_senders"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_says_that_older_messages_exist_when_microsoft_offers_more"
   ask: "What is new in the Launch chat?"
   provenance: drafted
   asks_user: false
@@ -142,6 +168,8 @@ uc-06-11:
 
 uc-06-12:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_each_unread_chat_and_names_the_sender_of_each_message"
   ask: "Read me what is new in my unread chats."
   provenance: drafted
   asks_user: false
@@ -154,6 +182,9 @@ uc-06-12:
 
 uc-06-13:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_tells_two_dates_of_a_recurring_meeting_apart"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_refuses_a_transcript_of_another_call_when_microsoft_drops_the_filter"
   ask: "Summarize the Weekly sync of 5 October."
   provenance: drafted
   asks_user: false
@@ -171,6 +202,8 @@ uc-06-13:
 
 uc-06-14:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_the_company_switched_off_as_refused"
   ask: "Summarize yesterday's Design review."
   provenance: drafted
   asks_user: false
@@ -187,6 +220,7 @@ uc-06-14:
 
 uc-06-15:
   status: partly
+  no_test: "assistant: The assistant must build the meeting handle from the join address of a calendar event, and only a model can show that it does."
   ask: "Summarize the Budget review that is on my calendar."
   blocker:
     kind: description
@@ -209,6 +243,8 @@ uc-06-15:
 
 uc-06-16:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_to_sign_in_again_and_lists_no_chat"
   ask: "Which of my Teams chats have unread messages?"
   provenance: drafted
   asks_user: false
@@ -219,6 +255,8 @@ uc-06-16:
 
 uc-06-17:
   status: untested
+  tests:
+    - "tests/test_error_mapping.py::TestEveryToolTranslatesItsOwnRefusal::test_a_refused_call_reaches_the_client_as_advice"
   ask: "Show me my unread Teams chats."
   provenance: drafted
   asks_user: false
@@ -232,6 +270,9 @@ uc-06-18:
   ask: "Which of my Teams chats have unread messages?"
   provenance: drafted
   asks_user: false
+  tests:
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/limited]"
+    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/too-busy]"
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
@@ -270,6 +311,9 @@ uc-06-18:
 
 uc-06-19:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_read_that_microsoft_keeps_failing"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_list_that_keeps_saying_more_follows_and_sends_none"
   ask: "What is unread in my Teams chats?"
   provenance: drafted
   asks_user: false
@@ -282,6 +326,8 @@ uc-06-19:
 
 uc-06-20:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reports_the_reason_when_microsoft_rejects_the_search"
   ask: "Where did we talk about the pricing change in Teams?"
   provenance: drafted
   asks_user: false
@@ -292,6 +338,8 @@ uc-06-20:
 
 uc-06-31:
   status: untested
+  tests:
+    - "tests/test_error_mapping.py::TestEveryToolTranslatesItsOwnRefusal::test_a_refused_call_reaches_the_client_as_advice"
   ask: "What happened in the Releases channel this week?"
   provenance: drafted
   asks_user: false
@@ -306,6 +354,8 @@ uc-06-31:
 
 uc-06-32:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_chat_that_microsoft_cannot_find_without_saying_it_was_deleted"
   ask: "What is new in the Launch chat?"
   provenance: drafted
   asks_user: false
@@ -318,6 +368,8 @@ uc-06-32:
 
 uc-06-21:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_microsoft_no_longer_returns_as_gone"
   ask: "Summarize the Design review from two months ago."
   provenance: drafted
   asks_user: false
@@ -335,6 +387,8 @@ uc-06-21:
 
 uc-06-22:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_refuses_a_transcript_of_one_byte_over_100_megabytes_as_too_long"
   ask: "Summarize yesterday's Design review."
   provenance: drafted
   asks_user: false
@@ -349,6 +403,8 @@ uc-06-22:
 
 uc-06-23:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reads_a_transcript_whose_size_equals_the_ceiling"
   ask: "What did we decide in yesterday's Design review?"
   provenance: drafted
   asks_user: false
@@ -365,6 +421,8 @@ uc-06-23:
 
 uc-06-24:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_does_not_summarize_a_transcript_that_stops_before_its_declared_end"
   ask: "Give me the summary of the Design review."
   provenance: drafted
   asks_user: false
@@ -381,6 +439,8 @@ uc-06-24:
 
 uc-06-25:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_is_not_ready_after_a_meeting_that_just_ended"
   ask: "Summarize the Design review that just ended."
   provenance: drafted
   asks_user: false
@@ -394,6 +454,8 @@ uc-06-25:
 
 uc-06-26:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
   ask: "Summarize the Design review."
   provenance: drafted
   asks_user: false
@@ -407,6 +469,8 @@ uc-06-26:
 
 uc-06-33:
   status: untested
+  tests:
+    - "tests/test_error_mapping.py::TestEveryToolTranslatesItsOwnRefusal::test_a_refused_call_reaches_the_client_as_advice"
   ask: "Summarize the Design review."
   provenance: drafted
   asks_user: false
@@ -420,6 +484,8 @@ uc-06-33:
 
 uc-06-27:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_refuses_a_search_with_nothing_to_look_for_before_it_asks_microsoft"
   ask: "Search my Teams messages."
   provenance: drafted
   asks_user: false
@@ -430,6 +496,9 @@ uc-06-27:
 
 uc-06-28:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_marks_a_crowded_chat_whose_members_may_be_cut"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_names_every_member_that_microsoft_listed_and_warns"
   ask: "Show me my group chats and who is in them."
   provenance: drafted
   asks_user: false
@@ -440,6 +509,7 @@ uc-06-28:
 
 uc-06-29:
   status: untested
+  no_test: "assistant: Whether the assistant obeys or only shows an instruction that a message holds depends on the model, and no code guard exists."
   ask: "What is new in the Launch chat?"
   provenance: drafted
   asks_user: false
@@ -453,6 +523,9 @@ uc-06-29:
 
 uc-06-30:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_reports_that_chats_beyond_the_newest_fifty_may_exist"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_says_the_list_is_complete_when_no_older_chat_exists"
   ask: "Which of my Teams chats have unread messages?"
   provenance: drafted
   asks_user: false
@@ -463,6 +536,8 @@ uc-06-30:
 
 uc-06-34:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_finds_unread_posts_of_channels_through_the_read_state_search"
   ask: "What did I miss in my Teams channels?"
   provenance: drafted
   asks_user: false
@@ -476,6 +551,8 @@ uc-06-34:
 
 uc-06-35:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_the_summary_from_the_transcript_and_the_message_written_after_it"
   ask: "Summarize the Design review, and tell me what people wrote about it afterwards."
   provenance: observed
   evidence: teams_read_transcript then teams_search_messages in 3 sessions of prod between 2026-10-14 and 2026-10-23; the logs hold the tool names and no arguments, so the listing steps come from uc-06-05
@@ -495,6 +572,8 @@ uc-06-35:
 
 uc-06-36:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist"
   ask: "Show me all replies to the post 'v2 is out?' in Releases."
   provenance: drafted
   asks_user: false
@@ -511,6 +590,8 @@ uc-06-36:
 
 uc-06-37:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_channel_folder_that_microsoft_cannot_find_without_calling_it_empty"
   ask: "What files are in the Launch channel of the Platform team?"
   provenance: drafted
   asks_user: false
@@ -525,6 +606,8 @@ uc-06-37:
 
 uc-06-40:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_how_long_to_wait_when_a_channel_keeps_limiting_the_reads"
   ask: "What happened in the Releases channel this week?"
   provenance: drafted
   asks_user: false

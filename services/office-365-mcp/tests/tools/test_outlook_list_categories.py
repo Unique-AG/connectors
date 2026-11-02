@@ -9,6 +9,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.tools import outlook_list_categories as lister
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -242,3 +243,21 @@ class TestGraphFailures:
 
     def test_the_permissions_are_the_ones_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("MailboxSettings.Read",)
+
+
+_CREATED_CATEGORY = "seed-v1 case-outlook_list_categories-created"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_category_that_was_just_created_is_in_the_list_with_its_color(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_categories-created")
+        _ = await call("outlook_create_category", name=_CREATED_CATEGORY, color="preset5")
+
+        listed = await call("outlook_list_categories")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        categories = cast("list[dict[str, str]]", listed["categories"])
+        assert categories[-1] == {"name": _CREATED_CATEGORY, "color": "preset5"}
+        assert (len(categories), listed["capped"]) == (7, False)

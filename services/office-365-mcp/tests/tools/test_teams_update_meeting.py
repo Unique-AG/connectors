@@ -30,6 +30,9 @@ from office_365_mcp.tools.teams_update_meeting import (
     a_person_agrees,
     update_meeting,
 )
+from tests.tools.scenarios.support import Person as Approver
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import uncalled, was_sent
 
 from .conftest import (
     JOIN_WEB_URL,
@@ -1005,3 +1008,31 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0, "an attendee the schema refuses reached Graph"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_renames_a_meeting_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_update_meeting-subject")
+        created = await call(
+            "teams_create_meeting",
+            subject="seed-v1 case-teams_update_meeting-subject meeting",
+            starts_at="2026-10-31T16:00:00Z",
+            ends_at="2026-10-31T16:30:00Z",
+            attendees=[],
+        )
+        mia = Approver()
+
+        updated = await call(
+            "teams_update_meeting",
+            person=mia,
+            meeting_uri=created["meeting_uri"],
+            subject="seed-v1 case-teams_update_meeting-subject renamed",
+        )
+
+        assert updated["meeting_uri"] == created["meeting_uri"]
+        assert updated["subject"] == "seed-v1 case-teams_update_meeting-subject renamed"
+        assert "seed-v1 case-teams_update_meeting-subject renamed" in mia.asked[0]
+        assert was_sent(routes, "PATCH", "/me/onlineMeetings/")
+        assert uncalled(routes) == []

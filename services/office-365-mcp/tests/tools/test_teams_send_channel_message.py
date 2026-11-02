@@ -33,6 +33,8 @@ from office_365_mcp.shared.messages import ChannelImportance, Mention, TeamsMess
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_channel_message as sender
 from office_365_mcp.tools.teams_send_channel_message import a_person_agrees, send_channel_message
+from tests.tools.scenarios.support import serve
+from tests.tools.teams_recordings import post_in_seed_channel, uncalled, was_sent
 
 from .conftest import TEAMS_SENDER, message_payload
 
@@ -1065,3 +1067,18 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0, "a mention the schema refuses reached Graph"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_posts_a_message_in_the_channel_of_a_team(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_send_channel_message-post")
+
+        post = await post_in_seed_channel("seed-v1 case-teams_send_channel_message-post hello team")
+
+        assert post["team_id"] == "00000000-e7a0-41c6-863d-0548ee2dacdd"
+        assert post["body"] == "seed-v1 case-teams_send_channel_message-post hello team"
+        assert post["reply_to_id"] is None
+        assert was_sent(routes, "POST", f"/channels/{post['channel_id']}/messages")
+        assert uncalled(routes) == []

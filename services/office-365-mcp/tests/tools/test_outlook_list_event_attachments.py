@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import cast
 
 import httpx
@@ -22,6 +23,8 @@ from office_365_mcp.shared.handles import (
     event_handle,
 )
 from office_365_mcp.tools import outlook_list_event_attachments as lister
+from office_365_mcp.tools.outlook_list_events import list_events
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
@@ -364,3 +367,27 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
     tool = await mcp.get_tool(lister.TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
     return tool
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_one_file_attached_to_the_listed_meeting(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_event_attachments-agenda")
+
+        listing = await list_events(
+            client,
+            starts_on=date(2026, 10, 29),
+            ends_on=date(2026, 10, 30),
+            subject_contains="Offsite agenda review",
+            limit=25,
+        )
+        attached = await lister.list_event_attachments(client, uri=listing.events[0].uri)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (agenda,) = attached.attachments
+        assert agenda.name == "calendar-agenda.txt"
+        assert agenda.content_type == "text/plain"
+        assert agenda.size == 264
+        assert agenda.is_inline is False
+        assert attached.capped is False

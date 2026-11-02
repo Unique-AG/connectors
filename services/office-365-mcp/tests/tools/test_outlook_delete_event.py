@@ -39,7 +39,9 @@ from office_365_mcp.shared.seam import (
     ToolAdvice,
 )
 from office_365_mcp.tools import outlook_delete_event as deleter
+from office_365_mcp.tools.outlook_create_event import CreatedEvent, create_event
 from office_365_mcp.tools.outlook_delete_event import DeletedEvent, a_person_agrees, delete_event
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -677,3 +679,28 @@ class TestHowItDeclaresItself:
 
     def test_the_not_found_advice_ends_with_the_canonical_retry_sentence(self) -> None:
         assert deleter.GRAPH_NOT_FOUND.endswith(_SAME_FAILURE)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_deletes_the_event_it_created_and_names_it(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_delete_event-created")
+        subject = "seed-v1 case-outlook_delete_event-created"
+
+        created = await create_event(
+            client,
+            subject=subject,
+            starts_at="2026-10-31T13:00:00",
+            ends_at="2026-10-31T13:30:00",
+            time_zone="Europe/Zurich",
+            attendees=[],
+            confirm=_agrees,
+        )
+        assert isinstance(created, CreatedEvent)
+        deleted = await _delete(client, uri=created.uri)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert any(route.called for (method, _), route in routes.items() if method == "DELETE")
+        assert deleted.uri == created.uri
+        assert deleted.subject == subject

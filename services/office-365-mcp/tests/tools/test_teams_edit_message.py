@@ -29,6 +29,8 @@ from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirmed
 from office_365_mcp.tools import teams_edit_message as editor
 from office_365_mcp.tools.teams_edit_message import EditedMessage, a_person_agrees, edit_message
+from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import post_in_seed_channel, uncalled, was_sent
 
 from .conftest import ME, OTHER_USER_ID, message_payload
 
@@ -1179,3 +1181,25 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0, "a mention the schema refuses reached Graph"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_replaces_the_text_of_a_post_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_edit_message-post")
+        post = await post_in_seed_channel("seed-v1 case-teams_edit_message-post before")
+        mia = Person()
+
+        edited = await call(
+            "teams_edit_message",
+            person=mia,
+            uri=post["uri"],
+            message="seed-v1 case-teams_edit_message-post after",
+        )
+
+        assert edited["uri"] == post["uri"]
+        assert edited["text"] == "seed-v1 case-teams_edit_message-post after"
+        assert "seed-v1 case-teams_edit_message-post before" in mia.asked[0]
+        assert was_sent(routes, "PATCH", f"/messages/{post['message_id']}")
+        assert uncalled(routes) == []

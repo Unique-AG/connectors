@@ -21,7 +21,9 @@ from office_365_mcp.shared.handles import (
 )
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT
 from office_365_mcp.tools import outlook_update_contact as updater
+from office_365_mcp.tools.outlook_create_contact import NewContact, create_contact
 from office_365_mcp.tools.outlook_update_contact import ContactChange
+from tests.graph_fixtures import serve
 
 _CONTACT_ID = "AAMkAGI2SYNTHETIC-contact-0001="
 
@@ -607,3 +609,30 @@ class TestHowItDeclaresItself:
             if not field.get("description")
         )
         assert undescribed == [], "a model is handed these values with nothing to say what they are"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_sets_the_job_title_of_the_contact_it_created(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_update_contact-title")
+
+        created = await create_contact(
+            client,
+            details=NewContact(
+                display_name="seed-v1 case-outlook_update_contact-title",
+                given_name="Omar",
+                surname="Haddad",
+            ),
+        )
+        updated = await updater.update_contact(
+            client, uri=created.uri, change=ContactChange(job_title="Head of Sales")
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (patch,) = (route for (method, _), route in routes.items() if method == "PATCH")
+        assert _sent(patch)["jobTitle"] == "Head of Sales"
+        assert created.job_title is None
+        assert updated.uri == created.uri
+        assert updated.job_title == "Head of Sales"
+        assert (updated.given_name, updated.surname) == ("Omar", "Haddad")

@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import cast
 from urllib.parse import quote
 
@@ -17,6 +18,8 @@ from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools import outlook_cancel_event as canceller
 from office_365_mcp.tools.outlook_cancel_event import CancelledEvent, cancel_event
+from office_365_mcp.tools.outlook_list_events import list_events
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -485,3 +488,39 @@ class TestHowItDescribesItself:
 
     def test_the_series_master_field_has_the_one_description_of_the_series_fact(self) -> None:
         assert CancelledEvent.model_fields["series_master"].description == SERIES_MASTER_FIELD
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_cancels_the_listed_meeting_and_tells_each_attendee_why(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_cancel_event-budget")
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        listing = await list_events(
+            client,
+            starts_on=date(2026, 10, 29),
+            ends_on=date(2026, 10, 30),
+            subject_contains="Budget alignment",
+            limit=25,
+        )
+        cancelled = await _cancel(
+            client,
+            uri=listing.events[0].uri,
+            comment="The numbers are not final.",
+            confirm=capturing,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (cancel,) = (route for (_, path), route in routes.items() if path.endswith("/cancel"))
+        assert _sent(cancel) == {"Comment": "The numbers are not final."}
+        assert cancelled.subject == "Budget alignment"
+        assert cancelled.comment == "The numbers are not final."
+        assert [attendee.address for attendee in cancelled.attendees] == ["anna@example.test"]
+        assert len(asked) == 1
+        assert "anna@example.test" in asked[0]

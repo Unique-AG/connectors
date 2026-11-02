@@ -20,6 +20,7 @@ from office_365_mcp.shared.handles import (
 from office_365_mcp.shared.notes import OWNED_REFUSED, ContainerOrderBy
 from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_sections as lister
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -1186,3 +1187,30 @@ class TestItsArguments:
         assert "`created_by`" in described
         assert str(MAX_SCANNED_ITEMS) in described
         assert "`limit`" in described
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_section_group_lists_the_sections_it_holds(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_list_sections-group")
+        notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Dogfood")
+        top = await call("onenote_list_sections", parent=_first_uri_of(notebooks, "notebooks"))
+        group = _first_uri_of(top, "section_groups")
+
+        inside = await call("onenote_list_sections", parent=group)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        names = [row["name"] for row in cast("list[Mapping[str, str]]", top["sections"])]
+        assert names == ["seed-v1 Planning", "seed-v1 Reading"]
+        groups = [row["name"] for row in cast("list[Mapping[str, str]]", top["section_groups"])]
+        assert groups == ["seed-v1 Archive"]
+        held = [row["name"] for row in cast("list[Mapping[str, str]]", inside["sections"])]
+        assert held == ["seed-v1 Old plans"]
+        assert inside["parent_uri"] == group
+        assert inside["notebook_name"] == "seed-v1 Dogfood Notes"
+        assert inside["section_groups"] == []

@@ -13,6 +13,9 @@ the parameters, and the docs to match. For the tool reference, read `../docs/REA
 | `NN-name.feature` | The capability, as scenarios. It names no tool and no argument. |
 | `NN-name.calls.yaml` | For each scenario, the status, the prompt, the limit, and the chain of tools that the assistant calls. |
 | `STATUS.md` | The status of every scenario, by surface. It lists the work for UN-27222. A script writes it. |
+| `PENDING.txt` | The ids of the scenarios that have no `tests` and no `no_test` yet. The list only gets shorter. |
+| `../tests/test_scenario_traceability.py` | The check that every scenario has a test or a reason, and that each named test exists. |
+| `../tests/tools/scenarios/` | The scenario tests, and the helper that they use. |
 | `../tests/test_use_cases.py` | The check that the files agree, that the chains use real tools, arguments, and values, and that the two generated pages are current. |
 | `../docs/use-cases.md` | The guide for readers. The text between its two markers comes from the features and the sidecars. A person writes the rest. |
 | `../scripts/render-use-cases.py` | Writes the guide and `STATUS.md`. Run `uv run python scripts/render-use-cases.py`, or add `--check` to find drift. |
@@ -75,6 +78,8 @@ Each entry has these keys:
 | `asks_user` | True when a tool in the chain asks the user to approve. |
 | `chain` | The steps, in order. A step has `tool`, or `any_of` for a choice. It can have `optional`, `repeat: many`, `args`, and `uses`. |
 | `must_not` | Tools that the assistant must not call. |
+| `tests` | The pytest tests that prove the scenario. See "Testing a scenario". |
+| `no_test` | The reason why no test can prove the scenario. See "Testing a scenario". |
 | `note` | An extra fact or an open point. |
 
 The status:
@@ -188,7 +193,8 @@ To add a run:
    steps.
 4. Run `uv run pytest tests/e2e`. A request that does not match shows the request. Copy its values
    into the fixture.
-5. Increase `_MINIMUM_EXECUTABLE` in `test_scenarios.py` to the new number of runs.
+5. List the runner node id of each new run in `tests` (see "Testing a scenario").
+6. Increase `_MINIMUM_EXECUTABLE` in `test_scenarios.py` to the new number of runs.
 
 `_MINIMUM_EXECUTABLE` is a ratchet. The number of runs must not go below it. Increase it when you
 add a run. Decrease it only in a change that says why.
@@ -205,6 +211,135 @@ only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has 
 `../scripts/dogfood/seed/README.md` has the seed. A recorded fixture is a variant named
 `recorded` in the sidecar, and its fixture name starts with `rec-`. The option `--link` of the
 recorder writes that variant into the sidecar.
+
+## Testing a scenario
+
+Each scenario has a test, or a reason why it has none. `../tests/test_scenario_traceability.py`
+fails when a scenario has neither.
+
+### The keys
+
+An entry has one of these keys, and never both:
+
+| Key | Meaning |
+| --- | --- |
+| `tests` | A list of pytest node ids, with at least one. A node id is relative to the service folder, for example `tests/tools/scenarios/test_02_find_and_read_mail.py::TestUnreadMail::test_it_lists_unread_mail`. It names a function, or a class and a function, or a whole class. A parametrized test has no bracket part. |
+| `no_test` | A text `<kind>: <reason>`. The reason is one sentence. |
+
+The test uses `ast` to check that each file exists and defines each name. It does not collect or
+run the tests.
+
+The kinds of `no_test` are a closed list:
+
+| Kind | Use it when |
+| --- | --- |
+| `assistant` | The result depends on how a model reads the descriptions or phrases the answers. |
+| `human` | The test needs data that only a person can make. Name the step. |
+| `limit` | The scenario documents a capability that does not exist, so no test can run it. Say why. |
+
+A scenario that has a run (`fixture` or `variants`) keeps the run. It also lists the node id of the
+runner for each run. The id has the name of the run in brackets:
+
+```yaml
+tests:
+  - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01]"
+  - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/busy]"
+```
+
+The runner is the only test that can have a bracket. The bracket must name a run of the same
+scenario: the id itself for `fixture`, and the id, a slash, and the name for a variant.
+
+### The list of pending scenarios
+
+`PENDING.txt` has one scenario id on each line. A scenario in this list may have neither key. A
+test fails in these cases:
+
+- A scenario that is not in the list has neither key.
+- A scenario in the list has a key. Delete its line in the same change.
+- The list names an id that does not exist.
+
+Add no line to the list. The list only gets shorter. When it is empty, delete the file.
+
+### Where a test lives
+
+Put the tests of a feature in `../tests/tools/scenarios/test_<NN>_<feature>.py`. `NN` and `<feature>`
+come from the name of the feature file. A feature has one module. Put the tests of one scenario in
+one class, and name the class for the scenario. The folder is in `tests/tools`, so the fixtures of
+`tests/tools/conftest.py` apply: `graph` is the respx router for Microsoft Graph, and
+`retry_sleeps` (from `tests/conftest.py`) records the waits of the retry handler so that a test
+does not wait.
+
+### The helper
+
+`../tests/tools/scenarios/support.py` gives four names:
+
+| Name | Use |
+| --- | --- |
+| `call(tool, *, person=None, **arguments)` | Calls the tool through the real app and the real middleware, with the arguments that the assistant sends. It returns the result as a mapping. It raises `ToolError` with the text that the assistant sees. |
+| `Person` | The user who answers the approval question. `Person(approval="no")` declines. The values are the `approval` values of the runner. `person.asked` holds the questions that the user got. |
+| `serve(graph, name)` | Makes Graph answer from the fixture `name`. It returns a dictionary of routes, one for each method and path. |
+| `response(spec)` | Makes one answer, for example `response({"status": 500, "body": "error.generalException.json"})`. The body is a file in `../tests/e2e/bodies/`. |
+
+The helper uses `build_server`, `Person`, and `patch_obo` of `../tests/e2e/test_scenarios.py`.
+
+### A test with a recorded fixture
+
+Serve the recorded fixture, call the tool, and assert what the user sees. Check that each route was
+used, so that a fixture with no use does not stay.
+
+```python
+async def test_it_lists_the_newest_mail(graph: MockRouter) -> None:
+    routes = serve(graph, "rec-tool-outlook_list_mail-inbox")
+
+    seen = await call("outlook_list_mail", limit=5)
+
+    assert [key for key, route in routes.items() if not route.called] == []
+    messages = cast("list[Mapping[str, object]]", seen["messages"])
+    assert seen["unread_items"] == 23
+    assert messages[0]["subject"] == "Roadmap check"
+```
+
+`serve` ignores the query. A recorded fixture holds the requests of the recorded call, so use the
+same arguments as the recording. A request that no route matches fails the test.
+
+### A test with a fault
+
+Serve the fixture. Then replace one route with the fault. Assert the error that the user sees. For a
+read tool, a Microsoft 500 gives the advice to retry once.
+
+```python
+async def test_a_microsoft_500_gives_the_retry_advice(graph: MockRouter) -> None:
+    routes = serve(graph, "rec-tool-outlook_list_mail-inbox")
+    _ = routes[("GET", "/me/mailFolders/inbox/messages")].mock(
+        side_effect=[response({"status": 500, "body": "error.generalException.json"})]
+    )
+
+    with pytest.raises(ToolError, match="Retry once"):
+        _ = await call("outlook_list_mail", limit=5)
+```
+
+Other faults:
+
+- A busy answer: `response({"status": 429, "headers": {"Retry-After": "2"}, "body":
+  "error.TooManyRequests.json"})`. Add the fixture `retry_sleeps` to the test, and assert
+  `retry_sleeps.delays`.
+- No answer in time: `side_effect=httpx.ReadTimeout`.
+- A tool that must not repeat a write gives a different text for a 5xx: the outcome is not known.
+  Assert that text for a write.
+- A scenario that has no recorded fixture: write the answer with
+  `graph.get(path).mock(return_value=httpx.Response(200, json=payload))`.
+
+### Test the behavior, not the implementation
+
+- Assert what the user or the assistant sees: the fields of the result, the class of the error, and
+  the advice text. Match the advice, not the status code.
+- Do not assert the number of Graph calls or the query, unless the scenario states them. The runner
+  checks `graph_calls` for a scenario that does.
+- Do not import a tool module or a private name. Use `call`.
+- For a write, assert that nothing changed when the user declines: `person.asked` has the question,
+  and the route of the write was not called.
+- Use a recorded fixture for the answer of Graph. Write an answer by hand only for a fault.
+- A test with a model is a `no_test` of the kind `assistant`.
 
 ## Evidence for the order
 

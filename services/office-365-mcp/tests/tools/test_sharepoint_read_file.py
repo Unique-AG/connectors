@@ -1,7 +1,9 @@
 import base64
 import gzip
+import json
 import logging
 import os
+from collections import defaultdict
 from collections.abc import AsyncIterator, Iterator, Mapping
 from typing import cast
 
@@ -26,6 +28,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.tools import sharepoint_read_file as reader
+from tests.graph_fixtures import E2E, response
+from tests.tools.scenarios.support import call
 
 DRIVE_ID = "b!SYNTHETICDRIVE0000"
 ITEM_ID = "01SYNTHETICFILE0000"
@@ -656,3 +660,42 @@ def _labels(rendered: str) -> Iterator[tuple[str, str]]:
     for pair in rendered.split('",') if rendered else ():
         name, _, value = pair.partition("=")
         yield name.strip(), value.strip().strip('"')
+
+
+def _serve_with_the_download_hop(
+    router: respx.MockRouter, name: str
+) -> dict[tuple[str, str, str], respx.Route]:
+    answers: dict[tuple[str, str, str], list[httpx.Response]] = defaultdict(list)
+    recorded = cast(
+        "list[dict[str, object]]", json.loads((E2E / "fixtures" / f"{name}.json").read_text())
+    )
+    for spec in recorded:
+        host = str(spec.get("host", "graph.microsoft.com"))
+        answers[(str(spec["method"]), host, str(spec["path"]))].append(response(spec))
+    return {
+        key: router.route(method=key[0], url=f"https://{key[1]}{key[2]}").mock(side_effect=answered)
+        for key, answered in answers.items()
+    }
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_reads_the_word_file_that_the_search_found_through_the_download_link(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        routes = _serve_with_the_download_hop(graph, "rec-tool-sharepoint_read_file-docx")
+        found = await call("sharepoint_search_files", query="seed-v1 Project Plan", limit=1)
+        plan = cast("list[dict[str, str]]", found["files"])[0]
+
+        read = await reader.sharepoint_read_file(client, transport, file=plan["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert plan["name"] == "seed-v1 Project Plan.docx"
+        resource = read.to_resource_content().resource
+        assert (resource.mime_type, str(resource.uri)) == (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "file:///seed-v1%20Project%20Plan.docx",
+        )
+        assert (
+            read.data
+            == (E2E / "bodies" / "rec-tool-sharepoint_read_file-docx.04.docx").read_bytes()
+        )

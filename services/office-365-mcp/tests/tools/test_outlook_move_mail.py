@@ -1,7 +1,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from typing import cast
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import httpx
 import pytest
@@ -24,6 +24,7 @@ from office_365_mcp.shared.mail import WellKnownFolder
 from office_365_mcp.shared.seam import Confirm, Confirmed
 from office_365_mcp.tools import outlook_copy_mail as copier
 from office_365_mcp.tools import outlook_move_mail as mover
+from tests.tools.scenarios.support import call, serve
 
 _FIRST_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _SECOND_ID = "AAMkAGI2SYNTHETIC-immutable-0002="
@@ -1068,3 +1069,45 @@ class TestWhatItSaysAboutItself:
         refs = cast("list[str]", mover.GRAPH_CALL_EXAMPLE["message_refs"])
         assert all(ref.startswith("outlook:///messages/") for ref in refs)
         assert len(refs) >= 1
+
+
+_COPY_FROM = "seed-v1 case-outlook_move_mail-copy from"
+_COPY_TO = "seed-v1 case-outlook_move_mail-copy to"
+
+
+def _folder_id(folder: Mapping[str, object]) -> str:
+    return unquote(str(folder["uri"]).removeprefix("outlook:///folders/"))
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_copy_in_one_folder_moves_on_to_another_by_its_new_handle(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_move_mail-copy")
+        listing = await call("outlook_list_mail", category="seed-v1", limit=1)
+        original = cast("list[dict[str, str]]", listing["messages"])[0]["uri"]
+        source = await call("outlook_create_folder", name=_COPY_FROM)
+        target = await call("outlook_create_folder", name=_COPY_TO)
+        copied = await call("outlook_copy_mail", message_refs=[original], folder_ref=source["uri"])
+        (copy,) = cast("list[dict[str, str]]", copied["messages"])
+
+        moved = await call(
+            "outlook_move_mail", message_refs=[copy["new_uri"]], folder_ref=target["uri"]
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (move,) = cast("list[dict[str, object]]", moved["messages"])
+        assert (copied["copied_count"], copied["failed_count"]) == (1, 0)
+        assert (moved["moved_count"], moved["failed_count"]) == (1, 0)
+        assert copy["new_uri"] != original
+        assert (move["uri"], move["moved"]) == (copy["new_uri"], True)
+        assert move["new_uri"] == copy["new_uri"]
+        posts = {
+            path.rsplit("/", 1)[1]: _sent_body(route)
+            for (verb, path), route in routes.items()
+            if verb == "POST" and path.startswith("/me/messages/")
+        }
+        assert posts == {
+            "copy": {"DestinationId": _folder_id(source)},
+            "move": {"DestinationId": _folder_id(target)},
+        }

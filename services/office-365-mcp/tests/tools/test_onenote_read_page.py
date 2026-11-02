@@ -20,6 +20,8 @@ from office_365_mcp.shared.notes import OWNED_REFUSED, PAGE_EXPANSIONS, PAGE_FIE
 from office_365_mcp.shared.seam import READ_ONLY, Advised, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_read_page as reader
+from tests.graph_fixtures import E2E
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -661,3 +663,33 @@ class TestIncludeIds:
         _ = await _read(client, transport, include_ids=True)
 
         assert "includeIDs" not in page.calls.last.request.url.params
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_page_is_read_with_the_html_microsoft_sent(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_read_page-gallery")
+        notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Dogfood")
+        sections = await call(
+            "onenote_list_sections",
+            parent=_first_uri_of(notebooks, "notebooks"),
+            name_contains="Reading",
+        )
+        pages = await call(
+            "onenote_list_pages",
+            section=_first_uri_of(sections, "sections"),
+            title_contains="Gallery",
+        )
+
+        read = await call("onenote_read_page", page=_first_uri_of(pages, "pages"))
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        sent = (E2E / "bodies" / "rec-tool-onenote_read_page-gallery.08.html").read_bytes()
+        assert read["html"] == sent.decode()
+        assert cast("Mapping[str, str]", read["page"])["title"] == "seed-v1 Gallery"
+        assert 'alt="A blue square"' in cast("str", read["html"])

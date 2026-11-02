@@ -8,6 +8,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.shared.handles import message_handle
 from office_365_mcp.tools import teams_browse_channel as browser
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import rows, uncalled
 
 from .conftest import GRAPH_V1, reaction_payload
 
@@ -621,3 +623,23 @@ class TestGraphFailures:
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert browser.GRAPH_PERMISSIONS == ("ChannelMessage.Read.All",)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_shows_no_post_in_a_channel_that_holds_only_system_events(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_browse_channel-standard")
+        teams = rows(await call("teams_list_my_teams"), "teams")
+        team_id = teams[0]["team_id"]
+        channels = await call("teams_list_channels", team_id=team_id, membership_type="standard")
+
+        browsed = await call(
+            "teams_browse_channel",
+            team_id=team_id,
+            channel_id=rows(channels, "channels")[0]["channel_id"],
+            limit=10,
+        )
+
+        assert browsed["messages"] == []
+        assert uncalled(routes) == []

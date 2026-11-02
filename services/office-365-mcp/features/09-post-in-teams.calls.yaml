@@ -1,5 +1,7 @@
 uc-09-01:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_posts_a_chat_message_with_a_mention_of_a_member_after_she_approves"
   ask: "Tell the chat with Anna and Tom that the build is green, and mention Anna."
   provenance: drafted
   asks_user: true
@@ -13,6 +15,8 @@ uc-09-01:
 
 uc-09-02:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_posts_nothing_when_mia_declines"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -23,6 +27,8 @@ uc-09-02:
 
 uc-09-03:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_does_not_mention_a_person_who_is_not_in_the_chat_and_asks_nobody"
   ask: "Tell the chat with Anna and Tom to review the plan, and mention Priya."
   provenance: drafted
   asks_user: false
@@ -37,6 +43,8 @@ uc-09-03:
 
 uc-09-04:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_puts_a_reply_into_the_thread_and_makes_no_new_post"
   ask: "Reply to the post 'v2 is out?' in Releases with 'Yes, since noon'."
   provenance: drafted
   asks_user: true
@@ -52,6 +60,8 @@ uc-09-04:
 
 uc-09-05:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_attaches_a_file_that_is_in_sharepoint_to_a_channel_post"
   ask: "Post Q3 Plan.pptx in the Sales channel."
   provenance: drafted
   asks_user: true
@@ -66,6 +76,8 @@ uc-09-05:
 
 uc-09-06:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestMiaChangesOnlyHerOwnMessages::test_it_corrects_her_own_message_in_place"
   ask: "Correct my message 'Launch on 14 Jun' to 'Launch on 14 June'."
   provenance: drafted
   asks_user: true
@@ -78,6 +90,8 @@ uc-09-06:
 
 uc-09-07:
   status: untested
+  tests:
+    - "tests/test_error_mapping.py::TestARefusalBeforeTheQuestion::test_a_message_from_another_person_is_refused_in_the_tools_own_words"
   ask: "Correct the message 'Launch on 14 Jun' that Tom wrote."
   provenance: drafted
   asks_user: false
@@ -90,6 +104,8 @@ uc-09-07:
 
 uc-09-08:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_makes_a_new_top_level_post_after_mia_approves_it"
   ask: "Post 'v2 ships on Friday' in the Releases channel."
   provenance: drafted
   asks_user: true
@@ -104,6 +120,8 @@ uc-09-08:
 
 uc-09-09:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_attaches_a_file_that_is_in_sharepoint_to_a_chat_message"
   ask: "Send Q3 Plan.pptx to Anna in our chat."
   provenance: drafted
   asks_user: true
@@ -117,6 +135,8 @@ uc-09-09:
 
 uc-09-10:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestAMessageIsPostedAfterMiaApproves::test_it_does_not_post_a_file_that_is_in_a_personal_onedrive"
   ask: "Post Notes.docx in the Sales channel."
   provenance: drafted
   asks_user: false
@@ -132,6 +152,8 @@ uc-09-10:
 
 uc-09-11:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestMiaChangesOnlyHerOwnMessages::test_it_deletes_her_own_message_after_she_approves_the_deletion"
   ask: "Delete my message 'Launch on 14 Jun' from the chat."
   provenance: drafted
   asks_user: true
@@ -145,6 +167,8 @@ uc-09-11:
 
 uc-09-12:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestMiaChangesOnlyHerOwnMessages::test_it_gives_a_message_a_thumbs_up_after_she_approves_the_reaction"
   ask: "Give Anna's message about the release notes a thumbs-up."
   provenance: drafted
   asks_user: true
@@ -160,6 +184,8 @@ uc-09-12:
 
 uc-09-13:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_tells_mia_to_sign_in_again_and_posts_nothing"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -172,6 +198,8 @@ uc-09-13:
 
 uc-09-14:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_tells_mia_that_an_administrator_must_grant_the_access"
   ask: "Post in the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -184,6 +212,8 @@ uc-09-14:
 
 uc-09-15:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_does_not_report_a_chat_that_microsoft_cannot_find_as_deleted"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -196,6 +226,8 @@ uc-09-15:
 
 uc-09-16:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_tells_mia_how_long_to_wait_and_does_not_ask_again_sooner"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -208,6 +240,8 @@ uc-09-16:
 
 uc-09-17:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_does_not_send_a_failed_message_again_before_the_chat_is_checked"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -222,6 +256,8 @@ uc-09-17:
 
 uc-09-18:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhenMicrosoftCannotPostTheMessage::test_it_reports_the_reason_when_microsoft_rejects_the_message"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -234,6 +270,8 @@ uc-09-18:
 
 uc-09-19:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_does_not_post_in_a_channel_when_mia_declines"
   ask: "Post 'v2 ships on Friday' in the Releases channel."
   provenance: drafted
   asks_user: true
@@ -248,6 +286,8 @@ uc-09-19:
 
 uc-09-20:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_does_not_send_a_message_with_a_file_when_mia_declines"
   ask: "Send Q3 Plan.pptx to Anna in our chat."
   provenance: drafted
   asks_user: true
@@ -262,6 +302,8 @@ uc-09-20:
 
 uc-09-21:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_leaves_a_message_as_it_was_when_mia_declines_the_change"
   ask: "Correct my message 'Launch on 14 Jun' to 'Launch on 14 June'."
   provenance: drafted
   asks_user: true
@@ -273,6 +315,8 @@ uc-09-21:
 
 uc-09-22:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_changes_nothing_when_the_chat_program_answers_the_question_with_an_error"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -282,6 +326,8 @@ uc-09-22:
 
 uc-09-29:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_sends_nothing_when_the_chat_program_cannot_show_a_question"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: false
@@ -294,6 +340,16 @@ uc-09-29:
 
 uc-09-23:
   status: untested
+  tests:
+    - "tests/tools/test_teams_send_chat_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_sends_nothing"
+    - "tests/tools/test_teams_send_channel_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_posts_nothing"
+    - "tests/tools/test_teams_send_chat_message_with_files.py::TestTheEraWithNoBackChannel::test_an_accept_for_one_file_set_cannot_send_another"
+    - "tests/tools/test_teams_send_channel_message_with_files.py::TestTheEraWithNoBackChannel::test_an_accept_for_one_file_set_cannot_post_another"
+    - "tests/tools/test_teams_edit_message.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_text_another_mention_and_another_message"
+    - "tests/tools/test_teams_edit_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_edit_changes_nothing"
+    - "tests/tools/test_teams_delete_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_deletes_nothing"
+    - "tests/tools/test_teams_react_to_message.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_reaction_another_action_and_another_message"
+    - "tests/tools/test_teams_react_to_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_reaction_changes_nothing"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true
@@ -303,6 +359,8 @@ uc-09-23:
 
 uc-09-24:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhatTeamsCannotTake::test_it_does_not_change_a_message_that_is_already_deleted"
   ask: "Correct my message 'Launch on 14 Jun' to 'Launch on 14 June'."
   provenance: drafted
   asks_user: false
@@ -314,6 +372,8 @@ uc-09-24:
 
 uc-09-25:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhatTeamsCannotTake::test_it_refuses_a_reply_with_a_subject_and_asks_nobody"
   ask: "Reply to the post 'v2 is out?' in Releases with 'Yes, since noon' and the subject 'Release news'."
   provenance: drafted
   asks_user: false
@@ -330,6 +390,9 @@ uc-09-25:
 
 uc-09-26:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhatTeamsCannotTake::test_it_does_not_attach_a_folder_to_a_post"
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhatTeamsCannotTake::test_it_does_not_take_a_folder_handle_for_a_file"
   ask: "Post the Offers folder in the Sales channel."
   provenance: drafted
   asks_user: false
@@ -345,6 +408,8 @@ uc-09-26:
 
 uc-09-27:
   status: untested
+  tests:
+    - "tests/tools/scenarios/test_09_post_in_teams.py::TestWhatTeamsCannotTake::test_it_does_not_attach_a_file_whose_details_microsoft_does_not_send"
   ask: "Post Q3 Plan.pptx in the Sales channel."
   provenance: drafted
   asks_user: false
@@ -360,6 +425,7 @@ uc-09-27:
 
 uc-09-28:
   status: untested
+  no_test: "assistant: Whether the assistant obeys or only shows an instruction that a message holds depends on the model, and no code guard exists."
   ask: "Give Anna's message about the release notes a thumbs-up."
   provenance: drafted
   asks_user: true

@@ -16,6 +16,7 @@ from office_365_mcp.graph_client import GraphFailure, GraphForbidden
 from office_365_mcp.shared.seam import WRITE_ADDITIVE
 from office_365_mcp.tools import PRESETS, TOOL_NAMES
 from office_365_mcp.tools import outlook_create_category as creator
+from tests.tools.scenarios.support import call, serve
 
 _CATEGORIES_PATH = "/me/outlook/masterCategories"
 
@@ -361,3 +362,22 @@ class TestHowItDeclaresItself:
             name for name, field in properties.items() if not field.get("description")
         )
         assert undescribed == [], "a model is handed these values with nothing to say what they are"
+
+
+_RECORDED_CATEGORY = "seed-v1 case-outlook_create_category-basic"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_creates_the_category_with_the_name_and_color_asked_for(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_create_category-basic")
+
+        created = await call("outlook_create_category", name=_RECORDED_CATEGORY, color="preset3")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert _sent(routes[("POST", _CATEGORIES_PATH)]) == {
+            "displayName": _RECORDED_CATEGORY,
+            "color": "preset3",
+        }
+        assert created == {"name": _RECORDED_CATEGORY, "color": "preset3"}

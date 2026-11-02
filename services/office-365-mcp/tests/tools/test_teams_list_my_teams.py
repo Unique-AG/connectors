@@ -7,6 +7,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.tools import teams_list_my_teams as lister
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import rows, uncalled
 
 from .conftest import GRAPH_V1
 
@@ -158,3 +160,14 @@ class TestGraphFailures:
 
     def test_the_permission_is_the_one_microsoft_documents(self) -> None:
         assert lister.GRAPH_PERMISSIONS == ("Team.ReadBasic.All",)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_one_team_that_microsoft_sent(self, graph: respx.MockRouter) -> None:
+        routes = serve(graph, "rec-tool-teams_list_my_teams-all")
+
+        (team,) = rows(await call("teams_list_my_teams"), "teams")
+
+        assert team["team_id"] == "00000000-d034-4a82-8630-01e372765b48"
+        assert team["is_archived"] is False
+        assert uncalled(routes) == []

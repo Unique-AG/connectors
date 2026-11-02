@@ -11,6 +11,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphForbidden
 from office_365_mcp.tools import teams_search_messages
 from office_365_mcp.tools.teams_search_messages import SearchCriteria
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import uncalled
 
 from .conftest import channel_hit, chat_hit, message_payload, reaction_payload, search_response
 
@@ -943,3 +945,16 @@ class TestIncludeBody:
                 size=25,
                 include_body=True,
             )
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_returns_no_message_when_microsoft_finds_no_hit(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_search_messages-seed")
+
+        found = await call("teams_search_messages", query="seed-v1 case", size=5)
+
+        assert found["messages"] == []
+        assert found["next_offset"] is None
+        assert uncalled(routes) == []

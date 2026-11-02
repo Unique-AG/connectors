@@ -20,6 +20,7 @@ from office_365_mcp.shared.handles import (
     mail_message_handle,
 )
 from office_365_mcp.tools import outlook_list_attachments as lister
+from tests.tools.scenarios.support import call, serve
 
 _MESSAGE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _FILE_ID = "AAMkAGI2SYNTHETIC-attachment-0001="
@@ -340,3 +341,24 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
     tool = await mcp.get_tool(lister.TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
     return tool
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_lists_the_file_attached_to_the_message_that_it_found(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_list_attachments-with-files")
+        listing = await call("outlook_list_mail", category="seed-v1", has_attachments=True, limit=1)
+        message = cast("list[dict[str, object]]", listing["messages"])[0]
+
+        found = await call("outlook_list_attachments", uri=message["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert message["subject"] == "RE: Q3 budget review"
+        attachments = cast("list[dict[str, object]]", found["attachments"])
+        assert [
+            (row["name"], row["kind"], row["content_type"], row["size"], row["is_inline"])
+            for row in attachments
+        ] == [("q3-numbers.csv", "file", "text/csv", 244, False)]
+        assert str(attachments[0]["uri"]).startswith(f"{message['uri']}/attachments/")
+        assert found["capped"] is False

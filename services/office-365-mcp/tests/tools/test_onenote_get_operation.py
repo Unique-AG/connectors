@@ -23,6 +23,7 @@ from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary
 from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_get_operation as getter
 from office_365_mcp.tools.onenote_get_operation import get_operation
+from tests.tools.scenarios.support import call, serve
 
 _OPERATION_ID = "1-SYNTHETICOPERATION0000!0-ABCDEF"
 _GROUP_ID = "00000000-0000-4000-8000-0000000000aa"
@@ -572,3 +573,37 @@ class TestHowItDeclaresItself:
         advice = getter.GRAPH_NOT_FOUND.casefold()
         assert "expire" not in advice
         assert "almost always" not in advice
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_copy_that_has_not_started_is_polled_under_a_new_handle(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_get_operation-copy")
+        notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Scratch")
+        notebook = _first_uri_of(notebooks, "notebooks")
+        pad = await call("onenote_list_sections", parent=notebook, name_contains="Pad")
+        copies = await call("onenote_list_sections", parent=notebook, name_contains="Copies")
+        page = await call(
+            "onenote_create_page",
+            section=_first_uri_of(pad, "sections"),
+            title="seed-v1 case-onenote_get_operation-copy",
+            body_html="<p>Start.</p>",
+        )
+        started = await call(
+            "onenote_copy_page", page=page["uri"], to_section=_first_uri_of(copies, "sections")
+        )
+
+        polled = await call("onenote_get_operation", operation=started["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert str(started["uri"]).startswith("onenote:///operations/")
+        assert str(polled["uri"]).startswith("onenote:///operations/")
+        assert polled["uri"] != started["uri"]
+        assert polled["created_at"] == started["created_at"]
+        assert polled["result_uri"] is None
+        assert polled["error_code"] is None

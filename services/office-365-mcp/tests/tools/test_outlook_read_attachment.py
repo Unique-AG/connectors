@@ -21,6 +21,7 @@ from office_365_mcp.shared.handles import (
     mail_attachment_handle,
 )
 from office_365_mcp.tools import outlook_read_attachment as reader
+from tests.tools.scenarios.support import call, serve
 
 _MESSAGE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
 _ATTACHMENT_ID = "AAMkAGI2SYNTHETIC-attachment-0001="
@@ -507,3 +508,28 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
     tool = await mcp.get_tool(reader.TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
     return tool
+
+
+_OFFSITE_AGENDA = b"Day 1: arrival, workshop, dinner.\nDay 2: boat trip, review, return.\n"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_reads_the_first_attachment_of_the_message_that_it_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_read_attachment-first")
+        listing = await call("outlook_list_mail", category="seed-v1", has_attachments=True, limit=1)
+        message = cast("list[dict[str, object]]", listing["messages"])[0]
+        listed = await call("outlook_list_attachments", uri=message["uri"])
+        first = cast("list[dict[str, str]]", listed["attachments"])[0]
+
+        read = await reader.read_attachment(client, uri=first["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert message["subject"] == "Team offsite in Lucerne: agenda"
+        assert read.data == _OFFSITE_AGENDA
+        resource = read.to_resource_content().resource
+        assert (resource.mime_type, str(resource.uri)) == (
+            "text/plain",
+            "file:///offsite-agenda.txt",
+        )

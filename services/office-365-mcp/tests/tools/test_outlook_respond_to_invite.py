@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping
+from datetime import date
 from typing import cast
 from urllib.parse import quote
 
@@ -14,12 +15,14 @@ from office_365_mcp.graph_client import GraphNotFound, GraphThrottled, GraphUnav
 from office_365_mcp.shared.calendar import SUMMARY_FIELDS
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.tools.outlook_list_events import list_events
 from office_365_mcp.tools.outlook_respond_to_invite import (
     InvitationResponse,
     ProposedTime,
     Response,
     respond_to_invite,
 )
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -518,3 +521,30 @@ class TestWhatItAnswers:
         answer = await _respond(client, response="accept", send_response=False)
 
         assert answer.sent_response is False
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_accepts_the_listed_invitation_and_notifies_the_organizer(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_respond_to_invite-accept")
+
+        listing = await list_events(
+            client,
+            starts_on=date(2026, 10, 29),
+            ends_on=date(2026, 10, 30),
+            subject_contains="Roadmap check",
+            limit=25,
+        )
+        answer = await _respond(
+            client, uri=listing.events[0].uri, response="accept", comment="I will join."
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (accept,) = (route for (_, path), route in routes.items() if path.endswith("/accept"))
+        assert _sent(accept) == {"Comment": "I will join.", "SendResponse": True}
+        assert answer.subject == "Roadmap check"
+        assert answer.response == "accepted"
+        assert answer.sent_response is True
+        assert answer.organizer is not None
+        assert answer.organizer.address == "anna@example.test"

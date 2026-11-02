@@ -19,6 +19,7 @@ from office_365_mcp.shared.notes import (
 )
 from office_365_mcp.shared.seam import Advised
 from office_365_mcp.tools import onenote_list_pages as lister
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1
 
@@ -1246,3 +1247,32 @@ class TestItsArguments:
 
     def test_the_description_names_the_group_and_site_search(self) -> None:
         assert "notebooks of one group or one SharePoint site" in lister._DESCRIPTION  # pyright: ignore[reportPrivateUsage]
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_the_pages_of_a_section_come_newest_change_first(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_list_pages-section")
+        notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Dogfood")
+        sections = await call(
+            "onenote_list_sections",
+            parent=_first_uri_of(notebooks, "notebooks"),
+            name_contains="Planning",
+        )
+
+        listed = await call("onenote_list_pages", section=_first_uri_of(sections, "sections"))
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        pages = cast("list[Mapping[str, str]]", listed["pages"])
+        assert len(pages) == 2
+        assert pages[0]["title"] == "seed-v1 Meeting notes"
+        assert pages[0]["section_name"] == "seed-v1 Planning"
+        assert pages[0]["notebook_name"] == "seed-v1 Dogfood Notes"
+        changed = [page["last_modified_at"] for page in pages]
+        assert changed == ["2026-10-29T14:27:20Z", "2026-10-29T14:27:18Z"]
+        assert listed["capped"] is False

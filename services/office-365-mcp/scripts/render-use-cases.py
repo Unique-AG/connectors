@@ -16,6 +16,7 @@ Requirements:
 """
 
 import argparse
+import collections
 import difflib
 import functools
 import pathlib
@@ -50,6 +51,7 @@ _AREA_TAGS = {
     "@onenote": ("OneNote", 0),
 }
 _STATUSES = ("working", "partly", "gap", "untested")
+_PROOFS = ("tests", "no_test", "pending")
 _KINDS = ("tool", "parameter", "description", "preset", "graph", "unknown")
 _FIXABLE = _KINDS[:4]
 _KIND_TITLES = {
@@ -122,6 +124,20 @@ def _scenario_id(scenario: Mapping[str, object]) -> str:
     )
 
 
+def _proof(entry: Mapping[str, object]) -> str:
+    return next((key for key in _PROOFS if key in entry), "pending")
+
+
+def _evidence(entry: Mapping[str, object]) -> str:
+    match _proof(entry):
+        case "tests":
+            return f"Tests: {len(_list(entry['tests']))}"
+        case "no_test":
+            return f"No test: {str(entry['no_test']).partition(':')[0]}"
+        case _:
+            return "Tests: pending"
+
+
 def _blocker(entry: Mapping[str, object]) -> Mapping[str, object]:
     return _object(entry["blocker"])
 
@@ -151,7 +167,14 @@ def _scenario(scenario: Mapping[str, object], entry: Mapping[str, object]) -> li
         if kind != "Conjunction":
             bucket = context if kind == "Context" else outcome if kind == "Outcome" else []
         bucket.append(str(step["text"]))
-    lines = [f"**{scenario['name']}**", "", f'Ask your assistant: "{entry["ask"]}"', ""]
+    lines = [
+        f"**{scenario['name']}**",
+        "",
+        f'Ask your assistant: "{entry["ask"]}"',
+        "",
+        _evidence(entry),
+        "",
+    ]
     if entry["status"] == "partly":
         lines += ['!!! warning "Limit"', f"    {_blocker(entry)['user']}", ""]
     if rows := _outline_rows(scenario):
@@ -346,6 +369,16 @@ def render_status() -> str:
         if found:
             happy = found.count("happy")
             paths.append(f"| {surface} | {happy} | {len(found) - happy} | {len(found)} |")
+    proof = collections.Counter((names[i][0], _proof(e)) for i, e in _entries().items())
+    evidence = [
+        "| Surface | tests | no test | pending | total |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for surface in _SURFACES:
+        row = [proof[surface, kind] for kind in _PROOFS]
+        if sum(row):
+            evidence.append(f"| {surface} | {' | '.join(map(str, row))} | {sum(row)} |")
+    totals = collections.Counter(map(_proof, _entries().values()))
     runs = sum(1 for entry in _entries().values() if {"fixture", "variants"} & set(entry))
     lines = [
         "# office-365-mcp use case status",
@@ -360,6 +393,16 @@ def render_status() -> str:
         *table,
         "",
         f"Scenarios with an executable run: {runs} of {len(_entries())}.",
+        "",
+        "## Tests by surface",
+        "",
+        "A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a reason), or "
+        + "neither while it is in `PENDING.txt`.",
+        "",
+        *evidence,
+        "",
+        f"Scenarios with an executable test: {totals['tests']} of {len(_entries())} "
+        + f"({totals['no_test']} with an explained reason, {totals['pending']} pending).",
         "",
         "## Happy and unhappy paths by surface",
         "",

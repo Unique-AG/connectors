@@ -1,6 +1,7 @@
 import json
 import re
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 import httpx
 import pytest
@@ -25,6 +26,7 @@ from office_365_mcp.shared.mail import SUMMARY_FIELDS, FlagMoment, MailFlag, Mai
 from office_365_mcp.tools import outlook_read_mail as reader
 from office_365_mcp.tools.outlook_read_mail import MailMessage, MessageHeader, read_mail
 from office_365_mcp.tools.outlook_search_mail import SearchCriteria, search_mail
+from tests.tools.scenarios.support import call, serve
 
 from .conftest import GRAPH_V1, ME
 
@@ -960,3 +962,29 @@ async def _registered(transport: httpx.AsyncClient) -> Tool:
     tool = await mcp.get_tool(reader.TOOL_NAME)
     assert tool is not None, "register left the tool off the server"
     return tool
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_reads_the_message_that_the_listing_found_with_its_attachment(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_read_mail-latest")
+        listing = await call("outlook_list_mail", category="seed-v1", limit=1)
+        found = cast("list[dict[str, object]]", listing["messages"])[0]
+
+        message = await call("outlook_read_mail", uri=found["uri"])
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert message["subject"] == found["subject"] == "RE: Q3 budget review"
+        assert str(message["body"]).strip() == (
+            "Accepted. I attach the final numbers. Please check line 7 before Thursday."
+        )
+        assert message["cc"] == [{"name": "Tom Berger", "address": "tom@example.test"}]
+        assert message["flag"] == {
+            "status": "flagged",
+            "start": None,
+            "due": None,
+            "completed": None,
+        }
+        attachments = cast("list[dict[str, object]]", message["attachments"])
+        assert [(one["name"], one["size"]) for one in attachments] == [("q3-numbers.csv", 244)]

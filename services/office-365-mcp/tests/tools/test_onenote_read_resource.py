@@ -1,4 +1,6 @@
+import re
 from collections.abc import AsyncIterator, Mapping
+from html import unescape
 from typing import cast
 
 import httpx
@@ -15,6 +17,8 @@ from office_365_mcp.shared.handles import OnenotePageHandle, OnenoteSectionHandl
 from office_365_mcp.shared.notes import OWNED_REFUSED, resource_id_in
 from office_365_mcp.shared.seam import READ_ONLY, Advised
 from office_365_mcp.tools import onenote_read_resource as reader
+from tests.graph_fixtures import E2E
+from tests.tools.scenarios.support import call, serve
 
 RESOURCE_ID = "1-SYNTHETICRESOURCE0000"
 
@@ -409,3 +413,34 @@ class TestHowItDeclaresItself:
         annotations = tool.annotations
         assert annotations is not None, "a tool with no annotations joins the write surface"
         assert annotations.read_only_hint is READ_ONLY["readOnlyHint"]
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_picture_of_a_page_comes_back_as_the_bytes_microsoft_sent(
+        self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_read_resource-gallery")
+        notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Dogfood")
+        sections = await call(
+            "onenote_list_sections",
+            parent=_first_uri_of(notebooks, "notebooks"),
+            name_contains="Reading",
+        )
+        pages = await call(
+            "onenote_list_pages",
+            section=_first_uri_of(sections, "sections"),
+            title_contains="Gallery",
+        )
+        read = await call("onenote_read_page", page=_first_uri_of(pages, "pages"))
+        source = re.search(r'<img[^>]*\ssrc="([^"]+)"', cast("str", read["html"]))
+        assert source is not None
+
+        picture = await _read(client, transport, resource=unescape(source.group(1)))
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        sent = (E2E / "bodies" / "rec-tool-onenote_read_resource-gallery.09.bin").read_bytes()
+        assert picture.data == sent

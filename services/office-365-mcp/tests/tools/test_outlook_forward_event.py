@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import cast
 from urllib.parse import quote
 
@@ -34,6 +35,9 @@ from office_365_mcp.tools.outlook_forward_event import (
     a_person_agrees,
     forward_event,
 )
+from office_365_mcp.tools.outlook_list_events import list_events
+from office_365_mcp.tools.outlook_read_event import read_event
+from tests.graph_fixtures import serve
 
 _CALENDAR_ID = "AAMkSYNTHETIC-cal-0001="
 _EVENT_ID = "AAMkAGI2SYNTHETIC-event-0001="
@@ -768,3 +772,33 @@ class TestHowItDeclaresItself:
             name for name, field in properties.items() if not field.get("description")
         )
         assert undescribed == []
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_forwards_the_read_meeting_to_its_attendee(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_forward_event-hosting")
+
+        listing = await list_events(
+            client,
+            starts_on=date(2026, 10, 29),
+            ends_on=date(2026, 10, 30),
+            subject_contains="Hosting review",
+            limit=25,
+        )
+        event = await read_event(client, uri=listing.events[0].uri)
+        recipient = event.attendees[0].address
+        assert recipient is not None
+        forwarded = await _forward(
+            client,
+            uri=listing.events[0].uri,
+            to=[recipient],
+            comment="Please join for the hosting part.",
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        (forward,) = (route for (_, path), route in routes.items() if path.endswith("/forward"))
+        assert _sent(forward)["Comment"] == "Please join for the hosting part."
+        assert forwarded.subject == "Hosting review"
+        assert forwarded.to == ["anna@example.test"]
