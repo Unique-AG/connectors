@@ -7,6 +7,7 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from space_config_mcp import contexts
+from space_config_mcp.mcp.dependencies import get_caller
 from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.persistence import Persistence
@@ -20,8 +21,6 @@ from space_config_mcp.upstream import Upstream
 )
 async def snapshot_space(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to snapshot.")],
     label: Annotated[
         str,
@@ -29,12 +28,14 @@ async def snapshot_space(
     ] = "",
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> dict[str, str]:
     """Capture the full space configuration as a named JSON snapshot stored in the knowledge base.
 
     Returns snapshot_id for later revert. Snapshots are point-in-time captures:
     config changes made through the portal since the last snapshot are not reflected.
     """
+    user_id, company_id = caller
     return await contexts.snapshot_space(
         upstream=upstream,
         persistence=persistence,
@@ -51,16 +52,16 @@ async def snapshot_space(
 )
 async def list_snapshots(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to list snapshots for.")],
     persistence: Persistence = Depends(get_persistence),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> list[dict[str, object]]:
     """List snapshots for a space stored in the knowledge base, newest first.
 
     Only shows snapshots created by this MCP. Config changes made in the
     portal since the last snapshot are not reflected.
     """
+    user_id, company_id = caller
     return await contexts.list_snapshots(
         persistence=persistence,
         user_id=user_id,
@@ -75,17 +76,17 @@ async def list_snapshots(
 )
 async def get_snapshot(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space the snapshot belongs to.")],
     snapshot_id: Annotated[str, Field(description="ID of the snapshot to retrieve.")],
     persistence: Persistence = Depends(get_persistence),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> dict[str, object]:
     """Return the full JSON content of a stored snapshot.
 
     Snapshots reflect the space config at the time snapshot_space was called.
     Changes made through the portal since then are not included.
     """
+    user_id, company_id = caller
     try:
         return await contexts.get_snapshot(
             persistence=persistence,
@@ -104,18 +105,18 @@ async def get_snapshot(
 )
 async def revert_space(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to revert.")],
     snapshot_id: Annotated[str, Field(description="ID of the snapshot to restore from.")],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> dict[str, object]:
     """Restore a space to a prior snapshot. Auto-snapshots current state first.
 
     Snapshots reflect the config at the time snapshot_space was called.
     Portal changes made since then are not part of the snapshot and will be lost on revert.
     """
+    user_id, company_id = caller
     try:
         return await contexts.revert_space(
             upstream=upstream,
@@ -135,15 +136,15 @@ async def revert_space(
 )
 async def export_space_config(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to export.")],
     upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> str:
     """Return a portable JSON string of the full space config. No storage side-effects.
 
     Reflects the live config at call time. Use snapshot_space to persist a named version.
     """
+    user_id, company_id = caller
     return await contexts.export_space_config(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
     )
@@ -155,8 +156,6 @@ async def export_space_config(
 )
 async def import_space_config(
     *,
-    user_id: Annotated[str, Field(description="Unique platform user ID of the caller.")],
-    company_id: Annotated[str, Field(description="Unique platform company ID of the caller.")],
     space_id: Annotated[str, Field(description="ID of the space to apply the config to.")],
     config_json: Annotated[
         str,
@@ -170,8 +169,10 @@ async def import_space_config(
     ],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
+    caller: tuple[str, str] = Depends(get_caller),
 ) -> dict[str, object]:
     """Apply a previously exported JSON config to a space. Auto-snapshots before applying."""
+    user_id, company_id = caller
     return await contexts.import_space_config(
         upstream=upstream,
         persistence=persistence,

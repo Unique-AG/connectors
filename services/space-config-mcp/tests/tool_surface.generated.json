@@ -15,22 +15,12 @@
           },
           "type": "array"
         },
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to grant access on.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id",
         "access"
       ],
@@ -88,22 +78,12 @@
           },
           "type": "array"
         },
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to revoke access on.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id",
         "access_ids"
       ],
@@ -132,22 +112,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to export.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -176,22 +146,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the Conduct space.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -212,22 +172,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "module_id": {
           "description": "ID of the module to retrieve.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "module_id"
       ],
       "type": "object"
@@ -244,10 +194,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "snapshot_id": {
           "description": "ID of the snapshot to retrieve.",
           "type": "string"
@@ -255,15 +201,9 @@
         "space_id": {
           "description": "ID of the space the snapshot belongs to.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id",
         "snapshot_id"
       ],
@@ -285,22 +225,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to retrieve.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -317,22 +247,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to read access for.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -382,10 +302,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "config_json": {
           "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying. Portal changes since the export was taken are not included.",
           "type": "string"
@@ -393,15 +309,9 @@
         "space_id": {
           "description": "ID of the space to apply the config to.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id",
         "config_json"
       ],
@@ -423,22 +333,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space whose modules to list.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -455,22 +355,12 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "space_id": {
           "description": "ID of the space to list snapshots for.",
-          "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
           "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -503,10 +393,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "name": {
           "anyOf": [
             {
@@ -531,16 +417,8 @@
           "maximum": 1000,
           "minimum": 1,
           "type": "integer"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
-      "required": [
-        "user_id",
-        "company_id"
-      ],
       "type": "object"
     },
     "name": "list_spaces",
@@ -554,10 +432,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "snapshot_id": {
           "description": "ID of the snapshot to restore from.",
           "type": "string"
@@ -565,15 +439,9 @@
         "space_id": {
           "description": "ID of the space to revert.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id",
         "snapshot_id"
       ],
@@ -594,10 +462,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "label": {
           "default": "",
           "description": "Human-readable label for this snapshot. Auto-generated if empty.",
@@ -606,15 +470,9 @@
         "space_id": {
           "description": "ID of the space to snapshot.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -756,10 +614,6 @@
           ],
           "default": null,
           "description": "Reasoning effort level for the codex strategy."
-        },
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
         },
         "custom_instructions": {
           "anyOf": [
@@ -931,15 +785,9 @@
           ],
           "default": null,
           "description": "When non-empty, fully replaces the agent system prompt (setup.systemPromptOverride)."
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
@@ -955,10 +803,6 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
-        },
         "config_patch": {
           "additionalProperties": true,
           "description": "Keys to merge into the module's configuration dict. Existing keys not in the patch are preserved. For Conduct spaces, prefer update_conduct_config instead.",
@@ -967,15 +811,9 @@
         "module_id": {
           "description": "ID of the module to update.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "module_id",
         "config_patch"
       ],
@@ -1015,10 +853,6 @@
           ],
           "default": null,
           "description": "Whether users may switch models."
-        },
-        "company_id": {
-          "description": "Unique platform company ID of the caller.",
-          "type": "string"
         },
         "explanation": {
           "anyOf": [
@@ -1084,15 +918,9 @@
         "space_id": {
           "description": "ID of the space to update.",
           "type": "string"
-        },
-        "user_id": {
-          "description": "Unique platform user ID of the caller.",
-          "type": "string"
         }
       },
       "required": [
-        "user_id",
-        "company_id",
         "space_id"
       ],
       "type": "object"
