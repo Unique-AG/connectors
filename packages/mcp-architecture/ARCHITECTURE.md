@@ -74,7 +74,7 @@ main.py ─▶ mcp ─▶ contexts ─▶ upstream ────┐
 |---|---|---|
 | `main.py` | Starts telemetry, builds the server, runs it | everything |
 | `mcp/` | The FastMCP server, its HTTP serving and middleware, auth, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `shared`, `telemetry` |
-| `contexts/` | The domain: one folder per feature | `upstream`, `persistence`, `shared`, `telemetry` |
+| `contexts/` | The domain: one folder per feature, and the modules several features share | `upstream`, `persistence`, `shared`, `telemetry` |
 | `upstream/` | The system the MCP fronts: its client, settings and, for OpenAPI, the spec and generated code | `shared`, `telemetry` |
 | `persistence/` | Storage the MCP owns: Postgres, Redis, a key-value store | `shared`, `telemetry` |
 | `shared/` | What more than one layer uses: `contracts/`, the types two layers agree on without importing each other, and `utils/`, helpers such as a formatter. [`guides/shared.md`](guides/shared.md) says what belongs there | `telemetry` |
@@ -106,7 +106,7 @@ unused `upstream`, `persistence` or `shared` stays as an `__init__.py` with an e
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run poe architecture` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run poe architecture` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run poe architecture` |
-| `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
+| `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A module beside the features holds what several of them use and none owns, such as paging through a list, and imports no feature. A tool folder does not nest. A feature's module leads with its one public function. | review |
 | No file changes its own type check or turns a lint rule off beyond one line: no file-level `# pyright:` comment, and no `# ruff: noqa` or `# ruff: disable` outside `upstream/generated/`. | review |
 
 Never loosen a rule to make a change pass. CI runs each tool with the MCP's own configuration, so
