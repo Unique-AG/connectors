@@ -216,6 +216,35 @@ class TestNothingIsSentWithoutApproval:
         assert len(person.asked) == 1
         assert send.call_count == 0
 
+    async def test_a_draft_that_went_out_while_mia_decided_is_not_sent_again(
+        self, graph: respx.MockRouter
+    ) -> None:
+        stored = answer_of("rec-tool-outlook_send_draft-persona", "GET", "/me/messages/")
+        _ = graph.get("/me/messages/DRAFT1=").mock(
+            side_effect=[
+                httpx.Response(200, json=stored | {"id": "DRAFT1=", "isDraft": drafted})
+                for drafted in (True, False)
+            ]
+        )
+        send = graph.post("/me/messages/DRAFT1=/send").mock(return_value=httpx.Response(202))
+        person = Person()
+
+        advice = await refusal_of("outlook_send_draft", _SENDING_ARGUMENTS, person=person)
+
+        assert "NOTHING WAS SENT BY THIS CALL" in advice
+        assert len(person.asked) == 1
+        assert send.call_count == 0
+
+    async def test_a_program_of_the_newer_kind_gets_the_question_of_the_send(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _read, send = a_draft_to_send(graph)
+
+        asked = await asked_of("outlook_send_draft", _SENDING_ARGUMENTS)
+
+        assert asked.input_requests
+        assert send.call_count == 0
+
     async def test_the_tips_of_the_recipient_come_before_the_question_of_the_send(
         self, graph: respx.MockRouter
     ) -> None:
@@ -1265,3 +1294,21 @@ class TestAPersonIsFoundWhereMiaAlreadyWritesToHer:
             "anna.odd@example.test": (None, None, "token"),
             "anna.plain@example.test": (None, None, "exact"),
         }
+
+
+class TestAnAddressThatDoesNotFitAsksForNoNotes:
+    @pytest.mark.parametrize(
+        ("addresses", "told"),
+        [
+            ([_ANNA_MEIER], "is not one email address"),
+            ([_ANNA, _ANNA.upper()], "twice in `addresses`"),
+        ],
+        ids=["a-name", "the-same-address-twice"],
+    )
+    async def test_it_refuses_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, addresses: list[str], told: str
+    ) -> None:
+        advice = await advice_for("outlook_get_mail_tips", addresses=addresses)
+
+        assert told in advice
+        assert graph.calls.call_count == 0

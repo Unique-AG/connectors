@@ -807,3 +807,42 @@ uc-04-56:
     - tool: outlook_find_recipient
       args: {query: Anna}
   note: "tools/outlook_find_recipient.py:232-251 and :296-307: the kind comes from the person type, a person with no address is dropped (:287-293), and the sign-in name counts for an exact match (:322-331)."
+
+uc-04-57:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_went_out_while_mia_decided_is_not_sent_again"
+  ask: "Send my draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: "tools/outlook_send_draft.py:207-209 (_NOT_A_DRAFT): after Mia agrees, the tool reads the draft once more. A message that is no longer a draft is not sent, and the text says that nothing was sent by this call. uc-04-08 states the same rule for a draft that changed."
+
+uc-04-58:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitAsksForNoNotes"
+  ask: "Is Anna away this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mail_tips
+      args: {addresses: Anna Meier}
+    - tool: outlook_find_recipient
+    - tool: outlook_get_mail_tips
+      uses: {addresses: address of Anna from outlook_find_recipient}
+  note: "tools/outlook_get_mail_tips.py:49-62 and :208-213: the tool refuses an entry that is not one address and an address that it got twice, asks Microsoft nothing, and says what to correct."
+
+uc-04-59:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_program_of_the_newer_kind_gets_the_question_of_the_send"
+  ask: "Send my draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_send_draft
+      uses: {message_ref: uri of the draft}
+  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and sends nothing (tools/outlook_send_draft.py:185-186)."

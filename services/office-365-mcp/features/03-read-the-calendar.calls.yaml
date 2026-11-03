@@ -182,7 +182,7 @@ uc-03-13:
       args: {starts_on: next Friday, ends_on: next Wednesday, time_zone: Europe/Zurich}
     - tool: outlook_list_events
       args: {starts_on: next Wednesday, ends_on: next Friday, time_zone: Europe/Zurich}
-  note: "expected behaviour from tools/outlook_list_events.py:84-91 _ENDS_BEFORE_STARTS: put the earlier bound in starts_on and the later one in ends_on, then call again. The first call reads nothing. It is optional, because an assistant that orders the dates itself never makes it."
+  note: "expected behaviour from tools/outlook_list_events.py:84-91 _ENDS_BEFORE_STARTS: put the earlier bound in starts_on and the later one in ends_on, then call again. The first call reads nothing. It is optional, because an assistant that orders the dates itself never makes it. outlook_list_reminders has the same rule at tools/outlook_list_reminders.py:133-134."
 
 uc-03-14:
   status: untested
@@ -421,7 +421,7 @@ uc-03-30:
   chain:
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Atlantis/Nowhere}
-  note: "expected behaviour from tools/outlook_list_events.py:92, tools/outlook_read_event.py:110, tools/outlook_list_event_instances.py:81 and tools/outlook_list_group_events.py:85: a zone name that the time zone database does not know reads nothing and names the accepted forms."
+  note: "expected behaviour from tools/outlook_list_events.py:92, tools/outlook_read_event.py:110, tools/outlook_list_event_instances.py:81 and tools/outlook_list_group_events.py:85: a zone name that the time zone database does not know reads nothing and names the accepted forms. outlook_list_reminders refuses it too (tools/outlook_list_reminders.py:130-132)."
 
 uc-03-31:
   status: untested
@@ -475,3 +475,14 @@ uc-03-34:
     - tool: outlook_read_event
       uses: {uri: uri of the event from the listing}
   note: "shared/calendar.py:605-623: when Microsoft gives a start that no zone explains, the tool keeps the local text and gives no converted time (iso is null)."
+
+uc-03-35:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestACalendarWithNoOwner"
+  provenance: drafted
+  ask: "Which calendars do I have?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendars
+  note: "shared/mail.py:114-118: a calendar that Microsoft gives with no owner is listed with no owner, and the other fields stay."

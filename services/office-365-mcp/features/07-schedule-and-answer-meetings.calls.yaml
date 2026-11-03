@@ -857,3 +857,29 @@ uc-07-60:
     - tool: outlook_update_event
       args: {body_html: the stored body and a new line}
   note: "tools/outlook_update_event.py:512-520 _kept: the new body is accepted when it holds all of the stored body, with spaces counted as one."
+
+uc-07-61:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestTheTimeZonesInTheNamesOfAListing"
+  ask: "What is on my calendar on Monday in Zurich time?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_time_zones
+      args: {standard: iana}
+    - tool: outlook_list_events
+      args: {time_zone: Europe/Zurich}
+  note: "tools/outlook_list_time_zones.py:97-112: the IANA list needs the documented spelling of the standard in the path, which the generated client does not write, so the tool rewrites it. A tool that lists events takes only IANA names (tools/outlook_list_time_zones.py:33-36)."
+
+uc-07-62:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestARoomList::test_a_name_in_place_of_the_address_of_a_room_list_reads_nothing"
+  ask: "Find the rooms of the room list Building 9."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_rooms
+      args: {room_list: Building 9}
+  note: "expected behaviour from tools/outlook_find_rooms.py:194-196 (_NOT_ONE_ADDRESS): the name of a room list is not its address, so the tool reads nothing and says that it takes one address."

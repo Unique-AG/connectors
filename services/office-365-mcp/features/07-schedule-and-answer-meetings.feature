@@ -441,6 +441,13 @@ Feature: Scheduling and answering meetings
       Then the assistant asks Mia which time zone she means
       But "Launch review" is not on Mia's calendar
 
+    @happy @uc-07-61
+    Scenario: The time zones are listed with the names that a listing of meetings takes
+      Given Mia wants the meetings of a day in the zone of Zurich
+      When the assistant asks for the time zones in the form that a listing of meetings takes
+      Then the assistant gets the name "Europe/Zurich"
+      And it can use that name for the listing
+
   Rule: A meeting room is found before it is booked
 
     @unhappy @uc-07-47
@@ -456,6 +463,13 @@ Feature: Scheduling and answering meetings
       When Mia asks her assistant to find the rooms of the room list "building9@example.com"
       Then the assistant tells Mia that Microsoft found no room list at that address
       And it asks Mia for the right address or offers to list every room of the company
+
+    @unhappy @uc-07-62
+    Scenario: The name of a room list in place of its address reads nothing
+      Given Mia asks her assistant to find the rooms of the room list "Building 9"
+      When the assistant gives the name of the room list as its address
+      Then no room is read
+      And the assistant is told to ask Mia for the address of the room list
 
   Rule: A booking that cannot be read is refused before anyone is invited
 

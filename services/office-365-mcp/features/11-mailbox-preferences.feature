@@ -116,6 +116,13 @@ Feature: Mailbox preferences
       Then the assistant lists "ada@acme.example" with the Focused tab
       And it lists "news@shop.example" with the Other tab
 
+    @unhappy @uc-11-36
+    Scenario: A sender that is stored with no tab is listed with no tab
+      Given Mia has a sender "anna@example.test" that Outlook stores with no tab
+      When Mia asks her assistant which senders have a fixed tab
+      Then the assistant lists "anna@example.test"
+      But it names no tab for that sender
+
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant never reports a failed reading as an automatic reply that is off.
 

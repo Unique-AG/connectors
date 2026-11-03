@@ -551,3 +551,14 @@ uc-11-35:
     - tool: outlook_get_mailbox_settings
       args: {include: categories}
   note: "tools/outlook_get_mailbox_settings.py:300-313 lists the category names and says whether the list stopped short."
+
+uc-11-36:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderWithNoStoredTabIsListedWithNoTab"
+  ask: "Which senders do I always put in a tab?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_focused_overrides
+  note: "shared/focused_inbox.py:46-49: a sender that Microsoft gives with no tab is listed with a null tab, and the address stays."

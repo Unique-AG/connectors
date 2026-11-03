@@ -130,6 +130,64 @@ Feature: Finding and reading mail
       Then the assistant lists the 2 reminders
       But it does not list the 30 other messages
 
+    @happy @uc-02-44
+    Scenario Outline: Mail of one importance is listed or found
+      Given Mia has messages of high importance and of normal importance
+      When Mia asks her assistant for the messages of <importance> importance
+      Then the assistant shows only the messages of <importance> importance
+
+      Examples:
+        | importance |
+        | high       |
+        | normal     |
+        | low        |
+
+    @unhappy @uc-02-45
+    Scenario Outline: A value that does not fit lists no mail
+      Given Mia asks her assistant to list her mail
+      When the assistant gives <value>
+      Then no mail is listed
+      And the assistant is told what to correct
+
+      Examples:
+        | value                                           |
+        | a folder by its name and a folder by its handle |
+        | the name of a sender in place of an address     |
+
+    @happy @uc-02-47
+    Scenario Outline: A window closes at the end of the day or at the moment that Mia names
+      Given Anna sent Mia a message on 9 March, and two messages on 10 March at 11:00 and at 13:00
+      When Mia asks her assistant for the messages up to <end>
+      Then the assistant shows the messages up to <end>
+      But it does not show the later messages
+
+      Examples:
+        | end                                 |
+        | the end of 10 March                 |
+        | 12:00 on 10 March                   |
+        | 12:00 and half a second on 10 March |
+
+    @happy @uc-02-48
+    Scenario: Mail is found by who got it and by the name of an attachment
+      Given Mia and Anna wrote to each other, and one message has the attachment "Draft v2.pdf"
+      When Mia asks her assistant for the mail with Anna that has an attachment named "Draft v2.pdf"
+      Then the assistant shows the message that has this attachment
+      But it does not show the other messages
+
+    @happy @uc-02-49
+    Scenario: A phrase in quotes stays together and the word OR is only a word
+      Given Mia has mail that holds the phrase "Q3 budget" and mail that holds the words "budget OR plan"
+      When Mia asks her assistant to search for "budget OR plan" and then for the phrase "Q3 budget"
+      Then the search reads "OR" as a word and not as a choice
+      And the search keeps the phrase "Q3 budget" together
+
+    @unhappy @uc-02-50
+    Scenario: A search that finds nothing says so
+      Given Mia has no message about the budget
+      When Mia asks her assistant to search for the budget
+      Then the assistant tells Mia that it found no message
+      But it does not tell Mia that more messages may match
+
   Rule: The assistant reads a message and its attachments
 
     @happy @uc-02-06
@@ -199,6 +257,27 @@ Feature: Finding and reading mail
       Then the assistant gives the full text of the message
       But it sends nothing to "pay@elsewhere.example", because Mia names every recipient
 
+    @unhappy @uc-02-46
+    Scenario Outline: A name in place of a message handle reads nothing
+      Given Mia asks her assistant to <task>
+      When the assistant names the message by its subject line and not by the handle that the lists gave
+      Then nothing is read
+      And the assistant is told to take the handle from the list
+
+      Examples:
+        | task                              |
+        | read a message                    |
+        | follow a conversation             |
+        | list the attachments of a message |
+        | read an attachment                |
+
+    @happy @uc-02-51
+    Scenario: A message with no text is read as a message with no text
+      Given Anna sent Mia a message that has a subject and no text
+      When Mia asks her assistant to read the message
+      Then the assistant gives the subject of the message
+      And it tells Mia that the message has no text
+
   Rule: The assistant follows a conversation from first message to last
 
     @happy @uc-02-09
@@ -214,6 +293,18 @@ Feature: Finding and reading mail
       When Mia asks her assistant what the conversation decided
       Then the assistant answers that the launch is on 14 June
       But it does not use any message of another conversation
+
+    @unhappy @uc-02-52
+    Scenario Outline: A conversation that holds no message is given as empty
+      Given Mia has a message that <state>
+      When Mia asks her assistant to follow the conversation of that message
+      Then the assistant gives a conversation with no message
+      But it does not tell Mia that the conversation has more messages
+
+      Examples:
+        | state                                                   |
+        | belongs to no conversation                              |
+        | has a conversation that Microsoft lists with no message |
 
   Rule: A shared mailbox is read only with Mia's access
 

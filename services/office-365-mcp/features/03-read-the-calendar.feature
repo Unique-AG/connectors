@@ -234,6 +234,13 @@ Feature: Reading the calendar
       Then the assistant tells Mia that no reminder is listed for this week
       But it does not say that Mia has no reminder on any calendar
 
+    @happy @uc-03-35
+    Scenario: A calendar that has no owner is listed without one
+      Given Microsoft lists a calendar of Mia and gives no owner for it
+      When Mia asks her assistant which calendars she has
+      Then the assistant lists the calendar with its name
+      But it names no owner for the calendar
+
   Rule: The assistant shows how Mia's calendars are grouped
 
     @happy @uc-03-27 @deferred

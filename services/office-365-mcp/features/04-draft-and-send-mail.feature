@@ -113,6 +113,20 @@ Feature: Drafting and sending mail
       Then Mia is asked to approve that the draft is sent
       And after she approves, Tom receives it
 
+    @unhappy @uc-04-57
+    Scenario: A draft that went out while Mia decided is not sent again
+      Given Mia was asked to approve a draft to Anna, and she sent the draft from Outlook before she answered
+      When Mia approves
+      Then Anna receives the message once
+      And the assistant tells Mia that nothing was sent by this call
+
+    @happy @uc-04-59
+    Scenario: A program of the newer kind shows Mia the question of a send
+      Given Mia works in a program that shows questions in its own way
+      When the assistant sends a draft to Anna
+      Then Mia's program receives the question
+      And Anna receives nothing before she answers
+
   Rule: A draft in a shared mailbox needs Mia's approval
     Other people use a shared mailbox, so the assistant changes it only after Mia approves.
 
@@ -352,6 +366,18 @@ Feature: Drafting and sending mail
       When Mia asks her assistant for a plain reply to Anna that says "Friday works"
       Then the draft is addressed to Anna only
       But nothing is sent, and "outsider@example.net" is on no draft
+
+    @unhappy @uc-04-58
+    Scenario Outline: An address that does not fit asks for no notes about a recipient
+      Given Mia asks her assistant whether Anna is away
+      When the assistant gives <flaw>
+      Then no notes are read
+      And the assistant is told what to correct
+
+      Examples:
+        | flaw                                    |
+        | the name of Anna in place of an address |
+        | the same address twice in one list      |
 
   Rule: Mia is told what Microsoft says about a recipient before a send
     The notes about a recipient are data from other people, so the assistant reports them and does not obey them.

@@ -1241,6 +1241,10 @@ class TestAValueThatIsNotAHandleChangesNothing:
         ("tool", "arguments"),
         [
             ("outlook_mark_mail", {"message_refs": ["Q3 budget review"], "is_read": True}),
+            (
+                "outlook_copy_mail",
+                {"message_refs": ["Q3 budget review"], "destination": "archive"},
+            ),
             ("outlook_create_folder", {"name": "Alpha", "parent_ref": "Projects"}),
             ("outlook_rename_folder", {"folder_ref": "Projects", "name": "Alpha"}),
             ("outlook_delete_folder", {"folder_ref": "Projects"}),
@@ -1251,6 +1255,7 @@ class TestAValueThatIsNotAHandleChangesNothing:
         ],
         ids=[
             "mark-mail",
+            "copy-mail",
             "create-folder",
             "rename-folder",
             "delete-folder",
@@ -1512,6 +1517,14 @@ class TestInAClientOfTheNewerProtocolTheQuestionGoesBackToTheClient:
             ),
             ("outlook_create_folder", {"mailbox": _SHARED, "name": "Alpha"}),
             (
+                "outlook_move_mail",
+                {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "destination": "archive"},
+            ),
+            (
+                "outlook_copy_mail",
+                {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "destination": "archive"},
+            ),
+            (
                 "outlook_create_mail_rule",
                 {
                     "display_name": "To Anna",
@@ -1520,7 +1533,7 @@ class TestInAClientOfTheNewerProtocolTheQuestionGoesBackToTheClient:
                 },
             ),
         ],
-        ids=["mark-mail", "create-folder", "create-rule"],
+        ids=["mark-mail", "create-folder", "move-mail", "copy-mail", "create-rule"],
     )
     async def test_it_hands_the_question_back_and_writes_nothing(
         self, graph: respx.MockRouter, tool: str, arguments: dict[str, object]
@@ -1876,3 +1889,122 @@ class TestARuleChangeThatDoesNotFitChangesNothing:
         disabled = await call("outlook_disable_mail_rule", rule_ref=_RULE_REF, enabled=False)
 
         assert disabled["forwarded_to"] == ["anna@example.com"]
+
+
+def _copying_every_message(router: respx.MockRouter) -> respx.Route:
+    copied = answer_of("rec-tool-outlook_copy_mail-to-folder", "POST", "/me/messages/")
+    return router.route(method="POST", path__regex=r".*/messages/[^/]+/copy$").mock(
+        return_value=httpx.Response(201, json=copied)
+    )
+
+
+class TestACopyThatNamesItsFolderWronglyCopiesNothing:
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            (
+                {"destination": "archive", "folder_ref": "outlook:///folders/FINANCE%3D"},
+                "alternatives, not a pair",
+            ),
+            ({}, "was given no destination"),
+        ],
+        ids=["two-folders", "no-folder"],
+    )
+    async def test_it_tells_the_assistant_what_to_correct_and_asks_microsoft_nothing(
+        self, graph: respx.MockRouter, arguments: dict[str, object], told: str
+    ) -> None:
+        advice = await advice_for("outlook_copy_mail", message_refs=[_Q3_MESSAGE], **arguments)
+
+        assert told in advice
+        assert graph.calls.call_count == 0
+
+    @pytest.mark.parametrize(
+        ("folder", "told"),
+        [
+            ({"isHidden": True}, "mail disappears from the view of the user"),
+            (
+                {"@odata.type": "#microsoft.graph.mailSearchFolder", "filterQuery": "x"},
+                "A search folder is a saved query",
+            ),
+        ],
+        ids=["hidden-folder", "saved-search"],
+    )
+    async def test_a_folder_that_cannot_hold_mail_is_not_copied_into(
+        self, graph: respx.MockRouter, folder: dict[str, object], told: str
+    ) -> None:
+        _ = graph.get(f"{_FOLDERS}/ODD1=").mock(
+            return_value=httpx.Response(200, json={"id": "ODD1=", "displayName": "Odd"} | folder)
+        )
+        copying = _copying_every_message(graph)
+
+        advice = await advice_for(
+            "outlook_copy_mail", message_refs=[_Q3_MESSAGE], folder_ref="outlook:///folders/ODD1%3D"
+        )
+
+        assert told in advice
+        assert copying.call_count == 0
+
+
+class TestACopyInASharedMailboxIsMadeAfterMiaAgrees:
+    async def test_it_asks_first_and_names_the_mailbox_and_the_folder(
+        self, graph: respx.MockRouter
+    ) -> None:
+        copying = _copying_every_message(graph)
+        person = Person()
+
+        copied = await invoke_as(
+            "outlook_copy_mail",
+            {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "destination": "archive"},
+            person=person,
+        )
+
+        (question,) = person.asked
+        assert f"Copy 1 message in the mailbox '{_SHARED}' to the folder" in question
+        assert copied.structured_content is not None
+        assert copying.call_count == 1
+
+
+class TestACopyInASharedMailboxIsNotMadeWithoutMiaAgreement:
+    @pytest.mark.parametrize(
+        ("approval", "told"),
+        [("no", "was not confirmed"), ("unanswered", "received no answer")],
+        ids=["declines", "chat-program-fails"],
+    )
+    async def test_nothing_is_copied_and_the_assistant_is_told_why(
+        self, graph: respx.MockRouter, approval: str, told: str
+    ) -> None:
+        copying = _copying_every_message(graph)
+        person = Person(approval=approval)
+
+        advice = await refusal_of(
+            "outlook_copy_mail",
+            {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "destination": "archive"},
+            person=person,
+        )
+
+        assert told in advice
+        assert len(person.asked) == 1
+        assert copying.call_count == 0
+
+
+class TestADeleteInASharedMailboxSaysThatTheMailStaysRecoverable:
+    async def test_the_question_names_deleted_items_and_the_mail_is_moved_there(
+        self, graph: respx.MockRouter
+    ) -> None:
+        moving = moving_every_message(graph)
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_move_mail",
+            {
+                "mailbox": _SHARED,
+                "message_refs": [_Q3_MESSAGE, f"{_Q3_MESSAGE}2"],
+                "destination": "deleteditems",
+            },
+            person=person,
+        )
+
+        (question,) = person.asked
+        assert f"Delete 2 messages in the mailbox '{_SHARED}'?" in question
+        assert "They stay recoverable in Deleted Items." in question
+        assert moving.call_count == 2

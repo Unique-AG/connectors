@@ -829,3 +829,117 @@ uc-02-43:
   chain:
     - tool: outlook_list_mail
   note: "shared/mail.py:176-179: a message with no flag object gives a null flag."
+
+uc-02-44:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailOfOneImportanceIsListedOrFound"
+  ask: "Show me my messages of high importance."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+  note: "tools/outlook_list_mail.py:313-315 and tools/outlook_search_mail.py:210-213: the listing keeps the messages of the stated importance. The search adds the term importance to its words, and it writes the importance normal as medium."
+
+uc-02-45:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAValueThatDoesNotFitListsNoMail"
+  ask: "List the mail that Anna Meier sent me."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+      args: {from_address: Anna Meier}
+    - tool: outlook_find_recipient
+    - tool: outlook_list_mail
+      uses: {from_address: address of Anna from outlook_find_recipient}
+  note: "expected behaviour from tools/outlook_list_mail.py:211-215 (_BOTH_FOLDERS) and :320-328 (_NOT_ONE_ADDRESS): the listing refuses a folder given twice and a name in place of an address, asks Microsoft nothing, and says what to correct. The chain shows the refused call with a name and the call that repairs it."
+
+uc-02-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageIsNamedByItsHandleAndByNothingElse"
+  ask: "Read the message Q3 budget review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_read_mail
+      uses: {uri: uri of the message from the listing}
+  note: "expected behaviour from the handle check at the start of tools/outlook_read_mail.py:255-257, tools/outlook_read_thread.py:210-212, tools/outlook_list_attachments.py:73-75, and tools/outlook_read_attachment.py:112-114: each tool refuses before it asks Microsoft, so no Graph call is made."
+
+uc-02-47:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAWindowClosesAtTheEndOfTheDayOrAtTheMomentThatMiaNames"
+  ask: "Show me the messages that Anna sent me up to 12:00 on 10 March."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+  note: "tools/outlook_list_mail.py:260-269 and tools/outlook_search_mail.py:236-245: a closing date covers the whole day. A closing moment is the end of the window, with its fraction of a second when it has one."
+
+uc-02-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment"
+  ask: "Find the mail with Anna that has an attachment named Draft v2.pdf."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {recipient: Anna Meier, attachment_name: Draft v2.pdf}
+  note: "tools/outlook_search_mail.py:188-195: the search names the people of a message and the name of an attachment as two terms of one search."
+
+uc-02-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord"
+  ask: "Find the mail that holds the words budget OR plan, and the mail that holds the phrase Q3 budget."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: budget OR plan}
+    - tool: outlook_search_mail
+      args: {query: '"Q3 budget"'}
+  note: "shared/kql.py:79-111: a quoted phrase stays one phrase, and an operator word of the query language is quoted so that it is only a word."
+
+uc-02-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASearchThatFindsNothingGivesAnEmptyList"
+  ask: "Find the mail about the budget."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: budget}
+  note: "tools/outlook_search_mail.py:158-161: a search with no match gives an empty list, and the tool does not ask Microsoft to translate any id."
+
+uc-02-51:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageWithNoTextIsReadWithNoText"
+  ask: "Read the last message from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_read_mail
+      uses: {uri: uri of the message from the listing}
+  note: "tools/outlook_read_mail.py:216-226: a message with no body gives no text, and neither flag of the body is set."
+
+uc-02-52:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageThatListsNoConversationGivesAnEmptyThread"
+  ask: "What did we decide in the conversation about the launch?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_read_thread
+      uses: {uri: uri of a message of the conversation}
+  note: "tools/outlook_read_thread.py:106-108 and :131-132: a message with no conversation id, and a conversation that Microsoft lists with no message, both give a thread with no message that is complete."

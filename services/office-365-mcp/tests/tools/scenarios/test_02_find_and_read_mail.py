@@ -839,3 +839,194 @@ class TestAnAttachmentIsGivenAsMicrosoftDescribesIt:
         listed = await call("outlook_list_mail", limit=5)
 
         assert _rows(listed, "flag")[0][0] is None
+
+
+def _filter_asked(router: respx.MockRouter) -> str:
+    (asked,) = [
+        request.url.params["$filter"]
+        for request, _answer in cast("list[tuple[httpx.Request, object]]", router.calls)
+        if "$filter" in request.url.params
+    ]
+    return asked
+
+
+class TestMailOfOneImportanceIsListedOrFound:
+    @pytest.mark.parametrize(
+        ("importance", "limit", "subjects"),
+        [
+            ("high", 2, [("RE: Q3 budget review",), ("Laptop rollout: your new device",)]),
+            ("normal", 1, [("Roadmap check",)]),
+        ],
+    )
+    async def test_a_listing_keeps_only_the_messages_of_that_importance(
+        self, graph: respx.MockRouter, importance: str, limit: int, subjects: list[tuple[str]]
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_list_mail-inbox")
+
+        found = await call("outlook_list_mail", importance=importance, limit=limit)
+
+        assert _rows(found, "subject") == subjects
+
+    @pytest.mark.parametrize(
+        ("importance", "asked"), [("low", "low"), ("normal", "medium"), ("high", "high")]
+    )
+    async def test_a_search_asks_for_that_importance(
+        self, graph: respx.MockRouter, importance: str, asked: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_search_mail", query="budget", importance=importance, limit=5)
+
+        assert search_of(graph).endswith(f" AND importance:{asked}")
+
+
+class TestAValueThatDoesNotFitListsNoMail:
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            (
+                {"folder": "sentitems", "folder_ref": "outlook:///folders/FINANCE%3D"},
+                "alternatives, not a pair",
+            ),
+            ({"from_address": "Anna Meier"}, "it takes one address and nothing else"),
+        ],
+        ids=["folder-named-twice", "sender-given-as-a-name"],
+    )
+    async def test_it_tells_the_assistant_what_to_correct_and_asks_microsoft_nothing(
+        self, graph: respx.MockRouter, arguments: dict[str, object], told: str
+    ) -> None:
+        advice = await advice_for("outlook_list_mail", limit=5, **arguments)
+
+        assert told in advice
+        assert graph.calls.call_count == 0
+
+
+class TestAMessageIsNamedByItsHandleAndByNothingElse:
+    @pytest.mark.parametrize(
+        "tool",
+        [
+            "outlook_read_mail",
+            "outlook_read_thread",
+            "outlook_list_attachments",
+            "outlook_read_attachment",
+        ],
+    )
+    async def test_a_subject_line_in_place_of_a_handle_reads_nothing(
+        self, graph: respx.MockRouter, tool: str
+    ) -> None:
+        advice = await advice_for(tool, uri="Q3 budget review")
+
+        assert "handle" in advice
+        assert graph.calls.call_count == 0
+
+
+class TestAWindowClosesAtTheEndOfTheDayOrAtTheMomentThatMiaNames:
+    @pytest.mark.parametrize(
+        ("closing", "listed", "searched"),
+        [
+            ("2026-03-10", "lt 2026-03-11T00:00:00Z", "received<2026-03-11T00:00:00Z"),
+            ("2026-03-10T12:00:00", "le 2026-03-10T12:00:00Z", "received<=2026-03-10T12:00:00Z"),
+            (
+                "2026-03-10T12:00:00.500000",
+                "le 2026-03-10T12:00:00.500000Z",
+                "received<=2026-03-10T12:00:00.500000Z",
+            ),
+        ],
+        ids=["a-day", "a-moment", "a-moment-with-a-fraction-of-a-second"],
+    )
+    async def test_a_listing_and_a_search_close_the_window_there(
+        self, graph: respx.MockRouter, closing: str, listed: str, searched: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_list_mail-inbox")
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_list_mail", received_before=closing, limit=3)
+        _ = await call("outlook_search_mail", sender="Anna", received_before=closing, limit=5)
+
+        assert _filter_asked(graph).endswith(listed)
+        assert search_of(graph).endswith(searched)
+
+
+class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
+    async def test_a_search_names_the_recipient_and_the_attachment(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call(
+            "outlook_search_mail", recipient="Anna Meier", attachment_name="Draft v2.pdf", limit=5
+        )
+
+        assert search_of(graph) == 'participants:"Anna Meier" attachment:"Draft v2.pdf"'
+
+
+class TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord:
+    @pytest.mark.parametrize(
+        ("query", "asked"),
+        [
+            ('the "Q3 budget" plan', 'the "Q3 budget" plan'),
+            ('the "  " plan', "the plan"),
+            ("budget OR plan", 'budget "OR" plan'),
+        ],
+        ids=["a-quoted-phrase", "an-empty-quote", "an-operator-word"],
+    )
+    async def test_a_search_gives_the_words_to_microsoft_as_text(
+        self, graph: respx.MockRouter, query: str, asked: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_search_mail", query=query, limit=5)
+
+        assert search_of(graph) == asked
+
+
+class TestASearchThatFindsNothingGivesAnEmptyList:
+    async def test_it_gives_no_message_and_says_that_no_more_may_exist(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/messages").mock(return_value=httpx.Response(200, json={"value": []}))
+
+        found = await call("outlook_search_mail", query="budget", limit=5)
+
+        assert found == {"messages": [], "more_may_exist": False}
+        assert [path for path in paths_asked(graph) if "translate" in path] == []
+
+
+class TestAMessageWithNoTextIsReadWithNoText:
+    async def test_it_gives_no_body_and_says_that_the_text_is_not_html(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/messages/MSG1").mock(
+            return_value=httpx.Response(200, json=mail_message("MSG1", "Empty"))
+        )
+        _ = graph.get("/me/messages/MSG1/attachments").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+
+        message = await call("outlook_read_mail", uri="outlook:///messages/MSG1")
+
+        assert message["body"] is None
+        assert (message["body_is_the_new_part"], message["body_is_plain_text"]) == (False, False)
+
+
+class TestAMessageThatListsNoConversationGivesAnEmptyThread:
+    @pytest.mark.parametrize(
+        ("anchor", "listed"),
+        [
+            ({"id": "MSG1"}, None),
+            ({"id": "MSG1", "conversationId": "CONV1"}, []),
+        ],
+        ids=["no-conversation", "no-message-in-the-conversation"],
+    )
+    async def test_it_gives_no_message_and_does_not_hide_that_the_thread_is_empty(
+        self, graph: respx.MockRouter, anchor: dict[str, object], listed: list[object] | None
+    ) -> None:
+        _ = graph.get("/me/messages/MSG1").mock(return_value=httpx.Response(200, json=anchor))
+        listing = graph.get("/me/messages").mock(
+            return_value=httpx.Response(200, json={"value": listed or []})
+        )
+
+        thread = await call("outlook_read_thread", uri="outlook:///messages/MSG1")
+
+        assert (thread["messages"], thread["message_count"], thread["complete"]) == ([], 0, True)
+        assert listing.called is (listed is not None)

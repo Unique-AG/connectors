@@ -592,6 +592,7 @@ class TestAWindowNamedBackwards:
         [
             pytest.param("outlook_list_event_instances", {"uri": _uri(_ANNA_EVENT)}, id="series"),
             pytest.param("outlook_list_group_events", {"group_id": "team-1"}, id="team"),
+            pytest.param("outlook_list_reminders", {}, id="reminders"),
         ],
     )
     async def test_a_series_or_a_team_calendar_is_not_read_with_a_backwards_window(
@@ -753,6 +754,7 @@ _UNKNOWN_ZONES = [
         "cannot resolve the name",
         id="team",
     ),
+    pytest.param("outlook_list_reminders", _WINDOW, "cannot resolve the name", id="reminders"),
 ]
 
 
@@ -882,3 +884,18 @@ class TestATimeThatMicrosoftGivesInAStrangeForm:
         else:
             assert (_part(seen, "start")["local"], _part(seen, "start")["iso"]) == shown
         assert seen["body"] is None
+
+
+class TestACalendarWithNoOwner:
+    async def test_it_is_listed_with_no_owner(self, graph: respx.MockRouter) -> None:
+        bare = _calendar(_ANNA_CALENDAR_ID, _ANNA, can_edit=False)
+        del bare["owner"]
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json={"id": "me", **_MIA}))
+        _ = graph.get("/me/calendars").mock(
+            return_value=httpx.Response(200, json={"value": [bare]})
+        )
+
+        calendars = await call("outlook_list_calendars")
+
+        (row,) = _list(calendars, "calendars")
+        assert (row["name"], row["owner"]) == ("Anna Meier", None)

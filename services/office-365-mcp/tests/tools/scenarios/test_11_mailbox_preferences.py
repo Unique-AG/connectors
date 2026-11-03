@@ -853,3 +853,16 @@ class TestTheReplyMiaSeesIsTheReplyThatOutlookHolds:
         assert stored["categories"] == [f"synthetic text {number:02d}" for number in range(1, 7)]
         assert stored["categories_capped"] is False
         assert stored["rules"] is None
+
+
+class TestASenderWithNoStoredTabIsListedWithNoTab:
+    async def test_it_gives_the_address_and_no_tab(self, graph: MockRouter) -> None:
+        stored = _override("anna@example.test", "Anna Meier", "other")
+        del stored["classifyAs"]
+        _ = graph.get(OVERRIDES).mock(return_value=httpx.Response(200, json={"value": [stored]}))
+
+        listed = await call("outlook_list_focused_overrides")
+
+        assert [(row["sender_address"], row["classify_as"]) for row in _rows(listed)] == [
+            ("anna@example.test", None)
+        ]

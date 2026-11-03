@@ -1143,6 +1143,40 @@ class TestARoomList:
         assert "Microsoft found no room list at that address" in str(refused.value)
         assert "call this tool again without `room_list`" in str(refused.value)
 
+    async def test_a_name_in_place_of_the_address_of_a_room_list_reads_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call("outlook_find_rooms", room_list="Building 9")
+
+        assert "takes one SMTP address in `room_list`" in str(refused.value)
+        assert graph.calls.call_count == 0
+
+
+class TestTheTimeZonesInTheNamesOfAListing:
+    async def test_the_iana_names_are_asked_for_in_the_form_that_microsoft_documents(
+        self, graph: respx.MockRouter
+    ) -> None:
+        zones = graph.route(method="GET", path__startswith="/me/outlook/supportedTimeZones").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {"alias": "Europe/Zurich", "displayName": "Europe/Zurich"},
+                        {"alias": "Asia/Kolkata", "displayName": "Asia/Kolkata"},
+                    ]
+                },
+            )
+        )
+
+        listed = await call("outlook_list_time_zones", standard="iana")
+
+        assert [one["alias"] for one in _list(listed, "time_zones")] == [
+            "Europe/Zurich",
+            "Asia/Kolkata",
+        ]
+        assert "microsoft.graph.timeZoneStandard'Iana'" in zones.calls.last.request.url.path
+
 
 _BOOK: Row = {
     "subject": "Launch review",

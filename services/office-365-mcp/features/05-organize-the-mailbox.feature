@@ -237,6 +237,20 @@ Feature: Organizing the mailbox
         | a folder that only an old add-in uses | that the mail would vanish from her view, and that the assistant can use a visible folder or delete the mail instead  |
         | a saved search                        | that a saved search holds no mail, and that the assistant must use the real folder of the mail                        |
 
+    @unhappy @uc-05-77
+    Scenario Outline: A copy that names its folder wrongly copies nothing
+      Given Mia asks her assistant to copy a message to a folder
+      When the assistant gives <flaw>
+      Then no message is copied
+      And the assistant is told what to correct
+
+      Examples:
+        | flaw                                    |
+        | a folder by its name and by its handle  |
+        | no folder                               |
+        | a folder that is hidden                 |
+        | a folder that is a saved search         |
+
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant tells Mia the problem in plain words and does not claim a result that did not happen.
 
@@ -606,6 +620,34 @@ Feature: Organizing the mailbox
       When the assistant asks for a change that needs her approval
       Then Mia's program receives the question
       And nothing changes before she answers
+
+    @happy @uc-05-78
+    Scenario: A copy in a shared mailbox is made after Mia agrees
+      Given Mia asks her assistant to copy a message of the shared mailbox "support@example.com" to "Archive"
+      When the assistant asks for the copy
+      Then the assistant asks Mia to approve the copy
+      And the question names the mailbox "support@example.com" and the folder "Archive"
+      And the copy is made after Mia agrees
+
+    @unhappy @uc-05-79
+    Scenario Outline: A copy in a shared mailbox is not made without Mia's agreement
+      Given Mia asked her assistant to copy a message of the shared mailbox "support@example.com" to "Archive"
+      When Mia is asked to approve the copy and <answer>
+      Then the assistant tells Mia <told>
+      But no copy is made
+
+      Examples:
+        | answer                                              | told                                                   |
+        | she declines                                        | that the copy was not confirmed and nothing was copied |
+        | her chat program answers the question with an error | that it received no answer and that she can ask again  |
+
+    @happy @uc-05-80
+    Scenario: A delete in a shared mailbox says that the mail stays in Deleted Items
+      Given Mia asks her assistant to delete 2 messages of the shared mailbox "support@example.com"
+      When the assistant asks for the delete
+      Then the assistant asks Mia to approve the delete
+      And the question says that the 2 messages stay recoverable in Deleted Items
+      And the messages move to Deleted Items after Mia agrees
 
   Rule: A folder that Outlook makes stays as it is
 

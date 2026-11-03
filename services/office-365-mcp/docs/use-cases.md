@@ -275,6 +275,80 @@ What happens:
 - The assistant lists the 2 reminders.
 - It does not list the 30 other messages.
 
+**Mail of one importance is listed or found**
+
+Ask your assistant: "Show me my messages of high importance."
+
+Tests: 1
+
+Cases:
+
+- Mia has messages of high importance and of normal importance. The assistant shows only the messages of high importance.
+- Mia has messages of high importance and of normal importance. The assistant shows only the messages of normal importance.
+- Mia has messages of high importance and of normal importance. The assistant shows only the messages of low importance.
+
+**A value that does not fit lists no mail**
+
+Ask your assistant: "List the mail that Anna Meier sent me."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to list her mail. No mail is listed. The assistant is told what to correct.
+- Mia asks her assistant to list her mail. No mail is listed. The assistant is told what to correct.
+
+**A window closes at the end of the day or at the moment that Mia names**
+
+Ask your assistant: "Show me the messages that Anna sent me up to 12:00 on 10 March."
+
+Tests: 1
+
+Cases:
+
+- Anna sent Mia a message on 9 March, and two messages on 10 March at 11:00 and at 13:00. The assistant shows the messages up to the end of 10 March. It does not show the later messages.
+- Anna sent Mia a message on 9 March, and two messages on 10 March at 11:00 and at 13:00. The assistant shows the messages up to 12:00 on 10 March. It does not show the later messages.
+- Anna sent Mia a message on 9 March, and two messages on 10 March at 11:00 and at 13:00. The assistant shows the messages up to 12:00 and half a second on 10 March. It does not show the later messages.
+
+**Mail is found by who got it and by the name of an attachment**
+
+Ask your assistant: "Find the mail with Anna that has an attachment named Draft v2.pdf."
+
+Tests: 1
+
+Situation: Mia and Anna wrote to each other, and one message has the attachment "Draft v2.pdf".
+
+What happens:
+
+- The assistant shows the message that has this attachment.
+- It does not show the other messages.
+
+**A phrase in quotes stays together and the word OR is only a word**
+
+Ask your assistant: "Find the mail that holds the words budget OR plan, and the mail that holds the phrase Q3 budget."
+
+Tests: 1
+
+Situation: Mia has mail that holds the phrase "Q3 budget" and mail that holds the words "budget OR plan".
+
+What happens:
+
+- The search reads "OR" as a word and not as a choice.
+- The search keeps the phrase "Q3 budget" together.
+
+**A search that finds nothing says so**
+
+Ask your assistant: "Find the mail about the budget."
+
+Tests: 1
+
+Situation: Mia has no message about the budget.
+
+What happens:
+
+- The assistant tells Mia that it found no message.
+- It does not tell Mia that more messages may match.
+
 #### The assistant reads a message and its attachments
 
 **A message is read in full and its attachments are named**
@@ -393,6 +467,32 @@ What happens:
 - The assistant gives the full text of the message.
 - It sends nothing to "pay@elsewhere.example", because Mia names every recipient.
 
+**A name in place of a message handle reads nothing**
+
+Ask your assistant: "Read the message Q3 budget review."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to read a message. Nothing is read. The assistant is told to take the handle from the list.
+- Mia asks her assistant to follow a conversation. Nothing is read. The assistant is told to take the handle from the list.
+- Mia asks her assistant to list the attachments of a message. Nothing is read. The assistant is told to take the handle from the list.
+- Mia asks her assistant to read an attachment. Nothing is read. The assistant is told to take the handle from the list.
+
+**A message with no text is read as a message with no text**
+
+Ask your assistant: "Read the last message from Anna."
+
+Tests: 1
+
+Situation: Anna sent Mia a message that has a subject and no text.
+
+What happens:
+
+- The assistant gives the subject of the message.
+- It tells Mia that the message has no text.
+
 #### The assistant follows a conversation from first message to last
 
 **A decision is found in a long conversation**
@@ -419,6 +519,17 @@ What happens:
 
 - The assistant answers that the launch is on 14 June.
 - It does not use any message of another conversation.
+
+**A conversation that holds no message is given as empty**
+
+Ask your assistant: "What did we decide in the conversation about the launch?"
+
+Tests: 1
+
+Cases:
+
+- Mia has a message that belongs to no conversation. The assistant gives a conversation with no message. It does not tell Mia that the conversation has more messages.
+- Mia has a message that has a conversation that Microsoft lists with no message. The assistant gives a conversation with no message. It does not tell Mia that the conversation has more messages.
 
 #### A shared mailbox is read only with Mia's access
 
@@ -773,6 +884,34 @@ What happens:
 - Mia is asked to approve that the draft is sent.
 - After she approves, Tom receives it.
 
+**A draft that went out while Mia decided is not sent again**
+
+Ask your assistant: "Send my draft to Anna."
+
+Tests: 1
+
+Situation: Mia was asked to approve a draft to Anna, and she sent the draft from Outlook before she answered.
+
+What happens:
+
+- Anna receives the message once.
+- The assistant tells Mia that nothing was sent by this call.
+- The assistant asks Mia to approve first.
+
+**A program of the newer kind shows Mia the question of a send**
+
+Ask your assistant: "Send my draft to Anna."
+
+Tests: 1
+
+Situation: Mia works in a program that shows questions in its own way.
+
+What happens:
+
+- Mia's program receives the question.
+- Anna receives nothing before she answers.
+- The assistant asks Mia to approve first.
+
 Other people use a shared mailbox, so the assistant changes it only after Mia approves.
 
 **A draft in a shared mailbox needs Mia's approval**
@@ -1075,6 +1214,17 @@ What happens:
 
 - The draft is addressed to Anna only.
 - Nothing is sent, and "outsider@example.net" is on no draft.
+
+**An address that does not fit asks for no notes about a recipient**
+
+Ask your assistant: "Is Anna away this week?"
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant whether Anna is away. No notes are read. The assistant is told what to correct.
+- Mia asks her assistant whether Anna is away. No notes are read. The assistant is told what to correct.
 
 #### Mia is told what Microsoft says about a recipient before a send
 
@@ -1715,6 +1865,19 @@ Cases:
 - Mia asks her assistant to file 3 messages in a folder that only an old add-in uses. None of the 3 messages is moved. Mia is told that the mail would vanish from her view, and that the assistant can use a visible folder or delete the mail instead.
 - Mia asks her assistant to file 3 messages in a saved search. None of the 3 messages is moved. Mia is told that a saved search holds no mail, and that the assistant must use the real folder of the mail.
 
+**A copy that names its folder wrongly copies nothing**
+
+Ask your assistant: "Copy this message to my Archive folder."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to copy a message to a folder. No message is copied. The assistant is told what to correct.
+- Mia asks her assistant to copy a message to a folder. No message is copied. The assistant is told what to correct.
+- Mia asks her assistant to copy a message to a folder. No message is copied. The assistant is told what to correct.
+- Mia asks her assistant to copy a message to a folder. No message is copied. The assistant is told what to correct.
+
 #### Mia is told what happened when Microsoft cannot do what she asked
 
 The assistant tells Mia the problem in plain words and does not claim a result that did not happen.
@@ -2202,6 +2365,45 @@ What happens:
 - Nothing changes before she answers.
 - The assistant asks Mia to approve first.
 
+**A copy in a shared mailbox is made after Mia agrees**
+
+Ask your assistant: "Copy the message Refund question of the support mailbox to its Archive folder."
+
+Tests: 1
+
+Situation: Mia asks her assistant to copy a message of the shared mailbox "support@example.com" to "Archive".
+
+What happens:
+
+- The assistant asks Mia to approve the copy.
+- The question names the mailbox "support@example.com" and the folder "Archive".
+- The copy is made after Mia agrees.
+
+**A copy in a shared mailbox is not made without Mia's agreement**
+
+Ask your assistant: "Copy the message Refund question of the support mailbox to its Archive folder."
+
+Tests: 1
+
+Cases:
+
+- Mia asked her assistant to copy a message of the shared mailbox "support@example.com" to "Archive". The assistant tells Mia that the copy was not confirmed and nothing was copied. No copy is made.
+- Mia asked her assistant to copy a message of the shared mailbox "support@example.com" to "Archive". The assistant tells Mia that it received no answer and that she can ask again. No copy is made.
+
+**A delete in a shared mailbox says that the mail stays in Deleted Items**
+
+Ask your assistant: "Delete the two messages Refund question and Refund answer of the support mailbox."
+
+Tests: 1
+
+Situation: Mia asks her assistant to delete 2 messages of the shared mailbox "support@example.com".
+
+What happens:
+
+- The assistant asks Mia to approve the delete.
+- The question says that the 2 messages stay recoverable in Deleted Items.
+- The messages move to Deleted Items after Mia agrees.
+
 #### A folder that Outlook makes stays as it is
 
 **A folder that Outlook makes is neither renamed nor deleted**
@@ -2539,6 +2741,19 @@ What happens:
 
 - The assistant lists "ada@acme.example" with the Focused tab.
 - It lists "news@shop.example" with the Other tab.
+
+**A sender that is stored with no tab is listed with no tab**
+
+Ask your assistant: "Which senders do I always put in a tab?"
+
+Tests: 1
+
+Situation: Mia has a sender "anna@example.test" that Outlook stores with no tab.
+
+What happens:
+
+- The assistant lists "anna@example.test".
+- It names no tab for that sender.
 
 #### Mia is told what happened when Microsoft cannot do what she asked
 
@@ -3168,6 +3383,19 @@ What happens:
 
 - The assistant tells Mia that no reminder is listed for this week.
 - It does not say that Mia has no reminder on any calendar.
+
+**A calendar that has no owner is listed without one**
+
+Ask your assistant: "Which calendars do I have?"
+
+Tests: 1
+
+Situation: Microsoft lists a calendar of Mia and gives no owner for it.
+
+What happens:
+
+- The assistant lists the calendar with its name.
+- It names no owner for the calendar.
 
 #### The assistant shows how Mia's calendars are grouped
 
@@ -3946,6 +4174,19 @@ What happens:
 - The assistant asks Mia which time zone she means.
 - "Launch review" is not on Mia's calendar.
 
+**The time zones are listed with the names that a listing of meetings takes**
+
+Ask your assistant: "What is on my calendar on Monday in Zurich time?"
+
+Tests: 1
+
+Situation: Mia wants the meetings of a day in the zone of Zurich.
+
+What happens:
+
+- The assistant gets the name "Europe/Zurich".
+- It can use that name for the listing.
+
 #### A meeting room is found before it is booked
 
 **A company with no listed room is not reported as having no room**
@@ -3973,6 +4214,19 @@ What happens:
 
 - The assistant tells Mia that Microsoft found no room list at that address.
 - It asks Mia for the right address or offers to list every room of the company.
+
+**The name of a room list in place of its address reads nothing**
+
+Ask your assistant: "Find the rooms of the room list Building 9."
+
+Tests: 1
+
+Situation: Mia asks her assistant to find the rooms of the room list "Building 9".
+
+What happens:
+
+- No room is read.
+- The assistant is told to ask Mia for the address of the room list.
 
 #### A booking that cannot be read is refused before anyone is invited
 
