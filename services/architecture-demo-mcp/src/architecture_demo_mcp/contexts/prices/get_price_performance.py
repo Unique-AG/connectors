@@ -4,6 +4,7 @@ from itertools import pairwise
 from math import sqrt
 from statistics import stdev
 
+from mcp_observability import traced
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -13,6 +14,10 @@ from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import Upstream
 
 
+@traced(
+    arguments=("ticker", "start_date", "end_date"),
+    result=lambda performance: {"trading_days": performance.trading_days},
+)
 async def get_price_performance(
     *,
     upstream: Upstream,

@@ -65,7 +65,7 @@ async def masks_error_details(factory: ServerFactory) -> bool:
     async with factory() as server:
         server.add_tool(ServedTool.from_function(raise_probe_secret, name=_PROBE_TOOL))
         async with Client(server) as client:
-            with _fastmcp_logs_off():
+            with _probe_logs_off():
                 result = await client.call_tool(_PROBE_TOOL, {}, raise_on_error=False)
     return (
         bool(calls)
@@ -79,15 +79,18 @@ async def masks_error_details(factory: ServerFactory) -> bool:
 
 
 @contextmanager
-def _fastmcp_logs_off() -> Generator[None]:
-    """FastMCP logs the probe's error with its traceback, which reads as a failure of the check."""
-    logger = logging.getLogger("fastmcp")
-    level = logger.level
-    logger.setLevel(logging.CRITICAL + 1)
+def _probe_logs_off() -> Generator[None]:
+    """FastMCP and the tool-call middleware log the probe's error with its traceback, which reads
+    as a failure of the check."""
+    loggers = [logging.getLogger(name) for name in ("fastmcp", "mcp_observability")]
+    levels = [logger.level for logger in loggers]
+    for logger in loggers:
+        logger.setLevel(logging.CRITICAL + 1)
     try:
         yield
     finally:
-        logger.setLevel(level)
+        for logger, level in zip(loggers, levels, strict=True):
+            logger.setLevel(level)
 
 
 async def tool_surface(server: FastMCP) -> str:
