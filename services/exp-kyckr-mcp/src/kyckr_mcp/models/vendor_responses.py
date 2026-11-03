@@ -456,6 +456,12 @@ class ShareholderPersonDetails(LegalEntity):
     type: str = Field(..., description="Person type shareholder")
 
 
+class GetOrdersOrderIdDownloadResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+
 class AddressGroup(BaseModel):
     model_config = ConfigDict(
         extra="allow",

@@ -9,6 +9,14 @@ from pydantic import Field
 from tiingo_mcp.deps import get_api
 from tiingo_mcp.models import operations
 from tiingo_mcp.models.fundamentals import FinancialPeriod
+from tiingo_mcp.models.vendor_requests import (
+    GetFundamentalsDailyPath,
+    GetFundamentalsDailyQuery,
+    GetFundamentalsDailyRequest,
+    GetFundamentalsStatementsPath,
+    GetFundamentalsStatementsQuery,
+    GetFundamentalsStatementsRequest,
+)
 from tiingo_mcp.models.vendor_responses import FundamentalsDaily, FundamentalsStatement
 from tiingo_mcp.params import LookbackDays, since
 
@@ -65,12 +73,18 @@ async def recent_financials(
     cashFlow (default all). Each section maps Tiingo data codes to values; the codes
     are explained in the resource://fundamentals_definitions resource.
     """
-    statements = await api.call_untyped(
-        operations.GET_FUNDAMENTALS_STATEMENTS, ticker=ticker, startDate=since((periods + 2) * 100)
+    path = GetFundamentalsStatementsPath(ticker=ticker)
+    statements = await api.call(
+        operations.GET_FUNDAMENTALS_STATEMENTS,
+        GetFundamentalsStatementsRequest(
+            path=path, query=GetFundamentalsStatementsQuery(start_date=since((periods + 2) * 100))
+        ),
     )
     if sum(row.quarter != 0 for row in statements) < periods:
         # The window can miss older filings (delisted tickers, short histories): ask for all.
-        statements = await api.call_untyped(operations.GET_FUNDAMENTALS_STATEMENTS, ticker=ticker)
+        statements = await api.call(
+            operations.GET_FUNDAMENTALS_STATEMENTS, GetFundamentalsStatementsRequest(path=path)
+        )
     return _recent_financial_periods(statements, periods, sections)
 
 
@@ -83,6 +97,10 @@ async def recent_valuation_metrics(
     """Daily market cap, enterprise value, P/E, P/B and trailing PEG for a ticker
     over the last `lookback_days` calendar days (default 30).
     """
-    return await api.call_untyped(
-        operations.GET_FUNDAMENTALS_DAILY, ticker=ticker, startDate=since(lookback_days)
+    return await api.call(
+        operations.GET_FUNDAMENTALS_DAILY,
+        GetFundamentalsDailyRequest(
+            path=GetFundamentalsDailyPath(ticker=ticker),
+            query=GetFundamentalsDailyQuery(start_date=since(lookback_days)),
+        ),
     )

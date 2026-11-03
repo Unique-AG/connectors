@@ -7,6 +7,14 @@ from kyckr_mcp.failures import answers_failures
 from kyckr_mcp.hints import FREE_READ, PAID_ORDER, tool_options
 from kyckr_mcp.models import operations
 from kyckr_mcp.models.replies import ListOrdersReply, OrderReply
+from kyckr_mcp.models.vendor_requests import (
+    GetOrderQuery,
+    GetOrderRequest,
+    GetOrdersOrderIdPath,
+    GetOrdersOrderIdRequest,
+    PostOrdersBody,
+    PostOrdersRequest,
+)
 from kyckr_mcp.orders import as_order, created_order, finished_id, order_reply
 from kyckr_mcp.params import EndDate, IsoCode, KyckrId, OrderId, ProductId, StartDate
 from kyckr_mcp.settings import Settings
@@ -43,12 +51,20 @@ async def create_document_order(
     "Pending"`, poll `get_order(data.orderId)` until `data.documentJson` is populated or
     `status` is `Failed`. Never mention download URLs.
     """
-    response = await api.call_untyped(
+    defaults = {
+        "customer_reference": settings.kyckr_default_customer_reference,
+        "contact_email": settings.kyckr_default_contact_email,
+    }
+    response = await api.call(
         operations.POST_ORDERS,
-        kyckrId=kyckr_id,
-        productId=product_id,
-        customerReference=settings.kyckr_default_customer_reference,
-        contactEmail=settings.kyckr_default_contact_email,
+        PostOrdersRequest(
+            body=PostOrdersBody(
+                kyckr_id=kyckr_id,
+                product_id=product_id,
+                # A field set to None is sent as null, so a default nobody configured is left out.
+                **{name: value for name, value in defaults.items() if value is not None},
+            )
+        ),
     )
     order = created_order(response)
     return await order_reply(api, response, order, finished_id(order))
@@ -74,7 +90,10 @@ async def get_order(order_id: OrderId, api: OperationClient = Depends(get_api)) 
     delivery is not yet supported; relay that message. Treat `statusCode: 410` as terminal:
     the order is no longer retrievable, do not retry. Never mention download URLs.
     """
-    response = await api.call_untyped(operations.GET_ORDERS_ORDER_ID, orderId=str(order_id))
+    response = await api.call(
+        operations.GET_ORDERS_ORDER_ID,
+        GetOrdersOrderIdRequest(path=GetOrdersOrderIdPath(order_id=str(order_id))),
+    )
     order = as_order(response.data)
     return await order_reply(api, response, order, finished_id(order, str(order_id)))
 
@@ -100,8 +119,11 @@ async def list_orders(
     paging in `data.pageNumber`, `data.pageSize` and `data.totalCount`. Each entry has the same
     shape as `get_order.data`. Use to reconcile when an order id is not in context.
     """
-    response = await api.call_untyped(
-        operations.GET_ORDER, startDate=start_date, endDate=end_date, isoCode=iso_code
+    response = await api.call(
+        operations.GET_ORDER,
+        GetOrderRequest(
+            query=GetOrderQuery(start_date=start_date, end_date=end_date, iso_code=iso_code)
+        ),
     )
     body = response.model_dump()
     for order in _orders(body.get("data")):

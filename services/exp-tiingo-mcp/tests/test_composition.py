@@ -8,6 +8,7 @@ import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 from mcp_openapi.upstream import Operation
+from pydantic import BaseModel
 
 from tiingo_mcp import server
 from tiingo_mcp.settings import Settings
@@ -52,14 +53,15 @@ def with_client[T](settings: Settings, use: Callable[[Client], Awaitable[T]]) ->
 
 
 class FakeApi:
-    """Answers `call_untyped` from canned rows, recording the arguments it got."""
+    """Answers `call` from canned rows, recording each request as it would be sent."""
 
     def __init__(self, rows: list[dict[str, object]]) -> None:
         self.rows = rows
-        self.calls: list[tuple[str, dict[str, str]]] = []
+        self.calls: list[tuple[str, dict[str, object]]] = []
 
-    async def call_untyped[T](self, operation: Operation[T], **arguments: str) -> T:
-        self.calls.append((operation.operation_id, arguments))
+    async def call[T, R: BaseModel](self, operation: Operation[T, R], request: R) -> T:
+        sent = request.model_dump(mode="json", by_alias=True, exclude_none=True)
+        self.calls.append((operation.operation_id, sent))
         return operation.adapter.validate_python(self.rows)
 
 
@@ -67,7 +69,9 @@ def test_recent_daily_prices_asks_for_the_window_since_today() -> None:
     api = FakeApi([{"date": "2026-01-02T00:00:00.000Z", "close": 5.0}])
     bars = asyncio.run(prices.recent_daily_prices("ABC", 30, api=api))
     start = (date.today() - timedelta(days=30)).isoformat()
-    assert api.calls == [("getDailyPrices", {"ticker": "ABC", "startDate": start})]
+    assert api.calls == [
+        ("getDailyPrices", {"path": {"ticker": "ABC"}, "query": {"startDate": start}})
+    ]
     assert [bar.close for bar in bars] == [5.0]
 
 

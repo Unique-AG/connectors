@@ -86,4 +86,6 @@ snake-case-fields = false
 operation-module = "mcp_openapi.upstream"
 models-module = "kyckr_mcp.models.vendor_responses"
 models-output = "src/kyckr_mcp/models/vendor_responses.py"
+requests-module = "kyckr_mcp.models.vendor_requests"
+requests-output = "src/kyckr_mcp/models/vendor_requests.py"
 operations-output = "src/kyckr_mcp/models/operations.py"
