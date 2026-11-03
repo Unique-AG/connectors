@@ -30,6 +30,12 @@ two ways:
   raises `UpstreamError` with the status, method and URL, followed by the first 200 characters
   of the error body, which reach the client.
 
+Generate before you write. Before writing an `Operation` or a response model by hand, list the
+operationId under `operation-ids` and run `uv run poe codegen`. `codegen --check` sees only what
+the codegen writes, so a hand-written operation drifts from the spec unnoticed when the vendor
+changes it. Write a model by hand only where the generated one does not parse what the vendor
+sends. Keep it in `upstream/`, and name in its docstring the field the spec gets wrong.
+
 A new MCP starts with its spec's first JSON operation, a GET if there is one, in both lists:
 served, and typed for when it is promoted. Serve more operations to grow the first version.
 Promote one when its output needs trimming or renaming, or a business rule, or when several
