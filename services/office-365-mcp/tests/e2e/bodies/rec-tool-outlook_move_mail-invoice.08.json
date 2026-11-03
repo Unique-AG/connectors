@@ -1,0 +1,49 @@
+{
+  "@odata.etag": "W/\"IQZQMIWEPQYqgZksVvfwUERpWjKf/OmfHFRgfVy4\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "The invoice of Alpine Print for the month 03 is due in 30 days.",
+    "contentType": "text"
+  },
+  "bodyPreview": "The invoice of Alpine Print for the month 03 is due in 30 days.",
+  "categories": ["seed-v1", "Finance"],
+  "ccRecipients": [],
+  "changeKey": "VOVGJMZTVVMcjAyfPdnuDOFbVsVv/MemFGKsnLk7",
+  "conversationId": "AAQkUMgsRNP4SEI7GMCqIVkfOBO4DF20Zaa7ZHF5WRNyHJUvS6SqARFTYHtWS7n-R5RKi0GaUgLXeIX=",
+  "createdDateTime": "2026-11-02T21:38:08Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "from": {
+    "emailAddress": {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  },
+  "hasAttachments": false,
+  "id": "GWxQDxZOVUUCYLNNJtojUi0wgYBsRU-IMa9Jt8Sjje09EbPCUg8Y1fnyumQC3dKvITLZ",
+  "importance": "normal",
+  "isDraft": false,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-11-02T22:37:28Z",
+  "parentFolderId": "AAMkQAcbYEM1DDW6BNMuAErwWPI4XO70Lth8IWN8SMPtQGMtL9DsDCSbBNLOWMIyjroZLQxhUXchG0h2GGS5AUBvzWukVopcXMGoAgNu-MemADWceu8AJNM=",
+  "receivedDateTime": "2026-10-23T10:00:00Z",
+  "replyTo": [],
+  "sender": {
+    "emailAddress": {
+      "address": "anna@example.test",
+      "name": "Anna Meier"
+    }
+  },
+  "sentDateTime": "2026-10-23T10:00:00Z",
+  "subject": "Invoice Alpine Print 2026-03",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FRXh1Mu8Owxn86CjMDCy2Q3rcqvdSQ6cDlGGCN&exvsurl=1&viewmodel=ReadMessageItem"
+}

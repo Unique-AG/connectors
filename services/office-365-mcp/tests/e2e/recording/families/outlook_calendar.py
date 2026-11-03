@@ -76,7 +76,7 @@ SCHEMA: Mapping[str, str] = {
         ("givenName", "surname", "middleName", "nickName", "companyName", "jobTitle", "department")
         + ("officeLocation", "profession", "manager", "assistantName", "spouseName", "children")
         + ("personalNotes", "businessPhones", "homePhones", "mobilePhone", "imAddresses")
-        + ("contentBytes", "eventSubject", "uniqueId", "suggestionReason", "nickname", "building")
+        + ("contentBytes", "eventSubject", "suggestionReason", "nickname", "building")
         + ("label", "floorLabel", "phone", "tags", "audioDeviceName", "videoDeviceName")
         + ("displayDeviceName", "street", "city", "state", "countryOrRegion", "postalCode")
         + ("eventWebLink",),
@@ -87,7 +87,7 @@ SCHEMA: Mapping[str, str] = {
     **dict.fromkeys(("time", "startDate", "endDate", "birthday"), "date"),
     **dict.fromkeys(
         ("type", "response", "status", "role", "allowedRoles", "allowedOnlineMeetingProviders")
-        + ("defaultOnlineMeetingProvider", "color", "hexColor", "locationType", "uniqueIdType")
+        + ("defaultOnlineMeetingProvider", "color", "hexColor", "locationType")
         + ("originalStartTimeZone", "originalEndTimeZone", "recurrenceTimeZone", "alias")
         + ("onlineMeetingProvider", "class", "subclass", "availability", "daysOfWeek", "index")
         + ("organizerAvailability", "emptySuggestionsReason", "bookingType", "firstDayOfWeek"),

@@ -1,0 +1,42 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/contacts",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "businessPhones": ["+41 44 555 01 03"],
+      "displayName": "seed-v1 case-outlook_update_contact-keep-numbers",
+      "givenName": "Paul",
+      "homePhones": ["+41 44 555 01 04"],
+      "mobilePhone": "+41 79 555 01 05",
+      "surname": "Roth"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/contacts('QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_contact-keep-numbers.01.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/contacts/QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "jobTitle": "Head of Sales"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_update_contact-keep-numbers.02.json"
+  }
+]

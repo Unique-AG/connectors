@@ -1,0 +1,37 @@
+{
+  "@odata.etag": "W/\"ZXZXQUPFFPEhyDfzRbdiTLEiHePr/EfzOJEuj/Sc\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Two.</p></body></html>",
+    "contentType": "html"
+  },
+  "bodyPreview": "Two.",
+  "categories": [],
+  "ccRecipients": [],
+  "changeKey": "XIPZQILLIEEfcOjmGxnoYMDaGyDx/EppMAHkz/Zo",
+  "conversationId": "AAQkFOnxMWS6TWE7PAQyTTqcZTY0JP34Pvw0POD9NPYnJURiE2TbIEHCUPGaRRI2J87Lmo7huIROug8=",
+  "createdDateTime": "2026-11-02T21:15:38Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "hasAttachments": false,
+  "id": "WVqGOxMMTSGEUKHJXpeySm7qaOOaYB-CMj0Ny8Lxfq92TmKBYl2P4xvwjaIR8iLpHDQC",
+  "importance": "normal",
+  "isDraft": true,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-11-02T21:15:38Z",
+  "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+  "receivedDateTime": "2026-11-02T21:15:38Z",
+  "replyTo": [],
+  "sentDateTime": "2026-11-02T21:15:38Z",
+  "subject": "seed-v1 case-outlook_mark_mail-batch two",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "tom@example.test",
+        "name": "Tom Berger"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FDFc8Ii1Rpix39ZeVLTr5T0ckqgsWC0pUpICWN&exvsurl=1&viewmodel=ReadMessageItem"
+}

@@ -1,0 +1,161 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/drive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/root/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01AJJQY18ZRSXENJOTWRNUQYAE4F9UKVN3/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KONAS7LM35YVMRGR6GXPKGEI99NLRYKF",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KONAS7LM35YVMRGR6GXPKGEI99NLRYKF/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?itemId=00000000-5fcd-417f-87e9-8e64ab3afff2&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "itemId": "00000000-5fcd-417f-87e9-8e64ab3afff2",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/plain"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.07.txt"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01QNPBZ5782G7MGJ7MSXPXYU0JACHWQZ0T",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.08.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01QNPBZ5782G7MGJ7MSXPXYU0JACHWQZ0T/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?itemId=00000000-4ff4-4e43-8860-60b4d148265f&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "itemId": "00000000-4ff4-4e43-8860-60b4d148265f",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/plain"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.10.txt"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01LQDMV96HCCFHFVQADCY3QLQNOVKH1XRU",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.11.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01LQDMV96HCCFHFVQADCY3QLQNOVKH1XRU/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?itemId=00000000-06c7-4735-8328-cd8e2326fa05&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "itemId": "00000000-06c7-4735-8328-cd8e2326fa05",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    "body": "rec-tool-sharepoint_read_file-folder-each.13.docx"
+  }
+]

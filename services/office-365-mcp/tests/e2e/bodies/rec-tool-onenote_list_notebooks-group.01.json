@@ -1,0 +1,24 @@
+{
+  "value": [
+    {
+      "createdDateTime": null,
+      "description": "synthetic text 01",
+      "displayName": "synthetic text 01",
+      "id": "00000000-d034-4a82-8630-01e372765b48",
+      "isArchived": false,
+      "summary": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "webUrl": null
+    },
+    {
+      "createdDateTime": null,
+      "description": "The team of the recorder cases.",
+      "displayName": "seed-v1 team",
+      "id": "00000000-e7a0-41c6-863d-0548ee2dacdd",
+      "isArchived": false,
+      "summary": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "webUrl": null
+    }
+  ]
+}

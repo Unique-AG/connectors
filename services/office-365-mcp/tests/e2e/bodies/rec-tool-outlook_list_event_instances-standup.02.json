@@ -17,9 +17,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "Room Pilatus",
-        "locationType": "default",
-        "uniqueId": "Room Pilatus",
-        "uniqueIdType": "private"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -60,9 +58,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "Room Pilatus",
-        "locationType": "default",
-        "uniqueId": "Room Pilatus",
-        "uniqueIdType": "private"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {

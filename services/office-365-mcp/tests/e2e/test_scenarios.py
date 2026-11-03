@@ -44,7 +44,9 @@ _OBO_TOKEN = "synthetic-obo-graph-token"
 _REQUEST_HEADERS = ("prefer", "consistencylevel")
 _DATETIME = r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?"
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-_SYMBOL = re.compile(rf"~(yesterday|today|tomorrow|next(?:{'|'.join(_WEEKDAYS)})(?:[+-]\d+)?)")
+_SYMBOL = re.compile(
+    rf"~(yesterday|today|tomorrow|day[+-]\d+|next(?:{'|'.join(_WEEKDAYS)})(?:[+-]\d+)?)"
+)
 _SIZED = re.compile(r"<generated:(\d+)>")
 MAX_GENERATED = 20_000_000
 _GENERATED_KEYS = frozenset({"transactionId", "externalId"})
@@ -53,6 +55,7 @@ _DAYS = {
     word: _TODAY + timedelta(n) for n, word in enumerate(("yesterday", "today", "tomorrow"), -1)
 }
 _NEXT = re.compile(r"next([A-Za-z]+)([+-]\d+)?")
+_OFFSET = re.compile(r"day([+-]\d+)")
 _SELECTOR = re.compile(r"\[(\d+|\*)\]|\[(\w+)=([^\]]*)\]|\.?([^.\[]+)")
 _MARKUP = re.compile(r"([a-z][a-z0-9]*)\[([\w\-]+)\]")
 _REFERENCE = re.compile(r"(?:tools|shared|graph_client)(?:\.\w+)+")
@@ -60,7 +63,9 @@ _REFERENCE = re.compile(r"(?:tools|shared|graph_client)(?:\.\w+)+")
 
 def day_named(word: str, today: date = _TODAY) -> date:
     """A day symbol of a case or a fixture. `nextMonday` is the next Monday on or after tomorrow;
-    `+N` or `-N` after it moves that many days."""
+    `+N` or `-N` after it moves that many days. `day+N` is N days from today."""
+    if offset := _OFFSET.fullmatch(word):
+        return today + timedelta(int(offset[1]))
     found = _NEXT.fullmatch(word)
     if found is None:
         return today + timedelta(("yesterday", "today", "tomorrow").index(word) - 1)

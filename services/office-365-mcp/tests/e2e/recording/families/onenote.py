@@ -32,6 +32,7 @@ READ_GETS: Mapping[str, tuple[str, ...]] = {
     "onenote_read_page": (f"GET {GROUP}/pages/*/content",),
     "onenote_read_resource": (f"GET {GROUP}/resources/*/content",),
     "onenote_get_operation": (f"GET {GROUP}/operations/*",),
+    "onenote_create_page": (f"GET {GROUP}/sections/*", f"GET {GROUP}/notebooks/*"),
     "onenote_copy_section": (f"GET {GROUP}/sections/*",),
     "onenote_copy_page": (f"GET {GROUP}/pages/*",),
 }
@@ -82,6 +83,7 @@ SCHEMA: Mapping[str, str] = {
     ),
 }
 GAP_SECONDS = 20
+BIG_PAGES = "/me/onenote/pages?$filter=contains(tolower(title),'big page')&$select=id"
 SEED_NOTEBOOKS = "/me/onenote/notebooks?$filter=contains(tolower(displayName),'seed-v1')&$select=id"
 NEEDS: Mapping[str, str] = {
     "onenote_seed": (
@@ -103,7 +105,7 @@ NEEDS: Mapping[str, str] = {
 }
 PROBES: Mapping[str, tuple[int, str, int]] = {
     "onenote_group": (1, "/me/joinedTeams#seed", 1),
-    "onenote_big": (1, SEED_NOTEBOOKS, 3),
+    "onenote_big": (1, BIG_PAGES, 1),
     "onenote_seed": (1, SEED_NOTEBOOKS, 3),
     "onenote_recent": (
         1,

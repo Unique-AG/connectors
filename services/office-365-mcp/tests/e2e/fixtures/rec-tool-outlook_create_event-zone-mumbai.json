@@ -1,0 +1,51 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/outlook/supportedTimeZones()",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_create_event-zone-mumbai.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_create_event-zone-mumbai.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~tomorrow",
+        "timeZone": "India Standard Time"
+      },
+      "isAllDay": false,
+      "start": {
+        "dateTime": "~tomorrow",
+        "timeZone": "India Standard Time"
+      },
+      "subject": "seed-v1 case-outlook_create_event-zone-mumbai",
+      "transactionId": "00000000-d83c-4828-8981-887fab4e8ee3"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('CRfKCmDQDUVXALQXUyipZm9ogKXhTH-FCd5Kk4Cvmd07GjOZQj0V7atbnhTZ4uRfFUTO')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_create_event-zone-mumbai.03.json"
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/findMeetingTimes",
+    "json": {
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          },
+          "@odata.type": "#microsoft.graph.attendeeBase",
+          "type": "required"
+        }
+      ],
+      "isOrganizerOptional": false,
+      "meetingDuration": "PT30M",
+      "returnSuggestionReasons": false,
+      "timeConstraint": {
+        "activityDomain": "work",
+        "timeSlots": [
+          {
+            "end": {
+              "dateTime": "~nextWednesday",
+              "timeZone": "Europe/Zurich"
+            },
+            "start": {
+              "dateTime": "~nextWednesday",
+              "timeZone": "Europe/Zurich"
+            }
+          }
+        ]
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-outlook_suggest_meeting_times-nobody-free.01.json"
+  }
+]

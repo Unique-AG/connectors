@@ -139,9 +139,14 @@ notebook or a section, so they stay.
 The mail family has three more phases. Its data is in `corpus/mail-extra.yaml`. All three run in
 the default of `apply`, and none of them needs the earlier phases of the family.
 
-- `mail-attach` runs as Mia. It makes three Inbox mails from the corpus: a mail with an xlsx
-  workbook, a mail with a file of 10 MiB (10,485,760 bytes) and a mail with a file of one byte
-  more. A file above 3 MiB goes through an upload session. A second run adds nothing.
+- `mail-attach` runs as Mia. It makes four Inbox mails from the corpus: a mail with an xlsx
+  workbook, a mail with a file of 10 MiB (10,485,760 bytes), a mail with a file of one byte more
+  and a mail with a file of 10,484,595 bytes. Graph adds a few hundred bytes to the size of an
+  attachment, and the amount is different for each file. The last file has 1,000 bytes of margin,
+  so the size that Graph reports stays below the size limit of `outlook_read_attachment`
+  (10,485,760 bytes). A file above 3 MiB goes through an upload session. A second run adds
+  nothing: it looks for each file by name, so a file of an old size stays. To change the size of
+  a file, run `cleanup --phases mail-attach` first.
 - `mail-people` sends real mail with `POST /me/sendMail`: nine mails, three from each test user,
   to the other two. Only a delivered mail puts a person into the people list of Exchange. The
   sent copy has no category. A second run sends nothing when Sent Items already holds the subject.
@@ -166,7 +171,7 @@ switches off an automatic reply whose text holds `seed-v1 case-`.
 
 | Item | Count |
 | --- | --- |
-| Mails | 69 (Mia 65, Anna 2, Tom 2), and 3 more in the phase `mail-attach` |
+| Mails | 69 (Mia 65, Anna 2, Tom 2), and 4 more in the phase `mail-attach` |
 | Mia's Inbox | 45 mails, 28 unread |
 | Threads | 3: "Website relaunch: launch checklist" with 12 messages, "Q3 budget review" with 5, "Printer replacement" with 3 |
 | Junk Email and Deleted Items | 3 and 2 mails |
@@ -174,7 +179,7 @@ switches off an automatic reply whose text holds `seed-v1 case-`.
 | Mail folders | 6, one inside another, and two named Archive at two levels |
 | Events | 9 (Mia 8, Tom 1), no attendees |
 | OneDrive files | 5 (Mia 4, Anna 1) |
-| Mail attachments | 3 |
+| Mail attachments | 3, and 4 more in the phase `mail-attach` |
 
 The corpus has these quirks on purpose: a mail with no subject, an empty body, an HTML-only body,
 flags, attachments, a draft, mail received yesterday, events in Windows time zones, one all-day

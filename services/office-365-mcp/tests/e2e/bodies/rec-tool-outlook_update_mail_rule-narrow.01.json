@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "markAsRead": true
+  },
+  "conditions": {
+    "subjectContains": ["seed-v1 case-outlook_update_mail_rule-narrow"]
+  },
+  "displayName": "seed-v1 case-outlook_update_mail_rule-narrow",
+  "hasError": false,
+  "id": "QCSVCA0PM38=",
+  "isEnabled": true,
+  "isReadOnly": false,
+  "sequence": 1
+}

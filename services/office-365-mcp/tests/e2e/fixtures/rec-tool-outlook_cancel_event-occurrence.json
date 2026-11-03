@@ -1,0 +1,123 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_cancel_event-occurrence.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "categories": ["seed-v1"],
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test"
+          },
+          "@odata.type": "#microsoft.graph.attendee",
+          "type": "required"
+        }
+      ],
+      "end": {
+        "dateTime": "~nextTuesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "isAllDay": false,
+      "recurrence": {
+        "pattern": {
+          "daysOfWeek": ["tuesday"],
+          "firstDayOfWeek": "sunday",
+          "interval": 1,
+          "type": "weekly"
+        },
+        "range": {
+          "numberOfOccurrences": 8,
+          "startDate": "~nextTuesday",
+          "type": "numbered"
+        }
+      },
+      "start": {
+        "dateTime": "~nextTuesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_cancel_event-occurrence",
+      "transactionId": "00000000-eb43-4f01-867e-1204ab59df0d"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('NVfNGfUNLJEPPTKOLqtdJv4keGQcDC-WTh1Ul5Qffi48XhNFUl7U6oceoqXJ6nGtSSWK')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_cancel_event-occurrence.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/NVfNGfUNLJEPPTKOLqtdJv4keGQcDC-WTh1Ul5Qffi48XhNFUl7U6oceoqXJ6nGtSSWK",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_cancel_event-occurrence.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/NVfNGfUNLJEPPTKOLqtdJv4keGQcDC-WTh1Ul5Qffi48XhNFUl7U6oceoqXJ6nGtSSWK/instances",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "endDateTime": "~day+51",
+      "startDateTime": "~nextTuesday",
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_cancel_event-occurrence.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/DKsLBETZUR6NXnmpSLSrKTNGKM9KRsObPtWAr3uPugRtiNqXJAcY8a3YCLTJhk3S0AK7mR0TXW7U7rwXVFL=",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_cancel_event-occurrence.05.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/DKsLBETZUR6NXnmpSLSrKTNGKM9KRsObPtWAr3uPugRtiNqXJAcY8a3YCLTJhk3S0AK7mR0TXW7U7rwXVFL=/cancel",
+    "json": {
+      "Comment": "The room is closed that day."
+    },
+    "status": 202
+  }
+]

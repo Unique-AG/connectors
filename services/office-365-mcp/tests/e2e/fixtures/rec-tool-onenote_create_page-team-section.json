@@ -1,0 +1,92 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 shared')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections/3-00000000-817c-43b5-8f03-52cac459f595",
+    "query": {
+      "$expand": "parentNotebook",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks/7-00000000-8967-4371-86c6-2c88ccb17532",
+    "query": {
+      "$select": "id,displayName,isShared,userRole"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.06.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections/3-00000000-817c-43b5-8f03-52cac459f595/pages",
+    "json": "<!DOCTYPE html><html><head><title>seed-v1 case-onenote_create_page-team-section</title><meta name=\"created\" content=\"~today\" /></head><body><p>One paragraph.</p></body></html>",
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/pages/5-8t81m6b722698k057593a019t1188t7e!79-00000000-817c-43b5-8f03-52cac459f595",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_create_page-team-section.07.json"
+  }
+]

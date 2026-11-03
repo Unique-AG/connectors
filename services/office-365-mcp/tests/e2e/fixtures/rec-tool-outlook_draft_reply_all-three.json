@@ -1,0 +1,102 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"subject:\\\"Hosting handover\\\"\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": [
+        "AAMkSEarAZE7IRN6IUBaHFpeFER5RU58Bdb6ELM3OBBdEQKdN6LgYIAEIXBPVNHewrnUXHpgYTdpN6g0DQA0CtFgyZfrQeerQGSgDzPo-UkzGARFOMQDCFMygUtgKemePWSdYtKc-ArbEJVbojNKVNO="
+      ],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/FWfJYzTHEBEJTQROSouqSc8kmOPlYX-AJe9Ke8Omtv28FoTDTj6N1pujmpPK0uWzZNOS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,conversationId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$filter": "conversationId eq 'AAQkHAbzGWJ0XAQ5NNBiGLffWJU3EN31Api4LKI3WSZgXHYlO0ZvKHOSKQqQHoRWWUiNnexUwKUROLz='",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,conversationId,sentDateTime",
+      "$top": "1000"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/FWfJYzTHEBEJTQROSouqSc8kmOPlYX-AJe9Ke8Omtv28FoTDTj6N1pujmpPK0uWzZNOS/createReplyAll",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {},
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('JOaSLsQPSGACLPMWBawwTf1jbSXkWW-EWu3Bb6Ipaz41ZiNWPe1E1pwayyXJ0oCwJkJT')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.05.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/JOaSLsQPSGACLPMWBawwTf1jbSXkWW-EWu3Bb6Ipaz41ZiNWPe1E1pwayyXJ0oCwJkJT",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "categories": ["seed-v1 case-outlook_draft_reply_all-three"],
+      "body": {
+        "content": "<p>Thanks to both of you.</p>",
+        "contentType": "html"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_draft_reply_all-three.06.json"
+  }
+]

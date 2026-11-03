@@ -1,0 +1,23 @@
+scenario: sharepoint_browse_folder-newest-first
+fixture: rec-tool-sharepoint_browse_folder-newest-first
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:06:08+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 216
+  keys dropped: 28
+  persona addresses: 42
+  persona names: 42
+  query parameters dropped: 8
+  response headers dropped: 34
+  text kept: 82
+  text replaced: 55
+literals:
+- last_modified
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

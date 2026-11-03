@@ -1,0 +1,42 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "contains(tolower(title),'big page')",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-big.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages/3-vxa5617jz8c21vi9c7287l71aih7o957!59-00000000-5d58-4d20-82c2-9abfd58e5c72",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-big.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages/3-vxa5617jz8c21vi9c7287l71aih7o957!59-00000000-5d58-4d20-82c2-9abfd58e5c72/content",
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/html; charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-big.03.html"
+  }
+]

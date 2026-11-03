@@ -1,0 +1,11 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/places/graph.room",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-outlook_find_rooms-all.01.json"
+  }
+]

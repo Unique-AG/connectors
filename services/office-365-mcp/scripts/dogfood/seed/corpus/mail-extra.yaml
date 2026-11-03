@@ -31,6 +31,12 @@ attachments:
     content_type: application/octet-stream
     size: 10485761
     label: attachment-10mib-plus-one
+  - id: scan-at-the-cap
+    name: scan-at-cap.bin
+    kind: filler
+    content_type: application/octet-stream
+    size: 10484595
+    label: attachment-at-cap
 
 messages:
   - id: m66
@@ -60,6 +66,15 @@ messages:
     received: "-3d 12:00"
     read: false
     attachments: [scan-above-the-cap]
+  - id: m69
+    folder: inbox
+    from: tom
+    to: [mia]
+    subject: Scan at the size cap
+    body: {type: text, content: "The third scan is as large as the connector accepts."}
+    received: "-3d 13:00"
+    read: false
+    attachments: [scan-at-the-cap]
 
 sends:
   - {from: mia, to: [anna], subject: Seed hello Anna, body: "Hello Anna, this is a test mail between the testers."}

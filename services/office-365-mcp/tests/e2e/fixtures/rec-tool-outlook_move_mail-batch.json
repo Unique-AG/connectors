@@ -1,0 +1,143 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>One.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_move_mail-batch one",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('VMuOPuXZTAZKXAJAMyeaJy4frNUpBH-KGi7Fa6Qnst86NxGWVf4T8fajuzBD6vN1IvSA')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Two.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_move_mail-batch two",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('IUfDSbEHONSVEGUYCazbZa9kuMEfWZ-YXq3Wf7Olsn14MeAMPk0Y5xuqjvWC1cK7YYUJ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Three.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_move_mail-batch three",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('ECjJAuACDFSJXGSKZxnoYr2vuXLaMP-GHn0Zz4Gsei40LbMFOr8E4qcrdcNM3kW3EuKH')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/VMuOPuXZTAZKXAJAMyeaJy4frNUpBH-KGi7Fa6Qnst86NxGWVf4T8fajuzBD6vN1IvSA/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('VMuOPuXZTAZKXAJAMyeaJy4frNUpBH-KGi7Fa6Qnst86NxGWVf4T8fajuzBD6vN1IvSA')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/IUfDSbEHONSVEGUYCazbZa9kuMEfWZ-YXq3Wf7Olsn14MeAMPk0Y5xuqjvWC1cK7YYUJ/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('IUfDSbEHONSVEGUYCazbZa9kuMEfWZ-YXq3Wf7Olsn14MeAMPk0Y5xuqjvWC1cK7YYUJ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.05.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/ECjJAuACDFSJXGSKZxnoYr2vuXLaMP-GHn0Zz4Gsei40LbMFOr8E4qcrdcNM3kW3EuKH/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "archive"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('ECjJAuACDFSJXGSKZxnoYr2vuXLaMP-GHn0Zz4Gsei40LbMFOr8E4qcrdcNM3kW3EuKH')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-batch.06.json"
+  }
+]

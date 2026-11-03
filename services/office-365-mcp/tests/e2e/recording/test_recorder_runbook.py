@@ -187,6 +187,26 @@ class TestExecution:
         assert "GRAPH_TOKEN" not in os.environ
         assert "--allow-writes" not in calls.commands[calls.envs.index(record[0])]
 
+    def test_a_plan_with_a_write_step_before_its_last_read_step_gets_allow_writes(
+        self, fixtures: Path, tmp_path: Path
+    ) -> None:
+        mixed = Plan(
+            "m1",
+            "rec-tool-m1",
+            ({"tool": "outlook_mark_mail"}, {"tool": "outlook_list_mail"}),
+            True,
+        )
+        calls = Calls(fixtures)
+        _ = execute(
+            plan_runs([mixed], frozenset(), {}, False),
+            UPNS,
+            calls,
+            calls.sleeps.append,
+            tmp_path / "r.json",
+        )
+        assert not runbook.reads(mixed)
+        assert any("--allow-writes" in c for c in calls.commands if "-m" in c)
+
     def test_a_throttled_read_waits_sweeps_and_retries_once(
         self, fixtures: Path, tmp_path: Path
     ) -> None:

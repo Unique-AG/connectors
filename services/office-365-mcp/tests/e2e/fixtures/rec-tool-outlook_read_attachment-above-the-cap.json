@@ -1,0 +1,64 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"subject:\\\"Scan above the size cap\\\"\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_attachment-above-the-cap.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": [
+        "AAMkOBvaWFN2ECH6QYIiEXacYGI1HD84Ttp5HOT8QCNgZUJgN0VgJWSRVJPUBRLqcdxFWAooZFmcE9c9HVO4QfNweJqkAunpYZXaDtRt-QnoNMHMJGBBATYylNpnAxxkOEAyOaCn-QmbTKAtuz_gHBT="
+      ],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_attachment-above-the-cap.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/JSnXIiPURAJKZMJWDigvDj9tkXGfUN-PDo6Ss2Gfnc28UuXMLv8B0likqlQR3qNwkGRU/attachments",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,name,contentType,size,isInline,lastModifiedDateTime"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_attachment-above-the-cap.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/JSnXIiPURAJKZMJWDigvDj9tkXGfUN-PDo6Ss2Gfnc28UuXMLv8B0likqlQR3qNwkGRU/attachments/RTuXVzNXDLHURVJRFvdtPy8kzTVcBI-NYk7Oe5Amhk36WhWKZj4F3xvyitCR9iUmrXRXOXCDESEM4udDjPW2EK3QlsBzGWaZ",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,name,contentType,size,isInline,lastModifiedDateTime"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_attachment-above-the-cap.04.json"
+  }
+]

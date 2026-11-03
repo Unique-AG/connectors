@@ -1,0 +1,116 @@
+{
+  "value": [
+    {
+      "childFolderCount": 0,
+      "displayName": "Archive",
+      "id": "AAMkTTozVMU4EDU4VAMsUTaoLFS4JI21Hof2PYA2EVBdJVYvE3JiWPRjTNUBYMUzanrHBAzhVHenQ1o7YGX0JWWudOtkNaavTIBvZsHu-MvtSTRCow7LIPL=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "synthetic text 01",
+      "id": "AAMkVCnfIJB4XOU7GZKvYGvfCOC1FB85Wye1MQA7FKElDSJfE1YnMPUsBHWERAGboieSKPkpUHfkD9s2ZPH8OATmdXypXbsgXNVlDzHj-KnwNMUy5MWfCSY=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 1,
+      "displayName": "synthetic text 02",
+      "id": "AAMkDHnsSGO4ADK6CWNlRHclTSD2DN48Fmt1DSN6SKUaHEMfM4UjYWBpHYTDZFYwtjsNPJoiBIrtJ5g2HTW5CRNquHbjNezvCKCcTbXn-PvnFAXGXV-lFEK=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 1,
+      "displayName": "Deleted Items",
+      "id": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN=",
+      "isHidden": false,
+      "totalItemCount": 102,
+      "unreadItemCount": 34
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "Drafts",
+      "id": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "isHidden": false,
+      "totalItemCount": 1,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "Inbox",
+      "id": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "isHidden": false,
+      "totalItemCount": 110,
+      "unreadItemCount": 91
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "Junk Email",
+      "id": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY=",
+      "isHidden": false,
+      "totalItemCount": 3,
+      "unreadItemCount": 3
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "Outbox",
+      "id": "AAMkGOxxLNI4THM3OLOeXShgLEE4SD01Vmp6YYS3ERHfOFHoK6VkVLPaTNXTUQNgtrgJZTgfZWdlG4n8QOW7YDDidHarQcxaLPFsKoTe-KvdFVJHBIWERAD=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 Archive",
+      "id": "AAMkPWiyMWD8UIE4XEKaKUgmTDK0YS55Tza5QSQ2WPZpIQFwA7DqNSRsNTFOQKFumorQTOotBWquN1z7JKW5AWXmfLarUoevSRPeJdBv-VpoGYIxpzG8PSJ=",
+      "isHidden": false,
+      "totalItemCount": 2,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 Clients",
+      "id": "AAMkQAcbYEM1DDW6BNMuAErwWPI4XO70Lth8IWN8SMPtQGMtL9DsDCSbBNLOWMIyjroZLQxhUXchG0h2GGS5AUBvzWukVopcXMGoAgNu-MemADWceu8AJNM=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 Handled",
+      "id": "AAMkALjoWNG5ITZ8HEEsTEbnQXK3ZA73Hdl4VNB1SGYpSQHiP5JhZYVnPUUZGMMnsuqDUYixFZyuC2u8JUG9QLMpkBhqAeiyYMXoGtPq-LdiENPdfpY2COZ=",
+      "isHidden": false,
+      "totalItemCount": 2,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 2,
+      "displayName": "seed-v1 Projects",
+      "id": "AAMkKGqmILV7VUE3BXOwDHqlLMM9LI99Djx5DHT3XFWwCIWlD2GvHRLaTKFOIOEezpdJUHvhLDkrR6p6DAX1RQTxgTixUlkgQKKmScVp-LnzVWRrvfP5RPQ=",
+      "isHidden": false,
+      "totalItemCount": 1,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "Sent Items",
+      "id": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+      "isHidden": false,
+      "totalItemCount": 52,
+      "unreadItemCount": 0
+    },
+    {
+      "childFolderCount": 0,
+      "displayName": "synthetic text 03",
+      "id": "AAMkHDakLUN0JWM2KHKzCScmSOT7LW13Xfm1WGP8ITYnJRUgY3IvSYEbBTBEUGDibnfXTWaaQKoaO2y8KRK5UIXgmWofEsybJRClMsJt-EcuSOZjKtfvFFF=",
+      "isHidden": false,
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    }
+  ]
+}

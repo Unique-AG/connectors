@@ -1,0 +1,77 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"subject:\\\"Budget workbook\\\"\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_attachment-xlsx.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": [
+        "AAMkESumASD8PKE1UHAlUWuuRNX5IH82Pms9YID9LIRaMBMbS5GqUGAZCFCKKWGzizwXQOloMCsiL6k6AVD8HrCynQxtQtfjQPWlKlEu-ObeZVQSCPSPGCGwnFjbAcspCDCyBhPe-LtxJRDqnj_qBMT="
+      ],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_attachment-xlsx.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ/attachments",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,name,contentType,size,isInline,lastModifiedDateTime"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_attachment-xlsx.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ/attachments/FWuPTeYPJPQRGLKEHoewBd7acSMaAP-VWo3Ab8Tgdk52KzWYTm2N0rinmnKV9iWprsSZZFXWSNSZUf0FdHe2YfRlXPsvynTl",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,name,contentType,size,isInline,lastModifiedDateTime"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_attachment-xlsx.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ/attachments/FWuPTeYPJPQRGLKEHoewBd7acSMaAP-VWo3Ab8Tgdk52KzWYTm2N0rinmnKV9iWprsSZZFXWSNSZUf0FdHe2YfRlXPsvynTl",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_attachment-xlsx.05.json"
+  }
+]

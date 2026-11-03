@@ -1,0 +1,61 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-two.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "json": {
+      "classifyAs": "focused",
+      "senderEmailAddress": {
+        "address": "tom@example.test"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/inferenceClassificationOverrides('00000000-726a-4f97-8c8e-9b796b04cebb')"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-two.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-two.03.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "json": {
+      "classifyAs": "other",
+      "senderEmailAddress": {
+        "address": "anna@example.test"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/inferenceClassificationOverrides('00000000-0daa-45ae-8ff0-f6f92111fee9')"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-two.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/inferenceClassification/overrides",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_list_focused_overrides-two.05.json"
+  }
+]

@@ -1,0 +1,53 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-onenote_list_notebooks-group.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 shared')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-group.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-group.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_notebooks-group.04.json"
+  }
+]

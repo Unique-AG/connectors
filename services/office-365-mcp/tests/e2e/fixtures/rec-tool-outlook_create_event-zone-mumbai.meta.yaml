@@ -1,0 +1,27 @@
+scenario: outlook_create_event-zone-mumbai
+fixture: rec-tool-outlook_create_event-zone-mumbai
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:29:47+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 10
+  keys dropped: 7
+  persona addresses: 2
+  persona names: 2
+  query parameters dropped: 1
+  response headers dropped: 21
+  text kept: 28
+  text replaced: 123
+literals:
+- '2026-11-03T15:30:00'
+- '2026-11-03T16:15:00'
+- seed-v1 case-outlook_create_event-zone-mumbai
+- ~tomorrowT15:30:00
+- ~tomorrowT16:15:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

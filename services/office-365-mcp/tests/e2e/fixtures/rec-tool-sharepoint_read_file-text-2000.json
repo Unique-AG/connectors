@@ -1,0 +1,76 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/drive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-text-2000.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/root/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-text-2000.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-text-2000.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01CEBXH27BEBXCWJYYWBTS9Q3FDHPFBKLQ",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_read_file-text-2000.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01CEBXH27BEBXCWJYYWBTS9Q3FDHPFBKLQ/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?itemId=00000000-b9f2-4c59-84d6-6564a7063125&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "itemId": "00000000-b9f2-4c59-84d6-6564a7063125",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/plain"
+    },
+    "body": "rec-tool-sharepoint_read_file-text-2000.06.txt"
+  }
+]

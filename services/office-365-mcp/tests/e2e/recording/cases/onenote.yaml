@@ -198,9 +198,10 @@ onenote_list_pages-team:
   scopes: *group-scopes
   chain:
     - *teams
+    - *team-notebook
     - tool: onenote_list_pages
       args: {title_contains: Team plan}
-      bind: {group: "$prev.teams[display_name=seed-v1 team].team_id"}
+      bind: {section: "$prev.notebooks[0].sections[name=seed-v1 Team notes].uri"}
       expect: {result: {"pages[0].title": seed-v1 Team plan}}
 
 onenote_read_page-team:
@@ -208,9 +209,10 @@ onenote_read_page-team:
   scopes: *group-scopes
   chain:
     - *teams
+    - *team-notebook
     - tool: onenote_list_pages
       args: {title_contains: Team plan}
-      bind: {group: "$prev.teams[display_name=seed-v1 team].team_id"}
+      bind: {section: "$prev.notebooks[0].sections[name=seed-v1 Team notes].uri"}
     - tool: onenote_read_page
       args: {include_ids: true}
       bind: {page: "$prev.pages[0].uri"}
@@ -258,7 +260,10 @@ onenote_edit_page-replace-sentence:
     - *pad
     - {tool: onenote_create_page, args: {title: "seed-v1 case-onenote_edit_page-replace-sentence", body_html: '<p data-id="one">First sentence.</p><p data-id="two">Second sentence.</p>'}, bind: {section: "$prev.sections[0].uri"}}
     - {tool: onenote_read_page, args: {include_ids: true}, bind: {page: "$prev.uri"}}
-    - {tool: onenote_edit_page, args: {commands: [{target: "#two", action: replace, content: '<p data-id="two">Changed sentence.</p>'}]}, bind: {page: "$3.uri"}}
+    - tool: onenote_edit_page
+      bind:
+        page: "$3.uri"
+        commands: [{target: "$prev.html~p[id]", action: replace, content: '<p data-id="one">Changed sentence.</p>'}]
 
 onenote_get_operation-notebook:
   needs: *seed
@@ -268,5 +273,6 @@ onenote_get_operation-notebook:
     - {tool: onenote_get_operation, bind: {operation: "$prev.uri"}}
     - {tool: onenote_get_operation, bind: {operation: "$2.uri"}}
     - tool: onenote_get_operation
+      wait_seconds: 20
       bind: {operation: "$2.uri"}
       expect: {result: {status: Completed}}

@@ -1,0 +1,31 @@
+{
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('drafts')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=1",
+  "value": [
+    {
+      "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+      "bodyPreview": "Hi Anna, can we spend 60 per person for the offsite dinner?",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+      "importance": "normal",
+      "isDraft": true,
+      "isRead": true,
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:32:11Z",
+      "replyTo": [],
+      "subject": "Offsite: budget for the dinner",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIOq4Cp1Tpwt40ZoJHDd8I9ovqbzCY3fAtOLKR&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

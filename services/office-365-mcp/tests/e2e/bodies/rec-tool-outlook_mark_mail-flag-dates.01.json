@@ -1,0 +1,37 @@
+{
+  "@odata.etag": "W/\"ZKKVKJIGTTJupLxvZfunEVPhFxNf/DkqZQMgv/LK\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>A draft with a follow-up.</p></body></html>",
+    "contentType": "html"
+  },
+  "bodyPreview": "A draft with a follow-up.",
+  "categories": [],
+  "ccRecipients": [],
+  "changeKey": "UDRHUUCTLECvdRagMugdSBOtWlMc/SluYUTgy/WH",
+  "conversationId": "AAQkBHqhAFH6SLH9TLUdCKdxTRE6SB34Dta6VGP8LTOlEJGlG8RjVTOJGF0RmAoM4uHVxJkH0TI0cQt=",
+  "createdDateTime": "2026-11-02T21:16:01Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "hasAttachments": false,
+  "id": "LIgBVwRBAMGBIHVXNpdbDi5dbMBlFT-FGw0Qs3Yoom73UdHRQr4C4zmldaQZ1nE1CcYR",
+  "importance": "normal",
+  "isDraft": true,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-11-02T21:16:01Z",
+  "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+  "receivedDateTime": "2026-11-02T21:16:01Z",
+  "replyTo": [],
+  "sentDateTime": "2026-11-02T21:16:01Z",
+  "subject": "seed-v1 case-outlook_mark_mail-flag-dates",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "tom@example.test",
+        "name": "Tom Berger"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FJBu7Nl1Duqa07DmRTMn2G8jbaunWL0yR9MrWT&exvsurl=1&viewmodel=ReadMessageItem"
+}

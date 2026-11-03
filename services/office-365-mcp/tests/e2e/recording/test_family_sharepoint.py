@@ -48,7 +48,7 @@ OLD_EXTERNAL = {"sharepoint_create_share_link-plan", "sharepoint_invite-anna"}
 NEW_EXTERNAL = {
     "sharepoint_copy_item-cross-drive",
     "sharepoint_invite-write-notify",
-    "sharepoint_invite-note-2000",
+    "sharepoint_invite-note-500",
     "sharepoint_create_share_link-organization-edit",
     "sharepoint_resolve_url-sharing-link",
 }
@@ -566,6 +566,10 @@ class TestTeamLibraryAndSharing:
     def test_the_over_cap_case_names_the_size_text_of_the_tool_as_its_error(self) -> None:
         last = mapping(items(mapping(CASES["sharepoint_read_file-over-cap"])["chain"])[-1])
         assert expected_error(mapping(last["expect"])["tool_error"]) == "10.0"
+
+    def test_the_note_case_sends_the_500_characters_that_graph_accepts(self) -> None:
+        last = mapping(items(mapping(CASES["sharepoint_invite-note-500"])["chain"])[-1])
+        assert mapping(last["bind"])["message"] == {"repeat": {"text": "a", "count": 500}}
 
     def test_the_probe_counts_follow_the_corpus(self) -> None:
         core = mapping(cast("object", yaml.safe_load((SEED / "files.yaml").read_text())))

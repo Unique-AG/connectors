@@ -584,7 +584,7 @@ def test_the_calendar_shapes_scrub_and_pass_the_lint() -> None:
         frozenset(),
     )
     fixture = scrub(recording)
-    assert set(fixture.dropped) == {"address"}
+    assert set(fixture.dropped) == {"address", "uniqueId"}
     files = files_of(fixture)
     assert lint_files(files, {stand_in.USER_ID, stand_in.UPN, stand_in.DOMAIN}) == []
     kept = {
@@ -619,7 +619,7 @@ def test_the_calendar_shapes_scrub_and_pass_the_lint() -> None:
 
 
 ENUMS = frozenset(
-    {"accepted", "declined", "tentativelyAccepted", "none", "exception", "attendeesUnavailable"}
+    {"accepted", "declined", "tentativelyAccepted", "none", "exception", "AttendeesUnavailable"}
     | {"read", "monday", "tuesday", "wednesday", "thursday", "friday"}
 )
 

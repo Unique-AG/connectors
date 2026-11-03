@@ -32,8 +32,7 @@
       "isOrganizer": false,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {

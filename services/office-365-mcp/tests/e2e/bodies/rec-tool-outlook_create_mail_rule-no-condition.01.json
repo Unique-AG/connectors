@@ -1,0 +1,11 @@
+{
+  "actions": {
+    "markAsRead": true
+  },
+  "displayName": "seed-v1 case-outlook_create_mail_rule-no-condition",
+  "hasError": false,
+  "id": "KXTGWV4TS9q=",
+  "isEnabled": true,
+  "isReadOnly": false,
+  "sequence": 1
+}

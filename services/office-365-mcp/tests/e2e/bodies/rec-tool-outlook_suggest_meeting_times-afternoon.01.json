@@ -1,0 +1,135 @@
+{
+  "emptySuggestionsReason": "",
+  "meetingTimeSuggestions": [
+    {
+      "attendeeAvailability": [
+        {
+          "attendee": {
+            "emailAddress": {
+              "address": "anna@example.test"
+            },
+            "type": "required"
+          },
+          "availability": "free"
+        }
+      ],
+      "confidence": 100.0,
+      "locations": [],
+      "meetingTimeSlot": {
+        "end": {
+          "dateTime": "2026-11-09T07:30:00.0000000",
+          "timeZone": "UTC"
+        },
+        "start": {
+          "dateTime": "2026-11-09T07:00:00.0000000",
+          "timeZone": "UTC"
+        }
+      },
+      "organizerAvailability": "free"
+    },
+    {
+      "attendeeAvailability": [
+        {
+          "attendee": {
+            "emailAddress": {
+              "address": "anna@example.test"
+            },
+            "type": "required"
+          },
+          "availability": "free"
+        }
+      ],
+      "confidence": 100.0,
+      "locations": [],
+      "meetingTimeSlot": {
+        "end": {
+          "dateTime": "2026-11-09T08:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "start": {
+          "dateTime": "2026-11-09T07:30:00.0000000",
+          "timeZone": "UTC"
+        }
+      },
+      "organizerAvailability": "free"
+    },
+    {
+      "attendeeAvailability": [
+        {
+          "attendee": {
+            "emailAddress": {
+              "address": "anna@example.test"
+            },
+            "type": "required"
+          },
+          "availability": "free"
+        }
+      ],
+      "confidence": 100.0,
+      "locations": [],
+      "meetingTimeSlot": {
+        "end": {
+          "dateTime": "2026-11-09T11:30:00.0000000",
+          "timeZone": "UTC"
+        },
+        "start": {
+          "dateTime": "2026-11-09T11:00:00.0000000",
+          "timeZone": "UTC"
+        }
+      },
+      "organizerAvailability": "free"
+    },
+    {
+      "attendeeAvailability": [
+        {
+          "attendee": {
+            "emailAddress": {
+              "address": "anna@example.test"
+            },
+            "type": "required"
+          },
+          "availability": "free"
+        }
+      ],
+      "confidence": 100.0,
+      "locations": [],
+      "meetingTimeSlot": {
+        "end": {
+          "dateTime": "2026-11-09T12:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "start": {
+          "dateTime": "2026-11-09T11:30:00.0000000",
+          "timeZone": "UTC"
+        }
+      },
+      "organizerAvailability": "free"
+    },
+    {
+      "attendeeAvailability": [
+        {
+          "attendee": {
+            "emailAddress": {
+              "address": "anna@example.test"
+            },
+            "type": "required"
+          },
+          "availability": "free"
+        }
+      ],
+      "confidence": 100.0,
+      "locations": [],
+      "meetingTimeSlot": {
+        "end": {
+          "dateTime": "2026-11-09T13:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "start": {
+          "dateTime": "2026-11-09T12:30:00.0000000",
+          "timeZone": "UTC"
+        }
+      },
+      "organizerAvailability": "free"
+    }
+  ]
+}

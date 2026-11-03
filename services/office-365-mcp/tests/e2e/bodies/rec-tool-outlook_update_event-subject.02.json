@@ -28,8 +28,7 @@
   "lastModifiedDateTime": "2026-10-30T10:10:46.8395133Z",
   "location": {
     "displayName": "",
-    "locationType": "default",
-    "uniqueIdType": "unknown"
+    "locationType": "default"
   },
   "locations": [],
   "occurrenceId": null,

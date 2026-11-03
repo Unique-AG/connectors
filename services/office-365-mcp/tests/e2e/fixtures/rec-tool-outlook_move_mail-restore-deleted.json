@@ -1,0 +1,97 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "categories": ["seed-v1 case-outlook_move_mail-restore-deleted"],
+      "body": {
+        "content": "<p>A draft that goes to Deleted Items by mistake.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_move_mail-restore-deleted",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('WLxPCmPVIXWWGFGKEqexFh6oySToNR-HIy7Kn2Lmpt37UjPUBn9S3mdiovWM7fG5EnJX')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-restore-deleted.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/WLxPCmPVIXWWGFGKEqexFh6oySToNR-HIy7Kn2Lmpt37UjPUBn9S3mdiovWM7fG5EnJX/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "deleteditems"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('WLxPCmPVIXWWGFGKEqexFh6oySToNR-HIy7Kn2Lmpt37UjPUBn9S3mdiovWM7fG5EnJX')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-restore-deleted.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_move_mail-restore-deleted.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-restore-deleted.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/WLxPCmPVIXWWGFGKEqexFh6oySToNR-HIy7Kn2Lmpt37UjPUBn9S3mdiovWM7fG5EnJX/move",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "DestinationId": "inbox"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('WLxPCmPVIXWWGFGKEqexFh6oySToNR-HIy7Kn2Lmpt37UjPUBn9S3mdiovWM7fG5EnJX')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_move_mail-restore-deleted.05.json"
+  }
+]

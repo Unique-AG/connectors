@@ -7,7 +7,9 @@ names the path of the leaf and the class of the match. It never prints a value.
 
 A short form of an identity, such as the tenant short name, is not a leak when the match lies
 inside text that the seed corpus holds. The text must contain the seed tag and must not run on
-into other words. The full identity always counts.
+into other words. A short form is also no leak inside a key that `SCHEMA` names, such as
+`uniqueBody` for the domain `unique.ch`, or inside a `$select` or `$orderby` of such keys. The full
+identity always counts.
 
   python -m tests.e2e.recording.lint [ROOT] [--require-identities]
 
@@ -103,6 +105,13 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     ("a GUID without dashes", re.compile(r"(?<![0-9A-Za-z])[0-9a-fA-F]{32}(?![0-9A-Za-z])")),
+)
+_SCHEMA_KEYS = re.compile(
+    r"(?<![a-z0-9])(?:"
+    + "|".join(
+        re.escape(key) for key in sorted({k.casefold() for k in SCHEMA}, key=len, reverse=True)
+    )
+    + r")(?![a-z0-9])"
 )
 _ID_TOKEN = re.compile(
     r"(?:AAMk|AQMk|AAQk)[A-Za-z0-9_\-+=]{12,}|b![A-Za-z0-9_\-]{12,}"
@@ -240,11 +249,12 @@ def _scan(
     for view, shown in _views(text):
         found += [f"{where}: {rule} ({view})" for rule, p in rules if p.search(shown)]
         folded = unicodedata.normalize("NFKC", shown).casefold()
+        unkeyed = _SCHEMA_KEYS.sub(" ", folded)
         found += [
             f"{where}: identity #{n} ({view}{form})"
             for n, identity in enumerate(sorted(identities), 1)
             for form, needle in _forms(identity)
-            if needle in folded
+            if needle in (unkeyed if form == _SHORT_FORM else folded)
             and not (
                 form == _SHORT_FORM and _only_corpus_text(folded, needle, corpus or load_corpus())
             )

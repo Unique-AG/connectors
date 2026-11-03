@@ -398,15 +398,26 @@ class TestTheScenarioRuns:
         for path in tests:
             named |= set(cast("list[str]", _SERVED.findall(path.read_text())))
         fixtures = sorted((_E2E / "fixtures").glob("*.json"))
-        text = "".join(path.read_text() for path in [*fixtures, *_FEATURES.glob("*.calls.yaml")])
         bodies = sorted((_E2E / "bodies").iterdir())
+        text = "".join(
+            path.read_text()
+            for path in [
+                *fixtures,
+                *_FEATURES.glob("*.calls.yaml"),
+                *(p for p in bodies if p.suffix == ".json"),
+            ]
+        )
 
         problems = [
             f"no sidecar names fixtures/{p.name}"
             for p in fixtures
             if p.stem not in named and not p.stem.startswith(_TOOL_RECORDING)
         ]
-        problems += [f"nothing uses bodies/{p.name}" for p in bodies if p.name not in text]
+        problems += [
+            f"nothing uses bodies/{p.name}"
+            for p in bodies
+            if p.name not in text and not (p.suffix == ".gen" and p.stem in text)
+        ]
         assert problems == []
 
 

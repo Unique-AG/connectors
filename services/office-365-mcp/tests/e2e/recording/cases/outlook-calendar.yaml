@@ -229,7 +229,7 @@ outlook_suggest_meeting_times-nobody-free:
         ends_at: "~nextWednesdayT18:00:00"
         time_zone: Europe/Zurich
         duration_minutes: 30
-      expect: {result: {"suggestions[*]": [], empty_reason: attendeesUnavailable}}
+      expect: {result: {"suggestions[*]": [], empty_reason: AttendeesUnavailable}}
 
 outlook_list_calendar_shares-default:
   chain:

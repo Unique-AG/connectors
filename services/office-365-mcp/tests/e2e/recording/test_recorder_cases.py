@@ -338,6 +338,31 @@ class TestCases:
         with pytest.raises(guard_module.Refused):
             _ = resolve("outlook_list_mail-x", cases=tmp_path)
 
+    def test_a_step_with_wait_seconds_sleeps_before_it_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plan = resolve("uc-02-01")
+        waiting = replace(plan, steps=({**plan.steps[0], "wait_seconds": 20}, *plan.steps[1:]))
+        slept: list[float] = []
+
+        async def sleep(seconds: float) -> None:
+            slept.append(seconds)
+
+        monkeypatch.setattr(asyncio, "sleep", sleep)
+        _ = record_on(waiting)
+        assert [s for s in slept if s] == [20]
+
+    @pytest.mark.parametrize("seconds", [0, 61])
+    def test_a_wait_outside_one_to_sixty_seconds_is_refused(
+        self, tmp_path: Path, seconds: int
+    ) -> None:
+        _ = (tmp_path / "f.yaml").write_text(
+            "outlook_list_mail-x:\n  chain:\n"
+            + f"    - {{tool: outlook_list_mail, wait_seconds: {seconds}}}\n"
+        )
+        with pytest.raises(guard_module.Refused, match="waits outside 1..60"):
+            _ = resolve("outlook_list_mail-x", cases=tmp_path)
+
     def test_link_with_a_case_is_refused_before_any_request(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:

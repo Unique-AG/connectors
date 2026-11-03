@@ -1,0 +1,23 @@
+scenario: sharepoint_read_file-10mib
+fixture: rec-tool-sharepoint_read_file-10mib
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:26:45+00:00'
+scrub_version: 1.0.0
+replacements:
+  binaries kept by hash: 1
+  ids mapped: 200
+  keys dropped: 24
+  persona addresses: 38
+  persona names: 38
+  query parameters dropped: 10
+  response headers dropped: 76
+  text kept: 66
+  text replaced: 51
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

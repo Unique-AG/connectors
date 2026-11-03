@@ -91,6 +91,7 @@ GRAPH = f"https://{GRAPH_HOST}/v1.0"
 _TRANSIENT = frozenset({429, 503, 504})
 _SCOPE = re.compile(r"[A-Za-z]+(?:\.[A-Za-z]+)+")
 _MAX_GAP = 600
+_MAX_WAIT = 60
 _PERSONA = re.compile(r"persona:[a-z]+(?:\.[a-z]+)?|env:SEED_[A-Z]+_UPN")
 _PERSONAS = 3
 _REPLACED = re.compile(
@@ -169,6 +170,12 @@ def resolve(
         raise Refused(f"{scenario}: {bad} is not a Graph permission name such as Group.Read.All")
     if not 0 <= gap <= _MAX_GAP:
         raise Refused(f"{scenario}: the gap must be within 0..{_MAX_GAP} seconds")
+    if bad := [
+        n
+        for n, step in enumerate(steps, 1)
+        if not 1 <= int(cast("int", step.get("wait_seconds", 1))) <= _MAX_WAIT
+    ]:
+        raise Refused(f"{scenario}: step {bad[0]} waits outside 1..{_MAX_WAIT} seconds")
     default = f"rec-tool-{scenario}" if spec else f"rec-{scenario}"
     phases, order = reseed_of(spec)
     if bad := [one for one in order if not 1 <= one <= _PERSONAS]:
@@ -527,6 +534,8 @@ async def capture(
                             f"{plan.scenario}: refused before step {number}: {refusal}", secrets
                         )
                     )
+                if "wait_seconds" in step:
+                    await asyncio.sleep(int(cast("int", step["wait_seconds"])))
                 failure = ""
                 try:
                     outcome = await _step(

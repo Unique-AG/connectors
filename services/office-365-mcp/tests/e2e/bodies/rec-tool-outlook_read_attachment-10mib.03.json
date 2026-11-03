@@ -1,0 +1,13 @@
+{
+  "value": [
+    {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentType": "application/octet-stream",
+      "id": "YRbVWkZXOOHFCLFEWskvIt1ucYPnEK-GVk9So9Bncp02FvQVNf0U9zwmnaBA5dSgnlGSOKZTEYPMA_QjHur1GasrYC-HZjUy",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-11-02T20:45:10Z",
+      "name": "scan-10mib.bin",
+      "size": 10485929
+    }
+  ]
+}

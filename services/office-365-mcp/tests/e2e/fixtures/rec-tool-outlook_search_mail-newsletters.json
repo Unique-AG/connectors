@@ -1,0 +1,35 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"newsletter\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_search_mail-newsletters.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": [
+        "AAMkDFbxPWZ5CDZ5INQqRUocEQK9VW06Yij4PLK2IUGnSZXsJ3JjFOBUEGYFOGDkzfaHOErkQCkgE1a9QIJ3JlIpcOlgIvyoTFNvBnTw-QxsLMMOWVEMLRZwvYowMdezRRNcSeUe-QngCAUqqi_ZCHB=",
+        "AAMkURtvEMB3BJT7MQGkOHlaPTU4YD08Elv0YKZ5XGQsDCLhB1MxQSMTLOBOVNEezizYHSqmIJomU6w2LRO5UeBleKoeCxamHJCzPuWb-ZzgMNTVDGFCPDFyyFvjBshgWCAjPaPp-ItwJWEsvs_UISY=",
+        "AAMkRUmzXSM2MRC8SRHoPOclHMG1UN00Uzw8LQG0WOVoNONgG2WbMJAMZOJUKAFnzwsSTDxsULiwC7q7ADT1HrOcoUuuSvmuXWRsXsUo-DjkFAXUSYMUMFIglFjfUndjQGEmYzAz-ZzeGCSzca_LSRC=",
+        "AAMkCAffYQD0MEZ0XCEpTTwsFZM4QE49Reu6YAC4KNXcNEPqM1TsSNRKEHMZURFcedvNWGmbYVliT5v7WUN8CsAxsNurGycmTMTeWfSh-MqcRVTZCRMPMYGzuIdvTojkJRLeMbRc-UhbFQIlob_ZCHJ="
+      ],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_search_mail-newsletters.02.json"
+  }
+]

@@ -1,0 +1,24 @@
+scenario: outlook_read_event-answers-mixed
+fixture: rec-tool-outlook_read_event-answers-mixed
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:26:05+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 12
+  keys dropped: 9
+  persona addresses: 7
+  persona names: 7
+  query parameters dropped: 2
+  response headers dropped: 21
+  text kept: 10
+literals:
+- '2026-11-03'
+- Design workshop
+- ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

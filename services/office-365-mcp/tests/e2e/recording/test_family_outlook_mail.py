@@ -246,23 +246,24 @@ class TestTheCasesAgainstTheCorpus:
             "more_may_exist": True
         }
 
-    def test_the_size_cases_expect_the_sizes_of_the_corpus_attachments(self) -> None:
-        sizes: dict[str, object] = {
-            str(mapping(one)["name"]): mapping(one)["size"]
-            for one in items(corpus("mail-extra.yaml")["attachments"])
-            if "size" in mapping(one)
-        }
+    def test_graph_reports_a_size_above_the_bytes_so_both_scans_are_refused(self) -> None:
         cases = own_cases()
-        assert dict(expectations(cases["outlook_read_attachment-10mib"])) == {
-            "attachments[0].size": sizes["scan-10mib.bin"]
-        }
         assert dict(expectations(cases["outlook_read_attachment-above-the-cap"])) == {
-            "attachments[0].size": sizes["scan-over.bin"]
+            "attachments[0].size": 10485926
         }
-        refusal = mapping(steps_of(cases["outlook_read_attachment-above-the-cap"])[-1]["expect"])
-        assert mapping(refusal["tool_error"]) == {
-            "tools.outlook_read_attachment._too_large": {"size": sizes["scan-over.bin"]}
-        }
+        for case, size in (
+            ("outlook_read_attachment-10mib", 10485925),
+            ("outlook_read_attachment-above-the-cap", 10485926),
+        ):
+            refusal = mapping(steps_of(cases[case])[-1]["expect"])
+            assert mapping(refusal["tool_error"]) == {
+                "tools.outlook_read_attachment._too_large": {"size": size}
+            }
+
+    def test_the_read_of_the_scan_at_the_cap_succeeds_and_asserts_no_exact_size(self) -> None:
+        case = own_cases()["outlook_read_attachment-at-cap"]
+        assert dict(expectations(case)) == {}
+        assert "expect" not in steps_of(case)[-1]
 
     def test_the_reply_all_case_expects_every_person_of_the_message_but_mia(self) -> None:
         [found] = [one for one in corpus_messages() if one.get("subject") == "Hosting handover"]

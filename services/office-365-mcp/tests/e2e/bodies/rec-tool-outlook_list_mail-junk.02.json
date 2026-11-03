@@ -1,0 +1,118 @@
+{
+  "value": [
+    {
+      "@odata.etag": "W/\"RCFZKTWFBFKwaSawBzgtKYKvBkWn/JfzFFPfk+ts\"",
+      "bodyPreview": "Cheap software licences, buy now.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "AUuDHmDXQDHBWTRBLtxyPe6rrXZjAR-FTz6Vk3Skez53CuCKLa8O1husmeZO7nYP2PGT",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY=",
+      "receivedDateTime": "2026-10-29T03:30:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Cheap licences",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FKLn7Im0Mlgp15KtHUIc2G8zwqkuAL3wHL9OCK&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"SVQTYVEVTVTdzRanTkioKAHwWcIc/DbtDCWfe+oY\"",
+      "bodyPreview": "Upgrade your plan for free today.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "BRnVOnDTNDFOLDKRKiydEm8pbYVmAI-COd5Ch8Hkdp67DfTQFw6J9apnouZK6sUI6YRQ",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY=",
+      "receivedDateTime": "2026-10-29T03:20:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Free upgrade",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FKUh6Ui6Ygwm53VhWLEq5N6cwjhuEI0kQA9RET&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"EWQIXTPQIHJxcFtdHdvoSGPiGnMe/NdaKULam+mP\"",
+      "bodyPreview": "You won a prize. Click here to collect it.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "YUoQFoQKQYMIVZYJWsuzBy0qwOVdHU-DJe3Zl5Uadi37HtTLQo8A0etsqlRB4tZG9sVY",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY=",
+      "receivedDateTime": "2026-10-29T03:10:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Prize offer",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQOu0Fa2Vtqi16PwOPNx7P6todsoNG7pNY7kAJ&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

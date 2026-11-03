@@ -29,6 +29,7 @@ from tests.e2e.recording.scrub import (
     made_by_the_mapper,
     map_id,
     mapped_guid,
+    mapped_id,
     scrub,
 )
 from tests.e2e.test_scenarios import items, mapping, select
@@ -184,6 +185,24 @@ def test_an_identity_is_found_in_its_encoded_form(recorded: Recorded, plant: str
     assert any("identity #" in line and form in line for line in findings), findings
 
 
+@pytest.mark.parametrize(
+    ("body", "short_form_counts"),
+    [
+        ({"uniqueBody": {"content": "x"}}, False),
+        ({"url": "https://graph.microsoft.com/v1.0/me/messages?$select=id,uniqueBody"}, False),
+        ({"uniqueBody": {"note": "unique.ch"}}, True),
+        ({"note": "the unique team"}, True),
+        ({"url": "https://graph.microsoft.com/v1.0/me/messages?$select=id,uniqueFoo"}, True),
+    ],
+)
+def test_a_short_form_inside_a_schema_key_is_no_leak_but_the_full_identity_is(
+    body: Mapping[str, object], short_form_counts: bool
+) -> None:
+    files = {"bodies/x.01.json": json.dumps(body).encode()}
+    findings = lint_files(files, {"unique.ch"})
+    assert bool(findings) is short_form_counts, findings
+
+
 def test_a_finding_names_the_path_and_class_but_never_the_text() -> None:
     body = {
         "value": [
@@ -212,7 +231,7 @@ def test_the_lint_fails_closed_without_identities(
     assert "scrub lint: clean (7 identities)" in capsys.readouterr().out
 
 
-def test_a_mapped_id_keeps_its_format_and_is_stable() -> None:
+def test_amapped_id_keeps_its_format_and_is_stable() -> None:
     raw = stand_in.exchange_id(b"\x00\x03\x24\x00", 101)
     mapped = map_id(raw)
     assert mapped == map_id(raw) != raw
@@ -223,6 +242,13 @@ def test_a_mapped_id_keeps_its_format_and_is_stable() -> None:
     item = map_id(stand_in.ITEM_ID)
     assert re.fullmatch(r"01[A-Z0-9]{32}", item) and item != stand_in.ITEM_ID
     assert map_id(stand_in.DRIVE_ID).startswith("b!")
+
+
+def test_amapped_id_never_holds_a_token_header() -> None:
+    raw = "AAMKAGF1F" + "aaA" * 15
+    assert "eyJ" in mapped_id(raw, 0)
+    mapped = map_id(raw)
+    assert "eyJ" not in mapped and made_by_the_mapper(mapped) and mapped == map_id(raw)
 
 
 def test_a_guid_becomes_a_recognizable_guid() -> None:
@@ -282,12 +308,25 @@ def test_a_persona_keeps_the_persona_name_that_the_corpus_gives_it() -> None:
     }
 
 
+def test_a_page_element_id_in_a_request_maps_like_the_one_in_the_page() -> None:
+    mapper = Mapper(load_corpus(), {}, frozenset(), "")
+    raw = f"p:{{{stand_in.TENANT_ID}}}{{12}}"
+    assert mapper.request_value(raw) == mapper.page_attribute("id", raw)
+    assert mapper.request_value(raw) == f"p:{{{mapped_guid(stand_in.TENANT_ID)}}}{{12}}"
+
+
+def test_a_page_read_keeps_the_include_ids_flag_in_its_query() -> None:
+    mapper = Mapper(load_corpus(), {}, frozenset(), "")
+    assert mapper.query({"includeIDs": "true", "tempauth": "x"}) == {"includeIDs": "true"}
+
+
 def test_the_download_location_loses_its_credentials(recorded: Recorded) -> None:
     location = select(loaded(recorded.out / FIXTURE), "[2].response_headers.location")
     assert location == (
         "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx"
-        + f"?UniqueId={mapped_guid(stand_in.FILE_UNIQUE_ID)}&Translate=false&ApiVersion=2.0"
+        + f"?itemId={mapped_guid(stand_in.FILE_UNIQUE_ID)}&Translate=false&ApiVersion=2.0"
     )
+    assert lint_dir(recorded.out, {"unique.ch"}) == []
 
 
 def test_a_binary_that_the_seed_did_not_make_is_refused(recorded: Recorded) -> None:

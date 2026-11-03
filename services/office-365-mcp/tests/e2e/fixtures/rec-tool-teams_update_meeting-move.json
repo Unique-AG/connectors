@@ -1,0 +1,74 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onlineMeetings/createOrGet",
+    "json": {
+      "endDateTime": "~tomorrow",
+      "externalId": "00000000-3935-496a-886a-c1f0b3bebc73",
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            }
+          },
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e"
+              }
+            }
+          }
+        ]
+      },
+      "startDateTime": "~tomorrow",
+      "subject": "seed-v1 case-teams_update_meeting-move meeting"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_update_meeting-move.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onlineMeetings",
+    "query": {
+      "$filter": "JoinWebUrl eq 'https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:ifhirje_D1RbU8RbAXImLKVqQT35TTXsAXqsTJQzQAHoPjDtCeGhD6N5@thread.v2/synthetic%20text%2003'"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-move.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-move.03.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/onlineMeetings/OQzoQiHhGOIgKz4bYDXlEKLdGBOvOiLaIE8nKNi4FVIuS3XbGzMqMAniLLl3eMLknPdaY62WElxtDAVBh86UTEOZQG23SVXkNX2CMIvRQSt2XobIgLaYFnrLxNJ1Ww5KzS7rGFRSrPfqBKSdMkXm",
+    "json": {
+      "@odata.type": "#microsoft.graph.onlineMeeting",
+      "endDateTime": "~tomorrow",
+      "startDateTime": "~tomorrow"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-move.04.json"
+  }
+]

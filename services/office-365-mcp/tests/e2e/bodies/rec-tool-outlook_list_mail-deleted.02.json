@@ -1,0 +1,118 @@
+{
+  "value": [
+    {
+      "@odata.etag": "W/\"ZJLKVFPRZUNipDbgNronEBGbQfQb/BqtDMCcx8Vi\"",
+      "bodyPreview": "synthetic text 01",
+      "categories": [],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "hasAttachments": false,
+      "id": "QYhPIqBDHNGEORAUQqnhEo5xgLNbNW-BPz8Fq2Siva97AuUCDt3C1bbuqcUR5_zfEeBT",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": false,
+      "parentFolderId": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN=",
+      "receivedDateTime": "2026-10-30T10:12:53Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "user-01@example.test",
+          "name": "synthetic text 02"
+        }
+      },
+      "subject": "synthetic text 03",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FVVx0Tr3Nato66TcISVe5B4hthcyLE3%2BkvKjZQ&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"ZRDTZPEIBANajNtaXghpPTKiZeSe/ShkRDBct+xu\"",
+      "bodyPreview": "The printer invoice was paid twice.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "hasAttachments": false,
+      "id": "FOwSQaAUECLTJOWKWtqbXh3rkKMnWO-AHb8Cj2Nsma53QsOMEw0O2azckdBN4fUB6wSM",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN=",
+      "receivedDateTime": "2026-10-30T09:30:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "tom@example.test",
+          "name": "Tom Berger"
+        }
+      },
+      "subject": "Printer invoice",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FSGo4Lp1Fqov22OnBXRg9B5turdfEM9sSA4bTT&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "@odata.etag": "W/\"QRUPGCPAWDAlaWmmGdgiLNVsZuVu/NojKRXkf+aj\"",
+      "bodyPreview": "This checklist is obsolete.",
+      "categories": ["seed-v1"],
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "hasAttachments": false,
+      "id": "XGpXYjRPOBVFCRMNBeqnLk1mxIZsVD-MHo2Cj0Ncui49OeZAHo5V9bdqqsDF3hMGqkWM",
+      "importance": "normal",
+      "isDraft": false,
+      "isRead": true,
+      "parentFolderId": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN=",
+      "receivedDateTime": "2026-10-30T09:00:00Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "subject": "Old checklist",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FDNa0Px5Nuwo07CgZEIp2P4ewexvVA6kSOenEA&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  ]
+}

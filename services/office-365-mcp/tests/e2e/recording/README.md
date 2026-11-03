@@ -27,6 +27,11 @@ fixture in the runner's format. Raw answers stay in memory. Only the scrubbed fi
 - An id keeps its length, its punctuation and its known prefix (`AAMkAG`, `b!`, `01`). Its letters
   and digits come from a keyed hash, so a second record gives the same ids. A GUID becomes
   `00000000-xxxx-4xxx-8xxx-xxxxxxxxxxxx`.
+- The id mapper never makes an id that holds `eyJ`. The lint reads that text as the start of a
+  token, so the mapper makes the id again with a new seed until the text is not there.
+- A request value that is the id of a OneNote page element (`p:{GUID}{N}`) goes through the same
+  mapping as the `id` attribute in the page, so the replay sends the id that the page holds. The
+  URL parameter `includeIDs` stays in the request.
 - A binary body must have the SHA-256 of a file that the seed generator made. Any other binary
   stops the run and nothing is written.
 - An attachment keeps its `contentBytes` only when the SHA-256 of the decoded bytes is in the seed
@@ -47,6 +52,10 @@ fixture in the runner's format. Raw answers stay in memory. Only the scrubbed fi
   refuses any line that it would change.
 - Response headers: only `content-type`, `location`, `retry-after` and `preference-applied`.
   URL parameters: an allowlist; `tempauth`, `sig` and all others are dropped.
+  The scrub writes the download parameter `UniqueId` as `itemId`, in the `location` header and in
+  the query of the next request, because the name holds the short form of a tenant name.
+- The lint does not count a short form of an identity inside a key that `SCHEMA` names, such as
+  `uniqueBody` for the domain `unique.ch`. The full identity always counts.
 
 The recorder prints the counts of each replacement. It refuses to write when the variant's
 `expect` reads a field that the scrub replaced or dropped.
@@ -135,6 +144,9 @@ outlook_move_mail-archive:
       bind: {message_refs: "$prev.messages[*].uri"}
 ```
 
+A chain step can have `wait_seconds: N`, with N from 1 to 60. The recorder waits N seconds before
+it runs that step. Use it to poll an operation that Graph has not finished yet.
+
 A bind can read an attribute of markup that an earlier step returned: `$prev.html~img[src]` is
 the `src` of the first `<img>`. A bind can also be a list or an object whose leaves are binds, for
 the person objects of the chat tools.
@@ -183,6 +195,9 @@ The seed side has the same shape: `scripts/dogfood/seed/families/<family>.py` ex
   metadata names the length.
 - `~nextMonday` to `~nextSunday` are the first such day on or after tomorrow. `+N` or `-N` after
   the name moves that many days: `~nextMonday+1`. The scrub writes the token that the case used.
+- A date in a request that no token names, and that is not yesterday, today or tomorrow, becomes
+  `~day+N` or `~day-N`. N is the number of days from the record day. The replay counts N from its
+  own day, so a fixture that one day recorded replays on any other day.
 - A seed file with a generator (`filler`, `filler-text`, `onenote-html`) and more than 256 KiB is
   stored as `bodies/<sha256>.gen`: `{generator, size, label, sha256}`. In a JSON answer a
   `contentBytes` of such a file is `<generated:<sha256>>`. The runner makes the bytes again from

@@ -1,0 +1,216 @@
+{
+  "value": [
+    {
+      "@odata.etag": "W/\"t0Vqpx09SfPYHq2N3bpwabQU6tZvKi==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "Walk through the open design tasks.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-17T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "LAlDOLYWQS4PpJ0_UIJiSBBMLD2PQlTvUtUOa9hQpgCafXxGIWvB3v3PKBLSqi9C0BI5tN4BVM9IcztYCDB=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Pilatus",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "EBuBXiIVAXLJNLLGTlvgLt5ebCNbKZ-SIn5Ob0Ladp24OcDMPh8Y8hqkbtER2qUK_DAF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-17T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Weekly design sync",
+      "type": "exception",
+      "webLink": "https://outlook.office365.com/owa/?itemid=BKjHCIUDFY1QmC1%2BVMQiMPBOJJ6SNiAuYxPGn0qVigIyqQoZRPyR5w3OYUNQrq5D2YO3sW5XBS8EbphBNIE%3D&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t0Vqpx09SfPYHq2N3bpwabQU6tZvKi==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "Walk through the open design tasks.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-09T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "WMnMTRAIKP587SSdCDVuLFDAKU9ZKmFyCkPQo0yAexGumPpSIQpE7a8MALVQaj4H5OA6vZ3JRR8ZbhuIFCY=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Pilatus",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "EBuBXiIVAXLJNLLGTlvgLt5ebCNbKZ-SIn5Ob0Ladp24OcDMPh8Y8hqkbtER2qUK_DAF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-09T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Weekly design sync",
+      "type": "occurrence",
+      "webLink": "https://outlook.office365.com/owa/?itemid=WMnMTRAIKP587SSdCDVuLFDAKU9ZKmFyCkPQo0yAexGumPpSIQpE7a8MALVQaj4H5OA6vZ3JRR8ZbhuIFCY%3D&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t0Vqpx09SfPYHq2N3bpwabQU6tZvKi==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "Walk through the open design tasks.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "OGaECQXIEJ8H6QnzdDWzSFGLLF9UGmLeLjTLc5vMslVtuCdCBPaX4r1JCQCXlu5B3TI2eS0KWX8TbftXCPR=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Pilatus",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "EBuBXiIVAXLJNLLGTlvgLt5ebCNbKZ-SIn5Ob0Ladp24OcDMPh8Y8hqkbtER2qUK_DAF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Weekly design sync",
+      "type": "occurrence",
+      "webLink": "https://outlook.office365.com/owa/?itemid=OGaECQXIEJ8H6QnzdDWzSFGLLF9UGmLeLjTLc5vMslVtuCdCBPaX4r1JCQCXlu5B3TI2eS0KWX8TbftXCPR%3D&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t0Vqpx09SfPYHq2N3bpwabQU6tZvKi==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "Walk through the open design tasks.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-12-07T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "ZNiZHDUTCJ6A0EcvAYSmVLOXXL7GVmDkZjWHw9yGfcXgvAuLBFtN7y1ZVHXWws3B6UX2jN9GKI8HwleJMFX=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Pilatus",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "EBuBXiIVAXLJNLLGTlvgLt5ebCNbKZ-SIn5Ob0Ladp24OcDMPh8Y8hqkbtER2qUK_DAF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-12-07T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Weekly design sync",
+      "type": "occurrence",
+      "webLink": "https://outlook.office365.com/owa/?itemid=ZNiZHDUTCJ6A0EcvAYSmVLOXXL7GVmDkZjWHw9yGfcXgvAuLBFtN7y1ZVHXWws3B6UX2jN9GKI8HwleJMFX%3D&exvsurl=1"
+    }
+  ]
+}

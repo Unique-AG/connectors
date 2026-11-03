@@ -1,0 +1,26 @@
+scenario: outlook_list_events-week-40
+fixture: rec-tool-outlook_list_events-week-40
+source: recorded
+target: graph
+recorded_at: '2026-11-02T23:21:33+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 103
+  keys dropped: 77
+  persona addresses: 26
+  persona names: 26
+  query parameters dropped: 25
+  response headers dropped: 14
+  text kept: 101
+literals:
+- '2026-11-23'
+- '2026-11-27'
+- Slot
+- ~nextMonday+14
+- ~nextMonday+18
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -1,0 +1,68 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "query": {
+      "$search": "\"subject:\\\"Printer replacement\\\"\"",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_thread-long-preview.01.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/translateExchangeIds",
+    "json": {
+      "InputIds": [
+        "AAMkGLiaOJV3VLK2AQKvQBuhZKT6XQ10Irr9FUX2UCLbUZWkQ0MuUOQEAATFVRXmbbcVMGjtXRhjW5c8IWF4OzHhmZgdItytTKWkWvOn-VphHUNOPBDCHMRliWbgDvvsFOQuWjVy-LkeTLMoxt_vHVG=",
+        "AAMkBUjwAUR4NIU4PVTvIIuhEEE4HS29Jil5RVL9RGZlRJKhZ6IlOQIKMSQTLMSybhrPHKkqPPmkB9h2UBR8BfMrsBzzTqkmEKYdTgKf-PrlZTFMKCEIXRZrzWphRisiBBSnVnNm-GvxPRMsvmxVXHR=",
+        "AAMkFQnbVWE3DYU5AHFtATvcDJM9EF36Uho6OBI7SINgWWOqQ0NqRBUJPYVXOWHeuihGBCfvQXreZ9z4VHY8PxDviRwsBtfaOLUyClVn-HaqLOOHBYNGNKPezSffXggxDNIhLbIh-FrvMIXnwd_mYSP="
+      ],
+      "SourceIdType": "restId",
+      "TargetIdType": "restImmutableEntryId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_read_thread-long-preview.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/KHdXXpHDJISEGNUDPliqAn0maMOxBN-JSo3Of1Frau87VlZNAk0T5awgfpYG0bUN3fLI",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,conversationId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-long-preview.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$filter": "conversationId eq 'AAQkFFucJTD2ITC9IZCvHTuxDLN2PL33Wvw5AHP1DSXdXGGiN8PpLJWBQUnrMZORIH-aab62Tcsyi2K='",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,conversationId,sentDateTime",
+      "$top": "1000"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_read_thread-long-preview.04.json"
+  }
+]

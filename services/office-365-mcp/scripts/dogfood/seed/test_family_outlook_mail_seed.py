@@ -105,7 +105,9 @@ class TestThePhases:
     def test_a_phase_that_is_not_asked_for_adds_no_step(self) -> None:
         assert outlook_mail.steps(context(), "mia", {"mail", "folders"}) == []
 
-    def test_mia_gets_one_workbook_and_two_scans_on_the_messages_of_the_attach_phase(self) -> None:
+    def test_mia_gets_one_workbook_and_three_scans_on_the_messages_of_the_attach_phase(
+        self,
+    ) -> None:
         steps = plan(1, {"mail-attach"})
         assert created(steps) == [
             "mail:m66",
@@ -113,6 +115,8 @@ class TestThePhases:
             "attachment:m67:scan-10mib.bin",
             "mail:m68",
             "attachment:m68:scan-over.bin",
+            "mail:m69",
+            "attachment:m69:scan-at-cap.bin",
         ]
         assert {step.phase for step in steps} == {"mail-attach"}
         assert plan(2, {"mail-attach"}) == plan(3, {"mail-attach"}) == []
@@ -121,8 +125,12 @@ class TestThePhases:
         steps = {step.key: step for step in plan(1, {"mail-attach"}) if step.kind != "lookup"}
         workbook = steps["mail:m66"].body["attachments"]
         assert [one["name"] for one in workbook] == ["budget.xlsx"]
-        assert all("attachments" not in steps[f"mail:{one}"].body for one in ("m67", "m68"))
-        for name, size in (("m67:scan-10mib.bin", 10485760), ("m68:scan-over.bin", 10485761)):
+        assert all("attachments" not in steps[f"mail:{one}"].body for one in ("m67", "m68", "m69"))
+        for name, size in (
+            ("m67:scan-10mib.bin", 10485760),
+            ("m68:scan-over.bin", 10485761),
+            ("m69:scan-at-cap.bin", 10484595),
+        ):
             step = steps[f"attachment:{name}"]
             assert step.kind == "upload"
             assert step.path.endswith("/attachments/createUploadSession")
@@ -130,11 +138,15 @@ class TestThePhases:
             assert step.generated is not None
             assert step.generated[:2] == ("filler", size)
 
-    def test_the_two_scans_differ_by_one_byte_and_by_their_hash(self) -> None:
+    def test_the_scans_differ_by_their_hash_and_the_last_one_has_1000_bytes_of_margin(self) -> None:
         sizes = {one["name"]: one["size"] for one in SPEC["attachments"] if one["kind"] == "filler"}
-        assert sizes == {"scan-10mib.bin": 10 * 1024 * 1024, "scan-over.bin": 10 * 1024 * 1024 + 1}
+        assert sizes == {
+            "scan-10mib.bin": 10 * 1024 * 1024,
+            "scan-over.bin": 10 * 1024 * 1024 + 1,
+            "scan-at-cap.bin": 10 * 1024 * 1024 - 1165,
+        }
         labels = {one["label"] for one in SPEC["attachments"] if one["kind"] == "filler"}
-        assert len(labels) == 2
+        assert len(labels) == 3
 
     def test_an_upload_waits_for_its_message_and_looks_for_the_file_first(self) -> None:
         steps = plan(1, {"mail-attach"})
@@ -145,7 +157,7 @@ class TestThePhases:
             ("upload", "attachment:m67:scan-10mib.bin"),
         ]
         lookups = [step for step in steps if step.lookup == "attachments"]
-        assert [step.key for step in lookups] == ["m67", "m68"]
+        assert [step.key for step in lookups] == ["m67", "m68", "m69"]
         assert all("{mail:" in step.path for step in lookups)
 
     def test_each_tester_sends_three_mails_and_nobody_sends_to_himself(self) -> None:
@@ -257,6 +269,23 @@ class TestThePhases:
         assert seed.apply(again, steps, context(), lambda _: None) == (0, 2)
         assert again.uploaded == []
 
+    def test_a_file_of_the_same_name_and_an_old_size_is_kept_and_not_uploaded_again(self) -> None:
+        prop = {"id": seed.KEY_PROP, "value": "seed-v1:mail:m69"}
+        old = {"id": "a", "name": "scan-at-cap.bin", "size": 10485595}
+        held = {
+            "/me/messages": [{"id": "old", "singleValueExtendedProperties": [prop]}],
+            "/me/messages/old/attachments": [old],
+        }
+        steps = [
+            step
+            for step in plan(1, {"mail-attach"})
+            if step.key in {"mail:m69", "m69", "attachment:m69:scan-at-cap.bin"}
+            or step.lookup == "tagged"
+        ]
+        graph = FakeGraph(held)
+        assert seed.apply(graph, steps, context(), lambda _: None) == (0, 2)
+        assert graph.uploaded == []
+
 
 class TestTheCorpus:
     def test_every_message_id_is_used_once_over_both_corpus_files(self) -> None:
@@ -339,12 +368,13 @@ class TestTheCorpus:
         assert "ignore all rules" in text
         assert not seed.ADDRESS_TOKEN.search(text)
 
-    def test_the_manifest_holds_the_two_scans_with_generator_label_and_hash(self) -> None:
+    def test_the_manifest_holds_the_three_scans_with_generator_label_and_hash(self) -> None:
         manifest = seed.corpus_manifest(context())
         found = {one["name"]: one for one in manifest["binaries"]}
         for name, size, label in (
             ("scan-10mib.bin", 10485760, "attachment-10mib"),
             ("scan-over.bin", 10485761, "attachment-10mib-plus-one"),
+            ("scan-at-cap.bin", 10484595, "attachment-at-cap"),
         ):
             expected = hashlib.sha256(docgen.generate("filler", size, label)).hexdigest()
             assert found[name]["sha256"] == expected

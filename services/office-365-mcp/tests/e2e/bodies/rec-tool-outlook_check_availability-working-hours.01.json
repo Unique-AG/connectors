@@ -1,0 +1,64 @@
+{
+  "value": [
+    {
+      "availabilityView": "00222222002000000000",
+      "scheduleId": "anna@example.test",
+      "scheduleItems": [
+        {
+          "end": {
+            "dateTime": "2026-11-09T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "start": {
+            "dateTime": "2026-11-09T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "status": "tentative"
+        },
+        {
+          "end": {
+            "dateTime": "2026-11-09T11:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "start": {
+            "dateTime": "2026-11-09T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "status": "busy"
+        },
+        {
+          "end": {
+            "dateTime": "2026-11-09T12:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "start": {
+            "dateTime": "2026-11-09T12:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "status": "busy"
+        }
+      ],
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday"],
+        "endTime": "16:00:00.0000000",
+        "startTime": "08:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    },
+    {
+      "availabilityView": "00000000000000000000",
+      "scheduleId": "tom@example.test",
+      "scheduleItems": [],
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "endTime": "15:30:00.0000000",
+        "startTime": "07:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    }
+  ]
+}

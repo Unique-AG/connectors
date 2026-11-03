@@ -1,0 +1,1644 @@
+{
+  "value": [
+    {
+      "@odata.etag": "W/\"d2Lhap59ElRIAw6G3dezxpDT1kSvWy==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T07:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "UKyJCkJRGNBRFSLXBeoiOl1wtGHzYX-DMt3Hn2Rzne63EfHXTm3E8dyniqEE6hPROHPF",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T07:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 01",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FFGa0Qv9Aiei02MaRLBb2D0hscgsJE8gSXYZBE&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"n0Hxog15PnIVNp7A6iypuaHD1mNlPu==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T08:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "REgJYkRXQIADTLSEZyhxIs5rtTHpHY-XGs0Kv0Jkle89EaBSVy3R1rxpbtFT9sRWQACE",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T08:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 02",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBNc0Va9Ruuo83FtLGAy5G6aszwhVI4fLBTDNV&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"u2Xkft61JhPAWx1Y0qvidkKK4rTbMF==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T09:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "ABcKHuJTHYXGXOSBJbltHm4lfTNzOO-SIm9Ai8Qvzo66PrJQLt5F3vbjknYP2sWELuIJ",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T09:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 03",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGJp8Dj5Knch71WwYFZr2D0rwdezQY1aZEZlBI&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"m5Ypwy42DyBWFk6Z6rxtfcUD6aQqIE==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T11:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "UXmVTqXDSESJISYWUbzrSo5zdHGxXJ-LAv1Rh9Pzki85ZgRLVg6L2ulpwoXU1cWANXJD",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T10:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 04",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FHGi3Bu2Ngku57AkXRBr0M1qwjkmGF8rSJQPCW&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"x6Tcju31MhVRBe0D1pxngtXI9jUaLC==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T12:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "EVoEDhAXJWUSKQKJAmifNf6ywEEkNA-GAm1Ib4Hpqv44BzYKRe8L8rhdbiHN6lWBGrZV",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T12:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 05",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIOj1Lz0Uiiq97QuEZCt2C2cefuaYU6wUXObQS&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t7Rcia13LoAZDm5Z1jqhmuNX2sCjNe==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T13:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "UIbYOdHOCKIPMUPOLogfFs0sdTVyHU-YQe4Bs3Qyeg75PaBKMs7U1moukpQC4kVUNpGP",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T13:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 06",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FAUr8Ex5Qcoi18PkYCXm9M6fwqfnRN5aYQDaLS&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"f6Kvsp90JqRKMc6V9urcxdOQ2rKcWE==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T14:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "QBlWRfGBSXLUOZAHWxbpAc8nbVSnUY-KNj6Uy8Pqni15FcRBMg3R2cmlixEN7cFFQLKD",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T14:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 07",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FLWt3Va9Wumk06QnMDTy6X0adhdcMH3rYKSUWS&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"q8Vxkz43YhUMOr6A2jgzjhCH9rGnCT==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-23T16:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "OZgVFyXZISUVZYYWHblwXv1aaETkVJ-APl4Dp1Qiaq95JfMKOv6S9xkhnkZC0wLVGbRO",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-23T15:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 08",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FLIf8Sr5Slur02UtDCBz6Y5pgzcyAZ8dTXZrYR&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"a1Bjrp28AuIOGm7V2awtnqGN2oQxZU==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T07:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "HSuHXhFKEWHNWSUDTydwWm4pjXPsBM-TYc7Wu4Rcek83XbIBLy6S3nmyscHO8tXBRCLN",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T07:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 09",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FVQa6Nd8Wlaa12FlDPYh4F8pkgyrXQ8eHUKQQI&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"a5Pbnh84EyTJGy1U2namzgFY7kUrTr==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T08:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "DYfZMeAOVKVQHIYXXgbzCd7suULwXU-IMp5Gp8Whus07PwSJOd5J8lqdvqSN8cZIGTDN",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T08:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 10",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBLn3Cq7Ynsj91KmZATd3Y2uhwrbGL2kJZJYCL&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"m5Zaij32RdFQWr4V2jsftsDW9bEcNM==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T09:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "LHwMJqMVJNTWRBZAHqyjTv9tpXRlXU-PFn9Xo9Kqte80UjPIGl9Y8utznwSK5xOBEHPX",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T09:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 11",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FVAv2Sm3Nybw29ThCWSa9C4oliluJE4xUSKEHM&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"k7Wnhp60PbRHZs3Z5irmsdIM2oXpBt==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T11:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "JSgZNjFNENTCOSUHEpvaDz0eoUSiJB-MId1Ol8Uzvq05CjEATa2T9gmubgNH6xSFEBSB",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T10:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 12",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCWw1Js2Klaj78PvNEAo9R6oxbomTJ3xVQYWMA&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"b0Oauw54KoSPJp1R0qbxrpIF1bUtHo==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T12:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "HWpBJcJVNNVBHLKWWjkgFa2joGQaAC-ZVg0Hl8Kbip61UgHAYd0G7uaurkTV8uLVSsGN",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T12:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 13",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FZEq4Xb2Eqjr38PvKHPb6A4dhedgIH9rTJIfGE&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"q6Auvq40PwRSHo3O1pmopkIU8oHhDV==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T13:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "WJvJEjQZHXAWUPHWIdjuNa2bvEYqHJ-FIg4Id5Mwpd28OaZUHp7N3hwvxmUI8oXCVnOU",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T13:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 14",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBGw4Uh1Lqki72IkOUDl3V1skgpmPD4wJTYfLH&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"i6Tzvc14AhUKRq2E7pykvmXM1aLbFu==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T14:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "ESeZNtSGDAIVCDVSOjeuKr9unVSpQU-EYs1Sv3Tdpz84PeZKHd2H5hneodAC5kSNRZAT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T14:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 15",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FTUj0Bi3Hlgn61QkJIAt4J9khufgIB5uIFHLTU&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"c0Znef98LcCDAm5V1qvhpoYD6eRqZL==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-24T16:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "AAyEVhVKTKJZXAZQGnslPs9hcUQpTJ-ICb2Ao7Npxu32JtVISs6O4yezeaDO2jJBXVQW",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-24T15:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 16",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBQt0Fx6Ugvz01BqVKQa8S6jiaosLC4pTHGWGW&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"o8Oavg49YkJECp9M1cvlhtKI0gEqWs==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T07:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "HAzDChBNCEMBCCVBNhieAh1hgDDlVT-HOg8Aw5Blld53QrLAOt8U7dbtffFT9hWRPuVG",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T07:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 17",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FVIr9Bt7Pdwk34MnCPPe3H9xtfggQS4hOOKdUI&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"s2Kdls25JoGBEg5N4hqcrfTY9dJinL==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T08:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "ILmTGwDJMCAEIUCGRrauRj6fqYLcBC-MPo0Hc1Nffu01OvHXTc8V8ocsiyUM7gPKMbZB",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T08:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 18",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FELe3Ag0Fuiu40IoPWMg6R0pitfzUC9kRUPcFG&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"g2Tjbe68AyFBQa6P7lshjmUU7qCfkI==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T09:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "OZnDQlFBKZTXABAHMnoeRz2sjJJaIY-CMz0Qe2Ezlv18GoCNIf6V2alnvlHN3pPVOmTL",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T09:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 19",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FEOa2Kq8Yovf74JvTQNt1J6jlfeoUT4eRMYePL&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"q4Vmwf48AgDNIb2J1xlqldUC8qSloh==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T11:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "HBcGNmNFPLAFKQARPaxnOz9naRTqVF-XUo0Wz5Aipn16IbDKOy1W7nnnxlDX1cQFRJNI",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T10:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 20",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FARj8Sr9Qvqo15TqYDAj7H6lmwkcJZ2aIDLOQC&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"o4Cazs39WrYDDa1B4mcoryOZ6cDmnG==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T12:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "XYoPZeRVHALPRPELXcmhOp4qeCFbTK-NZf5Lp8Kbfs88KtGIGo8A7bwcuqKC7lVXXeDK",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T12:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 21",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCDa8Rt4Bkpe21LsGLTs1Q4ucmkdWD8eCGGgNV&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"o0Nomx05FoCLIp1Q8xgpggAU9iIpmy==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T13:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "TIsYOwALUVQWTXBNZxtsVm1jkPOeHC-XEt9Br9Jdtc14HhRMMc8A9gzjerRL2cJRKrJJ",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T13:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 22",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FXLd1Hv0Nhpi28KmEZMi0A6giuelEF8dENTpRK&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"x1Mqba15MaAREp2M0givobNJ9gEnrN==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T14:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "YEbTErZUXVEMCBTXKjqcSr3ucWLdSD-WUu4Dz0Fjjn94ZcHJAm2T7lgpdxVF0pJEHoNT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T14:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 23",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FWDt2Se8Wqny79XhSMRs3H7dfupoTK5gGTXtIS&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"j7Pcjd02VdLAJx1A2iwudaLQ7hGvhn==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-25T16:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "IVrADzIAUXJDJSZVRaodBx3lxHYdMD-AZq9Sk9Wzsr78RbIWJb7K8uyflkYY9aNUDSVT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-25T15:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 24",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FERt9Iq4Duec65TkTNKd9X2mszfpVW8sACBBQK&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"d4Wumo39IgRPOc8A9rnhlhDD0oGjsJ==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T07:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "YRlJSkNXMGGLXYAMFmkwEa8ckSGfEA-NHe7Af6Tcgj94VpBMNp9J1fngxzLT4xIRSZOO",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T07:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 25",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FFKi7Lj8Wiyz72DfPXKo2X3hggokBO0sUMUAJH&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"w4Gfvh40ZzZGRb4F6adjqsFH8gDxoQ==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T08:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "TStKArZAZIICSISFYrgqQz5vqAOjVM-JPu3Ay3Wplo60FbYTVu7J8auppdKQ1xDGIsKW",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T08:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 26",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FMQv4Re0Adkh83HeWBUz0B7xczqtNE8cTABdQG&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"g9Epwl50VbDGZa2J9oidsdSM7sDubo==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T09:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "MCbGHqODMCGCXBAOWojpKr1omYThOX-KHq6Wv0Cgky79LgPJUk9Q0cjupjAI7jJMQdOB",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T09:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 27",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBYq6Tb8Vsue44JtEOPd1K7bjczuHR3cBTAgOA&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"r1Gyco98DmNEVj6S0lougsVQ6kFkbC==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T11:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "ASdRIdBPERVIZSJZIwddQb7ruKEyBE-UPg1Yj9Wcqw95PfHNYa1R4gwqoaBZ7aGMVQLK",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T10:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 28",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FKQg9Mu9Mmfa93EcQQOe5Z1rddioLH5sWNHGKO&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"m1Gsrx30AnGWRp7L4isbswUE0kKpaf==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T12:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "NLhBBwBIMLSBIYRCBnwsUg0jeOAiCM-LOl6Wm4Dlla65HkAWQc8X8hizjiKJ4mPBEKCT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T12:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 29",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBSd0Yb4Bwye28ZvPUPt3A8iwklbQQ9dUMJZWP&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"g7Zkyg20AkTACq1O5xcknuOP2qWdqD==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T13:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "EIkXFzWWFQIMMFAVKttiMl3btETxBA-JMo8Ae6Sqgs69ZlLFIg7F4eabfxRG2rHEvGTA",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T13:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 30",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBUx3Mb7Xwhe93KuGUXe3D8izbwaGA0dPKyVFX&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"i4Igas28BnHXZk6T8ybbnoJZ5cDxxt==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T14:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "PNiLZtFIICEFYRPTFmvpEt5grARbLC-ATa1Qe5Wsdk50XfDLTe4R4ymdbfHW4dFYfkBF",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T14:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 31",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGSk1Em9Fjbn33DjUPVc4X4ubutfBG1cCJlvGZ&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"k4Zrkd43ZiOXJc4R4zfnhyMG3aJokL==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-26T16:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "YPiIXbSLNLWEEDIRJvrwOg5sxUXbUT-RKg9Hx2Hght36NmXERc4J7keoheKJ6lCWvOFL",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-26T15:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 32",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FAMv3Vs2Yfwc95UqFOTe3G9jmltjYV2dXRzFCS&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t5Vkoe97AsNJEf8P6kzjwuLN1cZqgr==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T07:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "LYgPLzOJGWBQIOYCZkwfQg2mvOZiGH-CHu4Ay7Npmj16GjQHVa5L4aoqngNO4cDLbqRG",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T07:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 33",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FZOu9Eg7Ecbe26YnAUYl0V7zbpmlJG0hXFdiXZ&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"i1Koqt37HjDGIl1Q5qtskzTT4bSkdG==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T08:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "KVfMJeVJOFRESEXAUucxYj3arYSbWJ-PBj9Vy7Pnxo82KoXKSv7T4gsbbiQU9xEGpUJH",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T08:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 34",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQBb0Ko9Hnam34BvRBUh1F2obaqkQS1nKWrOVH&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"r7Zbso73NoFQSj0U6vpdneGM4yIqgb==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T09:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "UJfSObHTHZWORRQVNqefBl1zgHByOD-KCy1Bi9Dvdl60LpORKu6Y7bochcIF1rMVdpXC",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T09:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 35",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIAg0Tw4Tzho11UeKXLj1E5qnnbxGR9tZQpkLI&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"p0Zbit88JwKOAg4H4geqcoHZ6rZjvv==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T11:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "REgHDwAIVPHKZTMTWqnrHk0jhOJtTV-HIe6Di9Yxvc86ZzHTJx7C4rhsbhXT0vQNfAWX",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T10:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 36",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQPm1Ts1Ubtv38DoRMLz7G7brgzoZC5tLIkJEY&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"s2Hzly06EaUQAj2B3urzfnHH3vBcbW==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T12:20:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "DDfHZbCOMQKBEEAAJusfXa1shHVfXZ-HLo0Uz2Uwml83JpUFHc8X8rtiaeIM0rFHqzMT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T12:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 37",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCZv6Jw5Rmrr21BmRTWc1V2imhnyYZ2vFIfuCB&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"c3Lqdr46KqFBJd0F8mmkxuOB2bUaqc==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T13:35:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "NGyKNqSSFWBCVHGXMgaoTg0qtGMxXM-XGz5Tg6Ctlj33XaQEMs3A6omvpzMK5hTBlYOF",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T13:15:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 38",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FHVq0Nc1Vyst68TnTJZx1A4dqurjYB8cGJfMQX&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"t9Gnfu01OaMBPv7N4rdplhPD7qFkfI==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T14:50:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "OVkMWxGGNYJTCYQIFmaeIk8fwYFsVB-PQh8Gu6Cwvk72XtLKXo8H8dicifMZ3bUHynFT",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T14:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 39",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FFAe9Ro0Zmft55LrLLIe7S1gttjoTC0tYJufGG&exvsurl=1"
+    },
+    {
+      "@odata.etag": "W/\"r0Lpnn10HmTQGs8C2bevmvHV5nFzry==\"",
+      "attendees": [],
+      "bodyPreview": "A short slot of the busy week.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-27T16:05:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "HGaHYfLSBJMBZDJNMyxkOq2ikRBeOT-GTm9Le4Mguf34ZcMWYf1D0nqsmdCA7kLQbCNZ",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-27T15:45:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Slot 40",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FNUq5Bb9Cpce61RwNDDm8D6fqtzjJT1tQDhSZN&exvsurl=1"
+    }
+  ]
+}

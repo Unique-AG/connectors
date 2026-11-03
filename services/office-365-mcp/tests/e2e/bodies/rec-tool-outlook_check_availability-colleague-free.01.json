@@ -1,0 +1,17 @@
+{
+  "value": [
+    {
+      "availabilityView": "00000000000000000000",
+      "scheduleId": "tom@example.test",
+      "scheduleItems": [],
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "endTime": "15:30:00.0000000",
+        "startTime": "07:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    }
+  ]
+}

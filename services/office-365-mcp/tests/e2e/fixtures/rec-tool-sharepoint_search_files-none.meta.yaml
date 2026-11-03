@@ -1,0 +1,18 @@
+scenario: sharepoint_search_files-none
+fixture: rec-tool-sharepoint_search_files-none
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:07:40+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  response headers dropped: 6
+  text kept: 4
+literals:
+- seed-v1 zzqqxx nothing
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from html.parser import HTMLParser
 from importlib.metadata import version
+from itertools import count
 from pathlib import Path
 from string import ascii_lowercase, ascii_uppercase, digits
 from typing import Literal, cast, override
@@ -100,6 +101,7 @@ _TAG_LENGTH = 4
 MIN_TAGGED = 12
 _ALNUM = frozenset(ascii_lowercase + ascii_uppercase + digits)
 _GUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
+_ELEMENT_ID = re.compile(rf"[a-z]+:\{{{_GUID.pattern}\}}\{{\d+\}}")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?")
 _ENUM = re.compile(r"[A-Za-z#][A-Za-z0-9 .#()+\-:/_;=]{0,99}")
 _TOKEN = re.compile(r"[A-Za-z#$][A-Za-z0-9._#$\-]{0,63}")
@@ -123,9 +125,11 @@ KEPT_HOSTS = frozenset(
     | {"contoso.sharepoint.com", "contoso-my.sharepoint.com"}
 )
 _ID_PARAMETERS = frozenset({"$skiptoken", "$deltatoken", "itemid", "uniqueid"})
+_RENAMED_PARAMETERS = {"uniqueid": "itemId"}
 _PLAIN_PARAMETERS = frozenset(
     {"$select", "$filter", "$top", "$skip", "$orderby", "$expand", "$count", "$search"}
     | {"$format", "format", "translate", "apiversion", "exvsurl", "viewmodel", "search"}
+    | {"includeids"}
     | {"startdatetime", "enddatetime", "@microsoft.graph.conflictbehavior"}
 )
 _PAGE = re.compile(
@@ -440,11 +444,19 @@ def _thread_suffix(body: str) -> tuple[str, str]:
 
 
 def map_id(raw: str) -> str:
+    for retry in count():
+        mapped = mapped_id(raw, retry)
+        if "eyJ" not in mapped:
+            return mapped
+    raise AssertionError
+
+
+def mapped_id(raw: str, retry: int) -> str:
     prefix, whole = _split(raw)
     body, suffix = _thread_suffix(whole)
     chars = list(_GUID.sub(lambda found: mapped_guid(found[0]), body))
     positions = _mappable("".join(chars))
-    stream = _stream(b"id:" + raw.encode())
+    stream = _stream(b"id:" + raw.encode() + b"+" * retry)
     for at in positions:
         chars[at] = _like(chars[at], next(stream))
     if len(positions) >= MIN_TAGGED:
@@ -553,7 +565,8 @@ class Mapper:
         kept: dict[str, str] = {}
         for key, value in raw.items():
             if key.casefold() in _ID_PARAMETERS:
-                kept[key] = "/".join(self.id(part) for part in value.split("/"))
+                name = _RENAMED_PARAMETERS.get(key.casefold(), key)
+                kept[name] = "/".join(self.id(part) for part in value.split("/"))
             elif key.casefold() in _PLAIN_PARAMETERS:
                 kept[key] = self.plain(value)
             else:
@@ -637,6 +650,8 @@ class Mapper:
             return self.id(raw)
         if _GUID.fullmatch(raw):
             return mapped_guid(raw)
+        if _ELEMENT_ID.fullmatch(raw):
+            return self.plain(raw)
         if _DATE.fullmatch(raw) or _TOKEN.fullmatch(raw) or _TOKEN_LIST.fullmatch(raw):
             return raw
         if is_emoji(raw):
@@ -761,7 +776,7 @@ def _unchanged(text: str) -> str:
     return text
 
 
-def _symbols(day: date, where: str, tokens: frozenset[str] = _NO_TOKENS) -> Callable[[str], str]:
+def _symbols(day: date, tokens: frozenset[str] = _NO_TOKENS) -> Callable[[str], str]:
     named = {day_named(word.removeprefix("~"), day): word for word in sorted(tokens)}
 
     def symbol(found: re.Match[str]) -> str:
@@ -769,12 +784,7 @@ def _symbols(day: date, where: str, tokens: frozenset[str] = _NO_TOKENS) -> Call
         if wanted in named:
             return named[wanted]
         offset = (wanted - day).days
-        if offset not in _SYMBOLS:
-            raise Refused(
-                f"{where}: a request date is {offset} days from the record day, and the runner "
-                + "has a symbol only for -1, 0 and +1 and for the day tokens of the case"
-            )
-        return _SYMBOLS[offset]
+        return _SYMBOLS.get(offset) or f"~day{offset:+d}"
 
     return lambda text: re.sub(_DATETIME, symbol, text)
 
@@ -792,9 +802,7 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
     request_sizes: dict[int, list[int]] = {}
     for n, (hop, body) in enumerate(zip(recording.hops, parsed, strict=True), 1):
         where = f"{recording.scenario} hop {n}"
-        symbolize = (
-            _unchanged if _target(hop.url) in followed else _symbols(day, where, recording.tokens)
-        )
+        symbolize = _unchanged if _target(hop.url) in followed else _symbols(day, recording.tokens)
         asked = hop.asked
         api = asked["host"] == GRAPH_HOST
         interaction: dict[str, object] = {"method": asked["method"]}

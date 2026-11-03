@@ -1,0 +1,75 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_send_draft-seed-draft.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_send_draft-seed-draft.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_send_draft-seed-draft.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "body": "rec-tool-outlook_send_draft-seed-draft.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS/send",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "status": 202,
+    "response_headers": {
+      "preference-applied": "IdType=ImmutableId"
+    }
+  }
+]

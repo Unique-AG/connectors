@@ -17,8 +17,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -59,9 +58,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "Room Pilatus",
-        "locationType": "default",
-        "uniqueId": "Room Pilatus",
-        "uniqueIdType": "private"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -102,8 +99,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -152,8 +148,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -209,8 +204,7 @@
       "isOrganizer": false,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -251,8 +245,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -293,9 +286,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "Room Pilatus",
-        "locationType": "default",
-        "uniqueId": "Room Pilatus",
-        "uniqueIdType": "private"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -344,8 +335,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "",
-        "locationType": "default",
-        "uniqueIdType": "unknown"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {
@@ -386,9 +376,7 @@
       "isOrganizer": true,
       "location": {
         "displayName": "Phone",
-        "locationType": "default",
-        "uniqueId": "Phone",
-        "uniqueIdType": "private"
+        "locationType": "default"
       },
       "onlineMeeting": null,
       "organizer": {

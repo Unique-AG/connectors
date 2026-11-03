@@ -1,0 +1,24 @@
+scenario: outlook_move_mail-invoice
+fixture: rec-tool-outlook_move_mail-invoice
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:37:27+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 74
+  keys dropped: 20
+  persona addresses: 17
+  persona names: 16
+  response headers dropped: 56
+  text kept: 38
+  text replaced: 3
+literals:
+- Invoice Alpine Print
+- The invoice is filed under Clients.
+- seed-v1 case-outlook_move_mail-invoice
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

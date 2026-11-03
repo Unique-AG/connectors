@@ -1,0 +1,83 @@
+{
+  "@odata.etag": "W/\"s1Meuk90OkLGDu7B6nprcdAF3gZBZp==\"",
+  "allowNewTimeProposals": true,
+  "attendees": [
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      },
+      "status": {
+        "response": "none",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "type": "required"
+    }
+  ],
+  "body": {
+    "content": "synthetic text 01",
+    "contentType": "html"
+  },
+  "bodyPreview": "synthetic text 02",
+  "categories": [],
+  "changeKey": "j0Wpxt30BcFMOn2V9dtujcRU7fXQZu==",
+  "createdDateTime": "2026-11-02T22:33:18.2585415Z",
+  "end": {
+    "dateTime": "2026-11-03T15:30:00.0000000",
+    "timeZone": "Europe/Zurich"
+  },
+  "hasAttachments": false,
+  "hideAttendees": false,
+  "iCalUId": "868505438520K38401H6X7376R93B425763829486C871V766V2GZL86814562622075551419219364E3R19RV09RG3193EA033F8V7SBTF5999",
+  "id": "IPhMWsLXAAJLRZZNZgmyNd8gvEXxWA-DLx2Vr9Pygj81ErUHNi9C1esfvvTA2jDmLbLK",
+  "importance": "normal",
+  "isAllDay": false,
+  "isCancelled": false,
+  "isDraft": false,
+  "isOnlineMeeting": true,
+  "isOrganizer": true,
+  "isReminderOn": true,
+  "lastModifiedDateTime": "2026-11-02T22:33:20.1380305Z",
+  "location": {
+    "displayName": "synthetic text 03",
+    "locationType": "default"
+  },
+  "locations": [
+    {
+      "displayName": "synthetic text 03",
+      "locationType": "default"
+    }
+  ],
+  "occurrenceId": null,
+  "onlineMeeting": {
+    "joinUrl": "https://teams.microsoft.com/synthetic%20text%2004/synthetic%20text%2005/synthetic%20text%2006/synthetic%20text%2007"
+  },
+  "onlineMeetingProvider": "teamsForBusiness",
+  "onlineMeetingUrl": null,
+  "organizer": {
+    "emailAddress": {
+      "address": "mia@example.test",
+      "name": "Mia Keller"
+    }
+  },
+  "originalEndTimeZone": "Europe/Zurich",
+  "originalStartTimeZone": "Europe/Zurich",
+  "recurrence": null,
+  "reminderMinutesBeforeStart": 15,
+  "responseRequested": true,
+  "responseStatus": {
+    "response": "organizer",
+    "time": "0001-01-01T00:00:00Z"
+  },
+  "sensitivity": "normal",
+  "seriesMasterId": null,
+  "showAs": "busy",
+  "start": {
+    "dateTime": "2026-11-03T15:00:00.0000000",
+    "timeZone": "Europe/Zurich"
+  },
+  "subject": "seed-v1 case-outlook_create_event-teams-meeting",
+  "transactionId": "00000000-acf6-4d70-8c03-7e9786802265",
+  "type": "singleInstance",
+  "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FNMs0Pa6Ozcm13LoDBWy4Q7posyqRT2yBxNlDU&exvsurl=1"
+}

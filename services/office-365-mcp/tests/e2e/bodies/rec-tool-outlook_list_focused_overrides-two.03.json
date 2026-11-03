@@ -1,0 +1,12 @@
+{
+  "value": [
+    {
+      "classifyAs": "focused",
+      "id": "00000000-726a-4f97-8c8e-9b796b04cebb",
+      "senderEmailAddress": {
+        "address": "tom@example.test",
+        "name": "Tom Berger"
+      }
+    }
+  ]
+}

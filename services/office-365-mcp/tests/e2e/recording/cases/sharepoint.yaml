@@ -333,17 +333,17 @@ sharepoint_invite-write-notify:
       args: {recipients: [persona:anna], role: write, notify: true, message: seed-v1 case-sharepoint_invite-write-notify}
       bind: {item: "$prev.uri"}
 
-sharepoint_invite-note-2000:
+sharepoint_invite-note-500:
   external: true
   needs: [sharepoint-seed-files]
   chain:
     - *plan
     - tool: sharepoint_create_folder
-      args: {name: seed-v1 case-sharepoint_invite-note-2000}
+      args: {name: seed-v1 case-sharepoint_invite-note-500}
       bind: {parent: "$prev.files[0].parent_uri"}
     - tool: sharepoint_invite
       args: {recipients: [persona:anna], role: read, notify: true}
-      bind: {item: "$prev.uri", message: {repeat: {text: a, count: 2000}}}
+      bind: {item: "$prev.uri", message: {repeat: {text: a, count: 500}}}
 
 sharepoint_create_share_link-organization-edit:
   external: true

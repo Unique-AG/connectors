@@ -360,7 +360,7 @@ outlook_list_mail-deleted:
 outlook_list_mail-from-mia:
   chain:
     - tool: outlook_list_mail
-      args: {folder: inbox, category: seed-v1, from_address: "persona:mia", limit: 5}
+      args: {folder: inbox, category: seed-v1, from_address: "persona:mia", received_after: "2020-01-01", limit: 5}
       expect:
         result:
           "messages[*].subject": ["Note to self: call the printer"]
@@ -369,11 +369,11 @@ outlook_browse_folders-same-name:
   chain:
     - tool: outlook_browse_folders
       args: {limit: 50}
-      expect: {result: {"folders[display_name=seed-v1 Archive].display_name": seed-v1 Archive}}
+      expect: {result: {capped: false}}
     - tool: outlook_browse_folders
       args: {limit: 50}
       bind: {parent: "$prev.folders[display_name=seed-v1 Projects].uri"}
-      expect: {result: {"folders[display_name=seed-v1 Archive].display_name": seed-v1 Archive}}
+      expect: {result: {"folders[*].child_folder_count": [0, 0]}}
 
 outlook_search_mail-newsletters:
   needs: [mail-search-index]
@@ -414,7 +414,7 @@ outlook_read_attachment-pdf:
   needs: [mail-search-index]
   chain:
     - tool: outlook_search_mail
-      args: {subject: Invoice Alpine Print, has_attachments: true, limit: 1}
+      args: {subject: Invoice Alpine Print, has_attachments: true, limit: 3}
     - tool: outlook_list_attachments
       bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_read_attachment
@@ -427,7 +427,18 @@ outlook_read_attachment-10mib:
       args: {subject: Scan ten mebibytes, limit: 1}
     - tool: outlook_list_attachments
       bind: {uri: "$prev.messages[0].uri"}
-      expect: {result: {"attachments[0].size": 10485760}}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+      expect:
+        tool_error: {tools.outlook_read_attachment._too_large: {size: 10485925}}
+
+outlook_read_attachment-at-cap:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Scan at the size cap, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_read_attachment
       bind: {uri: "$prev.attachments[0].uri"}
 
@@ -438,22 +449,24 @@ outlook_read_attachment-above-the-cap:
       args: {subject: Scan above the size cap, limit: 1}
     - tool: outlook_list_attachments
       bind: {uri: "$prev.messages[0].uri"}
-      expect: {result: {"attachments[0].size": 10485761}}
+      expect: {result: {"attachments[0].size": 10485926}}
     - tool: outlook_read_attachment
       bind: {uri: "$prev.attachments[0].uri"}
       expect:
-        tool_error: {tools.outlook_read_attachment._too_large: {size: 10485761}}
+        tool_error: {tools.outlook_read_attachment._too_large: {size: 10485926}}
 
 outlook_draft_reply_all-three:
   needs: [mail-search-index]
   chain:
     - tool: outlook_search_mail
       args: {subject: Hosting handover, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_draft_reply_all
       args:
         body: "Thanks to both of you."
         categories: ["seed-v1 case-outlook_draft_reply_all-three"]
-      bind: {message_ref: "$prev.messages[0].uri"}
+      bind: {message_ref: "$1.messages[0].uri"}
       expect: {result: {recipient_count: 2, "to[0].address": "persona:tom"}}
 
 outlook_draft_reply-forward-workbook:
@@ -461,13 +474,15 @@ outlook_draft_reply-forward-workbook:
   chain:
     - tool: outlook_search_mail
       args: {subject: Budget workbook, has_attachments: true, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_draft_reply
       args:
         mode: forward
         body: "Please read this workbook."
         categories: ["seed-v1 case-outlook_draft_reply-forward-workbook"]
         to: ["persona:tom"]
-      bind: {message_ref: "$prev.messages[0].uri"}
+      bind: {message_ref: "$1.messages[0].uri"}
 
 outlook_move_mail-invoice:
   destructive: true
@@ -476,6 +491,8 @@ outlook_move_mail-invoice:
   chain:
     - tool: outlook_search_mail
       args: {subject: Invoice Alpine Print, limit: 3}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_browse_folders
       args: {limit: 50}
     - tool: outlook_draft_mail
@@ -486,7 +503,7 @@ outlook_move_mail-invoice:
     - tool: outlook_move_mail
       bind:
         message_refs: ["$1.messages[0].uri"]
-        folder_ref: "$2.folders[display_name=seed-v1 Clients].uri"
+        folder_ref: "$3.folders[display_name=seed-v1 Clients].uri"
 
 outlook_move_mail-batch:
   chain:

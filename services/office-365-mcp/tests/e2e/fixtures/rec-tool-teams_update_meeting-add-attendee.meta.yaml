@@ -1,0 +1,30 @@
+scenario: teams_update_meeting-add-attendee
+fixture: rec-tool-teams_update_meeting-add-attendee
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:30:22+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 32
+  keys dropped: 88
+  persona addresses: 5
+  query parameters dropped: 7
+  response headers dropped: 34
+  text kept: 4
+  text replaced: 23
+literals:
+- '2026-11-03T20:00:00Z'
+- '2026-11-03T20:30:00Z'
+- persona:anna.id
+- persona:anna.name
+- persona:tom.id
+- persona:tom.name
+- seed-v1 case-teams_update_meeting-add-attendee meeting
+- ~tomorrowT20:00:00Z
+- ~tomorrowT20:30:00Z
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

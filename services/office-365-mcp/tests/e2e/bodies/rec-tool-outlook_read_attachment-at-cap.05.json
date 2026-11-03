@@ -1,0 +1,10 @@
+{
+  "@odata.type": "#microsoft.graph.fileAttachment",
+  "contentBytes": "<generated:67001a5caeb66e2d425b771f3ecbd8ac161b2d25a1dae665fdef9d46d9355f68>",
+  "contentType": "application/octet-stream",
+  "id": "EOnFTjVVUBTYTEAZKrmhUp3bpAOfVW-CFw0Qh8Blbe85VjVQJx2U2eclknCU3aT6HVVLGAICXDTG0OdVylVZJjty-7Ln4KBi",
+  "isInline": false,
+  "lastModifiedDateTime": "2026-11-02T23:30:53Z",
+  "name": "scan-at-cap.bin",
+  "size": 10484768
+}

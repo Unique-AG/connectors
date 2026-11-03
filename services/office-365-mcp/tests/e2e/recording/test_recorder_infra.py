@@ -626,13 +626,20 @@ class TestDayTokens:
     def test_the_scrub_writes_the_token_that_the_case_used_even_when_it_is_tomorrow(self) -> None:
         monday = day_named("nextMonday", SUNDAY)
         assert monday == date(2026, 11, 2)
-        symbols = scrub_module._symbols(SUNDAY, "t", frozenset({"~nextMonday"}))
+        symbols = scrub_module._symbols(SUNDAY, frozenset({"~nextMonday"}))
         assert symbols(f"{monday.isoformat()}T09:00:00") == "~nextMonday"
         assert symbols("2026-11-01") == "~today"
-        with pytest.raises(Refused, match="day tokens"):
-            _ = symbols("2026-11-20")
-        plain = scrub_module._symbols(SUNDAY, "t")
+        plain = scrub_module._symbols(SUNDAY)
         assert plain("2026-11-02") == "~tomorrow"
+
+    def test_a_fixture_recorded_on_one_day_replays_on_another(self) -> None:
+        recorded = scrub_module._symbols(SUNDAY)("2026-11-20T09:00:00+00:00")
+        assert recorded == "~day+19"
+        assert scrub_module._symbols(SUNDAY)("2026-10-20") == "~day-12"
+        assert day_named("day+19", SUNDAY) == date(2026, 11, 20)
+        assert day_named("day-12", MONDAY) == date(2026, 10, 21)
+        assert _given("a~day+19T09:00:00", ()) == f"a{day_named('day+19').isoformat()}T09:00:00"
+        assert same("~day+19", f"{day_named('day+19').isoformat()}T10:00:00Z")
 
     def test_the_plan_names_the_tokens_of_its_steps(self) -> None:
         steps: tuple[Json, ...] = ({"tool": "x", "args": {"d": "~nextMonday", "e": "~today+0"}},)

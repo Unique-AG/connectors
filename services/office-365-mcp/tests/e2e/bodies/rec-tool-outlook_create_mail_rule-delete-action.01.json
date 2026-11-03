@@ -1,0 +1,15 @@
+{
+  "actions": {
+    "delete": true,
+    "stopProcessingRules": true
+  },
+  "conditions": {
+    "subjectContains": ["seed-v1 case-outlook_create_mail_rule-delete-action"]
+  },
+  "displayName": "seed-v1 case-outlook_create_mail_rule-delete-action",
+  "hasError": false,
+  "id": "IJKRVI2EY1G=",
+  "isEnabled": true,
+  "isReadOnly": false,
+  "sequence": 1
+}

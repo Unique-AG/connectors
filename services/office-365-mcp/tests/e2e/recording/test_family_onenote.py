@@ -350,6 +350,16 @@ def test_a_name_that_a_case_selects_or_expects_is_corpus_text() -> None:
     assert sorted(wanted - load_corpus().strings) == []
 
 
+@pytest.mark.parametrize("case", ["onenote_list_pages-team", "onenote_read_page-team"])
+def test_a_team_page_is_listed_through_its_section_and_not_through_the_account_index(
+    case: str,
+) -> None:
+    listing = mapping(CASES[case].steps[2])
+    assert tool_of(CASES[case].steps[2]) == "onenote_list_pages"
+    assert "group" not in mapping(listing["bind"])
+    assert "sections[name=seed-v1 Team notes]" in str(mapping(listing["bind"])["section"])
+
+
 def test_the_group_cases_name_what_the_seed_creates() -> None:
     path = Path(stand_in.__file__).parents[3] / "scripts/dogfood/seed/corpus/onenote.yaml"
     corpus = mapping(cast("object", yaml.safe_load(path.read_text())))
@@ -405,6 +415,9 @@ def test_a_group_notebook_listing_scrubs_and_passes_the_lint() -> None:
         ("onenote_list_sections", f"/groups/{GROUP}/onenote/notebooks/{NOTEBOOK}/sections", True),
         ("onenote_read_page", f"/groups/{GROUP}/onenote/pages/1-p/content", True),
         ("onenote_read_page", f"/groups/{GROUP}/onenote/pages/1-p", False),
+        ("onenote_create_page", f"/groups/{GROUP}/onenote/notebooks/{NOTEBOOK}", True),
+        ("onenote_create_page", f"/groups/{GROUP}/onenote/notebooks/{NOTEBOOK}/sections", False),
+        ("onenote_read_page", f"/groups/{GROUP}/onenote/notebooks/{NOTEBOOK}", False),
         ("onenote_read_page", f"/groups/{GROUP}/members", False),
         ("onenote_read_page", f"/groups/{GROUP}/calendarView", False),
         ("onenote_list_pages", f"/groups/{GROUP}/onenote/pages/1-p/content", False),

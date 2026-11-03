@@ -1,0 +1,19 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "createdDateTime ge ~yesterday",
+      "$orderby": "createdDateTime desc",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-created-after.01.json"
+  }
+]

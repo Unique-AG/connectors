@@ -1,0 +1,37 @@
+{
+  "@odata.etag": "W/\"NXMPREKXTEHeqQstGgdrTHJjZyMb/UxxGINht/LM\"",
+  "bccRecipients": [],
+  "body": {
+    "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Three.</p></body></html>",
+    "contentType": "html"
+  },
+  "bodyPreview": "Three.",
+  "categories": [],
+  "ccRecipients": [],
+  "changeKey": "ZAUBYGCUMRUbuLqySfnzRRTbCzLy/IduIEGsb/PZ",
+  "conversationId": "AAQkSKgpPFK2EDI7LEJwBXkyOFR9AO89Ikg9THV7VGTpOQDuL2EwBRIZXJwX1xtt6mCRnJgMOGgn_JM=",
+  "createdDateTime": "2026-11-02T21:16:30Z",
+  "flag": {
+    "flagStatus": "notFlagged"
+  },
+  "hasAttachments": false,
+  "id": "ECjJAuACDFSJXGSKZxnoYr2vuXLaMP-GHn0Zz4Gsei40LbMFOr8E4qcrdcNM3kW3EuKH",
+  "importance": "normal",
+  "isDraft": true,
+  "isRead": true,
+  "lastModifiedDateTime": "2026-11-02T21:16:30Z",
+  "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+  "receivedDateTime": "2026-11-02T21:16:30Z",
+  "replyTo": [],
+  "sentDateTime": "2026-11-02T21:16:30Z",
+  "subject": "seed-v1 case-outlook_move_mail-batch three",
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "address": "tom@example.test",
+        "name": "Tom Berger"
+      }
+    }
+  ],
+  "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FHHs4Eb5Cpsm98WkQAIq6V4qkwcoVI6yY7LxPC&exvsurl=1&viewmodel=ReadMessageItem"
+}

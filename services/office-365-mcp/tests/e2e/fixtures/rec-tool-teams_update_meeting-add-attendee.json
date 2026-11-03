@@ -1,0 +1,83 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onlineMeetings/createOrGet",
+    "json": {
+      "endDateTime": "~tomorrow",
+      "externalId": "00000000-19f0-4aee-8014-a14db83ee09c",
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            }
+          }
+        ]
+      },
+      "startDateTime": "~tomorrow",
+      "subject": "seed-v1 case-teams_update_meeting-add-attendee meeting"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "body": "rec-tool-teams_update_meeting-add-attendee.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onlineMeetings",
+    "query": {
+      "$filter": "JoinWebUrl eq 'https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003'"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-add-attendee.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-add-attendee.03.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/onlineMeetings/DHasRuEiYBBiEw6wQJZsTTBgHYWmHqIoXP3aQQx8YVLjC2BtAhTqGOrfPVc2uUVpuRciM63fCXNpRNInuR2SVUWToc8nN9YoJMstRUFTV0LpBRQvrHaUVXXrV1QmMdgrcSweTOkIwVrhDIVxVuJk",
+    "json": {
+      "@odata.type": "#microsoft.graph.onlineMeeting",
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            }
+          },
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_update_meeting-add-attendee.04.json"
+  }
+]

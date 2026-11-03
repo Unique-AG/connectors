@@ -89,7 +89,7 @@ class Run:
 
 def reads(plan: Plan) -> bool:
     last = tool_of(plan.steps[-1])
-    return last in READ_TOOLS or last in load().read_posts
+    return not writes(plan) and (last in READ_TOOLS or last in load().read_posts)
 
 
 def writes(plan: Plan) -> bool:
