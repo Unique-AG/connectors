@@ -621,6 +621,7 @@ outlook_create_mail_rule-delete-action:
         actions: {delete: true}
 
 outlook_create_mail_rule-forward-found-person:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
   needs: [people-index]
   chain:
     - tool: outlook_find_recipient
@@ -633,6 +634,7 @@ outlook_create_mail_rule-forward-found-person:
       bind: {actions: {forward_to: ["$prev.candidates[0].address"]}}
 
 outlook_find_recipient-tom:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
   needs: [people-index]
   chain:
     - tool: outlook_find_recipient
@@ -644,6 +646,7 @@ outlook_find_recipient-tom:
           "candidates[0].address": "persona:tom"
 
 outlook_draft_mail-to-found-person:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
   needs: [people-index]
   chain:
     - tool: outlook_find_recipient

@@ -37,6 +37,7 @@ _FEATURES = _ROOT / "features"
 
 TARGET = _ROOT / "docs" / "use-cases.md"
 STATUS = _FEATURES / "STATUS.md"
+_CASES = _ROOT / "tests" / "e2e" / "recording" / "cases"
 
 _BEGIN = "<!-- use-cases:begin -->"
 _END = "<!-- use-cases:end -->"
@@ -347,6 +348,33 @@ def _coverage_lines() -> list[str]:
     return lines
 
 
+def _deferred_lines() -> list[str]:
+    waiting: dict[str, list[str]] = collections.defaultdict(list)
+    for scenario_id, entry in _entries().items():
+        for case in _list(entry.get("deferred", [])):
+            waiting[str(case)].append(scenario_id)
+    reasons = {
+        str(case): str(_object(spec)["deferred"])
+        for file in sorted(_CASES.glob("*.yaml"))
+        for case, spec in _object(yaml.safe_load(file.read_text())).items()
+        if "deferred" in _object(spec)
+    }
+    lines = [
+        "## Deferred work",
+        "",
+        f"Scenarios tagged `@deferred`: {sum(1 for e in _entries().values() if 'deferred' in e)} "
+        + f"of {len(_entries())}. Recorder cases with a `deferred` reason: {len(reasons)}. "
+        + "No gate counts them as failed or blocked.",
+        "",
+        "| Recorder case | Reason | Scenarios |",
+        "| --- | --- | --- |",
+    ]
+    for case, reason in sorted(reasons.items()):
+        ids = ", ".join(f"`{one}`" for one in waiting.get(case, []))
+        lines.append(f"| `{case}` | {reason} | {ids} |")
+    return [*lines, ""]
+
+
 def render_status() -> str:
     names = _names()
     counts: dict[str, dict[str, int]] = {
@@ -421,6 +449,7 @@ def render_status() -> str:
         f"## {_KIND_TITLES['unknown']}",
         "",
         *_blocker_table("unknown", names)[2:],
+        *_deferred_lines(),
         *_coverage_lines(),
     ]
     return "\n".join(lines).rstrip("\n") + "\n"

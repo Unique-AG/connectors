@@ -625,6 +625,8 @@ uc-05-39:
   note: "expected behaviour from tools/outlook_disable_mail_rule.py:70 (_READ_ONLY_RULE): Microsoft marks the rule read-only, nothing was written, a read-only rule still runs and can still forward mail, tell the user that and what the rule does, and do not try another handle. The tool refuses before any write."
 
 uc-05-40:
+  deferred:
+    - outlook_create_mail_rule-forward-found-person
   status: untested
   tests:
     - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAnInboxRuleActsOnNewMailWithoutMia::test_a_rule_that_forwards_to_a_name_is_refused_until_the_address_is_found"
@@ -899,6 +901,9 @@ uc-05-57:
   note: the draft and the move do not depend on each other, and the message keeps its handle after the move. The folder listing is optional because none of the 4 logged sessions shows one between the two calls. That the move filed the message that the reply answers is the analyst's reading of the chain, not logged
 
 uc-05-58:
+  deferred:
+    - outlook_find_recipient-tom
+    - outlook_draft_mail-to-found-person
   status: untested
   tests:
     - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAPersonPlansMoreThanOneStepInOneRequest::test_an_invoice_is_filed_and_a_note_about_it_is_drafted_and_nothing_is_sent"

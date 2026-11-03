@@ -41,6 +41,7 @@ WRITE = plan("outlook_mark_mail", "w1", persona=2)
 DESTROY = plan("outlook_move_mail", "d1", destructive=True, reseed=("mail",))
 OUTSIDE = plan("outlook_mark_mail", "w0", external=True)
 NEEDY = plan("outlook_list_events", "n1", needs=("k",))
+LATER = plan("outlook_list_events", "l1", needs=("k",), deferred="Wait for the index.")
 
 
 def names(found: Sequence[runbook.Run]) -> list[str]:
@@ -62,6 +63,11 @@ class TestPlanning:
         assert plan_runs([NEEDY], frozenset(), {}, False)[0].reason == "Book a talk."
         assert plan_runs([NEEDY], frozenset(), {"k": False}, False)[0].status == "blocked"
         assert plan_runs([NEEDY], frozenset(), {"k": True}, False)[0].status == "run"
+
+    def test_a_deferred_case_is_never_run_even_when_forced_or_recorded(self) -> None:
+        for stored, forced in ((frozenset[str](), False), (frozenset({LATER.fixture}), True)):
+            found = plan_runs([LATER], stored, {"k": True}, forced)
+            assert (found[0].status, found[0].reason) == ("deferred", "Wait for the index.")
 
     def test_the_report_has_three_lists_and_the_human_steps(self) -> None:
         text = report(
@@ -506,6 +512,31 @@ class TestExtraScopes:
 
 
 class TestResume:
+    def test_a_deferred_case_replaces_an_earlier_recorded_result_and_sends_nothing(
+        self, fixtures: Path, tmp_path: Path
+    ) -> None:
+        calls = Calls(fixtures)
+        saved = tmp_path / "r.json"
+        _ = saved.write_text('{"l1": {"status": "recorded", "note": "ok"}}')
+        found = plan_runs([LATER], frozenset({LATER.fixture}), {}, False)
+        assert execute(found, UPNS, calls, calls.sleeps.append, saved)["l1"] == {
+            "status": "deferred",
+            "note": "Wait for the index.",
+        }
+        assert not any("record" in " ".join(command) for command in calls.commands)
+
+    def test_the_report_lists_deferred_cases_apart_from_blocked_and_refused(self) -> None:
+        text = report(
+            {
+                "c": {"status": "blocked", "note": "Book a talk."},
+                "d": {"status": "deferred", "note": "Wait for the index."},
+            }
+        )
+        assert "## Blocked (1)\n- c: Book a talk." in text
+        assert "## Deferred (1)\n- d: Wait for the index." in text
+        assert "## Refused (0)" in text
+        assert "- Wait for the index." not in text.split("## Simulated or human steps")[1]
+
     def test_a_recorded_fixture_replaces_a_stale_block(
         self, fixtures: Path, tmp_path: Path
     ) -> None:

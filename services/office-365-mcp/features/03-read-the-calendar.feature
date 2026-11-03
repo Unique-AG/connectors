@@ -65,7 +65,7 @@ Feature: Reading the calendar
 
   Rule: The assistant reads a calendar that a colleague shared with Mia
 
-    @happy @uc-03-08
+    @happy @uc-03-08 @deferred
     Scenario: The shared calendar of a colleague is read
       Given Anna shared her calendar with Mia
       And Anna has "Design review" tomorrow at 11:00
@@ -236,7 +236,7 @@ Feature: Reading the calendar
 
   Rule: The assistant shows how Mia's calendars are grouped
 
-    @happy @uc-03-27
+    @happy @uc-03-27 @deferred
     Scenario: The calendars of Mia are shown by group
       Given Mia keeps her own calendars in one group and the calendar of Anna in another group
       When Mia asks her assistant how her calendars are grouped

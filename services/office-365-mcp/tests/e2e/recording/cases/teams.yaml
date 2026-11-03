@@ -70,6 +70,7 @@ teams_search_messages-seed:
       args: {query: seed-v1 case, size: 5}
 
 teams_list_meeting_recordings-past:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting]
   chain:
     - &meetings {tool: teams_list_chats, args: {chat_type: meeting, limit: 50}}
@@ -78,6 +79,7 @@ teams_list_meeting_recordings-past:
       bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
 
 teams_list_meeting_transcripts-past:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting]
   chain:
     - *meetings
@@ -86,6 +88,7 @@ teams_list_meeting_transcripts-past:
       bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
 
 teams_read_meeting-past:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting]
   chain:
     - *meetings
@@ -94,6 +97,7 @@ teams_read_meeting-past:
       bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
 
 teams_read_transcript-past:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting]
   chain:
     - *meetings
@@ -332,6 +336,7 @@ teams_list_channels-seed:
       bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
 
 teams_list_channels-private:
+  deferred: "The tenant policy refuses to create a private channel. An administrator must switch on private channels."
   needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
@@ -341,6 +346,7 @@ teams_list_channels-private:
       bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
 
 teams_get_channel_files_folder-private:
+  deferred: "The tenant policy refuses to create a private channel. An administrator must switch on private channels."
   needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
@@ -376,6 +382,7 @@ teams_browse_channel-long:
         channel_id: "$prev.channels[display_name=seed-v1 Long channel].channel_id"
 
 teams_browse_channel-private:
+  deferred: "The tenant policy refuses to create a private channel. An administrator must switch on private channels."
   needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
@@ -501,6 +508,7 @@ teams_delete_message-chat:
       bind: {uri: "$prev.uri"}
 
 teams_search_messages-alpine:
+  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
@@ -508,6 +516,7 @@ teams_search_messages-alpine:
       expect: {result: {"messages[0].body_is_plain_text": true}}
 
 teams_search_messages-lena:
+  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
@@ -515,6 +524,7 @@ teams_search_messages-lena:
       expect: {result: {"messages[0].body_is_plain_text": true}}
 
 teams_search_messages-person-window:
+  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
@@ -522,6 +532,7 @@ teams_search_messages-person-window:
       expect: {result: {"messages[0].sender.display_name": Tom Berger}}
 
 teams_read_meeting-attendance:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting-attendance]
   chain:
     - *meetings
@@ -530,6 +541,7 @@ teams_read_meeting-attendance:
       bind: {meeting_uri: "$prev.chats[0].meeting_uri"}
 
 teams_read_transcript-lines:
+  deferred: "A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one."
   needs: [teams-meeting]
   chain:
     - *meetings

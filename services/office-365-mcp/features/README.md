@@ -442,6 +442,17 @@ The real flows that the sidecars use:
   `teams_read_transcript`, in 7 sessions.
 - Work across sources: one session of 22 calls read mail and files, drafted a reply, and filed mail.
 
+## Deferred work
+
+A scenario whose evidence waits on a deferred recorder case has the tag `@deferred`, and its
+sidecar entry has `deferred`, a list of recorder case ids. Examples: a shared calendar, a person
+that the tenant index does not list yet, a meeting recording or transcript, and a Teams search hit.
+Keep the `tests` or `no_test` key of the scenario. A test fails when the tag and the key do not
+agree, and when a listed case does not exist or has no `deferred` reason in
+`../tests/e2e/recording/cases/`. `STATUS.md` has the count and the list of cases with their reasons.
+When a case is finished, delete its `deferred` reason, and delete the tag and the key from the
+scenarios that no longer wait.
+
 ## Known gaps and work for UN-27222
 
 `STATUS.md` lists every scenario with status `partly` or `gap`, with its blocker. It is the work

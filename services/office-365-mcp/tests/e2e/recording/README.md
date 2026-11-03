@@ -137,6 +137,7 @@ outlook_move_mail-archive:
   cap: 40             # optional request cap, 1..100
   scopes: []          # Graph permission names added to the narrow token, such as Group.Read.All
   gap: 0              # seconds to wait before the next case, 0..600
+  deferred: ""        # a reason in words; the runbook never runs the case, see "Deferred cases"
   chain:
     - {tool: outlook_list_mail, args: {category: seed-v1, limit: 1}}
     - tool: outlook_move_mail
@@ -159,6 +160,26 @@ the synthetic value into the replay check. An unknown placeholder stops the run.
 A tool can declare fewer scopes than Graph needs for one call. Name the missing permissions in
 `scopes`. `get_token.py --scopes-for TOOL --scopes NAME` adds them to the token of that case, and
 `login` asks for them of all cases, so the admin consents once.
+
+## Deferred cases
+
+A case with a `deferred` reason is work that waits for something outside the recorder. The runbook
+never runs it, and `report` lists it under "Deferred (N)" with the reason. It is not blocked and
+not refused. A fixture that exists for it stays valid, and the replay tests still use it. To
+finish a case, do the step in the reason, delete the `deferred` key, and record the case. The
+scenarios that wait on it have `@deferred` and a `deferred` list in their sidecar entry.
+`features/STATUS.md` lists both.
+
+- Calendar sharing (4 cases): Mia must accept two sharing mails in Outlook on the web. Graph has
+  no call to accept them.
+- People index (3 cases): the tenant index lists a new user 1 to 24 hours after the first mail.
+- Meeting (6 cases): a person holds one Teams meeting at a time. Run `record_all.sh meeting all`.
+- Private channel (3 cases): the tenant policy refuses to create a private channel. An
+  administrator must switch on private channels.
+- Search (3 cases, recorded, expect unmet): Graph sends `chatMessage` without a hash, so
+  `teams_search_messages` drops every hit. The server needs a change.
+- `onenote_get_operation-notebook` (recorded, expect unmet): Graph sends the status not started
+  and the SDK parses it to None. The server needs a change.
 
 The fixture is `rec-tool-<id>`. A case that creates what it changes needs no reseed: name the item
 `seed-v1 case-<id>`, and `seed.py cleanup --cases --as N` deletes it. `--link` does not apply to a
@@ -225,7 +246,7 @@ scripts/dogfood/record_all.sh login|discover|seed|record|check|report|all [--cas
 teams,teams-posts,teams-chats 1 2 3`. These three phases are opt-in, and they need the order
 Mia, Anna, Tom.
 State goes to `.record-all/` (`discover.json`, `results.json`, `report.md`). The report has
-three lists (recorded, refused, blocked) and a list of simulated or human steps. A run is
+four lists (recorded, refused, blocked, deferred) and a list of simulated or human steps. A run is
 resumable: a case whose fixture exists is skipped unless you give `--force`. A skipped case
 replaces an earlier blocked or refused result. `check` also runs the seed tests.
 

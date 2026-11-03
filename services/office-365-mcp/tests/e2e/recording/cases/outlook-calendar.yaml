@@ -3,6 +3,7 @@ outlook_list_calendars-all:
     - tool: outlook_list_calendars
 
 outlook_list_calendars-shared:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
   needs: [shared_calendars]
   chain:
     - tool: outlook_list_calendars
@@ -16,6 +17,7 @@ outlook_list_calendar_groups-all:
     - tool: outlook_list_calendar_groups
 
 outlook_list_calendar_groups-with-shared:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
   needs: [shared_calendars]
   chain:
     - tool: outlook_list_calendar_groups
@@ -55,6 +57,7 @@ outlook_list_events-invitations-waiting:
       args: {starts_on: "~today", ends_on: "~tomorrow", owner_response: notResponded, limit: 100}
 
 outlook_list_events-colleague-calendar:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
   needs: [shared_calendars]
   chain:
     - tool: outlook_list_calendars
@@ -335,6 +338,7 @@ outlook_create_event_on_behalf-shared-calendar:
       bind: {calendar_ref: "$prev.calendars[name=seed-v1 Shared calendar].uri"}
 
 outlook_create_event_on_behalf-manager:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
   needs: [shared_calendars]
   external: true
   chain:

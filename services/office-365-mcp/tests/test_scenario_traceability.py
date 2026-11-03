@@ -4,6 +4,7 @@ scenario", has the keys."""
 
 import ast
 import pathlib
+import re
 from collections.abc import Mapping
 from typing import cast
 
@@ -14,6 +15,7 @@ _SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _FEATURES = _SERVICE_ROOT / "features"
 _PENDING = _FEATURES / "PENDING.txt"
 _RUNNER = "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says"
+_CASES = _SERVICE_ROOT / "tests" / "e2e" / "recording" / "cases"
 _NO_TEST_KINDS = ("assistant", "human", "limit")
 
 
@@ -176,3 +178,71 @@ class TestEveryScenarioHasATestOrAReason:
         self, entry: Mapping[str, object], pending: bool
     ) -> None:
         assert _problems("uc-00-01", entry, {"uc-00-01"} if pending else set()) == []
+
+
+def _deferred_cases() -> set[str]:
+    return {
+        case
+        for file in sorted(_CASES.glob("*.yaml"))
+        for case, spec in cast(
+            "Mapping[str, Mapping[str, object]]", yaml.safe_load(file.read_text())
+        ).items()
+        if spec.get("deferred")
+    }
+
+
+def _all_cases() -> set[str]:
+    return {
+        case
+        for file in sorted(_CASES.glob("*.yaml"))
+        for case in cast("Mapping[str, object]", yaml.safe_load(file.read_text()))
+    }
+
+
+def _tagged_deferred() -> set[str]:
+    tagged: set[str] = set()
+    for feature in sorted(_FEATURES.glob("*.feature")):
+        for line in feature.read_text().splitlines():
+            tags = line.split()
+            if tags and all(tag.startswith("@") for tag in tags) and "@deferred" in tags:
+                tagged.update(tag[1:] for tag in tags if re.fullmatch(r"@uc-\d\d-\d\d", tag))
+    return tagged
+
+
+class TestDeferredWork:
+    def test_a_deferred_key_lists_existing_cases_that_have_a_deferred_reason(self) -> None:
+        deferred, known = _deferred_cases(), _all_cases()
+        problems: list[str] = []
+        for scenario_id, entry in _entries().items():
+            listed = entry.get("deferred")
+            if listed is None:
+                continue
+            if not isinstance(listed, list) or not listed:
+                problems.append(f"{scenario_id}: `deferred` is a list with at least one case id")
+                continue
+            cases = [str(case) for case in cast("list[object]", listed)]
+            problems += [
+                f"{scenario_id}: {case} is not a recorder case"
+                for case in cases
+                if case not in known
+            ]
+            problems += [
+                f"{scenario_id}: {case} has no `deferred` reason"
+                for case in cases
+                if case in known and case not in deferred
+            ]
+
+        assert problems == []
+
+    def test_the_tag_and_the_sidecar_key_come_together(self) -> None:
+        keyed = {scenario_id for scenario_id, entry in _entries().items() if "deferred" in entry}
+
+        assert sorted(_tagged_deferred() ^ keyed) == []
+
+    def test_a_deferred_scenario_keeps_its_test_or_its_reason(self) -> None:
+        pending = _pending()
+        problems = [
+            p for i, e in _entries().items() if "deferred" in e for p in _problems(i, e, pending)
+        ]
+
+        assert problems == []

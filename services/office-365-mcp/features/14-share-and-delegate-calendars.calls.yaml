@@ -32,6 +32,8 @@ uc-14-02:
   note: the row My Organization cannot be removed, so Anna may still see when Mia is free or busy if she works in Mia's company
 
 uc-14-03:
+  deferred:
+    - outlook_create_event_on_behalf-manager
   status: untested
   tests:
     - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_meeting_is_booked_on_the_calendar_of_the_manager_after_mia_approves"

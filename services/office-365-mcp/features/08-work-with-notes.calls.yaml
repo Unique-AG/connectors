@@ -562,6 +562,8 @@ uc-08-39:
   note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Notes.Read (tools/onenote_read_page.py:29), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
 
 uc-08-40:
+  deferred:
+    - onenote_get_operation-notebook
   status: untested
   tests:
     - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_notebook_is_copied_under_a_new_name_and_followed_to_the_end"

@@ -120,7 +120,9 @@ def plan_runs(
     found: list[Run] = []
     for plan in sorted(plans, key=order):
         missing = [key for key in plan.needs if not discovered.get(key, False)]
-        if plan.fixture in existing and not force:
+        if plan.deferred:
+            found.append(Run(plan, "deferred", plan.deferred))
+        elif plan.fixture in existing and not force:
             found.append(Run(plan, "skip", "the fixture exists"))
         elif missing:
             found.append(Run(plan, "blocked", " ".join(load().needs.get(k, k) for k in missing)))
@@ -154,6 +156,7 @@ def report(results: Results) -> str:
             *section("Recorded", "recorded"),
             *section("Refused", "refused"),
             *section("Blocked", "blocked"),
+            *section("Deferred", "deferred"),
             *section("Would record (dry run)", "would-record"),
             f"## Not recorded ({len(unrecorded)})",
             *(f"- {tool}: {why}" for tool, why in unrecorded),
@@ -276,7 +279,7 @@ def execute(
         if run.status != "run":
             earlier = results.get(plan.scenario, {}).get("status")
             if (
-                run.status == "blocked"
+                run.status in ("blocked", "deferred")
                 or (run.status == "skip" and earlier != "recorded")
                 or plan.scenario not in results
             ):

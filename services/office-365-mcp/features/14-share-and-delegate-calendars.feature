@@ -20,7 +20,7 @@ Feature: Sharing and delegating calendars
 
   Rule: A delegate acts in the name of the person who delegated
 
-    @happy @uc-14-03
+    @happy @uc-14-03 @deferred
     Scenario: A meeting is booked on the calendar of a manager
       Given Mia's manager Lena delegated her calendar to Mia
       When Mia asks her assistant to book "Budget review" with Anna on Lena's calendar

@@ -94,6 +94,9 @@ uc-03-07:
       uses: {uri: uri of the event from the listing}
 
 uc-03-08:
+  deferred:
+    - outlook_list_calendars-shared
+    - outlook_list_events-colleague-calendar
   status: untested
   tests:
     - "tests/tools/scenarios/test_03_read_the_calendar.py::TestASharedCalendar::test_it_lists_the_events_of_a_calendar_that_a_colleague_shared"
@@ -368,6 +371,8 @@ uc-03-26:
   note: "model behaviour, no code guard (source: tools/outlook_list_reminders.py:40-41, the third note: Graph does not say which calendars the view covers, and an empty list does not prove that no calendar holds a reminder; and :107-112, the reminders field: an empty list means that Graph returned no reminder, read capped before you report that the list is complete)."
 
 uc-03-27:
+  deferred:
+    - outlook_list_calendar_groups-with-shared
   status: untested
   tests:
     - "tests/tools/scenarios/test_03_read_the_calendar.py::TestRemindersAndGroups::test_it_shows_the_calendars_by_group_and_marks_the_own_ones"

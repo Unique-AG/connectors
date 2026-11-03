@@ -27,6 +27,8 @@ uc-06-02:
       args: {include_member_emails: true}
 
 uc-06-03:
+  deferred:
+    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_finds_a_topic_in_a_chat_and_in_a_channel"
@@ -68,6 +70,10 @@ uc-06-04:
       uses: {uri: uri of a post}
 
 uc-06-05:
+  deferred:
+    - teams_list_meeting_transcripts-past
+    - teams_read_transcript-past
+    - teams_read_transcript-lines
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_who_said_what_in_a_transcript"
@@ -114,6 +120,8 @@ uc-06-07:
   must_not: [teams_read_transcript]
 
 uc-06-08:
+  deferred:
+    - teams_list_meeting_recordings-past
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_describes_a_recording_and_gives_none_of_its_content"
@@ -127,6 +135,8 @@ uc-06-08:
       uses: {meeting_uri: uri of the meeting}
 
 uc-06-09:
+  deferred:
+    - teams_search_messages-lena
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_for_messages_that_mention_mia"
@@ -141,6 +151,8 @@ uc-06-09:
       uses: {uri: uri of a hit}
 
 uc-06-10:
+  deferred:
+    - teams_search_messages-person-window
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_the_messages_of_one_person_in_a_time_window"
@@ -219,6 +231,9 @@ uc-06-14:
   note: the refusal is the same for every meeting, so the assistant stops after the first one.
 
 uc-06-15:
+  deferred:
+    - teams_list_meeting_transcripts-past
+    - teams_read_transcript-past
   status: partly
   no_test: "assistant: The assistant must build the meeting handle from the join address of a calendar event, and only a model can show that it does."
   ask: "Summarize the Budget review that is on my calendar."
@@ -535,6 +550,8 @@ uc-06-30:
   note: "One call reads at most 50 chats. Expected behaviour from src/office_365_mcp/tools/teams_list_chats.py:42 and :215-222: capped is true when the walk stopped after it collected the limit; chats can remain beyond what the call reached; the assistant says so and does not call the result the full answer."
 
 uc-06-34:
+  deferred:
+    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_finds_unread_posts_of_channels_through_the_read_state_search"
@@ -550,6 +567,10 @@ uc-06-34:
   note: "teams_list_chats lists chats and not channels, so the unread posts of channels come from the search by read state (src/office_365_mcp/tools/teams_search_messages.py:152 and :188-189). A hit of a channel post has a team and a channel and a hit of a chat message has neither (:109-117), so the assistant keeps the posts. Nobody ran it: whether Microsoft keeps a read state for channel posts is not proven."
 
 uc-06-35:
+  deferred:
+    - teams_list_meeting_transcripts-past
+    - teams_read_transcript-past
+    - teams_search_messages-person-window
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_the_summary_from_the_transcript_and_the_message_written_after_it"

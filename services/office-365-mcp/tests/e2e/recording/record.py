@@ -116,6 +116,7 @@ class Plan:
     scopes: tuple[str, ...] = ()
     gap: int = 0
     reseed_personas: tuple[int, ...] = ()
+    deferred: str = ""
 
     @property
     def literals(self) -> frozenset[str]:
@@ -176,6 +177,9 @@ def resolve(
         if not 1 <= int(cast("int", step.get("wait_seconds", 1))) <= _MAX_WAIT
     ]:
         raise Refused(f"{scenario}: step {bad[0]} waits outside 1..{_MAX_WAIT} seconds")
+    deferred = spec.get("deferred", "")
+    if not isinstance(deferred, str) or ("deferred" in spec and not deferred.strip()):
+        raise Refused(f"{scenario}: deferred is a reason in words, not {deferred!r}")
     default = f"rec-tool-{scenario}" if spec else f"rec-{scenario}"
     phases, order = reseed_of(spec)
     if bad := [one for one in order if not 1 <= one <= _PERSONAS]:
@@ -194,6 +198,7 @@ def resolve(
         scopes,
         gap,
         order,
+        deferred,
     )
 
 

@@ -19,7 +19,7 @@ Feature: Catching up on Teams
       When Mia asks her assistant for her chats
       Then the assistant shows that chat as the chat with Anna and Tom
 
-    @happy @uc-06-34
+    @happy @uc-06-34 @deferred
     Scenario: Unread posts in channels are listed
       Given Mia belongs to the team "Sales", and 2 posts in its channel "Offers" are unread
       When Mia asks her assistant what she missed in her Teams channels
@@ -28,7 +28,7 @@ Feature: Catching up on Teams
 
   Rule: The assistant finds a message in any chat or channel
 
-    @happy @uc-06-03
+    @happy @uc-06-03 @deferred
     Scenario: A topic is found in a chat and in a channel
       Given Tom wrote about the pricing change in a chat with Mia
       And Priya wrote about the pricing change in the channel "Sales"
@@ -44,7 +44,7 @@ Feature: Catching up on Teams
       And it includes the 4 replies under their post
       And it says whether it read all posts of the channel
 
-    @happy @uc-06-09
+    @happy @uc-06-09 @deferred
     Scenario: Messages that mention Mia are found
       Given Tom mentioned Mia in a chat on Monday
       And Priya mentioned Mia in the channel "Sales" on Tuesday
@@ -52,7 +52,7 @@ Feature: Catching up on Teams
       Then the assistant shows the message of Tom
       And it shows the message of Priya
 
-    @happy @uc-06-10
+    @happy @uc-06-10 @deferred
     Scenario: The messages of one person in a time window are found
       Given Tom wrote in a chat yesterday and in the channel "Sales" yesterday
       And Tom also wrote in a chat last week
@@ -78,7 +78,7 @@ Feature: Catching up on Teams
 
   Rule: The assistant tells Mia what a meeting said
 
-    @happy @uc-06-05
+    @happy @uc-06-05 @deferred
     Scenario: A transcript becomes a summary with action items
       Given the "Design review" of yesterday has a transcript where Anna and Tom speak
       When Mia asks her assistant for a summary with the action items
@@ -91,7 +91,7 @@ Feature: Catching up on Teams
       When Mia asks her assistant for the decisions of that meeting
       Then the assistant names the decision from the end of the transcript
 
-    @happy @uc-06-35
+    @happy @uc-06-35 @deferred
     Scenario: The messages that follow a meeting are found with its summary
       Given "Design review" of yesterday has a transcript, and Tom wrote in a chat after the meeting that he sends the offer
       When Mia asks her assistant for a summary of "Design review" and for what people wrote about it afterwards
@@ -106,7 +106,7 @@ Feature: Catching up on Teams
 
   Rule: A recording is described and never handed over
 
-    @unhappy @uc-06-08
+    @unhappy @uc-06-08 @deferred
     Scenario: The assistant describes a recording and does not give it
       Given "Design review" was recorded and runs for 52 minutes
       When Mia asks her assistant for the recording
@@ -131,7 +131,7 @@ Feature: Catching up on Teams
       Then the assistant tells Mia that an administrator must allow access to transcripts
       But it does not say that no transcript exists
 
-    @happy @uc-06-15
+    @happy @uc-06-15 @deferred
     Scenario: A meeting from the calendar is summarized from its transcript
       Given "Budget review" is on Mia's calendar and it has a transcript
       And Mia has no meeting chat for "Budget review"

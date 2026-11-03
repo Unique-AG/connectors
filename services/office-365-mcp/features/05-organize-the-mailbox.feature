@@ -373,7 +373,7 @@ Feature: Organizing the mailbox
       And the assistant tells Mia what the rule does
       But the rule keeps acting on new mail
 
-    @happy @uc-05-40
+    @happy @uc-05-40 @deferred
     Scenario: A rule that forwards to a name asks for the address first
       Given Mia knows Anna only by her name
       When Mia asks her assistant for a rule that forwards mail from "ceo@example.com" to "Anna"
@@ -523,7 +523,7 @@ Feature: Organizing the mailbox
       And the message of Anna is in "Contracts"
       But nothing is sent
 
-    @happy @uc-05-58
+    @happy @uc-05-58 @deferred
     Scenario: A note is drafted for a message that Mia files
       Given Mia has the invoice "Brightway March" in her inbox
       When Mia asks her assistant to file the invoice in "Finance" and to draft a note to Tom that it is filed

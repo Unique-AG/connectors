@@ -73,7 +73,7 @@ Feature: Running Teams chats and online meetings
       When Mia asks her assistant who attended "Design review"
       Then the assistant tells Mia that only Anna can see the attendance
 
-    @happy @uc-13-39
+    @happy @uc-13-39 @deferred
     Scenario: The organizer sees who attended and for how long
       Given Mia organized "Design review", and it ended yesterday with an attendance report that lists Anna for 25 minutes and Tom for 40 minutes
       When Mia asks her assistant who attended "Design review"

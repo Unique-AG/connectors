@@ -1,4 +1,6 @@
 uc-04-01:
+  deferred:
+    - outlook_draft_mail-to-found-person
   status: untested
   tests:
     - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_it_addresses_the_draft_to_the_address_that_the_name_found"

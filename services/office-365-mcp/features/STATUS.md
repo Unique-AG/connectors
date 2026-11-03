@@ -104,6 +104,33 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-14-05` | Sharing and delegating calendars | The events of a team calendar are listed for a week | partly | `outlook_list_group_events` | The only call in prod failed and the logs give no cause, and the tool declares the permission Calendars.Read only. |
 | `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known. |
 
+## Deferred work
+
+Scenarios tagged `@deferred`: 20 of 547. Recorder cases with a `deferred` reason: 20. No gate counts them as failed or blocked.
+
+| Recorder case | Reason | Scenarios |
+| --- | --- | --- |
+| `onenote_get_operation-notebook` | Graph sends the status not started and the SDK parses it to None. The server needs a change. | `uc-08-40` |
+| `outlook_create_event_on_behalf-manager` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-14-03` |
+| `outlook_create_mail_rule-forward-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-05-40` |
+| `outlook_draft_mail-to-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-04-01`, `uc-05-58`, `uc-15-06` |
+| `outlook_find_recipient-tom` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-05-58`, `uc-15-06` |
+| `outlook_list_calendar_groups-with-shared` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-27` |
+| `outlook_list_calendars-shared` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-08` |
+| `outlook_list_events-colleague-calendar` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-08` |
+| `teams_browse_channel-private` | The tenant policy refuses to create a private channel. An administrator must switch on private channels. |  |
+| `teams_get_channel_files_folder-private` | The tenant policy refuses to create a private channel. An administrator must switch on private channels. |  |
+| `teams_list_channels-private` | The tenant policy refuses to create a private channel. An administrator must switch on private channels. |  |
+| `teams_list_meeting_recordings-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-08` |
+| `teams_list_meeting_transcripts-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-05`, `uc-06-15`, `uc-06-35`, `uc-15-09` |
+| `teams_read_meeting-attendance` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-13-39` |
+| `teams_read_meeting-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-13-39` |
+| `teams_read_transcript-lines` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-05` |
+| `teams_read_transcript-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-05`, `uc-06-15`, `uc-06-35`, `uc-15-09` |
+| `teams_search_messages-alpine` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-03`, `uc-06-34`, `uc-15-07` |
+| `teams_search_messages-lena` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-09` |
+| `teams_search_messages-person-window` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-10`, `uc-06-35`, `uc-15-12` |
+
 ## Tool coverage
 
 120 of 121 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.

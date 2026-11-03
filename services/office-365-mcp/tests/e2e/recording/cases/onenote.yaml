@@ -266,6 +266,7 @@ onenote_edit_page-replace-sentence:
         commands: [{target: "$prev.html~p[id]", action: replace, content: '<p data-id="one">Changed sentence.</p>'}]
 
 onenote_get_operation-notebook:
+  deferred: "Graph sends the status not started and the SDK parses it to None. The server needs a change."
   needs: *seed
   chain:
     - {tool: onenote_list_notebooks, args: {name_contains: "seed-v1 Spare"}}

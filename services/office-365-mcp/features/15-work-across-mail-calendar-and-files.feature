@@ -59,7 +59,7 @@ Feature: Working across mail, calendar, files, and Teams
 
   Rule: Mia gathers what she has on one customer from three places
 
-    @happy @uc-15-07
+    @happy @uc-15-07 @deferred
     Scenario: Mail, Teams messages, and files about a customer are gathered
       Given Acme wrote to Mia by mail about the renewal
       And Tom wrote about Acme in a Teams chat
@@ -69,14 +69,14 @@ Feature: Working across mail, calendar, files, and Teams
 
   Rule: A Teams discussion or a meeting leads to a mail
 
-    @happy @uc-15-06
+    @happy @uc-15-06 @deferred
     Scenario: A decision from a chat becomes a mail draft
       Given Anna and Tom agreed in the chat "Launch" that the launch moves to 14 June
       When Mia asks her assistant to draft a mail to Anna and Tom that states the decision
       Then the draft to Anna and Tom states that the launch moves to 14 June
       And the draft is not sent
 
-    @happy @uc-15-09
+    @happy @uc-15-09 @deferred
     Scenario: The action items of a meeting go into a mail draft for its attendees
       Given "Design review" of yesterday has a transcript with 3 action items
       And Anna and Tom attended it
@@ -101,7 +101,7 @@ Feature: Working across mail, calendar, files, and Teams
       Then Mia is asked to approve the new file first
       And after she approves, "Offers" holds a text file with the text of the mail
 
-    @happy @uc-15-12
+    @happy @uc-15-12 @deferred
     Scenario: A file that Anna posted in Teams is read
       Given Anna posted the file "Offer.docx" in a chat with Mia yesterday
       When Mia asks her assistant what is in the file that Anna posted

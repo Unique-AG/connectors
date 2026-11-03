@@ -272,6 +272,26 @@ class TestCases:
         assert guard_for(STAND_IN_UPNS, plan, False, 40).allowed_upn == STAND_IN_UPNS[1]
         assert guard_for(STAND_IN_UPNS, plan, False, 40).cap == 7
 
+    def test_a_deferred_reason_is_read_and_defaults_to_none(self, tmp_path: Path) -> None:
+        _ = (tmp_path / "f.yaml").write_text(
+            "outlook_list_mail-x:\n  deferred: Wait for the index.\n"
+            + "  chain:\n    - {tool: outlook_list_mail}\n"
+            + "outlook_list_mail-y:\n  chain:\n    - {tool: outlook_list_mail}\n"
+        )
+        assert resolve("outlook_list_mail-x", cases=tmp_path).deferred == "Wait for the index."
+        assert resolve("outlook_list_mail-y", cases=tmp_path).deferred == ""
+
+    @pytest.mark.parametrize("reason", ['""', "[a]", "5"])
+    def test_a_deferred_reason_that_is_not_words_is_refused(
+        self, tmp_path: Path, reason: str
+    ) -> None:
+        _ = (tmp_path / "f.yaml").write_text(
+            f"outlook_list_mail-x:\n  deferred: {reason}\n"
+            + "  chain:\n    - {tool: outlook_list_mail}\n"
+        )
+        with pytest.raises(guard_module.Refused, match="deferred"):
+            _ = resolve("outlook_list_mail-x", cases=tmp_path)
+
     @pytest.mark.parametrize(("option", "value"), [("persona", 4), ("persona", 0), ("cap", 101)])
     def test_a_persona_or_cap_out_of_range_is_refused(
         self, tmp_path: Path, option: str, value: int

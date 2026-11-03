@@ -5,7 +5,7 @@ Feature: Drafting and sending mail
 
   Rule: A draft goes to the real address of the right person
 
-    @happy @uc-04-01
+    @happy @uc-04-01 @deferred
     Scenario: A draft is addressed to the address of the named person
       Given Anna Meier works in Legal and has the address "anna.meier@example.com"
       When Mia asks her assistant to draft a note to Anna Meier that asks for the contract by Friday

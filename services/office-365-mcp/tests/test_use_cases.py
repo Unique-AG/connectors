@@ -51,6 +51,7 @@ _ENTRY_KEYS = {
     "variants",
     "tests",
     "no_test",
+    "deferred",
 }
 _RUNNER_STEP_KEYS = {"args", "pick", "fault", "expect", "approval", "bind"}
 _STEP_KEYS = {"tool", "any_of", "optional", "repeat", "args", "uses", *_RUNNER_STEP_KEYS}
