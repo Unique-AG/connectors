@@ -1,6 +1,7 @@
 from datetime import datetime
 from datetime import UTC
 import json
+import logging
 from typing import cast
 import uuid
 
@@ -8,6 +9,8 @@ import unique_sdk
 
 from space_config_mcp.persistence import Persistence
 from space_config_mcp.upstream import Upstream
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def snapshot_space(
@@ -23,20 +26,31 @@ async def snapshot_space(
 
     Snapshots are point-in-time captures. Config changes made through
     the portal between MCP calls are not reflected until the next call.
+    The knowledge-base write is best-effort: the snapshot ID and config
+    are always returned, even when persistence fails.
     """
     space = await upstream.get_space(user_id, company_id, space_id)
     snapshot_id = str(uuid.uuid4())
     captured_at = datetime.now(UTC).isoformat()
     effective_label = label or f"snapshot-{captured_at}"
-    await persistence.save_snapshot(
-        user_id,
-        company_id,
-        space_id=space_id,
-        snapshot_id=snapshot_id,
-        label=effective_label,
-        captured_at=captured_at,
-        config=dict(space),
-    )
+    try:
+        await persistence.save_snapshot(
+            user_id,
+            company_id,
+            space_id=space_id,
+            snapshot_id=snapshot_id,
+            label=effective_label,
+            captured_at=captured_at,
+            config=dict(space),
+        )
+    except Exception:
+        _LOGGER.warning(
+            "Failed to persist snapshot %s for space %s — "
+            "snapshot captured but not stored in the knowledge base.",
+            snapshot_id,
+            space_id,
+            exc_info=True,
+        )
     return {"snapshot_id": snapshot_id, "label": effective_label}
 
 
@@ -133,6 +147,22 @@ async def revert_space(
         "reverted_to": snapshot_id,
         "pre_revert_snapshot": pre_revert["snapshot_id"],
     }
+
+
+async def delete_snapshots(
+    *,
+    persistence: Persistence,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+) -> dict[str, object]:
+    """Delete all stored snapshots for a space.
+
+    Removes the snapshot file and every version it contains. This cannot be
+    undone. Individual version deletion is not supported by the KB API.
+    """
+    await persistence.delete_snapshots(user_id, company_id, space_id)
+    return {"deleted": True, "space_id": space_id}
 
 
 async def export_space_config(

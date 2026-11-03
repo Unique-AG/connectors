@@ -12,6 +12,7 @@ from space_config_mcp.upstream import Upstream
 _get_request_meta: Callable[[], dict[str, object] | None] | None = None
 _user_id_key: str | None = None
 _company_id_key: str | None = None
+_assistant_id_key: str | None = None
 
 try:
     from unique_mcp.meta.keys import MetaKeys as _MetaKeys
@@ -20,6 +21,7 @@ try:
     _get_request_meta = _get_request_meta_impl
     _user_id_key = _MetaKeys.USER_ID
     _company_id_key = _MetaKeys.COMPANY_ID
+    _assistant_id_key = _MetaKeys.ASSISTANT_ID
 except ImportError:
     pass
 
@@ -55,4 +57,28 @@ async def get_caller() -> tuple[str, str]:
     raise ToolError(
         "Cannot resolve caller identity: no _meta auth keys and "
         "UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID are not set."
+    )
+
+
+async def get_space_id() -> str:
+    """Resolve the calling space's assistant ID from request meta.
+
+    The Unique platform injects ``unique.app/chat/assistant-id`` into every
+    tool call's ``_meta``. Falls back to ``UNIQUE_AUTH_ASSISTANT_ID`` for
+    local development.
+    """
+    if _get_request_meta is not None and _assistant_id_key is not None:
+        meta = _get_request_meta()
+        if meta is not None:
+            aid = meta.get(_assistant_id_key)
+            if aid and isinstance(aid, str):
+                return aid
+
+    aid = os.environ.get("UNIQUE_AUTH_ASSISTANT_ID")
+    if aid:
+        return aid
+
+    raise ToolError(
+        "Cannot resolve space ID: no _meta assistant-id key and "
+        "UNIQUE_AUTH_ASSISTANT_ID is not set."
     )

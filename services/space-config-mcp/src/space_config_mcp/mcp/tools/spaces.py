@@ -12,34 +12,14 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.upstream import Upstream
 
-_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
-
-
-@tool(
-    title="List Spaces",
-    meta=_META,
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
+_META = merge_tool_meta(
+    {},
+    ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID, MetaKeys.ASSISTANT_ID]),
 )
-async def list_spaces(
-    *,
-    name: Annotated[
-        str | None, Field(description="Optional case-insensitive partial name filter.")
-    ] = None,
-    skip: Annotated[int, Field(description="Number of records to skip for pagination.", ge=0)] = 0,
-    take: Annotated[
-        int, Field(description="Maximum number of records to return.", ge=1, le=1000)
-    ] = 20,
-    upstream: Upstream = Depends(get_upstream),
-    caller: tuple[str, str] = Depends(get_caller),
-) -> unique_sdk.Space.Spaces:
-    """List Unique AI spaces. Optionally filter by name substring."""
-    user_id, company_id = caller
-    return await contexts.list_spaces(
-        upstream=upstream, user_id=user_id, company_id=company_id, name=name, skip=skip, take=take
-    )
 
 
 @tool(
@@ -49,11 +29,11 @@ async def list_spaces(
 )
 async def get_space(
     *,
-    space_id: Annotated[str, Field(description="ID of the space to retrieve.")],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
-    """Get full space configuration: metadata, modules, scope rules, MCP servers, and access."""
+    """Get the full configuration of the current space: metadata, modules, scope rules, and access."""
     user_id, company_id = caller
     return await contexts.get_space(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
@@ -67,7 +47,6 @@ async def get_space(
 )
 async def update_space(
     *,
-    space_id: Annotated[str, Field(description="ID of the space to update.")],
     name: Annotated[str | None, Field(description="New display name for the space.")] = None,
     explanation: Annotated[
         str | None, Field(description="Description / system-prompt text for the space.")
@@ -90,8 +69,9 @@ async def update_space(
     ] = None,
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
-    """Update space metadata. Only the fields you provide are changed."""
+    """Update metadata of the current space. Only the fields you provide are changed."""
     user_id, company_id = caller
     try:
         return await contexts.update_space(
