@@ -374,6 +374,8 @@ networkPolicy:
   baseline:
     prometheus:
       namespace: system
+    ephemeralPorts:
+      enabled: false
     egress:
       microsoft:
         toFQDNs:
