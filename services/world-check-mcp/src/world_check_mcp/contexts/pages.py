@@ -1,5 +1,9 @@
 from world_check_mcp.upstream import GET_RESULTS
+from world_check_mcp.upstream import GetResultsPath
+from world_check_mcp.upstream import GetResultsRequest
 from world_check_mcp.upstream import next_page
+from world_check_mcp.upstream import PaginationReferenceRequestInput
+from world_check_mcp.upstream import ResultsFilterRequestInput
 from world_check_mcp.upstream import ResultWire
 from world_check_mcp.upstream import Upstream
 
@@ -14,11 +18,16 @@ async def all_case_results(*, upstream: Upstream, case_system_id: str) -> list[R
     page_reference: str | None = None
     seen: set[str] = set()
     for _ in range(100):
-        pagination: dict[str, object] = {"itemsPerPage": 1000}
-        if page_reference is not None:
-            pagination["pageReference"] = page_reference
-        page = await upstream.call_untyped(
-            GET_RESULTS, caseSystemId=case_system_id, pagination=pagination
+        page = await upstream.call(
+            GET_RESULTS,
+            GetResultsRequest(
+                path=GetResultsPath(case_system_id=case_system_id),
+                body=ResultsFilterRequestInput(
+                    pagination=PaginationReferenceRequestInput(
+                        items_per_page=1000, page_reference=page_reference
+                    )
+                ),
+            ),
         )
         found.extend(page.results)
         following = next_page(page.pagination)

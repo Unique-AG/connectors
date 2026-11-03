@@ -2,8 +2,32 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
+from world_check_mcp.upstream.generated.vendor_requests import GetApiInfoRequest
+from world_check_mcp.upstream.generated.vendor_requests import (
+    GetCaseAuditEventsByCaseSystemIdRequest,
+)
+from world_check_mcp.upstream.generated.vendor_requests import GetCaseReferenceRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetCaseTemplateForGroupRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetCountriesRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetGroupByIdRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetGroupsRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetMrzDataRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetNationalitiesRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetOngoingScreeningUpdatesRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetProvidersRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetRecordRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetResolutionToolkitsForGroupRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
+from world_check_mcp.upstream.generated.vendor_requests import GetSearchFiltersRequest
+from world_check_mcp.upstream.generated.vendor_requests import SearchCasesRequest
+from world_check_mcp.upstream.generated.vendor_requests import (
+    ToggleOngoingScreeningByProviderTypesRequest,
+)
 from world_check_mcp.upstream.generated.vendor_responses import ApiInfo
+from world_check_mcp.upstream.generated.vendor_responses import AuditSearchResponse
+from world_check_mcp.upstream.generated.vendor_responses import CaseBulkResponse
 from world_check_mcp.upstream.generated.vendor_responses import CaseReference
+from world_check_mcp.upstream.generated.vendor_responses import CaseSearchResponse
 from world_check_mcp.upstream.generated.vendor_responses import CaseTemplateResponse
 from world_check_mcp.upstream.generated.vendor_responses import Entity
 from world_check_mcp.upstream.generated.vendor_responses import GetCountriesResponse
@@ -12,25 +36,56 @@ from world_check_mcp.upstream.generated.vendor_responses import (
     GetResolutionToolkitsForGroupResponse,
 )
 from world_check_mcp.upstream.generated.vendor_responses import GroupSummary
+from world_check_mcp.upstream.generated.vendor_responses import MRZGenerationResponse
+from world_check_mcp.upstream.generated.vendor_responses import OgsUpdatesFilteredNotifications
 from world_check_mcp.upstream.generated.vendor_responses import ProviderDetail
+from world_check_mcp.upstream.generated.vendor_responses import ResultsResponse
 from world_check_mcp.upstream.generated.vendor_responses import SearchParameterCollection
 
-GET_API_INFO = Operation[ApiInfo]("getApiInfo", TypeAdapter(ApiInfo))
-GET_CASE_REFERENCE = Operation[CaseReference]("getCaseReference", TypeAdapter(CaseReference))
-GET_CASE_TEMPLATE_FOR_GROUP = Operation[CaseTemplateResponse](
+GET_API_INFO = Operation[ApiInfo, GetApiInfoRequest]("getApiInfo", TypeAdapter(ApiInfo))
+GET_CASE_REFERENCE = Operation[CaseReference, GetCaseReferenceRequest](
+    "getCaseReference", TypeAdapter(CaseReference)
+)
+GET_CASE_TEMPLATE_FOR_GROUP = Operation[CaseTemplateResponse, GetCaseTemplateForGroupRequest](
     "getCaseTemplateForGroup", TypeAdapter(CaseTemplateResponse)
 )
-GET_COUNTRIES = Operation[GetCountriesResponse]("getCountries", TypeAdapter(GetCountriesResponse))
-GET_GROUP_BY_ID = Operation[GroupSummary]("getGroupById", TypeAdapter(GroupSummary))
-GET_GROUPS = Operation[list[GroupSummary]]("getGroups", TypeAdapter(list[GroupSummary]))
-GET_NATIONALITIES = Operation[GetNationalitiesResponse](
+GET_COUNTRIES = Operation[GetCountriesResponse, GetCountriesRequest](
+    "getCountries", TypeAdapter(GetCountriesResponse)
+)
+GET_GROUP_BY_ID = Operation[GroupSummary, GetGroupByIdRequest](
+    "getGroupById", TypeAdapter(GroupSummary)
+)
+GET_GROUPS = Operation[list[GroupSummary], GetGroupsRequest](
+    "getGroups", TypeAdapter(list[GroupSummary])
+)
+GET_NATIONALITIES = Operation[GetNationalitiesResponse, GetNationalitiesRequest](
     "getNationalities", TypeAdapter(GetNationalitiesResponse)
 )
-GET_PROVIDERS = Operation[list[ProviderDetail]]("getProviders", TypeAdapter(list[ProviderDetail]))
-GET_RECORD = Operation[Entity]("getRecord", TypeAdapter(Entity))
-GET_RESOLUTION_TOOLKITS_FOR_GROUP = Operation[GetResolutionToolkitsForGroupResponse](
-    "getResolutionToolkitsForGroup", TypeAdapter(GetResolutionToolkitsForGroupResponse)
+GET_PROVIDERS = Operation[list[ProviderDetail], GetProvidersRequest](
+    "getProviders", TypeAdapter(list[ProviderDetail])
 )
-GET_SEARCH_FILTERS = Operation[SearchParameterCollection](
+GET_RECORD = Operation[Entity, GetRecordRequest]("getRecord", TypeAdapter(Entity))
+GET_RESOLUTION_TOOLKITS_FOR_GROUP = Operation[
+    GetResolutionToolkitsForGroupResponse, GetResolutionToolkitsForGroupRequest
+]("getResolutionToolkitsForGroup", TypeAdapter(GetResolutionToolkitsForGroupResponse))
+GET_SEARCH_FILTERS = Operation[SearchParameterCollection, GetSearchFiltersRequest](
     "getSearchFilters", TypeAdapter(SearchParameterCollection)
+)
+SEARCH_CASES = Operation[CaseSearchResponse, SearchCasesRequest](
+    "searchCases", TypeAdapter(CaseSearchResponse)
+)
+GET_RESULTS = Operation[ResultsResponse, GetResultsRequest](
+    "getResults", TypeAdapter(ResultsResponse)
+)
+GET_CASE_AUDIT_EVENTS_BY_CASE_SYSTEM_ID = Operation[
+    AuditSearchResponse, GetCaseAuditEventsByCaseSystemIdRequest
+]("getCaseAuditEventsByCaseSystemId", TypeAdapter(AuditSearchResponse))
+TOGGLE_ONGOING_SCREENING_BY_PROVIDER_TYPES = Operation[
+    CaseBulkResponse, ToggleOngoingScreeningByProviderTypesRequest
+]("toggleOngoingScreeningByProviderTypes", TypeAdapter(CaseBulkResponse))
+GET_ONGOING_SCREENING_UPDATES = Operation[
+    OgsUpdatesFilteredNotifications, GetOngoingScreeningUpdatesRequest
+]("getOngoingScreeningUpdates", TypeAdapter(OgsUpdatesFilteredNotifications))
+GET_MRZ_DATA = Operation[MRZGenerationResponse, GetMrzDataRequest](
+    "getMrzData", TypeAdapter(MRZGenerationResponse)
 )

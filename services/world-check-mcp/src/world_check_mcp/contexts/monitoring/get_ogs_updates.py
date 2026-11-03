@@ -9,11 +9,15 @@ from world_check_mcp.contexts.monitoring.models import OgsPage
 from world_check_mcp.contexts.monitoring.models import OgsUpdate
 from world_check_mcp.contexts.monitoring.models import OgsWindow
 from world_check_mcp.contexts.monitoring.models import UpdateMode
-from world_check_mcp.upstream import GET_OGS_UPDATES
+from world_check_mcp.upstream import GET_ONGOING_SCREENING_UPDATES
+from world_check_mcp.upstream import GetOngoingScreeningUpdatesRequest
 from world_check_mcp.upstream import next_page
-from world_check_mcp.upstream import OgsUpdateWire
+from world_check_mcp.upstream import OgsUpdateFilterInput
+from world_check_mcp.upstream import PaginationReferenceRequestInput
+from world_check_mcp.upstream import SortCriterionInput
 from world_check_mcp.upstream import Upstream
 from world_check_mcp.upstream import UpstreamError
+from world_check_mcp.upstream import WatchlistResults
 
 _EMPTY = "NO_OGS_CASE_UPDATES_FOUND_WITHIN_DATE_RANGE"
 
@@ -35,16 +39,21 @@ async def get_ogs_updates(
     start, end = _window(since=since, until=until)
     resolved = None if case is None else await get_case(upstream=upstream, case=case)
     case_system_id = None if resolved is None else resolved.case_system_id
-    pagination: dict[str, object] = {"itemsPerPage": limit}
-    if page_reference is not None:
-        pagination["pageReference"] = page_reference
     try:
-        found = await upstream.call_untyped(
-            GET_OGS_UPDATES,
-            filter=_filter(start=start, end=end, group_id=group_id, case_system_id=case_system_id),
-            sort=[{"columnName": "updateDate", "order": "ASCENDING"}],
-            pagination=pagination,
-            mode=mode,
+        found = await upstream.call(
+            GET_ONGOING_SCREENING_UPDATES,
+            GetOngoingScreeningUpdatesRequest(
+                body=OgsUpdateFilterInput(
+                    filter=_filter(
+                        start=start, end=end, group_id=group_id, case_system_id=case_system_id
+                    ),
+                    sort=[SortCriterionInput(column_name="updateDate", order="ASCENDING")],
+                    pagination=PaginationReferenceRequestInput(
+                        items_per_page=limit, page_reference=page_reference
+                    ),
+                    mode=mode,
+                )
+            ),
         )
     except UpstreamError as error:
         if error.status_code != 404 or _EMPTY not in str(error):
@@ -58,11 +67,10 @@ async def get_ogs_updates(
                 case_system_id=item.case_system_id,
                 group_id=item.group_id,
                 update_date=item.update_date,
-                new_results=_count(item=item, updated=False),
-                updated_results=_count(item=item, updated=True),
+                new_results=_count(counts=item.watchlist_results, updated=False),
+                updated_results=_count(counts=item.watchlist_results, updated=True),
             )
             for item in found.results
-            if item.case_system_id
         ],
         next_page=next_page(found.pagination),
     )
@@ -88,11 +96,10 @@ def _filter(*, start: str, end: str, group_id: str | None, case_system_id: str |
     return ";".join(parts)
 
 
-def _count(*, item: OgsUpdateWire, updated: bool) -> int | None:
-    counts = item.watchlist_results
+def _count(*, counts: WatchlistResults | None, updated: bool) -> int | None:
     if counts is None:
         return None
-    return counts.updated_results if updated else counts.new_results
+    return counts.number_of_updated_results if updated else counts.number_of_new_results
 
 
 def _stamp(*, value: datetime) -> str:

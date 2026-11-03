@@ -9,6 +9,8 @@ from world_check_mcp.contexts.resolution.models import ResolutionOutcome
 from world_check_mcp.contexts.resolution.models import ResolutionPlan
 from world_check_mcp.contexts.resolution.models import ResolutionRequest
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupRequest
 from world_check_mcp.upstream import ResolutionField
 from world_check_mcp.upstream import RESOLVE_RESULTS
 from world_check_mcp.upstream import ResultWire
@@ -29,7 +31,12 @@ async def prepare_resolution(
     except ResultPageError as error:
         raise ResolutionError(f"{error} No resolution was saved.") from error
     match = _match(results=results, result_id=request.result_id)
-    toolkits = await upstream.call_untyped(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=case.group_id)
+    toolkits = await upstream.call(
+        GET_RESOLUTION_TOOLKITS_FOR_GROUP,
+        GetResolutionToolkitsForGroupRequest(
+            path=GetResolutionToolkitsForGroupPath(group_id=case.group_id)
+        ),
+    )
     toolkit = toolkits.root.get("WATCHLIST")
     if (
         toolkit is None

@@ -3,8 +3,12 @@ import json
 from world_check_mcp.contexts.cases.models import CasePage
 from world_check_mcp.contexts.cases.models import CaseSummary
 from world_check_mcp.contexts.cases.models import SearchMode
+from world_check_mcp.upstream import CaseSearchRequestInput
 from world_check_mcp.upstream import next_page
+from world_check_mcp.upstream import PaginationReferenceRequestInput
 from world_check_mcp.upstream import SEARCH_CASES
+from world_check_mcp.upstream import SearchCasesRequest
+from world_check_mcp.upstream import SortCriterionInput
 from world_check_mcp.upstream import Upstream
 
 
@@ -19,16 +23,21 @@ async def search_cases(
     page_reference: str | None = None,
 ) -> CasePage:
     """Cases in one group, newest first. The group filter is always applied."""
-    arguments: dict[str, object] = {
-        "searchMode": search_mode,
-        "detailLevel": "CASE_AND_RESULTS",
-        "sort": [{"columnName": "creationDate", "order": "DESCENDING"}],
-        "pagination": _page(limit=limit, page_reference=page_reference),
-        "filter": _group_filter(group_id=group_id, expression=expression),
-    }
-    if query is not None:
-        arguments["query"] = query
-    found = await upstream.call_untyped(SEARCH_CASES, **arguments)
+    found = await upstream.call(
+        SEARCH_CASES,
+        SearchCasesRequest(
+            body=CaseSearchRequestInput(
+                query=query,
+                search_mode=search_mode,
+                detail_level="CASE_AND_RESULTS",
+                filter=_group_filter(group_id=group_id, expression=expression),
+                sort=[SortCriterionInput(column_name="creationDate", order="DESCENDING")],
+                pagination=PaginationReferenceRequestInput(
+                    items_per_page=limit, page_reference=page_reference
+                ),
+            )
+        ),
+    )
     return CasePage(
         cases=[
             CaseSummary(
@@ -39,18 +48,11 @@ async def search_cases(
                 group_id=hit.group_id,
                 lifecycle_state=hit.lifecycle_state,
             )
-            for hit in found.results
+            for hit in found.results or []
             if hit.case_system_id
         ],
         next_page=next_page(found.pagination),
     )
-
-
-def _page(*, limit: int, page_reference: str | None) -> dict[str, object]:
-    pagination: dict[str, object] = {"itemsPerPage": limit}
-    if page_reference is not None:
-        pagination["pageReference"] = page_reference
-    return pagination
 
 
 def _group_filter(*, group_id: str, expression: str | None) -> str:

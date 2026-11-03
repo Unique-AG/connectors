@@ -6,38 +6,15 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import TypeAdapter
 
-
-class PageReferencesWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    next: str | None = None
-
-
-class PaginationWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    page_references: PageReferencesWire | None = Field(default=None, alias="pageReferences")
-
-
-class CaseHitWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    case_id: str | None = Field(default=None, alias="caseId")
-    case_system_id: str | None = Field(default=None, alias="caseSystemId")
-    name: str | None = None
-    entity_type: str | None = Field(default=None, alias="entityType")
-    group_id: str | None = Field(default=None, alias="groupId")
-    lifecycle_state: str | None = Field(default=None, alias="lifecycleState")
-
-
-class CaseSearchWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    results: list[CaseHitWire] = []
-    pagination: PaginationWire | None = None
+from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
+from world_check_mcp.upstream.generated.vendor_responses import PaginationReferenceResponse
 
 
 class ResultWire(BaseModel):
+    """A case result. Hand-written because it carries the passport mrzLine fields that the generated
+    AbstractScreeningResult drops (the spec models them on a subtype the codegen collapses away).
+    """
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     result_id: str | None = Field(default=None, alias="resultId")
@@ -54,10 +31,14 @@ class ResultsWire(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     results: list[ResultWire] = []
-    pagination: PaginationWire | None = None
+    pagination: PaginationReferenceResponse | None = None
 
 
 class ProviderCountWire(BaseModel):
+    """A per-provider screening summary. The generated CaseResultsSummary types reviewRequired as a
+    bool, but the API sends the count there, so this stays hand-written.
+    """
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     total_matches: int | None = Field(default=None, alias="totalMatches")
@@ -75,33 +56,17 @@ class ScreeningStatusWire(BaseModel):
     )
 
 
-class AuditEventWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    id: str | None = None
-    action_type: str | None = Field(default=None, alias="actionType")
-    event_date: str | None = Field(default=None, alias="eventDate")
-    actioned_by_user_name: str | None = Field(default=None, alias="actionedByUserName")
-
-
-class AuditSearchWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    results: list[AuditEventWire] = []
-    pagination: PaginationWire | None = None
-
-
-SEARCH_CASES = Operation[CaseSearchWire]("searchCases", TypeAdapter(CaseSearchWire))
-GET_RESULTS = Operation[ResultsWire]("getResults", TypeAdapter(ResultsWire))
+# getResults keeps its generated request model but a hand-written response, since the results carry
+# the passport mrzLine fields the generated model drops.
+GET_RESULTS = Operation[ResultsWire, GetResultsRequest]("getResults", TypeAdapter(ResultsWire))
+# getScreeningStatus has a JSON response but the generated model types reviewRequired as a bool
+# where the API sends the count, so it stays hand-written and call_untyped.
 GET_SCREENING_STATUS = Operation[list[ScreeningStatusWire]](
     "getScreeningStatus", TypeAdapter(list[ScreeningStatusWire])
 )
-GET_CASE_AUDIT_EVENTS = Operation[AuditSearchWire](
-    "getCaseAuditEventsByCaseSystemId", TypeAdapter(AuditSearchWire)
-)
 
 
-def next_page(pagination: PaginationWire | None) -> str | None:
+def next_page(pagination: PaginationReferenceResponse | None) -> str | None:
     if pagination is None or pagination.page_references is None:
         return None
     reference = pagination.page_references.next

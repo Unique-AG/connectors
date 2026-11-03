@@ -18,11 +18,44 @@ class AbstractGroupSummary(BaseModel):
     name: str = Field(..., description="Name for the Group.")
 
 
+class AbstractResolution(BaseModel):
+    status_id: str | None = Field(
+        None,
+        alias="statusId",
+        description="Unique status ID defined in Group's resolution toolkit and used when resolving this Result. Get the available\nstatus IDs and their details via `GET /groups/{groupId}/resolution-toolkits`.\n",
+    )
+    risk_id: str | None = Field(
+        None,
+        alias="riskId",
+        description="Unique risk ID defined in Group's resolution toolkit and used when resolving this Result. Get the available\nrisk IDs and their details via `GET /groups/{groupId}/resolution-toolkits`.\n",
+    )
+    reason_id: str | None = Field(
+        None,
+        alias="reasonId",
+        description="Unique reason ID defined in Group's resolution toolkit and used when resolving this Result. Get the available\nreason IDs and their details via `GET /groups/{groupId}/resolution-toolkits`.\n",
+    )
+    resolution_remark: str | None = Field(
+        None,
+        alias="resolutionRemark",
+        description="Resolution remark added when resolving this Result.",
+    )
+
+
 class ApiInfo(BaseModel):
     version: str = Field(..., description="Current API version.")
     system_date_time: str = Field(
         ..., alias="systemDateTime", description="Current system date and time."
     )
+
+
+class CaseBulkSummary(BaseModel):
+    total_cases: int | None = Field(
+        None,
+        alias="totalCases",
+        description="Total number of cases on which bulk action was performed.",
+    )
+    success: int | None = Field(None, description="Total number of cases with success response.")
+    failed: int | None = Field(None, description="Total number of cases with failure response.")
 
 
 class CaseReference(BaseModel):
@@ -36,14 +69,249 @@ class CaseReference(BaseModel):
     )
 
 
+class ClientWatchlistResultSummary(BaseModel):
+    client_watchlist_total_matches: int | None = Field(
+        None,
+        alias="clientWatchlistTotalMatches",
+        description="Field contains client watch list total matches count.",
+    )
+    client_watchlist_unresolved: int | None = Field(
+        None,
+        alias="clientWatchlistUnresolved",
+        description="Field contains count of client watch list unresolved.",
+    )
+    client_watchlist_review_required: int | None = Field(
+        None,
+        alias="clientWatchlistReviewRequired",
+        description="Field contains count of client watch list review required.",
+    )
+    client_watchlist_resolved_positive: int | None = Field(
+        None,
+        alias="clientWatchlistResolvedPositive",
+        description="Field contains watchlist resolved positive count.",
+    )
+    client_watchlist_resolved_possible: int | None = Field(
+        None,
+        alias="clientWatchlistResolvedPossible",
+        description="Field contains watchlist resolved possible count.",
+    )
+    client_watchlist_resolved_false: int | None = Field(
+        None,
+        alias="clientWatchlistResolvedFalse",
+        description="Field contains watchlist resolved false count.",
+    )
+    client_watchlist_resolved_unspecified: int | None = Field(
+        None,
+        alias="clientWatchlistResolvedUnspecified",
+        description="Field contains watchlist resolved unspecified count.",
+    )
+
+
 class Country(BaseModel):
     code: str = Field(..., description="Country code.")
     name: str = Field(..., description="Country name.")
 
 
+class ErrorDetail(BaseModel):
+    key: str = Field(
+        ...,
+        description="the key in the path causing the error - can be the name of a header, query parameter, json body in get/post request or the id of the object causing the error.",
+    )
+    reason: str = Field(
+        ...,
+        description="the value - possibly wrapped in a message - causing the error, eventually/ideally should have a link to the documentation.",
+    )
+    invalid_name: bool | None = Field(
+        None,
+        alias="invalidName",
+        description="set to true if strict type checking is enabled and a property is invalid.",
+    )
+    name: str | None = Field(None, description="the field name causing the error.")
+
+
+class ExplainabilityMatchGroup(BaseModel):
+    match_group_name: str | None = Field(
+        None, alias="matchGroupName", description="Name of the match group."
+    )
+    match_group_contribution: float | None = Field(
+        None,
+        alias="matchGroupContribution",
+        description="Relative contribution of the match group to the model score. The value rounded to 2 decimal places.",
+    )
+    match_group_strength: str | None = Field(
+        None, alias="matchGroupStrength", description="Strength assigned to the match group."
+    )
+    match_group_direction: str | None = Field(
+        None, alias="matchGroupDirection", description="Direction of the impact on the model score."
+    )
+
+
+class FieldModel(AbstractField):
+    value: str | None = Field(
+        None,
+        description="The value for this Field. This property should be used for fields with [FieldValueType](#tag/FieldValueType_Model) other than 'DATE'.",
+    )
+    date_time_value: str | None = Field(
+        None,
+        alias="dateTimeValue",
+        description="The 'Date' value for this Field. This property should be used for fields with [FieldValueType](#tag/FieldValueType_Model) set to 'DATE'.",
+    )
+
+
+class FilterValueCount(BaseModel):
+    value: str | None = Field(
+        None, description="The value of the filtered result for this filter type."
+    )
+    count: int | None = Field(
+        None, description="The number of results with this value for the filter."
+    )
+
+
+class FilterValues(BaseModel):
+    filter_name: str | None = Field(
+        None, alias="filterName", description="Column name of filter used in filer query request."
+    )
+    filter_display_name: str | None = Field(
+        None, alias="filterDisplayName", description="Display name for the filter."
+    )
+    value_counts: list[FilterValueCount] | None = Field(None, alias="valueCounts")
+
+
+class GenericPayload(BaseModel):
+    details_type: str = Field(
+        ..., alias="detailsType", description="Represents a type of GenericPayload."
+    )
+
+
+class ItemIdentifier(BaseModel):
+    id: str | None = Field(None, description="A string identifier for the item value.")
+    label: str | None = Field(None, description="A string label for the item value.")
+
+
 class LanguageCode(BaseModel):
     code: str | None = Field(None, description="Language code in 'ISO-639(-3)' format.")
     name: str | None = Field(None, description="Name of the language.")
+
+
+class MRZGenerationResponse(BaseModel):
+    lines: list[str] | None = Field(None, description="List of MRZ lines.")
+    conform_with_icao: bool | None = Field(
+        None,
+        alias="conformWithICAO",
+        description="Flag indicating if MRZ data conform to ICAO requirements. Field can be absent if compliance information\nis not available.\n",
+    )
+
+
+class MatchedTerm(BaseModel):
+    term: str | None = Field(None, description="Matched term.")
+    type: str | None = Field(None, description="Matched term types.")
+    submitted_term: str | None = Field(
+        None, alias="submittedTerm", description="Submitted term for screening."
+    )
+    submitted_term_type: str | None = Field(
+        None, alias="submittedTermType", description="Submitted term type for screening."
+    )
+    match_strength: str | None = Field(
+        None, alias="matchStrength", description="Matched Result Strength."
+    )
+    match_score: float | None = Field(
+        None,
+        alias="matchScore",
+        description="The exact match score with value rounded to 2 decimal places.",
+    )
+
+
+class MediaCheckResultSummary(BaseModel):
+    media_check_attached_count: int | None = Field(
+        None,
+        alias="mediaCheckAttachedCount",
+        description="Field contains counter for media check attached.",
+    )
+    media_check_review_required: bool | None = Field(
+        None,
+        alias="mediaCheckReviewRequired",
+        description="Flag that indicates that MEDIA_CHECK case should be resolved.",
+    )
+
+
+class MediaCheckResults(BaseModel):
+    number_of_new_results: int | None = Field(
+        None,
+        alias="numberOfNewResults",
+        description="Indicates the count of new results under a case.",
+    )
+    number_of_updated_results: int | None = Field(
+        None,
+        alias="numberOfUpdatedResults",
+        description="Indicates the count of updated results under a case.",
+    )
+
+
+class NewResults(BaseModel):
+    result_id: str = Field(..., alias="resultId", description="Identifier of the new result.")
+    reference_id: str = Field(
+        ..., alias="referenceId", description="The reference ID of the matched Entity."
+    )
+    matched_term: str | None = Field(
+        None, alias="matchedTerm", description="Matched term for the Result."
+    )
+    action_types: list[str] | None = Field(
+        None,
+        alias="actionTypes",
+        description="Action type for the case indicating why the action was taken (reasons for an action).\nThe available actionTypes are:\n - DATA_ISSUE : Represents resolve issues found with the data provided for batch processing.\n - RESULT_NOT_FOUND : Represents result Not Found after re-screening.\n - SCORE_INCREASED : Represents result Strength Increased after re-screening.\n - SCORE_DECREASED : Represents result Strength Decreased after re-screening.\n - PROFILE_UPDATED : Represents profile has been Updated.\n - PROFILE_UPDATED_C1 : Represents profile has been updated with update category C1.\n - PROFILE_UPDATED_C2 : Represents profile has been updated with update category C2.\n - PROFILE_UPDATED_C3 : Represents profile has been updated with update category C3.\n - PROFILE_UPDATED_C4 : Represents profile has been updated with update category C4.\n - GENDER_UPDATED : Represents gender secondary field updated.\n - DATE_OF_BIRTH_UPDATED : Represents date of birth secondary field updated.\n - COUNTRY_LOCATION_UPDATED : Represents country location secondary field updated.\n - PLACE_OF_BIRTH_UPDATED : Represents place of birth secondary field updated.\n - NATIONALITY_UPDATED : Represents nationality secondary field updated.\n - REGISTERED_COUNTRY_UPDATED : Represents registered country secondary field updated.\n - IMO_NUMBER_UPDATED : Represents imo number secondary field updated.\n - DOCUMENT_ID_UPDATED : Represents document Id secondary field updated.\n - COMPOSITE_MATCH_SCORE_INCREASED : Represents that the Composite Matching Score has exceeded the configured AI Review threshold.\n - COMPOSITE_MATCH_SCORE_DECREASED : Represents that the Composite Matching Score has fallen below the configured AI Review threshold.\n",
+    )
+    source_categories: list[str] = Field(
+        ...,
+        alias="sourceCategories",
+        description="Represents the sources for the result.\nThe available sourceCategories are:\n - 'Sanctions' : Represents the World-Check Sanctions category.\n - 'Regulatory Enforcement' : Represents the World-Check Regulatory Enforcement category.\n - 'Law Enforcement' : Represents the World-Check Law Enforcement category.\n - 'PEP' : Represents the World-Check Politically Exposed People category.\n - 'Other Bodies' : Represents the World-Check Other Bodies category.\n - 'Special Interest Categories' : Represents the World-Check Special Interest Categories category.\n",
+    )
+    matched_date: str | None = Field(
+        None, alias="matchedDate", description="Date on which the result was matched."
+    )
+    alert_date: str | None = Field(
+        None,
+        alias="alertDate",
+        description="Date on which the result was auto resolved, 'null' otherwise.",
+    )
+    match_score: float = Field(..., alias="matchScore", description="The score of the result term.")
+    composite_match_score: float | None = Field(
+        None,
+        alias="compositeMatchScore",
+        description="The composite match score of the result term.",
+    )
+    composite_match_strength: str | None = Field(
+        None,
+        alias="compositeMatchStrength",
+        description="Match strength derived from the composite match score.",
+    )
+    match_event_type: str = Field(
+        ...,
+        alias="matchEventType",
+        description="The case matched event type enumeration. \n The below case match event types are available:\n - UNRESOLVED : Indicates the case match is unresolved.\n - AUTO_RESOLVED : Indicates the case match is autoresolved.\n - AI_AUTO_RESOLVED : Indicates the case match is autoresolved by Artificial Intelligence (AI).\n - REVIEW_REQUIRED : Indicates the reviewRequired action on unresolved case match.\n - REVIEW_REQUIRED_ALERT : Indicates the reviewRequired action on resolved case match.\n",
+    )
+    resolution_status: str = Field(
+        ...,
+        alias="resolutionStatus",
+        description="Indicates the resolution status for the case match.\nList of resolutionstatus are available:\n - POSITIVE \n - POSSIBLE \n - FALSE  \n - UNSPECIFIED\n",
+    )
+
+
+class PageReference(BaseModel):
+    previous: str | None = Field(None, description="A reference to the previous page.")
+    current: str | None = Field(None, description="A reference to the current page.")
+    next: str | None = Field(None, description="A reference to the next page.")
+
+
+class PaginationReferenceResponse(BaseModel):
+    items_per_page: int | None = Field(
+        None,
+        alias="itemsPerPage",
+        description="The number of items per page passed in the pagination request payload.",
+    )
+    total_items: int | None = Field(
+        None, alias="totalItems", description="The total number of items available."
+    )
+    page_references: PageReference | None = Field(None, alias="pageReferences")
 
 
 class Provider(BaseModel):
@@ -195,6 +463,56 @@ class ResolutionField(BaseModel):
     label: str = Field(..., description="The label for the resolution type.")
 
 
+class ResultsCollectionSummary(BaseModel):
+    filter_values: list[FilterValues] | None = Field(None, alias="filterValues")
+
+
+class Review(BaseModel):
+    review_required: bool | None = Field(
+        None,
+        alias="reviewRequired",
+        description="Flag to indicate Review Required after re-screening the Case for this Result.",
+    )
+    review_required_date: str | None = Field(
+        None,
+        alias="reviewRequiredDate",
+        description="Represents the date and time when this Result was last flagged for review.",
+    )
+    review_remark: str | None = Field(
+        None, alias="reviewRemark", description="Review remark added when reviewing this Result."
+    )
+    review_date: str | None = Field(
+        None,
+        alias="reviewDate",
+        description="Represents the date and time when this Result was last reviewed.",
+    )
+
+
+class SecondaryFieldResult(AbstractField):
+    field: FieldModel
+    submitted_value: str | None = Field(
+        None,
+        alias="submittedValue",
+        description="Submitted value for this Secondary Field. Used for fields with [FieldValueType](#tag/FieldValueType_Model) other than `DATE`.",
+    )
+    submitted_date_time_value: str | None = Field(
+        None,
+        alias="submittedDateTimeValue",
+        description="Submitted date-time value for this Secondary Field. Used for fields with [FieldValueType] (#FieldValueType) `DATE`.",
+    )
+    matched_value: str | None = Field(
+        None,
+        alias="matchedValue",
+        description="Matched value for this Secondary Field. Used for fields with [FieldValueType] (#FieldValueType) other than `DATE`.",
+    )
+    matched_date_time_value: str | None = Field(
+        None,
+        alias="matchedDateTimeValue",
+        description="Matched date-time value for this Secondary Field. Used for fields with [FieldValueType] (#FieldValueType) `DATE`.",
+    )
+    field_result: str = Field(..., alias="fieldResult", description="Field result enumeration")
+
+
 class StatusResolutionField(ResolutionField):
     type: str | None = Field(None, description="Resolution status types enumeration.")
 
@@ -238,6 +556,136 @@ class TypeAvailableSelected(BaseModel):
     )
 
 
+class UboCheckResultSummary(BaseModel):
+    ubo_check_resolved_count: int | None = Field(
+        None,
+        alias="uboCheckResolvedCount",
+        description="Field contains counter for UBO check resolved.",
+    )
+    ubo_check_resolution_required: bool | None = Field(
+        None,
+        alias="uboCheckResolutionRequired",
+        description="Flag that indicates that UBO_CHECK case has been resolved.",
+    )
+
+
+class UpdatedResults(BaseModel):
+    result_id: str = Field(..., alias="resultId", description="Identifier of the updated result.")
+    reference_id: str = Field(
+        ..., alias="referenceId", description="The reference ID of the matched Entity."
+    )
+    matched_term: str | None = Field(
+        None, alias="matchedTerm", description="Matched term for the Result."
+    )
+    action_types: list[str] = Field(
+        ...,
+        alias="actionTypes",
+        description="Action type for the case indicating why the action was taken (reasons for an action).\nThe available actionTypes are:\n - DATA_ISSUE : Represents resolve issues found with the data provided for batch processing.\n - RESULT_NOT_FOUND : Represents result Not Found after re-screening.\n - SCORE_INCREASED : Represents result Strength Increased after re-screening.\n - SCORE_DECREASED : Represents result Strength Decreased after re-screening.\n - PROFILE_UPDATED : Represents profile has been Updated.\n - PROFILE_UPDATED_C1 : Represents profile has been updated with update category C1.\n - PROFILE_UPDATED_C2 : Represents profile has been updated with update category C2.\n - PROFILE_UPDATED_C3 : Represents profile has been updated with update category C3.\n - PROFILE_UPDATED_C4 : Represents profile has been updated with update category C4.\n - GENDER_UPDATED : Represents gender secondary field updated.\n - DATE_OF_BIRTH_UPDATED : Represents date of birth secondary field updated.\n - COUNTRY_LOCATION_UPDATED : Represents country location secondary field updated.\n - PLACE_OF_BIRTH_UPDATED : Represents place of birth secondary field updated.\n - NATIONALITY_UPDATED : Represents nationality secondary field updated.\n - REGISTERED_COUNTRY_UPDATED : Represents registered country secondary field updated.\n - IMO_NUMBER_UPDATED : Represents imo number secondary field updated.\n - DOCUMENT_ID_UPDATED : Represents document Id secondary field updated.\n - COMPOSITE_MATCH_SCORE_INCREASED : Represents that the Composite Matching Score has exceeded the configured AI Review threshold.\n - COMPOSITE_MATCH_SCORE_DECREASED : Represents that the Composite Matching Score has fallen below the configured AI Review threshold.\n",
+    )
+    source_categories: list[str] = Field(
+        ...,
+        alias="sourceCategories",
+        description="Represents the sources for the result.\nThe available sourceCategories are:\n - 'Sanctions' : Represents the World-Check Sanctions category.\n - 'Regulatory Enforcement' : Represents the World-Check Regulatory Enforcement category.\n - 'Law Enforcement' : Represents the World-Check Law Enforcement category.\n - 'PEP' : Represents the World-Check Politically Exposed People category.\n - 'Other Bodies' : Represents the World-Check Other Bodies category.\n - 'Special Interest Categories' : Represents the World-Check Special Interest Categories category.\n",
+    )
+    matched_date: str = Field(
+        ..., alias="matchedDate", description="Date on which the result was matched."
+    )
+    alert_date: str | None = Field(
+        None,
+        alias="alertDate",
+        description="Date on which the result was auto resolved, 'null' otherwise.",
+    )
+    match_score: float = Field(..., alias="matchScore", description="The score of the result term.")
+    composite_match_score: float | None = Field(
+        None,
+        alias="compositeMatchScore",
+        description="The composite match score of the result term.",
+    )
+    composite_match_strength: str | None = Field(
+        None,
+        alias="compositeMatchStrength",
+        description="Match strength derived from the composite match score.",
+    )
+    match_event_type: str = Field(
+        ...,
+        alias="matchEventType",
+        description="The case matched event type enumeration. \n The below case match event types are available:\n - UNRESOLVED : Indicates the case match is unresolved.\n - AUTO_RESOLVED : Indicates the case match is autoresolved.\n - AI_AUTO_RESOLVED : Indicates the case match is autoresolved by Artificial Intelligence (AI).\n - REVIEW_REQUIRED : Indicates the reviewRequired action on unresolved case match.\n - REVIEW_REQUIRED_ALERT : Indicates the reviewRequired action on resolved case match.\n",
+    )
+    resolution_status: str = Field(
+        ...,
+        alias="resolutionStatus",
+        description="Indicates the resolution status for the case match.\n  List of resolutionstatus are available:\n   - POSITIVE \n   - POSSIBLE \n   - FALSE  \n   - UNSPECIFIED\n",
+    )
+
+
+class UserSummaryDetails(BaseModel):
+    user_id: str = Field(..., alias="userId", description="Identifier of the User.")
+    first_name: str | None = Field(None, alias="firstName", description="First name of the User.")
+    last_name: str | None = Field(None, alias="lastName", description="Last name of the User.")
+    full_name: str = Field(..., alias="fullName", description="Full name of the User.")
+    email: str = Field(..., description="Email address of the User.")
+    status: str = Field(..., description="Enumeration of Status types")
+
+
+class WatchlistResultSummary(BaseModel):
+    watchlist_total_matches: int | None = Field(
+        None,
+        alias="watchlistTotalMatches",
+        description="Field contains watchlist total matches count.",
+    )
+    watchlist_unresolved: int | None = Field(
+        None,
+        alias="watchlistUnresolved",
+        description="Field contains count of watchlist unresolved.",
+    )
+    watchlist_review_required: int | None = Field(
+        None,
+        alias="watchlistReviewRequired",
+        description="Field contains count of watchlist review required.",
+    )
+    watchlist_resolved_positive: int | None = Field(
+        None,
+        alias="watchlistResolvedPositive",
+        description="Field contains watchlist resolved positive count.",
+    )
+    watchlist_resolved_possible: int | None = Field(
+        None,
+        alias="watchlistResolvedPossible",
+        description="Field contains watchlist resolved possible count.",
+    )
+    watchlist_resolved_false: int | None = Field(
+        None,
+        alias="watchlistResolvedFalse",
+        description="Field contains watchlist resolved false count.",
+    )
+    watchlist_resolved_unspecified: int | None = Field(
+        None,
+        alias="watchlistResolvedUnspecified",
+        description="Field contains watchlist resolved unspecified count.",
+    )
+    categorised_matches: dict[str, dict[str, int]] | None = Field(None, alias="categorisedMatches")
+
+
+class WatchlistResults(BaseModel):
+    number_of_new_results: int = Field(
+        ...,
+        alias="numberOfNewResults",
+        description="Indicates the count of new results under a case.",
+    )
+    number_of_auto_resolved_results: int | None = Field(
+        None,
+        alias="numberOfAutoResolvedResults",
+        description="Indicates the count of auto resolved results under a case.",
+    )
+    new_results: list[NewResults] | None = Field(None, alias="newResults")
+    number_of_updated_results: int = Field(
+        ...,
+        alias="numberOfUpdatedResults",
+        description="Indicates the count of updated results under a case.",
+    )
+    updated_results: list[UpdatedResults] | None = Field(None, alias="updatedResults")
+
+
 class GetCountriesResponse(RootModel[dict[str, str]]):
     root: dict[str, str]
 
@@ -260,12 +708,88 @@ class AbstractSearchParameter(BaseModel):
     )
 
 
+class AdvancedMatchingDetailExplainability(BaseModel):
+    match_groups: list[ExplainabilityMatchGroup] | None = Field(
+        None, alias="matchGroups", description="Match groups used to explain the model score."
+    )
+
+
+class AuditEvent(BaseModel):
+    id: str = Field(..., description="Identifier for this audit event")
+    object_id: str = Field(
+        ...,
+        alias="objectId",
+        description="Identifier of the entity for which this audit event was created",
+    )
+    entity_type: str = Field(
+        ...,
+        alias="entityType",
+        description="Entity type of the object that the audit event belongs to.",
+    )
+    event_date: str = Field(
+        ...,
+        alias="eventDate",
+        description="Creation date and time of this audit event in ISO 8601 format excluding Week and Ordinal dates.",
+    )
+    action_type: str = Field(
+        ...,
+        alias="actionType",
+        description="Type of action that caused the audit event to be created.",
+    )
+    source_type: str | None = Field(
+        None,
+        alias="sourceType",
+        description="Enumeration of available audit event sources types.\n\nPossible types of audit event sources are:\n\n* DESKTOP - Signifies the event is originating from DESKTOP/UI\n* DESKTOP_BULK - Signifies the event is originating from DESKTOP/UI Bulk actions\n* API - Signifies the event is originating from API\n* API_BULK - Signifies the event is originating from API Bulk actions\n* DESKTOP_BATCH - Signifies the event is originating from DESKTOP/UI Batch screening\n* API_BATCH - Signifies the event is originating from API Batch screening via saveAndScreen endpoint\n* OGS - Signifies the event is originating from ongoing screening\n* MCP - Signifies the event is originating from an MCP (Model Context Protocol) server\n* UNKNOWN - Signifies the event source is unknown\n",
+    )
+    actioned_by_user_id: str = Field(
+        ...,
+        alias="actionedByUserId",
+        description="Identifier of the User who created this audit event",
+    )
+    actioned_by_user_name: str = Field(
+        ...,
+        alias="actionedByUserName",
+        description="Full name of the User who created this audit event",
+    )
+    note: str | None = Field(None, description="a comment added by the user")
+    audit_event_to_date: str | None = Field(
+        None,
+        alias="auditEventToDate",
+        description="Unused field to represent the date and time of the last event for a continuous series of OGS audit events with zero matches. The value is in ISO 8601 format excluding Week and Ordinal dates.",
+    )
+    details: GenericPayload
+
+
+class CaseResultSummaries(BaseModel):
+    total_mandatory_actions: int | None = Field(
+        None,
+        alias="totalMandatoryActions",
+        description="The number of mandatory actions on this case.",
+    )
+    total_sub_cases: int | None = Field(
+        None, alias="totalSubCases", description="Holds a count of the number of child cases."
+    )
+    media_check: MediaCheckResultSummary | None = Field(None, alias="mediaCheck")
+    watchlist: WatchlistResultSummary | None = None
+    client_watchlist: ClientWatchlistResultSummary | None = Field(None, alias="clientWatchlist")
+    ubo_check: UboCheckResultSummary | None = Field(None, alias="uboCheck")
+
+
 class Detail(BaseModel):
     detail_type: str | None = Field(
         None, alias="detailType", description="Detail type enumeration."
     )
     text: str | None = Field(None, description="Detail text.")
     title: str | None = Field(None, description="Detail title.")
+
+
+class Error(BaseModel):
+    code: str = Field(..., description="Application specific error code.")
+    message: str = Field(
+        ...,
+        description="A human-readable meaningful explanation/reason specific to this occurrence of the problem.",
+    )
+    error: ErrorDetail | None = None
 
 
 class FieldDefinition(AbstractField):
@@ -429,6 +953,17 @@ class RecordNamesCollection(BaseModel):
     )
 
 
+class Resolution(AbstractResolution):
+    resolution_date: str | None = Field(
+        None,
+        alias="resolutionDate",
+        description="Represents the date and time when this Result was last resolved.",
+    )
+    resolution_status_type: str | None = Field(
+        None, alias="resolutionStatusType", description="Resolution status types enumeration."
+    )
+
+
 class ResolutionFields(BaseModel):
     statuses: list[StatusResolutionField] = Field(
         ..., description="A set of specific Statuses for the resolution fields."
@@ -456,6 +991,25 @@ class ResolutionToolkitResponse(BaseModel):
     )
 
 
+class Results(BaseModel):
+    group_id: str = Field(..., alias="groupId", description="Group ID for the Case.")
+    case_id: str = Field(
+        ...,
+        alias="caseId",
+        description="Case ID provided by the client. This is auto-generated by the system if not provided.",
+    )
+    case_system_id: str = Field(
+        ..., alias="caseSystemId", description="System generated ID for the Case."
+    )
+    update_date: str = Field(
+        ...,
+        alias="updateDate",
+        description="Creation date and time of this ongoingScreeningUpdate in ISO 8601 format excluding Week and Ordinal dates.",
+    )
+    watchlist_results: WatchlistResults | None = Field(None, alias="watchlistResults")
+    media_check_results: MediaCheckResults | None = Field(None, alias="mediaCheckResults")
+
+
 class SearchParameterCollection(BaseModel):
     free_text_parameters: list[QuerySearchParameter] | None = Field(
         None, alias="freeTextParameters", description="A set of free text query parameters."
@@ -478,6 +1032,15 @@ class SecondaryFieldsByEntity(BaseModel):
     )
 
 
+class SortCriterion(BaseModel):
+    column_name: str | None = Field(
+        None,
+        alias="columnName",
+        description="The logical name of the column on which data is to be sorted.",
+    )
+    order: str | None = Field(None, description="The order in which data is sorted.")
+
+
 class TranslatedEntity(BaseModel):
     translation_disclaimer: str | None = Field(
         None, alias="translationDisclaimer", description="Disclaimer for Translation Response."
@@ -489,6 +1052,211 @@ class TranslatedEntity(BaseModel):
 
 class GetResolutionToolkitsForGroupResponse(RootModel[dict[str, ResolutionToolkitResponse]]):
     root: dict[str, ResolutionToolkitResponse]
+
+
+class AbstractCaseSearchModel(BaseModel):
+    query: str | None = Field(
+        None,
+        description="A string containing the search query.\n\nThis is associated with the 'searchMode' field. \nThe entered search mode applies to all the fields in the query, but with the following rules being applied:\n\n - primaryName - supports all search modes\n - names - supports all search modes (The fields primaryName and names are mutually exclusive; only one can be included in a query.)\n - caseId - supports all search modes\n - idNumbersValue - uses EXACT matches for DEFAULT, CONTAINS and EXACT search modes, otherwise allows BEGINS_WITH search mode\n - customFieldsValue - uses BEGINS_WITH searches for DEFAULT and BEGINS_WITH search modes, also supports CONTAINS and EXACT search modes\n\n**Note:** To find the available search fields, check for fields with 'QUERY' type in the `GET /references/search-filters` endpoint.\n",
+    )
+    search_mode: str | None = Field(
+        None,
+        alias="searchMode",
+        description='The search mode for case search query fields. \nThe following search types are available:\n\n* DEFAULT: Searches for the words in the search string in any order.  \n   e.g. Searching for "smith fred" would match a case name of "fred james smith". \n   Supports wildcard searches using the * and ? characters:\n     * " * " : matches zero or more characters. e.g. "*ed j*es sm*" would match "fred james smith".\n     * " ? " : matches one character. e.g. "fr?d" would match "fred" but not "freed".\n\n* BEGINS_WITH: The text to be searched must begin with the search string. \n   e.g. Searching for "fred ja" would match a case name of "fred james smith".\n   Does not support wildcard searches.\n\n* EXACT: The text to be searched must exactly match the search string. \n   e.g. Searching for "fred james smith" would match a case name of "fred james smith".\n   Does not support wildcard searches.\n\n* CONTAINS: The text must contain all the words in the search string in the same order.\n   e.g. Searching for "james smith" or "fred james" would match a case name of "fred james smith".\n   Does not support wildcard searches.\n',
+    )
+    filter: str | None = Field(
+        None,
+        description='A string containing filter criteria.\n\n**Note:** To find the available search fields, check for fields with \'FILTER\' type in the `GET /references/search-filters` endpoint.\n\nCase Search With Time Stamp Is Also possible for Date filters but only supported for RANGE operator and the supported formats are given below.\n\n- creationDate=RANGE=("2025-02-01T22:21:21.222Z","2025-03-01T22:21:21.222Z")\n- creationDate=RANGE=("2025-02-01","2025-03-01")\n\nAbove example can be used for any Date filters like modificationDate,lastScreenedDate,creationDate etc.\n',
+    )
+    detail_level: str | None = Field(
+        None,
+        alias="detailLevel",
+        description="Enumeration that defines the detail level of the search response:\n  - 'CASE': The search response will provide full Case details.\n  - 'CASE_AND_RESULTS': The search response will include Сase details and Result summary related to this Case.\n  - 'CASE_AND_AGGREGATED_RESULTS': The search response will provide full Case details with an aggregated Result summary, summarizing data from primary and sub-cases.\n  - 'CASE_AND_RESULTS_AND_AGGREGATED_RESULTS': The search response will provide full Case details with a Result and aggregated(summarizing data from primary and sub-cases) summaries.\n",
+    )
+    sort: list[SortCriterion] | None = Field(
+        None,
+        description="An array of sorting criteria.\n\nThe list of available sort parameter names:\n- 'primaryName' - sort by the primary name for the Case;\n- 'caseId' - sort by the unique identifier for the Case;\n- 'caseSystemId' - sort by the system-generated ID for the Case;\n- 'creationDate' - sort by the time when the Case has been created;\n- 'modificationDateByUser' - sort by the time when the Case has been modified by the User;\n- 'modificationDateBySystem' - sort by the time when the Case has been modified by the system;\n- 'lastScreenedDate' - sort by the time when the Case was last screened;\n- 'primaryCase' - sort by the total child Cases count contained within the Case;  \n- 'nameTransposition' - sort by the name transposition state for the Case;\n- 'lifecycleState' - sort by the lifecycle state for the Case;\n- 'watchlistCaseScreeningState' - sort by the World-Check ongoing screening state for the Case;\n- 'mediaCheckCaseScreeningState' - sort by the Media-Check ongoing screening state for the Case;\n- 'entityType' - sort by the entity type for the Case;\n- 'caseRating' - sort by the rating for the Case;\n- 'mandatoryActions' - sort by the number of mandatory actions on this Case;\n- 'watchlistUnresolved' - sort by the count of unresolved matches with the provider type 'WATCHLIST';\n- 'watchlistReviewRequired' - sort by the count of matches with the provider type 'WATCHLIST' that require review;\n- 'clientWatchlistUnresolved' - sort by the count of unresolved matches with the provider type 'CLIENT_WATCHLIST';\n- 'clientWatchlistReviewRequired' - sort by the count of matches with the provider type 'CLIENT_WATCHLIST' that require review;\n- 'mediaCheckReviewRequired' - sort by the count of matches with the provider type 'MEDIA_CHECK' that require review;\n- 'secondaryFieldCountryLocation' - sort by the country location or registered country secondary field value;\n- 'secondaryFieldNationality'  - sort by the citizenship secondary field value;\n- 'secondaryFieldPlaceOfBirth' - sort by the place of birth secondary field value;\n- 'groupId' - sort by the name of the Group owning the Case;\n- 'creatorUserId' - sort by the full name of the User who created the Case;\n- 'modifierUserId' - sort by the full name of the User who modified the Case;\n- 'assigneeUserId' - sort by the full name of the User the Case is currently assigned to.\n",
+    )
+
+
+class AdvancedMatchingDetail(BaseModel):
+    model: str | None = Field(None, description="Name of the model that generated the score.")
+    model_match_score: float | None = Field(
+        None,
+        alias="modelMatchScore",
+        description="Match score generated by the model. The value rounded to 2 decimal places.",
+    )
+    model_match_strength: str | None = Field(
+        None, alias="modelMatchStrength", description="Match strength assigned by the model."
+    )
+    model_reference: str | None = Field(
+        None, alias="modelReference", description="Unique identifier of the model evaluation."
+    )
+    explainability: AdvancedMatchingDetailExplainability | None = None
+
+
+class AdvancedMatchingDetails(BaseModel):
+    composite_match_score: float | None = Field(
+        None,
+        alias="compositeMatchScore",
+        description="Final match score generated from all reranker outputs. The value rounded to 2 decimal places.",
+    )
+    composite_match_strength: str | None = Field(
+        None,
+        alias="compositeMatchStrength",
+        description="Match strength derived from the composite match score.",
+    )
+    details: list[AdvancedMatchingDetail] | None = Field(
+        None, description="Model-level scoring details."
+    )
+
+
+class AuditSearchResponse(BaseModel):
+    query: str | None = None
+    sort: list[SortCriterion] | None = Field(
+        None, description="The sort criteria to apply to the query."
+    )
+    pagination: PaginationReferenceResponse | None = None
+    results: list[AuditEvent] | None = None
+
+
+class CaseBulkFailed(BaseModel):
+    case_system_id: str | None = Field(
+        None, alias="caseSystemId", description="System generated ID for the Case."
+    )
+    case_id: str | None = Field(
+        None,
+        alias="caseId",
+        description="Case ID provided by the Сlient or else generated by the system for the Сlient.",
+    )
+    status: str | None = Field(None, description="Http status code for error.")
+    errors: list[Error] | None = Field(None, description="A set of validation errors.")
+
+
+class CaseBulkResponse(BaseModel):
+    id: str | None = Field(
+        None,
+        description="initiated by the GW, mandatory to be passed to backends (services) available in header X-Request-ID.",
+    )
+    summary: CaseBulkSummary
+    failed_cases: list[CaseBulkFailed] | None = Field(
+        None, alias="failedCases", description="A set of failed cases."
+    )
+
+
+class CaseDetailed(BaseModel):
+    case_id: str | None = Field(
+        None,
+        alias="caseId",
+        description="The unique identifier for the Case, which can be provided by the Client or generated by the system.\nThis field is not applicable for 'Zero Footprint Screening (ZFS)'.\n",
+    )
+    name: str | None = Field(None, description="The name used for screening this Case.")
+    alternate_names: list[str] | None = Field(
+        None, alias="alternateNames", description="List of additional names to be screened"
+    )
+    provider_types: list[str] | None = Field(
+        None,
+        alias="providerTypes",
+        description="The provider types required to screen this Case.\nFor 'Zero Footprint Screening (ZFS)', only 'WATCHLIST' and 'CLIENT_WATCHLIST' are supported.\n",
+    )
+    custom_fields: list[FieldModel] | None = Field(
+        None,
+        alias="customFields",
+        description="Custom fields associated with this Case. \nDefinitions for available custom fields can be obtained via `GET /groups/{groupId}/case-template` endpoint. \nCustom fields cannot be used with 'Zero Footprint Screening (ZFS)'.\n",
+    )
+    secondary_fields: list[FieldModel] | None = Field(
+        None,
+        alias="secondaryFields",
+        description="Secondary fields associated with this Case. \nDefinitions for available secondary fields can be obtained via `GET /groups/{groupId}/case-template` endpoint.\n",
+    )
+    group_id: str | None = Field(
+        None,
+        alias="groupId",
+        description="The identifier of the group that owns this Case. \nThe group determines whether the case is screened as 'Zero Footprint Screening (ZFS)' or not.\n",
+    )
+    entity_type: str | None = Field(
+        None, alias="entityType", description="Case Entity Type Enumeration."
+    )
+    case_system_id: str | None = Field(
+        None, alias="caseSystemId", description="The system-generated ID for the Case."
+    )
+    case_screening_state: dict[str, str] | None = Field(
+        None,
+        alias="caseScreeningState",
+        description='A mapping from ProviderType to indicate whether ongoing screening is enabled for this case on the specific ProviderType. \nBy default, the value is set from account settings.\n\nThe Available ProviderTypes are "WATCHLIST", "PASSPORT_CHECK", "MEDIA_CHECK", "CLIENT_WATCHLIST", "UBO_CHECK".\n',
+    )
+    lifecycle_state: str | None = Field(
+        None, alias="lifecycleState", description="Case lifecycle state enumeration."
+    )
+    creator: UserSummaryDetails | None = None
+    modifier: UserSummaryDetails | None = None
+    assignee: UserSummaryDetails | None = None
+    creation_date: str | None = Field(
+        None, alias="creationDate", description="The date and time when the Case was created."
+    )
+    modification_date: str | None = Field(
+        None,
+        alias="modificationDate",
+        description="The date and time when the Case was last modified.",
+    )
+    last_screened_date: str | None = Field(
+        None,
+        alias="lastScreenedDate",
+        description="The date and time when the Case was last screened.",
+    )
+    modification_date_by_system: str | None = Field(
+        None,
+        alias="modificationDateBySystem",
+        description="The date and time of the last modification to the Case by the system.",
+    )
+    modification_date_by_user: str | None = Field(
+        None,
+        alias="modificationDateByUser",
+        description="The date and time of the last modification to the Case by a User.",
+    )
+    last_audit_event_activity: str | None = Field(
+        None,
+        alias="lastAuditEventActivity",
+        description="Type of action that caused the audit event to be created.",
+    )
+    case_rating: str | None = Field(
+        None, alias="caseRating", description="The risk rating assigned to the case."
+    )
+    primary_case: bool | None = Field(
+        None, alias="primaryCase", description="A flag indicating whether this is a parent Case."
+    )
+    name_transposition: bool | None = Field(
+        None,
+        alias="nameTransposition",
+        description="A flag indicating whether name transposition is enabled for the Case.",
+    )
+    outstanding_actions: bool | None = Field(
+        None,
+        alias="outstandingActions",
+        description="A flag indicating outstanding actions on a Case.",
+    )
+    batches: list[ItemIdentifier] | None = Field(None, description="The owning batch of the Case.")
+    no_of_excluded_results: int | None = Field(
+        None,
+        alias="noOfExcludedResults",
+        description="The number of results that have been excluded from the result set due to auto-resolution rules.",
+    )
+    no_of_auto_resolved_results: int | None = Field(
+        None,
+        alias="noOfAutoResolvedResults",
+        description="The number of results that have been auto-resolved as 'False' due to auto-resolution rules.",
+    )
+    result_summaries: CaseResultSummaries | None = Field(None, alias="resultSummaries")
+    aggregated_result_summaries: CaseResultSummaries | None = Field(
+        None,
+        alias="aggregatedResultSummaries",
+        description="Case statistics containing summary of mandatory actions and resolutions for the primary case and any linked sub cases. Applicable only to primary cases.",
+    )
+
+
+class CaseSearchResponse(AbstractCaseSearchModel):
+    pagination: PaginationReferenceResponse | None = None
+    results: list[CaseDetailed] | None = None
 
 
 class CaseTemplateResponse(BaseModel):
@@ -504,6 +1272,32 @@ class CaseTemplateResponse(BaseModel):
     )
     name_transposition: TypeAvailableSelected | None = Field(None, alias="nameTransposition")
     mandatory_provider_types: list[str] | None = Field(None, alias="mandatoryProviderTypes")
+
+
+class OgsUpdatesFilteredNotifications(BaseModel):
+    filter: str = Field(
+        ...,
+        description="A FIQL query filter expression passed in the ongoing screening updates request payload.",
+    )
+    match_filter: str | None = Field(
+        None,
+        alias="matchFilter",
+        description="The matchFilter passed in the ongoing screening updates request payload.",
+    )
+    mode: str = Field(
+        ..., description="The mode passed in the ongoing screening updates request payload."
+    )
+    sort: list[SortCriterion] = Field(
+        ...,
+        description="The sorting criteria passed in the ongoing screening updates request payload.",
+    )
+    total_result_count: int = Field(
+        ...,
+        alias="totalResultCount",
+        description="Indicates the total number of results objects based on filter criteria.",
+    )
+    pagination: PaginationReferenceResponse
+    results: list[Results]
 
 
 class ProviderSource(BaseModel):
@@ -596,6 +1390,61 @@ class RecordLocationsCollection(BaseModel):
     )
 
 
+class AbstractScreeningResult(BaseModel):
+    result_id: str | None = Field(None, alias="resultId", description="Result identifier.")
+    reference_id: str = Field(
+        ..., alias="referenceId", description="The reference ID of the matched Entity."
+    )
+    match_strength: str | None = Field(
+        None, alias="matchStrength", description="Matched Result Strength"
+    )
+    match_score: float | None = Field(
+        None,
+        alias="matchScore",
+        description="The exact match score with value rounded to 2 decimal places.",
+    )
+    advanced_matching_details: AdvancedMatchingDetails | None = Field(
+        None,
+        alias="advancedMatchingDetails",
+        description="Advanced matching score details generated by AI reranking.",
+    )
+    matched_terms: list[MatchedTerm] | None = Field(
+        None, alias="matchedTerms", description="Actual terms that were matched with the Entity."
+    )
+    submitted_term: str | None = Field(
+        None, alias="submittedTerm", description="Submitted term for screening"
+    )
+    provider_type: str | None = Field(
+        None, alias="providerType", description="Provider type enumeration."
+    )
+    secondary_field_results: list[SecondaryFieldResult] | None = Field(
+        None, alias="secondaryFieldResults", description="Match Results for Case Secondary Fields."
+    )
+    sources: list[str] | None = Field(
+        None,
+        description="Set of [ProviderSource](#tag/ProviderSource_Model)s, each of which contains this Result's Entity and was used to screen\nthe Case when this Result was last found.\n",
+    )
+    source_categories: list[str] | None = Field(
+        None,
+        alias="sourceCategories",
+        description="Set of [ProviderSourceTypeCategory](#tag/ProviderSourceTypeCategoryDetail_Model) names of this Result's sources.\n",
+    )
+    creation_date: str | None = Field(
+        None, alias="creationDate", description="The date and time when the Result was created."
+    )
+    modification_date: str | None = Field(
+        None,
+        alias="modificationDate",
+        description="The date and time when the Result was last modified.",
+    )
+    last_alert_date: str | None = Field(
+        None, alias="lastAlertDate", description="Last alert date of the matched Result term."
+    )
+    modifier: UserSummaryDetails | None = None
+    resolution: Resolution | None = None
+    result_review: Review | None = Field(None, alias="resultReview")
+
+
 class Entity(BaseModel):
     entity_type: str = Field(
         ...,
@@ -643,6 +1492,21 @@ class ProviderDetail(Provider):
     sources: list[ProviderSource] | None = Field(
         None, description="Sources that belong to this Provider."
     )
+
+
+class ResultsResponse(BaseModel):
+    results_count: int | None = Field(
+        None,
+        alias="resultsCount",
+        description="The number of results in the response, depending on filters applied.",
+    )
+    filter: str | None = Field(
+        None, description="The filter (if any) used when sending the original request."
+    )
+    sort: list[SortCriterion] | None = None
+    pagination: PaginationReferenceResponse | None = None
+    summary: ResultsCollectionSummary | None = None
+    results: list[AbstractScreeningResult] | None = None
 
 
 SubCategory.model_rebuild()

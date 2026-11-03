@@ -7,6 +7,12 @@ from world_check_mcp.upstream import CaseTemplateResponse
 from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
 from world_check_mcp.upstream import GET_GROUP_BY_ID
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
+from world_check_mcp.upstream import GetCaseTemplateForGroupPath
+from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
+from world_check_mcp.upstream import GetGroupByIdPath
+from world_check_mcp.upstream import GetGroupByIdRequest
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupRequest
 from world_check_mcp.upstream import ResolutionField
 from world_check_mcp.upstream import ResolutionToolkitResponse
 from world_check_mcp.upstream import StatusResolutionField
@@ -15,9 +21,19 @@ from world_check_mcp.upstream import Upstream
 
 async def get_group_settings(*, upstream: Upstream, group_id: str) -> GroupSettings:
     """The group's template and the resolution choices its matches accept."""
-    group = await upstream.call_untyped(GET_GROUP_BY_ID, groupId=group_id)
-    template = await upstream.call_untyped(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
-    toolkits = await upstream.call_untyped(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=group_id)
+    group = await upstream.call(
+        GET_GROUP_BY_ID, GetGroupByIdRequest(path=GetGroupByIdPath(group_id=group_id))
+    )
+    template = await upstream.call(
+        GET_CASE_TEMPLATE_FOR_GROUP,
+        GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
+    )
+    toolkits = await upstream.call(
+        GET_RESOLUTION_TOOLKITS_FOR_GROUP,
+        GetResolutionToolkitsForGroupRequest(
+            path=GetResolutionToolkitsForGroupPath(group_id=group_id)
+        ),
+    )
     return GroupSettings(
         group=group_from_summary(summary=group),
         screening_type=template.group_screening_type,

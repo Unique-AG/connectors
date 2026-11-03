@@ -8,7 +8,9 @@ from pydantic import TypeAdapter
 
 
 class CaseWire(BaseModel):
-    """The case fields these tools read. The generated case model narrows optional fields."""
+    """The case fields these tools read. Hand-written: the generated Case narrows optional base
+    fields, which the type check rejects as an incompatible override.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 

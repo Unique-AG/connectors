@@ -13,6 +13,10 @@ from world_check_mcp.contexts.screening.outcome import outcome
 from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
 from world_check_mcp.upstream import GET_COUNTRIES
 from world_check_mcp.upstream import GET_NATIONALITIES
+from world_check_mcp.upstream import GetCaseTemplateForGroupPath
+from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
+from world_check_mcp.upstream import GetCountriesRequest
+from world_check_mcp.upstream import GetNationalitiesRequest
 from world_check_mcp.upstream import SAVE_AND_SCREEN
 from world_check_mcp.upstream import Upstream
 
@@ -46,9 +50,12 @@ async def screen_entity(
         case_id=case_id,
     )
     await refuse_existing_case(upstream=upstream, case_id=case_id)
-    template = await upstream.call_untyped(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
-    countries = await upstream.call_untyped(GET_COUNTRIES)
-    nationalities = await upstream.call_untyped(GET_NATIONALITIES)
+    template = await upstream.call(
+        GET_CASE_TEMPLATE_FOR_GROUP,
+        GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
+    )
+    countries = await upstream.call(GET_COUNTRIES, GetCountriesRequest())
+    nationalities = await upstream.call(GET_NATIONALITIES, GetNationalitiesRequest())
     saved = await upstream.call_untyped(
         SAVE_AND_SCREEN,
         **screening_arguments(

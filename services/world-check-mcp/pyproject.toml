@@ -103,10 +103,18 @@ operation-ids = [
     "getRecord",
     "getResolutionToolkitsForGroup",
     "getSearchFilters",
+    "searchCases",
+    "getResults",
+    "getCaseAuditEventsByCaseSystemId",
+    "toggleOngoingScreeningByProviderTypes",
+    "getOngoingScreeningUpdates",
+    "getMrzData",
 ]
 operation-module = "mcp_openapi.upstream"
 models-module = "world_check_mcp.upstream.generated.vendor_responses"
 models-output = "src/world_check_mcp/upstream/generated/vendor_responses.py"
+requests-module = "world_check_mcp.upstream.generated.vendor_requests"
+requests-output = "src/world_check_mcp/upstream/generated/vendor_requests.py"
 operations-output = "src/world_check_mcp/upstream/generated/operations.py"
 
 # The import contracts every MCP keeps, which packages/mcp-architecture/ARCHITECTURE.md explains.

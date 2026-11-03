@@ -365,9 +365,13 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "results": [
                     {
                         "id": "a1",
+                        "objectId": "sys-1",
+                        "entityType": "CASE",
                         "actionType": "NEW_CASE",
                         "eventDate": "2026-10-22T06:47:00Z",
+                        "actionedByUserId": "u1",
                         "actionedByUserName": "service-account",
+                        "details": {"detailsType": "CASE"},
                     }
                 ],
                 "pagination": {"pageReferences": {"next": None}},
@@ -434,12 +438,13 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             return _json(
                 200,
                 {
+                    "summary": {"totalCases": 1, "success": 0, "failed": 1},
                     "failedCases": [
                         {
                             "caseSystemId": "fail-1",
                             "errors": [{"code": "DENIED", "message": "Case cannot be monitored."}],
                         }
-                    ]
+                    ],
                 },
             )
         return httpx2.Response(204)
@@ -465,6 +470,10 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(
             200,
             {
+                "filter": expression,
+                "mode": "FULL",
+                "sort": [{"columnName": "updateDate", "order": "ASCENDING"}],
+                "totalResultCount": 1,
                 "results": [
                     {
                         "caseSystemId": "sys-1",

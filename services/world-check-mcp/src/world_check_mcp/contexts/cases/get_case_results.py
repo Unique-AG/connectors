@@ -2,7 +2,11 @@ from world_check_mcp.contexts.cases.get_case import get_case
 from world_check_mcp.contexts.cases.models import CaseResults
 from world_check_mcp.contexts.cases.models import Match
 from world_check_mcp.upstream import GET_RESULTS
+from world_check_mcp.upstream import GetResultsPath
+from world_check_mcp.upstream import GetResultsRequest
 from world_check_mcp.upstream import next_page
+from world_check_mcp.upstream import PaginationReferenceRequestInput
+from world_check_mcp.upstream import ResultsFilterRequestInput
 from world_check_mcp.upstream import Upstream
 
 
@@ -16,16 +20,18 @@ async def get_case_results(
 ) -> CaseResults:
     """Match facts for an internal caseSystemId, or an external caseId when that misses."""
     resolved = await get_case(upstream=upstream, case=case)
-    pagination: dict[str, object] = {"itemsPerPage": limit}
-    if page_reference is not None:
-        pagination["pageReference"] = page_reference
-    arguments: dict[str, object] = {
-        "caseSystemId": resolved.case_system_id,
-        "pagination": pagination,
-    }
-    if expression is not None:
-        arguments["filter"] = expression
-    found = await upstream.call_untyped(GET_RESULTS, **arguments)
+    found = await upstream.call(
+        GET_RESULTS,
+        GetResultsRequest(
+            path=GetResultsPath(case_system_id=resolved.case_system_id),
+            body=ResultsFilterRequestInput(
+                filter=expression,
+                pagination=PaginationReferenceRequestInput(
+                    items_per_page=limit, page_reference=page_reference
+                ),
+            ),
+        ),
+    )
     return CaseResults(
         case_system_id=resolved.case_system_id,
         matches=[

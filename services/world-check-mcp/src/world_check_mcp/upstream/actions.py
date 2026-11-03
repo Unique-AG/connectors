@@ -6,11 +6,34 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import TypeAdapter
 
-from world_check_mcp.upstream.queries import PaginationWire
-from world_check_mcp.upstream.queries import ResultWire
+from world_check_mcp.upstream.generated.vendor_requests import (
+    ToggleOngoingScreeningByProviderTypesRequest,
+)
+from world_check_mcp.upstream.generated.vendor_responses import CaseBulkResponse
+
+
+class ScreeningMatchWire(BaseModel):
+    """A screening result. The generated model drops mrzLine1-3: the spec puts them on a passport
+    result subtype that the codegen collapses into the base, so this stays hand-written.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    result_id: str | None = Field(default=None, alias="resultId")
+    reference_id: str | None = Field(default=None, alias="referenceId")
+    provider_type: str | None = Field(default=None, alias="providerType")
+    match_strength: str | None = Field(default=None, alias="matchStrength")
+    submitted_term: str | None = Field(default=None, alias="submittedTerm")
+    mrz_line_1: str | None = Field(default=None, alias="mrzLine1")
+    mrz_line_2: str | None = Field(default=None, alias="mrzLine2")
+    mrz_line_3: str | None = Field(default=None, alias="mrzLine3")
 
 
 class ScreenedCaseWire(BaseModel):
+    """The save-and-screen response the tools read. Hand-written because its results carry the
+    passport mrzLine fields that the generated ScreeningResultCollection drops.
+    """
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
 
     case_id: str | None = Field(default=None, alias="caseId")
@@ -18,74 +41,20 @@ class ScreenedCaseWire(BaseModel):
     name: str | None = None
     entity_type: str | None = Field(default=None, alias="entityType")
     group_id: str | None = Field(default=None, alias="groupId")
-    results: list[ResultWire] = []
+    results: list[ScreeningMatchWire] = []
 
 
-class BulkErrorWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    code: str | None = None
-    message: str | None = None
-
-
-class FailedCaseWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    case_system_id: str | None = Field(default=None, alias="caseSystemId")
-    errors: list[BulkErrorWire] = []
-
-
-class BulkResultWire(BaseModel):
-    """A 200 body lists the cases LSEG did not update. A 204 body is empty."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    failed_cases: list[FailedCaseWire] = Field(default_factory=list, alias="failedCases")
-
-
-class WatchlistUpdateWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    new_results: int | None = Field(default=None, alias="numberOfNewResults")
-    updated_results: int | None = Field(default=None, alias="numberOfUpdatedResults")
-
-
-class OgsUpdateWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    case_id: str | None = Field(default=None, alias="caseId")
-    case_system_id: str | None = Field(default=None, alias="caseSystemId")
-    group_id: str | None = Field(default=None, alias="groupId")
-    update_date: str | None = Field(default=None, alias="updateDate")
-    watchlist_results: WatchlistUpdateWire | None = Field(default=None, alias="watchlistResults")
-
-
-class OgsUpdatesWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
-
-    results: list[OgsUpdateWire] = []
-    pagination: PaginationWire | None = None
-
-
+# saveAndScreenCase and partialUpdateCase build their bodies dynamically and return results that
+# carry the passport mrzLine fields the spec omits, so they stay hand-written and call_untyped.
 SAVE_AND_SCREEN = Operation[ScreenedCaseWire]("saveAndScreenCase", TypeAdapter(ScreenedCaseWire))
 PARTIAL_UPDATE_CASE = Operation[ScreenedCaseWire](
     "partialUpdateCase", TypeAdapter(ScreenedCaseWire)
 )
-TOGGLE_ONGOING_SCREENING = Operation[BulkResultWire | None](
-    "toggleOngoingScreeningByProviderTypes", TypeAdapter(BulkResultWire | None)
-)
-GET_OGS_UPDATES = Operation[OgsUpdatesWire](
-    "getOngoingScreeningUpdates", TypeAdapter(OgsUpdatesWire)
-)
-
-
-class MrzWire(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
-
-    lines: list[str] = []
-    conforms_with_icao: bool | None = Field(default=None, alias="conformWithICAO")
-
-
-GET_MRZ = Operation[MrzWire]("getMrzData", TypeAdapter(MrzWire))
+# A success is an empty 204, so the response is widened to None over the generated model, which the
+# codegen types without it. The generated request model still types the call.
+TOGGLE_ONGOING_SCREENING = Operation[
+    CaseBulkResponse | None, ToggleOngoingScreeningByProviderTypesRequest
+]("toggleOngoingScreeningByProviderTypes", TypeAdapter(CaseBulkResponse | None))
+# Neither write returns a JSON body, so the codegen cannot generate an operation for them.
 VERIFY_PASSPORT = Operation[None]("mrzDataValidation", TypeAdapter(None))
 RESOLVE_RESULTS = Operation[None]("resolveResults", TypeAdapter(None))
