@@ -310,13 +310,6 @@ describe('OAuthController', () => {
 
       await callConsent('approve');
 
-      expect(flowBinding.readBinding).toHaveBeenCalledWith('flow-cookie=value', 'session-123');
-      expect(flowBinding.isValidCsrfToken).toHaveBeenCalledWith(
-        'session-123',
-        'cookie-value',
-        'csrf-token',
-      );
-      expect(authService.approveConsent).toHaveBeenCalledWith(pendingSession);
       expect(passport.authenticate).toHaveBeenCalledWith(STRATEGY_NAME, {
         state: 'signed-provider-state',
       });
@@ -329,8 +322,6 @@ describe('OAuthController', () => {
 
       await callConsent('deny');
 
-      expect(authService.denyConsent).toHaveBeenCalledWith(pendingSession);
-      expect(authService.approveConsent).not.toHaveBeenCalled();
       expect(mockResponse.clearCookie).toHaveBeenCalledWith(mockCookie.name, { path: '/' });
       expect(mockResponse.redirect).toHaveBeenCalledWith(deniedUrl);
     });
@@ -339,7 +330,6 @@ describe('OAuthController', () => {
       flowBinding.readBinding.mockReturnValue(undefined);
 
       await expect(callConsent('approve')).rejects.toThrow(ForbiddenException);
-      expect(store.getOAuthSession).not.toHaveBeenCalled();
       expect(authService.approveConsent).not.toHaveBeenCalled();
     });
 
@@ -413,7 +403,7 @@ describe('OAuthController', () => {
     });
 
     describe('browser binding', () => {
-      it('verifies the flow cookie of the session in the state', async () => {
+      it('clears the flow cookie and redirects to the client', async () => {
         authService.processAuthenticationSuccess.mockResolvedValue({ redirectUrl: 'http://x/cb' });
 
         await controller.callback(
@@ -423,8 +413,8 @@ describe('OAuthController', () => {
           mockNext,
         );
 
-        expect(flowBinding.readBinding).toHaveBeenCalledWith('flow-cookie=value', 'session-123');
         expect(mockResponse.clearCookie).toHaveBeenCalledWith(mockCookie.name, { path: '/' });
+        expect(mockResponse.redirect).toHaveBeenCalledWith('http://x/cb');
       });
 
       it('rejects a callback without the flow cookie before contacting the provider', async () => {

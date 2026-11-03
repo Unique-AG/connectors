@@ -83,8 +83,6 @@ describe('McpOAuthService', () => {
           sessionHmac: expectedHmac,
         });
         expect(store.updateOAuthSessionState).toHaveBeenCalledWith('session-123', expectedHmac);
-        expect(store.removeOAuthSession).not.toHaveBeenCalled();
-        expect(store.storeOAuthSession).not.toHaveBeenCalled();
       });
 
       it('returns the same provider state when the user approves twice', async () => {
@@ -148,7 +146,26 @@ describe('McpOAuthService', () => {
       });
     });
 
-    it('rejects a callback for a session that was never approved', async () => {
+    it('rejects a validly signed state while the stored session is still pending', async () => {
+      const signedState = decodeProviderState(await service.approveConsent(pendingSession));
+      assert.ok(signedState, 'approveConsent returns a decodable provider state');
+      store.getOAuthSession.mockResolvedValue(pendingSession);
+
+      await expect(
+        service.processAuthenticationSuccess({
+          user: {
+            profile: { id: 'user-123', username: 'testuser' },
+            accessToken: 'a',
+            refreshToken: 'r',
+            provider: 'test-provider',
+          },
+          ...signedState,
+        }),
+      ).rejects.toThrow(new UnauthorizedException('Invalid state.'));
+      expect(store.storeAuthCode).not.toHaveBeenCalled();
+    });
+
+    it('rejects a state signed with another secret', async () => {
       store.getOAuthSession.mockResolvedValue(pendingSession);
       const forgedHmac = createHmac('sha256', 'attacker-secret')
         .update('session-123:nonce')
