@@ -18,46 +18,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  mode:
-    name: Mode
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    environment: workflow-automation # to read the credentials of the GitHub App
-    permissions: {}
-    outputs:
-      mode: ${{ steps.mode.outputs.mode }}
-      note: ${{ steps.mode.outputs.note }}
-    steps:
-      - name: Decide the mode
-        id: mode
-        env:
-          DRY_RUN: ${{ inputs.dry-run }}
-          APP_CLIENT_ID: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
-          APP_KEY_SET: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY != '' }}
-        run: |
-          if [ "$DRY_RUN" = "true" ]; then
-            mode="plan"
-            note="This run is a dry run. It opens no pull request."
-          elif [ -z "$APP_CLIENT_ID" ] || [ "$APP_KEY_SET" != "true" ]; then
-            mode="plan"
-            note="The variable GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID or the secret GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY is missing. This run opens no pull request."
-          else
-            mode="pr"
-            note="This run opens one pull request for each entry in the first list."
-          fi
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "note=$note" >> "$GITHUB_OUTPUT"
-
   plan:
     name: Plan
-    needs: mode
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read # to read the repository
       pull-requests: read # to list the open dependency pull requests
     outputs:
-      mode: ${{ needs.mode.outputs.mode }}
+      mode: ${{ inputs.dry-run && 'plan' || 'pr' }}
       entries: ${{ steps.plan.outputs.entries }}
       updates: ${{ steps.plan.outputs.updates }}
     steps:
@@ -98,7 +67,7 @@ jobs:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           TAG_LEDGER: ${{ runner.temp }}/tag-ledger.json
           DASHBOARD_FILE: ${{ runner.temp }}/dashboard.md
-          PLAN_NOTE: ${{ needs.mode.outputs.note }}
+          PLAN_NOTE: ${{ inputs.dry-run && 'This run is a dry run. It opens no pull request.' || 'This run opens one pull request for each entry in the first list.' }}
         run: node .github/scripts/deps-nightly/plan.cli.mjs
 
       - name: Save the tag ledger
