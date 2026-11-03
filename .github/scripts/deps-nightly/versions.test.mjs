@@ -2,11 +2,14 @@ import assert from 'node:assert';
 import { describe, it } from 'node:test';
 import {
   compareVersions,
+  formatChange,
   isMajorBump,
   isStable,
   newestVersion,
   oldestVersion,
+  pairVersions,
   updateType,
+  versionLine,
 } from './versions.mjs';
 
 describe('compareVersions', () => {
@@ -62,10 +65,51 @@ describe('isMajorBump', () => {
     assert.strictEqual(isMajorBump(['8.1.0', '9.0.0'], ['10.0.0']), true);
   });
 
+  it('is false when each version line of a package moves inside its own major', () => {
+    assert.strictEqual(isMajorBump(['7.29.11', '8.0.8'], ['7.29.12', '8.0.10']), false);
+  });
+
+  it('is false for a downgrade', () => {
+    assert.strictEqual(isMajorBump('2.0.0', '1.9.0'), false);
+  });
+
   it('is false inside one major version and for text that is not a version', () => {
     assert.strictEqual(isMajorBump('0.28.2', '0.29.0'), false);
     assert.strictEqual(isMajorBump(['1.2.0'], ['1.3.0']), false);
     assert.strictEqual(isMajorBump('workspace:*', '2.0.0'), false);
+  });
+});
+
+describe('versionLine', () => {
+  it('gives the range of the major, or of the minor for 0.x', () => {
+    assert.strictEqual(versionLine('7.29.11'), '>=7.0.0 <8.0.0');
+    assert.strictEqual(versionLine('0.3.1'), '>=0.3.0 <0.4.0');
+    assert.strictEqual(versionLine('0.0.4'), '>=0.0.4 <0.0.5');
+  });
+});
+
+describe('pairVersions and formatChange', () => {
+  it('pairs each old version with the new version on its line', () => {
+    assert.deepStrictEqual(pairVersions('7.29.11, 8.0.8', '7.29.12, 8.0.10'), [
+      ['7.29.11', '7.29.12'],
+      ['8.0.8', '8.0.10'],
+    ]);
+  });
+
+  it('writes one arrow for each pair', () => {
+    assert.strictEqual(
+      formatChange(['7.29.11', '8.0.8'], ['7.29.12', '8.0.10']),
+      '7.29.11 -> 7.29.12, 8.0.8 -> 8.0.10',
+    );
+  });
+
+  it('keeps a single change, and text that is not a version', () => {
+    assert.strictEqual(formatChange('4.6.5', '4.6.7'), '4.6.5 -> 4.6.7');
+    assert.strictEqual(formatChange('~> 3', '4.9.0'), '~> 3 -> 4.9.0');
+  });
+
+  it('pairs a new major with the newest older version', () => {
+    assert.deepStrictEqual(pairVersions('6.1.0, 7.0.0', '8.0.0'), [['7.0.0', '8.0.0']]);
   });
 });
 

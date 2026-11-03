@@ -388,6 +388,7 @@ describe('buildPlan', () => {
       const first = buildPlan({ candidates, needsPerson: [], config });
       const openPulls = [...first.entries, ...first.deferred].map(({ key, name }, index) => ({
         ...pull(index, ['ai-assisted']),
+        humanCommits: true,
         branch: `deps/npm-${name}`,
         body: markerOf(key),
       }));
@@ -456,8 +457,8 @@ describe('buildPlan', () => {
       );
     });
 
-    it('only merges main into a pull request that the agent handled', () => {
-      const { entries, updates } = plan([pull({ labels: ['ai-assisted'] })]);
+    it('only merges main into a pull request that has a commit from a person', () => {
+      const { entries, updates } = plan([pull({ humanCommits: true })]);
       assert.deepStrictEqual(
         updates.map(({ slug, number }) => [slug, number]),
         [['npm-zod', 7]],
@@ -466,6 +467,41 @@ describe('buildPlan', () => {
         entries.map(({ slug }) => slug),
         ['npm-pino'],
       );
+    });
+
+    it('rebuilds a pull request that only carries an agent label', () => {
+      const { entries, updates } = plan([pull({ labels: ['ai-assisted'] })]);
+      assert.deepStrictEqual(updates, []);
+      assert.deepStrictEqual(
+        entries.map(({ slug, action }) => [slug, action]),
+        [
+          ['npm-zod', 'rebuild'],
+          ['npm-pino', 'new'],
+        ],
+      );
+    });
+
+    it('handles only the requested pull request, and skips everything else', () => {
+      const { entries, updates, skipped } = plan([pull()], { request: { number: 7 } });
+      assert.deepStrictEqual(
+        entries.map(({ slug, action }) => [slug, action]),
+        [['npm-zod', 'rebuild']],
+      );
+      assert.deepStrictEqual(updates, []);
+      assert.strictEqual(skipped.find(({ slug }) => slug === 'npm-pino').reason, 'the request is for #7');
+    });
+
+    it('rebuilds a requested pull request that is up to date and has a commit from a person', () => {
+      const { entries } = plan([pull({ behindBy: 0, humanCommits: true })], {
+        request: { number: 7, recreate: true },
+      });
+      assert.strictEqual(entries[0].action, 'rebuild');
+    });
+
+    it('keeps a requested pull request that is up to date when it is only a rebase request', () => {
+      const { entries, skipped } = plan([pull({ behindBy: 0 })], { request: { number: 7 } });
+      assert.deepStrictEqual(entries, []);
+      assert.strictEqual(skipped.find(({ slug }) => slug === 'npm-zod').reason, '#7 is up to date');
     });
 
     it('replaces a pull request for another version', () => {

@@ -9,6 +9,14 @@ on:
         description: "Write the plan to the job summary and open no pull request"
         type: boolean
         default: true
+      pr:
+        description: "Handle only this pull request number, and open no other pull request"
+        type: string
+        default: ""
+      recreate:
+        description: "With a pull request number: rebuild it from main, and drop the commits of a person or the agent"
+        type: boolean
+        default: false
 
 permissions:
   contents: read # to read the repository
@@ -67,7 +75,9 @@ jobs:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           TAG_LEDGER: ${{ runner.temp }}/tag-ledger.json
           DASHBOARD_FILE: ${{ runner.temp }}/dashboard.md
-          PLAN_NOTE: ${{ inputs.dry-run && 'This run is a dry run. It opens no pull request.' || 'This run opens one pull request for each entry in the first list.' }}
+          PLAN_NOTE: ${{ inputs.dry-run && 'This run is a dry run. It opens no pull request.' || inputs.pr && 'This run handles one pull request only.' || 'This run opens one pull request for each entry in the first list.' }}
+          PR_NUMBER: ${{ inputs.pr }}
+          RECREATE: ${{ inputs.recreate }}
         run: node .github/scripts/deps-nightly/plan.cli.mjs
 
       - name: Save the tag ledger
@@ -104,7 +114,7 @@ jobs:
   dashboard:
     name: Dashboard
     needs: plan
-    if: needs.plan.outputs.mode == 'pr'
+    if: needs.plan.outputs.mode == 'pr' && !inputs.pr
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

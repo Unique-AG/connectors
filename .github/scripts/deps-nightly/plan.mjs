@@ -3,6 +3,7 @@ import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from
 import { classifyOpenPull, entryKey } from './state.mjs';
 import {
   compareVersions,
+  formatChange,
   isMajorBump,
   isStable,
   newestVersion,
@@ -223,6 +224,7 @@ export function buildPlan({
   config,
   openPulls = [],
   closedKeys = new Set(),
+  request,
 }) {
   const ignored = candidates.filter((candidate) => isIgnored(config.ignore ?? [], candidate));
   const buckets = Map.groupBy(
@@ -268,14 +270,17 @@ export function buildPlan({
   );
   const openByBranch = new Map(openPulls.map((pull) => [pull.branch, pull]));
   const decisions = ordered.map((entry) => {
+    const pull = openByBranch.get(`deps/${entry.slug}`);
+    if (request && pull?.number !== request.number) {
+      return { entry, skip: `the request is for #${request.number}` };
+    }
     if (closedKeys.has(entry.key)) {
       return { entry, skip: 'a person closed this version' };
     }
-    const pull = openByBranch.get(`deps/${entry.slug}`);
     if (!pull) {
       return { entry: { ...entry, action: 'new' } };
     }
-    const action = classifyOpenPull({ key: entry.key, pull });
+    const action = classifyOpenPull({ key: entry.key, pull, recreate: request?.recreate });
     return action === 'keep'
       ? { entry, skip: `#${pull.number} is up to date` }
       : { entry: { ...entry, action, number: pull.number } };
@@ -298,7 +303,7 @@ function describe({ name, isGroup, members }) {
   if (isGroup) {
     return `${name}: ${members.length} packages`;
   }
-  return `${name}: ${members[0].from} -> ${members[0].to}`;
+  return `${name}: ${formatChange(members[0].from, members[0].to)}`;
 }
 
 const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR', update: 'merge main' };
