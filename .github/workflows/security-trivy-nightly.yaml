@@ -287,13 +287,15 @@ jobs:
         run: |
           set -uo pipefail
           alerts=$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&tool_name=Trivy&per_page=100" --paginate --jq '.[] | [.most_recent_instance.category, (.rule.security_severity_level // "unknown")] | @tsv' || true)
-          count() {
-            printf '%s\n' "$alerts" | awk -F'\t' -v category="$1" '$1 == category { found[$2]++ } END { printf "%d critical, %d high", found["critical"], found["high"] }'
+          line() {
+            printf '%s\n' "$alerts" | awk -F'\t' -v category="$1" -v icon="$2" -v label="$3" '$1 == category { found[$2]++ } END { printf "%s %s: %d critical, %d high", (found["critical"] + found["high"] == 0 ? ":white_check_mark:" : icon), label, found["critical"], found["high"] }'
           }
           {
             echo 'text<<EOF'
-            echo ":package: Lock files of main: $(count trivy-lockfiles)"
-            echo ":page_facing_up: Misconfiguration of main: $(count trivy-config)"
+            line trivy-lockfiles ':package:' 'Lock files of main'
+            echo
+            line trivy-config ':page_facing_up:' 'Misconfiguration of main'
+            echo
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 

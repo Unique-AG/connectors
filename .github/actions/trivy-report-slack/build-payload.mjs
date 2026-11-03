@@ -8,6 +8,7 @@ const ICON = {
   high: '🔴',
   medium: '🟠',
   warn: '⚠️',
+  ok: '✅',
   shield: '🛡️',
 };
 
@@ -16,7 +17,6 @@ const HEADER_TEXT_LIMIT = 150;
 const SECTION_TEXT_LIMIT = 3000;
 const CONTEXT_TEXT_LIMIT = 2000;
 
-export const IMAGES_LIMIT = 10;
 
 function truncate(text, limit) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
@@ -141,7 +141,9 @@ export function formatSeveritySummary(counts) {
 
 export function buildHeadlineText(summary) {
   const noun = summary.scanned === 1 ? 'image' : 'images';
-  return `${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}`;
+  const allClear =
+    summary.status === 'success' && summary.unique.critical === 0 && summary.unique.high === 0;
+  return `${allClear ? `${ICON.ok} ` : ''}${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}`;
 }
 
 export function formatSummedPerImageLine(summary) {
@@ -152,7 +154,7 @@ export function formatHeaderTitle(title, versionLabel) {
   return `${ICON.shield} ${title} → ${versionLabel}`;
 }
 
-export function topOffendingImages(images, limit = IMAGES_LIMIT) {
+export function topOffendingImages(images) {
   return images
     .filter((image) => image.failed || image.vulnerabilities.length > 0)
     .sort((left, right) => {
@@ -167,8 +169,7 @@ export function topOffendingImages(images, limit = IMAGES_LIMIT) {
         }
       }
       return left.service.localeCompare(right.service);
-    })
-    .slice(0, limit);
+    });
 }
 
 export function buildMainSectionText(summary) {
@@ -233,14 +234,6 @@ export function buildTopOffendersBlocks(images) {
   ];
 }
 
-function buildOmittedBlocks(images) {
-  const omitted =
-    topOffendingImages(images, Number.POSITIVE_INFINITY).length - topOffendingImages(images).length;
-  return omitted > 0
-    ? [sectionBlock(`_${omitted} more image(s) have findings. Open the run for the full list._`)]
-    : [];
-}
-
 function sectionBlock(text) {
   return { type: 'section', text: { type: 'mrkdwn', text: truncate(text, SECTION_TEXT_LIMIT) } };
 }
@@ -300,7 +293,6 @@ export function buildPayload(env) {
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },
       sectionBlock(buildMainSectionText(summary)),
       ...buildTopOffendersBlocks(summary.images),
-      ...buildOmittedBlocks(summary.images),
       ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       {
         type: 'context',

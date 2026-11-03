@@ -11,7 +11,6 @@ import {
   formatHeaderTitle,
   formatSeveritySummary,
   formatSummedPerImageLine,
-  IMAGES_LIMIT,
   summarize,
   topOffendingImages,
 } from './build-payload.mjs';
@@ -120,6 +119,22 @@ test('buildHeadlineText uses the unique counts', () => {
   );
 });
 
+test('buildHeadlineText starts with a check mark when no critical and no high finding is left', () => {
+  const unique = { critical: 0, high: 0, medium: 27 };
+
+  assert.equal(
+    buildHeadlineText({ status: 'success', scanned: 3, unique }),
+    '✅ 🟣 0 critical · 🔴 0 high · 🟠 27 medium unique across 3 images',
+  );
+  assert.equal(buildHeadlineText({ status: 'partial', scanned: 3, unique }).startsWith('✅'), false);
+  assert.equal(
+    buildHeadlineText({ status: 'success', scanned: 3, unique: { ...unique, high: 1 } }).startsWith(
+      '✅',
+    ),
+    false,
+  );
+});
+
 test('buildHeadlineText uses the singular for one image', () => {
   assert.match(
     buildHeadlineText({ scanned: 1, unique: { critical: 0, high: 0, medium: 0 } }),
@@ -192,14 +207,14 @@ test('topOffendingImages does not change the input order', () => {
   );
 });
 
-test('buildTopOffendersBlocks returns a table with the image tag and a row limit', () => {
-  const images = Array.from({ length: IMAGES_LIMIT + 3 }, (_, index) =>
+test('buildTopOffendersBlocks lists every image with findings, with its tag', () => {
+  const images = Array.from({ length: 13 }, (_, index) =>
     image(`service-${String(index).padStart(2, '0')}`, [vulnerability(`CVE-${index}`, 'high')]),
   );
   const [table] = buildTopOffendersBlocks(images);
 
   assert.equal(table.type, 'table');
-  assert.equal(table.rows.length, IMAGES_LIMIT + 1);
+  assert.equal(table.rows.length, 14);
   assert.deepEqual(
     table.rows[0].map((cell) => cell.text),
     ['Service', '🟣 Critical', '🔴 High', '🟠 Medium'],
@@ -377,52 +392,4 @@ test('buildPayload rejects a missing CHANNEL', () => {
     () => buildPayload({ ...baseEnv, CHANNEL: '', REPORTS_PATH: '.', SERVICES: '[]' }),
     /CHANNEL is required/,
   );
-});
-
-test('buildPayload says how many images the table leaves out', () => {
-  const services = Array.from({ length: IMAGES_LIMIT + 2 }, (_, index) => `s${index}`);
-  const payload = withReports(
-    (root) => {
-      for (const service of services) {
-        writeReport(root, service, {
-          meta: { found: true },
-          results: { Results: [{ Vulnerabilities: [trivyVulnerability(`CVE-${service}`, 'HIGH')] }] },
-        });
-      }
-    },
-    (root) =>
-      buildPayload({
-        ...baseEnv,
-        REPORTS_PATH: root,
-        SERVICES: JSON.stringify(services.map((service) => ({ service, version: '1.0.0' }))),
-      }),
-  );
-
-  assert.equal(
-    payload.blocks.at(-2).text.text,
-    '_2 more image(s) have findings. Open the run for the full list._',
-  );
-});
-
-test('buildPayload puts the other alerts below the table', () => {
-  const payload = withReports(
-    (root) =>
-      writeReport(root, 'admin', {
-        meta: { found: true },
-        results: { Results: [{ Vulnerabilities: [trivyVulnerability('CVE-1', 'HIGH')] }] },
-      }),
-    (root) =>
-      buildPayload({
-        ...baseEnv,
-        REPORTS_PATH: root,
-        SERVICES: JSON.stringify([{ service: 'admin', version: '1.2.3' }]),
-        OTHER_ALERTS: ':package: Lock files of main: 0 critical, 0 high',
-      }),
-  );
-
-  assert.deepEqual(
-    payload.blocks.map((block) => block.type),
-    ['header', 'section', 'table', 'section', 'context'],
-  );
-  assert.equal(payload.blocks[3].text.text, ':package: Lock files of main: 0 critical, 0 high');
 });
