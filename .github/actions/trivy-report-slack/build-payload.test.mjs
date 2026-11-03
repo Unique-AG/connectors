@@ -119,16 +119,16 @@ test('buildHeadlineText uses the unique counts', () => {
   );
 });
 
-test('buildHeadlineText starts with a check mark when no critical and no high finding is left', () => {
+test('buildHeadlineText ends with a check mark when no critical and no high finding is left', () => {
   const unique = { critical: 0, high: 0, medium: 27 };
 
   assert.equal(
     buildHeadlineText({ status: 'success', scanned: 3, unique }),
-    '✅ 🟣 0 critical · 🔴 0 high · 🟠 27 medium unique across 3 images',
+    '🟣 0 critical · 🔴 0 high · 🟠 27 medium unique across 3 images ✅',
   );
-  assert.equal(buildHeadlineText({ status: 'partial', scanned: 3, unique }).startsWith('✅'), false);
+  assert.equal(buildHeadlineText({ status: 'partial', scanned: 3, unique }).endsWith('✅'), false);
   assert.equal(
-    buildHeadlineText({ status: 'success', scanned: 3, unique: { ...unique, high: 1 } }).startsWith(
+    buildHeadlineText({ status: 'success', scanned: 3, unique: { ...unique, high: 1 } }).endsWith(
       '✅',
     ),
     false,
@@ -360,7 +360,7 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
   );
 });
 
-test('buildPayload adds a section for the other alerts only when it has text', () => {
+test('buildPayload adds the repository title and a table row only for a scan with findings', () => {
   const base = {
     CHANNEL: 'C0C1PR9CNMP',
     TITLE: 'Security Trivy Scan',
@@ -373,13 +373,33 @@ test('buildPayload adds a section for the other alerts only when it has text', (
     WORKFLOW_NAME: 'Trivy',
     RUN_URL: 'https://github.com/unique-ag/connectors/actions/runs/1',
   };
+  const none = { critical: 0, high: 0, medium: 0 };
   const without = buildPayload(base);
-  const withOther = buildPayload({
+  const withFindings = buildPayload({
     ...base,
-    OTHER_ALERTS: ':package: Lock files of main: 0 critical, 2 high',
+    REPOSITORY_ALERTS: JSON.stringify({
+      lockfiles: { critical: 0, high: 2, medium: 1 },
+      config: none,
+    }),
   });
-  assert.equal(withOther.blocks.length, without.blocks.length + 1);
-  assert.equal(withOther.blocks[2].text.text, ':package: Lock files of main: 0 critical, 2 high');
+  const withNone = buildPayload({
+    ...base,
+    REPOSITORY_ALERTS: JSON.stringify({ lockfiles: none, config: none }),
+  });
+
+  assert.equal(withFindings.blocks.length, without.blocks.length + 2);
+  assert.equal(
+    withFindings.blocks[2].text.text,
+    '*Repository (main): lock files and configuration*',
+  );
+  assert.deepEqual(
+    withFindings.blocks[3].rows.map((row) => row.map((cell) => cell.text)),
+    [
+      ['Scan', '🟣 Critical', '🔴 High', '🟠 Medium'],
+      ['📦 Lock files', '0', '2', '1'],
+    ],
+  );
+  assert.equal(withNone.blocks.length, without.blocks.length);
 });
 
 test('buildPayload sets the channel for a legacy webhook', () => {

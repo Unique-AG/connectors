@@ -35,8 +35,8 @@ inputs:
   run_url:
     description: URL of the workflow run
     required: true
-  other_alerts:
-    description: Optional text for a section about the other open alerts, for example the lock files
+  repository_alerts:
+    description: Optional JSON with the open alerts of the lock files and the configuration, for example {"lockfiles":{"critical":0,"high":0,"medium":0},"config":{"critical":0,"high":0,"medium":0}}
     required: false
     default: ""
 
@@ -57,7 +57,7 @@ runs:
         ACTOR: ${{ inputs.actor }}
         WORKFLOW_NAME: ${{ inputs.workflow_name }}
         RUN_URL: ${{ inputs.run_url }}
-        OTHER_ALERTS: ${{ inputs.other_alerts }}
+        REPOSITORY_ALERTS: ${{ inputs.repository_alerts }}
       run: |
         set -euo pipefail
         PAYLOAD=$(node "${{ github.action_path }}/build-payload.mjs")

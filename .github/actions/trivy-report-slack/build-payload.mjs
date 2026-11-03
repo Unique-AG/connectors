@@ -9,6 +9,8 @@ const ICON = {
   medium: '🟠',
   warn: '⚠️',
   ok: '✅',
+  lockfiles: '📦',
+  config: '📄',
   shield: '🛡️',
 };
 
@@ -143,7 +145,7 @@ export function buildHeadlineText(summary) {
   const noun = summary.scanned === 1 ? 'image' : 'images';
   const allClear =
     summary.status === 'success' && summary.unique.critical === 0 && summary.unique.high === 0;
-  return `${allClear ? `${ICON.ok} ` : ''}${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}`;
+  return `${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}${allClear ? ` ${ICON.ok}` : ''}`;
 }
 
 export function formatSummedPerImageLine(summary) {
@@ -201,36 +203,66 @@ function rawText(text) {
   return { type: 'raw_text', text };
 }
 
+function severityHeader(firstColumn) {
+  return [
+    rawText(firstColumn),
+    rawText(`${ICON.critical} Critical`),
+    rawText(`${ICON.high} High`),
+    rawText(`${ICON.medium} Medium`),
+  ];
+}
+
+function tableBlock(rows) {
+  return {
+    type: 'table',
+    column_settings: [
+      { is_wrapped: true },
+      { align: 'right' },
+      { align: 'right' },
+      { align: 'right' },
+    ],
+    rows,
+  };
+}
+
 export function buildTopOffendersBlocks(images) {
   const offenders = topOffendingImages(images);
   if (offenders.length === 0) {
     return [];
   }
-  const rows = [
-    [
-      rawText('Service'),
-      rawText(`${ICON.critical} Critical`),
-      rawText(`${ICON.high} High`),
-      rawText(`${ICON.medium} Medium`),
-    ],
-    ...offenders.map((image) => [
-      rawText(`${image.service}:${image.version}${image.failed ? ' (scan failed)' : ''}`),
-      rawText(String(image.critical)),
-      rawText(String(image.high)),
-      rawText(String(image.medium)),
+  return [
+    tableBlock([
+      severityHeader('Service'),
+      ...offenders.map((image) => [
+        rawText(`${image.service}:${image.version}${image.failed ? ' (scan failed)' : ''}`),
+        rawText(String(image.critical)),
+        rawText(String(image.high)),
+        rawText(String(image.medium)),
+      ]),
     ]),
   ];
+}
+
+const REPOSITORY_TITLE = 'Repository (main): lock files and configuration';
+const REPOSITORY_SCANS = [
+  { key: 'lockfiles', label: 'Lock files', icon: ICON.lockfiles },
+  { key: 'config', label: 'Configuration', icon: ICON.config },
+];
+
+export function buildRepositoryBlocks(alerts) {
+  const rows = REPOSITORY_SCANS.filter(({ key }) => SEVERITIES.some((severity) => alerts?.[key][severity] > 0));
+  if (rows.length === 0) {
+    return [];
+  }
   return [
-    {
-      type: 'table',
-      column_settings: [
-        { is_wrapped: true },
-        { align: 'right' },
-        { align: 'right' },
-        { align: 'right' },
-      ],
-      rows,
-    },
+    sectionBlock(`*${REPOSITORY_TITLE}*`),
+    tableBlock([
+      severityHeader('Scan'),
+      ...rows.map(({ key, label, icon }) => [
+        rawText(`${icon} ${label}`),
+        ...SEVERITIES.map((severity) => rawText(String(alerts[key][severity]))),
+      ]),
+    ]),
   ];
 }
 
@@ -268,12 +300,13 @@ export function buildPayload(env) {
     ACTOR,
     WORKFLOW_NAME,
     RUN_URL,
-    OTHER_ALERTS = '',
+    REPOSITORY_ALERTS = '',
   } = env;
   const expected = JSON.parse(SERVICES);
   assert.ok(Array.isArray(expected), 'SERVICES must be a JSON array');
   assert.ok(RUN_URL, 'RUN_URL is required');
   assert.ok(CHANNEL, 'CHANNEL is required');
+  const repositoryAlerts = REPOSITORY_ALERTS.trim() === '' ? null : JSON.parse(REPOSITORY_ALERTS);
 
   const summary = summarize(expected.map((entry) => readImage(REPORTS_PATH, entry)));
   const headerTitle = truncate(formatHeaderTitle(TITLE, VERSION_LABEL), HEADER_TEXT_LIMIT);
@@ -293,7 +326,7 @@ export function buildPayload(env) {
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },
       sectionBlock(buildMainSectionText(summary)),
       ...buildTopOffendersBlocks(summary.images),
-      ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
+      ...buildRepositoryBlocks(repositoryAlerts),
       {
         type: 'context',
         elements: [{ type: 'mrkdwn', text: truncate(footer, CONTEXT_TEXT_LIMIT) }],
