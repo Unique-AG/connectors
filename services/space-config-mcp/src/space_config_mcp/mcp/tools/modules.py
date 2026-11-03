@@ -12,8 +12,10 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
+from space_config_mcp.persistence import Persistence
 from space_config_mcp.shared import ClaudeEffort
 from space_config_mcp.shared import ClaudeSDKConfig
 from space_config_mcp.shared import CodexReasoningEffort
@@ -89,14 +91,18 @@ async def update_module_config(
         ),
     ],
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
     """Merge config_patch into a module's configuration dict. Existing unpatched keys are kept."""
     user_id, company_id = caller
     return await contexts.update_module_config(
         upstream=upstream,
+        persistence=persistence,
         user_id=user_id,
         company_id=company_id,
+        space_id=space_id,
         module_id=module_id,
         config_patch=config_patch,
     )
@@ -266,6 +272,7 @@ async def update_conduct_config(  # noqa: PLR0913
         ),
     ] = None,
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
@@ -339,6 +346,7 @@ async def update_conduct_config(  # noqa: PLR0913
     try:
         return await contexts.update_conduct_config(
             upstream=upstream,
+            persistence=persistence,
             user_id=user_id,
             company_id=company_id,
             space_id=space_id,

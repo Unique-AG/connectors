@@ -3,7 +3,7 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Grant access to a user or group on a space.",
+    "description": "Grant access to a user or group on the current space.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -14,14 +14,9 @@
             "type": "object"
           },
           "type": "array"
-        },
-        "space_id": {
-          "description": "ID of the space to grant access on.",
-          "type": "string"
         }
       },
       "required": [
-        "space_id",
         "access"
       ],
       "type": "object"
@@ -65,9 +60,26 @@
   },
   {
     "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Delete all stored snapshots for the current space.\n\nRemoves the snapshot file and every version it contains. This cannot be undone.\nIndividual version deletion is not supported by the KB API.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "delete_snapshots",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Delete Snapshots"
+  },
+  {
+    "annotations": {
       "idempotentHint": true
     },
-    "description": "Revoke access entries from a space.",
+    "description": "Revoke access entries from the current space.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -77,14 +89,9 @@
             "type": "string"
           },
           "type": "array"
-        },
-        "space_id": {
-          "description": "ID of the space to revoke access on.",
-          "type": "string"
         }
       },
       "required": [
-        "space_id",
         "access_ids"
       ],
       "type": "object"
@@ -108,18 +115,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return a portable JSON string of the full space config. No storage side-effects.\n\nReflects the live config at call time. Use snapshot_space to persist a named version.",
+    "description": "Return the current space config as a portable JSON string. No storage side-effects.\n\nReflects live config at call time. Use snapshot_space to persist a named version.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the space to export.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "export_space_config",
@@ -142,18 +141,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return the SwappableIntelligence module ID and its typed ConductConfig for a Conduct space.\n\nThe configuration dict uses camelCase keys matching the stored format. Use this before\ncalling update_conduct_config to inspect the current state.",
+    "description": "Return the SwappableIntelligence module ID and its typed ConductConfig for the current space.\n\nThe configuration dict uses camelCase keys matching the stored format. Use this before\ncalling update_conduct_config to inspect the current state.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the Conduct space.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "get_conduct_config",
@@ -190,21 +181,16 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Return the full JSON content of a stored snapshot.\n\nSnapshots reflect the space config at the time snapshot_space was called.\nChanges made through the portal since then are not included.",
+    "description": "Return the full JSON config stored in a specific snapshot version.\n\nReflects the space config at the time snapshot_space was called for that version.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "snapshot_id": {
-          "description": "ID of the snapshot to retrieve.",
-          "type": "string"
-        },
-        "space_id": {
-          "description": "ID of the space the snapshot belongs to.",
+          "description": "Snapshot ID returned by list_snapshots.",
           "type": "string"
         }
       },
       "required": [
-        "space_id",
         "snapshot_id"
       ],
       "type": "object"
@@ -221,18 +207,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Get full space configuration: metadata, modules, scope rules, MCP servers, and access.",
+    "description": "Get the full configuration of the current space: metadata, modules, scope rules, and access.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the space to retrieve.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "get_space",
@@ -243,18 +221,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List current access entries for a space.",
+    "description": "List current access entries for the current space.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the space to read access for.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "get_space_access",
@@ -298,21 +268,16 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Apply a previously exported JSON config to a space. Auto-snapshots before applying.",
+    "description": "Apply a previously exported JSON config to the current space. Auto-snapshots before applying.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "config_json": {
-          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying. Portal changes since the export was taken are not included.",
-          "type": "string"
-        },
-        "space_id": {
-          "description": "ID of the space to apply the config to.",
+          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying.",
           "type": "string"
         }
       },
       "required": [
-        "space_id",
         "config_json"
       ],
       "type": "object"
@@ -329,18 +294,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List all modules belonging to a space.",
+    "description": "List all modules belonging to the current space.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the space whose modules to list.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "list_modules",
@@ -351,18 +308,10 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List snapshots for a space stored in the knowledge base, newest first.\n\nOnly shows snapshots created by this MCP. Config changes made in the\nportal since the last snapshot are not reflected.",
+    "description": "List all stored snapshots for the current space, newest version first.\n\nReturns snapshot_id (a KB contentVersionId), version_number, label, and captured_at\nfor each snapshot. Pass snapshot_id to get_snapshot or revert_space.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {
-        "space_id": {
-          "description": "ID of the space to list snapshots for.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "space_id"
-      ],
+      "properties": {},
       "type": "object"
     },
     "name": "list_snapshots",
@@ -386,63 +335,18 @@
   },
   {
     "annotations": {
-      "idempotentHint": true,
-      "readOnlyHint": true
-    },
-    "description": "List Unique AI spaces. Optionally filter by name substring.",
-    "inputSchema": {
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional case-insensitive partial name filter."
-        },
-        "skip": {
-          "default": 0,
-          "description": "Number of records to skip for pagination.",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "take": {
-          "default": 20,
-          "description": "Maximum number of records to return.",
-          "maximum": 1000,
-          "minimum": 1,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "name": "list_spaces",
-    "title": "List Spaces"
-  },
-  {
-    "annotations": {
       "idempotentHint": false
     },
-    "description": "Restore a space to a prior snapshot. Auto-snapshots current state first.\n\nSnapshots reflect the config at the time snapshot_space was called.\nPortal changes made since then are not part of the snapshot and will be lost on revert.",
+    "description": "Restore the current space to a prior snapshot version.\n\nAuto-snapshots the current state first so the revert itself is reversible.\nReturns the pre-revert snapshot ID alongside the restored snapshot ID.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "snapshot_id": {
-          "description": "ID of the snapshot to restore from.",
-          "type": "string"
-        },
-        "space_id": {
-          "description": "ID of the space to revert.",
+          "description": "Snapshot ID returned by list_snapshots.",
           "type": "string"
         }
       },
       "required": [
-        "space_id",
         "snapshot_id"
       ],
       "type": "object"
@@ -458,7 +362,7 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Capture the full space configuration as a named JSON snapshot stored in the knowledge base.\n\nReturns snapshot_id for later revert. Snapshots are point-in-time captures:\nconfig changes made through the portal since the last snapshot are not reflected.",
+    "description": "Capture the full configuration of the current space as a versioned JSON snapshot.\n\nStores the snapshot in the knowledge base. Returns snapshot_id for later revert.\nEach call creates a new version of the space's snapshot file.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -466,15 +370,8 @@
           "default": "",
           "description": "Human-readable label for this snapshot. Auto-generated if empty.",
           "type": "string"
-        },
-        "space_id": {
-          "description": "ID of the space to snapshot.",
-          "type": "string"
         }
       },
-      "required": [
-        "space_id"
-      ],
       "type": "object"
     },
     "name": "snapshot_space",
@@ -490,7 +387,7 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Update a Conduct space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.",
+    "description": "Update the current space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -751,10 +648,6 @@
           "default": null,
           "description": "Show tool calls in the chat UI (setup.showToolCallsInChat)."
         },
-        "space_id": {
-          "description": "ID of the Conduct space to update.",
-          "type": "string"
-        },
         "strategy": {
           "anyOf": [
             {
@@ -787,9 +680,6 @@
           "description": "When non-empty, fully replaces the agent system prompt (setup.systemPromptOverride)."
         }
       },
-      "required": [
-        "space_id"
-      ],
       "type": "object"
     },
     "name": "update_conduct_config",
@@ -826,7 +716,7 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Update space metadata. Only the fields you provide are changed.",
+    "description": "Update metadata of the current space. Only the fields you provide are changed.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -914,15 +804,8 @@
           ],
           "default": null,
           "description": "Arbitrary settings dict merged at space level."
-        },
-        "space_id": {
-          "description": "ID of the space to update.",
-          "type": "string"
         }
       },
-      "required": [
-        "space_id"
-      ],
       "type": "object"
     },
     "name": "update_space",

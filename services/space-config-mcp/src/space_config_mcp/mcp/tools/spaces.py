@@ -12,8 +12,10 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
+from space_config_mcp.persistence import Persistence
 from space_config_mcp.upstream import Upstream
 
 _META = merge_tool_meta(
@@ -68,6 +70,7 @@ async def update_space(
         Field(description="Arbitrary settings dict merged at space level."),
     ] = None,
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
@@ -76,6 +79,7 @@ async def update_space(
     try:
         return await contexts.update_space(
             upstream=upstream,
+            persistence=persistence,
             user_id=user_id,
             company_id=company_id,
             space_id=space_id,

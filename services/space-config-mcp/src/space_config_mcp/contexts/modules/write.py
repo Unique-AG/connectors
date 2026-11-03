@@ -2,6 +2,8 @@ from typing import cast
 
 import unique_sdk
 
+from space_config_mcp.contexts.snapshots import snapshot_space
+from space_config_mcp.persistence import Persistence
 from space_config_mcp.shared import ClaudeSDKConfig
 from space_config_mcp.shared import CodexSDKConfig
 from space_config_mcp.shared import ConductConfig
@@ -17,12 +19,22 @@ _CONDUCT_MODULE_NAME = "SwappableIntelligence"
 async def update_module_config(
     *,
     upstream: Upstream,
+    persistence: Persistence,
     user_id: str,
     company_id: str,
+    space_id: str,
     module_id: str,
     config_patch: dict[str, object],
 ) -> unique_sdk.Module:
     """Merge config_patch into a module's configuration dict, preserving unpatched keys."""
+    await snapshot_space(
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        label="pre-update_module_config",
+    )
     current = await upstream.get_module(user_id, company_id, module_id)
     existing_config: dict[str, object] = cast(dict[str, object], current.configuration or {})
     merged = {**existing_config, **config_patch}
@@ -64,6 +76,7 @@ def _deep_merge(base: dict[str, object], patch: dict[str, object]) -> dict[str, 
 async def update_conduct_config(
     *,
     upstream: Upstream,
+    persistence: Persistence,
     user_id: str,
     company_id: str,
     space_id: str,
@@ -75,6 +88,14 @@ async def update_conduct_config(
     setup_patch: ConductSetupConfig | None = None,
 ) -> unique_sdk.Module:
     """Merge typed patches into the Conduct harness configuration."""
+    await snapshot_space(
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        label="pre-update_conduct_config",
+    )
     modules = await upstream.list_modules(user_id, company_id, space_id)
     mod = next((m for m in modules if m.name == _CONDUCT_MODULE_NAME), None)
     if mod is None:

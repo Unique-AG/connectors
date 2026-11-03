@@ -1,11 +1,14 @@
 import unique_sdk
 
+from space_config_mcp.contexts.snapshots import snapshot_space
+from space_config_mcp.persistence import Persistence
 from space_config_mcp.upstream import Upstream
 
 
 async def update_space(
     *,
     upstream: Upstream,
+    persistence: Persistence,
     user_id: str,
     company_id: str,
     space_id: str,
@@ -17,6 +20,14 @@ async def update_space(
     is_pinned: bool | None = None,
     settings: dict[str, object] | None = None,
 ) -> unique_sdk.Space:
+    await snapshot_space(
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        label="pre-update_space",
+    )
     patch: unique_sdk.Space.UpdateParams = {}
     if name is not None:
         patch["name"] = name
