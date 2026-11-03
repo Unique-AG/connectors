@@ -82,6 +82,13 @@ def _sent(route: Route) -> Mapping[str, object]:
     return cast("Mapping[str, object]", json.loads(route.calls.last.request.content))
 
 
+def _patched(routes: dict[tuple[str, str], Route]) -> tuple[str, Route]:
+    [(path, route)] = [
+        (path, route) for (method, path), route in routes.items() if method == "PATCH"
+    ]
+    return f"outlook:///contacts/{path.rsplit('/', 1)[1]}", route
+
+
 @functools.cache
 def _server() -> FastMCP[None]:
     return build_server()
@@ -268,25 +275,25 @@ class TestAChangeKeepsWhatTheContactHolds:
     async def test_it_keeps_the_numbers_a_contact_has_when_it_adds_one(
         self, graph: MockRouter
     ) -> None:
-        _ = Contact(graph, businessPhones=["+41 44 555 01 03"])
+        contact, _ = _patched(serve(graph, "rec-tool-outlook_update_contact-add-phone"))
 
         changed = await call(
-            "outlook_update_contact", uri=TOM, add_business_phones=["+41 44 555 01 09"]
+            "outlook_update_contact", uri=contact, add_business_phones=["+41 44 555 01 06"]
         )
 
-        assert changed["business_phones"] == ["+41 44 555 01 03", "+41 44 555 01 09"]
+        assert changed["business_phones"] == ["+41 44 555 01 03", "+41 44 555 01 06"]
 
     async def test_it_does_not_add_a_number_that_the_contact_already_has(
         self, graph: MockRouter
     ) -> None:
-        tom = Contact(graph, businessPhones=["+41 44 555 01 03"])
+        contact, patch = _patched(serve(graph, "rec-tool-outlook_update_contact-no-duplicate"))
 
         changed = await call(
-            "outlook_update_contact", uri=TOM, add_business_phones=["+41 44 555 01 03"]
+            "outlook_update_contact", uri=contact, add_business_phones=["+41 44 555 01 03"]
         )
 
         assert changed["business_phones"] == ["+41 44 555 01 03"]
-        assert tom.sent[0]["businessPhones"] == ["+41 44 555 01 03"]
+        assert _sent(patch)["businessPhones"] == ["+41 44 555 01 03"]
 
     async def test_it_refuses_to_clear_the_company_and_leaves_the_contact_as_it_is(
         self, graph: MockRouter

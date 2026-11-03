@@ -38,6 +38,7 @@ _PAGE_ID = "1-SYNTHETICPAGE00000000000000000000!ABCDEF"
 _SECTION_ID = "1-SYNTHETICSECTION0000!ABCDEF"
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!ABCDEF"
 _GROUP_ID = "5c6b7a81-2f0d-4a24-9b1e-8a9c3c470f9e"
+_SEED_TEAM_ID = "00000000-e7a0-41c6-863d-0548ee2dacdd"
 _TEAM = OnenoteOwner("groups", _GROUP_ID)
 _PAGE = OnenotePageHandle(_PAGE_ID).uri
 _TEAM_PAGE = OnenotePageHandle(_PAGE_ID, owner=_TEAM).uri
@@ -126,17 +127,6 @@ def _own_notes(graph: respx.MockRouter) -> None:
         return_value=httpx.Response(200, json=_notebook())
     )
     _ = graph.get(f"/me/onenote/sections/{_SECTION_ID}").mock(
-        return_value=httpx.Response(200, json=_section())
-    )
-
-
-def _team_notes(graph: respx.MockRouter) -> None:
-    root = f"/groups/{_GROUP_ID}/onenote"
-    _ = graph.get(f"{root}/pages/{_PAGE_ID}").mock(return_value=httpx.Response(200, json=_page()))
-    _ = graph.get(f"{root}/notebooks/{_NOTEBOOK_ID}").mock(
-        return_value=httpx.Response(200, json=_notebook(shared=True))
-    )
-    _ = graph.get(f"{root}/sections/{_SECTION_ID}").mock(
         return_value=httpx.Response(200, json=_section())
     )
 
@@ -352,33 +342,33 @@ class TestChangingANote:
     async def test_a_sentence_is_replaced_after_the_person_approves_and_nothing_else_is_sent(
         self, graph: respx.MockRouter
     ) -> None:
-        _own_notes(graph)
-        html = (
-            b'<html><body><p id="p:{a1}!1">Intro</p>'
-            + b'<p id="p:{b2}!2">Launch on 14 June</p></body></html>'
-        )
-        _ = graph.get(f"{_PAGE_PATH}/content").mock(return_value=_page_html(html))
-        patch = graph.post(f"{_PAGE_PATH}/onenotePatchContent").mock(
-            return_value=httpx.Response(204)
-        )
+        routes = serve(graph, "rec-tool-onenote_edit_page-replace-sentence")
+        page = OnenotePageHandle(_id_in(routes, "POST", "/me/onenote/pages/")).uri
         person = Person()
 
-        read = await call("onenote_read_page", page=_PAGE, include_ids=True)
+        read = await call("onenote_read_page", page=page, include_ids=True)
         target = cast(
-            "re.Match[str]", re.search(r'id="([^"]+)">Launch', cast("str", read["html"]))
+            "re.Match[str]", re.search(r'id="([^"]+)"[^>]*>First', cast("str", read["html"]))
         )[1]
         _ = await call(
             "onenote_edit_page",
-            page=_PAGE,
+            page=page,
             commands=[
-                {"target": target, "action": "replace", "content": "<p>Launch on 21 June</p>"}
+                {
+                    "target": target,
+                    "action": "replace",
+                    "content": '<p data-id="one">Changed sentence.</p>',
+                }
             ],
             person=person,
         )
 
+        [patch] = [
+            route for (_, path), route in routes.items() if path.endswith("onenotePatchContent")
+        ]
         [command] = cast("list[Row]", json.loads(patch.calls.last.request.content)["commands"])
-        assert (command["action"], command["target"]) == ("Replace", "p:{b2}!2")
-        assert "21 June" in cast("str", command["content"])
+        assert (command["action"], command["target"]) == ("Replace", target)
+        assert "Changed sentence" in cast("str", command["content"])
         assert len(person.asked) == 1
         assert "A replace cannot be undone" in person.asked[0]
 
@@ -398,21 +388,20 @@ class TestChangingANote:
     async def test_a_page_is_added_to_the_notebook_of_a_team_after_the_person_approves(
         self, graph: respx.MockRouter
     ) -> None:
-        _team_notes(graph)
-        _ = graph.post(f"/groups/{_GROUP_ID}/onenote/sections/{_SECTION_ID}/pages").mock(
-            return_value=httpx.Response(201, json=_page("Retro"))
-        )
+        routes = serve(graph, "rec-tool-onenote_create_page-team-section")
+        team = OnenoteOwner("groups", _id_in(routes, "POST", "/groups/"))
+        section = OnenoteSectionHandle(_id_in(routes, "POST", "/onenote/sections/"), owner=team).uri
         person = Person()
 
         created = await call(
             "onenote_create_page",
             title="Retro",
             body_html="<p>notes</p>",
-            section=_TEAM_SECTION,
+            section=section,
             person=person,
         )
 
-        assert str(created["uri"]).startswith(f"onenote:///groups/{_GROUP_ID}/pages/")
+        assert str(created["uri"]).startswith(f"onenote:///groups/{team.owner_id}/pages/")
         assert len(person.asked) == 1
         assert "belongs to a Microsoft 365 group" in person.asked[0]
 
@@ -935,24 +924,21 @@ class TestCopying:
     async def test_a_notebook_is_copied_into_a_team_after_the_person_approves(
         self, graph: respx.MockRouter
     ) -> None:
-        copies = serve(graph, "rec-tool-onenote_copy_notebook-spare")
+        copies = serve(graph, "rec-tool-onenote_copy_notebook-team")
         notebook_id = _id_in(copies, "POST", "/me/onenote/notebooks/")
-        _ = graph.get(f"/me/onenote/notebooks/{notebook_id}").mock(
-            return_value=httpx.Response(200, json=_notebook())
-        )
         person = Person()
 
         _ = await call(
             "onenote_copy_notebook",
             notebook=OnenoteNotebookHandle(notebook_id).uri,
-            to_group=_GROUP_ID,
+            to_group=_SEED_TEAM_ID,
             person=person,
         )
 
         [copy] = [route for (verb, _), route in copies.items() if verb == "POST"]
-        assert json.loads(copy.calls.last.request.content)["groupId"] == _GROUP_ID
+        assert json.loads(copy.calls.last.request.content)["groupId"] == _SEED_TEAM_ID
         assert len(person.asked) == 1
-        assert _GROUP_ID in person.asked[0]
+        assert _SEED_TEAM_ID in person.asked[0]
 
     async def test_a_section_is_copied_into_another_notebook(self, graph: respx.MockRouter) -> None:
         routes = serve(graph, "rec-tool-onenote_copy_section-notebook")

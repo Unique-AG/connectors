@@ -28,8 +28,8 @@ from tests.tools.scenarios.support import Person, call, serve
 
 type Row = Mapping[str, object]
 
-ANNA = {"user_id": "00000000-0000-4000-8000-0000000000a1", "name": "Anna Meier"}
-TOM = {"user_id": "00000000-0000-4000-8000-0000000000a2", "name": "Tom Berger"}
+ANNA = {"user_id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1", "name": "Anna Meier"}
+TOM = {"user_id": "00000000-e469-40d3-8f5b-9a7c5dac541e", "name": "Tom Berger"}
 PRIYA = {"user_id": "00000000-0000-4000-8000-0000000000a3", "name": "Priya Rao"}
 GUEST_UPN = "guest@outside.invalid"
 
@@ -77,6 +77,10 @@ async def _a_new_group_chat(mia: Person) -> Row:
 
 async def _called(tool: str, /, **arguments: object) -> Row:
     return await call(tool, person=None, **arguments)
+
+
+def _the_route(routes: Mapping[tuple[str, str], respx.Route], method: str) -> respx.Route:
+    return next(route for (verb, _path), route in routes.items() if verb == method)
 
 
 def _made(graph: respx.MockRouter) -> list[tuple[str, str]]:
@@ -385,16 +389,18 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
     async def test_it_sends_the_attendees_with_the_meeting_and_gives_them_back(
         self, graph: respx.MockRouter
     ) -> None:
+        routes = serve(graph, "rec-tool-teams_create_meeting-attendees")
         attendees = [ANNA["user_id"], TOM["user_id"]]
-        route = graph.post("/me/onlineMeetings/createOrGet").mock(
-            return_value=httpx.Response(200, json=_meeting(attendees=attendees))
-        )
 
         created = await _called("teams_create_meeting", **{**NEW_MEETING, "attendees": [ANNA, TOM]})
 
         sent = [
             cast("str", cast("Row", cast("Row", one["identity"])["user"])["id"])
-            for one in _rows(cast("Row", _body(route)["participants"])["attendees"])
+            for one in _rows(
+                cast(
+                    "Row", _body(routes[("POST", "/me/onlineMeetings/createOrGet")])["participants"]
+                )["attendees"]
+            )
         ]
         assert sent == attendees
         assert created["attendee_ids"] == attendees
@@ -453,53 +459,49 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
     async def test_it_moves_a_meeting_and_leaves_its_attendees_and_every_calendar_alone(
         self, graph: respx.MockRouter
     ) -> None:
-        attendees = [ANNA["user_id"], TOM["user_id"]]
-        _the_meeting_is(graph, _meeting(attendees=attendees))
-        moved = graph.patch(MEETING_PATH).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    **_meeting(attendees=attendees),
-                    "startDateTime": "2026-03-02T15:00:00Z",
-                    "endDateTime": "2026-03-02T15:30:00Z",
-                },
-            )
-        )
+        routes = serve(graph, "rec-tool-teams_update_meeting-move")
         mia = Person()
+        created = await call(
+            "teams_create_meeting", person=mia, **{**NEW_MEETING, "attendees": [ANNA, TOM]}
+        )
 
-        result = await call("teams_update_meeting", person=mia, **MOVE_MEETING)
+        result = await call(
+            "teams_update_meeting",
+            person=mia,
+            meeting_uri=created["meeting_uri"],
+            **TOMORROW_AT_15,
+        )
 
-        assert "2026-03-02T15:00:00+00:00 until 2026-03-02T15:30:00+00:00" in mia.asked[0]
-        assert _body(moved) == {
+        assert "2026-03-02T15:00:00+00:00 until 2026-03-02T15:30:00+00:00" in mia.asked[-1]
+        assert _body(_the_route(routes, "PATCH")) == {
             "@odata.type": "#microsoft.graph.onlineMeeting",
             "startDateTime": "2026-03-02T15:00:00+00:00",
             "endDateTime": "2026-03-02T15:30:00+00:00",
         }
-        assert result["attendee_ids"] == attendees
-        assert str(result["start"]).startswith("2026-03-02T15:00")
+        assert result["attendee_ids"] == [ANNA["user_id"], TOM["user_id"]]
+        assert str(result["start"]).startswith("2026-11-03T19:00")
         assert all("/events" not in path for _, path in _made(graph))
 
     async def test_it_adds_an_attendee_and_keeps_the_earlier_attendees(
         self, graph: respx.MockRouter
     ) -> None:
-        earlier = [ANNA["user_id"], TOM["user_id"]]
-        _the_meeting_is(graph, _meeting(attendees=earlier))
-        everyone = [*earlier, PRIYA["user_id"]]
-        changed = graph.patch(MEETING_PATH).mock(
-            return_value=httpx.Response(200, json=_meeting(attendees=everyone))
-        )
+        routes = serve(graph, "rec-tool-teams_update_meeting-add-attendee")
         mia = Person()
+        created = await call(
+            "teams_create_meeting", person=mia, **{**NEW_MEETING, "attendees": [ANNA]}
+        )
+        everyone = [ANNA["user_id"], TOM["user_id"]]
 
         result = await call(
             "teams_update_meeting",
             person=mia,
-            meeting_uri=MEETING_URI,
-            attendees=[ANNA, TOM, PRIYA],
+            meeting_uri=created["meeting_uri"],
+            attendees=[ANNA, TOM],
         )
 
-        sent = _rows(cast("Row", _body(changed)["participants"])["attendees"])
+        sent = _rows(cast("Row", _body(_the_route(routes, "PATCH"))["participants"])["attendees"])
         assert [cast("Row", cast("Row", one["identity"])["user"])["id"] for one in sent] == everyone
-        assert "removes" not in mia.asked[0]
+        assert "removes" not in mia.asked[-1]
         assert result["attendee_ids"] == everyone
         assert all("/events" not in path for _, path in _made(graph))
 

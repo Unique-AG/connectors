@@ -160,7 +160,7 @@ async def _thread(graph: MockRouter) -> Mapping[str, object]:
 
 
 async def _plan_file(graph: MockRouter) -> Mapping[str, object]:
-    _ = _fresh(graph, "sharepoint_search_files-plan")
+    _ = _fresh(graph, "sharepoint_read_file-docx")
     found = await call("sharepoint_search_files", query="seed-v1 Project Plan")
     return _list(found, "files")[0]
 
@@ -299,7 +299,6 @@ class TestAReplyUsesADocumentFromSharePoint:
         question = await _budget_mail(graph)
         mail = await _read_mail(graph, _list(question, "messages")[0]["uri"])
         plan = await _plan_file(graph)
-        _ = _stores_file(graph, cast("str", plan["uri"]))
         price_list = await _read_file(cast("str", plan["uri"]))
         routes = _fresh(graph, "outlook_draft_reply-reply")
         draft = await call(
@@ -444,7 +443,6 @@ class TestAMeetingIsPreparedFromItsInvitationMailAndFiles:
         )
         thread = await _thread(graph)
         plan = await _plan_file(graph)
-        _ = _stores_file(graph, cast("str", plan["uri"]))
         deck = await _read_file(cast("str", plan["uri"]))
 
         assert meeting["start"] == {

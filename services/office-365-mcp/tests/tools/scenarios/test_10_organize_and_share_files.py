@@ -112,6 +112,13 @@ def _handles(routes: Routes, method: str) -> list[tuple[str, str]]:
     return list(dict.fromkeys(found))
 
 
+def _recorded_name(routes: Routes) -> str:
+    [name] = [
+        path.split(":/", 1)[1].removesuffix(":/content") for (verb, path) in routes if verb == "PUT"
+    ]
+    return name
+
+
 class TestFilingDocuments:
     async def test_a_contract_moves_into_a_new_folder_after_each_approval(
         self, graph: respx.MockRouter
@@ -184,17 +191,12 @@ class TestFilingDocuments:
     ) -> None:
         routes = serve(graph, "rec-tool-sharepoint_create_text_file-seed-folder")
         [(drive, folder)] = _handles(routes, "GET")
-        [recorded_name] = [
-            path.split(":/", 1)[1].removesuffix(":/content")
-            for (verb, path) in routes
-            if verb == "PUT"
-        ]
         person = Person()
 
         saved = await call(
             "sharepoint_create_text_file",
             folder=DriveFolderHandle(drive, folder).uri,
-            name=recorded_name,
+            name=_recorded_name(routes),
             content=_NOTES,
             person=person,
         )
@@ -279,33 +281,22 @@ class TestGivingAccess:
     async def test_a_colleague_gets_edit_access_with_an_invitation_after_the_person_approves(
         self, graph: respx.MockRouter
     ) -> None:
-        _items(graph, item=_entry(name="Q3 Plan.pptx"))
-        invite = graph.post(f"{_ITEM_PATH}/invite").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        {
-                            "roles": ["write"],
-                            "invitation": {"email": "anna@example.invalid"},
-                            "grantedToV2": {"user": {"displayName": "Anna"}},
-                        }
-                    ]
-                },
-            )
-        )
+        routes = serve(graph, "rec-tool-sharepoint_invite-write-notify")
+        drive, item = _handles(routes, "POST")[-1]
+        [invite] = [route for (_, path), route in routes.items() if path.endswith("/invite")]
         person = Person()
 
         shared = await call(
             "sharepoint_invite",
-            item=_FILE,
-            recipients=["anna@example.invalid"],
+            item=DriveFileHandle(drive, item).uri,
+            recipients=["anna@example.test"],
             role="write",
             person=person,
         )
 
         [anna] = cast("list[Row]", shared["recipients"])
-        assert (anna["email"], anna["roles"]) == ("anna@example.invalid", ["write"])
+        assert (anna["display_name"], anna["roles"]) == ("Anna Meier", ["write"])
+        assert _body(invite)["recipients"] == [{"email": "anna@example.test"}]
         assert _body(invite)["sendInvitation"] is True
         assert len(person.asked) == 1
         assert "edit access" in person.asked[0]
@@ -658,14 +649,19 @@ class TestAChangeThatIsRefusedBeforeAnythingHappens:
     async def test_a_text_of_exactly_one_million_characters_is_saved_whole(
         self, graph: respx.MockRouter
     ) -> None:
-        _folders(graph)
-        put = _put_file(graph).mock(return_value=httpx.Response(201, json=_entry(name="Log.txt")))
+        routes = serve(graph, "rec-tool-sharepoint_create_text_file-one-million")
+        [(drive, folder)] = _handles(routes, "GET")
+        [put] = [route for (verb, _), route in routes.items() if verb == "PUT"]
 
-        _ = await call(
-            "sharepoint_create_text_file", folder=_FOLDER, name="Log.txt", content="x" * 1_000_000
+        saved = await call(
+            "sharepoint_create_text_file",
+            folder=DriveFolderHandle(drive, folder).uri,
+            name=_recorded_name(routes),
+            content="x" * 1_000_000,
         )
 
         assert len(put.calls.last.request.content) == 1_000_000
+        assert saved["is_folder"] is False
 
     async def test_a_text_of_one_million_and_one_characters_is_refused(
         self, graph: respx.MockRouter

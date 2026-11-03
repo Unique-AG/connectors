@@ -23,6 +23,7 @@ OVERRIDES = "/me/inferenceClassification/overrides"
 
 MONDAY = "2026-11-02T00:00:00"
 SATURDAY = "2026-11-07T00:00:00"
+TUESDAY = "2026-11-03T18:00:00"
 MIAS_ZONE = "W. Europe Standard Time"
 
 TURN_ON = {
@@ -161,14 +162,31 @@ class TestAReplyAlwaysHasAnEnd:
     async def test_it_stores_the_message_for_senders_inside_and_outside_the_organization(
         self, graph: MockRouter
     ) -> None:
-        _ = Mailbox(graph)
+        routes = serve(graph, "rec-tool-outlook_set_automatic_reply-both-messages")
+        inside = "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside."
+        outside = "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside."
 
-        _ = await _turn_on()
+        _ = await call(
+            "outlook_set_automatic_reply",
+            status="scheduled",
+            start=MONDAY,
+            end=TUESDAY,
+            time_zone="UTC",
+            internal_message=inside,
+            external_message=outside,
+            external_audience="none",
+        )
 
+        sent = cast(
+            "Mapping[str, Mapping[str, object]]",
+            json.loads(routes[("PATCH", SETTINGS)].calls.last.request.content),
+        )
         stored = await _stored_reply()
-        assert stored["internal_reply_message"] == "<p>I am away until Monday.</p>"
-        assert stored["external_reply_message"] == "<p>I am away until Monday.</p>"
-        assert stored["external_audience"] == "all"
+        assert sent["automaticRepliesSetting"]["internalReplyMessage"] == inside
+        assert sent["automaticRepliesSetting"]["externalReplyMessage"] == outside
+        assert stored["internal_reply_message"] == inside
+        assert stored["external_reply_message"] == outside
+        assert stored["external_audience"] == "none"
 
     async def test_it_refuses_a_reply_with_no_end_and_leaves_the_reply_off(
         self, graph: MockRouter
@@ -216,18 +234,23 @@ class TestTheStateOfTheReplyIsRead:
     async def test_it_gives_the_end_and_the_message_of_a_reply_that_is_on(
         self, graph: MockRouter
     ) -> None:
-        _ = Mailbox(
-            graph,
+        _ = serve(graph, "rec-tool-outlook_set_automatic_reply-scheduled")
+        away = "seed-v1 case-outlook_set_automatic_reply-scheduled: I am away today."
+        _ = await call(
+            "outlook_set_automatic_reply",
             status="scheduled",
-            internalReplyMessage="<p>I am away until Monday</p>",
-            scheduledEndDateTime={"dateTime": "2026-11-06T18:00:00.0000000", "timeZone": "UTC"},
+            start=MONDAY,
+            end=TUESDAY,
+            time_zone="UTC",
+            internal_message=away,
+            external_audience="none",
         )
 
         stored = await _stored_reply()
 
         assert stored["status"] == "scheduled"
-        assert _section(stored, "scheduled_end")["date_time"] == "2026-11-06T18:00:00.0000000"
-        assert stored["internal_reply_message"] == "<p>I am away until Monday</p>"
+        assert _section(stored, "scheduled_end")["date_time"] == "2026-11-03T18:00:00.0000000"
+        assert stored["internal_reply_message"] == away
 
 
 class TestAReplyStartsOnlyAfterMiaAgrees:
@@ -560,23 +583,19 @@ class TestASenderHasAFixedTab:
         assert [route.called for key, route in routes.items() if key[0] == "PATCH"] == [True]
 
     async def test_it_lists_every_fixed_sender_with_its_tab(self, graph: MockRouter) -> None:
-        _ = graph.get(OVERRIDES).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        _override("ada@acme.example", "Ada Keller", "focused"),
-                        _override("news@shop.example", "Shop News", "other"),
-                    ]
-                },
-            )
+        _ = serve(graph, "rec-tool-outlook_list_focused_overrides-two")
+        _ = await call(
+            "outlook_set_focused_override", sender="tom@example.test", classify_as="focused"
+        )
+        _ = await call(
+            "outlook_set_focused_override", sender="anna@example.test", classify_as="other"
         )
 
         listed = await call("outlook_list_focused_overrides")
 
         assert [(row["sender_address"], row["classify_as"]) for row in _rows(listed)] == [
-            ("ada@acme.example", "focused"),
-            ("news@shop.example", "other"),
+            ("anna@example.test", "other"),
+            ("tom@example.test", "focused"),
         ]
 
     async def test_it_refuses_a_name_where_an_address_is_needed_and_stores_nothing(

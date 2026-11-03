@@ -41,6 +41,7 @@ _SYNC = "team-sync-thursday"
 _SERIES = "team-sync-series"
 _MONDAY = {"starts_at": "2026-11-02T14:00", "ends_at": "2026-11-02T14:30"}
 _RECORDED_CREATE = "rec-tool-outlook_create_event-simple"
+_MUMBAI = "India Standard Time"
 
 _TOO_MANY: Json = {
     "status": 429,
@@ -110,8 +111,6 @@ def _event(
     attendees: Sequence[Row] = (),
     kind: str = "singleInstance",
     series: str | None = None,
-    answer: str | None = None,
-    allow_new_time: bool = True,
     start: str = "2026-11-06T09:00:00",
 ) -> dict[str, object]:
     mine = organizer == _MIA
@@ -132,11 +131,11 @@ def _event(
         "organizer": {"emailAddress": dict(organizer)},
         "isOrganizer": mine,
         "responseStatus": {
-            "response": "organizer" if mine else answer or "notResponded",
+            "response": "organizer" if mine else "notResponded",
             "time": "0001-01-01T00:00:00Z",
         },
         "attendees": [_attendee(one) for one in attendees],
-        "allowNewTimeProposals": allow_new_time,
+        "allowNewTimeProposals": True,
         "categories": [],
         "importance": "normal",
         "webLink": "https://outlook.office365.com/owa/?itemid=synthetic",
@@ -211,20 +210,22 @@ class TestAcceptingAnInvitation:
 
 
 class TestAnsweringAnInvitation:
-    @pytest.fixture(autouse=True)
+    @pytest.fixture
     def invitation(self, graph: respx.MockRouter) -> None:
         _stored(graph, _event(_LAUNCH, "Launch review", organizer=_ANNA, attendees=[_MIA]))
 
     async def test_a_decline_carries_the_note_to_the_organizer(
         self, graph: respx.MockRouter
     ) -> None:
-        decline = graph.post(f"{_path(_LAUNCH)}/decline").mock(return_value=httpx.Response(202))
+        routes = serve(graph, "rec-tool-outlook_respond_to_invite-decline")
+        critique = await _meeting("Design critique", "2026-11-03")
+        (decline,) = [route for (method, _path), route in routes.items() if method == "POST"]
         mia = Person()
 
         seen = await call(
             "outlook_respond_to_invite",
             person=mia,
-            uri=_uri(_LAUNCH),
+            uri=critique["uri"],
             response="decline",
             comment="I am on leave",
         )
@@ -236,13 +237,15 @@ class TestAnsweringAnInvitation:
     async def test_a_new_time_is_proposed_when_the_organizer_allows_it(
         self, graph: respx.MockRouter
     ) -> None:
-        decline = graph.post(f"{_path(_LAUNCH)}/decline").mock(return_value=httpx.Response(202))
+        routes = serve(graph, "rec-tool-outlook_respond_to_invite-new-time")
+        workshop = await _meeting("Workshop prep", "2026-11-03")
+        (decline,) = [route for (method, _path), route in routes.items() if method == "POST"]
         mia = Person()
 
         seen = await call(
             "outlook_respond_to_invite",
             person=mia,
-            uri=_uri(_LAUNCH),
+            uri=workshop["uri"],
             response="decline",
             proposed_new_time={
                 "starts_at": "2026-11-09T10:00",
@@ -259,15 +262,15 @@ class TestAnsweringAnInvitation:
     async def test_a_new_time_is_not_proposed_when_the_organizer_allows_none(
         self, graph: respx.MockRouter
     ) -> None:
-        _stored(graph, _event(_LAUNCH, "Launch review", organizer=_ANNA, allow_new_time=False))
-        decline = graph.post(f"{_path(_LAUNCH)}/decline").mock(return_value=httpx.Response(202))
+        _ = serve(graph, "rec-tool-outlook_read_event-no-new-time")
+        fixed = await _meeting("Fixed slot", "2026-11-03")
         mia = Person()
 
         with pytest.raises(ToolError) as refused:
             _ = await call(
                 "outlook_respond_to_invite",
                 person=mia,
-                uri=_uri(_LAUNCH),
+                uri=fixed["uri"],
                 response="decline",
                 proposed_new_time={
                     "starts_at": "2026-11-09T10:00",
@@ -278,17 +281,19 @@ class TestAnsweringAnInvitation:
 
         assert "does not allow new time proposals" in str(refused.value)
         assert "remove `proposed_new_time`" in str(refused.value)
-        assert (decline.called, mia.asked) == (False, [])
+        assert (graph.calls.last.request.method, mia.asked) == ("GET", [])
 
     async def test_a_new_time_is_not_proposed_with_an_acceptance(
         self, graph: respx.MockRouter
     ) -> None:
-        accept = graph.post(f"{_path(_LAUNCH)}/accept").mock(return_value=httpx.Response(202))
+        routes = serve(graph, "rec-tool-outlook_respond_to_invite-accept")
+        roadmap = await _meeting("Roadmap check", "2026-10-29")
+        (accept,) = [route for (method, _path), route in routes.items() if method == "POST"]
 
         with pytest.raises(ToolError) as refused:
             _ = await call(
                 "outlook_respond_to_invite",
-                uri=_uri(_LAUNCH),
+                uri=roadmap["uri"],
                 response="accept",
                 proposed_new_time={
                     "starts_at": "2026-11-09T10:00",
@@ -300,6 +305,7 @@ class TestAnsweringAnInvitation:
         assert "use `decline` or `tentative`" in str(refused.value)
         assert accept.called is False
 
+    @pytest.mark.usefixtures("invitation")
     async def test_a_withdrawn_invitation_records_no_answer_and_says_to_look_again(
         self, graph: respx.MockRouter
     ) -> None:
@@ -318,6 +324,7 @@ class TestAnsweringAnInvitation:
         assert "call outlook_list_events again" in str(refused.value)
         assert (accept.called, mia.asked) == (False, [])
 
+    @pytest.mark.usefixtures("invitation")
     async def test_an_answer_that_microsoft_rejects_gives_the_reason_after_the_approval(
         self, graph: respx.MockRouter
     ) -> None:
@@ -379,30 +386,28 @@ class TestListingTheInvitationsThatWait:
     async def test_it_lists_the_invitations_without_an_answer_and_not_the_accepted_ones(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = graph.get("/me/calendar").mock(return_value=httpx.Response(200, json=_calendar()))
-        _ = graph.get(f"/me/calendars/{_CALENDAR_ID}/calendarView").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        _event(_LAUNCH, "Launch review", organizer=_ANNA),
-                        _event(_BUDGET, "Budget review", organizer=_TOM),
-                        _event(_SYNC, "Team sync", organizer=_ANNA, answer="accepted"),
-                    ]
-                },
-            )
-        )
+        _ = serve(graph, "rec-tool-outlook_list_events-invitations-waiting")
 
         seen = await call(
             "outlook_list_events",
             starts_on="2026-11-02",
-            ends_on="2026-11-29",
+            ends_on="2026-11-03",
             owner_response="notResponded",
         )
 
-        assert [one["subject"] for one in _list(seen, "events")] == [
-            "Launch review",
-            "Budget review",
+        subjects = [one["subject"] for one in _list(seen, "events")]
+        assert "Hosting standby" not in subjects
+        assert subjects == [
+            "Roadmap check",
+            "Vendor call",
+            "Design critique",
+            "Planning session",
+            "Workshop prep",
+            "Fixed slot",
+            "Leave day review 1",
+            "Leave day review 2",
+            "Leave day review 3",
+            "Offsite forward target",
         ]
 
 
@@ -485,15 +490,7 @@ class TestFindingATime:
     async def test_a_day_with_no_time_for_everyone_gives_no_suggestion_and_the_reason(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = graph.post("/me/findMeetingTimes").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "emptySuggestionsReason": "AttendeesUnavailable",
-                    "meetingTimeSuggestions": [],
-                },
-            )
-        )
+        _ = serve(graph, "rec-tool-outlook_suggest_meeting_times-nobody-free")
 
         seen = await call(
             "outlook_suggest_meeting_times",
@@ -508,30 +505,20 @@ class TestFindingATime:
     async def test_a_colleague_who_is_free_is_shown_with_the_working_hours_to_compare_with(
         self, graph: respx.MockRouter
     ) -> None:
-        routes = serve(graph, "rec-tool-outlook_check_availability-tomorrow")
-        hours = {
-            "daysOfWeek": ["monday", "tuesday"],
-            "startTime": "08:00:00.0000000",
-            "endTime": "17:00:00.0000000",
-            "timeZone": {"name": _ZURICH},
-        }
-        _ = routes[("POST", "/me/calendar/getSchedule")].mock(
-            return_value=httpx.Response(
-                200,
-                json={"value": [_schedule("anna@example.test", "0" * 20, workingHours=hours)]},
-            )
+        _ = serve(graph, "rec-tool-outlook_check_availability-colleague-free")
+
+        seen = await _free_times(
+            addresses=["tom@example.test"], starts_at="2026-11-03T13:00", ends_at="2026-11-03T15:00"
         )
 
-        seen = await _free_times(starts_at="2026-11-03T13:00", ends_at="2026-11-03T15:00")
-
-        (anna,) = _list(seen, "schedules")
-        assert anna["availability_view"] == "0" * 20
-        assert anna["items"] == []
-        hours = _part(anna, "working_hours")
+        (tom,) = _list(seen, "schedules")
+        assert tom["availability_view"] == "0" * 20
+        assert tom["items"] == []
+        hours = _part(tom, "working_hours")
         assert (hours["days"], str(hours["starts_at"])[:5], str(hours["ends_at"])[:5]) == (
-            ["monday", "tuesday"],
-            "08:00",
-            "17:00",
+            ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            "07:00",
+            "15:30",
         )
 
     @pytest.mark.parametrize(
@@ -792,24 +779,10 @@ class TestBookingAMeeting:
         self, graph: respx.MockRouter
     ) -> None:
         routes = serve(graph, _RECORDED_CREATE)
-        _ = graph.get("/me/outlook/supportedTimeZones()").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        {
-                            "alias": "India Standard Time",
-                            "displayName": "(UTC+05:30) Chennai, Kolkata, Mumbai, New Delhi",
-                        }
-                    ]
-                },
-            )
-        )
+        _ = serve(graph, "rec-tool-outlook_list_time_zones-windows")
 
         zones = await call("outlook_list_time_zones")
-        (mumbai,) = [
-            one for one in _list(zones, "time_zones") if "Mumbai" in str(one["display_name"])
-        ]
+        (mumbai,) = [one for one in _list(zones, "time_zones") if one["alias"] == _MUMBAI]
         _ = await _book(
             Person(),
             attendees=["priya@example.test"],
@@ -820,7 +793,7 @@ class TestBookingAMeeting:
 
         assert _part(_posted(routes[("POST", "/me/events")]), "start") == {
             "dateTime": "2026-11-02T15:00",
-            "timeZone": "India Standard Time",
+            "timeZone": _MUMBAI,
         }
 
     @pytest.mark.parametrize(
@@ -887,10 +860,11 @@ def _stored_changeable(graph: respx.MockRouter) -> None:
 
 
 class TestChangingOrCancellingAMeeting:
-    @pytest.fixture(autouse=True)
+    @pytest.fixture
     def meetings(self, graph: respx.MockRouter) -> None:
         _stored_changeable(graph)
 
+    @pytest.mark.usefixtures("meetings")
     async def test_one_date_of_a_series_moves_and_the_series_is_left_alone(
         self, graph: respx.MockRouter
     ) -> None:
@@ -921,6 +895,7 @@ class TestChangingOrCancellingAMeeting:
         }
         assert master.called is False
 
+    @pytest.mark.usefixtures("meetings")
     async def test_a_whole_series_is_cancelled_after_the_question_and_the_attendees_are_told(
         self, graph: respx.MockRouter
     ) -> None:
@@ -974,21 +949,21 @@ class TestChangingOrCancellingAMeeting:
                     "ends_at": "2026-11-06T10:30",
                     "time_zone": _ZURICH,
                 },
-                ("PATCH", _LAUNCH),
+                ("PATCH", ""),
                 "outlook_respond_to_invite can accept, decline",
                 id="move",
             ),
             pytest.param(
                 "outlook_cancel_event",
                 {},
-                ("POST", f"{_LAUNCH}/cancel"),
+                ("POST", "/cancel"),
                 "only the organizer can cancel it",
                 id="cancel",
             ),
             pytest.param(
                 "outlook_delete_event",
                 {},
-                ("DELETE", _LAUNCH),
+                ("DELETE", ""),
                 "outlook_respond_to_invite can decline",
                 id="delete",
             ),
@@ -1002,13 +977,16 @@ class TestChangingOrCancellingAMeeting:
         write: tuple[str, str],
         told: str,
     ) -> None:
-        changed = graph.route(method=write[0], path=_path(write[1])).mock(
-            return_value=httpx.Response(202)
-        )
+        _ = serve(graph, "rec-tool-outlook_respond_to_invite-decline")
+        critique = await _meeting("Design critique", "2026-11-03")
+        calendar_id, event_id = (unquote(one) for one in str(critique["uri"]).split("/")[-2:])
+        changed = graph.route(
+            method=write[0], path=f"/me/calendars/{calendar_id}/events/{event_id}{write[1]}"
+        ).mock(return_value=httpx.Response(202))
         mia = Person()
 
         with pytest.raises(ToolError) as refused:
-            _ = await _call(tool, person=mia, uri=_uri(_LAUNCH), **arguments)
+            _ = await _call(tool, person=mia, uri=critique["uri"], **arguments)
 
         assert told in str(refused.value)
         assert (changed.called, mia.asked) == (False, [])
@@ -1022,6 +1000,7 @@ class TestChangingOrCancellingAMeeting:
             pytest.param("outlook_delete_event", {}, "this call deleted nothing", id="delete"),
         ],
     )
+    @pytest.mark.usefixtures("meetings")
     async def test_a_meeting_that_is_gone_is_not_changed_or_deleted_and_the_advice_is_to_look_again(
         self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
     ) -> None:
@@ -1040,14 +1019,22 @@ class TestChangingOrCancellingAMeeting:
     async def test_a_deleted_meeting_is_asked_about_by_name_and_attendee_and_then_removed(
         self, graph: respx.MockRouter
     ) -> None:
-        removed = graph.delete(_path(_DESIGN)).mock(return_value=httpx.Response(204))
+        routes = serve(graph, "rec-tool-outlook_delete_event-with-attendee")
+        booked = await _call(
+            "outlook_create_event",
+            person=Person(),
+            subject="Budget alignment",
+            attendees=["anna@example.test"],
+            time_zone=_ZURICH,
+            **_MONDAY,
+        )
         mia = Person()
 
-        seen = await call("outlook_delete_event", person=mia, uri=_uri(_DESIGN))
+        seen = await call("outlook_delete_event", person=mia, uri=booked["uri"])
 
-        assert "Design review" in mia.asked[0]
+        assert "case-outlook_delete_event-with-attendee" in mia.asked[0]
         assert "anna@example.test" in mia.asked[0]
-        assert removed.called
+        assert routes[next(key for key in routes if key[0] == "DELETE")].called
         assert [one["address"] for one in _list(seen, "attendees")] == ["anna@example.test"]
 
 
@@ -1075,21 +1062,18 @@ class TestCancellingAMeetingWithANote:
 
 
 class TestForwardingAnInvitation:
-    @pytest.fixture
-    def invitation(self, graph: respx.MockRouter) -> None:
-        _stored(graph, _event(_LAUNCH, "Launch review", organizer=_ANNA, attendees=[_MIA]))
-
-    @pytest.mark.usefixtures("invitation")
     async def test_an_invitation_is_forwarded_with_the_note_and_the_organizer_is_told(
         self, graph: respx.MockRouter
     ) -> None:
-        forward = graph.post(f"{_path(_LAUNCH)}/forward").mock(return_value=httpx.Response(202))
+        routes = serve(graph, "rec-tool-outlook_forward_event-received")
+        offsite = await _meeting("Offsite forward target", "2026-11-03")
+        (forward,) = [route for (method, _path), route in routes.items() if method == "POST"]
         mia = Person()
 
         seen = await call(
             "outlook_forward_event",
             person=mia,
-            uri=_uri(_LAUNCH),
+            uri=offsite["uri"],
             to=["priya@example.test"],
             comment="Please join",
         )

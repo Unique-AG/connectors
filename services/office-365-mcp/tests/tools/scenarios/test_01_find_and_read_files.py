@@ -18,7 +18,6 @@ from mcp.types import BlobResourceContents, EmbeddedResource, TextResourceConten
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import build_server, patch_obo
-from tests.tools.conftest import search_response
 from tests.tools.scenarios.support import call, serve
 
 type Row = dict[str, object]
@@ -66,27 +65,24 @@ def _names(answer: Mapping[str, object], key: str) -> list[object]:
     return [row["name"] for row in _rows(answer, key)]
 
 
+def _row(answer: Mapping[str, object], key: str, field: str, value: str) -> Row:
+    return next(row for row in _rows(answer, key) if row[field] == value)
+
+
+async def _seed_files() -> Mapping[str, object]:
+    top = await call("sharepoint_browse_folder", limit=100)
+    seed = _row(top, "items", "name", "seed-v1 Seed Files")
+    return await call("sharepoint_browse_folder", folder=seed["uri"], limit=100)
+
+
+async def _seed_uri(name: str) -> str:
+    return cast("str", _row(await _seed_files(), "items", "name", name)["uri"])
+
+
 def _query_string(route: respx.Route) -> str:
     body = cast("Row", json.loads(route.calls.last.request.content))
     request = cast("list[Row]", body["requests"])[0]
     return cast("str", cast("Row", request["query"])["queryString"])
-
-
-def _hit(
-    name: str, *, edited_by: str = "Ada Lovelace", edited: str = "2026-03-04T16:12:41Z"
-) -> Row:
-    resource = {
-        "@odata.type": "#microsoft.graph.driveItem",
-        "id": f"01{name}",
-        "name": name,
-        "size": 2048,
-        "webUrl": f"https://contoso.sharepoint.invalid/sites/Legal/{name}",
-        "lastModifiedDateTime": edited,
-        "lastModifiedBy": {"user": {"displayName": edited_by}},
-        "file": {"mimeType": _DOCX},
-        "parentReference": {"driveId": "b!SYNTHETICDRIVE", "id": _FOLDER_ID},
-    }
-    return {"hitId": name, "rank": 1, "summary": "synthetic", "resource": resource}
 
 
 def _item(
@@ -99,17 +95,6 @@ def _item(
         "webUrl": "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
         "parentReference": {"driveId": "b!SYNTHETICDRIVE"},
         **(facets or {"file": {"mimeType": mime_type}}),
-    }
-
-
-def _child(name: str, *, folder: bool, modified: str) -> Row:
-    return {
-        "id": f"01{name}",
-        "name": name,
-        "size": 100,
-        "lastModifiedDateTime": modified,
-        "parentReference": {"driveId": "b!SYNTHETICDRIVE"},
-        **({"folder": {"childCount": 7}} if folder else {"file": {"mimeType": _PDF}}),
     }
 
 
@@ -160,19 +145,15 @@ class TestFindingAFile:
     async def test_the_file_edited_last_comes_first_with_its_editor(
         self, graph: respx.MockRouter
     ) -> None:
-        may = _hit("Plan May.docx", edited_by="Priya", edited="2026-05-12T09:00:00Z")
-        march = _hit("Plan March.docx", edited_by="Tom", edited="2026-03-12T09:00:00Z")
-        january = _hit("Plan January.docx", edited_by="Anna", edited="2026-01-12T09:00:00Z")
-        route = graph.post("/search/query").mock(
-            return_value=httpx.Response(200, json=search_response([may, march, january]))
-        )
+        route = serve(graph, "rec-tool-sharepoint_search_files-order")[("POST", "/search/query")]
 
         found = await call(
-            "sharepoint_search_files", query="quarterly plan", sort_by="last_modified"
+            "sharepoint_search_files", query="seed-v1 Order", sort_by="last_modified"
         )
 
         first = _rows(found, "files")[0]
-        assert (first["name"], first["last_modified_by"]) == ("Plan May.docx", "Priya")
+        assert (first["name"], first["last_modified_by"]) == ("seed-v1 Order D.txt", "Anna Meier")
+        assert _names(found, "files") == [f"seed-v1 Order {letter}.txt" for letter in "DCBA"]
         sent = cast(
             "list[Row]", cast("Row", json.loads(route.calls.last.request.content))["requests"]
         )
@@ -210,29 +191,23 @@ class TestFindingAFile:
     async def test_a_search_without_a_match_answers_with_an_empty_list(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = graph.post("/search/query").mock(
-            return_value=httpx.Response(200, json=search_response([]))
-        )
+        _ = serve(graph, "rec-tool-sharepoint_search_files-none")
 
-        found = await call("sharepoint_search_files", query="Zephyr")
+        found = await call("sharepoint_search_files", query="seed-v1 zzqqxx nothing")
 
         assert (found["files"], found["next_offset"]) == ([], None)
 
 
 class TestBrowsingAFolder:
     async def test_a_folder_lists_one_level_newest_first(self, graph: respx.MockRouter) -> None:
-        route = _serve_children(
-            graph,
-            _child("A Oldest.pdf", folder=False, modified="2026-01-01T00:00:00Z"),
-            _child("B Newest.pdf", folder=False, modified="2026-03-01T00:00:00Z"),
-            _child("C Subfolder", folder=True, modified="2026-02-01T00:00:00Z"),
-        )
+        routes = serve(graph, "rec-tool-sharepoint_browse_folder-newest-first")
+        ordered = await _seed_uri("seed-v1 Ordered")
 
-        level = await call("sharepoint_browse_folder", folder=_FOLDER, order_by="last_modified")
+        level = await call("sharepoint_browse_folder", folder=ordered, order_by="last_modified")
 
-        assert _names(level, "items") == ["B Newest.pdf", "C Subfolder", "A Oldest.pdf"]
+        assert _names(level, "items") == [f"seed-v1 Order {letter}.txt" for letter in "CBA"]
         assert level["order_covers_level"] is True
-        assert route.call_count == 1, "nothing inside the subfolder is listed"
+        assert [route.call_count for route in routes.values()] == [1, 1, 1, 1]
 
     async def test_the_top_of_onedrive_lists_its_files_and_folders(
         self, graph: respx.MockRouter
@@ -249,22 +224,16 @@ class TestBrowsingAFolder:
     async def test_the_files_of_a_channel_are_listed_from_its_files_folder(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-teams_get_channel_files_folder-standard")
+        _ = serve(graph, "rec-tool-sharepoint_browse_folder-channel-files")
         teams = await call("teams_list_my_teams")
-        team = cast("str", _rows(teams, "teams")[0]["team_id"])
-        channels = await call("teams_list_channels", team_id=team)
-        channel = cast("str", _rows(channels, "channels")[0]["channel_id"])
+        team = cast("str", _row(teams, "teams", "display_name", "seed-v1 team")["team_id"])
+        channels = await call("teams_list_channels", team_id=team, membership_type="standard")
+        channel = _row(channels, "channels", "display_name", "seed-v1 Long channel")["channel_id"]
         folder = await call("teams_get_channel_files_folder", team_id=team, channel_id=channel)
-        files_folder = cast("str", folder["uri"])
-        _ = _serve_children(
-            graph,
-            _child("Launch Plan.docx", folder=False, modified="2026-03-01T00:00:00Z"),
-            folder=files_folder,
-        )
 
-        listed = await call("sharepoint_browse_folder", folder=files_folder)
+        listed = await call("sharepoint_browse_folder", folder=folder["uri"], limit=100)
 
-        assert _names(listed, "items") == ["Launch Plan.docx"]
+        assert _names(listed, "items") == ["seed-v1 Channel Notes.txt"]
 
 
 _SHARING_LINK = (
@@ -275,16 +244,23 @@ _SHARING_LINK = (
 
 class TestReadingAFile:
     @pytest.mark.parametrize(
-        ("mime_type", "content"),
-        [(_PDF, b"%PDF-1.7 launch 14 June"), ("text/plain", b"the launch date is 14 June")],
+        ("mime_type", "fixture", "name", "size"),
+        [
+            (_PDF, "pdf", "seed-v1 Brochure Proof.pdf", 860),
+            ("text/plain", "text-2000", "seed-v1 Text 2000.txt", 2000),
+        ],
         ids=["pdf", "plain-text"],
     )
     async def test_a_file_that_needs_no_conversion_comes_back_as_it_is(
-        self, graph: respx.MockRouter, mime_type: str, content: bytes
+        self, graph: respx.MockRouter, mime_type: str, fixture: str, name: str, size: int
     ) -> None:
-        asked = _serve_file(graph, content, mime_type=mime_type)
+        routes = serve(graph, f"rec-tool-sharepoint_read_file-{fixture}")
+        file = await _seed_uri(name)
 
-        assert await _read(_FILE) == (mime_type, content)
+        read_mime, content = await _read(file)
+
+        assert (read_mime, len(content)) == (mime_type, size)
+        [asked] = [route for (_, path), route in routes.items() if path.endswith("/content")]
         assert asked.calls.last.request.url.params == httpx.QueryParams()
 
     async def test_a_sharing_link_leads_to_the_file_it_opens(self, graph: respx.MockRouter) -> None:
@@ -312,50 +288,43 @@ class TestReadingAFile:
         assert (await _read(cast("str", _rows(found, "files")[0]["uri"])))[1] == b"PK Q3 plan"
 
     async def test_every_file_of_a_folder_is_read_on_its_own(self, graph: respx.MockRouter) -> None:
-        _ = serve(graph, "rec-tool-sharepoint_browse_folder-seed-folder")
-        listed = await call(
+        _ = serve(graph, "rec-tool-sharepoint_read_file-folder-each")
+        reports = await call(
             "sharepoint_browse_folder",
-            folder="sharepoint:///folders/b%21oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            folder=await _seed_uri("seed-v1 Reports"),
+            limit=100,
         )
-        offers = _rows(listed, "items")
-        for number, offer in enumerate(offers):
-            _ = _serve_file(graph, f"offer {number}".encode(), handle=cast("str", offer["uri"]))
 
-        read = [(await _read(cast("str", offer["uri"])))[1] for offer in offers]
+        read = [
+            (await _read(cast("str", _row(reports, "items", "name", name)["uri"])))[1]
+            for name in ("seed-v1 Report A.txt", "seed-v1 Report B.txt", "seed-v1 Report C.docx")
+        ]
 
-        assert read == [f"offer {number}".encode() for number in range(len(offers))]
+        assert read[:2] == [
+            b"Report A. Sales rose in the first quarter.\n",
+            b"Report B. Costs stayed flat in the second quarter.\n",
+        ]
+        assert read[2][:2] == b"PK"
 
     async def test_a_file_that_names_another_file_leads_to_the_named_file(
         self, graph: respx.MockRouter
     ) -> None:
-        plan, workbook = _hit("Brightway Launch Plan.docx"), _hit("Brightway Pricing.xlsx")
-        _ = graph.post("/search/query").mock(
-            side_effect=[
-                httpx.Response(200, json=search_response([plan])),
-                httpx.Response(200, json=search_response([workbook])),
-            ]
-        )
-        plan_uri = cast(
-            "str",
-            _rows(await call("sharepoint_search_files", query="Launch Plan"), "files")[0]["uri"],
-        )
-        _ = _serve_file(graph, b"The budget is in Brightway Pricing.xlsx", handle=plan_uri)
-        named = (await _read(plan_uri))[1].decode().removeprefix("The budget is in ")
+        _ = serve(graph, "rec-tool-sharepoint_read_file-names-another")
+        pointer = (await _read(await _seed_uri("seed-v1 Read me first.txt")))[1].decode()
+        named = pointer.removeprefix("See ").removesuffix(" for the plan.\n")
 
-        found = await call("sharepoint_search_files", query=named)
-        workbook_uri = cast("str", _rows(found, "files")[0]["uri"])
-        _ = _serve_file(graph, b"budget 120000", handle=workbook_uri)
+        found = await call("sharepoint_search_files", query="seed-v1 Project Plan", limit=1)
+        mime_type, content = await _read(cast("str", _rows(found, "files")[0]["uri"]))
 
         assert _names(found, "files") == [named]
-        assert (await _read(workbook_uri))[1] == b"budget 120000"
+        assert (mime_type, content[:2]) == (_DOCX, b"PK")
 
     async def test_a_file_of_exactly_ten_megabytes_is_read_as_a_whole(
         self, graph: respx.MockRouter
     ) -> None:
-        whole = b"x" * (10 * _MEGABYTE)
-        _ = _serve_file(graph, whole)
+        _ = serve(graph, "rec-tool-sharepoint_read_file-10mib")
 
-        assert (await _read(_FILE))[1] == whole
+        assert len((await _read(await _seed_uri("seed-v1 Scan 10MiB.bin")))[1]) == 10 * _MEGABYTE
 
 
 class TestAFileThatCannotBeRead:
