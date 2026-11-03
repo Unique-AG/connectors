@@ -26,7 +26,7 @@ jobs:
       contents: read # to read the repository
       pull-requests: read # to list the open dependency pull requests
     outputs:
-      mode: ${{ steps.mode.outputs.mode }}
+      mode: ${{ inputs.dry-run && 'plan' || 'pr' }}
       entries: ${{ steps.plan.outputs.entries }}
       updates: ${{ steps.plan.outputs.updates }}
     steps:
@@ -53,26 +53,6 @@ jobs:
       - name: Run the unit tests of the scripts
         run: node --test .github/scripts/deps-nightly/*.test.mjs
 
-      - name: Decide the mode
-        id: mode
-        env:
-          DRY_RUN: ${{ inputs.dry-run }}
-          APP_CLIENT_ID: ${{ vars.DEPS_APP_CLIENT_ID }}
-          APP_KEY_SET: ${{ secrets.DEPS_APP_PRIVATE_KEY != '' }}
-        run: |
-          if [ "$DRY_RUN" = "true" ]; then
-            mode="plan"
-            note="This run is a dry run. It opens no pull request."
-          elif [ -z "$APP_CLIENT_ID" ] || [ "$APP_KEY_SET" != "true" ]; then
-            mode="plan"
-            note="The variable DEPS_APP_CLIENT_ID or the secret DEPS_APP_PRIVATE_KEY is missing. This run opens no pull request."
-          else
-            mode="pr"
-            note="This run opens one pull request for each entry in the first list."
-          fi
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "PLAN_NOTE=$note" >> "$GITHUB_ENV"
-
       - name: Restore the tag ledger
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -87,6 +67,7 @@ jobs:
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           TAG_LEDGER: ${{ runner.temp }}/tag-ledger.json
           DASHBOARD_FILE: ${{ runner.temp }}/dashboard.md
+          PLAN_NOTE: ${{ inputs.dry-run && 'This run is a dry run. It opens no pull request.' || 'This run opens one pull request for each entry in the first list.' }}
         run: node .github/scripts/deps-nightly/plan.cli.mjs
 
       - name: Save the tag ledger
@@ -102,6 +83,23 @@ jobs:
           path: ${{ runner.temp }}/dashboard.md
           retention-days: 1
           if-no-files-found: ignore
+
+  credentials:
+    name: Credentials
+    if: ${{ !inputs.dry-run }}
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    timeout-minutes: 5
+    environment: workflow-automation # to read the credentials of the GitHub App
+    permissions: {}
+    steps:
+      - name: Create the App token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
 
   dashboard:
     name: Dashboard
@@ -133,9 +131,10 @@ jobs:
 
   update:
     name: Update ${{ matrix.entry.slug }}
-    needs: plan
+    needs: [plan, credentials]
     if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.updates != '[]'
-    runs-on: ubuntu-24.04
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
     timeout-minutes: 5
     permissions:
       contents: read # this job reads no content, the App token does the write
@@ -149,8 +148,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.DEPS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.DEPS_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
@@ -170,7 +169,7 @@ jobs:
 
   bump:
     name: Bump ${{ matrix.entry.slug }}
-    needs: plan
+    needs: [plan, credentials]
     if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -226,9 +225,10 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.entry.slug }}
-    needs: [plan, bump]
-    if: always() && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
-    runs-on: ubuntu-24.04
+    needs: [plan, bump, credentials]
+    if: always() && needs.credentials.result == 'success' && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
     timeout-minutes: 10
     permissions:
       contents: read # to read the repository, the App token does the writes
@@ -268,8 +268,8 @@ jobs:
         if: steps.patch.outcome == 'success'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.DEPS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.DEPS_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
