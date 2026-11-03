@@ -550,7 +550,7 @@ class Mapper:
         if lowered in KEPT_HOSTS or lowered.endswith(f".{SYNTHETIC_DOMAIN}"):
             return lowered
         if lowered.endswith(".sharepoint.com"):
-            mine = lowered.endswith("-my.sharepoint.com")
+            mine = lowered.removesuffix(".sharepoint.com").endswith("-my")
             return "contoso-my.sharepoint.com" if mine else "contoso.sharepoint.com"
         self.counts["hosts replaced"] += 1
         return self.hosts.setdefault(lowered, f"host-{len(self.hosts) + 1:02d}.{SYNTHETIC_DOMAIN}")
