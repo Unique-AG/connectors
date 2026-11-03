@@ -441,7 +441,7 @@ describe('McpOAuthService', () => {
         generation: 1,
         expiresAt: new Date(Date.now() + 86400000),
       });
-      store.revokeTokenFamily?.mockResolvedValue(undefined);
+      store.revokeTokenFamily.mockResolvedValue(undefined);
 
       await service.revokeToken(refreshRevokeDto);
 

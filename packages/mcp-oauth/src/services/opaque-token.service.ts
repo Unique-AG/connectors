@@ -174,9 +174,11 @@ export class OpaqueTokenService {
     if (!metadata) {
       return null;
     }
+    const { familyId } = metadata;
+    assert.ok(familyId, 'Refresh token has no family');
 
     if (metadata.usedAt) {
-      await this.revokeReplayedRefreshToken(refreshToken, metadata);
+      await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
       return null;
     }
 
@@ -203,11 +205,10 @@ export class OpaqueTokenService {
     // The used row is kept until it expires, so a later replay is still recognised as one.
     const redeemed = await this.store.redeemRefreshToken(refreshToken);
     if (!redeemed) {
-      await this.revokeReplayedRefreshToken(refreshToken, metadata);
+      await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
       return null;
     }
 
-    const familyId = metadata.familyId || typeid('tkfam').toString();
     const tokenPair = await this.generateTokenPair(
       metadata.userId,
       metadata.clientId,
@@ -218,9 +219,7 @@ export class OpaqueTokenService {
       (metadata.generation || 0) + 1,
     );
 
-    // A concurrent request that lost the redemption revokes the family, deleting the used row.
-    // If that happened before the new pair was stored, the pair escaped the revocation, so revoke
-    // again now. A revocation that runs after this check deletes the new pair along with the rest.
+    // A concurrent loser may have revoked the family before this pair was stored; revoke it again.
     const redeemedTokenSurvived = await this.store.getRefreshToken(refreshToken);
     if (!redeemedTokenSurvived) {
       this.logger.error({
@@ -229,20 +228,11 @@ export class OpaqueTokenService {
         familyId,
         clientId: metadata.clientId,
       });
-      await this.revokeIssuedTokenPair(familyId, tokenPair);
+      await this.store.revokeTokenFamily(familyId);
       return null;
     }
 
     return tokenPair;
-  }
-
-  private async revokeIssuedTokenPair(familyId: string, tokenPair: TokenPair): Promise<void> {
-    if (this.store.revokeTokenFamily) {
-      await this.store.revokeTokenFamily(familyId);
-      return;
-    }
-    await this.store.removeAccessToken(tokenPair.access_token);
-    await this.store.removeRefreshToken(tokenPair.refresh_token);
   }
 
   private async findUnexpiredRefreshToken(
@@ -270,20 +260,17 @@ export class OpaqueTokenService {
 
   private async revokeReplayedRefreshToken(
     token: string,
-    metadata: RefreshTokenMetadata,
+    familyId: string,
+    clientId: string,
   ): Promise<void> {
     this.logger.error({
       msg: 'SECURITY: Refresh token reuse detected! Revoking entire token family.',
       tokenPrefix: token.substring(0, 8),
-      familyId: metadata.familyId,
-      clientId: metadata.clientId,
+      familyId,
+      clientId,
     });
 
-    if (metadata.familyId && this.store.revokeTokenFamily) {
-      await this.store.revokeTokenFamily(metadata.familyId);
-    } else {
-      await this.store.removeRefreshToken(token);
-    }
+    await this.store.revokeTokenFamily(familyId);
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<void> {

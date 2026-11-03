@@ -70,7 +70,7 @@ export interface IOAuthStore {
   redeemRefreshToken(token: string): Promise<boolean>;
 
   // Refresh token family management for reuse detection
-  revokeTokenFamily?(familyId: string): Promise<void>;
+  revokeTokenFamily(familyId: string): Promise<void>;
 
   /**
    * Delete every MCP access/refresh token for a user profile.

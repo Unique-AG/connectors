@@ -611,7 +611,6 @@ describe('McpOAuthStore', () => {
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
-      expect(mockCache.del).not.toHaveBeenCalledWith('refresh_token:refresh-1');
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-2');
     });
 

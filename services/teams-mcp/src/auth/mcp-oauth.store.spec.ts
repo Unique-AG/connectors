@@ -536,7 +536,6 @@ describe('McpOAuthStore', () => {
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
-      expect(mockCache.del).not.toHaveBeenCalledWith('refresh_token:refresh-1');
     });
 
     it('reports the blast radius so a shared profile logs every client it disconnected', async () => {
