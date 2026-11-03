@@ -61,9 +61,10 @@ _MARKUP = re.compile(r"([a-z][a-z0-9]*)\[([\w\-]+)\]")
 _REFERENCE = re.compile(r"(?:tools|shared|graph_client)(?:\.\w+)+")
 
 
-def day_named(word: str, today: date = _TODAY) -> date:
+def day_named(word: str, today: date | None = None) -> date:
     """A day symbol of a case or a fixture. `nextMonday` is the next Monday on or after tomorrow;
     `+N` or `-N` after it moves that many days. `day+N` is N days from today."""
+    today = today or _TODAY
     if offset := _OFFSET.fullmatch(word):
         return today + timedelta(int(offset[1]))
     found = _NEXT.fullmatch(word)
@@ -175,7 +176,7 @@ def _given(value: object, results: Sequence[object]) -> object:
         found = select(results[-1] if root == "prev" else results[int(root) - 1], path)
         return attribute_in(found, markup) if markup else found
     if value in _DAYS:
-        return _DAYS[value].isoformat()
+        return day_named(value).isoformat()
     return _SYMBOL.sub(lambda word: day_named(word[1]).isoformat(), value)
 
 
@@ -243,12 +244,19 @@ def _without_generated(body: object) -> object:
     return body
 
 
+def _same_headers(wanted: object, got: object) -> bool:
+    def tokens(headers: object) -> dict[str, list[str]]:
+        return {name: sorted(str(one).split(", ")) for name, one in mapping(headers).items()}
+
+    return tokens(wanted) == tokens(got)
+
+
 def _matches(interaction: Json, asked: Json) -> bool:
     return (
         interaction.get("method") == asked["method"]
         and same(interaction.get("path"), asked["path"])
         and interaction.get("host", "graph.microsoft.com") == asked["host"]
-        and interaction.get("headers", {}) == asked["headers"]
+        and _same_headers(interaction.get("headers", {}), asked["headers"])
         and same(interaction.get("query", {}), asked["query"])
         and same(_without_generated(interaction.get("json")), _without_generated(asked["json"]))
     )
@@ -354,18 +362,12 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
     patch_obo(monkeypatch)
 
 
-@pytest.mark.usefixtures("obo")
-@pytest.mark.parametrize(("entry", "variant"), [r[1:] for r in runs()], ids=[r[0] for r in runs()])
-async def test_the_scenario_runs_as_its_sidecar_says(
-    entry: Json, variant: Json, server: FastMCP[None], retry_sleeps: RecordedSleeps
-) -> None:
-    fixture = str(variant.get("fixture", entry.get("fixture")))
+async def run_chain(
+    steps: Sequence[Json], fixture: str, server: FastMCP[None], retry_sleeps: RecordedSleeps
+) -> Person:
     recorded = cast("object", json.loads((HERE / "fixtures" / f"{fixture}.json").read_text()))
     replay, person = Replay([mapping(one) for one in items(recorded)]), Person()
     results: list[object] = []
-    overrides = cast("Mapping[object, object]", variant)
-    chain = items(entry["chain"])
-    steps = [{**mapping(step), **mapping(overrides.get(n, {}))} for n, step in enumerate(chain, 1)]
     with respx.mock(assert_all_mocked=True) as graph:
         _ = graph.route().mock(side_effect=replay)
         async with Client(FastMCPTransport(server), elicitation_handler=person, mode="legacy") as c:
@@ -373,6 +375,22 @@ async def test_the_scenario_runs_as_its_sidecar_says(
                 results.append(await _step(c, replay, person, retry_sleeps, number, step, results))
     unused = [json.dumps(one) for n, one in enumerate(replay.interactions) if n not in replay.seen]
     assert unused == [], f"fixture {fixture}: no request reached\n" + "\n".join(unused)
+    return person
+
+
+@pytest.mark.usefixtures("obo")
+@pytest.mark.parametrize(("entry", "variant"), [r[1:] for r in runs()], ids=[r[0] for r in runs()])
+async def test_the_scenario_runs_as_its_sidecar_says(
+    entry: Json, variant: Json, server: FastMCP[None], retry_sleeps: RecordedSleeps
+) -> None:
+    overrides = cast("Mapping[object, object]", variant)
+    steps = [
+        {**mapping(step), **mapping(overrides.get(n, {}))}
+        for n, step in enumerate(items(entry["chain"]), 1)
+    ]
+    person = await run_chain(
+        steps, str(variant.get("fixture", entry.get("fixture"))), server, retry_sleeps
+    )
     assert bool(person.asked) == entry["asks_user"], f"asks_user, but asked {person.asked}"
 
 

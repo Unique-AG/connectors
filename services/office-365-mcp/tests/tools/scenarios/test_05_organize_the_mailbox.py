@@ -18,7 +18,6 @@ from tests.tools.scenarios.mail_support import (
     answers,
     call_with,
     every_time,
-    folder_listing,
     invoke_as,
     marking_every_message,
     methods_asked,
@@ -277,39 +276,15 @@ class TestABatchIsCheckedWholeAndReportedForEachMessage:
     async def test_a_message_that_was_deleted_by_mistake_is_put_back_in_the_inbox(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = folder_listing(
-            graph,
-            f"{_FOLDERS}/deleteditems",
-            _a_message("BW1=", "Brightway invoice"),
-            display_name="Deleted Items",
-        )
-        _ = moving_every_message(graph)
+        _ = serve(graph, "rec-tool-outlook_move_mail-restore-deleted")
         listing = await call("outlook_list_mail", folder="deleteditems", limit=25)
 
-        moved = await call("outlook_move_mail", message_refs=_uris(listing), destination="inbox")
+        moved = await call(
+            "outlook_move_mail", message_refs=_uris(listing)[:1], destination="inbox"
+        )
 
         assert (moved["destination"], moved["moved_count"]) == ("inbox", 1)
         assert sent_json(graph, "POST", "/move") == {"DestinationId": "inbox"}
-
-
-def _a_message(message_id: str, subject: str) -> dict[str, object]:
-    return {
-        "id": message_id,
-        "subject": subject,
-        "bodyPreview": subject,
-        "from": {"emailAddress": {"name": "Brightway", "address": "billing@brightway.example"}},
-        "sender": {"emailAddress": {"name": "Brightway", "address": "billing@brightway.example"}},
-        "toRecipients": [],
-        "receivedDateTime": "2026-03-04T09:15:00Z",
-        "isRead": True,
-        "hasAttachments": False,
-        "parentFolderId": "AQMkADAwSYNTHETIC-folder",
-        "webLink": "https://outlook.office365.invalid/owa/?ItemID=synthetic",
-        "importance": "normal",
-        "flag": {"flagStatus": "notFlagged"},
-        "categories": [],
-        "isDraft": False,
-    }
 
 
 class TestMiaKeepsHerFoldersAsSheNamesThem:
@@ -389,45 +364,19 @@ class TestMiaKeepsHerFoldersAsSheNamesThem:
     async def test_two_folders_with_one_name_show_up_at_different_levels(
         self, graph: respx.MockRouter
     ) -> None:
-        def level(parent: str, *names: str) -> dict[str, object]:
-            return {
-                "value": [
-                    {
-                        "id": f"{parent}-{name}=",
-                        "displayName": name,
-                        "totalItemCount": 3,
-                        "unreadItemCount": 0,
-                        "childFolderCount": 0 if name == "Finance" else 1,
-                        "isHidden": False,
-                    }
-                    for name in names
-                ]
-            }
-
-        _ = graph.get(_FOLDERS).mock(
-            return_value=httpx.Response(200, json=level("top", "Inbox", "Archive"))
-        )
-        _ = graph.get(f"{_FOLDERS}/top-Inbox=/childFolders").mock(
-            return_value=httpx.Response(200, json=level("Inbox", "Finance"))
-        )
-        _ = graph.get(f"{_FOLDERS}/top-Archive=/childFolders").mock(
-            return_value=httpx.Response(200, json=level("Archive", "Finance"))
-        )
+        _ = serve(graph, "rec-tool-outlook_browse_folders-same-name")
         top = await call("outlook_browse_folders", limit=50)
-        inside_inbox = await call(
-            "outlook_browse_folders", parent=_folder(top, "Inbox")["uri"], limit=50
-        )
-        inside_archive = await call(
-            "outlook_browse_folders", parent=_folder(top, "Archive")["uri"], limit=50
-        )
+        projects = _folder(top, "seed-v1 Projects")
+        inside = await call("outlook_browse_folders", parent=projects["uri"], limit=50)
 
-        assert "Finance" not in _rows(top, "folders", "display_name")
-        assert [
-            row["child_folder_count"] for row in cast("list[dict[str, int]]", top["folders"])
-        ] == [1, 1]
-        assert _rows(inside_inbox, "folders", "display_name") == ["Finance"]
-        assert _rows(inside_archive, "folders", "display_name") == ["Finance"]
-        assert _rows(inside_inbox, "folders", "uri") != _rows(inside_archive, "folders", "uri")
+        assert _rows(top, "folders", "display_name").count("seed-v1 Archive") == 1
+        assert "seed-v1 Website Relaunch" not in _rows(top, "folders", "display_name")
+        assert projects["child_folder_count"] == 2
+        assert _rows(inside, "folders", "display_name") == [
+            "seed-v1 Archive",
+            "seed-v1 Website Relaunch",
+        ]
+        assert _folder(inside, "seed-v1 Archive")["uri"] != _folder(top, "seed-v1 Archive")["uri"]
         assert methods_asked(graph) == {"GET"}
 
 
@@ -536,7 +485,7 @@ class TestAnInboxRuleActsOnNewMailWithoutMia:
     async def test_a_rule_that_deletes_mail_moves_it_to_deleted_items_and_never_erases_it(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_create_mail_rule-basic")
+        _ = serve(graph, "rec-tool-outlook_create_mail_rule-delete-action")
 
         _ = await call(
             "outlook_create_mail_rule",
@@ -552,7 +501,7 @@ class TestAnInboxRuleActsOnNewMailWithoutMia:
     async def test_a_rule_without_a_condition_is_created_for_every_new_message_without_a_question(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_create_mail_rule-basic")
+        _ = serve(graph, "rec-tool-outlook_create_mail_rule-no-condition")
         archive = answer_of(
             "rec-tool-outlook_delete_folder-created", "GET", "/me/mailFolders/archive"
         )
@@ -578,7 +527,7 @@ class TestAnInboxRuleActsOnNewMailWithoutMia:
     async def test_a_rule_is_narrowed_in_place_with_the_whole_set_of_conditions(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_update_mail_rule-rename")
+        _ = serve(graph, "rec-tool-outlook_update_mail_rule-narrow")
         rule = await call(
             "outlook_create_mail_rule",
             display_name="Billing to Finance",
@@ -600,7 +549,7 @@ class TestAnInboxRuleActsOnNewMailWithoutMia:
     async def test_a_rule_that_is_off_is_turned_on_again_and_the_disable_tool_cannot_do_it(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_update_mail_rule-rename")
+        _ = serve(graph, "rec-tool-outlook_update_mail_rule-turn-on")
         rule = await call(
             "outlook_create_mail_rule",
             display_name="Receipts",
@@ -1200,29 +1149,31 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
     async def test_an_invoice_is_filed_and_a_note_about_it_is_drafted_and_nothing_is_sent(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_draft_mail-basic")
-        _ = moving_every_message(graph)
-        _ = graph.get(f"{_FOLDERS}/FIN1=").mock(
-            return_value=httpx.Response(200, json={"id": "FIN1=", "displayName": "Finance"})
-        )
+        _ = serve(graph, "rec-tool-outlook_move_mail-invoice")
+        found = await call("outlook_search_mail", subject="Invoice Alpine Print", limit=3)
+        invoice = cast("list[dict[str, object]]", found["messages"])[0]
+        clients = _folder(await call("outlook_browse_folders", limit=50), "seed-v1 Clients")
+        sender = cast("dict[str, str]", invoice["sender"])["address"]
 
         moved = await call(
-            "outlook_move_mail", message_refs=[_Q3_MESSAGE], folder_ref="outlook:///folders/FIN1%3D"
+            "outlook_move_mail",
+            message_refs=[cast("str", invoice["uri"])],
+            folder_ref=clients["uri"],
         )
         note = await call(
             "outlook_draft_mail",
-            to=["tom@example.test"],
+            to=[sender],
             subject="Invoice filed",
-            body="The invoice is filed in Finance.",
+            body="The invoice is filed in Clients.",
         )
 
-        assert (moved["moved_count"], moved["destination"]) == (1, "Finance")
+        assert (moved["moved_count"], moved["destination"]) == (1, "seed-v1 Clients")
         assert note["uri"]
         created = sent_json(graph, "POST", "/me/messages")
         assert created["subject"] == "Invoice filed"
-        assert created["toRecipients"] == [{"emailAddress": {"address": "tom@example.test"}}]
+        assert created["toRecipients"] == [{"emailAddress": {"address": sender}}]
         assert cast("dict[str, object]", created["body"])["content"] == (
-            "<p>The invoice is filed in Finance.</p>"
+            "<p>The invoice is filed in Clients.</p>"
         )
         assert not [path for path in paths_asked(graph) if path.endswith("/send")]
 

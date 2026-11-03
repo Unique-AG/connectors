@@ -14,6 +14,7 @@ from office_365_mcp.shared.handles import DriveFolderHandle, MessageHandle
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.tools.conftest import ME, TEAMS_SENDER, message_payload
 from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import new_group_chat
 
 type Row = Mapping[str, object]
 
@@ -21,12 +22,18 @@ CHAT_ID = "19:release@thread.v2"
 CHAT_PATH = f"/chats/{quote(CHAT_ID, safe='')}"
 TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 CHANNEL_ID = "19:releases@thread.tacv2"
-CHANNEL_PATH = f"/teams/{TEAM_ID}/channels/{quote(CHANNEL_ID, safe='')}"
 OWN_MESSAGE_ID = "1770000000000"
 POST_ID = "1770000000050"
 LAUNCH = "Launch on 14 Jun"
 MESSAGE_URI = MessageHandle(OWN_MESSAGE_ID, chat_id=CHAT_ID).uri
 THUMBS_UP = "\U0001f44d"
+
+NOTES = "seed-v1 Meeting Notes.txt"
+NOTES_GUID = "00000000-4897-4dbd-827c-66309915e60d"
+NOTES_URL = (
+    "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/"
+    "seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+)
 
 DRIVE_ID = "b!SYNTHETICDRIVE0000"
 DECK_ID = "01SYNTHETICFILE0000"
@@ -48,6 +55,7 @@ HELLO_TEAM = "seed-v1 case-teams_send_channel_message-post hello team"
 BEFORE = "seed-v1 case-teams_edit_message-post before"
 AFTER = "seed-v1 case-teams_edit_message-post after"
 DOOMED = "seed-v1 case-teams_delete_message-post doomed"
+TARGET = "seed-v1 case-teams_react_to_message-post target"
 
 
 def _rows(value: object) -> list[Row]:
@@ -66,6 +74,11 @@ async def _seed_channel() -> dict[str, str]:
         "team_id": team_id,
         "channel_id": cast("str", _rows(channels["channels"])[0]["channel_id"]),
     }
+
+
+async def _notes_uri() -> str:
+    found = await call("sharepoint_search_files", query="seed-v1 Meeting Notes", limit=1)
+    return cast("str", _rows(found["files"])[0]["uri"])
 
 
 async def _refused_by(person: Person | None, tool: str, /, **arguments: object) -> str:
@@ -101,14 +114,6 @@ def _request_body(route: respx.Route) -> Row:
 def _writes(graph: respx.MockRouter) -> respx.Route:
     return graph.route(method__in=["POST", "PATCH", "PUT", "DELETE"]).mock(
         return_value=httpx.Response(204)
-    )
-
-
-def _the_chat_accepts_a_message(graph: respx.MockRouter) -> respx.Route:
-    return graph.post(f"{CHAT_PATH}/messages").mock(
-        return_value=httpx.Response(
-            201, json=message_payload(message_id="1770000000001", content_type="text")
-        )
     )
 
 
@@ -322,44 +327,58 @@ class TestAMessageIsPostedAfterMiaApproves:
     async def test_it_attaches_a_file_that_is_in_sharepoint_to_a_channel_post(
         self, graph: respx.MockRouter
     ) -> None:
-        _the_deck_is(graph)
-        post = graph.post(f"{CHANNEL_PATH}/messages").mock(
-            return_value=httpx.Response(201, json=message_payload(message_id="1770000000053"))
-        )
+        routes = serve(graph, "rec-tool-teams_send_channel_message_with_files-post")
+        notes = await _notes_uri()
+        channel = await _seed_channel()
         mia = Person()
 
         _ = await call(
-            "teams_send_channel_message_with_files", person=mia, **CHANNEL_POST, **WITH_THE_DECK
+            "teams_send_channel_message_with_files",
+            person=mia,
+            **channel,
+            message="v2 ships on Friday",
+            attachments=[notes],
         )
 
-        assert "Q3 Plan.pptx" in mia.asked[0]
+        assert _uncalled(routes) == []
+        assert NOTES in mia.asked[0]
+        post = routes[
+            ("POST", f"/teams/{channel['team_id']}/channels/{channel['channel_id']}/messages")
+        ]
         (attachment,) = _rows(_request_body(post)["attachments"])
-        assert attachment["name"] == "Q3 Plan.pptx"
-        assert attachment["id"] == DECK_GUID
-        assert attachment["contentUrl"] == f"{SITE}/Q3%20Plan.pptx"
+        assert attachment["name"] == NOTES
+        assert attachment["id"] == NOTES_GUID
+        assert attachment["contentUrl"] == NOTES_URL
         assert _request_body(post)["body"] == {
             "contentType": "html",
-            "content": f'<p>v2 ships on Friday</p> <attachment id="{DECK_GUID}"></attachment>',
+            "content": f'<p>v2 ships on Friday</p> <attachment id="{NOTES_GUID}"></attachment>',
         }
 
     async def test_it_attaches_a_file_that_is_in_sharepoint_to_a_chat_message(
         self, graph: respx.MockRouter
     ) -> None:
-        _the_deck_is(graph)
-        post = _the_chat_accepts_a_message(graph)
+        routes = serve(graph, "rec-tool-teams_send_chat_message_with_files-group")
+        notes = await _notes_uri()
+        chat_id = (await new_group_chat())["chat_id"]
         mia = Person()
 
         _ = await call(
-            "teams_send_chat_message_with_files", person=mia, **CHAT_MESSAGE, **WITH_THE_DECK
+            "teams_send_chat_message_with_files",
+            person=mia,
+            chat_id=chat_id,
+            message="The build is green",
+            attachments=[notes],
         )
 
-        assert "Q3 Plan.pptx" in mia.asked[0]
+        assert _uncalled(routes) == []
+        assert NOTES in mia.asked[0]
+        post = routes[("POST", f"/chats/{chat_id}/messages")]
         (attachment,) = _rows(_request_body(post)["attachments"])
-        assert attachment["name"] == "Q3 Plan.pptx"
-        assert attachment["contentUrl"] == f"{SITE}/Q3%20Plan.pptx"
+        assert attachment["name"] == NOTES
+        assert attachment["contentUrl"] == NOTES_URL
         assert _request_body(post)["body"] == {
             "contentType": "html",
-            "content": f'<p>The build is green</p> <attachment id="{DECK_GUID}"></attachment>',
+            "content": f'<p>The build is green</p> <attachment id="{NOTES_GUID}"></attachment>',
         }
 
     async def test_it_does_not_post_a_file_that_is_in_a_personal_onedrive(
@@ -413,17 +432,20 @@ class TestMiaChangesOnlyHerOwnMessages:
     async def test_it_gives_a_message_a_thumbs_up_after_she_approves_the_reaction(
         self, graph: respx.MockRouter
     ) -> None:
-        _the_message_is(graph, content="The release notes are ready", sender=None)
-        react = graph.post(f"{CHAT_PATH}/messages/{OWN_MESSAGE_ID}/setReaction").mock(
-            return_value=httpx.Response(204)
-        )
+        routes = serve(graph, "rec-tool-teams_react_to_message-post")
         mia = Person()
+        posted = await call(
+            "teams_send_channel_message", person=mia, **await _seed_channel(), message=TARGET
+        )
 
         reacted = await call(
-            "teams_react_to_message", person=mia, uri=MESSAGE_URI, reaction=THUMBS_UP
+            "teams_react_to_message", person=mia, uri=posted["uri"], reaction=THUMBS_UP
         )
 
-        assert len(mia.asked) == 1 and THUMBS_UP in mia.asked[0]
+        assert _uncalled(routes) == []
+        assert len(mia.asked) == 2 and THUMBS_UP in mia.asked[1]
+        post_path = f"/teams/{posted['team_id']}/channels/{posted['channel_id']}/messages"
+        react = routes[("POST", f"{post_path}/{posted['message_id']}/setReaction")]
         assert _request_body(react)["reactionType"] == THUMBS_UP
         assert reacted["removed"] is False
 

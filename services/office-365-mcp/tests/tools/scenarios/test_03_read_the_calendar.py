@@ -24,8 +24,6 @@ type Row = Mapping[str, object]
 _ZURICH = "Europe/Zurich"
 _MIA: Row = {"name": "Mia Keller", "address": "mia@example.test"}
 _ANNA: Row = {"name": "Anna Meier", "address": "anna@example.test"}
-_TOM: Row = {"name": "Tom Weber", "address": "tom@example.test"}
-_PRIYA: Row = {"name": "Priya Rao", "address": "priya@example.test"}
 _CALENDAR_ID = "AAMkSYNTHETIC-calendar-default"
 _ANNA_CALENDAR_ID = "AAMkSYNTHETIC-calendar-anna"
 _VIEW = f"/me/calendars/{_CALENDAR_ID}/calendarView"
@@ -100,8 +98,6 @@ def _event(
     end: str,
     *,
     organizer: Row = _MIA,
-    kind: str = "singleInstance",
-    series: str | None = None,
 ) -> dict[str, object]:
     return {
         "id": event_id,
@@ -111,8 +107,8 @@ def _event(
         "end": {"dateTime": f"{end}.0000000", "timeZone": "UTC"},
         "isAllDay": False,
         "isCancelled": False,
-        "type": kind,
-        "seriesMasterId": series,
+        "type": "singleInstance",
+        "seriesMasterId": None,
         "sensitivity": "normal",
         "showAs": "busy",
         "location": {"displayName": "Room Pilatus"},
@@ -130,18 +126,10 @@ def _event(
     }
 
 
-def _attendee(person: Row, answer: str) -> dict[str, object]:
-    return {
-        "emailAddress": dict(person),
-        "type": "required",
-        "status": {"response": answer, "time": "2026-11-01T08:00:00Z"},
-    }
-
-
-def _view_of(graph: respx.MockRouter, *events: dict[str, object]) -> respx.Route:
+def _view_of(graph: respx.MockRouter) -> respx.Route:
     mine = _calendar(_CALENDAR_ID, _MIA, can_edit=True)
     _ = graph.get("/me/calendar").mock(return_value=httpx.Response(200, json=mine))
-    return graph.get(_VIEW).mock(return_value=httpx.Response(200, json={"value": list(events)}))
+    return graph.get(_VIEW).mock(return_value=httpx.Response(200, json={"value": []}))
 
 
 def _route(routes: Mapping[tuple[str, str], respx.Route], tail: str) -> respx.Route:
@@ -158,6 +146,10 @@ def _list(seen: Row, key: str) -> list[Row]:
 
 def _part(parent: Row, key: str) -> Row:
     return cast("Row", parent[key])
+
+
+def _answers(seen: Row) -> dict[str, object]:
+    return {str(one["name"]): one["response"] for one in _list(seen, "attendees")}
 
 
 def _starts(events: Sequence[Row]) -> list[tuple[str, str]]:
@@ -211,35 +203,25 @@ class TestADayOrAWeek:
     async def test_it_lists_a_moved_date_of_a_weekly_meeting_on_its_own_day_only(
         self, graph: respx.MockRouter
     ) -> None:
-        moved = _event(
-            "AAMkSYNTHETIC-exception-1",
-            "Team sync",
-            "2026-11-06T09:00:00",
-            "2026-11-06T09:30:00",
-            kind="exception",
-            series="AAMkSYNTHETIC-series-1",
+        _ = serve(graph, "rec-tool-outlook_list_events-series-exception")
+
+        seen = await _day(
+            starts_on="2026-11-09", ends_on="2026-12-07", subject_contains="Weekly design sync"
         )
-        _ = _view_of(graph, moved)
 
-        seen = await _day(starts_on="2026-11-02", ends_on="2026-11-08")
-
-        (sync,) = _list(seen, "events")
-        assert _starts([sync]) == [("Team sync", "2026-11-06T10:00:00+01:00")]
-        assert (sync["kind"], sync["in_series"]) == ("exception", True)
+        (moved,) = [one for one in _list(seen, "events") if one["kind"] == "exception"]
+        assert _starts([moved]) == [("Weekly design sync", "2026-11-17T09:00:00+01:00")]
+        assert moved["in_series"] is True
 
     async def test_it_gives_overlapping_meetings_times_that_show_the_clash(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = _view_of(
-            graph,
-            _event("e1", "Budget review", "2026-11-03T13:00:00", "2026-11-03T14:00:00"),
-            _event("e2", "Launch review", "2026-11-03T13:30:00", "2026-11-03T14:30:00"),
-        )
+        _ = serve(graph, "rec-tool-outlook_list_events-overlap")
 
-        seen = await _day(starts_on="2026-11-03", ends_on="2026-11-03")
+        seen = await _day(starts_on="2026-11-03", ends_on="2026-11-03", subject_contains="Overlap")
 
         first, second = _list(seen, "events")
-        assert (first["subject"], second["subject"]) == ("Budget review", "Launch review")
+        assert (first["subject"], second["subject"]) == ("Overlap A", "Overlap B")
         assert _moment(second, "start") < _moment(first, "end")
 
     async def test_it_tells_a_meeting_that_mia_organizes_from_an_invitation(
@@ -268,58 +250,41 @@ class TestADayOrAWeek:
     async def test_a_week_of_40_meetings_is_cut_at_the_default_limit_and_whole_at_a_limit_of_40(
         self, graph: respx.MockRouter
     ) -> None:
-        week = [
-            _event(f"e{n:02}", f"Meeting {n:02}", "2026-11-03T08:00:00", "2026-11-03T08:30:00")
-            for n in range(40)
-        ]
-
-        def page(request: httpx.Request) -> httpx.Response:
-            top = int(request.url.params["$top"])
-            more = {"@odata.nextLink": f"{GRAPH_V1}{_VIEW}?$skip={top}"} if top < len(week) else {}
-            return httpx.Response(200, json={"value": week[:top]} | more)
-
-        _ = _view_of(graph).mock(side_effect=page)
-
-        by_default = await _day(starts_on="2026-11-02", ends_on="2026-11-08")
-        in_full = await _day(starts_on="2026-11-02", ends_on="2026-11-08", limit=40)
+        _ = serve(graph, "rec-tool-outlook_list_events-week-40")
+        by_default = await _day(starts_on="2026-11-23", ends_on="2026-11-27")
+        graph.routes.clear()
+        _ = serve(graph, "rec-tool-outlook_list_events-week-40-whole")
+        in_full = await _day(starts_on="2026-11-23", ends_on="2026-11-27", limit=40)
 
         assert (len(_list(by_default, "events")), by_default["capped"]) == (25, True)
         assert (len(_list(in_full, "events")), in_full["capped"]) == (40, False)
 
 
 class TestWhoIsComingAndWhereTheMeetingIs:
-    async def _read_offsite(
-        self, graph: respx.MockRouter, attendees: Sequence[dict[str, object]]
-    ) -> Row:
-        routes = serve(graph, "rec-tool-outlook_read_event-agenda")
-        one_event = next(route for (_m, path), route in routes.items() if "/events/" in path)
-        _ = one_event.mock(
-            return_value=httpx.Response(
-                200,
-                json=_recorded("rec-tool-outlook_read_event-agenda.03") | {"attendees": attendees},
-            )
-        )
-        found = await _day(subject_contains=_OFFSITE)
+    async def _read_meeting(self, graph: respx.MockRouter, cassette: str, subject: str) -> Row:
+        _ = serve(graph, cassette)
+        found = await _day(starts_on="2026-11-03", ends_on="2026-11-03", subject_contains=subject)
         (listed,) = _list(found, "events")
         return await call("outlook_read_event", uri=listed["uri"], time_zone=_ZURICH)
 
     async def test_it_shows_what_each_attendee_answered(self, graph: respx.MockRouter) -> None:
-        seen = await self._read_offsite(
-            graph,
-            [
-                _attendee(_ANNA, "accepted"),
-                _attendee(_TOM, "declined"),
-                _attendee(_PRIYA, "none"),
-            ],
+        mixed = await self._read_meeting(
+            graph, "rec-tool-outlook_read_event-answers-mixed", "Design workshop"
+        )
+        graph.routes.clear()
+        open_ = await self._read_meeting(
+            graph, "rec-tool-outlook_read_event-answers-open", "Content review"
         )
 
-        answers = {str(one["name"]): one["response"] for one in _list(seen, "attendees")}
-        assert answers == {"Anna Meier": "accepted", "Tom Weber": "declined", "Priya Rao": "none"}
+        assert _answers(mixed) == {"Anna Meier": "accepted", "Tom Berger": "declined"}
+        assert _answers(open_) == {"Anna Meier": "tentativelyAccepted", "Tom Berger": "none"}
 
     async def test_it_has_no_attendee_filter_so_a_person_is_found_by_reading_the_events(
         self, graph: respx.MockRouter
     ) -> None:
-        seen = await self._read_offsite(graph, [_attendee(_TOM, "accepted")])
+        seen = await self._read_meeting(
+            graph, "rec-tool-outlook_read_event-answers-mixed", "Design workshop"
+        )
 
         assert await _input_names("outlook_list_events") == {
             "starts_on",
@@ -331,16 +296,21 @@ class TestWhoIsComingAndWhereTheMeetingIs:
             "owner_response",
             "limit",
         }
-        assert [one["address"] for one in _list(seen, "attendees")] == ["tom@example.test"]
+        assert [one["address"] for one in _list(seen, "attendees")] == [
+            "anna@example.test",
+            "tom@example.test",
+        ]
 
     async def test_it_opens_the_meeting_of_an_invitation_by_its_subject_with_time_and_attendees(
         self, graph: respx.MockRouter
     ) -> None:
-        seen = await self._read_offsite(graph, [_attendee(_ANNA, "accepted")])
+        seen = await self._read_meeting(
+            graph, "rec-tool-outlook_read_event-answers-mixed", "Design workshop"
+        )
 
-        assert seen["subject"] == _OFFSITE
-        assert _part(seen, "start")["iso"] == "2026-10-29T11:00:00+01:00"
-        assert [one["name"] for one in _list(seen, "attendees")] == ["Anna Meier"]
+        assert seen["subject"] == "Design workshop"
+        assert _part(seen, "start")["iso"] == "2026-11-03T10:00:00+01:00"
+        assert [one["name"] for one in _list(seen, "attendees")] == ["Anna Meier", "Tom Berger"]
         assert await _input_names("outlook_read_event") == {"uri", "time_zone"}
 
     async def test_a_meeting_deleted_after_the_listing_is_reported_as_unread_and_not_as_deleted(

@@ -212,6 +212,16 @@ only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has 
 `recorded` in the sidecar, and its fixture name starts with `rec-`. The option `--link` of the
 recorder writes that variant into the sidecar.
 
+## Running a tool case
+
+`../tests/e2e/test_tool_cases.py` runs the chain of each case in `../tests/e2e/recording/cases/`
+against the fixture `rec-tool-<case>`. The run uses the day of the recording as today, because a
+day symbol in a fixture matches only a day within one day of today. A case that has no fixture does
+not run.
+
+A case does not run when its fixture does not hold the chain that the case states. The names of
+these cases are in `_NEEDS_RE_RECORDING`. Record the case again, then remove its name from the set.
+
 ## Testing a scenario
 
 Each scenario has a test, or a reason why it has none. `../tests/test_scenario_traceability.py`
