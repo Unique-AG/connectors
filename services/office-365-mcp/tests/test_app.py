@@ -49,6 +49,7 @@ from office_365_mcp.cardinality import (
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 from office_365_mcp.server import readiness
+from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
 from office_365_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection, register_tools, resolve
 
@@ -649,6 +650,13 @@ def main_module(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_MainModul
         os.chdir(working_before)
         os.environ.clear()
         os.environ.update(environment_before)
+
+
+class TestServerInfo:
+    async def test_initialize_advertises_the_server_icons(self) -> None:
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            assert client.server_info is not None
+            assert client.server_info.icons == SERVER_ICONS
 
 
 class TestMainEntrypoint:
