@@ -5,18 +5,17 @@ import type { Params } from 'nestjs-pino';
 import { isPlainObject } from 'remeda';
 import { sanitizeError } from './sanitize-error';
 
-function serializeReq(req: IncomingMessage) {
-  const rawUrl = req.url ?? '';
-  const qIndex = rawUrl.indexOf('?');
-  const urlPath = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
-  const url = urlPath.startsWith('/auth/') ? urlPath : rawUrl;
-  return {
-    method: req.method,
-    url,
-    headers: req.headers,
-    remoteAddress: req.socket?.remoteAddress,
-    remotePort: req.socket?.remotePort,
-  };
+// pino-http hands a custom req serializer the output of pino-std-serializers, not the IncomingMessage.
+function serializeReq<T extends { url?: string; query?: unknown }>(req: T) {
+  const url = req.url ?? '';
+  const queryIndex = url.indexOf('?');
+  const pathname = queryIndex >= 0 ? url.slice(0, queryIndex) : url;
+  if (!pathname.startsWith('/auth/')) {
+    return req;
+  }
+
+  const { query: _query, ...rest } = req;
+  return { ...rest, url: pathname };
 }
 
 export const productionTarget = {
