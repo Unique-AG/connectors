@@ -403,3 +403,26 @@ test('buildPayload says how many images the table leaves out', () => {
     '_2 more image(s) have findings. Open the run for the full list._',
   );
 });
+
+test('buildPayload puts the other alerts below the table', () => {
+  const payload = withReports(
+    (root) =>
+      writeReport(root, 'admin', {
+        meta: { found: true },
+        results: { Results: [{ Vulnerabilities: [trivyVulnerability('CVE-1', 'HIGH')] }] },
+      }),
+    (root) =>
+      buildPayload({
+        ...baseEnv,
+        REPORTS_PATH: root,
+        SERVICES: JSON.stringify([{ service: 'admin', version: '1.2.3' }]),
+        OTHER_ALERTS: ':package: Lock files of main: 0 critical, 0 high',
+      }),
+  );
+
+  assert.deepEqual(
+    payload.blocks.map((block) => block.type),
+    ['header', 'section', 'table', 'section', 'context'],
+  );
+  assert.equal(payload.blocks[3].text.text, ':package: Lock files of main: 0 critical, 0 high');
+});

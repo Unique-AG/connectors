@@ -299,9 +299,9 @@ export function buildPayload(env) {
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },
       sectionBlock(buildMainSectionText(summary)),
-      ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       ...buildTopOffendersBlocks(summary.images),
       ...buildOmittedBlocks(summary.images),
+      ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       {
         type: 'context',
         elements: [{ type: 'mrkdwn', text: truncate(footer, CONTEXT_TEXT_LIMIT) }],
