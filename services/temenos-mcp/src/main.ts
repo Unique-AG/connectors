@@ -42,6 +42,6 @@ async function bootstrap() {
 initOpenTelemetry({
   defaultServiceName: 'temenos-mcp',
   defaultServiceVersion: packageJson.version,
-  sensitivePathSegments: process.env.MCP_API_KEY ? [process.env.MCP_API_KEY] : [],
+  sensitiveValues: process.env.MCP_API_KEY ? [process.env.MCP_API_KEY] : [],
 });
 void runWithInstrumentation(bootstrap, 'temenos-mcp');
