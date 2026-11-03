@@ -34,7 +34,7 @@ export class McpAuthJwtGuard implements CanActivate {
 
     // This is a global guard, as we cannot inject it into the McpModule
     // To not interfere with authentication and other routes, we only authenticate requests to /mcp endpoints
-    if (!request.url.startsWith('/mcp/') && request.url !== '/mcp') {
+    if (!this.isMcpPath(request.url)) {
       return true;
     }
 
@@ -58,6 +58,16 @@ export class McpAuthJwtGuard implements CanActivate {
 
     request.user = validationResult;
     return true;
+  }
+
+  // Express routes an absolute-form target (POST http://host/mcp) to /mcp, ignores casing, the query string
+  // and a trailing slash, so the match must too. A url that does not parse requires a token.
+  private isMcpPath(url: string): boolean {
+    const pathname = URL.parse(url, 'http://localhost')?.pathname.toLowerCase();
+    if (pathname === undefined) {
+      return true;
+    }
+    return pathname === '/mcp' || pathname.startsWith('/mcp/');
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

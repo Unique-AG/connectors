@@ -43,6 +43,7 @@ import { registerKbIntegrationModule } from './kb-integration/kb-integration.mod
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
+import { serverIcons } from './server-icons';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -153,6 +154,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       name: 'teams-mcp',
       version: packageJson.version,
       instructions: serverInstructions,
+      icons: serverIcons,
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),

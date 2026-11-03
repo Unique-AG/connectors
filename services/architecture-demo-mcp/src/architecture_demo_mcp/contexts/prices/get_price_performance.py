@@ -4,6 +4,7 @@ from itertools import pairwise
 from math import sqrt
 from statistics import stdev
 
+from mcp_observability import traced
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -13,6 +14,10 @@ from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import Upstream
 
 
+@traced(
+    arguments=("ticker", "start_date", "end_date"),
+    result=lambda performance: {"trading_days": performance.trading_days},
+)
 async def get_price_performance(
     *,
     upstream: Upstream,
@@ -65,12 +70,12 @@ def _max_drawdown(*, closes: list[DailyClose]) -> float:
 
 
 class PricePerformance(BaseModel):
-    ticker: str
-    first_date: date
-    last_date: date
-    trading_days: int
-    first_close: float
-    last_close: float
+    ticker: str = Field(description="The ticker as Tiingo lists it.")
+    first_date: date = Field(description="The first trading day in the period.")
+    last_date: date = Field(description="The last trading day in the period.")
+    trading_days: int = Field(description="The closes the performance is computed from.")
+    first_close: float = Field(description="The adjusted close on `first_date`.")
+    last_close: float = Field(description="The adjusted close on `last_date`.")
     total_return: float = Field(description="0.12 is a 12% gain from the first to the last close.")
     annualized_volatility: float | None = Field(
         description="The standard deviation of daily returns, scaled to 252 trading days."
@@ -78,8 +83,8 @@ class PricePerformance(BaseModel):
     max_drawdown: float = Field(
         description="The largest fall from a running high close, 0.25 for 25%."
     )
-    period_high: float
-    period_low: float
+    period_high: float = Field(description="The highest adjusted close in the period.")
+    period_low: float = Field(description="The lowest adjusted close in the period.")
 
 
 class PerformanceUnavailableError(Exception):

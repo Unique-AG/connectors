@@ -21,7 +21,6 @@ on:
       - ".github/workflows/_template-containerize.yaml"
       - ".github/workflows/_template-helm.yaml"
       - ".github/workflows/_template-terraform.yaml"
-      - ".github/actions/**"
   workflow_dispatch:
     inputs:
       services:
@@ -32,7 +31,6 @@ on:
 permissions:
   contents: read # to read the repository
   packages: read # to let the called workflows pull the base chart from GHCR
-  pull-requests: read # to let containerize read the live security-exception label
 
 concurrency:
   group: ci-services-${{ github.event.pull_request.number || github.ref }}
@@ -76,7 +74,6 @@ jobs:
               - '.github/workflows/_template-containerize.yaml'
               - '.github/workflows/_template-helm.yaml'
               - '.github/workflows/_template-terraform.yaml'
-              - '.github/actions/**'
 
       # This step builds the list of Node services for the matrix jobs. It lists services in three cases.
       # 1. A manual run lists the services that the input names, or all services.

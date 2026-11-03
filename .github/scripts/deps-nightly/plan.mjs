@@ -1,0 +1,340 @@
+import { createHash } from 'node:crypto';
+import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
+import { classifyOpenPull, entryKey } from './state.mjs';
+import {
+  compareVersions,
+  isMajorBump,
+  isStable,
+  newestVersion,
+  oldestVersion,
+  updateType,
+} from './versions.mjs';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MATRIX_LIMIT = 250;
+
+function matchesPattern(pattern, name) {
+  return new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`).test(
+    name,
+  );
+}
+
+function violatesCap(version, spec) {
+  return spec.split(',').some((part) => {
+    const limit = /^<(=?)(\d[^\s,]*)$/.exec(part.trim());
+    return limit !== null && compareVersions(version, limit[2]) >= (limit[1] ? 1 : 0);
+  });
+}
+
+const majorData = (from, to) => (isMajorBump(from, to) ? { data: { major: true } } : {});
+
+function overrideNames(overrides) {
+  return new Set(Object.keys(overrides).map((key) => /^(@?[^@]+)/.exec(key)[1]));
+}
+
+export function npmCandidates({ outdated, lockChanges, overrides }) {
+  const pinned = overrideNames(overrides);
+  const direct = Object.entries(outdated).flatMap(([name, { wanted, latest }]) => {
+    const order = compareVersions(latest, wanted);
+    if (order === 0) {
+      return [];
+    }
+    const found = {
+      ecosystem: 'npm',
+      name,
+      from: wanted,
+      to: latest,
+      direct: true,
+      ...majorData(wanted, latest),
+    };
+    if (order < 0) {
+      return [{ ...found, reason: `The newest version ${latest} is older than ${wanted}.` }];
+    }
+    return [found];
+  });
+  const transitive = lockChanges
+    .filter(({ name, from, to }) => from.length > 0 && to.length > 0 && !(name in outdated))
+    .map(({ name, from, to }) => ({
+      ecosystem: 'npm',
+      name,
+      from: from.join(', '),
+      to: to.join(', '),
+      direct: false,
+      ...majorData(from, to),
+    }));
+  const all = [...direct, ...transitive];
+  return {
+    candidates: all.filter(({ name, reason }) => !reason && !pinned.has(name)),
+    needsPerson: all.flatMap(({ ecosystem, name, reason }) => {
+      if (reason) {
+        return [{ ecosystem, name, reason }];
+      }
+      return pinned.has(name)
+        ? [{ ecosystem, name, reason: 'The pnpm overrides pin this package.' }]
+        : [];
+    }),
+  };
+}
+
+function eligibleLatest(pypi, now, cooldownDays) {
+  const cutoff = now - cooldownDays * DAY_MS;
+  const versions = Object.entries(pypi.releases ?? {})
+    .filter(
+      ([version, files]) =>
+        isStable(version) &&
+        files.length > 0 &&
+        files.every((file) => !file.yanked && Date.parse(file.upload_time_iso_8601) <= cutoff),
+    )
+    .map(([version]) => version);
+  return versions.length > 0 ? newestVersion(versions) : undefined;
+}
+
+async function pypiOrUndefined(fetchPypi, name) {
+  try {
+    return await fetchPypi(name);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function latestEligibleVersions(names, fetchPypi, now, cooldownDays) {
+  const answers = await Promise.all(
+    names.map(async (name) => ({ name, pypi: await pypiOrUndefined(fetchPypi, name) })),
+  );
+  const pairs = answers.map(({ name, pypi }) => [
+    name,
+    eligibleLatest(pypi ?? {}, now, cooldownDays),
+  ]);
+  return {
+    latest: new Map(pairs.filter(([, version]) => version !== undefined)),
+    needsPerson: answers
+      .filter(({ pypi }) => pypi === undefined)
+      .map(({ name }) => ({
+        ecosystem: 'uv',
+        name,
+        reason: `PyPI did not answer for ${name}.`,
+      })),
+  };
+}
+
+export function uvCandidates({ projects, latest }) {
+  const holders = new Map();
+  const targets = new Map();
+  const needsPerson = [];
+  const addTarget = (name, to) => targets.set(name, [...(targets.get(name) ?? []), to]);
+
+  const requirements = projects.flatMap(({ project, pyproject }) =>
+    parseRequirements(pyproject).map((requirement) => ({ ...requirement, project })),
+  );
+  for (const { project, lock, updates } of projects) {
+    for (const [name, versions] of parseUvPackages(lock)) {
+      holders.set(name, [
+        ...(holders.get(name) ?? []),
+        { project, current: newestVersion(versions) },
+      ]);
+    }
+    for (const { name, to } of updates) {
+      addTarget(normalizeName(name), to);
+    }
+  }
+  const pinnedNames = new Set(
+    requirements.filter(({ spec }) => pinnedVersion(spec)).map(({ name }) => name),
+  );
+  for (const name of pinnedNames) {
+    const newest = latest.get(name);
+    const cap = requirements.find(
+      (requirement) => requirement.name === name && violatesCap(newest ?? '0', requirement.spec),
+    );
+    const pins = requirements.filter(
+      ({ name: other, spec }) => other === name && pinnedVersion(spec),
+    );
+    if (newest && pins.some(({ spec }) => compareVersions(newest, pinnedVersion(spec)) > 0)) {
+      if (cap) {
+        needsPerson.push({
+          ecosystem: 'uv',
+          name,
+          reason: `Version ${newest} breaks the limit ${cap.spec} in ${cap.project}.`,
+        });
+      } else {
+        addTarget(name, newest);
+      }
+    }
+  }
+
+  const candidates = [];
+  for (const [name, versions] of targets) {
+    const target = oldestVersion(versions);
+    const current = holders.get(name) ?? [];
+    const ahead = current.find((holder) => compareVersions(holder.current, target) > 0);
+    if (ahead) {
+      needsPerson.push({
+        ecosystem: 'uv',
+        name,
+        reason: `The target ${target} is older than ${ahead.current} in ${ahead.project}.`,
+      });
+      continue;
+    }
+    const behind = current.filter((holder) => compareVersions(holder.current, target) < 0);
+    if (behind.length > 0) {
+      const from = oldestVersion(behind.map((holder) => holder.current));
+      candidates.push({
+        ecosystem: 'uv',
+        name,
+        from,
+        to: target,
+        direct: pinnedNames.has(name),
+        ...majorData(from, target),
+      });
+    }
+  }
+  return { candidates, needsPerson };
+}
+
+function slugOf(ecosystem, name) {
+  return `${ecosystem}-${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')}`;
+}
+
+const shortHash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 6);
+
+function separateSlugs(seeds) {
+  const sharing = Map.groupBy(seeds, ({ entry }) => entry.slug);
+  return seeds.map(({ base, entry }) =>
+    sharing.get(entry.slug).length > 1
+      ? { ...entry, slug: `${entry.slug}-${shortHash(base)}` }
+      : entry,
+  );
+}
+
+function isIgnored(rules, candidate) {
+  return rules.some(
+    ({ ecosystem, name, updateTypes }) =>
+      (!ecosystem || ecosystem === candidate.ecosystem) &&
+      matchesPattern(name, candidate.name) &&
+      (!updateTypes || updateTypes.includes(updateType(candidate.from, candidate.to))),
+  );
+}
+
+export function buildPlan({
+  candidates,
+  needsPerson,
+  config,
+  openPulls = [],
+  closedKeys = new Set(),
+}) {
+  const ignored = candidates.filter((candidate) => isIgnored(config.ignore ?? [], candidate));
+  const buckets = Map.groupBy(
+    candidates.filter((candidate) => !ignored.includes(candidate)),
+    (candidate) => {
+      const group = config.groups.find(
+        ({ ecosystem, patterns }) =>
+          ecosystem === candidate.ecosystem &&
+          patterns.some((pattern) => matchesPattern(pattern, candidate.name)),
+      );
+      return JSON.stringify(
+        group
+          ? [candidate.ecosystem, 'group', group.name, Boolean(candidate.data?.major)]
+          : [candidate.ecosystem, 'package', candidate.name],
+      );
+    },
+  );
+  const seeds = [...buckets].map(([bucket, members]) => {
+    const [, kind, groupName, major] = JSON.parse(bucket);
+    const isGroup = kind === 'group' && members.length > 1;
+    const name = isGroup ? groupName : members[0].name;
+    const base = kind === 'group' ? `${groupName}${major ? '-major' : ''}` : name;
+    const entry = {
+      ecosystem: members[0].ecosystem,
+      slug: slugOf(members[0].ecosystem, base),
+      name,
+      isGroup,
+      members: members.map(({ name: memberName, from, to, direct, data }) => ({
+        name: memberName,
+        from,
+        to,
+        direct,
+        ...(data ? { data } : {}),
+      })),
+    };
+    return { base, entry };
+  });
+  const entries = separateSlugs(seeds).map((entry) => ({ ...entry, key: entryKey(entry) }));
+  const ordered = entries.sort(
+    (a, b) =>
+      Number(b.members.some(({ direct }) => direct)) -
+        Number(a.members.some(({ direct }) => direct)) || a.slug.localeCompare(b.slug),
+  );
+  const openByBranch = new Map(openPulls.map((pull) => [pull.branch, pull]));
+  const decisions = ordered.map((entry) => {
+    if (closedKeys.has(entry.key)) {
+      return { entry, skip: 'a person closed this version' };
+    }
+    const pull = openByBranch.get(`deps/${entry.slug}`);
+    if (!pull) {
+      return { entry: { ...entry, action: 'new' } };
+    }
+    const action = classifyOpenPull({ key: entry.key, pull });
+    return action === 'keep'
+      ? { entry, skip: `#${pull.number} is up to date` }
+      : { entry: { ...entry, action, number: pull.number } };
+  });
+  const withAction = (action) =>
+    decisions.flatMap(({ entry }) => (entry.action === action ? [entry] : []));
+  const allEntries = [...withAction('rebuild'), ...withAction('replace'), ...withAction('new')];
+  const allUpdates = withAction('update');
+  return {
+    entries: allEntries.slice(0, MATRIX_LIMIT),
+    updates: allUpdates.slice(0, MATRIX_LIMIT),
+    deferred: [...allEntries.slice(MATRIX_LIMIT), ...allUpdates.slice(MATRIX_LIMIT)],
+    skipped: decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
+    ignored,
+    needsPerson,
+  };
+}
+
+function describe({ name, isGroup, members }) {
+  if (isGroup) {
+    return `${name}: ${members.length} packages`;
+  }
+  return `${name}: ${members[0].from} -> ${members[0].to}`;
+}
+
+const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR', update: 'merge main' };
+
+export function renderSummary(
+  { entries, updates = [], deferred = [], skipped, ignored = [], needsPerson },
+  modeNote,
+) {
+  const section = (title, items) =>
+    items.length > 0
+      ? [`### ${title} (${items.length})`, '', ...items.map((item) => `- ${item}`), '']
+      : [];
+  const line = (entry) =>
+    `${entry.ecosystem} ${describe(entry)}${ACTION_LABELS[entry.action] ? ` (${ACTION_LABELS[entry.action]})` : ''}`;
+  return [
+    '## Dependency plan',
+    '',
+    modeNote,
+    '',
+    ...section('Pull requests for this run', entries.map(line)),
+    ...section(
+      'Branches that get main merged in',
+      updates.map((entry) => `${entry.ecosystem} ${entry.name} (#${entry.number})`),
+    ),
+    ...section('Left for the next night (GitHub allows 256 jobs in a matrix)', deferred.map(line)),
+    ...section(
+      'Skipped',
+      skipped.map((entry) => `${entry.ecosystem} ${entry.name}: ${entry.reason}`),
+    ),
+    ...section(
+      'Ignored by the configuration',
+      ignored.map(({ ecosystem, name, from, to }) => `${ecosystem} ${name}: ${from} -> ${to}`),
+    ),
+    ...section(
+      'Needs a person',
+      needsPerson.map(({ ecosystem, name, reason }) => `${ecosystem} ${name}: ${reason}`),
+    ),
+  ].join('\n');
+}

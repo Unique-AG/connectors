@@ -1,7 +1,7 @@
 # contexts
 
-The domain: one folder per feature. [`ARCHITECTURE.md`](../ARCHITECTURE.md) holds the rules this
-guide works within.
+The domain: one folder per feature, and the modules several features share.
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) holds the rules this guide works within.
 
 A feature is one domain concept, named in the plural of what it handles: `prices`,
 `portfolios`. Features sit side by side. A feature never contains another feature, and organizes
@@ -90,3 +90,8 @@ A context:
 - May use another feature through that feature's top level: `value_portfolio` prices each
   position with `get_latest_close`, imported from `<package>.contexts.prices`. If two features
   need each other, the shared part is a third feature.
+
+A helper several features use, with no domain of its own, is a module beside the features, such
+as `contexts/pages.py` for paging through a list. It imports no feature, so a feature can use it
+without a cycle. Once it holds a domain concept, it becomes a feature. When another layer needs
+it too, it belongs in `shared/`.

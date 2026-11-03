@@ -4,7 +4,7 @@ from pathlib import Path
 
 SERVICE = Path(__file__).resolve().parents[1]
 PACKAGE = SERVICE / "src" / "kyckr_mcp"
-GENERATED = ("vendor_responses.py", "operations.py")
+GENERATED = ("vendor_responses.py", "vendor_requests.py", "operations.py")
 
 
 def test_the_generated_models_match_the_vendored_spec(tmp_path: Path) -> None:

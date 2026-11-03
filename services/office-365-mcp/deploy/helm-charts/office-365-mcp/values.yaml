@@ -150,6 +150,12 @@ networkPolicy:
   enableDefaultDeny:
     ingress: true
     egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
   baseline:
     # Prometheus lives in `system`, not the base chart's `monitoring` default, and `enabled: false`
     # emits no Prometheus rule at all — either way every scrape is dropped silently once an overlay

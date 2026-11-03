@@ -43,6 +43,7 @@ dependencies = [
     # `shared/calendar.py` converts every calendar time through `zoneinfo`; this is its fallback
     # when a base image ships no system tz database, which otherwise refuses every IANA zone name.
     "tzdata==2026.6",
+    "mcp-observability==0.1.0",
 ]
 
 [project.scripts]
@@ -108,3 +109,6 @@ include = ["src", "tests"]
 extraPaths = ["src", "."]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
+
+[tool.uv.sources]
+mcp-observability = { path = "../../packages/mcp-observability" }

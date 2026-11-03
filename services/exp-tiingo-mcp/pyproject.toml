@@ -91,4 +91,6 @@ snake-case-fields = false
 operation-module = "mcp_openapi.upstream"
 models-module = "tiingo_mcp.models.vendor_responses"
 models-output = "src/tiingo_mcp/models/vendor_responses.py"
+requests-module = "tiingo_mcp.models.vendor_requests"
+requests-output = "src/tiingo_mcp/models/vendor_requests.py"
 operations-output = "src/tiingo_mcp/models/operations.py"

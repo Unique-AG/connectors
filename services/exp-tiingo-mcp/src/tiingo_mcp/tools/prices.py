@@ -5,6 +5,11 @@ from mcp_openapi.upstream import OperationClient
 
 from tiingo_mcp.deps import get_api
 from tiingo_mcp.models import operations
+from tiingo_mcp.models.vendor_requests import (
+    GetDailyPricesPath,
+    GetDailyPricesQuery,
+    GetDailyPricesRequest,
+)
 from tiingo_mcp.models.vendor_responses import DailyPriceBar
 from tiingo_mcp.params import LookbackDays, Ticker, since
 
@@ -20,5 +25,9 @@ async def recent_daily_prices(
     adjusted close per day.
     """
     return await api.call(
-        operations.GET_DAILY_PRICES, ticker=ticker, startDate=since(lookback_days)
+        operations.GET_DAILY_PRICES,
+        GetDailyPricesRequest(
+            path=GetDailyPricesPath(ticker=ticker),
+            query=GetDailyPricesQuery(start_date=since(lookback_days)),
+        ),
     )

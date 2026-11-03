@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import * as z from 'zod';
+import { isAllowedRedirectUri } from '../utils/redirect-uri';
 
 export const RegisterClientSchema = z.object({
   client_name: z.string().describe('The name of the client'),
@@ -8,7 +9,15 @@ export const RegisterClientSchema = z.object({
   client_uri: z.string().describe('The URI of the client').optional(),
   developer_name: z.string().describe('The name of the developer').optional(),
   developer_email: z.string().describe('The email of the developer').optional(),
-  redirect_uris: z.array(z.string()).describe('The redirect URIs of the client'),
+  redirect_uris: z
+    .array(
+      z.string().refine(isAllowedRedirectUri, {
+        error:
+          'invalid_redirect_uri: must be an absolute https URL, an http loopback URL, or a private-use scheme, without a fragment',
+      }),
+    )
+    .min(1, { error: 'invalid_redirect_uri: at least one redirect URI is required' })
+    .describe('The redirect URIs of the client'),
   grant_types: z
     .array(z.string())
     .describe('The grant types of the client')
