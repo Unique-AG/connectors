@@ -145,7 +145,13 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, amqpConnection),
+        oauthStore: new McpOAuthStore(
+          drizzle,
+          aesService,
+          cacheManager,
+          amqpConnection,
+          configService.get('auth.hmacSecret', { infer: true }).value,
+        ),
         encryptionService: aesService,
         metricService,
       }),

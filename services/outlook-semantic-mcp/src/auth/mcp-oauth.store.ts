@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createHmac } from 'node:crypto';
 import {
   AccessTokenMetadata,
   AuthorizationCode,
@@ -51,7 +52,12 @@ export class McpOAuthStore implements IOAuthStore {
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
     private readonly amqpConnection: AmqpConnection,
+    private readonly hmacSecret: string,
   ) {}
+
+  private hashToken(token: string): string {
+    return createHmac('sha256', this.hmacSecret).update(`mcp-token:${token}`).digest('hex');
+  }
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
     const saved = await this.drizzle
@@ -93,14 +99,16 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async storeAuthCode(code: AuthorizationCode): Promise<void> {
-    await this.drizzle.insert(authorizationCodes).values(toDrizzleAuthCodeInsert(code));
+    await this.drizzle
+      .insert(authorizationCodes)
+      .values(toDrizzleAuthCodeInsert({ ...code, code: this.hashToken(code.code) }));
   }
 
   public async getAuthCode(code: string): Promise<AuthorizationCode | undefined> {
     const [authCode] = await this.drizzle
       .select()
       .from(authorizationCodes)
-      .where(eq(authorizationCodes.code, code));
+      .where(eq(authorizationCodes.code, this.hashToken(code)));
     if (!authCode) {
       return undefined;
     }
@@ -113,7 +121,9 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async removeAuthCode(code: string): Promise<void> {
     try {
-      await this.drizzle.delete(authorizationCodes).where(eq(authorizationCodes.code, code));
+      await this.drizzle
+        .delete(authorizationCodes)
+        .where(eq(authorizationCodes.code, this.hashToken(code)));
     } catch (error) {
       this.logger.warn({
         msg: 'Failed to delete expired authorization code from database',
@@ -240,8 +250,9 @@ export class McpOAuthStore implements IOAuthStore {
       throw new Error('User profile not found');
     }
 
+    const hash = this.hashToken(token);
     await this.drizzle.insert(tokens).values({
-      token,
+      token: hash,
       type: 'ACCESS',
       expiresAt: metadata.expiresAt,
       userId: metadata.userId,
@@ -251,11 +262,12 @@ export class McpOAuthStore implements IOAuthStore {
       userProfileId: metadata.userProfileId,
     });
 
-    await this.cacheAccessTokenMetadata(token, metadata);
+    await this.cacheAccessTokenMetadata(hash, metadata);
   }
 
   public async getAccessToken(token: string): Promise<AccessTokenMetadata | undefined> {
-    const cacheKey = this.getAccessTokenCacheKey(token);
+    const hash = this.hashToken(token);
+    const cacheKey = this.getAccessTokenCacheKey(hash);
     const cached = await this.cacheManager.get<AccessTokenMetadata>(cacheKey);
 
     if (cached) {
@@ -280,7 +292,7 @@ export class McpOAuthStore implements IOAuthStore {
       })
       .from(tokens)
       .leftJoin(userProfiles, eq(tokens.userProfileId, userProfiles.id))
-      .where(eq(tokens.token, token))
+      .where(eq(tokens.token, hash))
       .then((rows) => rows[0]);
     if (!metadata) {
       return undefined;
@@ -290,14 +302,14 @@ export class McpOAuthStore implements IOAuthStore {
       return undefined;
     }
 
-    await this.cacheAccessTokenMetadata(token, metadata as unknown as AccessTokenMetadata);
+    await this.cacheAccessTokenMetadata(hash, metadata as unknown as AccessTokenMetadata);
     return metadata as unknown as AccessTokenMetadata;
   }
 
   public async removeAccessToken(token: string): Promise<void> {
-    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
-
-    await this.removeCachedAccessToken(token);
+    const hash = this.hashToken(token);
+    await this.drizzle.delete(tokens).where(eq(tokens.token, hash));
+    await this.removeCachedAccessToken(hash);
   }
 
   public async storeRefreshToken(token: string, metadata: RefreshTokenMetadata): Promise<void> {
@@ -306,8 +318,9 @@ export class McpOAuthStore implements IOAuthStore {
       throw new Error('User profile not found');
     }
 
+    const hash = this.hashToken(token);
     await this.drizzle.insert(tokens).values({
-      token,
+      token: hash,
       type: 'REFRESH',
       expiresAt: metadata.expiresAt,
       userId: metadata.userId,
@@ -319,11 +332,12 @@ export class McpOAuthStore implements IOAuthStore {
       generation: metadata.generation ?? undefined,
     });
 
-    await this.cacheRefreshTokenMetadata(token, metadata);
+    await this.cacheRefreshTokenMetadata(hash, metadata);
   }
 
   public async getRefreshToken(token: string): Promise<RefreshTokenMetadata | undefined> {
-    const cacheKey = this.getRefreshTokenCacheKey(token);
+    const hash = this.hashToken(token);
+    const cacheKey = this.getRefreshTokenCacheKey(hash);
     const cached = await this.cacheManager.get<RefreshTokenMetadata>(cacheKey);
 
     if (cached) {
@@ -348,7 +362,7 @@ export class McpOAuthStore implements IOAuthStore {
         generation: tokens.generation,
       })
       .from(tokens)
-      .where(eq(tokens.token, token))
+      .where(eq(tokens.token, hash))
       .then((rows) => rows[0]);
 
     if (!metadata) {
@@ -359,15 +373,15 @@ export class McpOAuthStore implements IOAuthStore {
       return undefined;
     }
 
-    await this.cacheRefreshTokenMetadata(token, metadata);
+    await this.cacheRefreshTokenMetadata(hash, metadata);
 
     return metadata;
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
-    await this.drizzle.delete(tokens).where(eq(tokens.token, token));
-
-    await this.removeCachedRefreshToken(token);
+    const hash = this.hashToken(token);
+    await this.drizzle.delete(tokens).where(eq(tokens.token, hash));
+    await this.removeCachedRefreshToken(hash);
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {
@@ -412,9 +426,9 @@ export class McpOAuthStore implements IOAuthStore {
   }
 
   public async markRefreshTokenAsUsed(token: string): Promise<void> {
-    await this.drizzle.update(tokens).set({ usedAt: new Date() }).where(eq(tokens.token, token));
-
-    await this.removeCachedRefreshToken(token);
+    const hash = this.hashToken(token);
+    await this.drizzle.update(tokens).set({ usedAt: new Date() }).where(eq(tokens.token, hash));
+    await this.removeCachedRefreshToken(hash);
   }
 
   public async isRefreshTokenUsed(token: string): Promise<boolean> {
@@ -422,7 +436,7 @@ export class McpOAuthStore implements IOAuthStore {
     const [metadata] = await this.drizzle
       .select({ usedAt: tokens.usedAt })
       .from(tokens)
-      .where(eq(tokens.token, token));
+      .where(eq(tokens.token, this.hashToken(token)));
 
     return !!metadata?.usedAt;
   }

@@ -1,7 +1,12 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { MockCacheManager, MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
 import { McpOAuthStore } from './mcp-oauth.store';
+
+const TEST_HMAC_SECRET = 'test-hmac-secret';
+const hashToken = (token: string) =>
+  createHmac('sha256', TEST_HMAC_SECRET).update(`mcp-token:${token}`).digest('hex');
 
 describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
@@ -50,6 +55,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.storeClient(mockClient);
@@ -78,6 +84,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getClient('test-client-id');
@@ -94,6 +101,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getClient('non-existent');
@@ -121,6 +129,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.findClient('Test Client');
@@ -135,6 +144,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = unit.generateClientId({
@@ -163,11 +173,15 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.storeAuthCode(mockAuthCode);
 
       expect(mockDrizzle.insert).toHaveBeenCalled();
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ code: hashToken('test-auth-code') }),
+      );
     });
 
     it('gets valid authorization code', async () => {
@@ -191,6 +205,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getAuthCode('test-auth-code');
@@ -225,6 +240,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getAuthCode('expired-code');
@@ -239,6 +255,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.removeAuthCode('test-code');
@@ -270,6 +287,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.upsertUserProfile(mockUser);
@@ -287,6 +305,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.upsertUserProfile(mockUser);
@@ -308,6 +327,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await expect(unit.upsertUserProfile(mockUser)).resolves.toBe(userProfileId);
@@ -336,6 +356,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getUserProfileById('profile-123');
@@ -378,14 +399,18 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.storeAccessToken('test-token', mockAccessTokenMetadata);
 
       expect(mockDrizzle.insert).toHaveBeenCalled();
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ token: hashToken('test-token') }),
+      );
 
       expect(mockCache.set).toHaveBeenCalledWith(
-        'access_token:test-token',
+        `access_token:${hashToken('test-token')}`,
         mockAccessTokenMetadata,
         expect.any(Number),
       );
@@ -407,6 +432,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.storeAccessToken('test-token', {
@@ -427,12 +453,13 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getAccessToken('test-token');
 
       expect(result).toEqual(mockAccessTokenMetadata);
-      expect(mockCache.get).toHaveBeenCalledWith('access_token:test-token');
+      expect(mockCache.get).toHaveBeenCalledWith(`access_token:${hashToken('test-token')}`);
     });
 
     it('falls back to database when cache miss', async () => {
@@ -455,6 +482,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.getAccessToken('test-token');
@@ -479,12 +507,13 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.removeAccessToken('test-token');
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
-      expect(mockCache.del).toHaveBeenCalledWith('access_token:test-token');
+      expect(mockCache.del).toHaveBeenCalledWith(`access_token:${hashToken('test-token')}`);
     });
   });
 
@@ -500,6 +529,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.revokeAllTokensForUserProfile('profile-123');
@@ -521,11 +551,45 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const revoked = await unit.revokeAllTokensForUserProfile('profile-123');
 
       expect(revoked).toEqual({ tokenCount: 3, clientIds: ['client-a', 'client-b'] });
+    });
+
+    it('stores the hash of a refresh token', async () => {
+      mockDrizzle.__nextSelectRows = [
+        {
+          id: 'profile-123',
+          provider: 'microsoft',
+          providerUserId: 'user-123',
+        },
+      ];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+        TEST_HMAC_SECRET,
+      );
+
+      await unit.storeRefreshToken('refresh-token', {
+        userId: 'user-123',
+        clientId: 'client-123',
+        scope: 'read',
+        resource: 'test-resource',
+        expiresAt: new Date(Date.now() + 3600000),
+        userProfileId: 'profile-123',
+        familyId: 'family-123',
+        generation: 0,
+      });
+
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ token: hashToken('refresh-token'), type: 'REFRESH' }),
+      );
     });
 
     it('revokes token family', async () => {
@@ -534,6 +598,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.revokeTokenFamily('family-123');
@@ -547,6 +612,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       await unit.markRefreshTokenAsUsed('refresh-token');
@@ -562,6 +628,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.isRefreshTokenUsed('refresh-token');
@@ -579,6 +646,7 @@ describe('McpOAuthStore', () => {
         mockEncryption,
         mockCache as any,
         mockAmqp as any,
+        TEST_HMAC_SECRET,
       );
 
       const result = await unit.cleanupExpiredTokens(30);
