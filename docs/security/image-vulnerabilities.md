@@ -73,7 +73,7 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and a table with one row for each image that has findings. A check mark at the end of the counts means that the images hold no critical and no high finding. A second part has the title "Repository (main)". It has the counts for the lock files and the configuration of `main`, and the same check mark rule. Its table has a row only for a scan that has a finding. If the job cannot read the open alerts, this part says so.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and a table with one row for each image that has findings. A second part has the title "Repository (main)". It has the counts for the lock files and the configuration of `main`. Its table has a row only for a scan that has a finding. If the job cannot read the open alerts, this part says so.
 
 The scan also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
