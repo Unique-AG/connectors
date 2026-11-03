@@ -92,7 +92,7 @@ flowchart LR
 
 ## Cursor automations
 
-The monorepo defines the two automations in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. Both use the repository `Unique-AG/connectors` and the branch `main`. Memory is off. Only `connectors-vulna-patchy` has a Slack action, on the channel `C0C1PR9CNMP`. The PR automation has no Slack action. Both files have the action `mcp` with the server `Atlassian`. The agent uses it to file the Jira ticket for a PR with the label `human-required`. The site is `unique-ch.atlassian.net` and the project is `UN`.
+The monorepo defines the two automations in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. Both use the repository `Unique-AG/connectors` and the branch `main`. Memory is off. Only `connectors-vulna-patchy` has a Slack action, on the channel `C0C1PR9CNMP`. The PR automation has no Slack action. The agent uses no Jira tool and never files a ticket.
 
 | Name | Trigger | Prompt |
 |---|---|---|

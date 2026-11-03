@@ -38,7 +38,7 @@ flowchart TD
   ci -->|red| cause{"Did the bump cause it, is the fix in scope, and is it attempt 1 or 2?"}
   cause -->|yes| fix[Push a fix to the PR branch]
   fix --> ci
-  cause -->|no| handoff["Remove ai-assisted, add human-required, then file the Jira ticket or write the Hand-off section"]
+  cause -->|no| handoff["Remove ai-assisted, add human-required, then write the Hand-off section with a ticket draft"]
   ci -->|timed out or held| handoff
   verdict -->|safe to merge, or safe with a gap| report[Post one report comment and add ai-assisted]
   verdict -->|do not merge, break caused by the bump| handoff
@@ -61,7 +61,7 @@ The agent hands off when it cannot finish the PR. These causes give the label `h
 - The CI timed out, or a run waits for approval.
 - The cause is unclear, or the fix is outside the PR scope.
 
-The agent removes `ai-assisted` first, so a PR never has both labels. With a Jira tool, the agent files one ticket and writes the key in the report. The project is `UN` and the component is `mcp-servers`. Without the tool, the report gets the section "Hand-off: log a Jira ticket", and a person logs the ticket. The verdicts "safe to merge" and "safe with a gap" give `ai-assisted`.
+The agent removes `ai-assisted` first, so a PR never has both labels. The agent never files a Jira ticket. The report gets the section "Hand-off: log a Jira ticket", with a ticket draft. The project is `UN` and the component is `mcp-servers`. A person logs the ticket. To log it with an assistant, ask it to read the report and to follow `agentic/skills/jira/SKILL.md`. The verdicts "safe to merge" and "safe with a gap" give `ai-assisted`.
 
 ## Review a dependency PR
 
@@ -152,7 +152,7 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 
 1. Read the issue with the label `dependency-dashboard`. The nightly job updates it. It lists the plan and the open dependency PRs. You can also run `gh pr list --label dependencies --state open`.
 2. If a PR has the label `ai-assisted`, read the report in its comment. Then merge the PR.
-3. If a PR has the label `human-required`, read the report. If it has the section "Hand-off: log a Jira ticket", log the Jira ticket. Then finish the work.
+3. If a PR has the label `human-required`, read the report. If it has the section "Hand-off: log a Jira ticket", log the Jira ticket from the draft. Then finish the work.
 4. If a PR has no agent label and a green CI, run the review by hand. See [Review a dependency PR](#review-a-dependency-pr).
 5. Read the job summary of the last nightly run. The list "Needs a person" holds what the job cannot update, for example the Terraform version in `required_version`.
 6. Every month, read each pin and override. Remove the entry when upstream fixes the problem.
