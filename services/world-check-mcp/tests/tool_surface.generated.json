@@ -25,18 +25,22 @@
     "outputSchema": {
       "properties": {
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "enabled": {
+          "description": "Whether WATCHLIST ongoing screening is now enabled.",
           "type": "boolean"
         },
         "failures": {
+          "description": "Reasons LSEG did not enable monitoring, if any.",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "provider_type": {
+          "description": "Provider the monitoring applies to, WATCHLIST.",
           "type": "string"
         }
       },
@@ -142,9 +146,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Whether the MRZ conforms to ICAO, or null when LSEG does not say."
         },
         "lines": {
+          "description": "Generated MRZ lines.",
           "items": {
             "type": "string"
           },
@@ -232,15 +238,19 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Client-provided external case ID, if the case has one."
         },
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "entity_type": {
+          "description": "Entity type, INDIVIDUAL or ORGANISATION.",
           "type": "string"
         },
         "group_id": {
+          "description": "ID of the group that owns the case.",
           "type": "string"
         },
         "lifecycle_state": {
@@ -252,12 +262,15 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Case lifecycle state, e.g. UNARCHIVED."
         },
         "name": {
+          "description": "Screened entity name.",
           "type": "string"
         },
         "provider_types": {
+          "description": "Screening providers on the case, e.g. WATCHLIST.",
           "items": {
             "type": "string"
           },
@@ -335,9 +348,11 @@
     "outputSchema": {
       "properties": {
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "events": {
+          "description": "Audit events on this page, newest first.",
           "items": {
             "properties": {
               "action_type": {
@@ -348,7 +363,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Action recorded, e.g. SCREENED_CASE or NEW_CASE."
               },
               "actioned_by": {
                 "anyOf": [
@@ -358,7 +374,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Name of the user who performed the action."
               },
               "event_date": {
                 "anyOf": [
@@ -368,7 +385,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Event timestamp (ISO 8601)."
               },
               "id": {
                 "anyOf": [
@@ -378,7 +396,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Audit event ID."
               }
             },
             "required": [
@@ -399,7 +418,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
@@ -436,9 +456,11 @@
     "outputSchema": {
       "properties": {
         "case_id": {
+          "description": "Client-provided external case ID.",
           "type": "string"
         },
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         }
       },
@@ -509,9 +531,11 @@
     "outputSchema": {
       "properties": {
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "matches": {
+          "description": "Matches on this page.",
           "items": {
             "properties": {
               "match_strength": {
@@ -522,7 +546,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "provider_type": {
                 "anyOf": [
@@ -532,7 +557,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -542,7 +568,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -552,7 +579,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -562,7 +590,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -584,7 +613,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
@@ -623,15 +653,18 @@
         "Group": {
           "properties": {
             "child_groups": {
+              "description": "Direct child groups, nested.",
               "items": {
                 "$ref": "#/$defs/Group"
               },
               "type": "array"
             },
             "id": {
+              "description": "Group ID.",
               "type": "string"
             },
             "name": {
+              "description": "Group name.",
               "type": "string"
             },
             "parent_id": {
@@ -643,7 +676,8 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "default": null,
+              "description": "Parent group ID, or null for a root."
             }
           },
           "required": [
@@ -655,9 +689,11 @@
         "ResolutionOption": {
           "properties": {
             "id": {
+              "description": "Option ID, passed back when resolving a result.",
               "type": "string"
             },
             "label": {
+              "description": "Human-readable option label.",
               "type": "string"
             },
             "status_type": {
@@ -669,7 +705,8 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "default": null,
+              "description": "Status category, for a status option."
             }
           },
           "required": [
@@ -681,21 +718,25 @@
         "ResolutionToolkit": {
           "properties": {
             "provider_type": {
+              "description": "Provider the toolkit applies to, e.g. WATCHLIST.",
               "type": "string"
             },
             "reasons": {
+              "description": "Allowed resolution reasons.",
               "items": {
                 "$ref": "#/$defs/ResolutionOption"
               },
               "type": "array"
             },
             "risks": {
+              "description": "Allowed risk ratings.",
               "items": {
                 "$ref": "#/$defs/ResolutionOption"
               },
               "type": "array"
             },
             "statuses": {
+              "description": "Allowed resolution statuses.",
               "items": {
                 "$ref": "#/$defs/ResolutionOption"
               },
@@ -713,21 +754,27 @@
         "SecondaryField": {
           "properties": {
             "entity_type": {
+              "description": "Entity type the field applies to, e.g. individual.",
               "type": "string"
             },
             "label": {
+              "description": "Human-readable field label, e.g. DATE_OF_BIRTH.",
               "type": "string"
             },
             "provider": {
+              "description": "Provider the field applies to, e.g. watchlist.",
               "type": "string"
             },
             "required": {
+              "description": "Whether the field is required when screening.",
               "type": "boolean"
             },
             "type_id": {
+              "description": "Field typeId, passed back in screening secondary fields.",
               "type": "string"
             },
             "value_type": {
+              "description": "Value type, e.g. DATE, COUNTRY, GENDER, or TEXT.",
               "type": "string"
             }
           },
@@ -744,24 +791,29 @@
       },
       "properties": {
         "group": {
-          "$ref": "#/$defs/Group"
+          "$ref": "#/$defs/Group",
+          "description": "The group."
         },
         "mandatory_provider_types": {
+          "description": "Providers that must be screened, e.g. WATCHLIST.",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "screening_type": {
+          "description": "Group screening type, e.g. CASE_MANAGEMENT_AUDIT.",
           "type": "string"
         },
         "secondary_fields": {
+          "description": "Secondary fields the group's cases accept.",
           "items": {
             "$ref": "#/$defs/SecondaryField"
           },
           "type": "array"
         },
         "toolkits": {
+          "description": "Resolution toolkits available for the group.",
           "items": {
             "$ref": "#/$defs/ResolutionToolkit"
           },
@@ -881,9 +933,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Cursor for the next page, or null when there is none."
         },
         "updates": {
+          "description": "Monitoring updates on this page.",
           "items": {
             "properties": {
               "case_id": {
@@ -894,9 +948,11 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Client-provided external case ID, if the case has one."
               },
               "case_system_id": {
+                "description": "LSEG-generated internal case ID (caseSystemId).",
                 "type": "string"
               },
               "group_id": {
@@ -907,7 +963,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the group that owns the case."
               },
               "new_results": {
                 "anyOf": [
@@ -917,7 +974,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Number of new WATCHLIST results in the update."
               },
               "update_date": {
                 "anyOf": [
@@ -927,7 +985,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "When the update was recorded (ISO 8601)."
               },
               "updated_results": {
                 "anyOf": [
@@ -937,7 +996,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Number of changed WATCHLIST results in the update."
               }
             },
             "required": [
@@ -953,11 +1013,14 @@
           "type": "array"
         },
         "window": {
+          "description": "The date window these updates cover.",
           "properties": {
             "since": {
+              "description": "Start of the update window (ISO 8601).",
               "type": "string"
             },
             "until": {
+              "description": "End of the update window (ISO 8601).",
               "type": "string"
             }
           },
@@ -1002,21 +1065,25 @@
     "outputSchema": {
       "properties": {
         "categories": {
+          "description": "Record categories, e.g. Sanctions or PEP.",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "entity_type": {
+          "description": "Entity type, INDIVIDUAL or ORGANISATION.",
           "type": "string"
         },
         "names": {
+          "description": "Names on the record, primary first.",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "reference_id": {
+          "description": "World-Check record reference ID.",
           "type": "string"
         }
       },
@@ -1069,9 +1136,11 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "LSEG API version, for api_info."
         },
         "kind": {
+          "description": "Which reference dataset this response carries.",
           "enum": [
             "countries",
             "nationalities",
@@ -1093,7 +1162,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Name keyed by code, for countries and nationalities."
         },
         "providers": {
           "anyOf": [
@@ -1108,7 +1178,8 @@
                       {
                         "type": "null"
                       }
-                    ]
+                    ],
+                    "description": "Provider short code, e.g. trwc."
                   },
                   "identifier": {
                     "anyOf": [
@@ -1118,7 +1189,8 @@
                       {
                         "type": "null"
                       }
-                    ]
+                    ],
+                    "description": "Provider identifier used by the API."
                   },
                   "name": {
                     "anyOf": [
@@ -1128,7 +1200,8 @@
                       {
                         "type": "null"
                       }
-                    ]
+                    ],
+                    "description": "Human-readable provider name."
                   }
                 },
                 "required": [
@@ -1144,7 +1217,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Available providers, for the providers kind."
         },
         "search_filters": {
           "anyOf": [
@@ -1152,12 +1226,14 @@
               "items": {
                 "properties": {
                   "fields": {
+                    "description": "Field names available for this parameter.",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
                   },
                   "kind": {
+                    "description": "Kind of search parameter.",
                     "enum": [
                       "query",
                       "custom",
@@ -1178,7 +1254,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Available search parameters, for the search_filters kind."
         },
         "system_date_time": {
           "anyOf": [
@@ -1189,7 +1266,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "LSEG system time (ISO 8601), for api_info."
         }
       },
       "required": [
@@ -1224,12 +1302,15 @@
     "outputSchema": {
       "properties": {
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "providers": {
+          "description": "Per-provider screening summaries.",
           "items": {
             "properties": {
               "provider_type": {
+                "description": "Screening provider, e.g. WATCHLIST.",
                 "type": "string"
               },
               "review_required": {
@@ -1240,7 +1321,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Number of matches that require review."
               },
               "total_matches": {
                 "anyOf": [
@@ -1250,7 +1332,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Total matches for the provider."
               },
               "unresolved": {
                 "anyOf": [
@@ -1260,7 +1343,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Number of unresolved matches."
               }
             },
             "required": [
@@ -1281,7 +1365,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Overall screening status, or null when the case has not been screened."
         }
       },
       "required": [
@@ -1337,6 +1422,7 @@
     "outputSchema": {
       "properties": {
         "cases": {
+          "description": "Cases on this page, newest first.",
           "items": {
             "properties": {
               "case_id": {
@@ -1347,9 +1433,11 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Client-provided external case ID, if the case has one."
               },
               "case_system_id": {
+                "description": "LSEG-generated internal case ID (caseSystemId).",
                 "type": "string"
               },
               "entity_type": {
@@ -1360,7 +1448,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Entity type, INDIVIDUAL or ORGANISATION."
               },
               "group_id": {
                 "anyOf": [
@@ -1370,7 +1459,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the group that owns the case."
               },
               "lifecycle_state": {
                 "anyOf": [
@@ -1380,7 +1470,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Case lifecycle state, e.g. UNARCHIVED."
               },
               "name": {
                 "anyOf": [
@@ -1390,7 +1481,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Screened entity name."
               }
             },
             "required": [
@@ -1413,7 +1505,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
@@ -1442,15 +1535,18 @@
         "Group": {
           "properties": {
             "child_groups": {
+              "description": "Direct child groups, nested.",
               "items": {
                 "$ref": "#/$defs/Group"
               },
               "type": "array"
             },
             "id": {
+              "description": "Group ID.",
               "type": "string"
             },
             "name": {
+              "description": "Group name.",
               "type": "string"
             },
             "parent_id": {
@@ -1462,7 +1558,8 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "default": null,
+              "description": "Parent group ID, or null for a root."
             }
           },
           "required": [
@@ -1723,9 +1820,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Client-provided external case ID, if the case has one."
         },
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "group_id": {
@@ -1736,7 +1835,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "ID of the group that owns the case."
         },
         "name": {
           "anyOf": [
@@ -1746,9 +1846,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Screened entity name."
         },
         "passport_matches": {
+          "description": "Passport-check matches, if any.",
           "items": {
             "properties": {
               "match_strength": {
@@ -1759,7 +1861,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -1770,7 +1873,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -1781,7 +1885,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -1792,7 +1897,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -1802,7 +1908,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -1812,7 +1919,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -1822,7 +1930,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -1832,7 +1941,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -1847,6 +1957,7 @@
           "type": "array"
         },
         "watchlist_matches": {
+          "description": "WATCHLIST matches, truncated to the requested limit.",
           "items": {
             "properties": {
               "match_strength": {
@@ -1857,7 +1968,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -1868,7 +1980,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -1879,7 +1992,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -1890,7 +2004,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -1900,7 +2015,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -1910,7 +2026,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -1920,7 +2037,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -1930,7 +2048,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -1945,6 +2064,7 @@
           "type": "array"
         },
         "watchlist_truncated": {
+          "description": "Whether WATCHLIST matches were cut to the limit.",
           "type": "boolean"
         }
       },
@@ -2006,9 +2126,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Client-provided external case ID, if the case has one."
         },
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "entity_type": {
@@ -2019,7 +2141,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Entity type, INDIVIDUAL or ORGANISATION."
         },
         "group_id": {
           "anyOf": [
@@ -2029,9 +2152,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "ID of the group that owns the case."
         },
         "matches_returned": {
+          "description": "Total matches the screening returned.",
           "type": "integer"
         },
         "name": {
@@ -2042,9 +2167,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Screened entity name."
         },
         "passport_matches": {
+          "description": "Passport-check matches, if any.",
           "items": {
             "properties": {
               "match_strength": {
@@ -2055,7 +2182,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -2066,7 +2194,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -2077,7 +2206,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -2088,7 +2218,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -2098,7 +2229,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -2108,7 +2240,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -2118,7 +2251,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -2128,7 +2262,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -2143,6 +2278,7 @@
           "type": "array"
         },
         "watchlist_matches": {
+          "description": "WATCHLIST matches, truncated to the requested limit.",
           "items": {
             "properties": {
               "match_strength": {
@@ -2153,7 +2289,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -2164,7 +2301,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -2175,7 +2313,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -2186,7 +2325,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -2196,7 +2336,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -2206,7 +2347,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -2216,7 +2358,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -2226,7 +2369,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -2241,6 +2385,7 @@
           "type": "array"
         },
         "watchlist_truncated": {
+          "description": "Whether WATCHLIST matches were cut to the limit.",
           "type": "boolean"
         }
       },
@@ -2328,7 +2473,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "LSEG-generated internal case ID (caseSystemId)."
         },
         "note": {
           "anyOf": [
@@ -2339,7 +2485,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Saved resolution note, with reviewer."
         },
         "reason_id": {
           "anyOf": [
@@ -2350,9 +2497,11 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Applied resolution reason ID, if any."
         },
         "resolved": {
+          "description": "Whether the decision was saved to LSEG.",
           "type": "boolean"
         },
         "result_id": {
@@ -2364,7 +2513,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "ID of the resolved result."
         },
         "risk_id": {
           "anyOf": [
@@ -2375,7 +2525,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Applied risk rating ID."
         },
         "status": {
           "anyOf": [
@@ -2387,7 +2538,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "'cancelled' when the reviewer declined, otherwise null."
         },
         "status_id": {
           "anyOf": [
@@ -2398,7 +2550,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Applied resolution status ID."
         }
       },
       "required": [
@@ -2662,9 +2815,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Client-provided external case ID, if the case has one."
         },
         "case_system_id": {
+          "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
         "entity_type": {
@@ -2675,7 +2830,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Entity type, INDIVIDUAL or ORGANISATION."
         },
         "group_id": {
           "anyOf": [
@@ -2685,9 +2841,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "ID of the group that owns the case."
         },
         "matches_returned": {
+          "description": "Total matches the screening returned.",
           "type": "integer"
         },
         "name": {
@@ -2698,9 +2856,11 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Screened entity name."
         },
         "passport_matches": {
+          "description": "Passport-check matches, if any.",
           "items": {
             "properties": {
               "match_strength": {
@@ -2711,7 +2871,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -2722,7 +2883,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -2733,7 +2895,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -2744,7 +2907,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -2754,7 +2918,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -2764,7 +2929,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -2774,7 +2940,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -2784,7 +2951,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -2799,6 +2967,7 @@
           "type": "array"
         },
         "watchlist_matches": {
+          "description": "WATCHLIST matches, truncated to the requested limit.",
           "items": {
             "properties": {
               "match_strength": {
@@ -2809,7 +2978,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Match strength, e.g. EXACT or WEAK."
               },
               "mrz_line_1": {
                 "anyOf": [
@@ -2820,7 +2990,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "First MRZ line, passport results only."
               },
               "mrz_line_2": {
                 "anyOf": [
@@ -2831,7 +3002,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Second MRZ line, passport results only."
               },
               "mrz_line_3": {
                 "anyOf": [
@@ -2842,7 +3014,8 @@
                     "type": "null"
                   }
                 ],
-                "default": null
+                "default": null,
+                "description": "Third MRZ line, passport results only."
               },
               "provider_type": {
                 "anyOf": [
@@ -2852,7 +3025,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Provider that produced the match, e.g. WATCHLIST."
               },
               "reference_id": {
                 "anyOf": [
@@ -2862,7 +3036,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "World-Check record reference ID, for get_profile."
               },
               "result_id": {
                 "anyOf": [
@@ -2872,7 +3047,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the result within the case."
               },
               "submitted_term": {
                 "anyOf": [
@@ -2882,7 +3058,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Submitted term that produced the match."
               }
             },
             "required": [
@@ -2897,6 +3074,7 @@
           "type": "array"
         },
         "watchlist_truncated": {
+          "description": "Whether WATCHLIST matches were cut to the limit.",
           "type": "boolean"
         }
       },
@@ -3000,6 +3178,7 @@
     "outputSchema": {
       "properties": {
         "cases": {
+          "description": "Cases on this page, newest first.",
           "items": {
             "properties": {
               "case_id": {
@@ -3010,9 +3189,11 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Client-provided external case ID, if the case has one."
               },
               "case_system_id": {
+                "description": "LSEG-generated internal case ID (caseSystemId).",
                 "type": "string"
               },
               "entity_type": {
@@ -3023,7 +3204,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Entity type, INDIVIDUAL or ORGANISATION."
               },
               "group_id": {
                 "anyOf": [
@@ -3033,7 +3215,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "ID of the group that owns the case."
               },
               "lifecycle_state": {
                 "anyOf": [
@@ -3043,7 +3226,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Case lifecycle state, e.g. UNARCHIVED."
               },
               "name": {
                 "anyOf": [
@@ -3053,7 +3237,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Screened entity name."
               }
             },
             "required": [
@@ -3076,7 +3261,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
@@ -3132,7 +3318,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "LSEG-generated internal case ID (caseSystemId)."
         },
         "guidance": {
           "anyOf": [
@@ -3143,7 +3330,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Next-step guidance for the caller."
         },
         "mrz_matched": {
           "anyOf": [
@@ -3154,7 +3342,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Whether the reviewer confirmed the MRZ matched."
         },
         "note": {
           "anyOf": [
@@ -3165,9 +3354,11 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Saved verification note, with reviewer."
         },
         "recorded": {
+          "description": "Whether the verification was saved to LSEG.",
           "type": "boolean"
         },
         "status": {
@@ -3180,7 +3371,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "'cancelled' when the reviewer declined, otherwise null."
         }
       },
       "required": [

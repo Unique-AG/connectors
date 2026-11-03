@@ -2,6 +2,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 
 
 class ResolutionRequest(BaseModel):
@@ -45,11 +46,15 @@ class ResolutionPlan(BaseModel):
 
 
 class ResolutionOutcome(BaseModel):
-    resolved: bool
-    status: Literal["cancelled"] | None = None
-    case_system_id: str | None = None
-    result_id: str | None = None
-    status_id: str | None = None
-    risk_id: str | None = None
-    reason_id: str | None = None
-    note: str | None = None
+    resolved: bool = Field(description="Whether the decision was saved to LSEG.")
+    status: Literal["cancelled"] | None = Field(
+        default=None, description="'cancelled' when the reviewer declined, otherwise null."
+    )
+    case_system_id: str | None = Field(
+        default=None, description="LSEG-generated internal case ID (caseSystemId)."
+    )
+    result_id: str | None = Field(default=None, description="ID of the resolved result.")
+    status_id: str | None = Field(default=None, description="Applied resolution status ID.")
+    risk_id: str | None = Field(default=None, description="Applied risk rating ID.")
+    reason_id: str | None = Field(default=None, description="Applied resolution reason ID, if any.")
+    note: str | None = Field(default=None, description="Saved resolution note, with reviewer.")

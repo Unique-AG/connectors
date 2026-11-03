@@ -24,18 +24,26 @@ class Passport(BaseModel):
 
 
 class Mrz(BaseModel):
-    lines: list[str]
-    conforms_with_icao: bool | None
+    lines: list[str] = Field(description="Generated MRZ lines.")
+    conforms_with_icao: bool | None = Field(
+        description="Whether the MRZ conforms to ICAO, or null when LSEG does not say."
+    )
 
 
 class PassportCheck(BaseModel):
-    case_id: str | None
-    case_system_id: str
-    name: str | None
-    group_id: str | None
-    passport_matches: list[ScreeningMatch]
-    watchlist_matches: list[ScreeningMatch]
-    watchlist_truncated: bool
+    case_id: str | None = Field(
+        description="Client-provided external case ID, if the case has one."
+    )
+    case_system_id: str = Field(description="LSEG-generated internal case ID (caseSystemId).")
+    name: str | None = Field(description="Screened entity name.")
+    group_id: str | None = Field(description="ID of the group that owns the case.")
+    passport_matches: list[ScreeningMatch] = Field(description="Passport-check matches, if any.")
+    watchlist_matches: list[ScreeningMatch] = Field(
+        description="WATCHLIST matches, truncated to the requested limit."
+    )
+    watchlist_truncated: bool = Field(
+        description="Whether WATCHLIST matches were cut to the limit."
+    )
 
 
 class PassportVerificationRequest(BaseModel):
@@ -69,9 +77,15 @@ class PassportVerificationPlan(BaseModel):
 
 
 class PassportVerification(BaseModel):
-    recorded: bool
-    status: Literal["cancelled"] | None = None
-    case_system_id: str | None = None
-    mrz_matched: bool | None = None
-    note: str | None = None
-    guidance: str | None = None
+    recorded: bool = Field(description="Whether the verification was saved to LSEG.")
+    status: Literal["cancelled"] | None = Field(
+        default=None, description="'cancelled' when the reviewer declined, otherwise null."
+    )
+    case_system_id: str | None = Field(
+        default=None, description="LSEG-generated internal case ID (caseSystemId)."
+    )
+    mrz_matched: bool | None = Field(
+        default=None, description="Whether the reviewer confirmed the MRZ matched."
+    )
+    note: str | None = Field(default=None, description="Saved verification note, with reviewer.")
+    guidance: str | None = Field(default=None, description="Next-step guidance for the caller.")
