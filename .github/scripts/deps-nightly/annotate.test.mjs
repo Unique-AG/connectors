@@ -56,7 +56,10 @@ describe('failureReport', () => {
 
   it('writes the same lines into the job summary', () => {
     const { summary } = failureReport({ title, message: 'cz rejects the title\nerror: scope' });
-    assert.strictEqual(summary, `### ${title}\n\n\`\`\`text\ncz rejects the title\nerror: scope\n\`\`\`\n`);
+    assert.strictEqual(
+      summary,
+      `### ${title}\n\n\`\`\`text\ncz rejects the title\nerror: scope\n\`\`\`\n`,
+    );
   });
 
   it('limits the length of the text', () => {
