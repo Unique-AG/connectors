@@ -502,24 +502,14 @@ export class McpOAuthService {
         return;
       }
 
-      // Revoke the entire token family for security
-      if (refreshTokenResult.familyId && this.store.revokeTokenFamily) {
-        await this.store.revokeTokenFamily(refreshTokenResult.familyId);
-        this.logger.log({
-          msg: 'Refresh token family revoked',
-          clientId: client_id,
-          familyId: refreshTokenResult.familyId,
-          tokenPrefix: token.substring(0, 8),
-        });
-      } else {
-        // Fallback to removing just this token if family revocation is not available
-        await this.store.removeRefreshToken(token);
-        this.logger.log({
-          msg: 'Refresh token revoked (family revocation not available)',
-          clientId: client_id,
-          tokenPrefix: token.substring(0, 8),
-        });
-      }
+      assert.ok(refreshTokenResult.familyId, 'Refresh token has no family');
+      await this.store.revokeTokenFamily(refreshTokenResult.familyId);
+      this.logger.log({
+        msg: 'Refresh token family revoked',
+        clientId: client_id,
+        familyId: refreshTokenResult.familyId,
+        tokenPrefix: token.substring(0, 8),
+      });
       return;
     }
 

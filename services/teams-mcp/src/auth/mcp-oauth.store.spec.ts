@@ -536,7 +536,6 @@ describe('McpOAuthStore', () => {
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
       expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
-      expect(mockCache.del).toHaveBeenCalledWith('refresh_token:refresh-1');
     });
 
     it('reports the blast radius so a shared profile logs every client it disconnected', async () => {
@@ -592,7 +591,11 @@ describe('McpOAuthStore', () => {
       );
     });
 
-    it('revokes token family', async () => {
+    it('revokes token family and clears its cached access tokens', async () => {
+      mockDrizzle.__nextDeleteReturningRows = [
+        { token: 'access-1', type: 'ACCESS' },
+        { token: 'refresh-1', type: 'REFRESH' },
+      ];
       const unit = new McpOAuthStore(
         mockDrizzle as any,
         mockEncryption,
@@ -604,9 +607,12 @@ describe('McpOAuthStore', () => {
       await unit.revokeTokenFamily('family-123');
 
       expect(mockDrizzle.delete).toHaveBeenCalled();
+      expect(mockCache.del).toHaveBeenCalledTimes(1);
+      expect(mockCache.del).toHaveBeenCalledWith('access_token:access-1');
     });
 
-    it('marks refresh token as used', async () => {
+    it('redeems an unused refresh token', async () => {
+      mockDrizzle.__nextUpdateReturningRows = [{ id: 'token-1' }];
       const unit = new McpOAuthStore(
         mockDrizzle as any,
         mockEncryption,
@@ -615,14 +621,14 @@ describe('McpOAuthStore', () => {
         TEST_HMAC_SECRET,
       );
 
-      await unit.markRefreshTokenAsUsed('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token');
 
+      expect(result).toBe(true);
       expect(mockDrizzle.update).toHaveBeenCalled();
     });
 
-    it('checks if refresh token is used', async () => {
-      mockDrizzle.__nextSelectRows = [{ usedAt: new Date() }];
-
+    it('does not redeem a refresh token that is already used', async () => {
+      mockDrizzle.__nextUpdateReturningRows = [];
       const unit = new McpOAuthStore(
         mockDrizzle as any,
         mockEncryption,
@@ -631,10 +637,27 @@ describe('McpOAuthStore', () => {
         TEST_HMAC_SECRET,
       );
 
-      const result = await unit.isRefreshTokenUsed('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token');
 
-      expect(result).toBe(true);
-      expect(mockDrizzle.select).toHaveBeenCalled();
+      expect(result).toBe(false);
+    });
+
+    it('reads refresh tokens from the database, never from the cache', async () => {
+      const usedAt = new Date();
+      mockDrizzle.__nextSelectRows = [{ clientId: 'client-a', usedAt }];
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+        TEST_HMAC_SECRET,
+      );
+
+      const result = await unit.getRefreshToken('refresh-token');
+
+      expect(result).toEqual({ clientId: 'client-a', usedAt });
+      expect(mockCache.get).not.toHaveBeenCalled();
+      expect(mockCache.set).not.toHaveBeenCalled();
     });
   });
 

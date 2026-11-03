@@ -75,6 +75,7 @@
     "@suites/unit": "catalog:",
     "@swc/cli": "catalog:",
     "@swc/core": "catalog:",
+    "@testcontainers/postgresql": "12.2.1",
     "@types/amqplib": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
