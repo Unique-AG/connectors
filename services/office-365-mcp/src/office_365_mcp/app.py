@@ -121,6 +121,7 @@ def create_app(
         version=config.version,
         icons=SERVER_ICONS,
         auth=auth,
+        mask_error_details=True,
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #
