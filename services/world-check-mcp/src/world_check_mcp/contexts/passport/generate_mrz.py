@@ -21,6 +21,8 @@ async def generate_passport_mrz(*, upstream: Upstream, passport: Passport) -> Mr
             "Use issuing-state and nationality codes from get_reference_data nationalities, "
             "not the WATCHLIST country list."
         )
+    # call_untyped: the spec types dateOfBirth as a date-time, not the date the passport carries.
+    # Pinned by tests/test_spec_overrides.py.
     generated = await upstream.call_untyped(
         GET_MRZ_DATA,
         givenName=passport.given_name,

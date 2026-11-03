@@ -10,6 +10,7 @@ from pydantic import TypeAdapter
 class CaseWire(BaseModel):
     """The case fields these tools read. Hand-written: the generated Case narrows optional base
     fields, which the type check rejects as an incompatible override.
+    Pinned by tests/test_spec_overrides.py.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)

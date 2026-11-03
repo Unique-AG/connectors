@@ -13,6 +13,7 @@ from world_check_mcp.upstream.generated.vendor_responses import PaginationRefere
 class ResultWire(BaseModel):
     """A case result. Hand-written because it carries the passport mrzLine fields that the generated
     AbstractScreeningResult drops (the spec models them on a subtype the codegen collapses away).
+    Pinned by tests/test_spec_overrides.py.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
@@ -37,6 +38,7 @@ class ResultsWire(BaseModel):
 class ProviderCountWire(BaseModel):
     """A per-provider screening summary. The generated CaseResultsSummary types reviewRequired as a
     bool, but the API sends the count there, so this stays hand-written.
+    Pinned by tests/test_spec_overrides.py.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
@@ -61,6 +63,7 @@ class ScreeningStatusWire(BaseModel):
 GET_RESULTS = Operation[ResultsWire, GetResultsRequest]("getResults", TypeAdapter(ResultsWire))
 # getScreeningStatus has a JSON response but the generated model types reviewRequired as a bool
 # where the API sends the count, so it stays hand-written and call_untyped.
+# Pinned by tests/test_spec_overrides.py.
 GET_SCREENING_STATUS = Operation[list[ScreeningStatusWire]](
     "getScreeningStatus", TypeAdapter(list[ScreeningStatusWire])
 )
