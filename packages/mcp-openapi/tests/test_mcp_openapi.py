@@ -263,7 +263,7 @@ def test_call_untyped_sends_path_query_header_and_body_arguments_where_the_spec_
     assert request.headers["authorization"] == "Token k"
 
 
-def test_call_untyped_sends_an_empty_object_when_the_spec_requires_a_body_no_argument_fills() -> None:
+def test_call_untyped_sends_an_empty_object_for_a_required_body_no_arg_fills() -> None:
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
