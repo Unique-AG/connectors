@@ -6,12 +6,7 @@ const REDACTED = '[REDACTED]';
 
 type Redact = (value: string) => string;
 
-/**
- * Redacts a span's name and string attributes in `onEnding`, the last moment the span is still
- * writable. HTTP, Express and NestJS instrumentation copy the raw request path into `url.full`,
- * `http.target`, `http.route` and span names, some of them only after routing, so no request
- * hook sees them all.
- */
+/** Redacts in `onEnding`, after routing has set `http.route` and the span name, while still writable. */
 class RedactingSpanProcessor implements SpanProcessor {
   public constructor(private readonly redact: Redact) {}
 

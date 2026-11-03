@@ -109,10 +109,13 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   if (metricReader) {
     sdkConfig.metricReaders = [metricReader];
   }
-  if (spanProcessor) {
-    sdkConfig.spanProcessors = redaction
-      ? [redaction.spanProcessor, spanProcessor]
-      : [spanProcessor];
+  // An unset `spanProcessors` makes NodeSDK build an unredacted exporter from the environment.
+  if (!spanProcessor) {
+    sdkConfig.spanProcessors = [];
+  } else if (redaction) {
+    sdkConfig.spanProcessors = [redaction.spanProcessor, spanProcessor];
+  } else {
+    sdkConfig.spanProcessors = [spanProcessor];
   }
   const allViews = redaction ? [...views, redaction.httpMetricsView] : views;
   if (allViews.length) {
