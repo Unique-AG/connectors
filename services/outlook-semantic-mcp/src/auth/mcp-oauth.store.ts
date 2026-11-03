@@ -56,7 +56,7 @@ export class McpOAuthStore implements IOAuthStore {
   ) {}
 
   private hashToken(token: string): string {
-    return createHmac('sha256', this.hmacSecret).update(token).digest('hex');
+    return createHmac('sha256', this.hmacSecret).update(`mcp-token:${token}`).digest('hex');
   }
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {

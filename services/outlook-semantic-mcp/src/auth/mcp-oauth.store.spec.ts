@@ -9,7 +9,7 @@ import { McpOAuthStore } from './mcp-oauth.store';
 
 const TEST_HMAC_SECRET = 'test-hmac-secret';
 const hashToken = (token: string) =>
-  createHmac('sha256', TEST_HMAC_SECRET).update(token).digest('hex');
+  createHmac('sha256', TEST_HMAC_SECRET).update(`mcp-token:${token}`).digest('hex');
 
 describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
@@ -182,6 +182,9 @@ describe('McpOAuthStore', () => {
       await unit.storeAuthCode(mockAuthCode);
 
       expect(mockDrizzle.insert).toHaveBeenCalled();
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ code: hashToken('test-auth-code') }),
+      );
     });
 
     it('gets valid authorization code', async () => {
@@ -415,6 +418,9 @@ describe('McpOAuthStore', () => {
       await unit.storeAccessToken('test-token', mockAccessTokenMetadata);
 
       expect(mockDrizzle.insert).toHaveBeenCalled();
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ token: hashToken('test-token') }),
+      );
 
       expect(mockCache.set).toHaveBeenCalledWith(
         `access_token:${hashToken('test-token')}`,
@@ -566,6 +572,39 @@ describe('McpOAuthStore', () => {
       const revoked = await unit.revokeAllTokensForUserProfile('profile-123');
 
       expect(revoked).toEqual({ tokenCount: 3, clientIds: ['client-a', 'client-b'] });
+    });
+
+    it('stores the hash of a refresh token', async () => {
+      mockDrizzle.__nextSelectRows = [
+        {
+          id: 'profile-123',
+          provider: 'microsoft',
+          providerUserId: 'user-123',
+        },
+      ];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+        TEST_HMAC_SECRET,
+      );
+
+      await unit.storeRefreshToken('refresh-token', {
+        userId: 'user-123',
+        clientId: 'client-123',
+        scope: 'read',
+        resource: 'test-resource',
+        expiresAt: new Date(Date.now() + 3600000),
+        userProfileId: 'profile-123',
+        familyId: 'family-123',
+        generation: 0,
+      });
+
+      expect(mockDrizzle.insert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({ token: hashToken('refresh-token'), type: 'REFRESH' }),
+      );
     });
 
     it('revokes token family', async () => {

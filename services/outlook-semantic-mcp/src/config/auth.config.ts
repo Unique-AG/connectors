@@ -16,7 +16,7 @@ const ConfigSchema = z.object({
     .default(2592000)
     .describe('The expiration time of the refresh token in seconds. Default is 30 days.'),
   hmacSecret: redacted(z.string().min(1)).describe(
-    'The secret key for the MCP Server to sign HMAC tokens.',
+    'The secret key for the MCP Server to sign the OAuth session state and hash the stored MCP tokens. Rotating it signs out every user.',
   ),
 });
 
