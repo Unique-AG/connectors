@@ -86,7 +86,7 @@ flowchart LR
 | What | Why |
 |---|---|
 | The secret `SLACK_LEGACY_WEBHOOK_URL` | The nightly scan posts the Slack report to the channel `C0C1PR9CNMP` with it. Without it, the scan posts nothing. |
-| The environment `workflow-automation` of this repository, with the variable `GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID` and the secret `GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY` of the GitHub App `gh/workflow-automations` | The nightly dependency update opens PRs with the App. Only `main` can use the environment. The jobs that use it run on the runner `gh-static-ip-slim`, because the App accepts only fixed IP addresses. Without the credentials, the job writes only its plan. |
+| The environment `workflow-automation` of this repository, with the variable `GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID` and the secret `GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY` of the GitHub App `gh/workflow-automations` | The nightly dependency update opens PRs with the App. Only `main` can use the environment. The jobs that use it run on the runner `gh-static-ip-slim`, because the App accepts only fixed IP addresses. Without the credentials, the step that creates the token fails and no PR opens. |
 | The check `release-gate` in the list `required_status_checks` of the ruleset code. See [The ruleset](./docs/security/code-vulnerabilities.md#the-ruleset). | A release PR cannot merge before the gate has run. Today the ruleset requires only `gatekeeper`. |
 | The two Cursor automation files in the monorepo. Apply them with the Cursor Terraform. See [Cursor automations](#cursor-automations). | Cursor needs access to this repository. `connectors-vulna-patchy` also needs access to the Slack channel `C0C1PR9CNMP`. Without the automations, no agent run starts. |
 
