@@ -223,10 +223,11 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+    # Each client's BACKSTOP_BASE_URL is its own <tenant>.backstopsolutions.com host.
     egress:
       backstop:
         toFQDNs:
-          - matchName: api.backstopsolutions.com
+          - matchPattern: "*.backstopsolutions.com"
         toPorts:
           - ports:
               - port: "443"
